@@ -61,10 +61,10 @@ BREAK_VARIABLE = "ROWS_R8_BREAK"
 SELFTEST_VARIABLE = "ROWS_R8_SELFTEST"
 SEGMENT_ONE_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator.py")
 # 两个钉值都是被钉文件此刻的内容：跑那一趟的第一段编排器 1dcfb8d0… 那一版与此刻差的不只是登记过的搬迁（每台线程改取登记值等），倒换不回去
-SEGMENT_ONE_ORCHESTRATOR_SHA256 = "2b8fbdcc321cde368524d3c86a6486cfa01b9be6db3253ba4d84a3ec2a1f608f"
+SEGMENT_ONE_ORCHESTRATOR_SHA256 = "00ffd24c3a85361f0ff0355c4ac2cc2efded989c308842f1b2ac6a5ca85b076b"
 CROSS_HOST_CHECK_PATH = os.path.join(HERE, "cross_host_o3_check.py")
-CROSS_HOST_CHECK_SHA256 = "1f6e39b245a203c6869107dca70b03a52fdf5e457529e2b9ada7bbdb1d5a488b"
-SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 35 项，红 0"
+CROSS_HOST_CHECK_SHA256 = "7d071b620fed9861b2cb1f2c5a791c8741fd3979aec0cbb88042bca463bd1b20"
+SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 37 项，红 0"
 CROSS_HOST_SELFTEST_LAST_LINE = "自证 38 项，红 0"
 PEER_LABEL_PREFIX = "e171s1r8"
 EXIT_WRONG_PINNED_FILE = 3
@@ -349,19 +349,24 @@ def pinned_selftest_cell(path: str, last_line: str) -> tuple[bool, str]:
     return completed.returncode == 0 and got[0] == last_line, f"{os.path.basename(path)} --selftest 末行 {got[0]}（要 {last_line}）"
 
 
-SELFTEST_CELLS = {
-    "overrides-applied": cell_overrides_applied, "mutations-table-checked": cell_mutations_table_checked,
-    "cross-host-o3-scheduling-keys": cell_cross_host_o3_scheduling_keys, "e2e-two-hosts": cell_e2e_two_hosts, "e2e-stop-file": cell_e2e_stop_file,
-    "segment-one-orchestrator-selftest": lambda scratch: pinned_selftest_cell(SEGMENT_ONE_ORCHESTRATOR_PATH, SEGMENT_ONE_SELFTEST_LAST_LINE),
-    "cross-host-check-selftest": lambda scratch: pinned_selftest_cell(CROSS_HOST_CHECK_PATH, CROSS_HOST_SELFTEST_LAST_LINE),
-}
+def selftest_cell_functions():
+    """自证的各格，格名到函数。表写在函数体里：写成模块级赋值，会在 import 这个模块时把全部自证格连同它们起的子进程拖进 import 一方的判法单元闭包。"""
+    return {
+        "overrides-applied": cell_overrides_applied, "mutations-table-checked": cell_mutations_table_checked,
+        "cross-host-o3-scheduling-keys": cell_cross_host_o3_scheduling_keys, "e2e-two-hosts": cell_e2e_two_hosts, "e2e-stop-file": cell_e2e_stop_file,
+        "segment-one-orchestrator-selftest": lambda scratch: pinned_selftest_cell(SEGMENT_ONE_ORCHESTRATOR_PATH, SEGMENT_ONE_SELFTEST_LAST_LINE),
+        "cross-host-check-selftest": lambda scratch: pinned_selftest_cell(CROSS_HOST_CHECK_PATH, CROSS_HOST_SELFTEST_LAST_LINE),
+    }
+
+
 SELFTEST_SWITCHES = {"peer-names-revision-6": "overrides-applied", "mutations-table-skipped": "mutations-table-checked",
                      "cross-host-original-o3": "cross-host-o3-scheduling-keys", "stop-file-ignored": "e2e-stop-file"}
 
 
 def selftest(argument_list: list[str]) -> int:
     os.environ[SELFTEST_VARIABLE] = "1"
-    return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
+    return harness.run_selftest(os.path.abspath(__file__), argument_list, harness.cells_reporting_progress(selftest_cell_functions()), SELFTEST_SWITCHES,
+                                BREAK_VARIABLE, SELFTEST_VARIABLE)
 
 
 if __name__ == "__main__":

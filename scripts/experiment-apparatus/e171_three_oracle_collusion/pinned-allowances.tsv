@@ -1,0 +1,12 @@
+# 判法 C2 的放行表（direction_change_judge.py --allowances；依据 research/prompts/e171-r3-prereg.md 第十二节修订 11、修订 16）。
+# 七列，制表符分隔：实验行、流、表行号、名字、不变量、理由、依据。多一列、少一列、不变量没有定义行都拒。
+# 每一行都要在产物里真用上（该行 expected=in、名字相符、该不变量是新增的红），用不上判有问题；同一行新增了表外的不变量照判有问题。
+# 理由：补丁只改最新根的 txg 字段并重封，最新根退成上一版，带最新一版内容的假根仍是候选根，遍历走到最新一版发布新写的单元，
+# 它们不在上一版的分配记录里，I-3.21 按定义句字面红。expected=in 说的是恢复读得出，不是池级检查器放行。
+E171.2	fixed_script_through_e_then_unmount	13	N1-F	I-3.21	补丁让带最新内容的假根进候选_按I-3.21定义字面红	修订11；工作根e171-n1f-i321/result.md
+E171.3	fixed_script_through_e_then_unmount	13	N1-F	I-3.21	补丁让带最新内容的假根进候选_按I-3.21定义字面红	修订11；工作根e171-n1f-i321/result.md
+E171.4	fixed_script_through_e_then_unmount	13	N1-F	I-3.21	补丁让带最新内容的假根进候选_按I-3.21定义字面红	修订11；工作根e171-n1f-i321/result.md
+E171.7	fixed_script_through_e_then_unmount	13	N1-F	I-3.21	补丁让带最新内容的假根进候选_按I-3.21定义字面红	修订16（用户定扩表）；与修订11同一张Q2表的同一行
+E171.9	fixed_script_through_e_then_unmount	13	N1-F	I-3.21	补丁让带最新内容的假根进候选_按I-3.21定义字面红	修订16（用户定扩表）；与修订11同一张Q2表的同一行
+E171.10	fixed_script_through_e_then_unmount	13	N1-F	I-3.21	补丁让带最新内容的假根进候选_按I-3.21定义字面红	修订16（用户定扩表）；与修订11同一张Q2表的同一行
+E171.11	fixed_script_through_e_then_unmount	13	N1-F	I-3.21	补丁让带最新内容的假根进候选_按I-3.21定义字面红	修订16（用户定扩表）；与修订11同一张Q2表的同一行

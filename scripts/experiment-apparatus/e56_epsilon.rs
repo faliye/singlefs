@@ -308,7 +308,7 @@ struct Cache {
 
 /// 常驻集的历史最大值。**这是一条钉绝对值的读数**：它必须恰好等于
 /// `min(声明的缓存节点数, 树的节点总数)`，三条臂各自都要满足——
-/// 不是「三条臂互相比」（`.claude/singlefs-ai-sop/rules/test-discipline.md`）。
+/// 不是「三条臂互相比」（`.claude/rules/test-discipline.md`）。
 static mut RESIDENT_NODES_PEAK: usize = 0;
 fn note_resident(resident_node_count: usize) {
     unsafe {
@@ -361,7 +361,7 @@ impl Cache {
         note_resident(self.map.len());
     }
     /// 常驻集不许超过声明的缓存。**三条臂共用这一条**，所以它不是臂间互比，
-    /// 是把绝对值钉死（`.claude/singlefs-ai-sop/rules/test-discipline.md`）。
+    /// 是把绝对值钉死（`.claude/rules/test-discipline.md`）。
     fn check_residency(&self) {
         if self.map.len() > self.capacity {
             eprintln!("常驻集闸破了：常驻 {} 超过声明的缓存 {}", self.map.len(), self.capacity);

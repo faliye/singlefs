@@ -2,7 +2,7 @@
 
   python3 device_timing.py run -- <命令…>
       在被测进程起止各取一次时刻（`time.monotonic_ns`）。命令的标准输出与标准错误原样继承：这里不读、不转打它的输出行
-      （`.claude/singlefs-ai-sop/rules/test-discipline.md`「分段计时在被测进程里计，不在转发输出的循环里计」）。命令退出之后往标准输出补一行
+      （`.claude/singlefs-ai-sop/rules/show-me-test.md`「分段计时在被测进程里计，不在转发输出的循环里计」）。命令退出之后往标准输出补一行
       `E7TIMING name=process_wall seconds=<秒> exit=<退出码>`，照命令的退出码退出。由驱动直接起、
       紧挨着装置，排队的时间不算进去。
   python3 device_timing.py check <-timing 产物>

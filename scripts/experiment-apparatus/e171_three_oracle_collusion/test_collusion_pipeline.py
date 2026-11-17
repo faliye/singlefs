@@ -359,7 +359,7 @@ class DriverArgumentTests(unittest.TestCase):
                 seen = dict(line.split("=", 1) for line in handle.read().splitlines() if "=" in line)
             self.assertEqual({name: seen.get(name) for name in row_driver.frozen_o3.CHILD_THREAD_VARIABLES},
                              {name: "6" for name in row_driver.frozen_o3.CHILD_THREAD_VARIABLES})
-            self.assertEqual(len(row_driver.frozen_o3.CHILD_THREAD_VARIABLES), 20)
+            self.assertEqual(len(row_driver.frozen_o3.CHILD_THREAD_VARIABLES), 19)
             self.assertIn("SINGLEFS_THREAD_CAP", row_driver.frozen_o3.CHILD_THREAD_VARIABLES)
             self.assertIn("CARGO_BUILD_JOBS", row_driver.frozen_o3.CHILD_THREAD_VARIABLES)
 

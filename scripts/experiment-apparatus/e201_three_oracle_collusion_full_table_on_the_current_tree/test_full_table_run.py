@@ -1,45 +1,113 @@
-"""full_table_run.py 的单测：读法 10 的键（V13：键要随实际改坏用的变异行变）、5.6 的哨兵（V14：库里的结论被改坏、哨兵要判出不同）、复用三问（自证那一格原样调）、
-复用账、分片、存进库那一份的打包、T3 的取舍；读法 1 的拷树与记录、T3 的写法（write_t3）、Z1、Z2 与 Z3、Z4、Z6、S1–S7、K2 与 K3、F3、A7 各条判法
-（登记落地清单里上一段写「无用例」的那几行）。不起 cargo、编译、装置、服务：判定库是内存里的假库，装置、逐行驱动、E171 比对器的函数用 mock 换成假的，
+"""full_table_run.py 的单测：每行的判定请求（V13：请求要带实际改坏用的变异行）与拒算、5.6 的哨兵（V14）、计划、入库、合并取回与复用账
+（long_run_item_verdicts 的算键换成请求原文的 sha256、判定库换成内存里的假库；真算键、连临时 prune-server 的复用三问与哨兵在 full_table_run.py 自己的自证里）、
+分片、存进库那一份的打包、T3 的取舍；读法 1 的拷树与记录、T3 的写法（write_t3）、Z1、Z2 与 Z3、Z4、Z6、S1–S7、K2 与 K3、F3、A7 各条判法
+（登记落地清单里上一段写「无用例」的那几行）。不起 cargo、编译、装置、服务：装置、逐行驱动、E171 比对器的函数用 mock 换成假的，
 导出目录是每条用例自己在临时目录里造的小文件。跑法：在本目录 `python3 -B -m unittest test_full_table_run`。"""
 
 from __future__ import annotations
 
+import contextlib
 import gzip
+import hashlib
 import json
 import os
 import re
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 
 import full_table_run as run
 
-TREE = run.TreeInputs("a" * 64, "b" * 64, run.DEVICE_ARGUMENTS["s1"], run.DEVICE_FEATURES, "rustc 1", "gpu", (("x.py", "c" * 64),), "d" * 64)
+TREE = run.TreeInputs("a" * 64, "b" * 64, run.DEVICE_ARGUMENTS["s1"], run.DEVICE_FEATURES, "rustc 1", "gpu", "d" * 64)
 
 
 def silent(_line: str) -> None:
     return None
 
 
-class KeyTests(unittest.TestCase):
-    def test_the_key_changes_with_the_mutation_line_actually_used(self):
-        """V13：只差改坏用的变异行，键就不同（不同就不复用）。"""
-        self.assertNotEqual(run.row_key(TREE, run.RowInput(15, "line", "1" * 64)), run.row_key(TREE, run.RowInput(15, "line", "2" * 64)))
+class FakeLibrary:
+    """内存里的假判定库（只给单测：long_run_item_verdicts 的 library_of 换成它），与 prune_server_client 的库 read_many / write 同形。"""
 
-    def test_the_key_changes_with_the_list_line_the_snapshot_and_the_route(self):
-        row = run.RowInput(15, "line", "1" * 64)
-        base = run.row_key(TREE, row)
-        self.assertNotEqual(base, run.row_key(TREE, run.RowInput(15, "line-changed", "1" * 64)))
-        for changed in (dict(snapshot_digest="e" * 64), dict(judging_route="cpu"), dict(o3_freeze_digest="f" * 64), dict(mutations_table_sha256="9" * 64)):
-            self.assertNotEqual(base, run.row_key(run.dataclasses.replace(TREE, **changed), row), changed)
+    def __init__(self):
+        self.entries: dict[str, bytes] = {}
+
+    def read_many(self, relatives: list[str]) -> list[bytes | None]:
+        return [self.entries.get(relative) for relative in relatives]
+
+    def write(self, relative: str, data: bytes | str) -> None:
+        self.entries[relative] = data.encode("utf-8") if isinstance(data, str) else data
+
+
+def fake_unit_key(_context, lines: list[str]) -> SimpleNamespace:
+    """算键换成请求行原文的 sha256（单测不收闭包）。"""
+    return SimpleNamespace(key=hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest(), refusals=[])
+
+
+@contextlib.contextmanager
+def fake_item_verdicts(library: FakeLibrary):
+    """long_run_item_verdicts 的库与算键换成假的；键相同的全当复用哨兵、不抽强制现判。"""
+    verdicts = run.item_verdicts_module()
+    with mock.patch.object(verdicts, "library_of", return_value=library), mock.patch.object(verdicts, "keys_of_lines", side_effect=fake_unit_key), \
+            mock.patch.dict(os.environ, {verdicts.lib_reuse_checks.SENTINEL_COUNT_VARIABLE: verdicts.ALL_SENTINELS}):
+        yield verdicts
+
+
+def judge_in_a_fake_shard(root: str, plan: run.ReusePlan, state: str, numbers: list[int]) -> None:
+    """各片换成假的：每行写一份只随行号变的 row-result.tsv，再照真的那样收（store_finished_rows）。"""
+    rows_root = os.path.join(root, "rows")
+    for number in numbers:
+        write_file(os.path.join(rows_root, f"row-{number}", "row-result.tsv"), f"row_number\t{number}\nstatus\tok\n")
+    run.store_finished_rows(plan, numbers, rows_root, {}, state, os.path.join(root, run.ROWS_OUTSIDE_THE_LIBRARY), silent)
+
+
+def one_round(root: str, name: str, rows: list[run.RowInput]) -> tuple[run.ReusePlan, str]:
+    """一趟的计划与各片（在 root/<name> 下）：交 (计划, 状态目录)。"""
+    work = os.path.join(root, name)
+    state = os.path.join(work, run.ITEM_STATE_DIRECTORY)
+    plan = run.plan_reuse(root, TREE, rows, state, silent)
+    judge_in_a_fake_shard(work, plan, state, list(plan.fresh))
+    return plan, state
+
+
+class RequestTests(unittest.TestCase):
+    def test_the_request_carries_the_mutation_line_actually_used(self):
+        """V13：只差改坏用的变异行，请求就不同（键随它变、不复用），变异行原文照 JSON 转写成一个 line: 项。"""
+        one = run.row_request_lines(TREE, run.RowInput(15, "line", "m15\tcrates/a.rs\tx\ty", ""))
+        other = run.row_request_lines(TREE, run.RowInput(15, "line", "m15\tcrates/a.rs\tx\tz", ""))
+        self.assertNotEqual(one, other)
+        self.assertIn('line:mutation-line="m15\\tcrates/a.rs\\tx\\ty"', one[0].split("\t"))
+
+    def test_the_request_names_the_device_the_judge_and_what_changes_the_row(self):
+        """入口是装置 main（gpu 特性、release 档），判法是逐行驱动判一行的函数；行号、名单行原文、装置参数、判的路线、O3 冻结件进 line:；
+        快照摘要、变异表与各文件的 sha256 不进请求（闭包代替它们）。"""
+        tokens = run.row_request_lines(TREE, run.RowInput(15, "15\t1\tcrates/a/src/lib.rs", "m15", ""))[0].split("\t")
+        self.assertEqual(tokens[:2], ["row-15", run.DEVICE_ENTRY])
+        for token in ("feature:singlefs-verification/gpu", "profile:release", f"judge:{run.ROW_JUDGE}", f"judge-root:{run.REPOSITORY_ROOT}", "line:row=15",
+                      'line:list-line="15\\t1\\tcrates/a/src/lib.rs"', "line:device-arguments=row --streams 1,2", "line:judging-route=gpu",
+                      f"line:o3-freeze={'d' * 64}", "line:compare=timing"):
+            self.assertIn(token, tokens)
+        self.assertEqual(len(tokens), 13)
+        self.assertFalse([token for token in tokens if "a" * 64 in token or "b" * 64 in token])
+        self.assertTrue(run.ROW_JUDGE.endswith("current_tree_row_driver.py::run_row_on_the_lane"))
+
+    def test_a_refused_row_is_not_requested(self):
+        for refusal in (run.NEEDS_SUBSTITUTION, run.MUTATION_TOUCHES_THE_MODULE_SET):
+            self.assertEqual(run.row_request_lines(TREE, run.RowInput(15, "line", "", refusal)), [], refusal)
+
+    def test_a_mutation_that_touches_the_module_set_is_refused(self):
+        from bad_implementation_table import MutationRow
+        plain = MutationRow("m", "crates/a/src/lib.rs", "fn a() {}", "fn a() { b() }", "-p a", "t", "raw")
+        self.assertFalse(run.touches_the_module_set(plain))
+        for original, replacement in (("fn a() {}", "mod b;\\nfn a() {}"), ('include_str!("x")', '""'), ("#[path = \"x.rs\"]", "")):
+            self.assertTrue(run.touches_the_module_set(MutationRow("m", "crates/a/src/lib.rs", original, replacement, "-p a", "t", "raw")), original)
 
     def test_a_row_that_needs_a_substitution_is_never_reused(self):
-        store = run.MemoryStore()
-        row = run.RowInput(15, "line", "needs_substitution")
-        store.write(run.library_relative(run.row_key(TREE, row)), b"old")
-        plan = run.plan_reuse(TREE, [row], store)
-        self.assertEqual((plan.fresh, plan.reused, plan.sentinels), ((15,), (), ()))
+        rows = run.selftest_rows((11, 15), {15: run.NEEDS_SUBSTITUTION})
+        with tempfile.TemporaryDirectory() as root, fake_item_verdicts(FakeLibrary()):
+            one_round(root, "first", rows)
+            plan, _state = one_round(root, "second", rows)
+        self.assertEqual((plan.keys[15], 15 in plan.decisions, 15 in plan.fresh, plan.decisions[11]), (None, False, True, run.DECISION_REUSE))
 
 
 class SentinelTests(unittest.TestCase):
@@ -47,28 +115,75 @@ class SentinelTests(unittest.TestCase):
         self.assertEqual([run.sentinel_count(count) for count in (0, 1, 2, 50, 100, 101, 278)], [0, 1, 2, 2, 2, 3, 6])
 
     def test_sentinels_are_drawn_from_the_reused_rows_and_rerun(self):
-        store = run.MemoryStore()
-        rows = run.selftest_rows()
-        for row in rows:
-            store.write(run.library_relative(run.row_key(TREE, row)), b"verdict")
-        plan = run.plan_reuse(TREE, rows, store)
+        """V14：6 行都复用时抽 2 行哨兵，它们重跑、不算复用。"""
+        rows = run.selftest_rows((11, 12, 13, 14, 15, 16))
+        with tempfile.TemporaryDirectory() as root, fake_item_verdicts(FakeLibrary()):
+            one_round(root, "first", rows)
+            plan = run.plan_reuse(root, TREE, rows, os.path.join(root, "second", run.ITEM_STATE_DIRECTORY), silent)
         self.assertEqual(len(plan.sentinels), 2)
         self.assertTrue(set(plan.sentinels) <= set(plan.fresh))
         self.assertFalse(set(plan.sentinels) & set(plan.reused))
         self.assertEqual(len(plan.reused) + len(plan.sentinels), len(rows))
 
-    def test_a_corrupted_library_entry_is_caught_by_a_sentinel(self):
-        """V14 与作废 Z7：自证那一格原样调。"""
-        self.assertTrue(run.cell_sentinel_detects_a_corrupted_library_entry(printer=silent))
+    def test_a_sentinel_whose_rerun_differs_from_the_library_entry_is_named(self):
+        """作废 Z7：重跑出的判定格与库里那一条不同记 decision_cells_differ，没重跑出来记 sentinel_not_rerun（库里换了一包的整条路子在 full_table_run.py 自证的那一格）。"""
+        plan = run.ReusePlan({11: "k11", 12: "k12"}, {11: run.DECISION_REUSE, 12: run.DECISION_REUSE}, (11, 12), (), (11, 12))
+        problems = run.sentinel_problems(plan, {11: b"old", 12: b"same"}, {11: b"new", 12: b"same"}, lambda data: data)
+        self.assertEqual(problems, ["11:decision_cells_differ"])
+        self.assertEqual(run.sentinel_problems(plan, {11: b"old", 12: b"same"}, {12: b"same"}, lambda data: data), ["11:sentinel_not_rerun"])
 
 
 class ReuseTests(unittest.TestCase):
-    def test_reuse_three_questions(self):
-        """复用三问：头一趟全现判、第二趟全复用（哨兵算强制现判）、闭包外改动全复用、改一行的名单行文只现判那一行。"""
-        self.assertTrue(run.cell_reuse_three_questions(printer=silent))
-
     def test_the_reuse_account(self):
         self.assertTrue(run.cell_reuse_account(printer=silent))
+
+    def test_rows_judged_in_a_shard_go_into_the_library_and_the_merge_takes_them_back(self):
+        """judge 的行经 record 写进库、合并照键取回；拒算的行那一包只在产物目录里，合并从那里取。"""
+        rows = run.selftest_rows((11, 12, 15), {15: run.NEEDS_SUBSTITUTION})
+        library = FakeLibrary()
+        with tempfile.TemporaryDirectory() as root, fake_item_verdicts(library) as verdicts:
+            plan, state = one_round(root, "first", rows)
+            outside = run.outside_rows([os.path.join(root, "first")])
+            values, missing = run.merged_rows(plan, state, outside)
+            packed = {number: run.pack_row_directory(os.path.join(root, "first", "rows", f"row-{number}")) for number in (11, 12, 15)}
+            stored = {number: library.entries.get(verdicts.output_relative(plan.keys[number])) for number in (11, 12)}
+        self.assertEqual(sorted(outside), [15])
+        self.assertEqual(stored, {11: packed[11], 12: packed[12]})
+        self.assertEqual((values, missing), (packed, []))
+
+    def test_a_row_without_a_row_result_is_neither_recorded_nor_kept(self):
+        """测量管子缺陷、领卡没成的行不写 row-result.tsv：不记进库、不留那一包，合并记取不到（复用账点名）。"""
+        rows = run.selftest_rows((11, 12))
+        library = FakeLibrary()
+        with tempfile.TemporaryDirectory() as root, fake_item_verdicts(library) as verdicts:
+            state = os.path.join(root, run.ITEM_STATE_DIRECTORY)
+            plan = run.plan_reuse(root, TREE, rows, state, silent)
+            judge_in_a_fake_shard(root, plan, state, [11])
+            os.makedirs(os.path.join(root, "rows", "row-12"))
+            run.store_finished_rows(plan, [11, 12], os.path.join(root, "rows"), {11: 0}, state, os.path.join(root, run.ROWS_OUTSIDE_THE_LIBRARY), silent)
+            values, missing = run.merged_rows(plan, state, run.outside_rows([root]))
+            recorded = library.entries.get(verdicts.verdict_relative(plan.keys[12]))
+        self.assertEqual((sorted(values), missing, recorded), ([11], [12], None))
+
+    def test_a_library_output_that_does_not_match_its_verdict_is_not_taken(self):
+        """.out 的 sha256 与 .verdict 记的不同（写了一半、被换了）：合并不取它，那一行记取不到。"""
+        rows = run.selftest_rows((11, 12))
+        library = FakeLibrary()
+        with tempfile.TemporaryDirectory() as root, fake_item_verdicts(library) as verdicts:
+            plan, state = one_round(root, "first", rows)
+            library.entries[verdicts.output_relative(plan.keys[11])] += b"changed"
+            values, missing = run.merged_rows(plan, state, {})
+        self.assertEqual((sorted(values), missing), ([12], [11]))
+
+    def test_a_red_finish_goes_into_the_reuse_account(self):
+        """long_run_item_verdicts 的 finish 退非 0（复用哨兵红、键中途变了）记进复用账。"""
+        rows = run.selftest_rows((11,))
+        with tempfile.TemporaryDirectory() as root, fake_item_verdicts(FakeLibrary()) as verdicts:
+            plan, state = one_round(root, "first", rows)
+            green = run.reuse_account(plan, state, [], 1, silent)[1]
+            with mock.patch.object(verdicts, "finish", return_value=1):
+                red = run.reuse_account(plan, state, [], 1, silent)[1]
+        self.assertEqual((green, red), ([], ["item_verdicts_finish_exit_1"]))
 
 
 class PieceTests(unittest.TestCase):
@@ -304,7 +419,8 @@ class RepositoryRootReferenceTests(unittest.TestCase):
         for script in sorted(path for path in named if path.endswith(".sh")):
             reached.update(files_a_shell_script_sources_or_runs(run.REPOSITORY_ROOT, script))
         # 判例：多机配置判法 source 的两份、preflight 那一层 source 的规范副本与它起的 preflight.py 都收得到
-        for expected in ("scripts/hosts/peer-host-lib.sh", ".claude/scripts/preflight.sh", ".claude/singlefs-ai-sop/scripts/preflight.sh",
+        # `scripts/hosts/heavy-threads.sh` 是多机配置判法在它自己的自证分支里 source 的：行键在快照上算，闭包按字面收，快照里缺它整行拒算
+        for expected in ("scripts/hosts/peer-host-lib.sh", "scripts/hosts/heavy-threads.sh", ".claude/scripts/preflight.sh", ".claude/singlefs-ai-sop/scripts/preflight.sh",
                          ".claude/singlefs-ai-sop/scripts/preflight.py"):
             self.assertIn(expected, reached)
         self.assertEqual(paths_not_covered_by(reached, run.SYNCED_ENTRIES), [], reached)
@@ -587,13 +703,13 @@ class ShardStepTests(unittest.TestCase):
             plan_directory, output_directory = os.path.join(root, "plan"), os.path.join(root, "shard-1")
             os.makedirs(output_directory)
             write_file(os.path.join(plan_directory, "plan-record.json"),
-                       json.dumps({"segment": "s1", "shards": [[], []], "keys": {}, "fresh": [], "reused": [], "sentinels": []}))
+                       json.dumps({"segment": "s1", "shards": [[], []], "keys": {}, "decisions": {}, "fresh": [], "reused": [], "sentinels": []}))
             with mock.patch.object(run, "shard_check_problems", side_effect=checks), mock.patch.object(run, "heavy_threads", return_value=12), \
                     mock.patch.object(run, "compile_clean_binaries", return_value=(compile_exit, "/fake/device", "/fake/export")) as compiled, \
                     mock.patch.object(run, "run_device", return_value=0) as device, \
                     mock.patch.object(run, "verdict_fields", return_value={"s1_failed_checks": "0"}), \
                     mock.patch.object(run, "run_driver", side_effect=fake_driver), mock.patch.object(run, "stored_row_differences", return_value=[]):
-                exit_code = run.shard_step(plan_directory, output_directory, 1, run.MemoryStore())
+                exit_code = run.shard_step(plan_directory, output_directory, 1)
             return exit_code, read_bodies(os.path.join(output_directory, "shard.out")), compiled, device
 
     def test_a_drift_at_the_start_stops_the_shard_before_anything_is_compiled(self):
@@ -740,7 +856,7 @@ class MergeReadingTests(unittest.TestCase):
 
     def test_every_shard_reports_a7_for_the_empty_mutation_and_each_of_its_sentinels(self):
         record = {"shards": [[11, 12], [13]]}
-        plan = run.ReusePlan({11: "a", 12: "b", 13: "c"}, (11, 12, 13), (), (12,))
+        plan = run.ReusePlan({11: "a", 12: "b", 13: "c"}, {}, (11, 12, 13), (), (12,))
         records = {0: [{"name": "a7", "row": "0", "differing": "-"}, {"name": "a7", "row": "12", "differing": "12:stored_row_differs"}],
                    1: []}
         self.assertEqual(run.stored_row_check_problems(records, record, plan), ["0:12:stored_row_differs", "1:a7_lines_0_expected_1"])
@@ -825,6 +941,24 @@ class ControlTests(unittest.TestCase):
         self.assertEqual(self.run_negative_controls(empty_dump=True, touched=False), (0, []))
         self.assertEqual(self.run_negative_controls(empty_dump=True, touched=True)[0], 1)
         self.assertEqual(self.run_negative_controls(empty_dump=False, touched=False), (1, ["name=k2_empty_mutation ran=false"]))
+
+
+class FrozenO3Is496Tests(unittest.TestCase):
+    """登记第十二节修订 8：E201 的 O3 一侧用 496 目录与 E171 第 3 次重跑的冻结参照；E171 研究一侧 frozen_o3.py 的 487 常量只在本进程里被换掉。"""
+
+    def test_the_o3_directory_and_the_freeze_reference_are_the_496_ones(self):
+        import frozen_o3
+        self.assertEqual(frozen_o3.FROZEN_DIRECTORY_RELATIVE, "scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496")
+        self.assertEqual(frozen_o3.FREEZE_REFERENCE_RELATIVE, "research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out")
+        self.assertEqual(frozen_o3.FILES_OUTSIDE_THE_FREEZE, ("comparator", "mutation_driver"))
+
+    def test_the_recorded_digest_reads_the_496_reference_and_the_directory_exists(self):
+        import frozen_o3
+        self.assertTrue(os.path.isdir(os.path.join(run.REPOSITORY_ROOT, frozen_o3.FROZEN_DIRECTORY_RELATIVE)))
+        reference = os.path.join(run.REPOSITORY_ROOT, frozen_o3.FREEZE_REFERENCE_RELATIVE)
+        if not os.path.isfile(reference):
+            self.skipTest("冻结参照产物已归档出工作区")
+        self.assertEqual(len(run.o3_freeze_digest()), 64)
 
 
 if __name__ == "__main__":

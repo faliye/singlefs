@@ -30,6 +30,7 @@ import subprocess
 import sys
 
 import e171_research_side
+from e171_research_side import frozen_o3
 from contrast_against_r1 import DECISION_CLASSES, PRESENCE_FIELD, parse_row_set, read_product_entries
 from result_lines import ResultLines, field
 
@@ -112,12 +113,19 @@ def read_function_map(text: str) -> FunctionMap:
     return FunctionMap(groups, cells)
 
 
+def sha256_before_moves(content: bytes) -> tuple[str, ...]:
+    """此刻的内容照 `.claude/gate.d/path-moves.tsv` 全部登记逐次倒换回去的各版的 sha256（`.claude/rules/path-moves.md` 第 2 步：按 sha256 钉的值按全部登记行倒换）。
+    复用 E171 的 frozen_o3.RegisteredMoves.contents_before_moves（不抄第二份）：只换了一半的、登记表不在的交空的，只认此刻的 sha256。"""
+    moves = frozen_o3.registered_moves(e171_research_side.REPOSITORY_ROOT)
+    return tuple(hashlib.sha256(version).hexdigest() for version in moves.contents_before_moves(content))
+
+
 def load_function_map(path: str, expected_sha256: str) -> FunctionMap:
     with open(path, "rb") as handle:
         content = handle.read()
     actual = hashlib.sha256(content).hexdigest()
-    if actual != expected_sha256:
-        raise ValueError(f"对应表 {path} 的 sha256 是 {actual}，登记记的是 {expected_sha256}：表在登记之后被改过，不归因")
+    if actual != expected_sha256 and expected_sha256 not in sha256_before_moves(content):
+        raise ValueError(f"对应表 {path} 的 sha256 是 {actual}（照搬迁登记倒换回去的各版也都不是），登记记的是 {expected_sha256}：表在登记之后被改过，不归因")
     return read_function_map(content.decode("utf-8"))
 
 

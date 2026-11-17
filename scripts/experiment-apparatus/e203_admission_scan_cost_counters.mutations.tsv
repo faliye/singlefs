@@ -53,7 +53,7 @@ c52_allocation_plan_table_drops_the_previous_nodes	{P}scale({row('AllocationReco
 c53_allocation_intersection_table_drops_the_nodes_after	{P}scale({row('AllocationRecordTreePlan')}, rewritten.len() + nodes_after.len())	{P}scale({row('AllocationRecordTreePlan')}, rewritten.len())
 c54_record_for_bound_off_by_one	f"        {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len())	f"        {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len() + 1)
 c55_release_bound_not_read	f"            {P}scale_to_the_hit({row('AllocatorReleaseLinearFind')}, self.records.len());\n", None))	f"            // 不读（变异 c55）\n", None))
-c56_user_data_slot_bound_counts_slots_not_pairs	{row('UserDataSlotLinearScan')}, usize::try_from(end.saturating_sub(candidate) / 2)	{row('UserDataSlotLinearScan')}, usize::try_from(end.saturating_sub(candidate))
+c56_user_data_slot_bound_counts_slots_not_pairs	" + usize::try_from(CLUSTER_SEGMENT_SLOTS / 2)	" + usize::try_from(CLUSTER_SEGMENT_SLOTS)
 c57_record_filter_table_read_as_the_part_to_the_hit	f"    {P}scale({row('RecordIntersectionFilter')}, records.len())	f"    {P}scale_to_the_hit({row('RecordIntersectionFilter')}, records.len())
 c58_record_find_bound_not_read	counts_begin=f"            {P}scale_to_the_hit({row('RecordIntersectionFilter')}, records.len());\n"))	counts_begin=""))
 c59_record_retain_table_one_short	f"            {P}scale({row('RecordIntersectionFilter')}, records.len());\n"	f"            {P}scale({row('RecordIntersectionFilter')}, records.len() - 1);\n"
@@ -70,3 +70,29 @@ c69_a_timing_guard_times_while_paused	//T             return TimerGuard { active
 c70_an_attributed_delta_is_recorded_while_paused	//C         if !readings_paused() && attributed_row() == row {	//C         if attributed_row() == row {
 c71_the_release_find_records_no_call	counted_call("AllocatorReleaseLinearFind", "            "), None))	None, None))
 c72_the_release_find_is_not_timed	"            assert!(\n                !record.is_released,\n", "AllocatorReleaseLinearFind", "            "))	"            assert!(\n                !record.is_released,\n", "AllocatorReleaseLinearFind", "            ", timer=False))
+c73_the_user_data_slot_pair_loop_records_a_call_not_a_step	"            .find(|first_index_of_the_pair| {\n" + f"                {P}step_to_the_hit(	"            .find(|first_index_of_the_pair| {\n" + f"                {P}call(
+c74_the_user_data_slot_segment_step_is_a_call_not_a_step	FIND_SEGMENT + f"                {P}step_to_the_hit(	FIND_SEGMENT + f"                {P}call(
+c75_the_whole_copy_forgets_the_segments_with_an_unblocked_slot_pair	+ self.segments_with_an_unblocked_slot_pair.len()	+ 0
+c76_the_whole_copy_forgets_the_unreleased_record_bits	+ self.is_under_an_unreleased_record.len()	+ 0
+c77_the_whole_copy_forgets_the_slot_pairs_without_an_unreleased_record	+ self.slot_pairs_without_an_unreleased_record_per_segment.len()	+ 0
+c78_the_whole_copy_forgets_the_unblocked_slots_per_leaf	+ self.unblocked_slots_per_allocation_record_tree_leaf.len()	+ 0
+c79_the_whole_copy_forgets_the_instance_table_rows_of_the_root_ring	+ self.instance_table_judging_the_rereads.rows.len()	+ 0
+c80_the_whole_copy_forgets_the_tree_of_the_version_without_file	                .allocation_record_tree_of_the_version_without_file	                .allocation_record_tree_of_the_version_without_files
+c81_the_pooled_fallback_records_no_call	counted_call("PooledFallbackByTheLeaf"), guard(	None, guard(
+c82_the_pooled_fallback_is_not_timed	guard("PooledFallbackByTheLeaf")))	None))
+c83_the_pooled_fallback_candidate_loop_records_no_step	past_the_last_slot_of_the_leaf.0 {\n" + f"            {pooled_step}", None))	past_the_last_slot_of_the_leaf.0 {\n" + "", None))
+c84_the_pooled_fallback_leaf_loop_records_a_call_not_a_step	"        for leaf_number in first_leaf_index.0..=last_leaf_index.0 {\n" + f"            {pooled_step}", None))	"        for leaf_number in first_leaf_index.0..=last_leaf_index.0 {\n" + f"            {P}call({row('PooledFallbackByTheLeaf')});\n", None))
+c85_the_whole_copy_forgets_the_quarantines_noted_by_the_publishes	+ self.compaction.clone().take_the_quarantines_noted_by_the_publishes().len()	+ 0
+c86_the_state_line_forgets_the_frozen_publish_reading	u8::from(allocator.frozen_publish().is_some()),	0_u8,	histories
+c87_the_state_line_drops_the_frozen_publish_field	central_mapping_levels={} frozen_publish_set={}"	central_mapping_levels={}"	histories
+c88_an_insertion_inside_an_argument_list_is_not_reported	            if top != "{":	            if False:
+c89_an_insertion_after_a_comma_is_not_reported	            if last not in (";", "{", "}", ""):	            if last not in (";", "{", "}", ",", ""):
+c90_the_statement_recognizer_misses_every_counter_call	crate::transaction::e20\d_\w+::	crate::transactionx::e20\d_\w+::
+c91_an_unclosed_bracket_after_the_insertion_is_not_reported	            if error or stack:	            if error:
+c92_the_cluster_segment_sum_anchor_goes_back_into_the_slot_pair_argument	             "        SlotPairCount(\n", "before",	             "        self.unblocked_slot_pairs.0\n", "before",
+c93_a_bracket_char_literal_is_counted_as_a_bracket	            elif index + 2 < length and text[index + 2] == "'":	            elif False:
+c94_a_bracket_in_a_line_comment_is_counted_as_code	        if text.startswith("//", index):	        if False:
+c96_a_bracket_in_a_block_comment_is_counted_as_code	        elif text.startswith("/*", index):	        elif False:
+c97_a_bracket_in_a_string_is_counted_as_code	        elif char == '"':	        elif False:
+c98_a_lifetime_mark_swallows_the_next_characters_like_a_char_literal	            elif index + 2 < length and text[index + 2] == "'":	            elif text.find("'", index + 1) >= 0:
+c95_the_syntax_gate_of_the_anchor_check_reports_nothing	if syntax_report(f"e203_{kind}"	if 0 and syntax_report(f"e203_{kind}"

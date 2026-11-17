@@ -783,7 +783,7 @@ mod tests {
 
     /// 模型那一侧照旧写 0x02、crates 导出写 0x06 时，第一种调用报的字段标签恰是 feature_bits 与 slot_checksum 两个。
     #[test]
-    fn a_model_slot_without_bit_two_against_a_crates_slot_with_it_differs_in_feature_bits_and_slot_checksum_only() {
+    fn model_slot_without_bit_two_against_a_crates_slot_with_it_differs_in_feature_bits_and_slot_checksum_only() {
         let model_slot = sealed_system_configuration_slot(FIRST_INCOMPAT_BYTE_WITHOUT_TRUNCATION_FIELDS);
         let crates_slot = sealed_system_configuration_slot(FIRST_INCOMPAT_BYTE_WITH_TRUNCATION_FIELDS);
         let segments = diff_segments(&model_slot, &crates_slot);

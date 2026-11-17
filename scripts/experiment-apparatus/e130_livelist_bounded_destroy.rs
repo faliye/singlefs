@@ -12,7 +12,7 @@
 //!
 //! 没有文件 I/O、没有并发、没有随机源 ⇒ 同一个二进制跑 N 遍必然逐字节一致。
 //! 「N 轮一致」说明的是没有隐藏状态，不是统计上稳定
-//! （`.claude/singlefs-ai-sop/rules/test-discipline.md`）。
+//! （`.claude/rules/test-discipline.md`）。
 //! 证据强度来自变异测试与钉死绝对值的断言，不来自轮数。
 //!
 //! ## 跨装置闸：两个常量必须落回 kb

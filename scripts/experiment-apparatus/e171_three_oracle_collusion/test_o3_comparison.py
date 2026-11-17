@@ -426,6 +426,20 @@ class CompileFailureSubstitutionComparatorTests(unittest.TestCase):
             self.write_row(root, "still-failing/row-3", {"row_name": "c 原", "status": "compile_failed", "substituted_from": "c 原", "mutated_row_name": "-"})
             self.assertEqual(len(comparator.rows_with_substitutes(merged, [os.path.join(root, "still-failing")])[1]), 1)
 
+    def test_a_row_taken_again_unsubstituted_in_the_substitution_root_is_the_original_row_and_is_neither_replaced_nor_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            self.write_row(root, "table/row-3", {"row_name": "c 原", "status": "compile_failed"})
+            self.write_row(root, "table/row-4", {"row_name": "d", "status": "ok"})
+            self.write_row(root, "subst/row-3", {"row_name": "c 原", "status": "ok", "substituted_from": "c 原", "mutated_row_name": "c 换"})
+            self.write_row(root, "subst/row-4", {"row_name": "d", "status": "ok", "substituted_from": "-", "mutated_row_name": "d"})
+            merged = comparator.row_directories([os.path.join(root, "table")])
+            replaced_rows, replaced = comparator.rows_with_substitutes(merged, [os.path.join(root, "subst")])
+            self.assertEqual([(number, os.path.relpath(path, root)) for number, path in replaced_rows], [(3, "subst/row-3"), (4, "table/row-4")])
+            self.assertEqual([number for number, _, _ in replaced], [3])
+            self.write_row(root, "other-outcome/row-4", {"row_name": "d", "status": "device_failed", "substituted_from": "-", "mutated_row_name": "d"})
+            with self.assertRaises(ValueError):
+                comparator.rows_with_substitutes(merged, [os.path.join(root, "other-outcome")])
+
     def test_the_row_analyses_take_the_substitute_in_place_of_the_row_that_did_not_compile(self) -> None:
         from test_collusion_pipeline import minimal_run
         with tempfile.TemporaryDirectory() as root:

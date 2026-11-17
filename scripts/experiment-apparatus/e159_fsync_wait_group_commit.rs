@@ -183,7 +183,7 @@ mod capacity_tests {
     }
 
     /// B5：头 311 时的余数（33，D23 已定项 4「4096 上余 3785」）——全部单测里唯一分得开 307 与
-    /// 311 的一条。写成加法，不写减法（`.claude/singlefs-ai-sop/rules/test-discipline.md`
+    /// 311 的一条。写成加法，不写减法（`.claude/rules/test-discipline.md`
     /// 「常量断言写加法，别写减法」）。
     #[test]
     fn named_items_per_record_remainder_matches_head_311() {

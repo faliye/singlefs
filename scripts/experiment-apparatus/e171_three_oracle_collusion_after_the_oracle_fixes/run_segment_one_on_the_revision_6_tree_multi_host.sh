@@ -71,12 +71,12 @@ must() { "$@" >> "$LOGS/sequence.log" 2>&1 || stop "判法不过：$*"; }
 
 snapshot_check() {  # 作废 Z5：每趟开头与收尾核冻结树的快照摘要
   local digest
-  digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest('$TREE')[0])")
+  digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest(sys.argv[1])[0])" "$TREE")
   [ "$digest" = "$SNAPSHOT_DIGEST" ] || stop "冻结树快照摘要变了（Z5）：$digest"
 }
 freeze_check() {  # 作废 Z2：O3 冻结行
   local differences
-  differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; print(len(frozen_o3.freeze_differences('$REPO')))")
+  differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; print(len(frozen_o3.freeze_differences(sys.argv[1])))" "$REPO")
   [ "$differences" = "0" ] || stop "O3 冻结行对不上（Z2）：$differences 处"
 }
 # s15 <比法> <步名> <参数…>：S15 的一项比对，结果进新产物 <步名>；触发就停（两边都查，既不作废也不当结果，交主 agent）
@@ -256,7 +256,7 @@ fi
 if begin 5 "O3 基线（流一、流二）"; then
   freeze_check
   [ -e "$(product_of o3-baseline-streams-1-2)" ] && stop "产物已存在：$(product_of o3-baseline-streams-1-2)"
-  python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor('$REPO', '$REPO/$DUMPS/$S2_BASELINE', ['new_pool_file_creation', 'fixed_script_through_e_then_unmount'], $THREADS, '$REPO/$(product_of o3-baseline-streams-1-2)', '$LOGS/o3-baseline-streams-1-2.log'); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" \
+  python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor(sys.argv[1], sys.argv[2], sys.argv[3].split(','), int(sys.argv[4]), sys.argv[5], sys.argv[6]); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" "$REPO" "$REPO/$DUMPS/$S2_BASELINE" "new_pool_file_creation,fixed_script_through_e_then_unmount" "$THREADS" "$REPO/$(product_of o3-baseline-streams-1-2)" "$LOGS/o3-baseline-streams-1-2.log" \
     >> "$LOGS/sequence.log" 2>&1 || stop "执行器没退 0（日志 $LOGS/o3-baseline-streams-1-2.log）"
   freeze_check
   must python3 -B "$CHECK" o3 "$(product_of o3-baseline-streams-1-2)" new_pool_file_creation,fixed_script_through_e_then_unmount
@@ -300,7 +300,7 @@ fi
 if begin 8 "O3 判基线第一次的三条流"; then
   freeze_check
   [ -e "$(product_of o3-baseline-run1)" ] && stop "产物已存在：$(product_of o3-baseline-run1)"
-  python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor('$REPO', '$REPO/$DUMPS/baseline-run1', ['new_pool_file_creation', 'fixed_script_through_e_then_unmount', 'first_file_unlinked_then_inodes_across_one_leaf'], $THREADS, '$REPO/$(product_of o3-baseline-run1)', '$LOGS/o3-baseline-run1.log'); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" \
+  python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor(sys.argv[1], sys.argv[2], sys.argv[3].split(','), int(sys.argv[4]), sys.argv[5], sys.argv[6]); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" "$REPO" "$REPO/$DUMPS/baseline-run1" "new_pool_file_creation,fixed_script_through_e_then_unmount,first_file_unlinked_then_inodes_across_one_leaf" "$THREADS" "$REPO/$(product_of o3-baseline-run1)" "$LOGS/o3-baseline-run1.log" \
     >> "$LOGS/sequence.log" 2>&1 || stop "执行器没退 0（日志 $LOGS/o3-baseline-run1.log）"
   freeze_check
   python3 -B "$CHECK" o3 "$(product_of o3-baseline-run1)" new_pool_file_creation,fixed_script_through_e_then_unmount >> "$LOGS/sequence.log" 2>&1 \

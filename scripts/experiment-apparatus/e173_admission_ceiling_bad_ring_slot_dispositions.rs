@@ -2071,17 +2071,17 @@ const FAMILIES_WITH_A_FAULT_TO_INJECT: [HistoryFamily; 4] = [
 ];
 
 fn pool_settings_list() -> Vec<PoolSettings> {
-    let mut specs = Vec::new();
+    let mut pool_settings = Vec::new();
     for slots_per_region in SLOTS_PER_REGION_CHOICES {
         for metadata_blocks in METADATA_BLOCKS_CHOICES {
             for reserve_reading in RESERVE_READINGS {
                 for fullness in POOL_FULLNESSES {
-                    specs.push(PoolSettings { geometry: RingGeometry { slots_per_region }, metadata_blocks, reserve_reading, fullness });
+                    pool_settings.push(PoolSettings { geometry: RingGeometry { slots_per_region }, metadata_blocks, reserve_reading, fullness });
                 }
             }
         }
     }
-    specs
+    pool_settings
 }
 
 /// 第一段（补 Q1）：H1–H4 × e / g × P1 / P2 / T1 / T2 × 三种池 × 四条 Q1 臂，Q2 固定在全零不并（登记第五节「分段」）。
@@ -3251,7 +3251,7 @@ fn emit_the_segment_verdict(emitter: &mut Emitter, tally: &mut RunTally, segment
     );
 }
 
-fn emit_the_config(emitter: &mut Emitter, segment: &str) {
+fn emit_the_configuration_line(emitter: &mut Emitter, segment: &str) {
     emit(
         emitter,
         format!(
@@ -3261,7 +3261,7 @@ fn emit_the_config(emitter: &mut Emitter, segment: &str) {
 }
 
 fn run_the_checks(emitter: &mut Emitter, tally: &mut RunTally) {
-    emit_the_config(emitter, "checks");
+    emit_the_configuration_line(emitter, "checks");
     emit_the_frozen_tree_anchors(emitter, tally);
     emit_the_structural_anchors(emitter, tally);
     emit_the_first_request_anchor(emitter, tally);
@@ -3282,7 +3282,7 @@ fn run_the_checks(emitter: &mut Emitter, tally: &mut RunTally) {
 }
 
 fn run_the_first_segment(emitter: &mut Emitter, tally: &mut RunTally) {
-    emit_the_config(emitter, "first");
+    emit_the_configuration_line(emitter, "first");
     let groups = groups_of_the_first_segment();
     let results = run_groups_in_parallel(&groups);
     for result in &results {
@@ -3295,7 +3295,7 @@ fn run_the_first_segment(emitter: &mut Emitter, tally: &mut RunTally) {
 }
 
 fn run_the_second_segment(emitter: &mut Emitter, tally: &mut RunTally) {
-    emit_the_config(emitter, "second");
+    emit_the_configuration_line(emitter, "second");
     let groups = groups_of_the_second_segment();
     let results = run_groups_in_parallel(&groups);
     emit_the_zero_slot_cells(emitter, "second", &results);
@@ -4064,7 +4064,7 @@ mod pinned_readings {
     /// 预期：N = 50、写行 51、暖机 1 次、环 [41, 52]、待回收 127 块；不够 ⇒ 上限 47、抬 F 那一串 3 次、F 抬到 47、抬 F 期间空闲最低 30、回收 78 块
     /// （待回收剩 127 − 78 + 15 + 13 = 77）、这一次请求在一串抬 F 之后发成、发成之后空闲 − P保留 = 50。
     #[test]
-    fn first_request_of_the_b5_cell_follows_the_independent_arithmetic_on_every_arm() {
+    fn first_request_of_the_crashed_near_full_control_cell_follows_the_independent_arithmetic_on_every_arm() {
         let geometry = geometry_of_the_control_pools();
         let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, METADATA_BLOCKS_OF_THE_CONTROL_POOLS);
         let settings = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
@@ -4155,7 +4155,7 @@ mod pinned_readings {
     /// 场景（M1）：H3（正常卸载，F = V = 50），读坏槽里住着 txg 50（j = 2，恰好是 V）。
     /// 预期：读坏槽能住的最大 txg 50 不低于 F 50，照今天封在 50；读得出的根算出的 C0 是 51。
     #[test]
-    fn a_bad_slot_that_can_hold_exactly_the_floor_still_caps_the_ceiling() {
+    fn bad_slot_that_can_hold_exactly_the_floor_still_caps_the_ceiling() {
         let geometry = geometry_of_the_control_pools();
         let history = HistoryFamily::UnmountedAfterOverwrites.build_pool_after_history(geometry, 5);
         let fault = fault_below_the_newest_root(&history, 2, ReadFaultKind::DeviceError, FaultPersistence::UntilTheProcessWritesTheSlot);
@@ -4196,7 +4196,7 @@ mod pinned_readings {
     /// 场景（M10）：H1，读坏槽 j = 10，持续读坏、写了也坏（P2），照今天，条款读法的近满 k = 0。
     /// 预期：这个进程在暖机之前就写过 X 那一槽（它成了「知道住着根的槽」），算上限那一遍重读仍坏，抬 F 报自己的错：每一次请求都被这个拒因拒、F 一直是 0。
     #[test]
-    fn a_slot_this_process_wrote_that_still_reads_bad_stops_every_floor_raise_with_its_own_error() {
+    fn slot_this_process_wrote_that_still_reads_bad_stops_every_floor_raise_with_its_own_error() {
         let geometry = geometry_of_the_control_pools();
         let history = HistoryFamily::CrashedAfterOverwrites.build_pool_after_history(geometry, 5);
         let fault = fault_below_the_newest_root(&history, 10, ReadFaultKind::DeviceError, FaultPersistence::EvenAfterTheProcessWritesTheSlot);
@@ -4229,17 +4229,17 @@ mod pinned_readings {
     /// 场景：第二段 z 族的一组（H1，S = 4，c = 5，条款读法，近满 k = 0，P1，照今天）与 H5 的一组，两条 Q2 臂各跑。
     /// 预期：H1–H4 每格 3S − 1 = 11 个位置；H5 一个位置；Q1 不并臂上两条 Q2 臂逐位置相同；同一组算两遍结果逐项相同（确定性模型，没有隐藏状态）。
     #[test]
-    fn positions_per_cell_and_the_q2_arms_agree_where_the_no_merge_arm_never_merges() {
+    fn positions_per_cell_and_the_two_merge_arms_agree_where_the_no_merge_arm_never_merges() {
         let pool = pool_of_the_control_cells(ReserveReading::ClauseReadingTenPlusSevenEmptyPublishes, PoolFullness::NearlyFullWithNoSpareOverwrite);
-        let z_group = GroupSettings {
+        let all_zero_fault_group = GroupSettings {
             family: HistoryFamily::CrashedAfterOverwrites,
             fault_kind: Some(ReadFaultKind::AllZeroBytes),
             persistence: Some(FaultPersistence::UntilTheProcessWritesTheSlot),
             pool,
             stuck_ceiling: StuckCeilingDisposition::DoNotMergeTheBadSlots,
         };
-        let first = run_a_group(&z_group);
-        let second = run_a_group(&z_group);
+        let first = run_a_group(&all_zero_fault_group);
+        let second = run_a_group(&all_zero_fault_group);
         assert_eq!((first.not_merged.positions, first.not_merged.expected_positions), (11, 11));
         assert_eq!(first.pair.identical_positions, first.pair.positions, "不并臂上两条 Q2 臂相同");
         assert_eq!(
@@ -4339,7 +4339,7 @@ mod measurement_readings {
     /// 场景：一条判定在两个点上各有两格：A 点两格的值是 0 和 1，B 点两格的值是 0 和 0。
     /// 预期：A 点打中（最大值 1、打中的格 1 / 2）、B 点没打中；门槛挪到最大值 + 1 之后 A 点由真转假。
     #[test]
-    fn a_judgment_hits_at_one_and_the_shifted_threshold_flips_it() {
+    fn judgment_hits_at_one_and_the_shifted_threshold_flips_it() {
         let key = |slots_per_region: u64| CellKey {
             family: HistoryFamily::CrashedAfterOverwrites,
             fault_kind: Some(ReadFaultKind::DeviceError),

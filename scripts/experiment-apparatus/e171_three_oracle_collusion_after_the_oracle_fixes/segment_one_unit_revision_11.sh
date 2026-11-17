@@ -3,16 +3,20 @@
 # 由 segment_one_units_revision_11.py 起：bash <这一份> <单元名>，环境变量由它给；退 0 是这个单元绿，别的是红。
 # 照抄修订 8 单元脚本 segment_one_unit_revision_8.sh；判法、阈值一个字不动，内存包装与各步的内存上限同它一样已删（额度由任务服务给）；各读数进程外面的 nice 与线程包装也删了（第 2 次重跑登记修订 5）；线程取每台默认重活线程数（scripts/hosts/heavy-threads.sh 的 heavy_thread_default，第 2 次重跑登记修订 10），单元编排起的单元里 SINGLEFS_THREAD_CAP 是它分到的数，取到的就是那个数。改的只有：
 #   device_step、driver_step、run_executor 三处，与第 3 步 O3 阳性对照（o3_bad_image_judge.py control）、研究一侧变异表两处读数进程：编排给了这一步的条目
-#   （REUSE_ENTRIES 里「步名<TAB>条目」）就取用（reuse_library.py fetch：条目在 prune-server 里，解出来核 RC5、按角色写到这一趟的名字），不起那个进程；判法照跑；
-#   驱动行取用之后照旧起驱动、参数不变，由驱动按键复用从取来的行目录重报产物与计时（行目录里 reuse_key 与这一趟相同才读回、不编、不跑装置与执行器；冻结行前后照核）；
-#   每一步的读数（现跑的、取来的）记一行进 REUSE_READINGS（步名、fresh|reused、退出码、角色=路径…；现跑的驱动行另记 compiled=<编译用的线道目录> 给 RC4），
+#   （REUSE_ENTRIES 里「步名<TAB>项名」）就取用（reuse_library.py fetch：编排这一趟的计划已从 prune-server 取回、放进状态目录 REUSE_LIBRARY 的那一项，
+#   按角色解到这一趟的名字），不起那个进程；判法照跑；
+#   驱动行取来的行目录解进输出根之后，驱动另带 --report-only 起，照取来的行目录重报产物与计时（不编、不起装置与执行器；冻结行前后照核）；
+#   每一步的读数（现跑的、取来的）记一行进 REUSE_READINGS（步名、fresh|reused、退出码、角色=路径…），
 #   由编排在单元结束时照入库条件入库；
 #   第 2b 步取用时不拷第 2 步导出（取来的那份导出目录已是拷贝加写入之后的整份）；
 #   新加单元 reuse-selfproof（RP2：H7 那个装置二进制跑三次 stream-constants，reuse_library.py selfproof）；
 #   第 2 步的逐文件比改用研究目录里的 s2_compare.py（当年仓外那一份丢了，照登记重写入库，第 2 次重跑登记修订 4）。
 # 环境：修订 8 那几个（REPO RESEARCH PREFIX SUFFIX TAG DUMPS TREE BIN E170_BIN SNAPSHOT_DIGEST MUTATIONS_SHA256 CONFIG THREADS（编排照旧给，这一份不读） WORK_ROOT
-#   UNIT_LOG UNIT_PRODUCTS UNIT_DIRECTORIES，依赖的名字，Q5_REVERSE_STATES Q5_MAIN_STATES，PRINT_ONLY）加 REUSE_LIBRARY（H30）、REUSE_ENTRIES、REUSE_READINGS。
+#   UNIT_LOG UNIT_PRODUCTS UNIT_DIRECTORIES，依赖的名字，Q5_REVERSE_STATES Q5_MAIN_STATES，PRINT_ONLY）加 REUSE_LIBRARY（编排给的这一份计划的状态目录）、REUSE_ENTRIES、REUSE_READINGS。
 #   PRINT_ONLY=1：只打出这个单元会跑的每一条命令（取用的那几步打 fetch 那一条），一条都不跑。
+# 弄坏开关（只在 UNITS_R11_SELFTEST=1 时认）。逐项写开关名、弄坏哪一处，下一行写打开后红的格（segment_one_units_revision_11.py 的自证打的）：
+#   UNITS_R11_BREAK=report-only-dropped  取来的驱动行起驱动不带 --report-only
+#       「✗ 自证 unit-script-driver-report-only：」
 set -u
 UNIT=${1:?要单元名}
 source "$(dirname "${BASH_SOURCE[0]}")/../../hosts/heavy-threads.sh" || exit 2
@@ -68,7 +72,7 @@ option_value() {  # option_value <选项> <参数…>：参数里那个选项后
 snapshot_check() {  # 作废 Z5：冻结树快照摘要没变；修订 8 第 8.6 节另核树里 crates/mutations.tsv 等于 H8
   [ "$PRINT_ONLY" = 1 ] && return 0
   local digest mutations
-  digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest('$TREE')[0])")
+  digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest(sys.argv[1])[0])" "$TREE")
   [ "$digest" = "$SNAPSHOT_DIGEST" ] || stop "冻结树快照摘要变了（Z5）：$digest"
   mutations=$(sha256sum "$TREE/crates/mutations.tsv" | cut -d' ' -f1)
   [ "$mutations" = "$MUTATIONS_SHA256" ] || stop "树里 crates/mutations.tsv 变了（Z5，H8）：$mutations"
@@ -76,7 +80,7 @@ snapshot_check() {  # 作废 Z5：冻结树快照摘要没变；修订 8 第 8.6
 freeze_check() {  # 作废 Z2：O3 冻结行
   [ "$PRINT_ONLY" = 1 ] && return 0
   local differences
-  differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; print(len(frozen_o3.freeze_differences('$REPO')))")
+  differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; print(len(frozen_o3.freeze_differences(sys.argv[1])))" "$REPO")
   [ "$differences" = "0" ] || stop "O3 冻结行对不上（Z2）：$differences 处"
 }
 
@@ -95,7 +99,7 @@ device_step() {
   fi
   snapshot_check
   if [ -n "$entry" ]; then
-    fetch_into "$entry" "product=$product" "timing=$timing" ${directory:+"directory=$directory"} || stop "$name 取用不成（条目坏了已挪进库里的 quarantine/，或目标已在；见 $UNIT_LOG）"
+    fetch_into "$entry" "product=$product" "timing=$timing" ${directory:+"directory=$directory"} || stop "$name 取用不成（状态目录里没有这一项、值里缺这个角色，或目标已在；见 $UNIT_LOG）"
     code=$FETCHED_EXIT
     note_reading "$name" reused "$code" "product=$product" "timing=$timing" ${directory:+"directory=$directory"}
   else
@@ -114,24 +118,28 @@ device_step() {
 driver_step() {
   local name=$1 baseline_timing=$2; shift 2
   local product timing code entry row
+  local report=()
   product=$(own "$name"); timing=$(own_timing "$name")
   refuse_existing "$product"; refuse_existing "$timing"
   entry=$(reuse_entry_for "$name")
   row=$(option_value --output-root "$@")/row-0
-  if [ -n "$entry" ]; then  # 取来的行目录放进输出根，驱动照旧起、参数不变，按键复用从它重报（不编、不跑装置与执行器）
-    fetch_into "$entry" "row=$row" || stop "$name 取用不成（条目坏了已挪进库里的 quarantine/，或目标已在；见 $UNIT_LOG）"
+  if [ -n "$entry" ]; then  # 取来的行目录解进输出根，驱动带 --report-only 照它重报（不编、不起装置与执行器；冻结行前后照核）
+    fetch_into "$entry" "row=$row" || stop "$name 取用不成（状态目录里没有这一项、值里缺这个角色，或目标已在；见 $UNIT_LOG）"
+    report=(--report-only)
+    # 弄坏开关（只在单元编排的自证里认：UNITS_R11_SELFTEST=1）：取来的驱动行不带 --report-only 起
+    case ",${UNITS_R11_BREAK:-}," in *,report-only-dropped,*) [ "${UNITS_R11_SELFTEST:-}" = 1 ] && report=() ;; esac
   fi
   if [ "$PRINT_ONLY" = 1 ]; then
     show python3 -B "$RESEARCH/row_driver.py" --repo-root "$REPO" --work-root "$WORK_ROOT" --snapshot-from "$REPO/$TREE" \
-      --baseline-timing "$REPO/$baseline_timing" --timing-output "$REPO/$timing" "$@"
+      --baseline-timing "$REPO/$baseline_timing" --timing-output "$REPO/$timing" "$@" ${report[@]+"${report[@]}"}
     echo "    → 产物 $product"; return 0
   fi
   snapshot_check
   ( set -o noclobber; python3 -B "$RESEARCH/row_driver.py" --repo-root "$REPO" --work-root "$WORK_ROOT" \
-      --snapshot-from "$REPO/$TREE" --baseline-timing "$REPO/$baseline_timing" --timing-output "$REPO/$timing" "$@" \
+      --snapshot-from "$REPO/$TREE" --baseline-timing "$REPO/$baseline_timing" --timing-output "$REPO/$timing" "$@" ${report[@]+"${report[@]}"} \
       > "$product" 2> "$UNIT_LOG.$name.stderr" )
   code=$?
-  if [ -n "$entry" ]; then note_reading "$name" reused "$code" "row=$row"; else note_reading "$name" fresh "$code" "row=$row" "compiled=$WORK_ROOT/lane0"; fi
+  if [ -n "$entry" ]; then note_reading "$name" reused "$code" "row=$row"; else note_reading "$name" fresh "$code" "row=$row"; fi
   note_product "$product"; [ -e "$timing" ] && note_product "$timing"
   snapshot_check
   say "  $name 驱动退出码 $code，$(grep '^name=row_time_limit' "$product")"
@@ -310,9 +318,8 @@ unit_step_4() {
 
 # ───── 第 5 步：O3 基线（冻结的 v2-487 执行器判第 1 步导出的流一、流二） ─────
 run_executor() {  # run_executor <产物步名> <导出目录> <流,…>
-  local product streams_python entry code
+  local product entry code
   product=$(own "$1"); refuse_existing "$product"
-  streams_python=$(printf "'%s'," ${3//,/ })
   entry=$(reuse_entry_for "$1")
   freeze_check
   if [ -n "$entry" ]; then
@@ -320,7 +327,7 @@ run_executor() {  # run_executor <产物步名> <导出目录> <流,…>
     code=$FETCHED_EXIT
     note_reading "$1" reused "$code" "product=$product"
   else
-    logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor('$REPO', '$REPO/$2', [$streams_python], $THREADS, '$REPO/$product', '$UNIT_LOG.$1.log'); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" \
+    logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor(sys.argv[1], sys.argv[1] + '/' + sys.argv[2], sys.argv[3].split(','), int(sys.argv[4]), sys.argv[1] + '/' + sys.argv[5], sys.argv[6]); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" "$REPO" "$2" "$3" "$THREADS" "$product" "$UNIT_LOG.$1.log" \
       || { note_reading "$1" fresh "$?" "product=$product"; stop "执行器没退 0（日志 $UNIT_LOG.$1.log）"; }
     note_reading "$1" fresh 0 "product=$product"
   fi

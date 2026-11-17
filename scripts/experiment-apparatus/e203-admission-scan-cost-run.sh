@@ -252,6 +252,7 @@ next_raw_name() {
 
 # 入口的主体：从 build、work、source_tree、chosen 起。退出码见文件头。
 run_flow() {
+  run_flow_shell=$BASHPID
   local item todo=() failed=0 library_trouble=0 copy diff_text diff_file raw raw_dir filters=() exact=(--exact) tests_directory
   local plan_file plan_output plan_code finish_code ran_before point_arguments=() tag point_field decision_field key_field
   local -A point_key=() point_decision=()
@@ -301,6 +302,7 @@ run_flow() {
     cd "$copy" || return 1
     export E203_BUILD="$build"
     # 原始输出放在副本里：副本清掉它们跟着清；每一份旁边的 .keys 记着起 cargo 时每个点的键，键变了就不取
+    # 进度行（e203 progress）另转一份到标准输出，起它的一方看得见历史还在走；判结果只读原始输出
     raw_dir="$copy/.e203-raw"
     mkdir -p "$raw_dir" || return 1
     if [ "$build" = "counts" ]; then
@@ -310,7 +312,7 @@ run_flow() {
         raw=$(next_raw_name counts)
         write_raw_keys "$raw" "${todo[@]}" || return 1
         SINGLEFS_RUN_SCOPE='种类=target; 跑什么=E203 历史用例（计数构建）; 范围=1 个测试目标; 为什么=量准入之前扫类的步数，只跑这一趟判定库里没有的点' \
-          cargo test --release -p singlefs-verification --test e203_admission_scan_cost_histories -- "${filters[@]}" "${exact[@]}" --nocapture > "$raw" 2>&1
+          cargo test --release -p singlefs-verification --test e203_admission_scan_cost_histories -- "${filters[@]}" "${exact[@]}" --nocapture 2>&1 | tee "$raw" | grep --line-buffered '^e203 progress'
         for item in "${todo[@]}"; do write_product counts "$item" default "$raw" || failed=1; done
       fi
     else
@@ -319,7 +321,7 @@ run_flow() {
         raw=$(next_raw_name "timing-$item")
         write_raw_keys "$raw" "$item" || return 1
         SINGLEFS_RUN_SCOPE='种类=target; 跑什么=E203 历史用例（计时构建，单线程）; 范围=1 个测试目标; 为什么=量准入之前扫类的挂钟，单线程逐点跑免得互相抢核' \
-          cargo test --release -p singlefs-verification --test e203_admission_scan_cost_histories -- "point_$item" "${exact[@]}" --nocapture --test-threads=1 > "$raw" 2>&1
+          cargo test --release -p singlefs-verification --test e203_admission_scan_cost_histories -- "point_$item" "${exact[@]}" --nocapture --test-threads=1 2>&1 | tee "$raw" | grep --line-buffered '^e203 progress'
         write_product timing "$item" 1 "$raw" || failed=1
       done
     fi
@@ -337,8 +339,10 @@ run_flow() {
 # 假 cargo：把参数记进 calls.log；按 $world_dir/mode 决定怎么跑。点名的 point_<点> 各打 row 与 item_done 两行。
 #   ok 全跑完；rows-differ 全跑完、row 那一行的读数换一个（强制现判判出与库里不同）；kill-immediately 一开始就被杀；kill-on-second-call 第二次调用被杀；
 #   kill-after-first 第一个点跑完、第二个点打一行就被杀；kill-cut-line 打出一行被截断的 item_done（点名被截掉最后两个字符）就被杀。
-# 模拟这一趟被系统杀掉：对自己这一个子 shell 发 KILL（不跑 EXIT trap），点名一个进程，不在循环里发。
+# 模拟这一趟被系统杀掉：对假 cargo 自己这一段与起这一趟的 run_flow 那个 shell 一起发 KILL（不跑 EXIT trap），点名两个进程，不在循环里发；
+# 假 cargo 跑在管道里，只杀一边，另一边会接着写或接着往下走；先发 run_flow 那个、再发自己（先杀了自己后一个就收不到）。
 simulate_this_run_being_killed() {
+  kill -KILL "${run_flow_shell:?}"
   kill -KILL "$BASHPID"
 }
 

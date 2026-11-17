@@ -165,6 +165,33 @@ class Pieces(unittest.TestCase):
             with self.assertRaises(ValueError):
                 attribution.load_function_map(path, "0" * 64)
 
+    def test_a_map_that_differs_only_by_registered_path_moves_matches_the_pin_after_reversing_them(self):
+        """此刻内容的 sha256 对不上钉值、倒换搬迁登记（path-moves.tsv，用的是 E171 的 frozen_o3）后对得上：通过；倒换后也对不上：照旧红。"""
+        import hashlib
+        content = "# 头 " + attribution.e171_research_side.DEVICE_SOURCE + "\n" + RESEARCH_MAP
+        data = content.encode("utf-8")
+        versions = frozen_o3_registered_moves().contents_before_moves(data)
+        self.assertTrue(versions, "此刻内容里该有登记过的新路径，倒得出几版")
+        self.assertNotEqual(versions[-1], data)
+        pinned = hashlib.sha256(versions[-1]).hexdigest()
+        self.assertNotEqual(pinned, hashlib.sha256(data).hexdigest())
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "map.tsv")
+            with open(path, "wb") as handle:
+                handle.write(data)
+            attribution.load_function_map(path, pinned)
+            attribution.load_function_map(path, hashlib.sha256(data).hexdigest())
+            with self.assertRaises(ValueError):
+                attribution.load_function_map(path, "1" * 64)
+            with open(path, "wb") as handle:
+                handle.write(data + "# 登记之后又改了\n".encode("utf-8"))
+            with self.assertRaises(ValueError):
+                attribution.load_function_map(path, pinned)
+
+
+def frozen_o3_registered_moves():
+    return e171_research_side.frozen_o3.registered_moves(e171_research_side.REPOSITORY_ROOT)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,3 +1,3 @@
 # 冻结范围里只改了路径的文件（.claude/rules/path-moves.md「怎么做」第 6 步：路径不在冻结范围内）：frozen_o3.freeze_differences 不把它们记成不同。
 # 一行五列，制表符隔开：名字（冻结范围里的文件名，或 freeze_seed）、冻结行里的值、现在的值、改它的提交、改了什么。
-# 冻结行在 research/results/e170-r1-o3-spec-executor-2026-11-05-refreeze-executor.out；重冻结之后冻结行就是此刻的目录，这张表没有行，之后再有只改路径的文件才登记。
+# 冻结行在 research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out；冻结行就是此刻的目录，这张表没有行，之后再有只改路径的文件才登记。

@@ -116,7 +116,7 @@ fn run_arm(world: &World, victim: u64, arm: Arm) -> (BTreeSet<u64>, u64) {
     let victim_snapshot = &world.snapshots[&victim];
     let freed_extents: BTreeSet<u64> = match arm {
         // D5 形态。**定义句原样贴在这里，不许按印象建**
-        // （rules/verify-before-claiming.md：引用一条决策去做推导之前，
+        // （rules/evidence-discipline.md：引用一条决策去做推导之前，
         //  把它的定义句原样贴进笔记；这条纪律本身就是上一次按印象建模翻车换来的）：
         //
         //   「块 b 被快照 S 引用 ⟺ birth(b) ≤ S.txg < death(b)，左闭右开」

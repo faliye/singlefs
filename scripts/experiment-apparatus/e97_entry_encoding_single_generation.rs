@@ -869,7 +869,7 @@ mod tests {
     }
 
     #[test]
-    fn a_leaf_narrower_than_the_generation_count_still_holds_one_group() {
+    fn leaf_narrower_than_the_generation_count_still_holds_one_group() {
         let dirty = dirty_leaves_per_publish(30, 25, 10);
         assert_eq!(dirty.groups_per_leaf, 1, "10 / 25 整除是 0，下限 1");
         assert_eq!(dirty.dirty_bytes, 30 * NODE_BYTES);

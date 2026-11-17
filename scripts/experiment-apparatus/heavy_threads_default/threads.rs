@@ -38,7 +38,7 @@ mod heavy_threads_default_tests {
     }
 
     #[test]
-    fn a_registry_without_a_positive_number_gives_none() {
+    fn registry_without_a_positive_number_gives_none() {
         assert_eq!(first_registered_threads("# 只有注释\n"), None);
         assert_eq!(first_registered_threads(""), None);
         assert_eq!(first_registered_threads("0  # 不是正整数\n"), None);

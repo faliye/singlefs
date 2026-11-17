@@ -358,7 +358,7 @@ EXECUTOR_WORKERS = re.compile(r"frozen_o3\.run_executor\('[^']*', '[^']*', \[[^\
 
 
 def printed_threads(text: str) -> list[str]:
-    """单元脚本 PRINT_ONLY=1 打出的命令（「  $ 」起头、printf %q 打法）里线程那几处：--threads 后面那个词，与 frozen_o3.run_executor(…) 的工作线程那一位。"""
+    """单元脚本 PRINT_ONLY=1 打出的命令（「  $ 」起头、printf %q 打法）里线程那几处：--threads 后面那个词，与 frozen_o3.run_executor(…) 的工作线程那一位（修订 11 的走 sys.argv[4]，取 -c 之后第 4 个词）。"""
     found = []
     for line in text.splitlines():
         if not line.startswith("  $ "):
@@ -366,6 +366,7 @@ def printed_threads(text: str) -> list[str]:
         words = shlex.split(line[4:])
         found += [words[index + 1] for index, word in enumerate(words[:-1]) if word == "--threads"]
         found += [match.group(1) for word in words for match in [EXECUTOR_WORKERS.search(word)] if match]
+        found += [words[index + 4] for index, word in enumerate(words) if "frozen_o3.run_executor(" in word and "int(sys.argv[4])" in word]
     return found
 
 

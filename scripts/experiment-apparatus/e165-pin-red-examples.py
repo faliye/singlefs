@@ -62,7 +62,8 @@
       按档分组起装置：㉒ 相同的行一组，每组按块起，命令是「<装置> --pinned-cases <块表> <㉒ 按空格切开>」（例 --profile r2）；
       块表只留这一块的行、每行只留 ①–㉑（装置只认 21 段，㉒ 不交给它），别的数据行换成 #、行号不变。
       不给 --binary 时：cargo build --release --locked -p singlefs-verification --bin e165_replay_bounded_enumeration
-      （CARGO_TARGET_DIR：--target 给了用它、不删；没给是这一趟自己建的 ${TMPDIR:-/tmp}/singlefs-e165-pinned-target-*，跑完删——删之前核没有进程开着里面的文件，
+      （CARGO_TARGET_DIR：--target 给了用它、不删；没给而环境里有绝对路径的 CARGO_TARGET_DIR（任务服务或整轮门禁给这一趟的编译目录）就用那一个、不删，
+      装置与这一趟别的 cargo 共用一份编译目录；都没有才是这一趟自己建的 ${TMPDIR:-/tmp}/singlefs-e165-pinned-target-*，跑完删——删之前核没有进程开着里面的文件，
       有就不删、报出进程、退 1；自己用完自己删，不跨轮复用）再跑。
       装置线程取 --threads（或 SINGLEFS_THREAD_CAP、登记的默认并行度），不套内存包装、不设内层上限：整条命令交 task-server，内存额度按记录由服务给，撞上限由服务放大重排；
       装置被信号停了的（subprocess 交负的信号号，或经 bash 起时退 128 + 信号号，例 137 = 外面 kill -9），判红，
@@ -130,6 +131,7 @@
       「replay-mismatch」「item-alone-equals-whole」「reuse-red-not-recorded」「prune-after-change」「replay-missing-line-no-mispair」
   E165_PIN_RED_EXAMPLES_BREAK=killed-as-regression  --replay 不认装置被信号停了，照装置退非 0 报回归、出路写修实现
       「replay-killed」「replay-killed-howto」「replay-exit-137」
+      「钉住的 … 行（现判的）在今天的实现上：装置退」（被信号停的装置照退非 0 报成回归，三格各打一行）
   E165_PIN_RED_EXAMPLES_BREAK=names-from-today-table  --check 照今天的变异表换 tsv-<行号>，不认产物里的名字
       「check-shifted-table」「check-title-other-variant」「check-title-other-variant-howto」
   E165_PIN_RED_EXAMPLES_BREAK=kill-bounds-optional  --check 账配的产物不在也不红，照今天的变异表换名
@@ -182,8 +184,6 @@
       「reuse-device-changed」「reuse-device-stand-in-swapped」「prune-after-change」
   E165_PIN_RED_EXAMPLES_BREAK=judging-units-raw-text  判法单元指纹取这份脚本整份原文的摘要（只改 replay 里一行注释也变）
       「judging-units-comment-only」
-  E165_PIN_RED_EXAMPLES_BREAK=spawn-inside-judging-closure  起装置那一下（run_reporting_progress）算进判法入口：起 --binary 给的程序那一段回到闭包里，库折不出那条命令，判法单元指纹拒算、每趟现判
-      「reuse-first-run-records」「reuse-second-run-reuses」「reuse-judging-units-changed」「reuse-mutation-row-changed」「reuse-mutation-row-restored」「reuse-device-changed」「reuse-device-stand-in-swapped」「reuse-ledger-path-renamed」「reuse-mutation-renamed」「reuse-row-own-key」「reuse-red-not-recorded」「reuse-resume-after-kill」「prune-unchanged-input」「reuse-closure-changed」「reuse-closure-unrelated-function」「reuse-closure-unchanged」「reuse-crate-root-file-unchanged」「reuse-device-source-function-changed」「judging-units-no-refusal」「judging-units-comment-only」「reuse-row-own-profile」「replay-unclean-block-records-green」「replay-missing-line-no-mispair」
   E165_PIN_RED_EXAMPLES_BREAK=row-key-with-ledger-path  每一行的键另带 ⑤（红例账的路径与行号）
       「reuse-ledger-path-renamed」
   E165_PIN_RED_EXAMPLES_BREAK=row-key-with-mutation-name  变异原文与替换文那一样另带 ⑥ 的表与变异名
@@ -209,8 +209,10 @@
 钉表认档（㉒）的几项，开关一行、下一行起写打开之后判错的自证格与门禁样本：
   E165_PIN_RED_EXAMPLES_BREAK=profile-read-as-r1  取档不读产物的 device_arguments=，一律当 --profile r1（r2 档的账钉成 r1 档）
       「pin-two-profiles」「pin-profile-r2」「check-two-profiles」「check-profile-differs」「pin-profile-unknown-argument」「profile-normalized」「replay-two-profiles」「replay-profile-arguments」「list-items-profile」
+      「行账与表里（或这一次前面的账里）同一档下同一个（输入, 变异）的原实现逐态行不同，一行都没钉」（两档的账都读成 r1 档，同一个（输入, 变异）的逐态行不同判成同档冲突）
   E165_PIN_RED_EXAMPLES_BREAK=product-profile-defaulted  产物没有 config 行、config 行没有 device_arguments=、或它的值是空的，照取 --profile r1，不判红
       「pin-product-without-config」「pin-product-without-arguments」「pin-product-empty-arguments」「pin-product-howto」「check-product-without-config」「profile-empty-refused」
+      「行账与表里（或这一次前面的账里）同一档下同一个（输入, 变异）的原实现逐态行不同，一行都没钉」（取不出档的 r2 档账当 r1 档，与表里已钉的 r1 档同一个（输入, 变异）的逐态行不同）
   E165_PIN_RED_EXAMPLES_BREAK=same-profile-conflict-ignored  追加不判同一档下同一个（①, ⑥）⑦ 不同，照钉
       「conflict」「replay-progress」「conflict-same-profile」「conflict-same-profile-unwritten」
   E165_PIN_RED_EXAMPLES_BREAK=check-ignores-profile  --check 不比 ㉒，钉成别的档也算钉着
@@ -219,6 +221,7 @@
       「check-table-profile-form」
   E165_PIN_RED_EXAMPLES_BREAK=replay-without-profile  --replay 起装置不带 ㉒ 的档参数（装置一律按 r1 档重放）
       「replay-two-profiles」「replay-profile-arguments」
+      「钉住的 … 行（现判的）在今天的实现上：装置退」（r2 档那三行按 r1 档重放，逐态行与 ⑦ 不同）
   E165_PIN_RED_EXAMPLES_BREAK=row-columns-unchecked  表里段数不是 22 的行不报，当表里没有这一行
       「check-columns-8」「check-columns-21」「replay-columns」「replay-columns-howto」
   E165_PIN_RED_EXAMPLES_BREAK=profile-arguments-unchecked  device_arguments= 里认不出的参数（例 --gate）照略过，不判红
@@ -227,6 +230,8 @@
       「reuse-row-own-profile」
   E165_PIN_RED_EXAMPLES_BREAK=threads-default-cpu-count  --threads 的缺省取核数，不取登记的重活默认并行度
       「threads-default-registered」
+  E165_PIN_RED_EXAMPLES_BREAK=replay-target-ignores-environment  --replay 没给 --target 时不看环境里的 CARGO_TARGET_DIR，装置一律在自建的临时目录里另编
+      「replay-target-from-environment」
 """
 import concurrent.futures
 import glob
@@ -1037,13 +1042,11 @@ def judging_units():
 
 def judging_unit_key_of(root, relative):
     """根 root 里 relative 那份脚本的判法单元指纹（UnitKey）：JUDGING_ENTRY 的单元闭包键，判定库与 lib_function_units.py 不进；算不出交一条拒算。
-    弄坏开关：judging-units-raw-text 下取那份脚本整份原文的摘要（改注释也变）；spawn-inside-judging-closure 下另把起装置那一下（run_reporting_progress）
-    算进判法入口（起 --binary 给的程序那一段回到闭包里，库折不出那条命令、判法单元指纹拒算）。"""
+    弄坏开关：judging-units-raw-text 下取那份脚本整份原文的摘要（改注释也变）。"""
     if "judging-units-raw-text" in BREAK:
         return UnitKey(digest_file(os.path.join(root, relative)), (), ())
-    entries = [f"{relative}::{JUDGING_ENTRY}"] + ([f"{relative}::run_reporting_progress"] if "spawn-inside-judging-closure" in BREAK else [])
     try:
-        return judging_unit_key(root, entries)
+        return judging_unit_key(root, [f"{relative}::{JUDGING_ENTRY}"])
     except ValueError as error:
         return UnitKey(None, (), (f"refused\tjudging-units\t{os.path.basename(relative)}:1\t{error}",))
 
@@ -1166,7 +1169,6 @@ def run_device_block(root, table_text, block, binary, options, work, profile):
         "SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS",
         "SINGLEFS_RANDOM_HISTORY_THREADS",
         "E161_THREADS",
-        "SINGLEFS_CRASH_JUDGE_CPU_THREADS",
         "SINGLEFS_CRASH_AMPLIFICATION_THREADS",
         "E165_THREADS",
         "E168_THREADS",
@@ -1461,6 +1463,8 @@ def main(arguments, selftest_library=None, selftest_forced_judge=False):
         if mode == "check-table":
             return check_table(root, table)
         if options["target"] is None:
+            options["target"] = environment_target_directory()
+        if options["target"] is None:
             return replay_in_own_target(root, table, options)
         return replay(root, table, options)
     except UsageError as usage:
@@ -1474,6 +1478,16 @@ def main(arguments, selftest_library=None, selftest_forced_judge=False):
     except NotRun as not_run:
         print(f"  ! {not_run}")
         return EXIT_NOT_RUN
+
+
+def environment_target_directory(environment=None):
+    """任务服务或整轮门禁给这一趟的编译目录（环境里绝对路径的 CARGO_TARGET_DIR）：交它；没有、是空串或不是绝对路径交 None。
+    --replay 没给 --target 时装置就在它里面编，与这一趟别的 cargo 共用一份编译目录，不另在 $TMPDIR 里冷编一份。
+    弄坏开关 replay-target-ignores-environment：一律交 None（装置在自建的临时目录里另编一份）。"""
+    value = (os.environ if environment is None else environment).get("CARGO_TARGET_DIR") or ""
+    if "replay-target-ignores-environment" in BREAK or not os.path.isabs(value):
+        return None
+    return value
 
 
 def replay_in_own_target(root, table, options):
@@ -2303,6 +2317,15 @@ def selftest():
         os.remove(r2_ledger)
         os.remove(r2_kill_bounds)
 
+    # --replay 编装置的编译目录：没给 --target 而环境里有绝对路径的 CARGO_TARGET_DIR 就用它（装置与这一趟别的 cargo 共用一份编译目录），
+    # 没有、空串、相对路径才自建（开关 replay-target-ignores-environment 下一律自建，这一格判错）
+    cases += 1
+    environment_targets = (environment_target_directory({"CARGO_TARGET_DIR": "/gate-target/shared"}), environment_target_directory({"CARGO_TARGET_DIR": ""}),
+                           environment_target_directory({"CARGO_TARGET_DIR": "relative/target"}), environment_target_directory({}))
+    if environment_targets != ("/gate-target/shared", None, None, None):
+        wrong.append("replay-target-from-environment")
+        print(f"    replay-target-from-environment 这一格判错：绝对路径、空串、相对路径、没设，期望 ('/gate-target/shared', None, None, None)，实测 {environment_targets}")  # gate-lint:detail
+
     # --threads 的缺省：没设 SINGLEFS_THREAD_CAP 取登记文件第一条非注释行的数，设了取它
     with open(os.path.join(SCRIPT_DIRECTORY, "..", "..", ".claude", "heavy-thread-default"), encoding="utf-8") as handle:
         registered_default = next((int(line.split()[0]) for line in handle if line.strip() and not line.lstrip().startswith("#")), None)
@@ -2324,8 +2347,8 @@ def selftest():
 
                      "profile-read-as-r1", "same-profile-conflict-ignored", "check-ignores-profile", "replay-without-profile", "row-columns-unchecked",
                      "profile-arguments-unchecked", "reuse-key-without-profile", "reuse-key-without-judging-units", "row-key-with-ledger-path", "row-key-with-mutation-name", "list-items-pipe-unhandled",
-                     "threads-default-cpu-count", "stand-in-unkeyed", "judging-units-raw-text",
-                     "spawn-inside-judging-closure", "table-check-globs-research", "check-globs-by-default", "check-kill-bounds-ignored", "profile-form-unchecked", "product-profile-defaulted",
+                     "threads-default-cpu-count", "replay-target-ignores-environment", "stand-in-unkeyed", "judging-units-raw-text",
+                     "table-check-globs-research", "check-globs-by-default", "check-kill-bounds-ignored", "profile-form-unchecked", "product-profile-defaulted",
                      "item-key-lines-skipped", "item-done-unrecorded", "key-mismatch-by-item-only", "key-items-ignored")
         # 各开关的那一趟互不依赖、各用各的临时目录（桩装置不起 cargo）：几趟同时起（至多登记的每台默认重活线程数那么多趟，.claude/heavy-thread-default），按开关的次序收退出码、数份数
         def run_break(item):

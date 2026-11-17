@@ -1,43 +1,53 @@
 #!/usr/bin/env python3
-"""E171 第 1 次重跑·修订 11：修订 8 那一趟第 11–13 步的多机逐行编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.2–11.5、11.9、11.10 节）。
-由 segment_one_units_revision_11.py 在修订 8 的逐行起跑闸都绿之后起（同修订 8 的命令行），修订 11 占位的路径从环境变量 E171_REVISION_11_CONFIG 取。
+"""E171 第 1 次重跑·修订 11：修订 8 那一趟第 11–13 步的多机逐行编排，带复用（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.2–11.5、11.9、11.10 节；
+复用那一层照 reuse_library.py 文件头「按项判定」）。由 segment_one_units_revision_11.py 在修订 8 的逐行起跑闸都绿之后起（同修订 8 的命令行），
+修订 11 占位的路径从环境变量 E171_REVISION_11_CONFIG 取。
 
 为什么另写一层：rows_orchestrator_revision_8.py 这一层不改它（它自己的改动按依赖次序重钉进下面的 ROWS_R8_SHA256：第 2 次重跑登记修订 4 补了 H16
 与冻结树两处运行条件之后重钉）。这一层按路径载入它（开跑先核 sha256，不是就退 3；它照旧按 sha256 载入
-第一段编排器 2ab19c53… 与 cross_host_o3_check.py），修订 8 那一层改的几处（落点、H8 核对、跨机 o3 比法、停派文件、加槽）原样装上，再在第一段编排器上换三处：
-  ① 第 11、12 步派发之前（phase_rows_and_checks）：每行照第 11.2、11.3 节算键（L 取 --baseline-timing 那份 step-7 计时的 process_wall），查库、写标记
-    （<H16 导出根>/reuse-markers/segment-one-rows/），命中的行照第 11.5 节「取用」先写标记、再把条目里的行目录从 prune-server 里那一条解出来写进行输出根（row-result.tsv 最后写），
-    编排器原有的续跑因此当它做完了、不派；合成时由编排器原有的按键复用重报把它并进产物（合并规则 ①–⑦ 不改）。第 12 步 row-0 与跨机那一份 X
-    （RC2）、要补位的行（按名字取不到、锚点不是恰 1 次、碰到模块集合）永远现跑；
-  ② 一个分片结束（finish_shard）：编排器原来那样记退出码、收别的台做完的行，再把这一分片现跑完的每一行照入库条件入库（库里有同键条目照 RC1 比，第二趟 RC2）；
-    本机的行先照 RC4 核那一槽这一次编译的 dep-info（<工作根>/lane0/target/release/<装置>.d，相对 <工作根>/lane0/tree），不符不入；
-    别的台跑的行入库之前另核三样（第 11.5 节「两台」）：行结果里 row_number 与 mutation_line_sha256 对得上键里 [mutation]、那一分片的 row_time_limit
-    秒数等于键里的 L、那一分片的 snapshot_digest 等于 H3；不过不入、记一行。别的台的行不做 RC4（H35：那边编完的 dep-info 在那一台本地盘上，
-    跑完由代跑那一片删掉，不进共享根），只有第 11.2 节的静态拦。S18 触发就冻库、这一分片记没跑成（编排器不再派新行，在跑的跑完再停，退 1）；
-  ③ 第 13 步（phase_timeout_reruns）：超时的行（限时再乘 3）照同一套查库、取用。
+第一段编排器 2ab19c53… 与 cross_host_o3_check.py），修订 8 那一层改的几处（落点、H8 核对、跨机 o3 比法、停派文件、加槽）原样装上，再在第一段编排器上换这几处：
+  ① 第 11、12 步派发之前（phase_rows_and_checks）：还没合成产物的那几步的每一行照 reuse_library 的请求写法（L 取 --baseline-timing 那份 step-7 计时的
+    process_wall）一份计划（ItemRun）：算键、查库、写标记（<H16 导出根>/reuse-markers/segment-one-rows/）；行输出根里这几行的旧行目录先删掉（输出根只是这一趟的产物，
+    不当结果、不当复用来源），取得到的行把判定库里那一份解进行输出根。第 12 步 row-0 与跨机那一份 X（RC2 的 second-run）、要补位的行（按名字取不到、
+    锚点不是恰 1 次、碰到模块集合）拒算、照跑；
+  ② 做没做完（is_done）只认这一趟：从判定库取来的，或这一趟的分片跑完、行目录里有 row-result.tsv 的；
+  ③ 合成时这一趟分片没覆盖的行（就是这一趟取来的那几行）：本机一个驱动带 --report-only 照取来的行目录重报（run_carry），合并规则 ①–⑦ 不改；
+    有一行不是这一趟取来的就停；
+  ④ 一个分片结束（finish_shard）：编排器原来那样记退出码、收别的台做完的行，再把这一分片照跑完的每一行照入库条件判绿或判红（RC1、RC2 照 reuse_library 比）；
+    别的台跑的行另核三样（reuse_library.peer_row_problems：行结果里 row_number 与 mutation_line_sha256 对得上请求、那一分片的 row_time_limit 秒数等于请求里的 L、
+    那一分片的 snapshot_digest 等于 H3），不过判红、记一行。S18 触发（那一把键已撤成红）这一分片记没跑成（编排器不再派新行，在跑的跑完再停，退 1）；
+    一步的计划收尾（finish）判红同样停（退 1）；
+  ⑤ 第 13 步（phase_timeout_reruns）：r11、r12 两步的参数带 --timed-out-before（第一段编排器 STEPS 那两步自己带，RERUN_FLAGS：调用方显式给，限时再乘 3），
+    超时的行照同一套一份计划、取用。
   收尾由标记现合复用账本 <H16 前缀>-reuse-ledger-rows<H16 后缀>.out（登记的行：第 11、12 步各行、多机时 X、第 13 步超时重跑的各行），N + M 不等于登记数退 1。
-  ④ 本机逐行驱动的工作根（--work-root，线道的树与编译目录；用户 2026-10-23 定案「自己用完自己删」）由这一层用完就删：编排器每起一个本机分片（launch_local，
-    含续带的 carry）记下它的工作根；只给一个分片用的（行 0、第 13 步重跑、carry 这几种按分片现建的）在那一分片 finish_shard 做完 RC4 与入库之后删；
+  ⑥ 本机逐行驱动的工作根（--work-root，线道的树与编译目录；用户 2026-10-23 定案「自己用完自己删」）由这一层用完就删：编排器每起一个本机分片（launch_local，
+    含续带的 carry）记下它的工作根；只给一个分片用的（行 0、第 13 步重跑、carry 这几种按分片现建的）在那一分片 finish_shard 做完入库之后删；
     同一槽接着用的（rows_orchestrator_revision_8.py 里非 fresh 的行落 host1-slot<槽>，修订 5 的增量编译口径，SLOT_WORK_ROOT_PREFIX）在整趟 run 收尾时删
     （正常结束、出错、被 TERM / INT 停：编排器 stop_running 等分片退出、照 finish_shard 收完，run 抛出来也走收尾）。删法照 scripts/hosts/run_build_directory.py
     （删之前核本机没有进程开着里面的文件，有就不删、报出进程；整趟本来退 0 的改退 1）。别的台的工作根在那一台本地盘上，由代跑那一片（shard_relay.py）在那条命令跑完时删。
 用法：
   rows_orchestrator_revision_11.py run  --config C --repo R --baseline-timing B --stop-file S      （同修订 8；E171_REVISION_11_CONFIG 要给）
-  rows_orchestrator_revision_11.py plan --config C --repo R --baseline-timing B --stop-file S      （修订 8 的 plan 原样，另打每行的键与库里有没有；只读）
+  rows_orchestrator_revision_11.py plan --config C --repo R --baseline-timing B --stop-file S      （修订 8 的 plan 原样，另打每行的键与库里有没有判绿的；只读）
   rows_orchestrator_revision_11.py --selftest [--cells 格,…] [--rounds N]
-退出码：同修订 8 逐行编排（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；E171_REVISION_11_CONFIG 没给、H31 不过退 78；prune-server 连不上退 75（复用库只在服务里，reuse_library.py 文件头「库」）；自证只在临时 prune-server 上跑（不是临时服务退 2）。
+退出码：同修订 8 逐行编排（0、1、2、3、78、143）；账本 N + M 不等于登记数退 1；E171_REVISION_11_CONFIG 没给、H31 不过退 78；
+prune-server 连不上退 75（判定库只在服务里，reuse_library.py 文件头「按项判定」）；自证只在临时 prune-server 上跑（不是临时服务退 2）。
 
 弄坏开关 ROWS_R11_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，ROWS_R11_SELFTEST=1）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
   ROWS_R11_BREAK=peer-checks-skipped  别的台跑的行入库之前不核那三样
       「✗ 自证 peer-checks：」
-  ROWS_R11_BREAK=s18-ignored  S18 触发了照样跑完、库不冻
+  ROWS_R11_BREAK=s18-ignored  S18 触发了照样跑完
       「✗ 自证 s18-stops：」
-  ROWS_R11_BREAK=work-roots-kept  本机逐行驱动的工作根用完不删（改前的样子：线道的树与编译目录留在 <日志目录>/rows-work 下）
+  ROWS_R11_BREAK=stale-rows-done  行输出根里旧的行目录不清，照「有 row-result.tsv 就是做完了」算
+      「✗ 自证 stale-rows-redone：」
+  ROWS_R11_BREAK=rerun-without-flag  第 13 步的参数去掉 --timed-out-before
+      「✗ 自证 timeout-rerun：」
+  ROWS_R11_BREAK=work-roots-kept  本机逐行驱动的工作根用完不删（线道的树与编译目录留在 <日志目录>/rows-work 下）
       「✗ 自证 reuse-e2e：」「✗ 自证 s18-stops：」（开关轮只核前一格 reuse-e2e）
   ROWS_R11_BREAK=sweep-skipped  每一格之后与末尾不收进程（自证外壳 revision_8_selftest_harness.py 的开关）
       「✗ 自证 no-leftover-processes：」
   ROWS_R11_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
       「✗ 自证 temporary-directory-removed：」
+另认 reuse_library.py 的 REUSE_BREAK 与 long_run_item_verdicts.py 的 LONG_RUN_ITEMS_BREAK（各自文件头）。
 """
 from __future__ import annotations
 
@@ -45,6 +55,7 @@ import dataclasses
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import types
@@ -55,7 +66,6 @@ sys.path.insert(1, os.path.join(HERE, "..", "..", "hosts"))   # scripts/hosts：
 import device_timing  # noqa: E402
 import frozen_tree_lines_revision_8 as judge  # noqa: E402
 import reuse_library as reuse  # noqa: E402
-import reuse_library_root as library_roots  # noqa: E402
 import revision_8_selftest_harness as harness  # noqa: E402
 import run_build_directory as build_directories  # noqa: E402
 
@@ -63,11 +73,12 @@ BREAK_VARIABLE = "ROWS_R11_BREAK"
 SELFTEST_VARIABLE = "ROWS_R11_SELFTEST"
 CONFIG_VARIABLE = "E171_REVISION_11_CONFIG"
 ROWS_R8_PATH = os.path.join(HERE, "rows_orchestrator_revision_8.py")
-ROWS_R8_SHA256 = "0a060f54f44d61f14cb20786f0d826f9fbb698323265b119ef1398c3db8d6a3d"
+ROWS_R8_SHA256 = "00770a2c1590205d4308fb7cf8bf7c631b45bc4ccaff407cabc8dacaad3ee351"
 EXIT_WRONG_PINNED_FILE = 3
 LEDGER_STEM = "reuse-ledger-rows"
 MARKERS_NAME = "segment-one-rows"
-# 同一槽接着用的工作根的名字（rows_orchestrator_revision_8.py 第 214 行，非 fresh 的行落 host1-slot<槽>）：整趟收尾时才删（文件头 ④）
+SCRIPT_KEY = f"{reuse.RESEARCH_RELATIVE}/rows_orchestrator_revision_11.py"   # 按项判定里认的脚本名（复用哨兵、复用三问的规范输出）
+# 同一槽接着用的工作根的名字（rows_orchestrator_revision_8.py 第 214 行，非 fresh 的行落 host1-slot<槽>）：整趟收尾时才删（文件头 ⑥）
 SLOT_WORK_ROOT_PREFIX = "host1-slot"
 
 
@@ -89,27 +100,31 @@ def broken(item: str) -> bool:
 
 @dataclasses.dataclass
 class RowsReuse:
-    """这一层的复用状态。decisions：(步, 行) → 决定；registered：账本登记的行名（第 11、12 步与 X 在派发之前登记，第 13 步的在它开头登记）。"""
-    library: reuse.Library
-    lookup: bool
+    """这一层的复用状态。decisions、runs：(步, 行) → 决定、那一份计划；fetched：这一趟从判定库取来、放进行输出根的 (步, 行)；finished：这一趟的分片跑完的 (步, 行)；
+    registered：账本登记的行名（第 11、12 步与 X 在派发之前登记，第 13 步的在它开头登记）。"""
+    repo: str
     markers: str
+    state_parent: str
     decisions: dict
+    runs: dict
+    fetched: set
+    finished: set
     registered: list
-    inputs: reuse.TreeInputs | None = None
+    facts: reuse.TreeFacts | None = None
 
 
-STATE: dict = {"reuse": None, "work_roots": {}}   # work_roots：本机分片的工作根（绝对路径）→ 还没删（文件头 ④），launch_local 记、删成了去掉
+STATE: dict = {"reuse": None, "work_roots": {}}   # work_roots：本机分片的工作根（绝对路径）→ 还没删（文件头 ⑥），launch_local 记、删成了去掉
 ORIGINAL: dict = {}
 
 
 def launch_local_recording_work_root(context, expected_hashes, label, step, rows, lanes, threads, work_root, kind):
-    """编排器原来的 launch_local；起之前记下这一分片的工作根（文件头 ④）。"""
+    """编排器原来的 launch_local；起之前记下这一分片的工作根（文件头 ⑥）。"""
     STATE["work_roots"][os.path.abspath(work_root)] = True
     return ORIGINAL["launch_local"](context, expected_hashes, label, step, rows, lanes, threads, work_root, kind)
 
 
 def remove_work_root(context, work_root: str) -> bool:
-    """删一个本机分片的工作根（scripts/hosts/run_build_directory.py：删之前核开着的文件）；不在算删成。弄坏开关 work-roots-kept 照改前不删。"""
+    """删一个本机分片的工作根（scripts/hosts/run_build_directory.py：删之前核开着的文件）；不在算删成。弄坏开关 work-roots-kept 下不删。"""
     if broken("work-roots-kept"):
         return True
     removed, lines = build_directories.remove_run_build_directory(work_root)
@@ -130,17 +145,12 @@ def remove_remaining_work_roots(context) -> bool:
     return removed
 
 
-def tree_inputs(context) -> reuse.TreeInputs:
-    """算键用的那棵树（第一次用到时现算）；dep-info 里有树外路径就是 S18 ②：冻库、停（编排器原有的 Stopped，退 1）。"""
+def tree_facts(context) -> reuse.TreeFacts:
+    """算请求用的那棵树（第一次用到时现算）。"""
     state = STATE["reuse"]
-    if state.inputs is None:
-        try:
-            state.inputs = reuse.tree_inputs_for_run(context.repo, context.tree, dict(os.environ))
-        except reuse.ClosureOutsideTheTree as error:
-            reuse.append_event(state.markers, f"E7RESULT name=reuse_closure_check unit=tree key=- matches=false outside-the-tree={reuse.value(str(error)[-120:])}")
-            state.library.freeze(f"S18 ②：{error}")
-            raise one.Stopped(f"S18 ②（闭包认不全）：{error}")
-    return state.inputs
+    if state.facts is None:
+        state.facts = reuse.tree_facts(context.repo, context.tree, dict(os.environ))
+    return state.facts
 
 
 def row_limit(context, rerun: bool) -> int | None:
@@ -152,63 +162,99 @@ def row_limit(context, rerun: bool) -> int | None:
     return device_timing.row_time_limit_seconds(baseline.process_wall_seconds, rerun) if baseline.process_wall_seconds is not None else None
 
 
-def row_keys(context, steps: tuple[str, ...], rows_of_step: dict | None = None) -> list[tuple[reuse.RowUnit, dict, str]]:
-    inputs, selected = tree_inputs(context), reuse.selected_row_lines(context.repo)
-    found = []
-    for row in reuse.segment_one_row_units(steps, rows_of_step):
-        sections, reason = reuse.row_sections(inputs, row, selected, reuse.limit_lines(row_limit(context, row.rerun)), [])
-        found.append((row, sections, reason))
-    return found
+def row_requests(context, steps: tuple[str, ...], rows_of_step: dict | None = None) -> list[tuple[reuse.RowUnit, reuse.UnitRequest]]:
+    facts, selected = tree_facts(context), reuse.selected_row_lines(context.repo)
+    return [(row, reuse.row_request(facts, row, selected, row_limit(context, row.rerun), [])) for row in reuse.segment_one_row_units(steps, rows_of_step)]
 
 
-def decide_and_fetch(context, steps: tuple[str, ...], rows_of_step: dict | None = None) -> None:
-    """派发之前：每行查库、写标记、取来命中的（第 11.5 节「与分片、续跑怎么叠」）；取来的行在 row-hosts.tsv 记一行「reused」（台号是原那一趟的）。"""
+def plan_and_fetch(context, steps: tuple[str, ...], rows_of_step: dict | None = None, clear_stale: bool = True) -> reuse.ItemRun | None:
+    """派发之前（文件头 ①）：这几步的行一份计划；取得到的把判定库里那一份解进行输出根。clear_stale：没取来的行的旧行目录也删掉（第 13 步与第 11、12 步共用
+    行目录，那一步不删，驱动照跑时自己删）。弄坏开关 stale-rows-done 下旧行目录不删。"""
     state = STATE["reuse"]
-    pairs, rows_of_name = [], {}
-    for row, sections, reason in row_keys(context, steps, rows_of_step):
-        decision, problems = reuse.decide(state.library, row.name, "driver-row", sections, reason, state.lookup)
-        if problems:
-            reuse.append_event(state.markers, f"E7RESULT name=reuse_corrupted unit={reuse.value(row.name)} key={decision.key} problems={reuse.value(','.join(problems[:6]))}")
-        state.decisions[(row.owner, row.number)] = decision
-        rows_of_name[row.name] = row
+    pairs = row_requests(context, steps, rows_of_step)
+    if not pairs:
+        return None
+    run = reuse.ItemRun(context.repo, SCRIPT_KEY, [request for _, request in pairs], state.state_parent, state.markers,
+                        printer=lambda line: one.say(context, line))
+    decisions = run.plan()
+    for row, request in pairs:
+        decision = decisions[request.unit]
+        state.decisions[(row.owner, row.number)], state.runs[(row.owner, row.number)] = decision, run
         if row.name not in state.registered:
             state.registered.append(row.name)
-        pairs.append((decision, os.path.join(context.step_root(one.STEPS[row.owner]), f"row-{row.number}")))
-    fetched, demoted = reuse.fetch_rows(state.library, state.markers, pairs)
-    for decision in demoted:
-        state.decisions[(rows_of_name[decision.unit].owner, rows_of_name[decision.unit].number)] = decision
-    for name in fetched:
-        row = rows_of_name[name]
-        origin = state.decisions[(row.owner, row.number)].meta.get("origin_host", "1")
-        one.append_ledger(context, row.owner, row.number, int(origin) if origin.isdigit() else 1, "reused")
-    counts = {state_name: sum(1 for decision, _ in pairs if decision.state == state_name) for state_name in (reuse.STATE_REUSED, reuse.STATE_FRESH_ALWAYS)}
-    one.say(context, f"  复用（{','.join(steps)}）：{len(pairs)} 行，库里取来 {len(fetched)} 行（命中 {counts[reuse.STATE_REUSED]}），永远现跑 "
-                     f"{counts[reuse.STATE_FRESH_ALWAYS]} 行，取用时条目坏了改现跑 {len(demoted)} 行")
+        row_directory = os.path.join(context.step_root(one.STEPS[row.owner]), f"row-{row.number}")
+        if decision.state == reuse.STATE_REUSED or (clear_stale and not broken("stale-rows-done")):
+            shutil.rmtree(row_directory, ignore_errors=True)
+        if decision.state == reuse.STATE_REUSED:
+            run.fetch(request.unit, {"row": row_directory})
+            state.fetched.add((row.owner, row.number))
+    counts = {name: sum(1 for decision in decisions.values() if decision.state == name) for name in (reuse.STATE_REUSED, reuse.STATE_FRESH, reuse.STATE_FRESH_ALWAYS)}
+    one.say(context, f"  复用（{','.join(steps)}）：{len(pairs)} 行，库里取来 {counts[reuse.STATE_REUSED]} 行，现判 {counts[reuse.STATE_FRESH]} 行，"
+                     f"拒算照跑 {counts[reuse.STATE_FRESH_ALWAYS]} 行")
+    return run
+
+
+def run_phase(context, run: reuse.ItemRun | None, phase, *arguments) -> None:
+    """编排器原来的一步；之后这一份计划收尾（文件头 ④）。那一步抛出来时收尾照做、照原样抛；收尾判红这一步停（退 1）。"""
+    try:
+        phase(*arguments)
+    except BaseException:
+        if run is not None:
+            run.finish()
+        raise
+    if run is not None and run.finish() != 0:
+        raise one.Stopped("按项判定收尾判红（复用哨兵或键在这一趟中途变了，见上面 long_run_item_verdicts 打的那几行）：交主 agent")
 
 
 def phase_rows_with_reuse(context, hosts, allocations, setup, expected_hashes) -> None:
-    decide_and_fetch(context, ("s11", "s12", "sx") if len(hosts) > 1 else ("s11", "s12"))
-    ORIGINAL["phase_rows_and_checks"](context, hosts, allocations, setup, expected_hashes)
+    steps = tuple(key for key in (("s11", "s12", "sx") if len(hosts) > 1 else ("s11", "s12")) if not os.path.exists(context.product(one.STEPS[key].stem)))
+    run_phase(context, plan_and_fetch(context, steps) if steps else None, ORIGINAL["phase_rows_and_checks"], context, hosts, allocations, setup, expected_hashes)
 
 
 def phase_timeout_reruns_with_reuse(context, hosts, setup, expected_hashes) -> None:
     timed = {key: one.timed_out_rows(context.product(one.STEPS[source].stem)) for key, source in (("r11", "s11"), ("r12", "s12"))}
     rows_of_step = {key: rows for key, rows in timed.items() if rows and not os.path.exists(context.product(one.STEPS[key].stem))}
-    if rows_of_step:
-        decide_and_fetch(context, tuple(rows_of_step), rows_of_step)
-    ORIGINAL["phase_timeout_reruns"](context, hosts, setup, expected_hashes)
+    run = plan_and_fetch(context, tuple(rows_of_step), rows_of_step, clear_stale=False) if rows_of_step else None
+    run_phase(context, run, ORIGINAL["phase_timeout_reruns"], context, hosts, setup, expected_hashes)
+
+
+def is_done_by_the_library(context, step, row: int) -> bool:
+    """这一步这一行这一趟做完了（文件头 ②）：从判定库取来的，或这一趟的分片跑完、行目录里有 row-result.tsv 的。弄坏开关 stale-rows-done 下照编排器原来的判法。"""
+    if broken("stale-rows-done"):
+        return ORIGINAL["is_done"](context, step, row)
+    state = STATE["reuse"]
+    if (step.key, row) in state.fetched:
+        return True
+    return (step.key, row) in state.finished and os.path.exists(os.path.join(context.step_root(step), f"row-{row}", "row-result.tsv"))
+
+
+def run_carry_from_the_library(context, step, rows: tuple[int, ...], expected_hashes: dict[str, str]) -> dict:
+    """合成时这一趟分片没覆盖的行（文件头 ③）：本机一个驱动带 --report-only 照这一趟取来的行目录重报。有一行不是这一趟取来的就停。"""
+    state = STATE["reuse"]
+    missing = [row for row in rows if (step.key, row) not in state.fetched]
+    if missing:
+        raise one.Stopped(f"第 {step.number} 步 {step.key}：第 {one.rows_text(missing)} 行既不是这一趟跑的、也不是这一趟从判定库取来的（输出根里的旧行不重报）")
+    work_root = os.path.join(context.attempt_dir, f"carry-work-{step.key}")
+    reporting = dataclasses.replace(step, flags=step.flags + ("--report-only",))
+    process, record = one.launch_local(context, expected_hashes, f"{step.key}-carry", reporting, rows, 1, one.registered_host_threads(), work_root, "carry")
+    code = process.wait()
+    if one.STOP.is_set():
+        raise one.Interrupted()
+    if not one.finish_shard(context, record, code):
+        raise one.Stopped(f"第 {step.number} 步 {step.key}：本机照取来的行目录重报第 {one.rows_text(rows)} 行那个驱动没跑成（退 {code}）")
+    return record
 
 
 def command_value(words: list[str], option: str) -> str:
     return words[words.index(option) + 1] if option in words and words.index(option) + 1 < len(words) else ""
 
 
-def peer_check_problems(context, record: dict, row: int, row_directory: str, decision: reuse.Decision) -> list[str]:
+def peer_check_problems(context, record: dict, row_directory: str, decision: reuse.Decision) -> list[str]:
     """别的台跑的行入库之前另核三样（reuse_library.peer_row_problems；快照摘要比给别的台读的那一份冻结树快照）。交回不过的那几样。"""
     if broken("peer-checks-skipped"):
         return []
     product = open(record["product"], encoding="utf-8").read() if os.path.exists(record["product"]) else ""
-    return reuse.peer_row_problems(row_directory, row, decision.text, product, frozen_snapshot_digest(context))
+    return reuse.peer_row_problems(row_directory, decision, product, frozen_snapshot_digest(context))
 
 
 def frozen_snapshot_digest(context) -> str:
@@ -218,7 +264,9 @@ def frozen_snapshot_digest(context) -> str:
 
 
 def finish_shard_with_reuse(context, record: dict, code: int) -> bool:
-    """finish_and_insert；之后（它出错也一样）只给这一分片用的本机工作根就删（文件头 ④：RC4 读完 lane0 的树与 dep-info 之后），删不成这一分片记没跑成。"""
+    """记下这一分片跑完的行（文件头 ②），finish_and_insert；之后（它出错也一样）只给这一分片用的本机工作根就删（文件头 ⑥），删不成这一分片记没跑成。"""
+    if record["kind"] in ("local", "peer"):
+        STATE["reuse"].finished.update((record["step"], row) for row in record["rows"])
     shard_ran_through = False
     try:
         shard_ran_through = finish_and_insert(context, record, code)
@@ -230,51 +278,43 @@ def finish_shard_with_reuse(context, record: dict, code: int) -> bool:
 
 
 def finish_and_insert(context, record: dict, code: int) -> bool:
-    """编排器原来的 finish_shard，再把这一分片现跑完的行入库（本机的先 RC4，别的台的先核三样）；S18 触发就冻库、这一分片记没跑成。"""
+    """编排器原来的 finish_shard，再把这一分片照跑完的行照入库条件判绿或判红（别的台的先核三样）；S18 触发这一分片记没跑成。"""
     shard_ran_through = ORIGINAL["finish_shard"](context, record, code)
     state = STATE["reuse"]
     if record["kind"] not in ("local", "peer"):
         return shard_ran_through
     step = one.STEPS[record["step"]]
     for row in record["rows"]:
-        decision = state.decisions.get((record["step"], row))
+        decision, run = state.decisions.get((record["step"], row)), state.runs.get((record["step"], row))
         row_directory = os.path.join(context.step_root(step), f"row-{row}")
-        if decision is None or decision.state == reuse.STATE_REUSED or not os.path.exists(os.path.join(row_directory, "row-result.tsv")):
+        if decision is None or run is None or not os.path.exists(os.path.join(row_directory, "row-result.tsv")):
             continue
-        if record["kind"] == "local":
-            lane = os.path.join(command_value(record["command"], "--work-root"), "lane0")
-            if not reuse.closure_check(state.markers, decision, os.path.join(lane, "tree"), os.path.join(lane, "target/release", reuse.DEVICE_BINARY + ".d"),
-                                       reuse.mutated_closure_paths(tree_inputs(context))):
-                continue
-            insertable = reuse.row_insertable(row_directory)
-        else:
-            problems = peer_check_problems(context, record, row, row_directory, decision)
-            insertable = (False, "peer-check-" + ",".join(problems)) if problems else reuse.row_insertable(row_directory)
-        fields = reuse.row_result_fields(row_directory)
-        meta = {"exit": fields.get("device_exit", "-"), "origin_run": f"{context.prefix}{context.tag}{context.suffix}", "origin_product": step.stem,
-                "origin_host": str(record["host"]), "threads": command_value(record["command"], "--threads"),
-                "closure_check": "rc4" if record["kind"] == "local" else "static-only"}
-        outcome = reuse.record_finished(state.library, state.markers, decision, {"row": row_directory}, insertable, meta)
+        problems = peer_check_problems(context, record, row_directory, decision) if record["kind"] == "peer" else []
+        insertable = (False, "peer-check-" + ",".join(problems)) if problems else reuse.row_insertable(row_directory)
+        device_exit = reuse.row_result_fields(row_directory).get("device_exit", "-")
+        outcome = run.record(decision.unit, {"row": row_directory}, int(device_exit) if device_exit.lstrip("-").isdigit() else -1, insertable)
         one.say(context, f"  入库 {decision.unit}（{one.host_name(record['host'])}）：{outcome}（{insertable[1] or '入库条件过'}）")
     problems = reuse.s18_problems(state.markers)
     if problems and not broken("s18-ignored"):
-        state.library.freeze(f"S18（修订 11 第 11.9 节）：{problems[0][:300]}")
-        one.say(context, f"✗ S18 触发（{len(problems)} 行事件，第一行：{problems[0][:200]}）：库冻住、不再取不再入，这一分片记没跑成，交主 agent")
+        one.say(context, f"✗ S18 触发（{len(problems)} 行事件，第一行：{problems[0][:200]}）：那一把键已撤成红，这一分片记没跑成，交主 agent")
         return False
     return shard_ran_through
 
 
 def plan_lines(context) -> list[str]:
-    """plan：每行的键与库里有没有（只读：不建库、不写标记、不挪坏条目）。"""
+    """plan：每行的键与库里有没有判绿的（只读：不写标记、不写库）。"""
     state = STATE["reuse"]
-    lines = [f"── 复用（修订 11）── 库 {state.library.location()}（冻住 {state.library.frozen_reason() or '否'}）；"
-             f"查库 {'开' if state.lookup else '关'}；标记 {state.markers}"]
+    lines = [f"── 复用（修订 11）── 判定库 prune-server apparatus-items/{reuse.KIND}；标记 {state.markers}"]
     if row_limit(context, False) is None:
         return lines + [f"限时要的那份计时 {context.baseline_timing} 还不在（修订 8 第 7 步没绿）：各行的键到起跑时现算"]
-    for row, sections, reason in row_keys(context, ("s11", "s12")):
-        key = reuse.key_of(sections)
-        present = state.library.present(key)
-        lines.append(f"行 {row.name}：键 {key[:16]}；{('永远现跑（' + reason + '）') if reason else ('库里有同键条目' if present else '库里没有')}")
+    pairs = row_requests(context, ("s11", "s12"))
+    keys = reuse.keyed_items(context.repo, [request for _, request in pairs])
+    for row, request in pairs:
+        key, why = keys[request.unit]
+        if request.reason or key is None:
+            lines.append(f"行 {row.name}：拒算（{request.reason or why}），照跑")
+        else:
+            lines.append(f"行 {row.name}：键 {key[:16]}；{'库里有判绿的' if reuse.stored_value(context.repo, key) is not None else '库里没有判绿的'}")
     return lines
 
 
@@ -294,7 +334,7 @@ def run_with_ledger(context, plan_only: bool) -> int:
         os.makedirs(context.logs, exist_ok=True)
         with open(os.path.join(context.logs, f"{LEDGER_STEM}.out"), "w", encoding="utf-8") as handle:
             handle.write(text)
-        work_roots_removed = remove_remaining_work_roots(context)   # 文件头 ④：正常、出错、被停（run 抛出来）都走这里
+        work_roots_removed = remove_remaining_work_roots(context)   # 文件头 ⑥：正常、出错、被停（run 抛出来）都走这里
     if not work_roots_removed:
         one.say(context, "✗ 本机逐行驱动的工作根有删不成的（上面几行点名了进程与路径），整趟不记绿")
         one.say(context, "     → 怎么办：照上面那几行停掉还开着的进程，再 python3 scripts/hosts/run_build_directory.py remove <工作根>")
@@ -309,18 +349,24 @@ def run_with_ledger(context, plan_only: bool) -> int:
     return code
 
 
-def install(reuse_config: dict, repo: str, dumps: str) -> None:
-    h30 = reuse_config.get("H30") or {}
-    root, _ = library_roots.library_root_of(h30)   # 库根两台同一（reuse_library_root）；取不成的 run 在 main 里已退 78，plan 照缺省那一个打
-    STATE["reuse"] = RowsReuse(reuse.Library(root), bool(h30.get("lookup", True)),
-                               os.path.join(repo, dumps, "reuse-markers", MARKERS_NAME), {}, [])
+def install(repo: str, dumps: str, plan: bool) -> None:
+    state_parent = os.path.join(repo, dumps, "reuse-items", MARKERS_NAME)
+    if not plan:
+        shutil.rmtree(state_parent, ignore_errors=True)   # 状态目录只属于一趟：上一趟停在中途留下的不读、删掉
+    STATE["reuse"] = RowsReuse(repo, os.path.join(repo, dumps, "reuse-markers", MARKERS_NAME), state_parent, {}, {}, set(), set(), [])
     ORIGINAL.update({"phase_rows_and_checks": one.phase_rows_and_checks, "finish_shard": one.finish_shard,  # 换掉之前逐个点名留下原件
-                     "phase_timeout_reruns": one.phase_timeout_reruns, "run": one.run, "launch_local": one.launch_local})
+                     "phase_timeout_reruns": one.phase_timeout_reruns, "run": one.run, "launch_local": one.launch_local, "is_done": one.is_done,
+                     "run_carry": one.run_carry})
     one.phase_rows_and_checks = phase_rows_with_reuse
     one.finish_shard = finish_shard_with_reuse
     one.phase_timeout_reruns = phase_timeout_reruns_with_reuse
     one.run = run_with_ledger
     one.launch_local = launch_local_recording_work_root
+    one.is_done = is_done_by_the_library
+    one.run_carry = run_carry_from_the_library
+    if broken("rerun-without-flag"):   # 文件头 ⑤：第 13 步的 --timed-out-before 由第一段编排器那两步自己带；弄坏开关下去掉
+        for key in ("r11", "r12"):
+            one.STEPS[key] = dataclasses.replace(one.STEPS[key], flags=tuple(flag for flag in one.STEPS[key].flags if flag != "--timed-out-before"))
 
 
 def main(argument_list: list[str]) -> int:
@@ -344,7 +390,7 @@ def main(argument_list: list[str]) -> int:
         try:
             if problems:
                 raise reuse.RunCondition("H31 不过：" + "；".join(problems[:4]))
-            reuse.Library(library_roots.require_library_root(reuse_config.get("H30"))).check_service_reachable()
+            reuse.check_service_reachable(repo)
         except reuse.RunCondition as error:
             print(f"✗ 运行条件不满足（退 78）：{error}", file=sys.stderr)
             return one.EXIT_RUN_CONDITION
@@ -352,14 +398,14 @@ def main(argument_list: list[str]) -> int:
 
     def configure_with_reuse(config: dict, stop_file: str) -> None:
         original_configure(config, stop_file)
-        install(reuse_config, repo, str(judge.section(config, "H16").get("dumps_root")))
+        install(repo, str(judge.section(config, "H16").get("dumps_root")), mode != "run")
 
     rows8.configure = configure_with_reuse
     return rows8.main(argument_list)
 
 
-# ── 自证：借第一段编排器的假世界（假驱动、假机器清单与资源；这里只用本机一台，不经假 task-server），假树补上算键要的几样；
-#    假驱动外面包一层，在 <工作根>/lane0 下放一份「这一次编译」的 dep-info 给 RC4 ──
+# ── 自证：借第一段编排器的假世界（假驱动、假机器清单与资源；这里只用本机一台，不经假 task-server），假仓与假树补上算键要的几样
+#    （reuse_library.furnish_rows_world；装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假入口）──
 FAKE_RUN_DATE = "2026-10-09"
 FAKE_DRIVER = os.path.join(HERE, "fake_row_driver.py")
 
@@ -368,22 +414,25 @@ FAKE_DRIVER = os.path.join(HERE, "fake_row_driver.py")
 class WorldEleven:
     root: str
     base: object
-    library: str
     environment: dict
 
 
-def fake_world_eleven(root: str) -> WorldEleven:
-    base = one.fake_world(os.path.join(root, "world"), hosts_code=3)
+def fake_world_eleven(root: str, extra: dict[str, str] | None = None) -> WorldEleven:
+    base = one.fake_world(os.path.join(root, "world"), hosts_code=3, extra_environment=extra)
     tree = os.path.join(base.repo, "scripts/experiment-apparatus/target/fake-frozen-tree")
     reuse.furnish_rows_world(base.repo, tree, tuple(row for rows in one.STEP_ROWS.values() for row in rows))
-    wrapper = judge.write_text(os.path.join(root, "fake-driver-with-dep-info.py"), reuse.FAKE_DRIVER_WRAPPER.replace("FAKE_DRIVER_PATH", FAKE_DRIVER))
-    environment = dict(base.environment, ROWS_R8_SELFTEST="1", ROWS_R11_SELFTEST="1", REUSE_SELFTEST="1", ROWS_ORCHESTRATOR_DRIVER=wrapper,
-                       REUSE_SELFTEST_TOOLCHAIN="cargo fake\nrustc fake\n", REUSE_SELFTEST_BUILD_ENVIRONMENT="<构建环境：假> 0")
-    return WorldEleven(root, base, os.path.join(root, "library"), environment)
+    entries = reuse.selftest_entries(os.path.join(root, "entries.tsv"), [f"seg1-{step}-row-{row}" for step, source in
+                                                                        (("s11", "s11"), ("s12", "s12"), ("sx", "sx"), ("r11", "s11"), ("r12", "s12"))
+                                                                        for row in one.STEP_ROWS[source]])
+    checks = reuse.items_library.lib_reuse_checks
+    environment = dict(base.environment, ROWS_R8_SELFTEST="1", ROWS_R11_SELFTEST="1", REUSE_SELFTEST="1", ROWS_ORCHESTRATOR_DRIVER=FAKE_DRIVER,
+                       **{reuse.items_library.LIBRARY_DIRECTORY_VARIABLE: os.path.join(root, "library"), reuse.items_library.SUBSTITUTION_VARIABLE: entries,
+                          checks.SENTINEL_COUNT_VARIABLE: reuse.ALL_SENTINELS})
+    return WorldEleven(root, base, environment)
 
 
-def pass_configs(world: WorldEleven, name: str, lookup: bool) -> tuple[str, str, str]:
-    """一遍的修订 8 配置（H16 各遍不同；H3、H8 照补好的假树现算）、修订 11 配置（库同一个）、这一遍 step-7 计时（各遍同一个 T）。"""
+def pass_configs(world: WorldEleven, name: str) -> tuple[str, str, str]:
+    """一遍的修订 8 配置（H16 各遍不同；H3、H8 照补好的假树现算）、修订 11 配置、这一遍 step-7 计时（各遍同一个 T）。"""
     tree = os.path.join(world.base.repo, "scripts/experiment-apparatus/target/fake-frozen-tree")
     run_date = f"{FAKE_RUN_DATE[:-2]}{name}"
     config = {"tree": "scripts/experiment-apparatus/target/fake-frozen-tree", "H3": {"snapshot_digest": judge.row_driver.snapshot_digest(tree)[0]},
@@ -395,17 +444,16 @@ def pass_configs(world: WorldEleven, name: str, lookup: bool) -> tuple[str, str,
         judge.write_text(f"{prefix}-{stem}-r8-timing.out", f"E7TIMING name=stream_time stream=a elapsed_ns=1000000000\nE7TIMING name=process_wall seconds={seconds} exit=0\n")
     revision_8 = judge.write_text(os.path.join(world.root, f"revision-8-{name}.json"), json.dumps(config))
     h31 = {path: reuse.sha256_file(path) for path in (os.path.abspath(__file__), os.path.join(HERE, "reuse_library.py"))}
-    revision_11 = judge.write_text(os.path.join(world.root, f"revision-11-{name}.json"),
-                                   json.dumps({"H30": {"library_root": world.library, "lookup": lookup}, "H31": {"files": h31}}))
+    revision_11 = judge.write_text(os.path.join(world.root, f"revision-11-{name}.json"), json.dumps({"H31": {"files": h31}}))
     return revision_8, revision_11, rows8.placeholders.product_prefix(run_date) + "-baseline-run1-r8-timing.out"
 
 
-def run_pass(world: WorldEleven, name: str, lookup: bool, extra: dict[str, str] | None = None) -> tuple[int, str]:
-    revision_8, revision_11, timing = pass_configs(world, name, lookup)
+def run_pass(world: WorldEleven, name: str, extra: dict[str, str] | None = None) -> tuple[int, str]:
+    revision_8, revision_11, timing = pass_configs(world, name)
     command = [sys.executable, "-B", os.path.abspath(__file__), "run", "--config", revision_8, "--repo", world.base.repo, "--baseline-timing", timing,
                "--stop-file", os.path.join(world.root, f"stop-{name}")]
     completed = subprocess.run(command, cwd=world.base.repo, env=dict(world.environment, E171_REVISION_11_CONFIG=revision_11, **(extra or {})),
-                               capture_output=True, text=True, timeout=300)
+                               capture_output=True, text=True, timeout=600)
     return completed.returncode, completed.stdout + completed.stderr
 
 
@@ -413,10 +461,14 @@ def product_of(world: WorldEleven, name: str, stem: str) -> str:
     return os.path.join(world.base.repo, f"{rows8.placeholders.product_prefix(FAKE_RUN_DATE[:-2] + name)}-{stem}-r8.out")
 
 
-def ran_rows(world: WorldEleven) -> list[str]:
-    """假驱动真跑过（按键复用读回的不算）的行：driver.log 里 ran 开头的那几行。"""
+def rows_root_of(world: WorldEleven, name: str) -> str:
+    return os.path.join(world.base.repo, f"scripts/experiment-apparatus/target/fake-dumps-{name}", "segment1-rows")
+
+
+def driver_lines(world: WorldEleven, kind: str) -> list[str]:
+    """假驱动的 driver.log 里以 kind 起头的那几行：ran（照跑的行）、reported（--report-only 重报的行）。"""
     path = os.path.join(world.base.root, "driver.log")
-    return [line.strip() for line in open(path, encoding="utf-8") if line.startswith("ran ")] if os.path.exists(path) else []
+    return [line.strip() for line in open(path, encoding="utf-8") if line.startswith(kind + " ")] if os.path.exists(path) else []
 
 
 def merged_rows_without_timing(path: str) -> list[str]:
@@ -424,38 +476,71 @@ def merged_rows_without_timing(path: str) -> list[str]:
 
 
 def work_roots_left(world: WorldEleven, name: str) -> list[str]:
-    """这一遍跑完 <日志目录>/rows-work 下还剩的工作根（文件头 ④：用完就删，连 rows-work 一起不剩）。"""
+    """这一遍跑完 <日志目录>/rows-work 下还剩的工作根（文件头 ⑥：用完就删，连 rows-work 一起不剩）。"""
     directory = os.path.join(world.root, f"logs-{name}", "rows-work")
     return sorted(os.listdir(directory)) if os.path.isdir(directory) else []
 
 
+def ledger_last_line(world: WorldEleven, name: str) -> str:
+    path = product_of(world, name, LEDGER_STEM)
+    return open(path, encoding="utf-8").read().strip().splitlines()[-1] if os.path.exists(path) else "账本不在"
+
+
 def cell_reuse_end_to_end(scratch: str) -> tuple[bool, str]:
-    """第一遍查库关（16 行全部现跑、RC4 过、入库，入库之后本机的工作根都删了）；第二遍查库开：除第 12 步 row-0（RC2）外全部取来、不派，假驱动只真跑 row-0；
-    合成的两份产物去耗时列之后与第一遍逐行相同（判法照跑、判过）；账本 reused=15、check_mismatches=0；两遍跑完 rows-work 下都不剩工作根。"""
+    """第一遍库空（16 行全部照跑、判绿入库，入库之后本机的工作根都删了）；第二遍：除第 12 步 row-0（RC2 的 second-run）外全部取来、不派，假驱动只照跑 row-0，
+    取来的 15 行由带 --report-only 的驱动重报；合成的两份产物去耗时列之后与第一遍逐行相同（判法照跑、判过）；账本 reused=15、check_mismatches=0；两遍都不剩工作根。"""
     world = fake_world_eleven(scratch)
-    first_code, first_output = run_pass(world, "11", False)
-    first_ran = len(ran_rows(world))
+    first_code, first_output = run_pass(world, "11")
+    first_ran, first_reported = len(driver_lines(world, "ran")), len(driver_lines(world, "reported"))
     first_left = work_roots_left(world, "11")
-    second_code, second_output = run_pass(world, "12", True)
-    second_ran = ran_rows(world)[first_ran:]
-    ledger = open(product_of(world, "12", LEDGER_STEM), encoding="utf-8").read().strip().splitlines()[-1] if os.path.exists(product_of(world, "12", LEDGER_STEM)) else "账本不在"
+    second_code, second_output = run_pass(world, "12")
+    second_ran = [line.split()[1] for line in driver_lines(world, "ran")[first_ran:]]
+    second_reported = len(driver_lines(world, "reported")) - first_reported
+    ledger = ledger_last_line(world, "12")
     same_products = all(merged_rows_without_timing(product_of(world, "11", stem)) == merged_rows_without_timing(product_of(world, "12", stem))
                         and merged_rows_without_timing(product_of(world, "12", stem)) for stem in ("rows-driver", "rows-probe-driver"))
-    closure_events = sum(1 for line in open(os.path.join(world.base.repo, "scripts/experiment-apparatus/target/fake-dumps-11/reuse-markers", MARKERS_NAME, "events.tsv"), encoding="utf-8")
-                         if "name=reuse_closure_check" in line and "matches=true" in line) if first_code == 0 else 0
     second_left = work_roots_left(world, "12")
-    good = (first_code == 0 and first_ran == 16 and closure_events == 16 and second_code == 0 and [line.split()[1] for line in second_ran] == ["row=0"]
+    good = (first_code == 0 and first_ran == 16 and first_reported == 0 and second_code == 0 and second_ran == ["row=0"] and second_reported == 15
             and same_products and " reused=15 " in ledger and " units_cover_registered=true " in ledger and " check_mismatches=0 " in ledger
             and not first_left and not second_left)
-    return good, (f"第一遍退 {first_code}、真跑 {first_ran} 行、RC4 相符 {closure_events} 次、跑完 rows-work 下剩 {first_left}；第二遍退 {second_code}、"
-                  f"真跑 {[line.split()[1] for line in second_ran]}、跑完剩 {second_left}；"
-                  f"两遍合成产物去耗时列相同 {same_products}；账本 {ledger[22:120]}；末行 {(second_output.strip().splitlines() or [''])[-1][:80]}")
+    return good, (f"第一遍退 {first_code}、照跑 {first_ran} 行、重报 {first_reported} 行、跑完 rows-work 下剩 {first_left}；第二遍退 {second_code}、"
+                  f"照跑 {second_ran}、重报 {second_reported} 行、跑完剩 {second_left}；两遍合成产物去耗时列相同 {same_products}；账本 {ledger[22:140]}；"
+                  f"第二遍末行 {(second_output.strip().splitlines() or [''])[-1][:120]}")
+
+
+def cell_stale_rows_redone(scratch: str) -> tuple[bool, str]:
+    """行输出根里先放一份旧的第 242 行（有 row-result.tsv、判定库里没有）：它不当做完，照跑（16 行都照跑）。"""
+    world = fake_world_eleven(scratch)
+    judge.write_text(os.path.join(rows_root_of(world, "51"), "row-242", "row-result.tsv"), "row_number\t242\nstatus\tok\ndevice_exit\t0\n")
+    code, output = run_pass(world, "51")
+    ran = [line.split()[1] for line in driver_lines(world, "ran")]
+    return code == 0 and "row=242" in ran and len(ran) == 16, f"退 {code}；照跑 {len(ran)} 行（第 242 行在不在 {'row=242' in ran}）；末行 {(output.strip().splitlines() or [''])[-1][:120]}"
+
+
+def cell_timeout_rerun(scratch: str) -> tuple[bool, str]:
+    """第 12 步第 15 行超时（253，判红）：第 13 步由这一层显式给 --timed-out-before，那一行限时是别的行的 3 倍、记着乘过 3、判绿入库；
+    第二遍第 12 步第 15 行（判红的）照跑、又超时，第 13 步的第 15 行从判定库取来、带 --report-only 重报。"""
+    world = fake_world_eleven(scratch, {"FAKE_DRIVER_TIMEOUT_ROWS": "15"})
+    first_code, _ = run_pass(world, "61")
+    first_ran, first_reported = len(driver_lines(world, "ran")), len(driver_lines(world, "reported"))
+    results = {row: reuse.row_result_fields(os.path.join(rows_root_of(world, "61"), f"row-{row}")) for row in (15, 23)}
+    second_code, second_output = run_pass(world, "62")
+    second_ran = sorted(line.split()[1] for line in driver_lines(world, "ran")[first_ran:])
+    reported = [line.split()[1] for line in driver_lines(world, "reported")[first_reported:]]
+    good = (first_code == 0 and results[15].get("timed_out_before") == "true" and results[23].get("timed_out_before") == "false"
+            and int(results[15].get("time_limit_seconds", "0")) == 3 * int(results[23].get("time_limit_seconds", "0")) > 0
+            and os.path.exists(product_of(world, "61", "rows-timeout-rerun-driver"))
+            and second_code == 0 and second_ran == ["row=0", "row=15"] and "row=15" in reported)
+    return good, (f"第一遍退 {first_code}；第 15 行 timed_out_before={results[15].get('timed_out_before')}、限时 {results[15].get('time_limit_seconds')}"
+                  f"（第 23 行 {results[23].get('time_limit_seconds')}）；第二遍退 {second_code}、照跑 {second_ran}、重报里有第 15 行 {'row=15' in reported}；"
+                  f"第二遍末行 {(second_output.strip().splitlines() or [''])[-1][:120]}")
 
 
 def cell_peer_checks(scratch: str) -> tuple[bool, str]:
     """别的台跑的行入库之前的三样：都对得上交回空表；row_number、mutation_line_sha256、row_time_limit、snapshot_digest 各错一样各报一样。"""
     raw = "m-row-two\tcrates/core/src/other.rs\talpha\tbeta\t-p core\tt_two"
-    decision = reuse.Decision("seg1-s12-row-15", "driver-row", "k", f"[mutation]\nrow 15\nmutation {raw}\n[limit]\nseconds 1800\n[python]\nx\n", reuse.STATE_FRESH, "no-entry")
+    decision = reuse.Decision("seg1-s12-row-15", "driver-row", "seg1-s12-row-15", "k", reuse.STATE_FRESH, "no-entry",
+                              facts={"row": 15, "mutation_line_sha256": hashlib.sha256(raw.encode()).hexdigest(), "limit_seconds": 1800})
     STATE["frozen_snapshot_digest"] = "d" * 64
     context = types.SimpleNamespace(shards=scratch)
     outcomes = {}
@@ -467,35 +552,48 @@ def cell_peer_checks(scratch: str) -> tuple[bool, str]:
         row_directory = os.path.join(scratch, case, "row-15")
         judge.write_text(os.path.join(row_directory, "row-result.tsv"), f"row_number\t{row_number}\nmutation_line_sha256\t{digest}\n")
         product = judge.write_text(os.path.join(scratch, case, "product.out"), f"name=row_time_limit seconds={limit} baseline_seconds=1\nsnapshot_digest={snapshot} files=3\n")
-        outcomes[case] = peer_check_problems(context, {"product": product}, 15, row_directory, decision)
+        outcomes[case] = peer_check_problems(context, {"product": product}, row_directory, decision)
     good = outcomes["good"] == [] and all(outcomes[case] == [case] for case in outcomes if case != "good")
     return good, f"各样：{outcomes}"
 
 
 def cell_s18_stops(scratch: str) -> tuple[bool, str]:
-    """第二遍查库关、本机的假驱动往 device.out 的 E7RESULT 里掺一个字：同键入库时 RC1 present-differs → S18：库冻住、那一分片记没跑成、退 1；
-    出错退的这一遍跑完 rows-work 下同样不剩工作根（文件头 ④）。"""
+    """第二遍本机的假驱动往 device.out 的 E7RESULT 里掺一个字：取来的行不派，第 12 步 row-0（second-run）照跑、与库里那一份比不同（RC2）→ S18：
+    那一把键撤成红、那一分片记没跑成、退 1；出错退的这一遍跑完 rows-work 下同样不剩工作根（文件头 ⑥）。"""
     world = fake_world_eleven(scratch)
-    first_code, _ = run_pass(world, "21", False)
-    second_code, output = run_pass(world, "22", False, {"FAKE_DRIVER_SALT_HOST": "1", "FAKE_DRIVER_SALT_PART": "device"})
-    frozen = reuse.Library(world.library).frozen_reason()
+    first_code, _ = run_pass(world, "21")
+    second_code, output = run_pass(world, "22", {"FAKE_DRIVER_SALT_HOST": "1", "FAKE_DRIVER_SALT_PART": "device"})
+    events = reuse.event_lines(os.path.join(world.base.repo, "scripts/experiment-apparatus/target/fake-dumps-22/reuse-markers", MARKERS_NAME))
+    mismatched = [line for line in events if " name=reuse_check kind=second-run " in f" {line} " and " identical=false " in f" {line} "]
     left = work_roots_left(world, "22")
-    return (first_code == 0 and second_code == 1 and bool(frozen) and "S18 触发" in output and not left,
-            f"第一遍退 {first_code}；第二遍（掺字）退 {second_code}；库冻住 {bool(frozen)}；第二遍跑完 rows-work 下剩 {left}")
+    return (first_code == 0 and second_code == 1 and bool(mismatched) and "S18 触发" in output and not left,
+            f"第一遍退 {first_code}；第二遍（掺字）退 {second_code}；RC2 不同 {len(mismatched)} 行；第二遍跑完 rows-work 下剩 {left}")
 
 
-SELFTEST_CELLS = {"reuse-e2e": cell_reuse_end_to_end, "peer-checks": cell_peer_checks, "s18-stops": cell_s18_stops}
-SELFTEST_SWITCHES = {"peer-checks-skipped": "peer-checks", "s18-ignored": "s18-stops", "work-roots-kept": "reuse-e2e"}
+def cell_reuse_three_questions(scratch: str) -> tuple[bool, str]:
+    """复用三问与复用哨兵的六格（reuse_library.run_reuse_cells）：这一层的两行 seg1-s12-row-1、seg1-s12-row-2，规范输出 REUSE_SELFTEST script=<本文件>。"""
+    return reuse.run_reuse_cells(scratch, SCRIPT_KEY, ("seg1-s12-row-1", "seg1-s12-row-2"))
+
+
+def selftest_cell_functions():
+    """自证的各格，格名到函数。表写在函数体里：写成模块级赋值，会在 import 这个模块时把全部自证格连同它们起的子进程拖进 import 一方的判法单元闭包。"""
+    return {"reuse-e2e": cell_reuse_end_to_end, "stale-rows-redone": cell_stale_rows_redone, "timeout-rerun": cell_timeout_rerun,
+            "peer-checks": cell_peer_checks, "s18-stops": cell_s18_stops, "reuse-three-questions": cell_reuse_three_questions}
+
+
+SELFTEST_SWITCHES = {"peer-checks-skipped": "peer-checks", "s18-ignored": "s18-stops", "stale-rows-done": "stale-rows-redone",
+                     "rerun-without-flag": "timeout-rerun", "work-roots-kept": "reuse-e2e"}
 
 
 def selftest(argument_list: list[str]) -> int:
     problem = reuse.prune_server_client.selftest_service_problem()
-    if problem:   # 复用库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「退出码」）
+    if problem:   # 判定库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「退出码」）
         print(f"✗ rows_orchestrator_revision_11.py 自证没跑：{problem}", file=sys.stderr)
         print(f"     → 怎么办：{reuse.prune_server_client.SELFTEST_SERVICE_REMEDY}", file=sys.stderr)
         return 2
     os.environ[SELFTEST_VARIABLE] = "1"
-    return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
+    return harness.run_selftest(os.path.abspath(__file__), argument_list, harness.cells_reporting_progress(selftest_cell_functions()), SELFTEST_SWITCHES,
+                                BREAK_VARIABLE, SELFTEST_VARIABLE)
 
 
 if __name__ == "__main__":

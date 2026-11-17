@@ -1,0 +1,6 @@
+# E206（发布固定点轮数的代价）插计数脚本的变异表（跑前登记第九节 M13–M16）。一行三段：名、原文、替换文，都逐字取自 e206_fixed_point_cost_counters.py。
+m13_rounds_counted_after_the_release_exit	Edit("round_begin", T, HEAD_SETTLE, FN_END, ROUND_BEGIN_ANCHOR, "before", f"        {E}round_begin(rewritten.len(), nodes_after.len());\n"),	Edit("round_begin", T, HEAD_SETTLE, FN_END, HOLDING, "before", f"        {E}round_begin(rewritten.len(), nodes_after.len());\n"),
+m14_placement_dirty_keeps_what_the_release_dirtied	new_dirty(changed, Some(changed_by_the_release), rewritten_by_the_plan);	new_dirty(changed, None, rewritten_by_the_plan);
+m15_closure_only_after_the_release_exit	Edit("merge_after_the_placements", T, HEAD_SETTLE, FN_END, PLACEMENT_MERGE, "replace", merged("changed", "PlacementNotCovered")),	Edit("merge_after_the_placements", T, HEAD_SETTLE, FN_END, PLACEMENT_MERGE, "after", ""),
+m16_closure_off_still_walks	matches!(arm(), Arm::ReleaseChainClosure)	matches!(arm(), Arm::ReleaseChainClosure | Arm::ClosurePatchedButNotWalked)
+m17_the_anchor_check_skips_the_syntax_check	    if bad == 0 and syntax:	    if False and syntax:

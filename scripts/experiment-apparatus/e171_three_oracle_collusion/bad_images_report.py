@@ -1,6 +1,6 @@
 """E171 Q2（坏镜像）的行文（登记 5.5、第六节 Q2-全放行、Q2-阴性、Q2-族覆盖、第八节几何）：四族坏镜像在 O2、O3 上的判定。
 
-O2 那一列来自装置的 `known-bad-images` 模式（41 条已知坏镜像在流一全持久态上的 `known-bad-o2.tsv`；E170 `bad-states` 模式造的 P、N、盲测各行的
+O2 那一列来自装置的 `known-bad-images` 模式（已知坏镜像在流一全持久态上的 `known-bad-o2.tsv`；E170 `bad-states` 模式造的 P、N、盲测各行的
 `e170-bad-rows-o2.tsv`，每行还带不打补丁的底态上 O2 的判定）；族名、行名、底态名从 E170 的 `bad-expected.tsv` 前四列取，第六列是 E170 设计员照条款推的期望
 （只用来核登记 A2 与失败条款 F3，不进任何判定）。O3 那两列来自 `o3_bad_image_judge.py judge` 的 `name=image_judgement` 行（冻结的执行器判，严格与暂代各一）。
 O3 严格判「规约欠一句」、出错都算弃权、不红（登记第一节读法 7）；`None` 表示没有这一行的 O3 判定（没跑）。盲测族的种子取冻结的那一版（登记 5.4），N 行附带。
@@ -22,7 +22,6 @@ FAMILIES_IN_THE_Q2_TABLE = (FAMILY_POSITIVE, FAMILY_BLIND, FAMILY_KNOWN_BAD)
 EXPECTED_BASE_LABELS = ("F", "Mk", "Mk+", "Mk-")
 P_ROWS_EXPECTED = 26
 N_ROWS_EXPECTED = 10
-KNOWN_BAD_ROWS_EXPECTED = 41
 BLIND_ROWS_EXPECTED = 40
 NEGATIVE_BASES_EXPECTED = 8
 EXPECTED_COLUMN_OF_THE_VERDICT = 5
@@ -75,7 +74,7 @@ class ImageJudgement:
 
 
 def read_known_bad_rows(known_bad_directory: str) -> list[BadImageRow]:
-    """41 条已知坏镜像（流一全持久态 F，施加在 `build_pool` 走完的干净镜像上）。列：序号、目标不变量、补丁叠回之后判红的不变量、直接改坏的判红的不变量、两者相等、目标红。"""
+    """已知坏镜像（流一全持久态 F，施加在 `build_pool` 走完的干净镜像上）。列：序号、目标不变量、补丁叠回之后判红的不变量、直接改坏的判红的不变量、两者相等、目标红。"""
     rows = []
     for columns in read_rows(os.path.join(known_bad_directory, "known-bad-o2.tsv")):
         index, target, patched_red = int(columns[0]), columns[1], columns[2]
@@ -225,7 +224,6 @@ def bad_image_lines(rows: list[BadImageRow], base_judgements: dict[tuple[str, st
     lines.result(
         f"name=a9_a10_a8 p_rows={families[FAMILY_POSITIVE]} p_rows_expected={P_ROWS_EXPECTED} n_rows={families[FAMILY_NEGATIVE]} "
         f"n_rows_expected={N_ROWS_EXPECTED} blind_rows={families[FAMILY_BLIND]} blind_rows_expected={BLIND_ROWS_EXPECTED} "
-        f"known_bad_rows={families[FAMILY_KNOWN_BAD]} known_bad_rows_expected={KNOWN_BAD_ROWS_EXPECTED} q2_table_rows={len(table_rows)} "
-        f"q2_table_rows_expected={P_ROWS_EXPECTED + BLIND_ROWS_EXPECTED + KNOWN_BAD_ROWS_EXPECTED}")
+        f"known_bad_rows={families[FAMILY_KNOWN_BAD]} q2_table_rows={len(table_rows)}")
     lines.result("name=a1 o1_column_in_the_q2_table=absent")
     tally["known_bad_rows_with_o2_quiet"] = sum(not row.o2_is_red() for row in by_family[FAMILY_KNOWN_BAD])

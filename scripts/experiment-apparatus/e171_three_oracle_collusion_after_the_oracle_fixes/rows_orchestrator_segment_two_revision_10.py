@@ -96,8 +96,8 @@ BREAK_VARIABLE = "SEGMENT_TWO_R10_BREAK"
 SELFTEST_VARIABLE = "SEGMENT_TWO_R10_SELFTEST"
 SEGMENT_TWO_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator_segment_two.py")
 # 钉的是第二段编排器此刻的内容（它钉的第一段编排器按此刻内容重钉了，跟着变）
-SEGMENT_TWO_ORCHESTRATOR_SHA256 = "50d59d280fac19e7a935b22d05b74b66f71d8ba0b4ffbd8a4765ece1efbb45ca"
-SEGMENT_TWO_SELFTEST_LAST_LINE = "自证 46 项，红 0"
+SEGMENT_TWO_ORCHESTRATOR_SHA256 = "ce9ef2766680cb2305221020d03419b5ff49e447293e61b4a3098a9be6274964"
+SEGMENT_TWO_SELFTEST_LAST_LINE = "自证 48 项，红 0"
 EXIT_WRONG_PINNED_FILE = 3
 YIELD_RECHECK_SECONDS = 30.0
 # 修订 8 那一趟第 11、12 步与跨机对照 X（第一段编排器 STEPS 的键）：让路看它们还有没有排着的行
@@ -774,14 +774,18 @@ def segment_two_selftest_cell(scratch: str) -> tuple[bool, str]:
     return completed.returncode == 0 and got == SEGMENT_TWO_SELFTEST_LAST_LINE, f"rows_orchestrator_segment_two.py --selftest 末行 {got}（要 {SEGMENT_TWO_SELFTEST_LAST_LINE}）"
 
 
-SELFTEST_CELLS = {
-    "overrides-applied": cell_overrides_applied, "mutations-table-checked": cell_mutations_table_checked,
-    "segment-one-rows-waiting": cell_segment_one_rows_waiting, "inputs-checked": cell_inputs_checked, "run-values-checked": cell_run_values_checked,
-    "e2e-two-hosts": cell_e2e_two_hosts, "e2e-stop-file": cell_e2e_stop_file, "e2e-s17-segment-one": cell_e2e_s17_segment_one,
-    "e2e-gate-refused": cell_e2e_gate_refused,
-    "e2e-local-gate-closed": cell_e2e_local_gate_closed, "e2e-local-gate-opens": cell_e2e_local_gate_opens, "e2e-yield": cell_e2e_yield,
-    "plan-writes-nothing": cell_plan_writes_nothing, "segment-two-orchestrator-selftest": segment_two_selftest_cell,
-}
+def selftest_cell_functions():
+    """自证的各格，格名到函数。表写在函数体里：写成模块级赋值，会在 import 这个模块时把全部自证格连同它们起的子进程拖进 import 一方的判法单元闭包。"""
+    return {
+        "overrides-applied": cell_overrides_applied, "mutations-table-checked": cell_mutations_table_checked,
+        "segment-one-rows-waiting": cell_segment_one_rows_waiting, "inputs-checked": cell_inputs_checked, "run-values-checked": cell_run_values_checked,
+        "e2e-two-hosts": cell_e2e_two_hosts, "e2e-stop-file": cell_e2e_stop_file, "e2e-s17-segment-one": cell_e2e_s17_segment_one,
+        "e2e-gate-refused": cell_e2e_gate_refused,
+        "e2e-local-gate-closed": cell_e2e_local_gate_closed, "e2e-local-gate-opens": cell_e2e_local_gate_opens, "e2e-yield": cell_e2e_yield,
+        "plan-writes-nothing": cell_plan_writes_nothing, "segment-two-orchestrator-selftest": segment_two_selftest_cell,
+    }
+
+
 SELFTEST_SWITCHES = {"peer-names-unchanged": "overrides-applied", "mutations-table-skipped": "mutations-table-checked",
                      "local-gate-ignored": "e2e-local-gate-closed", "running-shards-ignored": "segment-one-rows-waiting", "yield-ignored": "e2e-yield",
                      "stop-file-ignored": "e2e-stop-file", "s17-ignored": "e2e-s17-segment-one", "gate-ignored": "e2e-gate-refused", "inputs-unchecked": "inputs-checked",
@@ -790,7 +794,8 @@ SELFTEST_SWITCHES = {"peer-names-unchanged": "overrides-applied", "mutations-tab
 
 def selftest(argument_list: list[str]) -> int:
     os.environ[SELFTEST_VARIABLE] = "1"
-    return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
+    return harness.run_selftest(os.path.abspath(__file__), argument_list, harness.cells_reporting_progress(selftest_cell_functions()), SELFTEST_SWITCHES,
+                                BREAK_VARIABLE, SELFTEST_VARIABLE)
 
 
 if __name__ == "__main__":

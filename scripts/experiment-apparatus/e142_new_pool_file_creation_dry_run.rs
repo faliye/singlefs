@@ -175,7 +175,7 @@ const fn unit_area_slots_of_device_bytes(device_bytes: u64) -> u64 {
 }
 const UNIT_AREA_SLOTS: u64 = unit_area_slots_of_device_bytes(DEVICE_BYTES);
 /// E142 第二十二次跑第二段的第二个几何 P8G：两块盘、每盘 8 GiB（第二十二次登记第一节「第 2 行」的读法）。
-const P8G_DEVICE_BYTES: u64 = 8 << 30;
+const EIGHT_GIBIBYTE_POINT_DEVICE_BYTES: u64 = 8 << 30;
 /// D3（空间分配） 已定项 10 ①：聚簇段段长 64 个 16 KiB 槽；开放段 = 单元区内最低的、64 槽对齐的全空段。
 const CLUSTER_SEGMENT_SLOTS: u64 = 64;
 
@@ -3972,8 +3972,8 @@ fn read_extent_upper_leaf(reader: &dyn BlockReader, tree: TreeIdentifier, pointe
     }
     let first_entry = node.entries.first().ok_or_else(|| "extent 树上段叶没有条目".to_string())?;
     let inode = u64::from_le_bytes(first_entry[8..16].try_into().expect("key 前 24 字节里第二段是 inode 号"));
-    let k = extent_upper_leaf_index(inode);
-    let (expected_smallest, expected_largest) = extent_upper_leaf_positional_key_range(k);
+    let upper_leaf_index = extent_upper_leaf_index(inode);
+    let (expected_smallest, expected_largest) = extent_upper_leaf_positional_key_range(upper_leaf_index);
     if node.smallest_key != expected_smallest || node.largest_key != expected_largest {
         return Err("extent 树上段叶 key 区间与它按位置规定罩的那一段不符".to_string()); // D18 已定项 2 射程
     }
@@ -4579,8 +4579,8 @@ fn evaluate_state(base: &Pool, writes: &[WriteRequest], persisted: Vec<bool>, ro
 /// D13（验证路线） 已定项 4 的枚举域，从 `enumerate_layer0` 里拆出来给逐态比较（`compare_layer0_predictions`）
 /// 共用：前若干段全持久、当前段任一非满子集持久、之后各段都不持久，最后单独访问一次「全部持久」。
 /// 只改了「访问一个状态」的方式（从直接调 `evaluate_state` 改成回调），枚举次序与被访问的持久掩码集合不变。
-fn for_each_layer0_state(writes_len: usize, segments: &[Vec<usize>], mut visit: impl FnMut(Vec<bool>)) {
-    let mut persisted_before = vec![false; writes_len];
+fn for_each_layer0_state(writes_length: usize, segments: &[Vec<usize>], mut visit: impl FnMut(Vec<bool>)) {
+    let mut persisted_before = vec![false; writes_length];
     for segment in segments {
         let full_mask = (1u64 << segment.len()) - 1;
         for mask in 0..full_mask {
@@ -4720,14 +4720,14 @@ fn persisted_role_list(persisted: &[bool], role_names: &[String]) -> String {
 
 /// 单次发布的写清单里每一次写的角色名：单元按 `units_by_slot` 的次序给 `descriptive_tag()`，
 /// 其后依次是 journal 记录、根槽、系统配置槽（这个装置的单次发布流恰好各一次）。
-fn single_publish_role_names(writes_len: usize, units_by_slot: &[(SlotNumber, TransactionUnit, Vec<u8>)]) -> Vec<String> {
+fn single_publish_role_names(writes_length: usize, units_by_slot: &[(SlotNumber, TransactionUnit, Vec<u8>)]) -> Vec<String> {
     let mut names: Vec<String> = units_by_slot.iter().map(|(_, unit, _)| unit.descriptive_tag().to_string()).collect();
     for extra in ["journal_record", "root_record", "system_configuration"] {
-        if names.len() < writes_len {
+        if names.len() < writes_length {
             names.push(extra.to_string());
         }
     }
-    while names.len() < writes_len {
+    while names.len() < writes_length {
         names.push("unknown".to_string());
     }
     names
@@ -4794,8 +4794,8 @@ fn compare_layer0_predictions(
 /// 完全相同：段挨段、每段内 mask 从 0 到 `full_mask − 1`，最后单独访问一次全持久
 /// （`layer0_state_at_index_matches_for_each_layer0_state_on_the_positive_control` 逐态核过两者一致）。
 /// 并行切片只是把 `[0, closed_form)` 切成几段区间分给不同线程，每个下标对应哪个状态不因此改变。
-fn layer0_state_at_index(writes_len: usize, segments: &[Vec<usize>], mut global_index: u64) -> (Vec<bool>, Option<usize>) {
-    let mut persisted = vec![false; writes_len];
+fn layer0_state_at_index(writes_length: usize, segments: &[Vec<usize>], mut global_index: u64) -> (Vec<bool>, Option<usize>) {
+    let mut persisted = vec![false; writes_length];
     for (segment_index, segment) in segments.iter().enumerate() {
         let full_mask = (1u64 << segment.len()) - 1;
         if global_index < full_mask {
@@ -4923,39 +4923,39 @@ impl GroupedAccumulator {
     /// 完全相同的这三个诊断字段，其余都是纯计数的加法——这就是
     /// `layer0_grouped_enumeration_agrees_between_serial_and_parallel_*` 要证的「逐格相等」。
     fn merge(&mut self, other: GroupedAccumulator) {
-        let t = &mut self.tally;
-        let o = other.tally;
-        t.states += o.states;
-        t.violations += o.violations;
-        t.root_persisted_states += o.root_persisted_states;
-        t.no_file_states += o.no_file_states;
-        t.file_read_states += o.file_read_states;
-        t.file_read_wrong_content_states += o.file_read_wrong_content_states;
-        t.failed_states += o.failed_states;
-        t.journal_differing_states += o.journal_differing_states;
-        t.verification_ran_states += o.verification_ran_states;
-        t.verification_failed_states += o.verification_failed_states;
-        if t.first_violation.is_none() {
-            t.first_violation = o.first_violation;
+        let merged_tally = &mut self.tally;
+        let other_tally = other.tally;
+        merged_tally.states += other_tally.states;
+        merged_tally.violations += other_tally.violations;
+        merged_tally.root_persisted_states += other_tally.root_persisted_states;
+        merged_tally.no_file_states += other_tally.no_file_states;
+        merged_tally.file_read_states += other_tally.file_read_states;
+        merged_tally.file_read_wrong_content_states += other_tally.file_read_wrong_content_states;
+        merged_tally.failed_states += other_tally.failed_states;
+        merged_tally.journal_differing_states += other_tally.journal_differing_states;
+        merged_tally.verification_ran_states += other_tally.verification_ran_states;
+        merged_tally.verification_failed_states += other_tally.verification_failed_states;
+        if merged_tally.first_violation.is_none() {
+            merged_tally.first_violation = other_tally.first_violation;
         }
-        t.reader_branches.add(&o.reader_branches);
+        merged_tally.reader_branches.add(&other_tally.reader_branches);
 
-        let c = &mut self.comparison;
-        c.states += other.comparison.states;
-        c.predicted_violations += other.comparison.predicted_violations;
-        c.agree += other.comparison.agree;
-        c.missed += other.comparison.missed;
-        c.false_alarm += other.comparison.false_alarm;
-        if c.first_missed.is_none() {
-            c.first_missed = other.comparison.first_missed;
+        let merged_comparison = &mut self.comparison;
+        merged_comparison.states += other.comparison.states;
+        merged_comparison.predicted_violations += other.comparison.predicted_violations;
+        merged_comparison.agree += other.comparison.agree;
+        merged_comparison.missed += other.comparison.missed;
+        merged_comparison.false_alarm += other.comparison.false_alarm;
+        if merged_comparison.first_missed.is_none() {
+            merged_comparison.first_missed = other.comparison.first_missed;
         }
-        if c.first_false_alarm.is_none() {
-            c.first_false_alarm = other.comparison.first_false_alarm;
+        if merged_comparison.first_false_alarm.is_none() {
+            merged_comparison.first_false_alarm = other.comparison.first_false_alarm;
         }
         for (key, count) in other.comparison.outcome_matrix {
-            *c.outcome_matrix.entry(key).or_insert(0) += count;
+            *merged_comparison.outcome_matrix.entry(key).or_insert(0) += count;
         }
-        c.off_diagonal += other.comparison.off_diagonal;
+        merged_comparison.off_diagonal += other.comparison.off_diagonal;
 
         self.grouping.merge(&other.grouping);
     }
@@ -5089,7 +5089,7 @@ fn layer0_main_arm_verdict(tally: &Layer0Tally, closed_form: u64, comparison: &P
 /// 并行度取 `SINGLEFS_THREAD_CAP`（`scripts/hosts/capped.sh` 给「登记不到专属变量的实验装置」的通用兜底，
 /// 见该脚本文件头注释；这份装置在 `scripts/experiment-apparatus/` 下，不是 `crates/singlefs-verification`，不在它专属
 /// 变量表里）。没设或解析不出正整数就取登记的重活默认并行度（`.claude/heavy-thread-default`）。
-fn thread_cap_from_env() -> usize {
+fn parallel_thread_count() -> usize {
     default_heavy_threads(include_str!("../../.claude/heavy-thread-default"))
 }
 
@@ -5131,19 +5131,19 @@ fn build_single_publish_flow(parameters: &PoolParameters, file_bytes: &[u8], fua
 }
 
 /// R10：`(1 << (N-1)) - (1 << (N-1-|依赖集|))`。
-fn expected_violations_formula(n_writes: usize, dependency_count: usize) -> u64 {
-    (1u64 << (n_writes - 1)) - (1u64 << (n_writes - 1 - dependency_count))
+fn expected_violations_formula(write_count: usize, dependency_count: usize) -> u64 {
+    (1u64 << (write_count - 1)) - (1u64 << (write_count - 1 - dependency_count))
 }
 
 /// 阳性对照期望违例数的三档读法（R10 甲/乙/丙），从这一窗口的写清单现算，不写字面
 /// （M149 的会红检查：把甲档的依赖计数换成乙档会把 4092 改成 4080）。
 fn control_expected_violations_three_readings(flow: &SinglePublishFlow) -> (u64, u64, u64) {
-    let n = flow.writes.len();
+    let write_count = flow.writes.len();
     let unit_writes = flow.dependency_groups.len();
     (
-        expected_violations_formula(n, unit_writes),
-        expected_violations_formula(n, unit_writes - flow.below_root_count),
-        expected_violations_formula(n, unit_writes - 1),
+        expected_violations_formula(write_count, unit_writes),
+        expected_violations_formula(write_count, unit_writes - flow.below_root_count),
+        expected_violations_formula(write_count, unit_writes - 1),
     )
 }
 
@@ -5688,9 +5688,9 @@ fn run_full_pipeline(parameters: &PoolParameters, change_count: u64, file_bytes:
 }
 
 /// P6（E142 第十四次跑第五节 5.2）用：跑到「t9 之前（含 t9 两份）全部持久、t10 根槽与 t11 系统配置槽都没持久」
-/// 那个定点状态 S*，返回 (暖机之后的池, 新池新建文件的全部写请求, 这次发布的产出)。`s_star_persisted` 配它用：
+/// 那个定点状态 S*，返回 (暖机之后的池, 新池新建文件的全部写请求, 这次发布的产出)。`persisted_mask_up_to_the_journal_record_fixed_state` 配它用：
 /// 根槽 FUA 与系统配置槽两类写标 false，其余（8 个单元 × 2 盘 + journal 记录 × 2 盘）标 true。
-fn s_star_writes(parameters: &PoolParameters, file_bytes: &[u8]) -> (Pool, Vec<WriteRequest>, TransactionOutput) {
+fn writes_up_to_the_journal_record_fixed_state(parameters: &PoolParameters, file_bytes: &[u8]) -> (Pool, Vec<WriteRequest>, TransactionOutput) {
     let (mut recording, genesis) = mkfs(parameters);
     let instance = acquire_instance(&mut recording, parameters);
     let (_, last_warm_up_record) = warm_up(&mut recording, parameters, &genesis, instance);
@@ -5701,13 +5701,13 @@ fn s_star_writes(parameters: &PoolParameters, file_bytes: &[u8]) -> (Pool, Vec<W
     (base, writes, output)
 }
 
-fn s_star_persisted(writes: &[WriteRequest]) -> Vec<bool> {
+fn persisted_mask_up_to_the_journal_record_fixed_state(writes: &[WriteRequest]) -> Vec<bool> {
     writes.iter().map(|write| !matches!(write.kind, StepKind::RootRecordFua | StepKind::SystemConfigurationSlot)).collect()
 }
 
 /// 把 `writes` 里两份 t9 记录（两盘各一份 `StepKind::JournalRecord`）解析回 `JournalRecord`、按 `mutate` 改一个字段、
 /// 重封头校验和（D23 已定项 13）再写回字节——P6 的「两份改写」都靠它，不手改字节偏移。
-fn corrupt_t9_records(writes: &[WriteRequest], mutate: impl Fn(&mut JournalRecord)) -> Vec<WriteRequest> {
+fn corrupt_the_journal_record_copies(writes: &[WriteRequest], mutate: impl Fn(&mut JournalRecord)) -> Vec<WriteRequest> {
     writes
         .iter()
         .map(|write| {
@@ -5724,24 +5724,24 @@ fn corrupt_t9_records(writes: &[WriteRequest], mutate: impl Fn(&mut JournalRecor
 
 /// P6「t9 之后在计数器 4 的槽里加一条同 txg 3 的记录」：两盘各一份，序号 2、标志 0x00、提交标记 1、
 /// 反向链 = CRC32C(t9 的头)、不点名（重跑登记第五节 5.2 那一行）。
-fn append_trailing_same_txg_record(writes: &[WriteRequest], t9: &JournalRecord, t9_bytes: &[u8], parameters: &PoolParameters) -> Vec<WriteRequest> {
+fn append_trailing_same_txg_record(writes: &[WriteRequest], journal_record: &JournalRecord, journal_record_bytes: &[u8], parameters: &PoolParameters) -> Vec<WriteRequest> {
     let extra = JournalRecord {
-        instance: t9.instance,
+        instance: journal_record.instance,
         counter: JournalCounter(4),
-        checkpoint_txg: t9.checkpoint_txg,
+        checkpoint_txg: journal_record.checkpoint_txg,
         transaction: TransactionNumber(0),
         is_commit: true,
         ordinal_within_publish: 2,
         record_flags: 0x00,
-        back_chain: journal_back_chain(t9_bytes),
-        fsid: t9.fsid,
-        new_tree_table: t9.new_tree_table,
-        new_mapping_root: t9.new_mapping_root,
-        new_tree_identifier_watermark: t9.new_tree_identifier_watermark,
-        new_rollback_floor: t9.new_rollback_floor,
-        new_instance_table: t9.new_instance_table,
-        new_allocation_record_tree_root: t9.new_allocation_record_tree_root,
-        new_unmount_marker: t9.new_unmount_marker,
+        back_chain: journal_back_chain(journal_record_bytes),
+        fsid: journal_record.fsid,
+        new_tree_table: journal_record.new_tree_table,
+        new_mapping_root: journal_record.new_mapping_root,
+        new_tree_identifier_watermark: journal_record.new_tree_identifier_watermark,
+        new_rollback_floor: journal_record.new_rollback_floor,
+        new_instance_table: journal_record.new_instance_table,
+        new_allocation_record_tree_root: journal_record.new_allocation_record_tree_root,
+        new_unmount_marker: journal_record.new_unmount_marker,
         named: Vec::new(),
     };
     let extra_bytes = extra.to_bytes();
@@ -5770,19 +5770,19 @@ fn readable_record_count(records: &BTreeMap<(InstanceGeneration, JournalCounter)
     records.values().filter(|record| !record_flag_byte_is_corrupted(record) && !record_ordinal_is_corrupted(record)).count()
 }
 
-fn p6_mutate_flag_0x03(record: &mut JournalRecord) {
+fn journal_without_root_mutate_flag_0x03(record: &mut JournalRecord) {
     record.record_flags = 0x03;
 }
-fn p6_mutate_ordinal_0(record: &mut JournalRecord) {
+fn journal_without_root_mutate_ordinal_0(record: &mut JournalRecord) {
     record.ordinal_within_publish = 0;
 }
-fn p6_mutate_flag_0x00(record: &mut JournalRecord) {
+fn journal_without_root_mutate_flag_0x00(record: &mut JournalRecord) {
     record.record_flags = 0x00;
 }
-fn p6_mutate_ordinal_2(record: &mut JournalRecord) {
+fn journal_without_root_mutate_ordinal_2(record: &mut JournalRecord) {
     record.ordinal_within_publish = 2;
 }
-fn p6_mutate_txg_2(record: &mut JournalRecord) {
+fn journal_without_root_mutate_txg_2(record: &mut JournalRecord) {
     record.checkpoint_txg = CheckpointTxg(2);
 }
 
@@ -5791,7 +5791,7 @@ fn p6_mutate_txg_2(record: &mut JournalRecord) {
 /// 的 (实例代号, checkpoint_txg)（重跑登记第五节 5.2 表头），S* 的 `above` 至多 1 条（t9），
 /// 所以用 `journal.prefix_applied` 是否 ≥ 1 就等价于「重建出来的根有没有推进到 t9 那次发布」。
 #[derive(Debug, Clone)]
-struct P6Outcome {
+struct JournalWithoutRootOutcome {
     primary_prefix_applied: usize,
     primary_readable: usize,
     clause_prefix_applied: usize,
@@ -5801,22 +5801,22 @@ struct P6Outcome {
 
 /// P6（第五节 5.2）跑一格：在 S*（t9 之前含 t9 两份全部持久、t10 根槽与 t11 系统配置槽都没持久）上，
 /// 可选地改写 t9（`mutate`）或在 t9 之后加一条同 txg 的记录（`append_trailing`），两种读者各跑一次。
-fn run_p6_scenario(parameters: &PoolParameters, file_bytes: &[u8], mutate: Option<fn(&mut JournalRecord)>, append_trailing: bool) -> P6Outcome {
-    let (base, base_writes, output) = s_star_writes(parameters, file_bytes);
+fn run_journal_without_root_scenario(parameters: &PoolParameters, file_bytes: &[u8], mutate: Option<fn(&mut JournalRecord)>, append_trailing: bool) -> JournalWithoutRootOutcome {
+    let (base, base_writes, output) = writes_up_to_the_journal_record_fixed_state(parameters, file_bytes);
     let mut writes = base_writes;
     if let Some(mutate) = mutate {
-        writes = corrupt_t9_records(&writes, mutate);
+        writes = corrupt_the_journal_record_copies(&writes, mutate);
     }
     if append_trailing {
         writes = append_trailing_same_txg_record(&writes, &output.record, &output.record_bytes, parameters);
     }
-    let persisted = s_star_persisted(&writes);
+    let persisted = persisted_mask_up_to_the_journal_record_fixed_state(&writes);
     let image = CrashImage { base: &base, writes: &writes, persisted };
     let primary = recover(&image, JournalPolicy::Consult, ReaderMode::Primary);
     let clause = recover(&image, JournalPolicy::Consult, ReaderMode::Clause);
     // 读者甲不判标志/序号是否合法，「读得出」= 扫描到、校验和过的全部记录；读者乙额外按①滤掉当损坏的那些。
     let records = scan_journal(&image, unit_fsid(&parameters.fsid));
-    P6Outcome {
+    JournalWithoutRootOutcome {
         primary_prefix_applied: primary.journal.prefix_applied,
         primary_readable: records.len(),
         clause_prefix_applied: clause.journal.prefix_applied,
@@ -5904,10 +5904,10 @@ struct StreamVerdictFields {
     text_number_mismatches_zero: bool,
     text_numbers_all_classified: bool,
     named_instances_ok: bool,
-    r18_system_configuration_fields_ok: bool,
-    r18_root_flags_ok: bool,
-    r18_g8_ok: bool,
-    r18_g9_ok: bool,
+    clause_fields_system_configuration_ok: bool,
+    clause_fields_root_flags_ok: bool,
+    clause_fields_rollback_floor_ok: bool,
+    clause_fields_unmount_marker_ok: bool,
 }
 
 impl StreamVerdictFields {
@@ -5921,10 +5921,10 @@ impl StreamVerdictFields {
             ("text_number_mismatches_zero", self.text_number_mismatches_zero),
             ("text_numbers_all_classified", self.text_numbers_all_classified),
             ("named_instances_ok", self.named_instances_ok),
-            ("r18_system_configuration_fields_ok", self.r18_system_configuration_fields_ok),
-            ("r18_root_flags_ok", self.r18_root_flags_ok),
-            ("r18_g8_ok", self.r18_g8_ok),
-            ("r18_g9_ok", self.r18_g9_ok),
+            ("r18_system_configuration_fields_ok", self.clause_fields_system_configuration_ok),
+            ("r18_root_flags_ok", self.clause_fields_root_flags_ok),
+            ("r18_g8_ok", self.clause_fields_rollback_floor_ok),
+            ("r18_g9_ok", self.clause_fields_unmount_marker_ok),
         ]
     }
 }
@@ -6068,7 +6068,7 @@ fn stream_section(parameters: &PoolParameters, file_bytes: &[u8]) -> StreamSecti
     let fragmentation_runs_per_device = statistic_value(STATISTIC_FRAGMENTATION_RUNS);
     rows.push(format!(
         "name=gap id={gap_identifier} text={} bound_free_bytes_per_device={free_bytes_per_device} bound_empty_cluster_segments_per_device={empty_cluster_segments_per_device} bound_fragmentation_runs_per_device={fragmentation_runs_per_device}",
-        render_g22_text(gap_template, free_bytes_per_device, empty_cluster_segments_per_device, fragmentation_runs_per_device)
+        render_free_bytes_gap_text(gap_template, free_bytes_per_device, empty_cluster_segments_per_device, fragmentation_runs_per_device)
     ));
 
     let layout_rows = layout_field_rows(&full, &base_after_mkfs);
@@ -6076,7 +6076,7 @@ fn stream_section(parameters: &PoolParameters, file_bytes: &[u8]) -> StreamSecti
         let equal = layout_field_equal(&row.expected, &row.actual);
         rows.push(format!(
             "name=layout_field id={} record_or_unit={} field={} expected={} actual={} equal={equal} layout_line={}",
-            row.id, row.record_or_unit, row.field, row.expected, row.actual, row.layout_line
+            row.row_identifier, row.record_or_unit, row.field, row.expected, row.actual, row.layout_line
         ));
     }
     let (layout_equal_rows, layout_unequal_rows) = layout_field_tally(&layout_rows);
@@ -6115,16 +6115,16 @@ fn stream_section(parameters: &PoolParameters, file_bytes: &[u8]) -> StreamSecti
         "name=r18_clause_fields region=root_record device={} flags_hex={root_flags_hex} checksum_recomputes={root_checksum_recomputes} ok={root_flags_ok}",
         root_device_identity(parameters, root_region).0,
     ));
-    let (g8_row, g8_ok) = rollback_floor_sensitivity_row(parameters, window_system_configuration_generation, instance);
-    rows.push(g8_row);
-    let (g9_row, g9_ok) = unmount_marker_sensitivity_row(output.root, &parameters.fsid);
-    rows.push(g9_row);
+    let (rollback_floor_row, rollback_floor_ok) = rollback_floor_sensitivity_row(parameters, window_system_configuration_generation, instance);
+    rows.push(rollback_floor_row);
+    let (unmount_marker_row, unmount_marker_ok) = unmount_marker_sensitivity_row(output.root, &parameters.fsid);
+    rows.push(unmount_marker_row);
 
     let role_label_check = check_role_labels(&rows);
     let text_number_check = check_text_numbers(&rows);
     let journal_header_record_label = find_field_value_excluding(&rows, "journal_header_record_bytes", "record", &["w1", "w4"]).unwrap_or_else(|| "not_found".to_string());
     let write_list_journal_record_label = find_field_value_excluding(&rows, "role_labels", "journal_record", &[]).unwrap_or_else(|| "not_found".to_string());
-    let g22_text = rows
+    let free_bytes_gap_text = rows
         .iter()
         .find(|line| {
             let fields = split_fields(line);
@@ -6132,9 +6132,9 @@ fn stream_section(parameters: &PoolParameters, file_bytes: &[u8]) -> StreamSecti
         })
         .and_then(|line| split_fields(line).iter().find(|(key, _)| *key == "text").map(|(_, value)| (*value).to_string()))
         .unwrap_or_default();
-    let g22_free_bytes = extract_number_after_marker(&g22_text, "空闲字节").unwrap_or(0);
+    let free_bytes_in_the_gap_text = extract_number_after_marker(&free_bytes_gap_text, "空闲字节").unwrap_or(0);
     let accounting_free_bytes_per_device: u64 = find_field_value_excluding(&rows, "accounting", "free_bytes_per_device", &[]).and_then(|value| value.parse().ok()).unwrap_or(0);
-    let named_instances_ok = journal_header_record_label == write_list_journal_record_label && g22_free_bytes == accounting_free_bytes_per_device;
+    let named_instances_ok = journal_header_record_label == write_list_journal_record_label && free_bytes_in_the_gap_text == accounting_free_bytes_per_device;
 
     let verdict = StreamVerdictFields {
         write_list_ok: new_pool_file_creation_write_list_matches(write_count, barrier_count, fua_count, parameters.device_count),
@@ -6145,10 +6145,10 @@ fn stream_section(parameters: &PoolParameters, file_bytes: &[u8]) -> StreamSecti
         text_number_mismatches_zero: text_number_check.bound_mismatched == 0,
         text_numbers_all_classified: text_number_check.unclassified == 0,
         named_instances_ok,
-        r18_system_configuration_fields_ok: system_configuration_fields_ok,
-        r18_root_flags_ok: root_flags_ok,
-        r18_g8_ok: g8_ok,
-        r18_g9_ok: g9_ok,
+        clause_fields_system_configuration_ok: system_configuration_fields_ok,
+        clause_fields_root_flags_ok: root_flags_ok,
+        clause_fields_rollback_floor_ok: rollback_floor_ok,
+        clause_fields_unmount_marker_ok: unmount_marker_ok,
     };
     StreamSection { rows, verdict }
 }
@@ -6160,7 +6160,7 @@ fn root_device_identity(parameters: &PoolParameters, root_region: u64) -> Device
 
 /// 第二个几何 P8G（第二十二次登记第一节「第 2 行」的读法）：两块盘、每盘 8 GiB，其余同主点。
 fn p8g_parameters() -> PoolParameters {
-    PoolParameters::settled_two_devices_of_device_bytes(P8G_DEVICE_BYTES)
+    PoolParameters::settled_two_devices_of_device_bytes(EIGHT_GIBIBYTE_POINT_DEVICE_BYTES)
 }
 
 /// 行体里的 `name=<名字>` 改成 `name=p8g_<名字>`（只改第一处）。
@@ -6258,8 +6258,8 @@ fn extent_upper_leaf_index(inode: u64) -> u64 {
 
 /// extent 树上段叶的 key 区间（D8 已定项 14 第 401 行，唯一写法：写路径与读路径共用）：第 k 片
 /// （从 0 起，k = inode ÷ 143）罩 `[143k, 143k + 142]`，闭区间，第三分量恒 2^64 − 1（第七节 A7）。
-fn extent_upper_leaf_positional_key_range(k: u64) -> (Vec<u8>, Vec<u8>) {
-    let first_inode_in_span = EXTENT_TREE_UPPER_LEAF_INODES * k;
+fn extent_upper_leaf_positional_key_range(upper_leaf_index: u64) -> (Vec<u8>, Vec<u8>) {
+    let first_inode_in_span = EXTENT_TREE_UPPER_LEAF_INODES * upper_leaf_index;
     let last_inode_in_span = first_inode_in_span + EXTENT_TREE_UPPER_LEAF_INODES - 1;
     let mut smallest = [0u8; 24];
     smallest[8..16].copy_from_slice(&first_inode_in_span.to_le_bytes());
@@ -6274,7 +6274,7 @@ fn extent_upper_leaf_positional_key_range(k: u64) -> (Vec<u8>, Vec<u8>) {
 /// 必须恰好命中那一个区域、那一个偏移、且只翻中 1 字节。四个点：
 /// (a) 盘 0 那一份「罩盘 0 的层级 1 节点」第 0 条条目（唯一写法：稀疏，只有这一条）子指针的第一个字节；
 /// (b) 根 max_key 末字节；(c) extent 上段叶第一条条目的标签字节；(d) journal 记录第 5 个点名项首字节。
-fn run_p2_positive_control(emitter: &mut Emitter, arm_label: &str, writes: &[ModelWindowWrite]) {
+fn run_comparator_byte_positive_control(emitter: &mut Emitter, arm_label: &str, writes: &[ModelWindowWrite]) {
     let allocation_key_start = INDEX_NODE_KEY_WIDTH_OFFSET + 1 + ALLOCATION_KEY_BYTES;
     let extent_entries_start = index_node_header_bytes(24) + NONCE_MAC_RESERVED_BYTES as usize;
     let journal_named_item_5_offset = JOURNAL_HEADER_BYTES as usize + 4 * JOURNAL_NAMED_ENTRY_BYTES as usize;
@@ -6371,7 +6371,7 @@ fn window_segment_sizes_from_dump(text: &str) -> Vec<usize> {
     segments
 }
 
-fn catalog_unit_at_offset<'a>(catalog: &StructureCatalog<'a>, offset: u64) -> Option<&'a (SlotNumber, TransactionUnit, Vec<u8>)> {
+fn catalog_unit_at_offset<'catalog>(catalog: &StructureCatalog<'catalog>, offset: u64) -> Option<&'catalog (SlotNumber, TransactionUnit, Vec<u8>)> {
     catalog.units.iter().find(|(slot, _, _)| slot.device_offset().0 == offset)
 }
 
@@ -6508,12 +6508,12 @@ fn find_role_label_tokens(value: &str) -> Vec<&str> {
     while index < bytes.len() {
         let byte = bytes[index];
         if matches!(byte, b'm' | b'a' | b'w' | b't') {
-            let prev_ok = index == 0 || !bytes[index - 1].is_ascii_alphanumeric();
+            let previous_byte_is_a_boundary = index == 0 || !bytes[index - 1].is_ascii_alphanumeric();
             let mut end = index + 1;
             while end < bytes.len() && bytes[end].is_ascii_digit() {
                 end += 1;
             }
-            if prev_ok && end > index + 1 {
+            if previous_byte_is_a_boundary && end > index + 1 {
                 let next_ok = end == bytes.len() || !bytes[end].is_ascii_alphanumeric();
                 if next_ok {
                     tokens.push(&value[index..end]);
@@ -6696,7 +6696,7 @@ const BOUND_TEXT_MARKERS: &[(&str, &str)] = &[("空闲字节", "bound_free_bytes
 /// R19 第一类「字面白名单」的两种写法：ASCII 记号字母紧跟着（`D8`、`E77`……）；这个产物里中文那一份
 /// 同一件事的另一种写法——「已定项」三个字紧跟着（`D18已定项17`空格换下划线之后是`D18_已定项_17`，
 /// 数字前一个字符是下划线不是字母，但再往前一段是「已定项」，说的是同一种「编号的一部分」）。
-fn is_id_component_prefix(value: &str, start: usize) -> bool {
+fn is_identifier_component_prefix(value: &str, start: usize) -> bool {
     if start == 0 {
         return false;
     }
@@ -6734,10 +6734,10 @@ fn check_text_numbers(lines: &[String]) -> TextNumberCheck {
             for (start, run) in find_digit_runs(value) {
                 check.numbers += 1;
                 let end = start + run.len();
-                let is_id_component = is_id_component_prefix(value, start);
+                let is_identifier_component = is_identifier_component_prefix(value, start);
                 let is_date = dates.iter().any(|&(date_start, date_end)| start >= date_start && end <= date_end);
                 let is_multiplicity = is_multiplicity_count(value, start);
-                if is_id_component || is_date || is_multiplicity {
+                if is_identifier_component || is_date || is_multiplicity {
                     check.literal_allowlisted += 1;
                     continue;
                 }
@@ -6756,7 +6756,7 @@ fn check_text_numbers(lines: &[String]) -> TextNumberCheck {
                 // 还有「1GiB」「768MiB」这类跟三个绑定字段都无关的数，那些数不该被这条规则捞进来。
                 let marked_binding = BOUND_TEXT_MARKERS.iter().find(|(marker, _)| value[..start].ends_with(marker));
                 if let Some((_, field_key)) = marked_binding {
-                    let bound_value = fields.iter().find(|(other_key, _)| other_key == field_key).map(|(_, v)| *v);
+                    let bound_value = fields.iter().find(|(other_key, _)| other_key == field_key).map(|(_, other_field_value)| *other_field_value);
                     check.bound_mismatched += 1;
                     if check.mismatch_rows.len() < 8 {
                         check.mismatch_rows.push(format!("field={key} number={run} bound_to={field_key} value={} row={}", bound_value.unwrap_or("missing"), line.replace(' ', "_")));
@@ -6782,10 +6782,10 @@ fn check_text_numbers(lines: &[String]) -> TextNumberCheck {
 fn find_field_value_excluding(lines: &[String], line_name: &str, key: &str, exclude: &[&str]) -> Option<String> {
     for line in lines {
         let fields = split_fields(line);
-        if !fields.iter().any(|(k, v)| *k == "name" && *v == line_name) {
+        if !fields.iter().any(|(field_key, field_value)| *field_key == "name" && *field_value == line_name) {
             continue;
         }
-        if let Some((_, value)) = fields.iter().find(|(k, _)| *k == key) {
+        if let Some((_, value)) = fields.iter().find(|(field_key, _)| *field_key == key) {
             if !exclude.contains(value) {
                 return Some((*value).to_string());
             }
@@ -6809,16 +6809,16 @@ fn emitted_so_far_verdict_line() -> String {
 fn extract_number_after_marker(text: &str, marker: &str) -> Option<u64> {
     let start = text.find(marker)? + marker.len();
     let rest = &text[start..];
-    let digit_len = rest.bytes().take_while(u8::is_ascii_digit).count();
-    if digit_len == 0 {
+    let digit_length = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digit_length == 0 {
         return None;
     }
-    rest[..digit_len].parse().ok()
+    rest[..digit_length].parse().ok()
 }
 
 /// G22（问题单第 8 行）：把 `const GAPS` 里那条模板的三个占位符换成这一次产物自己现算的记账数——
 /// 唯一构造这段文本的地方，`main()` 与它的会红检查都调它（M157：第一个占位符退回字面 `3472670720`）。
-fn render_g22_text(template: &str, free_bytes_per_device: u64, empty_cluster_segments_per_device: u64, fragmentation_runs_per_device: u64) -> String {
+fn render_free_bytes_gap_text(template: &str, free_bytes_per_device: u64, empty_cluster_segments_per_device: u64, fragmentation_runs_per_device: u64) -> String {
     template
         .replace("{FREE_BYTES}", &free_bytes_per_device.to_string())
         .replace("{EMPTY_CLUSTER_SEGMENTS}", &empty_cluster_segments_per_device.to_string())
@@ -6873,13 +6873,13 @@ fn width_rows() -> [(&'static str, u64, u64); 30] {
 /// 登记 7.2 B1：t13 的反向链 = CRC32C(新 w4 的 487 字节头，`header_csum` [46, 78) 按零参与)。值取自 `back_chain_487.py`
 /// 在第二十一次跑步 ①(4) 带输入（N19R 产物里取的 fsid 8 字节与实例表指针 86 字节）算出的 `B1  t13.back_chain` 那一行
 /// （`research/results/e142-r21-anchor-b1-2026-10-04.out`）——是锚点，不是装置的任何一次产物；单测钉它。
-const ANCHOR_B1_BACK_CHAIN_OF_T13: u32 = 2_660_362_816;
+const ANCHOR_BACK_CHAIN_OF_THE_TRANSACTION_JOURNAL_RECORD: u32 = 2_660_362_816;
 /// 登记 7.2 B1b：w4 的反向链 = CRC32C(新 w1 的 487 字节头)，同一次运行打出的 `B1b w4.back_chain` 那一行。
-const ANCHOR_B1B_BACK_CHAIN_OF_W4: u32 = 750_278_362;
+const ANCHOR_BACK_CHAIN_OF_THE_WARM_UP_RECORD_AT_COUNTER_TWO: u32 = 750_278_362;
 
 /// 字段表的一行。`expected` 与 `actual` 都写成不含空格的文本，好让结果行按空格切段。
 struct LayoutFieldRow {
-    id: &'static str,
+    row_identifier: &'static str,
     record_or_unit: String,
     field: String,
     layout_line: &'static str,
@@ -6900,7 +6900,7 @@ fn le_u32_at(bytes: &[u8], offset: usize) -> u64 {
     u64::from(u32::from_le_bytes(bytes[offset..offset + 4].try_into().expect("切了 4 字节")))
 }
 
-fn le_u48_at(bytes: &[u8], offset: usize) -> u64 {
+fn le_48_bit_unsigned_at(bytes: &[u8], offset: usize) -> u64 {
     let mut eight = [0u8; 8];
     eight[..6].copy_from_slice(&bytes[offset..offset + 6]);
     u64::from_le_bytes(eight)
@@ -6920,7 +6920,7 @@ fn lowercase_hex(bytes: &[u8]) -> String {
 
 /// 两条位置条目的（设备，槽号）：`offsets` = [第 0 条设备, 第 0 条槽号, 第 1 条设备, 第 1 条槽号] 在 `bytes` 里的偏移（槽号 6 字节、设备 4 字节）。
 fn location_pair_text(bytes: &[u8], offsets: [usize; 4]) -> String {
-    format!("({},{}),({},{})", le_u32_at(bytes, offsets[0]), le_u48_at(bytes, offsets[1]), le_u32_at(bytes, offsets[2]), le_u48_at(bytes, offsets[3]))
+    format!("({},{}),({},{})", le_u32_at(bytes, offsets[0]), le_48_bit_unsigned_at(bytes, offsets[1]), le_u32_at(bytes, offsets[2]), le_48_bit_unsigned_at(bytes, offsets[3]))
 }
 
 /// 登记 7.2 B11 的落点：槽号乘 16384（设备内字节偏移）。
@@ -6932,15 +6932,15 @@ fn layout_bytes(image: &dyn BlockReader, device: u32, offset: u64, length: usize
     image.read(DeviceIdentity(device), DeviceOffset(offset), length)
 }
 
-fn push_layout_row(rows: &mut Vec<LayoutFieldRow>, id: &'static str, record_or_unit: &str, field: &str, layout_line: &'static str, expected: &str, actual: &str) {
-    rows.push(LayoutFieldRow { id, record_or_unit: record_or_unit.to_string(), field: field.to_string(), layout_line, expected: expected.to_string(), actual: actual.to_string() });
+fn push_layout_row(rows: &mut Vec<LayoutFieldRow>, row_identifier: &'static str, record_or_unit: &str, field: &str, layout_line: &'static str, expected: &str, actual: &str) {
+    rows.push(LayoutFieldRow { row_identifier, record_or_unit: record_or_unit.to_string(), field: field.to_string(), layout_line, expected: expected.to_string(), actual: actual.to_string() });
 }
 
 /// 树表第 `index` 条的六个字段（树 ID、种类、根指针落点槽号或 `zero`、头 ID、诞生 txg、previous_snapshot_txg）：
 /// 条目从 131 + 200 × index 起；根指针 86 字节在条目内偏移 14，第 0 条位置条目的槽号在指针内偏移 54（条目内 68）。
 fn tree_table_entry_texts(tree_table_unit: &[u8], index: usize) -> [String; 6] {
     let base = 131 + 200 * index;
-    let root_text = if is_all_zero(&tree_table_unit[base + 14..base + 100]) { "zero".to_string() } else { le_u48_at(tree_table_unit, base + 68).to_string() };
+    let root_text = if is_all_zero(&tree_table_unit[base + 14..base + 100]) { "zero".to_string() } else { le_48_bit_unsigned_at(tree_table_unit, base + 68).to_string() };
     [
         le_u64_at(tree_table_unit, base).to_string(),
         le_u16_at(tree_table_unit, base + 10).to_string(),
@@ -6955,18 +6955,18 @@ fn tree_table_entry_texts(tree_table_unit: &[u8], index: usize) -> [String; 6] {
 /// L1–L16：事务写的各单元里的树 ID、树表条目（设备 0 那一份，槽号 = 登记第零节写清单）。
 fn push_layout_rows_for_units(image: &dyn BlockReader, rows: &mut Vec<LayoutFieldRow>) {
     let unit = |slot: u64, length: usize| layout_bytes(image, 0, layout_slot_offset(slot), length);
-    let t1 = unit(50180, 32768);
-    push_layout_row(rows, "L1", "t1_data_unit", "five_tuple_tree_identifier@43", "182", "65536", &le_u64_at(&t1, 43).to_string());
-    let t2 = unit(50240, 16384);
-    push_layout_row(rows, "L2", "t2_extent_root", "tree_identifier@42", "282", "65536", &le_u64_at(&t2, 42).to_string());
+    let data_unit_bytes = unit(50180, 32768);
+    push_layout_row(rows, "L1", "t1_data_unit", "five_tuple_tree_identifier@43", "182", "65536", &le_u64_at(&data_unit_bytes, 43).to_string());
+    let extent_root_bytes = unit(50240, 16384);
+    push_layout_row(rows, "L2", "t2_extent_root", "tree_identifier@42", "282", "65536", &le_u64_at(&extent_root_bytes, 42).to_string());
     // 条目区从 163 起（头 86 + 2 × 24 + 29），条目 = key 24 + 标签 1 + 数据指针 88，指针内偏移 34 是出生树。
-    push_layout_row(rows, "L3", "t2_extent_root", "entry0_data_pointer_birth_tree@222", "208", "65536", &le_u64_at(&t2, 222).to_string());
-    let t3 = unit(50242, 32768);
-    push_layout_row(rows, "L4", "t3_inode_leaf_container", "class_identity_birth_tree@43", "260", "65537", &le_u64_at(&t3, 43).to_string());
-    let t4 = unit(50244, 16384);
-    push_layout_row(rows, "L5", "t4_inode_root", "tree_identifier@42", "256", "65537", &le_u64_at(&t4, 42).to_string());
+    push_layout_row(rows, "L3", "t2_extent_root", "entry0_data_pointer_birth_tree@222", "208", "65536", &le_u64_at(&extent_root_bytes, 222).to_string());
+    let inode_leaf_container_bytes = unit(50242, 32768);
+    push_layout_row(rows, "L4", "t3_inode_leaf_container", "class_identity_birth_tree@43", "260", "65537", &le_u64_at(&inode_leaf_container_bytes, 43).to_string());
+    let inode_root_bytes = unit(50244, 16384);
+    push_layout_row(rows, "L5", "t4_inode_root", "tree_identifier@42", "256", "65537", &le_u64_at(&inode_root_bytes, 42).to_string());
     // 条目区从 131 起，条目 = 分隔 key 8 + 身份引用 26 + 子指针 86；身份引用 = 出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8。
-    let identity_reference = format!("({},{},{},{})", le_u64_at(&t4, 139), le_u16_at(&t4, 147), le_u64_at(&t4, 149), le_u64_at(&t4, 157));
+    let identity_reference = format!("({},{},{},{})", le_u64_at(&inode_root_bytes, 139), le_u16_at(&inode_root_bytes, 147), le_u64_at(&inode_root_bytes, 149), le_u64_at(&inode_root_bytes, 157));
     push_layout_row(rows, "L6", "t4_inode_root", "entry0_identity_reference@139", "258", "(65537,2,1,3)", &identity_reference);
     for (name, slot) in [
         ("t5_allocation_leaf_of_device_0", 50245u64),
@@ -6977,23 +6977,23 @@ fn push_layout_rows_for_units(image: &dyn BlockReader, rows: &mut Vec<LayoutFiel
     ] {
         push_layout_row(rows, "L7", name, "tree_identifier@42", "298", "65538", &le_u64_at(&unit(slot, 16384), 42).to_string());
     }
-    let t10 = unit(50250, 16384);
-    push_layout_row(rows, "L8", "t10_accounting_root", "tree_identifier@42", "302", "65539", &le_u64_at(&t10, 42).to_string());
+    let accounting_root_bytes = unit(50250, 16384);
+    push_layout_row(rows, "L8", "t10_accounting_root", "tree_identifier@42", "302", "65539", &le_u64_at(&accounting_root_bytes, 42).to_string());
     // 记账条目区从 159 起（头 86 + 2 × 22 + 29），条目 34 字节，key 22 = 统计量 2 + 树 ID 8 + 设备 4 + 代 8；第 15 条（下标 14）是 inode 号水位。
-    let watermark_key = format!("({},{},{},{})", le_u16_at(&t10, 159 + 14 * 34), le_u64_at(&t10, 159 + 14 * 34 + 2), le_u32_at(&t10, 159 + 14 * 34 + 10), le_u64_at(&t10, 159 + 14 * 34 + 14));
+    let watermark_key = format!("({},{},{},{})", le_u16_at(&accounting_root_bytes, 159 + 14 * 34), le_u64_at(&accounting_root_bytes, 159 + 14 * 34 + 2), le_u32_at(&accounting_root_bytes, 159 + 14 * 34 + 10), le_u64_at(&accounting_root_bytes, 159 + 14 * 34 + 14));
     push_layout_row(rows, "L9", "t10_accounting_root", "entry14_key_inode_watermark@635", "272+303", "(12,65537,4294967295,3)", &watermark_key);
-    let t11 = unit(50251, 16384);
-    push_layout_row(rows, "L10", "t11_mapping_root", "tree_identifier@42", "77", "65540", &le_u64_at(&t11, 42).to_string());
+    let mapping_root_bytes = unit(50251, 16384);
+    push_layout_row(rows, "L10", "t11_mapping_root", "tree_identifier@42", "77", "65540", &le_u64_at(&mapping_root_bytes, 42).to_string());
     // 映射条目区从 169 起（头 86 + 2 × 27 + 29），条目一律 55，key 27 = 类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10（实例代号 4 + 事务号 6）。
     let code_one_key = (0..10)
         .map(|index| 169 + 55 * index)
-        .find(|offset| t11[*offset] == 1)
-        .map_or("absent".to_string(), |offset| format!("({},{},{},({},{}))", t11[offset], le_u64_at(&t11, offset + 1), le_u64_at(&t11, offset + 9), le_u32_at(&t11, offset + 17), le_u48_at(&t11, offset + 21)));
+        .find(|offset| mapping_root_bytes[*offset] == 1)
+        .map_or("absent".to_string(), |offset| format!("({},{},{},({},{}))", mapping_root_bytes[offset], le_u64_at(&mapping_root_bytes, offset + 1), le_u64_at(&mapping_root_bytes, offset + 9), le_u32_at(&mapping_root_bytes, offset + 17), le_48_bit_unsigned_at(&mapping_root_bytes, offset + 21)));
     push_layout_row(rows, "L11", "t11_mapping_root", "code_one_entry_key", "228", "(1,65536,3,(1,1))", &code_one_key);
-    let t12 = unit(50252, 16384);
-    push_layout_row(rows, "L12", "t12_tree_table_first_version", "tree_identifier@42", "386", "0", &le_u64_at(&t12, 42).to_string());
-    push_layout_row(rows, "L13", "t12_tree_table_first_version", "entry_count@98", "386+49+78", "12", &le_u16_at(&t12, 98).to_string());
-    push_layout_row(rows, "L14", "t12_tree_table_first_version", "declared_length@8", "386", "2400", &le_u16_at(&t12, 8).to_string());
+    let tree_table_first_version_bytes = unit(50252, 16384);
+    push_layout_row(rows, "L12", "t12_tree_table_first_version", "tree_identifier@42", "386", "0", &le_u64_at(&tree_table_first_version_bytes, 42).to_string());
+    push_layout_row(rows, "L13", "t12_tree_table_first_version", "entry_count@98", "386+49+78", "12", &le_u16_at(&tree_table_first_version_bytes, 98).to_string());
+    push_layout_row(rows, "L14", "t12_tree_table_first_version", "declared_length@8", "386", "2400", &le_u16_at(&tree_table_first_version_bytes, 8).to_string());
     let field_names = ["tree_identifier", "kind", "root_slot", "head_identifier", "birth_txg", "previous_snapshot_txg"];
     let first_seven: [[&str; 6]; 7] = [
         ["65536", "1", "50240", "65537", "3", "0"],
@@ -7013,14 +7013,14 @@ fn push_layout_rows_for_units(image: &dyn BlockReader, rows: &mut Vec<LayoutFiel
         ["65548", "13", "zero", "65537", "3", "0"], // 退役树
     ];
     for (index, expected) in first_seven.iter().enumerate() {
-        let actual = tree_table_entry_texts(&t12, index);
+        let actual = tree_table_entry_texts(&tree_table_first_version_bytes, index);
         for (field_index, field_name) in field_names.iter().enumerate() {
             push_layout_row(rows, "L15", "t12_tree_table_first_version", &format!("entry{index}_{field_name}"), "387+389-391", expected[field_index], &actual[field_index]);
         }
     }
     for (offset_index, expected) in last_five.iter().enumerate() {
         let index = 7 + offset_index;
-        let actual = tree_table_entry_texts(&t12, index);
+        let actual = tree_table_entry_texts(&tree_table_first_version_bytes, index);
         for (field_index, field_name) in field_names.iter().enumerate() {
             push_layout_row(rows, "L16", "t12_tree_table_first_version", &format!("entry{index}_{field_name}"), "387", expected[field_index], &actual[field_index]);
         }
@@ -7031,16 +7031,16 @@ fn push_layout_rows_for_units(image: &dyn BlockReader, rows: &mut Vec<LayoutFiel
 /// `after_mkfs_image` 是 mkfs 刚写完那一刻的池：区域 1、2 的槽 0 之后被暖机的第 1、2 代根覆盖，第 0 代根只在那份里读得到。
 fn push_layout_rows_for_watermarks(final_image: &dyn BlockReader, after_mkfs_image: &dyn BlockReader, rows: &mut Vec<LayoutFieldRow>) {
     // journal 环 16 MiB 起，记录 4096：计数器 1、2、3 落在 16777216、16781312、16785408（登记 7.2 B11）。
-    let w1 = layout_bytes(final_image, 0, 16_777_216, 4096);
-    let w4 = layout_bytes(final_image, 0, 16_781_312, 4096);
-    let t13 = layout_bytes(final_image, 0, 16_785_408, 4096);
+    let warm_up_record_at_counter_one = layout_bytes(final_image, 0, 16_777_216, 4096);
+    let warm_up_record_at_counter_two = layout_bytes(final_image, 0, 16_781_312, 4096);
+    let transaction_journal_record = layout_bytes(final_image, 0, 16_785_408, 4096);
     // 新根段从记录内偏移 99 起：树表指针 86、映射指针 86，树 ID 水位在 99 + 172 = 271。
-    push_layout_row(rows, "L17", "t13_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65549", &le_u64_at(&t13, 271).to_string());
-    push_layout_row(rows, "L18", "w1_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65536", &le_u64_at(&w1, 271).to_string());
-    push_layout_row(rows, "L18", "w4_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65536", &le_u64_at(&w4, 271).to_string());
+    push_layout_row(rows, "L17", "t13_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65549", &le_u64_at(&transaction_journal_record, 271).to_string());
+    push_layout_row(rows, "L18", "w1_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65536", &le_u64_at(&warm_up_record_at_counter_one, 271).to_string());
+    push_layout_row(rows, "L18", "w4_journal_record", "new_root_segment_tree_identifier_watermark@271", "325+353", "65536", &le_u64_at(&warm_up_record_at_counter_two, 271).to_string());
     // 根记录 512 槽：t14 = 区域 0 的槽 1（设备 0，1 MiB + 4096），水位在记录内偏移 122（4 + 16 + 4 + 4 + 8 + 86）。
-    let t14 = layout_bytes(final_image, 0, 1_052_672, 512);
-    push_layout_row(rows, "L19", "t14_root_record", "tree_identifier_watermark@122", "375", "65549", &le_u64_at(&t14, 122).to_string());
+    let transaction_root_record = layout_bytes(final_image, 0, 1_052_672, 512);
+    push_layout_row(rows, "L19", "t14_root_record", "tree_identifier_watermark@122", "375", "65549", &le_u64_at(&transaction_root_record, 122).to_string());
     // 三个区域的槽 0：区域 r 在 1 MiB + r × 3 MiB，区域设备 0 / 1 / 0。
     let mkfs_root_region_0 = layout_bytes(after_mkfs_image, 0, 1_048_576, 512);
     let mkfs_root_region_1 = layout_bytes(after_mkfs_image, 1, 4_194_304, 512);
@@ -7065,7 +7065,7 @@ fn push_layout_rows_for_watermarks(final_image: &dyn BlockReader, after_mkfs_ima
 fn push_layout_rows_for_records(
     rows: &mut Vec<LayoutFieldRow>,
     records: &[(&'static str, Vec<u8>); 3],
-    id: &'static str,
+    row_identifier: &'static str,
     field: &str,
     layout_line: &'static str,
     expected: [Option<&str>; 3],
@@ -7073,7 +7073,7 @@ fn push_layout_rows_for_records(
 ) {
     for ((label, bytes), expected_text) in records.iter().zip(expected) {
         if let Some(expected_text) = expected_text {
-            push_layout_row(rows, id, label, field, layout_line, expected_text, &decode(bytes));
+            push_layout_row(rows, row_identifier, label, field, layout_line, expected_text, &decode(bytes));
         }
     }
 }
@@ -7090,8 +7090,8 @@ fn push_layout_rows_for_journal_headers(image: &dyn BlockReader, rows: &mut Vec<
         [Some(text); 3]
     }
     let zero_or_hex = |bytes: &[u8]| if is_all_zero(bytes) { "zero".to_string() } else { lowercase_hex(bytes) };
-    let back_chain_of_w4 = ANCHOR_B1B_BACK_CHAIN_OF_W4.to_string();
-    let back_chain_of_t13 = ANCHOR_B1_BACK_CHAIN_OF_T13.to_string();
+    let back_chain_of_the_warm_up_record_at_counter_two = ANCHOR_BACK_CHAIN_OF_THE_WARM_UP_RECORD_AT_COUNTER_TWO.to_string();
+    let back_chain_of_the_transaction_journal_record = ANCHOR_BACK_CHAIN_OF_THE_TRANSACTION_JOURNAL_RECORD.to_string();
     // 三条记录各自已发布的根记录（设备，设备内偏移）：w1 对 w2（区域 1 槽 0）、w4 对 w5（区域 2 槽 0）、t13 对 t14（区域 0 槽 1）。
     let published_root_hex: Vec<String> = [(1u32, 4_194_304u64), (0, 7_340_032), (0, 1_052_672)]
         .iter()
@@ -7099,8 +7099,8 @@ fn push_layout_rows_for_journal_headers(image: &dyn BlockReader, rows: &mut Vec<
         .collect();
     let data_unit_fsid_hex = lowercase_hex(&layout_bytes(image, 0, layout_slot_offset(50180), 512)[83..91]);
     {
-        let mut push = |id: &'static str, field: &str, layout_line: &'static str, expected: [Option<&str>; 3], decode: &dyn Fn(&[u8]) -> String| {
-            push_layout_rows_for_records(rows, &records, id, field, layout_line, expected, decode);
+        let mut push = |row_identifier: &'static str, field: &str, layout_line: &'static str, expected: [Option<&str>; 3], decode: &dyn Fn(&[u8]) -> String| {
+            push_layout_rows_for_records(rows, &records, row_identifier, field, layout_line, expected, decode);
         };
         push("J1", "magic@0", "338", all("5346534a"), &|record: &[u8]| lowercase_hex(&record[0..4]));
         push("J2", "record_type@4", "339", all("1"), &|record: &[u8]| le_u16_at(record, 4).to_string());
@@ -7108,13 +7108,13 @@ fn push_layout_rows_for_journal_headers(image: &dyn BlockReader, rows: &mut Vec<
         push("J4", "record_flags@7", "341", all("1"), &|record: &[u8]| record[7].to_string());
         push("J5", "record_length@8", "342", all("4096"), &|record: &[u8]| le_u32_at(record, 8).to_string());
         push("J6", "named_count@12", "343+61+64", [Some("0"), Some("0"), Some("12")], &|record: &[u8]| le_u32_at(record, 12).to_string());
-        push("J7", "jsn_instance_counter@16", "344+61+64", [Some("(1,1)"), Some("(1,2)"), Some("(1,3)")], &|record: &[u8]| format!("({},{})", le_u32_at(record, 16), le_u48_at(record, 20)));
+        push("J7", "jsn_instance_counter@16", "344+61+64", [Some("(1,1)"), Some("(1,2)"), Some("(1,3)")], &|record: &[u8]| format!("({},{})", le_u32_at(record, 16), le_48_bit_unsigned_at(record, 20)));
         push("J8", "checkpoint_txg@26", "345+61+64", [Some("1"), Some("2"), Some("3")], &|record: &[u8]| le_u64_at(record, 26).to_string());
         push("J9", "nonce@34", "346", all("zero"), &|record: &[u8]| zero_or_hex(&record[34..46]));
         push("J10", "transaction@78", "348+321", [Some("0"), Some("0"), Some("1")], &|record: &[u8]| le_u64_at(record, 78).to_string());
         push("J11", "commit_marker@86", "349+321", all("1"), &|record: &[u8]| record[86].to_string());
         push("J12", "ordinal_within_publish@87", "350+322", all("1"), &|record: &[u8]| le_u32_at(record, 87).to_string());
-        push("J13", "back_chain@91", "351+323", [Some("0"), Some(back_chain_of_w4.as_str()), Some(back_chain_of_t13.as_str())], &|record: &[u8]| le_u32_at(record, 91).to_string());
+        push("J13", "back_chain@91", "351+323", [Some("0"), Some(back_chain_of_the_warm_up_record_at_counter_two.as_str()), Some(back_chain_of_the_transaction_journal_record.as_str())], &|record: &[u8]| le_u32_at(record, 91).to_string());
         push("J14", "payload_checksum@95", "352", [Some("0"), Some("0"), None], &|record: &[u8]| le_u32_at(record, 95).to_string());
         push(
             "J15",
@@ -7146,7 +7146,7 @@ fn push_layout_rows_for_journal_headers(image: &dyn BlockReader, rows: &mut Vec<
     }
     // J24：t13 的 12 个点名项，第 k 项起点 487 + 56k，两条位置条目各 14 字节（设备 4 + 槽号 6 + 校验和 4），第 1 条从项内偏移 14 起；
     // 槽号依次是 t1..t12 的落点（登记第零节写清单），设备 0、1。
-    let t13 = &records[2].1;
+    let transaction_journal_record = &records[2].1;
     for (named_index, slot) in [50180u64, 50240, 50242, 50244, 50245, 50246, 50247, 50248, 50249, 50250, 50251, 50252].iter().enumerate() {
         let start = 487 + 56 * named_index;
         push_layout_row(
@@ -7156,7 +7156,7 @@ fn push_layout_rows_for_journal_headers(image: &dyn BlockReader, rows: &mut Vec<
             &format!("named{named_index}_locations@{start}"),
             "329+361",
             &format!("(0,{slot}),(1,{slot})"),
-            &location_pair_text(t13, [start, start + 4, start + 14, start + 18]),
+            &location_pair_text(transaction_journal_record, [start, start + 4, start + 14, start + 18]),
         );
     }
 }
@@ -7183,7 +7183,7 @@ fn layout_field_positive_control(rows: &[LayoutFieldRow]) -> (usize, usize, bool
     let mut actuals: Vec<String> = rows.iter().map(|row| row.actual.clone()).collect();
     let mut injected_rows: Vec<usize> = Vec::new();
     for (index, row) in rows.iter().enumerate() {
-        let injected = match (row.id, row.field.as_str(), row.record_or_unit.as_str()) {
+        let injected = match (row.row_identifier, row.field.as_str(), row.record_or_unit.as_str()) {
             ("L19", _, _) => Some(row.actual.parse::<u64>().map_or("injected".to_string(), |watermark| (watermark + 1).to_string())),
             ("L16", "entry8_head_identifier", _) => Some("0".to_string()),
             ("L13", _, _) => Some("7".to_string()),
@@ -7310,16 +7310,16 @@ fn main() {
         emit(&mut emitter, &segments_sensitivity_line(&point_fields, "post_mkfs_stream", &recording.operations[..mkfs_operation_count], &swallowed_post_mkfs));
     }
     // ⑩ G11（⑧ 关，就是臂 N19，登记 R44）五条路径，与 G12a / G12b（G11 的流上照 G10 各吞一步屏障）。
-    let g11_stream = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &file_bytes);
-    for (path_name, earlier_operations, operations) in new_pool_file_creation_stream_paths(&g11_stream.operations, g11_stream.mkfs_operation_count, g11_stream.acquisition_operation_count, g11_stream.warm_up_operation_count) {
+    let stream_without_trailing_barrier = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &file_bytes);
+    for (path_name, earlier_operations, operations) in new_pool_file_creation_stream_paths(&stream_without_trailing_barrier.operations, stream_without_trailing_barrier.mkfs_operation_count, stream_without_trailing_barrier.acquisition_operation_count, stream_without_trailing_barrier.warm_up_operation_count) {
         emit(&mut emitter, &segments_sensitivity_line("point=G11 trailing_barrier=off", path_name, earlier_operations, operations));
     }
     for (point, swallowed_device) in SWALLOWED_BARRIER_POINTS_WITHOUT_TRAILING_BARRIER {
-        let swallowed_transaction = swallow_one_device_barrier_step_before_the_root(&g11_stream.operations[g11_stream.warm_up_operation_count..], swallowed_device);
-        let swallowed_post_mkfs: Vec<RecordedOperation> = g11_stream.operations[g11_stream.mkfs_operation_count..g11_stream.warm_up_operation_count].iter().cloned().chain(swallowed_transaction.iter().cloned()).collect();
+        let swallowed_transaction = swallow_one_device_barrier_step_before_the_root(&stream_without_trailing_barrier.operations[stream_without_trailing_barrier.warm_up_operation_count..], swallowed_device);
+        let swallowed_post_mkfs: Vec<RecordedOperation> = stream_without_trailing_barrier.operations[stream_without_trailing_barrier.mkfs_operation_count..stream_without_trailing_barrier.warm_up_operation_count].iter().cloned().chain(swallowed_transaction.iter().cloned()).collect();
         let point_fields = format!("point={point} trailing_barrier=off swallowed_device={}", swallowed_device.0);
-        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "transaction", &g11_stream.operations[..g11_stream.warm_up_operation_count], &swallowed_transaction));
-        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "post_mkfs_stream", &g11_stream.operations[..g11_stream.mkfs_operation_count], &swallowed_post_mkfs));
+        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "transaction", &stream_without_trailing_barrier.operations[..stream_without_trailing_barrier.warm_up_operation_count], &swallowed_transaction));
+        emit(&mut emitter, &segments_sensitivity_line(&point_fields, "post_mkfs_stream", &stream_without_trailing_barrier.operations[..stream_without_trailing_barrier.mkfs_operation_count], &swallowed_post_mkfs));
     }
     let write_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Write(_))).count();
     let barrier_count = transaction_operations.iter().filter(|operation| matches!(operation, RecordedOperation::Barrier(_))).count();
@@ -7372,12 +7372,12 @@ fn main() {
     ));
 
     // 臂 H（对照）：写者开关扳到 0x00，其余不变；与臂 F（本运行默认 parameters，flag=1）用同一份几何。
-    let h_parameters = parameters.clone().with_last_of_publish_flag(0x00);
-    let (h_image, _h_output) = run_full_pipeline(&h_parameters, NEW_POOL_FILE_CREATION_TXG, &file_bytes);
-    let f_image_for_hf = full.clone();
+    let flag_cleared_parameters = parameters.clone().with_last_of_publish_flag(0x00);
+    let (flag_cleared_image, _flag_cleared_output) = run_full_pipeline(&flag_cleared_parameters, NEW_POOL_FILE_CREATION_TXG, &file_bytes);
+    let flag_set_image_for_the_flag_difference = full.clone();
 
     // Q142.2 / P2：H、F 逐字节相减，每一段按落在哪条记录（w1/w4/本次事务自己那条）、记录内哪个字段打标签。
-    let hf_differences = diff_pools(&h_image, &f_image_for_hf);
+    let hf_differences = diff_pools(&flag_cleared_image, &flag_set_image_for_the_flag_difference);
     let mut hf_fields_by_record_device: BTreeMap<(String, u32), Vec<String>> = BTreeMap::new();
     for segment in &hf_differences {
         let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
@@ -7399,7 +7399,7 @@ fn main() {
     // P3：全盘相减分得出一个字节——在各自镜像的副本上把设备 0 的本次事务那条记录偏移 87（本次发布内序号首字节）、
     // 偏移 7（记录标志）各翻一位，与未翻的同一臂镜像相减；O 那一列由 `name=positive_control_change_count` 两行管（第五节 P3）。
     let this_transaction_record_base = journal_record_offset(JournalCounter(3)).0;
-    for (arm_name, image) in [("H", &h_image), ("F", &f_image_for_hf)] {
+    for (arm_name, image) in [("H", &flag_cleared_image), ("F", &flag_set_image_for_the_flag_difference)] {
         for (field_offset, field_tag) in [(87u64, "本次发布内序号"), (JOURNAL_RECORD_FLAGS_OFFSET_U64, "记录标志")] {
             let mut flipped = image.clone();
             flip_byte(&mut flipped, DeviceIdentity(0), DeviceOffset(this_transaction_record_base), field_offset);
@@ -7413,7 +7413,7 @@ fn main() {
     }
 
     // Q142.6 附带：H、F 两臂 w4、本次事务那条记录的反向链值（不当答案，只与第四节的线索并列给主 agent 看）。
-    for (arm_name, image) in [("H", &h_image), ("F", &f_image_for_hf)] {
+    for (arm_name, image) in [("H", &flag_cleared_image), ("F", &flag_set_image_for_the_flag_difference)] {
         let records = scan_journal(image, unit_fsid(&parameters.fsid));
         for (label, counter) in journal_header_record_labels(&journal_label) {
             if let Some(record) = records.get(&(InstanceGeneration(1), JournalCounter(counter))) {
@@ -7426,19 +7426,19 @@ fn main() {
     }
 
     // P6：读者读了标志与序号——四对 (H/F × 甲/乙) 都跑，另加 F 的六份改写（第五节 5.2）。
-    let p6_rows: [(&str, Option<fn(&mut JournalRecord)>, bool); 8] = [
+    let journal_without_root_rows: [(&str, Option<fn(&mut JournalRecord)>, bool); 8] = [
         ("F", None, false),
         ("H", None, false),
-        ("F_flag_0x03", Some(p6_mutate_flag_0x03), false),
-        ("F_ordinal_0", Some(p6_mutate_ordinal_0), false),
-        ("F_flag_0x00", Some(p6_mutate_flag_0x00), false),
-        ("F_ordinal_2", Some(p6_mutate_ordinal_2), false),
+        ("F_flag_0x03", Some(journal_without_root_mutate_flag_0x03), false),
+        ("F_ordinal_0", Some(journal_without_root_mutate_ordinal_0), false),
+        ("F_flag_0x00", Some(journal_without_root_mutate_flag_0x00), false),
+        ("F_ordinal_2", Some(journal_without_root_mutate_ordinal_2), false),
         ("F_trailing_same_txg", None, true),
-        ("F_txg_2", Some(p6_mutate_txg_2), false),
+        ("F_txg_2", Some(journal_without_root_mutate_txg_2), false),
     ];
-    for (label, mutate, append_trailing) in p6_rows {
-        let row_parameters = if label == "H" { h_parameters.clone() } else { parameters.clone() };
-        let row = run_p6_scenario(&row_parameters, &file_bytes, mutate, append_trailing);
+    for (label, mutate, append_trailing) in journal_without_root_rows {
+        let row_parameters = if label == "H" { flag_cleared_parameters.clone() } else { parameters.clone() };
+        let row = run_journal_without_root_scenario(&row_parameters, &file_bytes, mutate, append_trailing);
         emit(&mut emitter, &format!(
             "name=journal_header_p6 mirror={label} primary_prefix_applied={} primary_readable={} clause_prefix_applied={} clause_readable={} clause_fatal={}",
             row.primary_prefix_applied, row.primary_readable, row.clause_prefix_applied, row.clause_readable, row.clause_fatal
@@ -7449,42 +7449,42 @@ fn main() {
     // 按臂 H、臂 F 各跑一次、相减。这条流没有暖机，唯一的 journal 记录落在计数器 1（"w1" 分支），
     // 不会走到 `journal_record_name_for_offset` 的第三分支——第二个参数按这条流自己的单元数算，图的是
     // 万一以后这条流也带了暖机，标签仍然对，不留一个永远用不上、字面写死的角色名。
-    let g1_control_h = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
-    let g1_control_f = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
-    let (mut g1_recording_h, g1_genesis_h) = mkfs(&g1_control_h);
-    let _ = publish_first_file(&mut g1_recording_h, &g1_control_h, &g1_genesis_h, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
-    let (mut g1_recording_f, g1_genesis_f) = mkfs(&g1_control_f);
-    let g1_output_f = publish_first_file(&mut g1_recording_f, &g1_control_f, &g1_genesis_f, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
+    let unwarmed_single_device_flag_cleared_parameters = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
+    let unwarmed_single_device_flag_set_parameters = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
+    let (mut unwarmed_single_device_flag_cleared_recording, unwarmed_single_device_flag_cleared_genesis) = mkfs(&unwarmed_single_device_flag_cleared_parameters);
+    let _ = publish_first_file(&mut unwarmed_single_device_flag_cleared_recording, &unwarmed_single_device_flag_cleared_parameters, &unwarmed_single_device_flag_cleared_genesis, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
+    let (mut unwarmed_single_device_flag_set_recording, unwarmed_single_device_flag_set_genesis) = mkfs(&unwarmed_single_device_flag_set_parameters);
+    let unwarmed_single_device_flag_set_output = publish_first_file(&mut unwarmed_single_device_flag_set_recording, &unwarmed_single_device_flag_set_parameters, &unwarmed_single_device_flag_set_genesis, &file_bytes, InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
     // 前缀用 "c"（control，不进 `[mawt]` 那个字母表）：这条流是另一套几何（一盘、没有暖机），
     // 它的单元数与主臂不同，用同一个 "t" 前缀会跟主臂 `name=role_labels` 的 t1..t12 撞号
     // （这个几何 10 个单元 ⇒ 若用 "t11" 会跟主臂 t11=MappingTree 撞在角色名自检里，见第十二节修订）。
-    let g1_journal_label = format!("c{}", g1_output_f.units_by_slot.len() + 1);
-    let g1_differences = diff_pools(&g1_recording_h.pool, &g1_recording_f.pool);
-    let mut g1_fields: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    for segment in &g1_differences {
-        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &g1_journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
-        g1_fields.insert(format!("{record_name}:{}", journal_header_field_tag(offset_in_record)));
+    let unwarmed_single_device_journal_label = format!("c{}", unwarmed_single_device_flag_set_output.units_by_slot.len() + 1);
+    let unwarmed_single_device_differences = diff_pools(&unwarmed_single_device_flag_cleared_recording.pool, &unwarmed_single_device_flag_set_recording.pool);
+    let mut unwarmed_single_device_fields: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for segment in &unwarmed_single_device_differences {
+        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &unwarmed_single_device_journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
+        unwarmed_single_device_fields.insert(format!("{record_name}:{}", journal_header_field_tag(offset_in_record)));
     }
-    let g1_has_back_chain = g1_fields.iter().any(|field| field.ends_with(":back_chain"));
+    let unwarmed_single_device_has_back_chain = unwarmed_single_device_fields.iter().any(|field| field.ends_with(":back_chain"));
     emit(&mut emitter, &format!(
-        "name=journal_header_geometry sample=G1 record={g1_journal_label} fields={} back_chain_present={g1_has_back_chain}",
-        if g1_fields.is_empty() { "none".to_string() } else { g1_fields.iter().cloned().collect::<Vec<_>>().join(",") }
+        "name=journal_header_geometry sample=G1 record={unwarmed_single_device_journal_label} fields={} back_chain_present={unwarmed_single_device_has_back_chain}",
+        if unwarmed_single_device_fields.is_empty() { "none".to_string() } else { unwarmed_single_device_fields.iter().cloned().collect::<Vec<_>>().join(",") }
     ));
 
     // G2（盘数 2 → 1，带暖机）：run_full_pipeline 在一块盘的参数上，臂 H、臂 F 各跑一次、相减。
-    let g2_h = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
-    let g2_f = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
-    let (g2_image_h, _) = run_full_pipeline(&g2_h, NEW_POOL_FILE_CREATION_TXG, &file_bytes);
-    let (g2_image_f, g2_output_f) = run_full_pipeline(&g2_f, NEW_POOL_FILE_CREATION_TXG, &file_bytes);
-    let g2_journal_label = format!("c{}", g2_output_f.units_by_slot.len() + 1);
-    let g2_differences = diff_pools(&g2_image_h, &g2_image_f);
-    let mut g2_fields_by_record: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for segment in &g2_differences {
-        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &g2_journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
-        g2_fields_by_record.entry(record_name).or_default().push(journal_header_field_tag(offset_in_record).to_string());
+    let warmed_single_device_flag_cleared_parameters = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
+    let warmed_single_device_flag_set_parameters = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
+    let (warmed_single_device_flag_cleared_image, _) = run_full_pipeline(&warmed_single_device_flag_cleared_parameters, NEW_POOL_FILE_CREATION_TXG, &file_bytes);
+    let (warmed_single_device_flag_set_image, warmed_single_device_flag_set_output) = run_full_pipeline(&warmed_single_device_flag_set_parameters, NEW_POOL_FILE_CREATION_TXG, &file_bytes);
+    let warmed_single_device_journal_label = format!("c{}", warmed_single_device_flag_set_output.units_by_slot.len() + 1);
+    let warmed_single_device_differences = diff_pools(&warmed_single_device_flag_cleared_image, &warmed_single_device_flag_set_image);
+    let mut warmed_single_device_fields_by_record: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for segment in &warmed_single_device_differences {
+        let (record_name, offset_in_record) = journal_record_name_for_offset(segment.offset, &warmed_single_device_journal_label).unwrap_or(("unregistered".to_string(), segment.offset));
+        warmed_single_device_fields_by_record.entry(record_name).or_default().push(journal_header_field_tag(offset_in_record).to_string());
     }
-    for record_name in ["w1".to_string(), "w4".to_string(), g2_journal_label] {
-        let fields = g2_fields_by_record.get(&record_name).cloned().unwrap_or_default();
+    for record_name in ["w1".to_string(), "w4".to_string(), warmed_single_device_journal_label] {
+        let fields = warmed_single_device_fields_by_record.get(&record_name).cloned().unwrap_or_default();
         emit(&mut emitter, &format!("name=journal_header_geometry sample=G2 record={record_name} fields={}", if fields.is_empty() { "none".to_string() } else { fields.join(",") }));
     }
 
@@ -7576,7 +7576,7 @@ fn main() {
     let model_writes = model_window_writes(&catalog, transaction_operations);
 
     // P2（第五节 5.3）：比对器分得出一个字节——臂 N16 自己的镜像上翻四个点各一位，必须恰好命中。
-    run_p2_positive_control(&mut emitter, "arm_n16", &model_writes);
+    run_comparator_byte_positive_control(&mut emitter, "arm_n16", &model_writes);
 
     // Q142.1：逐区域比对（主读法 P）。
     let mut equal_count = 0u64;
@@ -7674,29 +7674,29 @@ fn main() {
     // Q142.19：臂 N15 → N16 哪些区域变了，按 (设备, 偏移, 长度) 配对（R3：不按区域名——节点数变了名字配不上）。
     // 第二个命令行参数这一次改指臂 N15 的产物（步 ① 现编现跑存下的那一份），不再是第十四次跑 arm O 的历史留存。
     if let Some(path) = std::env::args().nth(2) {
-        let arm_n15_text = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("Q142.19：读不到臂 N15 参照 {path}：{error}"));
-        let arm_n15_writes = parse_write_lines(&arm_n15_text, "name=device_region_bytes ");
-        let mut arm_n15_matched = vec![false; arm_n15_writes.len()];
+        let reference_arm_text = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("Q142.19：读不到臂 N15 参照 {path}：{error}"));
+        let reference_arm_writes = parse_write_lines(&reference_arm_text, "name=device_region_bytes ");
+        let mut reference_arm_matched = vec![false; reference_arm_writes.len()];
         let mut matched_count = 0u64;
         let mut changed_count = 0u64;
         for write in &model_writes {
             let length = write.bytes.len() as u64;
-            let Some(index) = find_matching_impl_write(&arm_n15_writes, write.device, write.offset, length) else {
+            let Some(index) = find_matching_impl_write(&reference_arm_writes, write.device, write.offset, length) else {
                 emit(&mut emitter, &format!("name=old_new_region_only_in role=N16 region={} device={} offset={} length={length}", write.region, write.device, write.offset));
                 continue;
             };
-            arm_n15_matched[index] = true;
+            reference_arm_matched[index] = true;
             matched_count += 1;
             let sha = sha256_hex(&write.bytes);
-            let changed = arm_n15_writes[index].sha256 != sha;
+            let changed = reference_arm_writes[index].sha256 != sha;
             if changed {
                 changed_count += 1;
             }
             emit(&mut emitter, &format!("name=old_new_region region={} device={} changed={changed}", write.region, write.device));
         }
-        for (index, matched) in arm_n15_matched.iter().enumerate() {
+        for (index, matched) in reference_arm_matched.iter().enumerate() {
             if !matched {
-                let line = &arm_n15_writes[index];
+                let line = &reference_arm_writes[index];
                 emit(&mut emitter, &format!("name=old_new_region_only_in role=N15 device={} offset={} length={}", line.device, line.offset, line.length));
             }
         }
@@ -7727,25 +7727,25 @@ fn main() {
     // 第八节 G4：一盘，走整条写路，与 crates 的一盘导出比（第三个命令行参数，可选）。
     if let Some(path) = std::env::args().nth(3) {
         let one_device_dump_text = std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("G4：读不到一盘导出 {path}：{error}"));
-        let g4_impl_writes = parse_write_lines(&one_device_dump_text, "name=device_region_bytes ");
-        let g4_parameters = PoolParameters::control_one_device_no_barriers();
-        let g4_writes = model_window_writes_for_parameters(&g4_parameters, &file_bytes);
-        let mut g4_matched = vec![false; g4_impl_writes.len()];
-        let mut g4_equal = 0u64;
-        let mut g4_unequal = 0u64;
-        for write in &g4_writes {
+        let one_device_dump_implementation_writes = parse_write_lines(&one_device_dump_text, "name=device_region_bytes ");
+        let one_device_dump_parameters = PoolParameters::control_one_device_no_barriers();
+        let one_device_dump_model_writes = model_window_writes_for_parameters(&one_device_dump_parameters, &file_bytes);
+        let mut one_device_dump_matched = vec![false; one_device_dump_implementation_writes.len()];
+        let mut one_device_dump_equal = 0u64;
+        let mut one_device_dump_unequal = 0u64;
+        for write in &one_device_dump_model_writes {
             let sha = sha256_hex(&write.bytes);
             let length = write.bytes.len() as u64;
-            let Some(index) = find_matching_impl_write(&g4_impl_writes, write.device, write.offset, length) else {
+            let Some(index) = find_matching_impl_write(&one_device_dump_implementation_writes, write.device, write.offset, length) else {
                 emit(&mut emitter, &format!("name=g4_bytes_unmatched side=model region={} device={} offset={} length={length}", write.region, write.device, write.offset));
                 continue;
             };
-            g4_matched[index] = true;
-            let (equal, first_diff_offset, mismatch_bytes) = compare_paired_write(&write.bytes, &sha, &g4_impl_writes[index]);
+            one_device_dump_matched[index] = true;
+            let (equal, first_diff_offset, mismatch_bytes) = compare_paired_write(&write.bytes, &sha, &one_device_dump_implementation_writes[index]);
             if equal {
-                g4_equal += 1;
+                one_device_dump_equal += 1;
             } else {
-                g4_unequal += 1;
+                one_device_dump_unequal += 1;
             }
             emit(&mut emitter, &format!(
                 "name=g4_bytes_equal region={} device={} offset={} length={length} equal={equal} first_diff_offset={} mismatch_bytes={}",
@@ -7754,15 +7754,15 @@ fn main() {
                 mismatch_bytes.map_or("unknown".to_string(), |value| value.to_string())
             ));
         }
-        for (index, matched) in g4_matched.iter().enumerate() {
+        for (index, matched) in one_device_dump_matched.iter().enumerate() {
             if !matched {
-                let line = &g4_impl_writes[index];
+                let line = &one_device_dump_implementation_writes[index];
                 emit(&mut emitter, &format!("name=g4_bytes_unmatched side=crates device={} offset={} length={}", line.device, line.offset, line.length));
             }
         }
         emit(&mut emitter, &format!(
-            "name=g4_bytes_equal_summary model_regions={} crates_regions={} equal={g4_equal} unequal={g4_unequal}",
-            g4_writes.len(), g4_impl_writes.len()
+            "name=g4_bytes_equal_summary model_regions={} crates_regions={} equal={one_device_dump_equal} unequal={one_device_dump_unequal}",
+            one_device_dump_model_writes.len(), one_device_dump_implementation_writes.len()
         ));
     } else {
         emit(&mut emitter, "name=g4_bytes_equal_summary skipped=true reason=no_one_device_dump_path_given");
@@ -7808,7 +7808,7 @@ fn main() {
     emit(&mut emitter, &format!("name=layer0_fua_not_boundary segments={} closed_form={}", segments_fua_free.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"), closed_form_state_count(&segments_fua_free)));
 
     let layer0_main_start = std::time::Instant::now();
-    let layer0_main_threads = thread_cap_from_env();
+    let layer0_main_threads = parallel_thread_count();
     let main_root_index = writes.iter().rposition(|write| write.kind == StepKind::RootRecordFua).expect("主臂写流里有根槽那一条");
     // 暖机两次空发布不写单元（D16（发布语义） 已定项 8「且不写单元」），整条主臂窗口里唯一会出现
     // `JournalRecord` 三次（w1、w4、t13 各一次发布），主事务自己那一次镜像最后 `device_count` 份就是它。
@@ -7887,26 +7887,26 @@ fn main() {
     emit(&mut emitter, &format!("name=layer0_control_outcome_matrix_summary off_diagonal={}", control_comparison.off_diagonal));
 
     // 第八节 G6：同一个一盘几何，把 D16（发布语义） 已定项 7 的两道屏障放回去（FUA 不切段）——违例该从正数翻成 0。
-    let g6_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &file_bytes, false);
-    let (g6_tally, g6_comparison) = compare_layer0_predictions(
-        &g6_flow.base, &g6_flow.writes, &g6_flow.segments, &file_bytes, ReaderMode::Clause, g6_flow.journal_index, &g6_flow.dependency_groups, &g6_flow.role_names,
+    let barriers_restored_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &file_bytes, false);
+    let (barriers_restored_tally, barriers_restored_comparison) = compare_layer0_predictions(
+        &barriers_restored_flow.base, &barriers_restored_flow.writes, &barriers_restored_flow.segments, &file_bytes, ReaderMode::Clause, barriers_restored_flow.journal_index, &barriers_restored_flow.dependency_groups, &barriers_restored_flow.role_names,
     );
     emit(&mut emitter, &format!(
         "name=layer0_sensitivity point=G6 barriers=settled fua_is_boundary=false segments={} states={} closed_form={} violations={} missed={} false_alarm={} file_read={} journal_differing={}",
-        g6_flow.segments.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"),
-        g6_tally.states, g6_flow.closed_form, g6_tally.violations, g6_comparison.missed, g6_comparison.false_alarm, g6_tally.file_read_states, g6_tally.journal_differing_states
+        barriers_restored_flow.segments.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"),
+        barriers_restored_tally.states, barriers_restored_flow.closed_form, barriers_restored_tally.violations, barriers_restored_comparison.missed, barriers_restored_comparison.false_alarm, barriers_restored_tally.file_read_states, barriers_restored_tally.journal_differing_states
     ));
 
     // 第八节 G7：阳性对照的同一条写流，只把 FUA 当段边界（D13（验证路线） 已定项 4 字面）——状态数与违例都该翻。
     let control_flow_fua = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &file_bytes, true);
-    let (g7_tally, g7_comparison) = compare_layer0_predictions(
+    let (fua_boundary_tally, fua_boundary_comparison) = compare_layer0_predictions(
         &control_flow_fua.base, &control_flow_fua.writes, &control_flow_fua.segments, &file_bytes, ReaderMode::Clause,
         control_flow_fua.journal_index, &control_flow_fua.dependency_groups, &control_flow_fua.role_names,
     );
     emit(&mut emitter, &format!(
         "name=layer0_sensitivity point=G7 barriers=none fua_is_boundary=true segments={} states={} closed_form={} violations={} missed={} false_alarm={} file_read={} journal_differing={}",
         control_flow_fua.segments.iter().map(|segment| segment.len().to_string()).collect::<Vec<_>>().join("+"),
-        g7_tally.states, control_flow_fua.closed_form, g7_tally.violations, g7_comparison.missed, g7_comparison.false_alarm, g7_tally.file_read_states, g7_tally.journal_differing_states
+        fua_boundary_tally.states, control_flow_fua.closed_form, fua_boundary_tally.violations, fua_boundary_comparison.missed, fua_boundary_comparison.false_alarm, fua_boundary_tally.file_read_states, fua_boundary_tally.journal_differing_states
     ));
 
     // PC2（第五节 5.2）：主臂几何上，全部持久、与逐个单元的两份都不持久（12 个单元、13 个状态）。
@@ -7992,7 +7992,7 @@ fn main() {
     let fragmentation_runs_per_device = statistic_value(STATISTIC_FRAGMENTATION_RUNS);
     for (gap_identifier, text) in GAPS {
         if *gap_identifier == "G22" {
-            let text = render_g22_text(text, free_bytes_per_device, empty_cluster_segments_per_device, fragmentation_runs_per_device);
+            let text = render_free_bytes_gap_text(text, free_bytes_per_device, empty_cluster_segments_per_device, fragmentation_runs_per_device);
             emit(&mut emitter, &format!(
                 "name=gap id={gap_identifier} text={text} bound_free_bytes_per_device={free_bytes_per_device} bound_empty_cluster_segments_per_device={empty_cluster_segments_per_device} bound_fragmentation_runs_per_device={fragmentation_runs_per_device}"
             ));
@@ -8028,7 +8028,7 @@ fn main() {
         let equal = layout_field_equal(&row.expected, &row.actual);
         emit(&mut emitter, &format!(
             "name=layout_field id={} record_or_unit={} field={} expected={} actual={} equal={equal} layout_line={}",
-            row.id, row.record_or_unit, row.field, row.expected, row.actual, row.layout_line
+            row.row_identifier, row.record_or_unit, row.field, row.expected, row.actual, row.layout_line
         ));
     }
     let (layout_equal_rows, layout_unequal_rows) = layout_field_tally(&layout_rows);
@@ -8067,19 +8067,19 @@ fn main() {
     let journal_header_record_label = find_field_value_excluding(&emitted_so_far, "journal_header_record_bytes", "record", &["w1", "w4"]).unwrap_or_else(|| "not_found".to_string());
     let write_list_journal_record_label = find_field_value_excluding(&emitted_so_far, "role_labels", "journal_record", &[]).unwrap_or_else(|| "not_found".to_string());
     let labels_equal = journal_header_record_label == write_list_journal_record_label;
-    let g22_text = emitted_so_far
+    let free_bytes_gap_text = emitted_so_far
         .iter()
         .find(|line| {
             let fields = split_fields(line);
-            fields.iter().any(|(k, v)| *k == "name" && *v == "gap") && fields.iter().any(|(k, v)| *k == "id" && *v == "G22")
+            fields.iter().any(|(field_key, field_value)| *field_key == "name" && *field_value == "gap") && fields.iter().any(|(field_key, field_value)| *field_key == "id" && *field_value == "G22")
         })
-        .and_then(|line| split_fields(line).iter().find(|(k, _)| *k == "text").map(|(_, v)| (*v).to_string()))
+        .and_then(|line| split_fields(line).iter().find(|(field_key, _)| *field_key == "text").map(|(_, field_value)| (*field_value).to_string()))
         .unwrap_or_default();
-    let g22_free_bytes = extract_number_after_marker(&g22_text, "空闲字节").unwrap_or(0);
+    let free_bytes_in_the_gap_text = extract_number_after_marker(&free_bytes_gap_text, "空闲字节").unwrap_or(0);
     let accounting_free_bytes_per_device: u64 = find_field_value_excluding(&emitted_so_far, "accounting", "free_bytes_per_device", &[]).and_then(|value| value.parse().ok()).unwrap_or(0);
-    let numbers_equal = g22_free_bytes == accounting_free_bytes_per_device;
+    let numbers_equal = free_bytes_in_the_gap_text == accounting_free_bytes_per_device;
     emit(&mut emitter, &format!(
-        "name=self_check_named_instances journal_header_record_label={journal_header_record_label} write_list_journal_record_label={write_list_journal_record_label} labels_equal={labels_equal} g22_free_bytes={g22_free_bytes} accounting_free_bytes_per_device={accounting_free_bytes_per_device} numbers_equal={numbers_equal}"
+        "name=self_check_named_instances journal_header_record_label={journal_header_record_label} write_list_journal_record_label={write_list_journal_record_label} labels_equal={labels_equal} g22_free_bytes={free_bytes_in_the_gap_text} accounting_free_bytes_per_device={accounting_free_bytes_per_device} numbers_equal={numbers_equal}"
     ));
 
     // R18 第五节 5.1 ④、第七节 A24–A27：模型自己核窗口两份系统配置槽与根槽的条款字段，
@@ -8201,10 +8201,10 @@ fn main() {
         // 预言数对不对上——G7 对不上就是停机 S10（见第十二节修订：这个装置的 `split_into_segments` 与
         // `crates/singlefs-verification/src/segments.rs` 都把 FUA 写并进它前面没被屏障断开的那一段，
         // 不是登记 A18 假设的「FUA 恒自成一段」，两边一致、不作废）。
-        g6_tally.states == g6_flow.closed_form && g6_flow.closed_form == 1028,
-        g6_tally.violations == 0,
-        g7_tally.states == control_flow_fua.closed_form && control_flow_fua.closed_form == 2050,
-        g7_tally.violations == 0,
+        barriers_restored_tally.states == barriers_restored_flow.closed_form && barriers_restored_flow.closed_form == 1028,
+        barriers_restored_tally.violations == 0,
+        fua_boundary_tally.states == control_flow_fua.closed_form && control_flow_fua.closed_form == 2050,
+        fua_boundary_tally.violations == 0,
         pc2.caught == 12 && pc2.all_persisted_legal && pc2.all_persisted_content_ok,
         role_label_check.contradictions == 0,
         role_label_check.undefined == 0,
@@ -8677,10 +8677,10 @@ mod tests {
         let (_, segments) = split_into_segments(&recording.operations[mkfs_operation_count..], false);
         assert_eq!(segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 3, 2, 3, 24, 2, 3]);
         assert_eq!(closed_form_state_count(&segments), 16_777_249);
-        let g11_stream = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
-        let (_, g11_segments) = split_into_segments(&g11_stream.operations[g11_stream.mkfs_operation_count..], false);
-        assert_eq!(g11_segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 3, 2, 27, 2, 3]);
-        assert_eq!(closed_form_state_count(&g11_segments), 134_217_754);
+        let stream_without_trailing_barrier = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
+        let (_, segments_without_trailing_barrier) = split_into_segments(&stream_without_trailing_barrier.operations[stream_without_trailing_barrier.mkfs_operation_count..], false);
+        assert_eq!(segments_without_trailing_barrier.iter().map(Vec::len).collect::<Vec<_>>(), vec![2, 2, 3, 2, 27, 2, 3]);
+        assert_eq!(closed_form_state_count(&segments_without_trailing_barrier), 134_217_754);
     }
 
     /// 段序列的五条路径由这条钉住，绝对值取 E142 第十九次跑登记 7.4 D1–D3 与 R19E-4 第 4 条（臂 N19M：屏障按设备各记一步、
@@ -8791,7 +8791,7 @@ mod tests {
 
     /// 臂 N19 的 ①：一道池屏障按设备号升序每块盘记一步，一块盘时恰一步。
     #[test]
-    fn a_pool_barrier_records_one_step_per_device_in_ascending_order() {
+    fn pool_barrier_records_one_step_per_device_in_ascending_order() {
         for (device_count, expected) in [(2usize, vec![DeviceIdentity(0), DeviceIdentity(1)]), (1, vec![DeviceIdentity(0)])] {
             let mut pool = RecordingPool { pool: Pool { devices: vec![SparseDevice::default(); device_count], device_bytes: DEVICE_BYTES }, operations: Vec::new() };
             pool.barrier();
@@ -8838,7 +8838,7 @@ mod tests {
 
     /// 取样点 G11（⑧ 关，就是臂 N19，登记 R44）：五条路径逐格对登记 7.1 A1–A4 与 7.2 B1–B5。
     #[test]
-    fn g11_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier() {
+    fn trailing_barrier_off_rows_match_the_anchors_of_the_stream_without_the_trailing_barrier() {
         let stream = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
         let expected: [(&str, usize, &str, u64, u64, &str, &str); 5] = [
             ("mkfs", 25, "14+1+1+1+4", 16402, 16402, "0+0+0+0+0", "[zero_fill×10,unit_write×4,barrier×2]|[root_record_fua]|[root_record_fua]|[root_record_fua]|[system_configuration_slot×4,barrier×2]"),
@@ -8946,7 +8946,7 @@ mod tests {
     /// `closed_form=`、`kinds=` 四个字段与主几何 `name=segments path=mkfs` 那一行逐个相同——mkfs 不随发布这一侧的屏障旋钮变。
     /// 主几何那一行的绝对值另由 `registered_segment_sequences_match_every_recorded_path` 钉住。
     #[test]
-    fn mkfs_segment_fields_at_g11_equal_the_main_geometry() {
+    fn mkfs_segment_fields_without_the_trailing_barrier_equal_the_main_geometry() {
         let BuiltPool { recording, mkfs_operation_count, .. } = built_pool();
         let main_mkfs_operations = &recording.operations[..mkfs_operation_count];
         let (_, main_segments) = split_into_segments(main_mkfs_operations, true);
@@ -8957,15 +8957,15 @@ mod tests {
             format!("kinds={}", format_segment_kinds(&segment_step_kinds(main_mkfs_operations, true))),
         ];
         assert_eq!(main_fields[0], "operations=25");
-        let g11_stream = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
+        let stream_without_trailing_barrier = record_new_pool_file_creation_stream(&PoolParameters::settled_two_devices_without_trailing_publish_barrier(), &sample_file());
         let [(path_name, earlier_operations, operations), ..] =
-            new_pool_file_creation_stream_paths(&g11_stream.operations, g11_stream.mkfs_operation_count, g11_stream.acquisition_operation_count, g11_stream.warm_up_operation_count);
+            new_pool_file_creation_stream_paths(&stream_without_trailing_barrier.operations, stream_without_trailing_barrier.mkfs_operation_count, stream_without_trailing_barrier.acquisition_operation_count, stream_without_trailing_barrier.warm_up_operation_count);
         assert_eq!(path_name, "mkfs");
-        let g11_line = segments_sensitivity_line("point=G11 trailing_barrier=off", path_name, earlier_operations, operations);
+        let line_without_trailing_barrier = segments_sensitivity_line("point=G11 trailing_barrier=off", path_name, earlier_operations, operations);
         for field in &main_fields {
             let field_name = field.split('=').next().expect("字段名");
-            let g11_field = g11_line.split(' ').find(|token| token.split('=').next() == Some(field_name)).expect("G11 那一行有这个字段");
-            assert_eq!(g11_field, field, "G11 的 path=mkfs 那一行 {field_name} 与主几何不同");
+            let field_without_trailing_barrier = line_without_trailing_barrier.split(' ').find(|token| token.split('=').next() == Some(field_name)).expect("G11 那一行有这个字段");
+            assert_eq!(field_without_trailing_barrier, field, "G11 的 path=mkfs 那一行 {field_name} 与主几何不同");
         }
     }
 
@@ -9143,9 +9143,9 @@ mod tests {
 
     /// M157 的会红检查：G22 的文本把三个占位符换成真给的记账数，不是写死的旧字面。
     #[test]
-    fn render_g22_text_fills_in_the_current_accounting_numbers() {
-        let template = GAPS.iter().find(|(id, _)| *id == "G22").expect("GAPS 里有 G22").1;
-        let text = render_g22_text(template, 42, 7, 3);
+    fn render_free_bytes_gap_text_fills_in_the_current_accounting_numbers() {
+        let template = GAPS.iter().find(|(gap_identifier, _)| *gap_identifier == "G22").expect("GAPS 里有 G22").1;
+        let text = render_free_bytes_gap_text(template, 42, 7, 3);
         assert_eq!(extract_number_after_marker(&text, "空闲字节"), Some(42));
         assert!(!text.contains("3472670720"), "不许把旧字面留在模板替换的结果里");
     }
@@ -9156,8 +9156,8 @@ mod tests {
     /// 应该停在暖机的旧态（没有文件）。
     #[test]
     fn main_arm_transaction_record_is_not_applied_when_a_named_unit_is_missing() {
-        let (base, writes, output) = s_star_writes(&PoolParameters::settled_two_devices(), &sample_file());
-        let mut persisted = s_star_persisted(&writes);
+        let (base, writes, output) = writes_up_to_the_journal_record_fixed_state(&PoolParameters::settled_two_devices(), &sample_file());
+        let mut persisted = persisted_mask_up_to_the_journal_record_fixed_state(&writes);
         let (slot, unit, _) = &output.units_by_slot[0];
         assert_eq!(*unit, TransactionUnit::Data, "第 0 个单元是数据单元（t1）");
         let offset = slot.device_offset();
@@ -9218,12 +9218,12 @@ mod tests {
     /// 第八节 A17/B17：G6（一盘、把 D16（发布语义） 已定项 7 的两道屏障放回去、FUA 不切段）——
     /// 屏障隔开了根槽与它前面的写，根槽照样自成一段：1028 个状态、0 个违例（方向与阳性对照相反）。
     #[test]
-    fn g6_matches_a17_1028_states_zero_violations() {
-        let g6_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &sample_file(), false);
-        assert_eq!(g6_flow.segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![10, 1, 2], "第七节 A17「段 [U],[1],[2]」");
-        assert_eq!(g6_flow.closed_form, 1028, "第七节 A17「1028 个状态」");
+    fn barriers_restored_matches_the_registered_1028_states_and_zero_violations() {
+        let barriers_restored_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &sample_file(), false);
+        assert_eq!(barriers_restored_flow.segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![10, 1, 2], "第七节 A17「段 [U],[1],[2]」");
+        assert_eq!(barriers_restored_flow.closed_form, 1028, "第七节 A17「1028 个状态」");
         let (tally, comparison) = compare_layer0_predictions(
-            &g6_flow.base, &g6_flow.writes, &g6_flow.segments, &sample_file(), ReaderMode::Clause, g6_flow.journal_index, &g6_flow.dependency_groups, &g6_flow.role_names,
+            &barriers_restored_flow.base, &barriers_restored_flow.writes, &barriers_restored_flow.segments, &sample_file(), ReaderMode::Clause, barriers_restored_flow.journal_index, &barriers_restored_flow.dependency_groups, &barriers_restored_flow.role_names,
         );
         assert_eq!(tally.states, 1028);
         assert_eq!(tally.violations, 0, "{:?}", tally.first_violation);
@@ -9240,12 +9240,12 @@ mod tests {
     /// M154 把切法换成「FUA 自成一段」会让这条测试变红（4097→2050、2046→0），用来证「这条判别力来自
     /// 切法，不是巧合」。
     #[test]
-    fn g7_fua_merges_with_preceding_unbarriered_writes_not_a18() {
-        let g7_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), true);
-        assert_eq!(g7_flow.segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![12, 1], "实测切法：单元+journal+根槽合并成一段，系统配置槽单独一段");
-        assert_eq!(g7_flow.closed_form, 4097, "1 + (2^12 − 1) + (2^1 − 1)");
+    fn fua_boundary_merges_with_preceding_unbarriered_writes_instead_of_the_registered_2050() {
+        let fua_boundary_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), true);
+        assert_eq!(fua_boundary_flow.segments.iter().map(Vec::len).collect::<Vec<_>>(), vec![12, 1], "实测切法：单元+journal+根槽合并成一段，系统配置槽单独一段");
+        assert_eq!(fua_boundary_flow.closed_form, 4097, "1 + (2^12 − 1) + (2^1 − 1)");
         let (tally, comparison) = compare_layer0_predictions(
-            &g7_flow.base, &g7_flow.writes, &g7_flow.segments, &sample_file(), ReaderMode::Clause, g7_flow.journal_index, &g7_flow.dependency_groups, &g7_flow.role_names,
+            &fua_boundary_flow.base, &fua_boundary_flow.writes, &fua_boundary_flow.segments, &sample_file(), ReaderMode::Clause, fua_boundary_flow.journal_index, &fua_boundary_flow.dependency_groups, &fua_boundary_flow.role_names,
         );
         assert_eq!(tally.states, 4097);
         assert_eq!(tally.violations, 2046, "根被并进那个 12 项段之后，根持久而依赖集不全的子集都判违例：(2^12)/2 − 2 = 2046");
@@ -9275,14 +9275,14 @@ mod tests {
     /// 例如「违例数 ≥ 1 才算对照有效」——G6 必须判「无效」、阳性对照必须判「有效」，
     /// 证明这个门槛不是摆设。
     #[test]
-    fn judgment_threshold_between_control_and_g6_discriminates_both_ways() {
+    fn judgment_threshold_between_control_and_barriers_restored_discriminates_both_ways() {
         let control_flow = build_single_publish_flow(&PoolParameters::control_one_device_no_barriers(), &sample_file(), false);
         let control_tally = enumerate_layer0(&control_flow.base, &control_flow.writes, &control_flow.segments, &sample_file(), ReaderMode::Clause);
-        let g6_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &sample_file(), false);
-        let g6_tally = enumerate_layer0(&g6_flow.base, &g6_flow.writes, &g6_flow.segments, &sample_file(), ReaderMode::Clause);
+        let barriers_restored_flow = build_single_publish_flow(&PoolParameters::one_device_with_barriers(), &sample_file(), false);
+        let barriers_restored_tally = enumerate_layer0(&barriers_restored_flow.base, &barriers_restored_flow.writes, &barriers_restored_flow.segments, &sample_file(), ReaderMode::Clause);
         let threshold_says_effective = |violations: u64| violations >= 1;
         assert!(threshold_says_effective(control_tally.violations), "阳性对照必须判「有效」");
-        assert!(!threshold_says_effective(g6_tally.violations), "G6 必须判「无效」");
+        assert!(!threshold_says_effective(barriers_restored_tally.violations), "G6 必须判「无效」");
     }
 
     /// PC3 之一（角色名自检，R18/R20）：合成一份产物——`name=role_labels` 把 `t9` 定义成单元，
@@ -9330,7 +9330,7 @@ mod tests {
     /// Q142.29 两处点名（问题单第 8 行）：从真实产物文本（不是 Rust 变量）里现取 journal_header 与
     /// write_list 两处的记录标签、G22 与记账两处的空闲字节，逐字节相同。
     #[test]
-    fn named_instances_journal_header_and_write_list_agree_and_g22_matches_accounting() {
+    fn named_instances_journal_header_and_write_list_agree_and_the_free_bytes_gap_matches_accounting() {
         let lines: Vec<String> = vec![
             "E7RESULT name=role_labels scope=main_transaction units=t1,t2 journal_record=t13 root=t14 system_configuration=t15 warm_up_journal_records=w1,w4".to_string(),
             "E7RESULT name=journal_header_record_bytes arm=F record=w1 device=0 flag_byte=0x00 ordinal_bytes=1 back_chain=0".to_string(),
@@ -9341,10 +9341,10 @@ mod tests {
         let journal_header_record_label = find_field_value_excluding(&lines, "journal_header_record_bytes", "record", &["w1", "w4"]).unwrap();
         let write_list_journal_record_label = find_field_value_excluding(&lines, "role_labels", "journal_record", &[]).unwrap();
         assert_eq!(journal_header_record_label, write_list_journal_record_label);
-        let g22_text = split_fields(lines.iter().find(|line| line.contains("id=G22")).unwrap()).iter().find(|(k, _)| *k == "text").unwrap().1.to_string();
-        let g22_free_bytes = extract_number_after_marker(&g22_text, "空闲字节").unwrap();
+        let free_bytes_gap_text = split_fields(lines.iter().find(|line| line.contains("id=G22")).unwrap()).iter().find(|(field_key, _)| *field_key == "text").unwrap().1.to_string();
+        let free_bytes_in_the_gap_text = extract_number_after_marker(&free_bytes_gap_text, "空闲字节").unwrap();
         let accounting_free_bytes: u64 = find_field_value_excluding(&lines, "accounting", "free_bytes_per_device", &[]).unwrap().parse().unwrap();
-        assert_eq!(g22_free_bytes, accounting_free_bytes);
+        assert_eq!(free_bytes_in_the_gap_text, accounting_free_bytes);
     }
 
     /// E142 第十五次跑（第七节 B1–B3）：分配记录树五个节点的层级、罩的段、格——按位置寻址的落点表。
@@ -9425,12 +9425,12 @@ mod tests {
     /// 第 k 片的 key 区间，第七节 B12 锚点的四个 inode 点（1、142、143、286）。
     #[test]
     fn extent_upper_leaf_positional_key_range_matches_the_frozen_anchors() {
-        for (inode, expected_k, expected_smallest_inode, expected_largest_inode) in
+        for (inode, expected_upper_leaf_index, expected_smallest_inode, expected_largest_inode) in
             [(1u64, 0u64, 0u64, 142u64), (142, 0, 0, 142), (143, 1, 143, 285), (286, 2, 286, 428)]
         {
-            let k = extent_upper_leaf_index(inode);
-            assert_eq!(k, expected_k, "inode={inode}");
-            let (smallest, largest) = extent_upper_leaf_positional_key_range(k);
+            let upper_leaf_index = extent_upper_leaf_index(inode);
+            assert_eq!(upper_leaf_index, expected_upper_leaf_index, "inode={inode}");
+            let (smallest, largest) = extent_upper_leaf_positional_key_range(upper_leaf_index);
             let mut expected_smallest = [0u8; 24];
             expected_smallest[8..16].copy_from_slice(&expected_smallest_inode.to_le_bytes());
             let mut expected_largest = [0u8; 24];
@@ -9564,47 +9564,47 @@ mod tests {
     /// P6（A8，E142 第十四次跑第五节 5.2）：读者读了标志与序号——十六格预期逐句照条款推出来。
     /// S*：t9 之前（含 t9 两份）全部持久，t10 根槽与 t11 系统配置槽都没持久。
     #[test]
-    fn p6_reader_outcomes_match_the_clause_table() {
-        let f = PoolParameters::settled_two_devices();
-        let h = f.clone().with_last_of_publish_flag(0x00);
+    fn journal_without_root_reader_outcomes_match_the_clause_table() {
+        let flag_set_parameters = PoolParameters::settled_two_devices();
+        let flag_cleared_parameters = flag_set_parameters.clone().with_last_of_publish_flag(0x00);
         let file_bytes = sample_file();
 
-        let row_f = run_p6_scenario(&f, &file_bytes, None, false);
-        assert_eq!(row_f.primary_prefix_applied, 1, "读者甲：F 上 t9 施加 ⇒ 根推进到 (1,3)");
-        assert_eq!(row_f.clause_prefix_applied, 1, "锚 w4（带标志）⇒ 接 t9；t9 带标志、提交标记 1 ⇒ 施加，根推进到 (1,3)");
-        assert!(!row_f.clause_fatal);
+        let flag_set_row = run_journal_without_root_scenario(&flag_set_parameters, &file_bytes, None, false);
+        assert_eq!(flag_set_row.primary_prefix_applied, 1, "读者甲：F 上 t9 施加 ⇒ 根推进到 (1,3)");
+        assert_eq!(flag_set_row.clause_prefix_applied, 1, "锚 w4（带标志）⇒ 接 t9；t9 带标志、提交标记 1 ⇒ 施加，根推进到 (1,3)");
+        assert!(!flag_set_row.clause_fatal);
 
-        let row_h = run_p6_scenario(&h, &file_bytes, None, false);
-        assert_eq!(row_h.primary_prefix_applied, 1, "读者甲不看标志，H 上 t9 照样施加 ⇒ (1,3)");
-        assert_eq!(row_h.clause_prefix_applied, 0, "w4 不带标志 ⇒ 锚点读不出；t9 也不带标志 ⇒ 这次发布走不到末条，不施加，根停在 (1,2)");
-        assert!(!row_h.clause_fatal);
+        let flag_cleared_row = run_journal_without_root_scenario(&flag_cleared_parameters, &file_bytes, None, false);
+        assert_eq!(flag_cleared_row.primary_prefix_applied, 1, "读者甲不看标志，H 上 t9 照样施加 ⇒ (1,3)");
+        assert_eq!(flag_cleared_row.clause_prefix_applied, 0, "w4 不带标志 ⇒ 锚点读不出；t9 也不带标志 ⇒ 这次发布走不到末条，不施加，根停在 (1,2)");
+        assert!(!flag_cleared_row.clause_fatal);
 
-        let row_flag_03 = run_p6_scenario(&f, &file_bytes, Some(p6_mutate_flag_0x03), false);
+        let row_flag_03 = run_journal_without_root_scenario(&flag_set_parameters, &file_bytes, Some(journal_without_root_mutate_flag_0x03), false);
         assert_eq!(row_flag_03.primary_prefix_applied, 1);
         assert_eq!(row_flag_03.primary_readable, 3);
         assert_eq!(row_flag_03.clause_prefix_applied, 0, "位 0 之外有位为 1 ⇒ 当损坏（已定项 4），根停在 (1,2)");
         assert_eq!(row_flag_03.clause_readable, 2, "t9 当损坏，读得出的只剩 w1、w4");
 
-        let row_ordinal_0 = run_p6_scenario(&f, &file_bytes, Some(p6_mutate_ordinal_0), false);
+        let row_ordinal_0 = run_journal_without_root_scenario(&flag_set_parameters, &file_bytes, Some(journal_without_root_mutate_ordinal_0), false);
         assert_eq!(row_ordinal_0.primary_prefix_applied, 1);
         assert_eq!(row_ordinal_0.primary_readable, 3);
         assert_eq!(row_ordinal_0.clause_prefix_applied, 0, "序号 0 ⇒ 当损坏（已定项 4），根停在 (1,2)");
         assert_eq!(row_ordinal_0.clause_readable, 2);
 
-        let row_flag_00 = run_p6_scenario(&f, &file_bytes, Some(p6_mutate_flag_0x00), false);
+        let row_flag_00 = run_journal_without_root_scenario(&flag_set_parameters, &file_bytes, Some(journal_without_root_mutate_flag_0x00), false);
         assert_eq!(row_flag_00.primary_prefix_applied, 1);
         assert_eq!(row_flag_00.clause_prefix_applied, 0, "锚 w4 ⇒ 接 t9；t9 不带标志 ⇒ 不施加（已定项 17），根停在 (1,2)");
 
-        let row_ordinal_2 = run_p6_scenario(&f, &file_bytes, Some(p6_mutate_ordinal_2), false);
+        let row_ordinal_2 = run_journal_without_root_scenario(&flag_set_parameters, &file_bytes, Some(journal_without_root_mutate_ordinal_2), false);
         assert_eq!(row_ordinal_2.primary_prefix_applied, 1);
         assert_eq!(row_ordinal_2.clause_prefix_applied, 0, "锚点 w4 读得出、t9 是下一次发布的首条而序号不是 1 ⇒ 断在 t9（已定项 4），根停在 (1,2)");
 
-        let row_trailing = run_p6_scenario(&f, &file_bytes, None, true);
+        let row_trailing = run_journal_without_root_scenario(&flag_set_parameters, &file_bytes, None, true);
         // 读者甲不看「带标志的那条之后还有没有记录」：t9（counter 3）施加之后，链继续接上新加的 counter 4 那条也施加 ⇒ 2 条。
         assert_eq!(row_trailing.primary_prefix_applied, 2, "读者甲逐条施加，t9 与新加的那条都施加，根仍推进到 txg 3");
         assert_eq!(row_trailing.clause_prefix_applied, 0, "t9 带标志而其后还有同 (1,3) 的记录 ⇒ 断在 t9、这次发布不施加（已定项 4），根停在 (1,2)");
 
-        let row_txg_2 = run_p6_scenario(&f, &file_bytes, Some(p6_mutate_txg_2), false);
+        let row_txg_2 = run_journal_without_root_scenario(&flag_set_parameters, &file_bytes, Some(journal_without_root_mutate_txg_2), false);
         assert_eq!(row_txg_2.primary_prefix_applied, 0, "读者甲锚到 w4，t9 的 (1,2) 不在水位之上 ⇒ 不施加，根停在 (1,2)");
         assert!(row_txg_2.clause_fatal, "同一 (实例, txg) 两条带末条标志 ⇒ 盘坏了、停下（已定项 14「这一版的失败处置」）");
     }
@@ -9613,13 +9613,13 @@ mod tests {
     /// 一段都不落进 unregistered（`journal_record_name_for_offset` 漏掉暖机记录时这条会红）。
     #[test]
     fn journal_header_flag_diff_segments_all_map_to_a_known_record() {
-        let f = PoolParameters::settled_two_devices();
-        let h = f.clone().with_last_of_publish_flag(0x00);
-        let (h_image, _) = run_full_pipeline(&h, NEW_POOL_FILE_CREATION_TXG, &sample_file());
-        let (f_image, f_output) = run_full_pipeline(&f, NEW_POOL_FILE_CREATION_TXG, &sample_file());
-        let journal_label = format!("t{}", f_output.units_by_slot.len() + 1);
+        let flag_set_parameters = PoolParameters::settled_two_devices();
+        let flag_cleared_parameters = flag_set_parameters.clone().with_last_of_publish_flag(0x00);
+        let (flag_cleared_image, _) = run_full_pipeline(&flag_cleared_parameters, NEW_POOL_FILE_CREATION_TXG, &sample_file());
+        let (flag_set_image, flag_set_output) = run_full_pipeline(&flag_set_parameters, NEW_POOL_FILE_CREATION_TXG, &sample_file());
+        let journal_label = format!("t{}", flag_set_output.units_by_slot.len() + 1);
         assert_eq!(journal_label, "t13", "今天写清单 12 个单元（第七节 B23），本次事务自己的记录是 t13");
-        let differences = diff_pools(&h_image, &f_image);
+        let differences = diff_pools(&flag_cleared_image, &flag_set_image);
         assert!(!differences.is_empty(), "P1/P2 的旋钮读到了才谈得上这条检查");
         for segment in &differences {
             let (record_name, _) = journal_record_name_for_offset(segment.offset, &journal_label).expect("H/F 的差异只可能落在 w1/w4/本次事务那条记录的头里");
@@ -9631,29 +9631,29 @@ mod tests {
     /// 反向链两臂恒 0（已定项 10）。挪成「含」两条都必须由绿转红，否则这两格没有判别力（作废 V3）。
     #[test]
     fn journal_header_geometry_back_chain_absence_has_discriminating_power() {
-        let f = PoolParameters::settled_two_devices();
-        let h = f.clone().with_last_of_publish_flag(0x00);
-        let (h_image, _) = run_full_pipeline(&h, NEW_POOL_FILE_CREATION_TXG, &sample_file());
-        let (f_image, f_output) = run_full_pipeline(&f, NEW_POOL_FILE_CREATION_TXG, &sample_file());
-        let main_journal_label = format!("t{}", f_output.units_by_slot.len() + 1);
-        let main_differences = diff_pools(&h_image, &f_image);
+        let flag_set_parameters = PoolParameters::settled_two_devices();
+        let flag_cleared_parameters = flag_set_parameters.clone().with_last_of_publish_flag(0x00);
+        let (flag_cleared_image, _) = run_full_pipeline(&flag_cleared_parameters, NEW_POOL_FILE_CREATION_TXG, &sample_file());
+        let (flag_set_image, flag_set_output) = run_full_pipeline(&flag_set_parameters, NEW_POOL_FILE_CREATION_TXG, &sample_file());
+        let main_journal_label = format!("t{}", flag_set_output.units_by_slot.len() + 1);
+        let main_differences = diff_pools(&flag_cleared_image, &flag_set_image);
         let has_back_chain = |differences: &[DiffSegment], record: &str, label: &str| {
             differences.iter().any(|segment| {
                 journal_record_name_for_offset(segment.offset, label).is_some_and(|(name, offset_in_record)| name == record && journal_header_field_tag(offset_in_record) == "back_chain")
             })
         };
 
-        let g1_h = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
-        let g1_f = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
-        let (mut g1_recording_h, g1_genesis_h) = mkfs(&g1_h);
-        let _ = publish_first_file(&mut g1_recording_h, &g1_h, &g1_genesis_h, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
-        let (mut g1_recording_f, g1_genesis_f) = mkfs(&g1_f);
-        let g1_output_f = publish_first_file(&mut g1_recording_f, &g1_f, &g1_genesis_f, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
-        let g1_journal_label = format!("c{}", g1_output_f.units_by_slot.len() + 1);
-        let g1_differences = diff_pools(&g1_recording_h.pool, &g1_recording_f.pool);
+        let unwarmed_single_device_flag_cleared_parameters = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x00);
+        let unwarmed_single_device_flag_set_parameters = PoolParameters::control_one_device_no_barriers().with_last_of_publish_flag(0x01);
+        let (mut unwarmed_single_device_flag_cleared_recording, unwarmed_single_device_flag_cleared_genesis) = mkfs(&unwarmed_single_device_flag_cleared_parameters);
+        let _ = publish_first_file(&mut unwarmed_single_device_flag_cleared_recording, &unwarmed_single_device_flag_cleared_parameters, &unwarmed_single_device_flag_cleared_genesis, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
+        let (mut unwarmed_single_device_flag_set_recording, unwarmed_single_device_flag_set_genesis) = mkfs(&unwarmed_single_device_flag_set_parameters);
+        let unwarmed_single_device_flag_set_output = publish_first_file(&mut unwarmed_single_device_flag_set_recording, &unwarmed_single_device_flag_set_parameters, &unwarmed_single_device_flag_set_genesis, &sample_file(), InstanceGeneration(FIRST_INSTANCE_GENERATION), None, NEW_POOL_FILE_CREATION_TXG);
+        let unwarmed_single_device_journal_label = format!("c{}", unwarmed_single_device_flag_set_output.units_by_slot.len() + 1);
+        let unwarmed_single_device_differences = diff_pools(&unwarmed_single_device_flag_cleared_recording.pool, &unwarmed_single_device_flag_set_recording.pool);
 
         assert!(!has_back_chain(&main_differences, "w1", &main_journal_label), "主取样点：w1 是本实例第一条，反向链两臂都是 0");
-        assert!(!has_back_chain(&g1_differences, &g1_journal_label, &g1_journal_label), "G1：本实例第一条就是它自己那条记录，反向链两臂都是 0");
+        assert!(!has_back_chain(&unwarmed_single_device_differences, &unwarmed_single_device_journal_label, &unwarmed_single_device_journal_label), "G1：本实例第一条就是它自己那条记录，反向链两臂都是 0");
     }
 
     /// A7（第七节）的会红检查（M86）：反向链 = CRC32C(前一条记录的头 [0,487)，头校验和 32 字节按零参与)。
@@ -9665,21 +9665,21 @@ mod tests {
     fn back_chain_matches_an_independently_computed_crc_over_487_bytes() {
         let BuiltPool { recording, output, .. } = built_pool();
         let records = scan_journal(&recording.pool, unit_fsid(&FIXED_FSID));
-        let w1_bytes = records[&(InstanceGeneration(1), JournalCounter(1))].to_bytes();
-        let w4_record = &records[&(InstanceGeneration(1), JournalCounter(2))];
-        let w4_bytes = w4_record.to_bytes();
-        let mut header_487 = w4_bytes[..487].to_vec();
+        let warm_up_record_at_counter_one_bytes = records[&(InstanceGeneration(1), JournalCounter(1))].to_bytes();
+        let warm_up_record_at_counter_two = &records[&(InstanceGeneration(1), JournalCounter(2))];
+        let warm_up_record_at_counter_two_bytes = warm_up_record_at_counter_two.to_bytes();
+        let mut header_487 = warm_up_record_at_counter_two_bytes[..487].to_vec();
         assert_eq!(header_487.len(), 487, "A1：头 487 字节");
         header_487[46..46 + 32].fill(0); // 头校验和字段按零参与
         let independently_computed = castagnoli_crc32(&header_487);
         assert_eq!(output.record.back_chain, independently_computed, "t13 的反向链 = CRC32C(w4 的 487 字节头，头校验和按零参与)");
-        let mut w1_header_487 = w1_bytes[..487].to_vec();
-        w1_header_487[46..46 + 32].fill(0);
-        assert_eq!(w4_record.back_chain, castagnoli_crc32(&w1_header_487), "w4 的反向链 = CRC32C(w1 的 487 字节头，头校验和按零参与)");
-        assert_eq!(output.record.back_chain, ANCHOR_B1_BACK_CHAIN_OF_T13, "7.2 B1：t13 的反向链");
-        assert_eq!(w4_record.back_chain, ANCHOR_B1B_BACK_CHAIN_OF_W4, "7.2 B1b：w4 的反向链");
-        assert_eq!(ANCHOR_B1_BACK_CHAIN_OF_T13, 2_660_362_816);
-        assert_eq!(ANCHOR_B1B_BACK_CHAIN_OF_W4, 750_278_362);
+        let mut warm_up_record_at_counter_one_header_487 = warm_up_record_at_counter_one_bytes[..487].to_vec();
+        warm_up_record_at_counter_one_header_487[46..46 + 32].fill(0);
+        assert_eq!(warm_up_record_at_counter_two.back_chain, castagnoli_crc32(&warm_up_record_at_counter_one_header_487), "w4 的反向链 = CRC32C(w1 的 487 字节头，头校验和按零参与)");
+        assert_eq!(output.record.back_chain, ANCHOR_BACK_CHAIN_OF_THE_TRANSACTION_JOURNAL_RECORD, "7.2 B1：t13 的反向链");
+        assert_eq!(warm_up_record_at_counter_two.back_chain, ANCHOR_BACK_CHAIN_OF_THE_WARM_UP_RECORD_AT_COUNTER_TWO, "7.2 B1b：w4 的反向链");
+        assert_eq!(ANCHOR_BACK_CHAIN_OF_THE_TRANSACTION_JOURNAL_RECORD, 2_660_362_816);
+        assert_eq!(ANCHOR_BACK_CHAIN_OF_THE_WARM_UP_RECORD_AT_COUNTER_TWO, 750_278_362);
         assert_eq!(records[&(InstanceGeneration(1), JournalCounter(1))].back_chain, 0, "w1 是本实例第一条，反向链恒 0");
     }
 
@@ -9752,7 +9752,7 @@ mod tests {
         let (recording, genesis) = mkfs(&parameters);
         let base = recording.pool.clone();
         let instance = InstanceGeneration(FIRST_INSTANCE_GENERATION);
-        let w1 = JournalRecord {
+        let record_from_a_newer_instance = JournalRecord {
             instance,
             counter: JournalCounter(1),
             checkpoint_txg: CheckpointTxg(1),
@@ -9771,7 +9771,7 @@ mod tests {
             new_unmount_marker: genesis.root.unmount_marker,
             named: Vec::new(),
         };
-        let record_bytes = w1.to_bytes();
+        let record_bytes = record_from_a_newer_instance.to_bytes();
         let writes: Vec<WriteRequest> = parameters
             .devices()
             .into_iter()
@@ -9993,7 +9993,7 @@ mod tests {
     /// 已承诺预留（标签 6）的式子，绝对值取第 25 次登记（`research/prompts/e142-r25-prereg.md`）第七节 7.2 A-T1、A-T2，由
     /// `anchors_r25.py` 独立算出，不取任何一次产物的输出（M221–M227、M238、M241 的会红检查落在这里）。
     #[test]
-    fn committed_reservation_formula_reproduces_the_d3_clause_anchors() {
+    fn committed_reservation_formula_reproduces_the_space_allocation_clause_anchors() {
         let main_point = committed_reservation_bytes(2, 0, 0, 1, 1, true);
         assert_eq!(main_point, 196_760, "A-T1：2 × ((2 + 0 + 1 + 2 + 0 + 1) × 16384 + 41 × 1 + 35 × 1)");
         assert_eq!(main_point.to_le_bytes(), [0x98, 0x00, 0x03, 0, 0, 0, 0, 0], "A-T1：小端 8 字节 9800030000000000");
@@ -10463,7 +10463,7 @@ mod tests {
 
     /// 登记第五节 5.4「并行要有一条并行与串行在阳性对照、G6、G7 上逐格相等的单测」原话。
     #[test]
-    fn layer0_grouped_enumeration_agrees_between_serial_and_parallel_on_the_positive_control_g6_and_g7() {
+    fn layer0_grouped_enumeration_agrees_between_serial_and_parallel_on_the_positive_control_barriers_restored_and_fua_boundary() {
         let flows: [(&str, PoolParameters, bool); 3] = [
             ("positive_control", PoolParameters::control_one_device_no_barriers(), false),
             ("g6", PoolParameters::one_device_with_barriers(), false),
@@ -10611,20 +10611,20 @@ mod tests {
     /// 逐格相加，`get` 对没出现过的标签给全零默认值（不 panic）。
     #[test]
     fn publish_grouping_records_and_merges_independently() {
-        let mut a = PublishGrouping::default();
-        a.record("txg1", false, false);
-        a.record("txg1", true, true);
-        a.record("txg2", false, false);
-        assert_eq!(a.get("txg1"), PublishBucket { states: 2, violations: 1, journal_differing_states: 1 });
-        assert_eq!(a.get("txg2"), PublishBucket { states: 1, violations: 0, journal_differing_states: 0 });
-        assert_eq!(a.get("after_last_root"), PublishBucket::default(), "没出现过的标签给全零默认值");
+        let mut accumulated_grouping = PublishGrouping::default();
+        accumulated_grouping.record("txg1", false, false);
+        accumulated_grouping.record("txg1", true, true);
+        accumulated_grouping.record("txg2", false, false);
+        assert_eq!(accumulated_grouping.get("txg1"), PublishBucket { states: 2, violations: 1, journal_differing_states: 1 });
+        assert_eq!(accumulated_grouping.get("txg2"), PublishBucket { states: 1, violations: 0, journal_differing_states: 0 });
+        assert_eq!(accumulated_grouping.get("after_last_root"), PublishBucket::default(), "没出现过的标签给全零默认值");
 
-        let mut b = PublishGrouping::default();
-        b.record("txg1", true, false);
-        b.record("after_last_root", false, false);
-        a.merge(&b);
-        assert_eq!(a.get("txg1"), PublishBucket { states: 3, violations: 2, journal_differing_states: 1 });
-        assert_eq!(a.get("after_last_root"), PublishBucket { states: 1, violations: 0, journal_differing_states: 0 });
+        let mut merged_in_grouping = PublishGrouping::default();
+        merged_in_grouping.record("txg1", true, false);
+        merged_in_grouping.record("after_last_root", false, false);
+        accumulated_grouping.merge(&merged_in_grouping);
+        assert_eq!(accumulated_grouping.get("txg1"), PublishBucket { states: 3, violations: 2, journal_differing_states: 1 });
+        assert_eq!(accumulated_grouping.get("after_last_root"), PublishBucket { states: 1, violations: 0, journal_differing_states: 0 });
     }
 
     // ───────── E142 第二十一次跑：字段表（R56）、新根段后三项的施加与读、宽度表 ─────────
@@ -10639,11 +10639,11 @@ mod tests {
     fn layout_field_table_has_174_rows_and_every_row_equals_the_registered_value() {
         let BuiltPool { recording, .. } = built_pool();
         let rows = layout_field_rows(&recording.pool, &after_mkfs_pool());
-        let mut per_id: BTreeMap<&str, usize> = BTreeMap::new();
+        let mut rows_per_identifier: BTreeMap<&str, usize> = BTreeMap::new();
         for row in &rows {
-            *per_id.entry(row.id).or_default() += 1;
+            *rows_per_identifier.entry(row.row_identifier).or_default() += 1;
         }
-        let expected_per_id: BTreeMap<&str, usize> = [
+        let expected_rows_per_identifier: BTreeMap<&str, usize> = [
             ("L1", 1), ("L2", 1), ("L3", 1), ("L4", 1), ("L5", 1), ("L6", 1), ("L7", 5), ("L8", 1), ("L9", 1), ("L10", 1), ("L11", 1),
             ("L12", 1), ("L13", 1), ("L14", 1), ("L15", 42), ("L16", 30), ("L17", 1), ("L18", 2), ("L19", 1), ("L20", 5), ("L21", 1),
             ("J1", 3), ("J2", 3), ("J3", 3), ("J4", 3), ("J5", 3), ("J6", 3), ("J7", 3), ("J8", 3), ("J9", 3), ("J10", 3), ("J11", 3),
@@ -10652,19 +10652,19 @@ mod tests {
         ]
         .into_iter()
         .collect();
-        assert_eq!(per_id, expected_per_id);
+        assert_eq!(rows_per_identifier, expected_rows_per_identifier);
         assert_eq!(rows.len(), 174 + 6, "7.2 A-T5：退役树那一条多 6 行");
-        assert_eq!(rows.iter().filter(|row| row.id.starts_with('L')).count(), 100);
-        assert_eq!(rows.iter().filter(|row| row.id.starts_with('J')).count(), 80);
+        assert_eq!(rows.iter().filter(|row| row.row_identifier.starts_with('L')).count(), 100);
+        assert_eq!(rows.iter().filter(|row| row.row_identifier.starts_with('J')).count(), 80);
         let unequal: Vec<String> = rows
             .iter()
             .filter(|row| !layout_field_equal(&row.expected, &row.actual))
-            .map(|row| format!("{} {} {} expected={} actual={}", row.id, row.record_or_unit, row.field, row.expected, row.actual))
+            .map(|row| format!("{} {} {} expected={} actual={}", row.row_identifier, row.record_or_unit, row.field, row.expected, row.actual))
             .collect();
         assert!(unequal.is_empty(), "字段表不等的行：{unequal:#?}");
         assert_eq!(layout_field_tally(&rows), (180, 0));
         // 几行抽查实测值（不经比较函数）：树表条目数、声明长度、水位、退役树那一条、两条反向链。
-        let actual_of = |id: &str, record_or_unit: &str, field: &str| rows.iter().find(|row| row.id == id && row.record_or_unit == record_or_unit && row.field == field).map(|row| row.actual.clone());
+        let actual_of = |row_identifier: &str, record_or_unit: &str, field: &str| rows.iter().find(|row| row.row_identifier == row_identifier && row.record_or_unit == record_or_unit && row.field == field).map(|row| row.actual.clone());
         assert_eq!(actual_of("L13", "t12_tree_table_first_version", "entry_count@98").as_deref(), Some("12"));
         assert_eq!(actual_of("L14", "t12_tree_table_first_version", "declared_length@8").as_deref(), Some("2400"));
         assert_eq!(actual_of("L17", "t13_journal_record", "new_root_segment_tree_identifier_watermark@271").as_deref(), Some("65549"));
@@ -10690,7 +10690,7 @@ mod tests {
         for row in &rows {
             lines.push(format!(
                 "E7RESULT name=layout_field id={} record_or_unit={} field={} expected={} actual={} equal=true layout_line={}",
-                row.id, row.record_or_unit, row.field, row.expected, row.actual, row.layout_line
+                row.row_identifier, row.record_or_unit, row.field, row.expected, row.actual, row.layout_line
             ));
         }
         let check = check_role_labels(&lines);
@@ -10716,7 +10716,7 @@ mod tests {
         let mut damaged = recording.pool.clone();
         flip_byte(&mut damaged, DeviceIdentity(0), DeviceOffset(1_052_672), 122);
         let rows = layout_field_rows(&damaged, &after_mkfs_pool());
-        let unequal: Vec<(&str, String)> = rows.iter().filter(|row| !layout_field_equal(&row.expected, &row.actual)).map(|row| (row.id, row.actual.clone())).collect();
+        let unequal: Vec<(&str, String)> = rows.iter().filter(|row| !layout_field_equal(&row.expected, &row.actual)).map(|row| (row.row_identifier, row.actual.clone())).collect();
         assert_eq!(unequal, vec![("L19", "65778".to_string())]);
     }
 
@@ -11028,10 +11028,10 @@ mod tests {
             text_number_mismatches_zero: true,
             text_numbers_all_classified: true,
             named_instances_ok: true,
-            r18_system_configuration_fields_ok: true,
-            r18_root_flags_ok: true,
-            r18_g8_ok: true,
-            r18_g9_ok: true,
+            clause_fields_system_configuration_ok: true,
+            clause_fields_root_flags_ok: true,
+            clause_fields_rollback_floor_ok: true,
+            clause_fields_unmount_marker_ok: true,
         };
         let full_line = format!("E7RESULT name=verdict width_mismatches=0 {} control_states_ok=true", all_true.as_named_fields().iter().map(|(name, _)| format!("{name}=true")).collect::<Vec<_>>().join(" "));
         assert_eq!(compare_stream_verdict_fields_to_printed_verdict(&full_line, &all_true), (12, vec![]));

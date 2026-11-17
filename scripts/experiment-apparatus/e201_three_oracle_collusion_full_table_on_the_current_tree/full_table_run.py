@@ -1,46 +1,102 @@
 #!/usr/bin/env python3
 # task-server-shards: run
-# task-server-gpu-arguments: run
+# task-server-card-lease: on-demand
 # task-server-resumable: run
 """E201（三oracle合谋今树整表） 的入口（跑前登记 research/prompts/e201-preregistration.md 第五节 5.5「full_table_run.py」、第十四节；修订 1、2）。
 
-只经统一任务服务的分片三步起（服务认文件头 `# task-server-shards: run`；`# task-server-gpu-arguments: run` 要卡；同一条命令重交就是续跑）：
+只经统一任务服务的分片三步起（服务认文件头 `# task-server-shards: run`；`# task-server-card-lease: on-demand` 按需领卡，见下面「卡」；同一条命令重交就是续跑）：
   task-server/task submit -- python3 scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/full_table_run.py run [--stream-three]
   task-server/task submit -- env PLAN_ONLY=1 python3 …/full_table_run.py run [--stream-three]   干跑：只做计划（拷树、记、核名单、算键、查库、抽哨兵、分片），
       计划行写进计划目录、合并那一步原样打进任务日志，0 片、不编不跑、不进 research/results
-  python3 …/full_table_run.py --selftest        自证四格（复用三问、哨兵、复用账、A7；假驱动、假比对器、内存里的假判定库，不起 cargo、编译、装置、服务；
-      末行 REUSE_SELFTEST 与 FULL_TABLE_SELFTEST cells=4 …）
+  python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 …/full_table_run.py --selftest
+      自证十格（下面「自证」）：只在临时 prune-server 底下跑（客户端 selftest_service_problem 判，不在退 2、一格都不跑）；不起 cargo、编译、真装置、统一任务服务
 三步（环境 TASK_SERVER_SHARD_PHASE 定是哪一步；没有这个变量退 2：不在服务外面起）：
   计划 plan：把此刻主工作区的 SYNCED_ENTRIES 那几样（scripts/hosts/lib_repository_copy.py 现算的拷贝范围：Cargo.toml、Cargo.lock、.cargo、crates 加闭包，
       prune-server 与 crates 编、跑时读的仓根文件；不带 target；各步起的子进程照那份库的 environment_for_commands_in_the_copy 带多机配置的绝对路径）
       拷进计划目录的 tree/（读法 1，登记修订 5、6），记快照摘要与份数、HEAD、
       `git status --porcelain -- <SYNCED_ENTRIES>` 全文、变异表与两张名单与装置与研究一侧各文件的 sha256；核名单（按名字取几次、锚点命中几次）；
-      按读法 10 算每行的键、查 prune-server（族 apparatus-items、种类 three_oracle_collusion_full_table_on_the_current_tree）；库里有同键的不派，按 5.6 抽哨兵
-      （k = max(2, ⌈0.02 × M⌉)，按 sha256(快照摘要 ‖ 键) 由小到大取，哨兵那几条的库值先抄进计划目录）；要现跑的行按行号交替分给两片；写 plan.json 与 plan-record.json。
+      每行一项经 long_run_item_verdicts.py 的 plan 算键、查库（下面「判定库」）；库里判绿的不派，按 5.6 从复用的行里抽哨兵（下面「判定库」的哨兵两层）；
+      要现跑的行按行号交替分给两片；写 plan.json 与 plan-record.json。
   各片 shard：开头与收尾核计划记的树与各文件 sha256（Z3）、冻结的 O3（Z2）；每片先编不改坏的装置、跑基线（`baseline --streams …`，T 取它的进程挂钟），
       片 0 另跑第二次基线（Z1）、停机 S2 那一比（E170 导出装置 `dump` 与基线导出逐文件比）、O3 基线与九样阳性对照两遍（基线一遍、空变异一遍）；
       两片都跑空变异（两片互比是跨机对照，S7）；再起逐行驱动跑分到的行（⌊SINGLEFS_THREAD_CAP ÷ 6⌋ 条线道、每线道 6 线程），每行判完把它的
-      row-result.tsv、o3.out、device.out 与导出目录里除三个大文件之外的文件打成一包写进库（键照读法 10）。空变异与各行都带 --keep-dumps 跑，
+      row-result.tsv、o3.out、device.out 与导出目录里除三个大文件之外的文件打成一包，经 record 写进库或留在这一片的产物目录（下面「判定库」）。空变异与各行都带 --keep-dumps 跑，
       入库之后哨兵以外的行删掉三个大文件；收尾对空变异与这一片的每一行哨兵核 A7（存进库那一份与完整导出在比对器上逐字相同，name=a7）。
       编译目录在服务给的 CARGO_TARGET_DIR（没给时在这一片的产物目录）下各线道一份，这一片收尾删掉。
-  合并 merge：从库里取回全部行摆成行输出根，起 E171 的第二段比对器出 T1、合成 T2、调第一段比对器那几个函数出 T3，再出逐格比（contrast_against_r1.py）、
-      归因（attribution.py）、Q2（q2_misses.py）、整表矩阵（whole_table_matrix.py）、阳性阴性对照、跨机对照、哨兵与复用账、NOT_RUN 合计（Z6）、
-      编前编后核对（Z4）、A7；作废、停机、失败条款逐条由纯函数 clause_checks 判（单测手造读数）。
+  卡（文件头第 3 行，task-server/task_server_lib.py 文件头「GPU」的按需领卡；计划与合并两步不上卡）：服务起跑不分卡、不清场，各片只在起装置的那几步前各领一张卡、
+      交给装置的 GPU_CARDS_BY_PRIORITY，那一步跑完照卡串还掉（同目录 device_steps_on_leased_cards.py）：本文件的 run_device（基线、第二次基线、八样装置对照；
+      E170 导出装置不上卡、不领）经它的 run_on_a_leased_card，逐行驱动经它起（driver_command），每一行只在装置那一步持卡，几条线道、几个对照单元同时要卡各领各的；
+      编译、同步、导出、执行器、O3 对照与比对器那几步一张卡都不持。各片开跑前核领卡通道，没有就退 78、一个装置都不起；领卡没成：各片自己起的那几步抛到 main、
+      这一片退 5（装置没起），逐行驱动里的那一行记测量管子的缺陷（card_lease，不入库）、驱动退 5、这一片照「有行没入库」退 1；还卡没成只打一行「!」。
+  合并 merge：入了库的行从库里取回、不入库的行取各片产物目录里那一包，摆成行输出根（下面「判定库」），起 E171 的第二段比对器出 T1、合成 T2、
+      调第一段比对器那几个函数出 T3，再出逐格比（contrast_against_r1.py）、归因（attribution.py）、Q2（q2_misses.py）、整表矩阵（whole_table_matrix.py）、
+      阳性阴性对照、跨机对照、哨兵与复用账（含 long_run_item_verdicts 的 finish）、NOT_RUN 合计（Z6）、编前编后核对（Z4）、A7；
+      作废、停机、失败条款逐条由纯函数 clause_checks 判（单测手造读数）。
+判定库（.claude/rules/verification.md「判定库只有一份」；读写、算键与复用哨兵都经 scripts/experiment-apparatus/long_run_item_verdicts.py，本地不建库目录）：
+  一行一项（项名 row-<行号>），存进 prune-server 的 apparatus-items 族、种类 three_oracle_collusion_full_table_on_the_current_tree：items/<键>.out 是
+  pack_row_directory 打的那一包（同一份内容同一串字节），items/<键>.verdict 是判定（判绿，退出码记 0；那一包里带耗时，比法写 timing）。
+  键照 long_run_item_verdicts.py 文件头「请求文件」，由 admission.py 的 compute_unit_key 在拷进计划目录的那棵树上算（计划目录里的树当 --root；row_request_lines）：
+    入口   装置二进制 e171_three_oracle_collusion_after_the_oracle_fixes 的 main（feature:singlefs-verification/gpu、profile:release）：单元闭包、工具链、
+           闭包真引到的依赖版本
+    judge  current_tree_row_driver.py 的 run_row_on_the_lane（judge-root 写仓根，只当索引）：判一行的那几个函数连同 import 时执行的模块级语句
+    line:  行号、名单那一行原文、改坏用的变异行原文（改坏之后的源码不进闭包，由这一行进键）、装置参数、判的路线、O3 冻结件的摘要（o3_freeze_digest）；
+           原文里的制表符照 JSON 转写
+  拒算（照跑、不复用、不入库）：取不到变异行或锚点不唯一、要补位的行（补位挑行跨行有关，needs_substitution），改坏那一处的原文或替换文里有 MODULE_SET_TOKENS
+    之一的行（改坏之后连上或断开的模块闭包认不全，mutation_touches_the_module_set），这两种不进请求；admission 算不出键的由 long_run_item_verdicts 记拒算。
+  各片：每 POLL_SECONDS 秒把判完的行（行目录里有 row-result.tsv）打包；long_run_item_verdicts 答 judge 的行经 record 写进库；强制现判、拒算的行 record 照记
+    结局、库照旧；合并不从库里取的行（拒算、强制现判、5.6 的哨兵）那一包写进这一片产物目录的 rows-outside-the-library/<行号>.tar.gz，只给这一趟的合并读、不复用。
+  续跑：被打断重交是一件新任务，计划目录是新的、计划那一步重查库，入过库的行复用；服务给每一片的每一次尝试一个新的产物目录
+    （task-server/task_server_lib.py 文件头「分片」②），逐行驱动不在里面找上一次的行。
+  合并：入了库的行（复用的、judge 的）照计划里的键从库里取（.verdict 判绿、.out 的 sha256 与它记的相同），别的取各片产物目录里那一包；
+    再起 long_run_item_verdicts 的 finish（重算现判过的行的键、判复用哨兵），退非 0 记进复用账。
+  哨兵两层：long_run_item_verdicts 的复用哨兵（lib_reuse_checks.ReuseSentinel：抽几条看它复用、另抽一条强制现判，timing 比法下只比绿红与退出码）照它文件头；
+    5.6 的哨兵另留（作废 Z7 比的是判定格，ReuseSentinel 比不出）：复用的行里抽 k = max(2, ⌈0.02 × M⌉) 行（不超过 M），按 sha256(快照摘要 ‖ 键) 由小到大取，
+    交给各片重跑、不 record（库里那一条照旧，long_run_item_verdicts 那边照复用记）；合并拿计划时从库里取回的那一包（plan 放进状态目录的 outputs/）与重跑出的
+    那一包照第二段比对器的 row_line 比判定格（row_decisions），不同记 Z7；摆进行输出根的是重跑出的那一包。
+自证（--selftest，十格，逐格串行：几格共用 PATH 最前面那一份假 cargo，算键时 admission 问它的版本，不起真 cargo）：
+  reuse-three-questions  long_run_item_verdicts.py reuse-cells 那六格（复用三问、key-independent-of-directory、reuse-sentinel 与哨兵的三种红；打 REUSE_SELFTEST
+      script=scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/full_table_run.py …）：样板树里只有假装置入口，
+      起法是本文件的 selftest-round（只在临时 prune-server 底下认：row-11、row-12 两行把计划、各片、合并三步在一个进程里依次走一遍，判一行换成写一份固定的 row-result.tsv）
+  sentinel-detects-a-corrupted-library-entry  头一趟入库之后把库里两行改成另一包（判定照写绿、sha256 照新的记），下一趟 5.6 的哨兵判出 decision_cells_differ
+  refused-rows-are-judged-outside-the-library  要补位的行与碰到模块集合的行两趟都现跑、不进请求，那一包从产物目录取回；同一趟能算键的行第二趟复用
+  reuse-account、stored-row-matches-the-full-export 与按需领卡五格：纯函数与临时目录里的假领卡客户端、假装置（bash 脚本）
+  每格跑完打一行 FULL_TABLE_SELFTEST_PROGRESS cell=<格名> done=<跑完几格>/10 cell_seconds=… total_seconds=…（各格的说明行随打随落进日志）；
+  末行 FULL_TABLE_SELFTEST cells=10 …
   作废 Z8（统一任务服务的结局不是跑成）不在这里判：由交任务的主 agent 读 `task-server/task wait` 末行 TASK_SERVER_RESULT 的 exit= 与 shard= 判（登记修订 3）。
 产物（都是新文件，已存在就加 -rN）：research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-<计划那一天>-<段>-<件>.out，
   段是 s1（流一、流二整表）或 s2（--stream-three：空变异加 r1 第一段十五行、三条流），件是 plan、t1、t2、t3、contrast、attribution、q2、matrix、controls、verdict。
-退出码：0 跑完（判定在产物里）；1 有作废或停机条款触发、复用账对不上、有一片的 NOT_RUN 合计不为 0；2 用法错、不在服务的分片三步里起；
-  75 prune-server 连不上（判定库只有那一份，不退回本地文件）。
+退出码：0 跑完（判定在产物里）；1 有作废或停机条款触发、复用账对不上、有一片的 NOT_RUN 合计不为 0；2 用法错、不在服务的分片三步里起、
+  --selftest 与 selftest-round 不在临时 prune-server 底下；
+  5 测量管子的缺陷：一片自己起的装置那一步领卡没成（装置没起，这一片没跑完）；75 prune-server 连不上（判定库只有那一份，不退回本地文件）；
+  78 各片开跑前环境里没有领卡通道（不是服务照按需领卡起的），一个装置都没起。
 弄坏开关只在自证里认（E201_FULL_TABLE_BREAK；平常跑设了退 2）：
   E201_FULL_TABLE_BREAK=sentinel-comparison-skipped  哨兵现跑之后不与库里那一条比
       自证项 「✗ sentinel-detects-a-corrupted-library-entry」
   E201_FULL_TABLE_BREAK=account-not-checked  复用账不核现判数加复用数等于计划登记的行数
       自证项 「✗ reuse-account」
+  E201_FULL_TABLE_BREAK=item-finish-ignored  合并不认 long_run_item_verdicts finish 的退出码（复用哨兵红、键中途变了都不进复用账）
+      自证项 「✗ reuse-three-questions」（reuse-cells 里 sentinel-rejudged-red、forced-verdict-differs-red、forced-still-reused-red 三格要的退 1 变成退 0）
+  E201_FULL_TABLE_BREAK=refused-row-requested  拒算的行（要补位、碰到模块集合）照常进请求
+      自证项 「✗ refused-rows-are-judged-outside-the-library」（那两行第二趟照键复用）
+按需领卡的几处（判法在 device_steps_on_leased_cards.py，开关也在那里读）：
+  E201_FULL_TABLE_BREAK=card-held-through-the-compile  逐行驱动一起来就领一张、整趟持着（编译那几步也持卡）
+      自证项 「✗ card-held-only-around-each-device-step」「✗ lanes-hold-different-cards」「✗ refused-card-lease-starts-no-device」（两条线道拿的是同一张；拒领卡时一进来就抛）
+  E201_FULL_TABLE_BREAK=card-kept-after-the-device  装置那一步跑完不还卡
+      自证项 「✗ card-held-only-around-each-device-step」「✗ lanes-hold-different-cards」「✗ failed-card-return-is-reported」（不还就没有还卡那一句）
+  E201_FULL_TABLE_BREAK=lanes-share-one-card  几条线道同时到装置那一步，装置都拿最先领到的那一张
+      自证项 「✗ lanes-hold-different-cards」「✗ card-held-only-around-each-device-step」（一条线道的后一步也拿到最先那一张）
+  E201_FULL_TABLE_BREAK=card-lease-refusal-runs-the-device  领卡没成照起装置（不带卡）
+      自证项 「✗ refused-card-lease-starts-no-device」
+  E201_FULL_TABLE_BREAK=card-lease-channel-unchecked  开跑前不核领卡通道
+      自证项 「✗ missing-lease-channel-exits-78」
+  E201_FULL_TABLE_BREAK=card-return-failure-unreported  还卡没成不打那一行「!」
+      自证项 「✗ failed-card-return-is-reported」
 """
 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import dataclasses
 import hashlib
 import io
@@ -54,16 +110,28 @@ import tarfile
 from collections.abc import Callable
 
 import e171_research_side
+import device_steps_on_leased_cards as card_steps
 from result_lines import ResultLines, field
 
 HERE = e171_research_side.HERE
 REPOSITORY_ROOT = e171_research_side.REPOSITORY_ROOT
-LIBRARY_FAMILY = "apparatus-items"
+SCRIPT_KEY = os.path.relpath(os.path.join(HERE, "full_table_run.py"), REPOSITORY_ROOT)
 LIBRARY_KIND = "three_oracle_collusion_full_table_on_the_current_tree"
-LIBRARY_DIRECTORY_NAME = "e201-full-table-rows"
+# 判定请求（文件头「判定库」）：装置入口、判一行的函数、long_run_item_verdicts 的状态目录（计划目录下）与不入库的那几包（各片产物目录下）
+DEVICE_PACKAGE = "singlefs-verification"
+DEVICE_ENTRY = f"{e171_research_side.DEVICE_SOURCE}::main"
+ROW_JUDGE = os.path.relpath(os.path.join(HERE, "current_tree_row_driver.py"), REPOSITORY_ROOT) + "::run_row_on_the_lane"
+ITEM_STATE_DIRECTORY = "items"
+ROWS_OUTSIDE_THE_LIBRARY = "rows-outside-the-library"
+DECISION_JUDGE, DECISION_FORCED, DECISION_REFUSED, DECISION_REUSE = "judge", "forced", "refused", "reuse"
+NEEDS_SUBSTITUTION = "needs_substitution"
+MUTATION_TOUCHES_THE_MODULE_SET = "mutation_touches_the_module_set"
+MODULE_SET_TOKENS = ("mod ", "#[path", "include_str!", "include_bytes!", "include!")
+SELFTEST_ROUND_MODE = "selftest-round"
+SELFTEST_ROWS = (11, 12)
 PRODUCT_STEM = "e201-three-oracle-collusion-full-table-on-the-current-tree"
 DEVICE_BINARY_NAME = "e171_three_oracle_collusion_after_the_oracle_fixes"
-EXPORT_BINARY_NAME = "e170_o3_spec_executor_export"
+EXPORT_BINARY_NAME = "e170_specification_executor_export"
 DEVICE_ARGUMENTS = {"s1": ("row", "--streams", "1,2"), "s2": ("row", "--streams", "1,2,3")}
 DEVICE_FEATURES = "gpu"
 LANE_THREADS = 6
@@ -83,6 +151,7 @@ STORED_ROW_FILES = ("row-result.tsv", "o3.out", "device.out")
 BREAK_VARIABLE = "E201_FULL_TABLE_BREAK"
 JUDGED, REUSED, FORCED = "现判", "复用", "强制现判"
 EXIT_INVALID, EXIT_USAGE, EXIT_UNAVAILABLE = 1, 2, 75
+EXIT_MEASUREMENT_PIPE_DEFECT = 5   # 一片自己起的装置那一步领卡没成（文件头「卡」）
 SENTINEL_FRACTION = 0.02
 MINIMUM_SENTINELS = 2
 # 干跑（经 `-- env PLAN_ONLY=1` 交）：计划照做（拷树、记、核名单、算键、查库、抽哨兵、分片），计划行写进计划目录里的这一份而不进 research/results，
@@ -123,23 +192,17 @@ def free_run_suffix(segment: str, date: str) -> str:
 
 
 def own_source_files() -> tuple[str, ...]:
-    """本目录的源文件（相对仓根），进计划记的 sha256 与读法 10 的键（逐行驱动与 O3 一步的研究一侧文件）。"""
+    """本目录的源文件（相对仓根），进计划记的 sha256（各片开头收尾照它核，作废 Z3）。"""
     names = sorted(name for name in os.listdir(HERE) if name.endswith((".py", ".tsv")) and not name.startswith("test_"))
     return tuple(os.path.relpath(os.path.join(HERE, name), REPOSITORY_ROOT) for name in names)
 
 
-# ── 读法 10：键、判定库、哨兵、复用账（纯函数与一层薄的库，自证与单测都只碰这一层） ──
-
-KEY_RESEARCH_FILES = (
-    os.path.relpath(os.path.join(HERE, "current_tree_row_driver.py"), REPOSITORY_ROOT),
-    os.path.relpath(os.path.join(HERE, "e171_research_side.py"), REPOSITORY_ROOT),
-    *(os.path.join(e171_research_side.E171_RELATIVE, name)
-      for name in ("frozen_o3.py", "device_timing.py", "bad_implementation_table.py", "run_directory.py", "o3_bad_image_judge.py")))
-
+# ── 判定库（文件头「判定库」）：请求、计划、入库、合并取回、哨兵、复用账（自证与单测都只碰这一层） ──
 
 @dataclasses.dataclass(frozen=True)
 class TreeInputs:
-    """一趟里各行共用的那几样键的组成（读法 10）。"""
+    """一趟里各行共用的那几样（计划记进 plan-record.json）：快照摘要与变异表的 sha256 给各片核作废 Z3、快照摘要另给 5.6 的哨兵定次序；
+    装置参数、特性、判的路线、O3 冻结件的摘要进每一行的请求（row_request_lines）；工具链全文只记进计划产物（进键的工具链行由 admission 在入口闭包里算）。"""
 
     snapshot_digest: str
     mutations_table_sha256: str
@@ -147,66 +210,75 @@ class TreeInputs:
     features: str
     toolchain: str
     judging_route: str
-    research_files_sha256: tuple[tuple[str, str], ...]
     o3_freeze_digest: str
 
 
 @dataclasses.dataclass(frozen=True)
 class RowInput:
-    """一行自己的那几样键的组成：整表编号、名单那一行全文、改坏用的变异行的 sha256（计划那一刻照名字取到、锚点恰好一次的那一行；
-    取不到或锚点不唯一的行要补位，补位挑行跨行有关，这种行不复用，键里写 needs_substitution）。"""
+    """一行进请求的那几样：整表编号、名单那一行原文、改坏用的变异行原文（计划那一刻照名字取到、锚点恰好一次的那一行；拒算的行是空串），
+    与拒算的理由（不拒算是空串；NEEDS_SUBSTITUTION、MUTATION_TOUCHES_THE_MODULE_SET 两种，文件头「判定库」的拒算）。"""
 
     number: int
     list_line: str
-    mutation_line_sha256: str
+    mutation_line: str
+    refusal: str
 
 
-def row_key(tree: TreeInputs, row: RowInput) -> str:
-    """读法 10 的键：各组成按固定次序拼成一份文字再取 sha256。"""
-    parts = [f"snapshot={tree.snapshot_digest}", f"mutations_table={tree.mutations_table_sha256}", f"row={row.number}",
-             f"list_line={row.list_line}", f"mutation_line={row.mutation_line_sha256}",
-             f"device_arguments={' '.join(tree.device_arguments)}", f"features={tree.features}", f"toolchain={tree.toolchain}",
-             f"judging_route={tree.judging_route}", *(f"research={path}:{digest}" for path, digest in tree.research_files_sha256),
-             f"o3_freeze={tree.o3_freeze_digest}"]
-    return sha256_bytes("\n".join(parts).encode("utf-8"))
+def item_name(number: int) -> str:
+    return f"row-{number}"
 
 
-def row_is_reusable(row: RowInput) -> bool:
-    return row.mutation_line_sha256 != "needs_substitution"
+def number_of_item(item: str) -> int:
+    return int(item.removeprefix("row-"))
 
 
-class MemoryStore:
-    """自证与单测用的假判定库：只有 read / write 两样，与 prune_server_client.LibraryStore 同形。"""
-
-    def __init__(self):
-        self.entries: dict[str, bytes] = {}
-
-    def read(self, relative: str) -> bytes | None:
-        return self.entries.get(relative)
-
-    def write(self, relative: str, data: bytes) -> None:
-        self.entries[relative] = data
+def touches_the_module_set(mutation) -> bool:
+    """改坏那一处的原文或替换文里有 MODULE_SET_TOKENS 之一：改坏之后连上或断开的模块，入口闭包（在没改坏的树上算）认不全。"""
+    return any(token in mutation.original_text() + mutation.replacement_text() for token in MODULE_SET_TOKENS)
 
 
-def library_relative(key: str) -> str:
-    return f"rows/{key}"
+def row_request_lines(tree: TreeInputs, row: RowInput) -> list[str]:
+    """一行的判定请求（long_run_item_verdicts.py 文件头「请求文件」，本文件头「判定库」）；拒算的行不进请求，交空表。
+    名单行与变异行里有制表符（请求按制表符切），照 JSON 转写成一个 line: 项。"""
+    if row.refusal and not broken("refused-row-requested"):
+        return []
+    tokens = [item_name(row.number), DEVICE_ENTRY, f"feature:{DEVICE_PACKAGE}/{tree.features}", "profile:release",
+              f"judge:{ROW_JUDGE}", f"judge-root:{REPOSITORY_ROOT}", f"line:row={row.number}",
+              f"line:list-line={json.dumps(row.list_line, ensure_ascii=False)}",
+              f"line:mutation-line={json.dumps(row.mutation_line, ensure_ascii=False)}",
+              f"line:device-arguments={' '.join(tree.device_arguments)}", f"line:judging-route={tree.judging_route}",
+              f"line:o3-freeze={tree.o3_freeze_digest}", "line:compare=timing"]
+    return ["\t".join(tokens)]
 
 
-def open_library():
-    """真跑用的那一份：prune-server 的 apparatus-items 族（连不上由客户端退 75）。"""
-    sys.path.insert(0, os.path.join(REPOSITORY_ROOT, "scripts", "prune-server"))
-    import prune_server_client
-    return prune_server_client.library_store(LIBRARY_FAMILY, LIBRARY_KIND, LIBRARY_DIRECTORY_NAME)
+def item_verdicts_module():
+    """scripts/experiment-apparatus/long_run_item_verdicts.py（按仓根找：变异驱动把本目录拷到仓外跑单测时仓根经环境交过来；放在 import 路径最后，
+    不遮本目录与 E171 研究一侧的模块）。"""
+    directory = os.path.join(REPOSITORY_ROOT, "scripts", "experiment-apparatus")
+    if directory not in sys.path:
+        sys.path.append(directory)
+    import long_run_item_verdicts
+    return long_run_item_verdicts
 
 
 @dataclasses.dataclass(frozen=True)
 class ReusePlan:
-    """计划那一步的复用决定：现跑的行（键对不上或不复用）、复用的行、哨兵（复用的行里抽出现跑、与库里那一条比的）。"""
+    """计划那一步的复用决定。keys：各行的键（拒算的是 None）；decisions：long_run_item_verdicts 给各行的决定（judge、forced、refused、reuse；
+    不进请求的拒算行不在里面）；fresh：现跑的行（复用以外的全部，含 5.6 的哨兵）；reused：复用的行（不含哨兵）；sentinels：5.6 的哨兵。"""
 
-    keys: dict[int, str]
+    keys: dict[int, str | None]
+    decisions: dict[int, str]
     fresh: tuple[int, ...]
     reused: tuple[int, ...]
     sentinels: tuple[int, ...]
+
+    def recorded(self, number: int) -> bool:
+        """判完经 long_run_item_verdicts record 记结局的行：judge（写进库）、forced 与 refused（库照旧）。"""
+        return self.decisions.get(number) in (DECISION_JUDGE, DECISION_FORCED, DECISION_REFUSED)
+
+    def in_the_library(self, number: int) -> bool:
+        """合并照键从库里取的行：复用的（5.6 的哨兵除外）与判完写进库的（judge）；别的行判完那一包留在各片产物目录里。"""
+        return number not in self.sentinels and self.decisions.get(number) in (DECISION_REUSE, DECISION_JUDGE)
 
 
 def sentinel_count(reused: int) -> int:
@@ -214,14 +286,32 @@ def sentinel_count(reused: int) -> int:
     return 0 if reused == 0 else min(reused, max(MINIMUM_SENTINELS, math.ceil(SENTINEL_FRACTION * reused)))
 
 
-def plan_reuse(tree: TreeInputs, rows: list[RowInput], store) -> ReusePlan:
-    keys = {row.number: row_key(tree, row) for row in rows}
-    reusable = [row.number for row in rows if row_is_reusable(row) and store.read(library_relative(keys[row.number])) is not None]
-    order = sorted(reusable, key=lambda number: sha256_bytes(f"{tree.snapshot_digest}{keys[number]}".encode("utf-8")))
-    sentinels = tuple(sorted(order[:sentinel_count(len(reusable))]))
+def draw_sentinels(snapshot_digest: str, keys: dict[int, str | None], reusable: list[int]) -> tuple[int, ...]:
+    """5.6：复用的行按 sha256(快照摘要 ‖ 键) 由小到大取前 sentinel_count(M) 行。"""
+    order = sorted(reusable, key=lambda number: sha256_bytes(f"{snapshot_digest}{keys[number]}".encode("utf-8")))
+    return tuple(sorted(order[:sentinel_count(len(reusable))]))
+
+
+def plan_reuse(tree_root: str, tree: TreeInputs, rows: list[RowInput], state_directory: str, printer=print) -> ReusePlan:
+    """计划那一步：各行的请求交 long_run_item_verdicts 的 plan（在 tree_root 上算键、查库、抽复用哨兵，状态写进 state_directory），
+    再从复用的行里按 5.6 抽哨兵。一行都没进请求（全拒算）时不起 plan，状态目录里没有计划。"""
+    verdicts = item_verdicts_module()
+    requests = "".join(line + "\n" for row in rows for line in row_request_lines(tree, row))
+    keys: dict[int, str | None] = {row.number: None for row in rows}
+    decisions: dict[int, str] = {}
+    if requests:
+        verdicts.plan(state_directory, SCRIPT_KEY, LIBRARY_KIND, tree_root, requests, "E201 各行的请求", printer)
+        planned = verdicts.read_plan(state_directory)
+        for item, entry in planned["items"].items():
+            number = number_of_item(item)
+            keys[number] = entry["key"]
+            forced = entry["decision"] == DECISION_JUDGE and item == planned["forced"]
+            decisions[number] = DECISION_FORCED if forced else entry["decision"]
+    reusable = sorted(number for number, decision in decisions.items() if decision == DECISION_REUSE)
+    sentinels = draw_sentinels(tree.snapshot_digest, keys, reusable)
     reused = tuple(sorted(set(reusable) - set(sentinels)))
     fresh = tuple(sorted(row.number for row in rows if row.number not in reused))
-    return ReusePlan(keys, fresh, reused, sentinels)
+    return ReusePlan(keys, decisions, fresh, reused, sentinels)
 
 
 def split_into_shards(numbers: tuple[int, ...], shard_count: int = SHARD_COUNT) -> list[list[int]]:
@@ -270,21 +360,87 @@ def account_problems(plan: ReusePlan, states: dict[int, str], registered_rows: i
     return problems
 
 
-def read_sentinel_entries(plan: ReusePlan, store) -> dict[int, bytes]:
-    """计划那一步：哨兵那几行库里原有的那一份先取出来（各片现跑之后同一把键会被新写的盖掉，合并拿这一份比）。"""
-    return {number: store.read(library_relative(plan.keys[number])) for number in plan.sentinels}
+def write_atomically(path: str, data: bytes) -> None:
+    """先写同目录的临时文件、再改名换上：读的一方要么看不到、要么看到整份。"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".writing", "wb") as handle:
+        handle.write(data)
+    os.replace(path + ".writing", path)
 
 
-def judge_and_store(plan: ReusePlan, numbers: list[int], store, judge: Callable[[int], bytes | None]) -> dict[int, bytes]:
-    """各片：这一片分到的行逐行现判，判完一行就把它那一份写进库（一块判完才写，写是原子的；被打断重交就是续跑）。judge 交 None 是这一行没跑成，不写。"""
-    results = {}
-    for number in sorted(numbers):
-        data = judge(number)
-        if data is None:
+def store_finished_rows(plan: ReusePlan, numbers: list[int], rows_root: str, stored: dict[int, int], state_directory: str,
+                        outside_directory: str, printer=print) -> None:
+    """判完的行（行目录里有 row-result.tsv）打包（pack_row_directory），记下它的 NOT_RUN 行数；已收过的不重复收。
+    合并不从库里取的行（拒算、强制现判、5.6 的哨兵）那一包写进 outside_directory/<行号>.tar.gz；long_run_item_verdicts 要记结局的行经 record 记
+    （判绿、退出码 0：judge 的写进库，forced、refused 的库照旧）。逐行驱动带 --keep-dumps 跑（A7 要完整导出），收过之后哨兵以外的行删掉三个大文件
+    （哨兵留着，片收尾在它上面核 A7）。"""
+    import current_tree_row_driver as driver
+    for number in numbers:
+        row_directory = os.path.join(rows_root, f"row-{number}")
+        if number in stored or not os.path.exists(os.path.join(row_directory, "row-result.tsv")):
             continue
-        store.write(library_relative(plan.keys[number]), data)
-        results[number] = data
-    return results
+        stored[number] = not_run_count([os.path.join(row_directory, "device.out"), os.path.join(row_directory, "dump")])
+        packed = pack_row_directory(row_directory)
+        if not plan.in_the_library(number):
+            write_atomically(os.path.join(outside_directory, f"{number}.tar.gz"), packed)
+        if plan.recorded(number):
+            item_verdicts_module().record(state_directory, item_name(number), 0, packed, True, printer)
+        if number not in plan.sentinels:
+            driver.remove_bulky_dump_files(os.path.join(row_directory, "dump"))
+
+
+def library_rows(state_directory: str, numbers: list[int]) -> dict[int, bytes]:
+    """合并：这几行照计划里的键从库里取那一包（.verdict 记着绿、.out 读得回且 sha256 与它记的相同才算取到）；取不到的不在交回里。"""
+    if not numbers:
+        return {}
+    verdicts = item_verdicts_module()
+    planned = verdicts.read_plan(state_directory)
+    store = verdicts.library_of(planned["kind"], planned["library_directory"])
+    keyed = [(number, planned["items"][item_name(number)]["key"]) for number in numbers]
+    records = [verdicts.parsed_record(raw, key) for (_, key), raw in zip(keyed, store.read_many([verdicts.verdict_relative(key) for _, key in keyed]))]
+    green = [(number, key, record) for (number, key), record in zip(keyed, records) if record is not None and record.get("verdict") == "green"]
+    outputs = store.read_many([verdicts.output_relative(key) for _, key, _ in green]) if green else []
+    return {number: output for (number, _, record), output in zip(green, outputs)
+            if output is not None and sha256_bytes(output) == record.get("output_sha256")}
+
+
+def outside_rows(directories: list[str]) -> dict[int, bytes]:
+    """各片产物目录里不入库的那几包（<目录>/rows-outside-the-library/<行号>.tar.gz）。"""
+    found = {}
+    for directory in directories:
+        place = os.path.join(directory, ROWS_OUTSIDE_THE_LIBRARY)
+        for name in sorted(os.listdir(place)) if os.path.isdir(place) else []:
+            if name.endswith(".tar.gz") and name.removesuffix(".tar.gz").isdigit():
+                with open(os.path.join(place, name), "rb") as handle:
+                    found[int(name.removesuffix(".tar.gz"))] = handle.read()
+    return found
+
+
+def sentinel_entries(plan: ReusePlan, state_directory: str) -> dict[int, bytes]:
+    """5.6 的哨兵那几行库里原有的那一包：计划那一步 long_run_item_verdicts plan 照复用从库里取回、放进状态目录的那一份（reused_output）。"""
+    verdicts = item_verdicts_module()
+    return {number: verdicts.reused_output(state_directory, item_name(number))[1] for number in plan.sentinels}
+
+
+def merged_rows(plan: ReusePlan, state_directory: str, outside: dict[int, bytes]) -> tuple[dict[int, bytes], list[int]]:
+    """合并摆进行输出根的每一行：入了库的照键从库里取（library_rows），别的取各片产物目录里那一包；5.6 的哨兵没重跑出来的取库里那一条
+    （sentinel_problems 另记 sentinel_not_rerun）。交 ({行: 那一包}, 取不到的行)。"""
+    values = library_rows(state_directory, [number for number in sorted(plan.keys) if plan.in_the_library(number)])
+    before = sentinel_entries(plan, state_directory)
+    for number in sorted(plan.keys):
+        if not plan.in_the_library(number) and (number in outside or number in before):
+            values[number] = outside.get(number, before.get(number))
+    return values, sorted(set(plan.keys) - set(values))
+
+
+def finish_items(state_directory: str, printer=print) -> int:
+    """合并：long_run_item_verdicts 的 finish（重算现判过的行的键、判复用哨兵、逐项报、打总计）的退出码；一行都没进请求时没有计划，交 0。"""
+    verdicts = item_verdicts_module()
+    if not os.path.isfile(os.path.join(state_directory, verdicts.PLAN_FILE)):
+        printer("  · 一行都没进请求（都拒算）：没有 long_run_item_verdicts 的计划，不收尾")
+        return 0
+    code = verdicts.finish(state_directory, printer)
+    return 0 if broken("item-finish-ignored") else code
 
 
 def sentinel_problems(plan: ReusePlan, before: dict[int, bytes], after: dict[int, bytes], decision_of: Callable[[bytes], object]) -> list[str]:
@@ -310,84 +466,174 @@ def outcome_states(plan: ReusePlan, judged: dict[int, bytes]) -> dict[int, str]:
 
 # ── 自证 ──
 
-def load_reuse_checks():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("lib_reuse_checks_for_e201", os.path.join(REPOSITORY_ROOT, "scripts", "gate", "lib_reuse_checks.py"))
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def reuse_account(plan: ReusePlan, state_directory: str, missing: list[int], registered_rows: int,
+                  printer=print) -> tuple[dict[int, str], list[str]]:
+    """合并的复用账：每行的结局（outcome_states）、account_problems，再加 long_run_item_verdicts finish 退非 0 那一条。交 (结局, 问题)。"""
+    states = outcome_states(plan, {number: b"" for number in plan.keys if number not in missing and number not in plan.reused})
+    problems = account_problems(plan, states, registered_rows)
+    code = finish_items(state_directory, printer)
+    if code != 0:
+        problems.append(f"item_verdicts_finish_exit_{code}")
+    return states, problems
 
 
-def selftest_tree(root: str) -> TreeInputs:
-    """自证的假树：快照摘要照 E171 逐行驱动的 snapshot_digest 在 root 上现算（只收 .rs 与 Cargo.*）。"""
+def selftest_tree_inputs(root: str) -> TreeInputs:
+    """自证的假树：快照摘要照 E171 逐行驱动的 snapshot_digest 在 root 上现算（只收 .rs 与 Cargo.*；5.6 的哨兵拿它定次序）。"""
     import row_driver
     digest, _ = row_driver.snapshot_digest(root)
-    return TreeInputs(digest, "f" * 64, DEVICE_ARGUMENTS["s1"], DEVICE_FEATURES, "rustc fake", "cpu", (("fake.py", "e" * 64),), "d" * 64)
+    return TreeInputs(digest, "f" * 64, DEVICE_ARGUMENTS["s1"], DEVICE_FEATURES, "rustc fake", "cpu", "d" * 64)
 
 
-def selftest_rows(changed_row: int | None = None) -> list[RowInput]:
-    return [RowInput(number, f"{number}\t1\tcrates/a/src/lib.rs\t0\tm{number}\tabc" + ("-changed" if number == changed_row else ""), f"{number:064x}")
-            for number in (11, 12, 13, 14, 15, 16)]
+def selftest_rows(numbers: tuple[int, ...] = SELFTEST_ROWS, refusals: dict[int, str] | None = None) -> list[RowInput]:
+    refusals = refusals or {}
+    return [RowInput(number, f"{number}\t1\tcrates/a/src/lib.rs\t0\tm{number}\tabc", f"m{number}\tcrates/a/src/lib.rs\tfn a()\tfn b()\t-p a\tt",
+                     refusals.get(number, "")) for number in numbers]
 
 
-def selftest_round(tree: TreeInputs, rows: list[RowInput], store) -> tuple[dict[int, str], list[str]]:
-    """一趟（计划、各片、合并三步在一个进程里依次做）：交回 (每行的结局, 哨兵与复用账的问题)。"""
-    plan = plan_reuse(tree, rows, store)
-    before = read_sentinel_entries(plan, store)
-    by_number = {row.number: row for row in rows}
-    judged = judge_and_store(plan, list(plan.fresh), store,
-                             lambda number: f"verdict:{number}:{by_number[number].mutation_line_sha256}".encode("utf-8"))
-    states = outcome_states(plan, judged)
-    return states, sentinel_problems(plan, before, judged, lambda data: data) + account_problems(plan, states, len(rows))
+def selftest_round(tree_root: str, rows: list[RowInput], work: str, printer=print) -> tuple[ReusePlan, dict[int, str], list[str]]:
+    """一趟（计划、各片、合并三步在一个进程里依次做，走的是 plan_reuse、store_finished_rows、merged_rows、reuse_account 那几个函数；
+    判一行换成写一份只随行号变的 row-result.tsv）。work 是这一趟新建的空目录。交 (计划, 每行的结局, 哨兵与复用账的问题)。"""
+    state = os.path.join(work, ITEM_STATE_DIRECTORY)
+    rows_root = os.path.join(work, "rows")
+    plan = plan_reuse(tree_root, selftest_tree_inputs(tree_root), rows, state, printer)
+    for number in plan.fresh:
+        os.makedirs(os.path.join(rows_root, f"row-{number}"))
+        with open(os.path.join(rows_root, f"row-{number}", "row-result.tsv"), "w", encoding="utf-8") as handle:
+            handle.write(f"row_number\t{number}\nstatus\tok\n")
+    store_finished_rows(plan, list(plan.fresh), rows_root, {}, state, os.path.join(work, ROWS_OUTSIDE_THE_LIBRARY), printer)
+    outside = outside_rows([work])
+    _values, missing = merged_rows(plan, state, outside)
+    problems = sentinel_problems(plan, sentinel_entries(plan, state), {number: outside[number] for number in plan.sentinels if number in outside},
+                                 lambda data: data)
+    states, account = reuse_account(plan, state, missing, len(rows), printer)
+    return plan, states, problems + account
+
+
+def run_selftest_round(tree_root: str) -> int:
+    """selftest-round（自证 reuse-three-questions 的起法，只在临时 prune-server 底下认）：row-11、row-12 在 tree_root 上走一趟 selftest_round；退 0 没有问题、1 有。"""
+    import tempfile
+    verdicts = item_verdicts_module()
+    problem = verdicts.prune_server_client.selftest_service_problem()
+    if problem:
+        print(f"  ✗ {SELFTEST_ROUND_MODE} 只在自证里起：{problem}")
+        print(f"     → 怎么办：{verdicts.prune_server_client.SELFTEST_SERVICE_REMEDY}")
+        return EXIT_USAGE
+    work = tempfile.mkdtemp(prefix="e201-selftest-round-")
+    try:
+        _plan, _states, problems = selftest_round(tree_root, selftest_rows(), work)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+    for problem in problems:
+        print(f"  ✗ {SELFTEST_ROUND_MODE}：{problem}")
+    return EXIT_INVALID if problems else 0
+
+
+@dataclasses.dataclass(frozen=True)
+class LibraryScene:
+    """在临时 prune-server 底下的一份现场：根目录与一棵只有假装置入口的树。"""
+
+    root: str
+    tree: str
+
+    def work(self, name: str) -> str:
+        path = os.path.join(self.root, name)
+        os.makedirs(path)
+        return path
+
+
+@contextlib.contextmanager
+def selftest_library_scene(rows: list[RowInput]):
+    """建一棵只有假装置入口的树（long_run_item_verdicts 的 plant_fake_module）；这几行的装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成
+    measure_alpha（行号最小那一行）与 measure_beta（其余几行）；命名空间是这份现场自己的；键相同的全当复用哨兵、不抽强制现判。出来时环境换回原样。"""
+    import tempfile
+    from unittest import mock
+    verdicts = item_verdicts_module()
+    checks = verdicts.lib_reuse_checks
+    with tempfile.TemporaryDirectory() as root:
+        tree = os.path.join(root, "tree")
+        verdicts.plant_fake_module(tree)
+        entries = os.path.join(root, "entries.tsv")
+        with open(entries, "w", encoding="utf-8") as handle:
+            for position, row in enumerate(sorted(rows, key=lambda row: row.number)):
+                handle.write(f"{item_name(row.number)}\t{verdicts.FAKE_MODULE}::{'measure_alpha' if position == 0 else 'measure_beta'}\n")
+        settings = {verdicts.LIBRARY_DIRECTORY_VARIABLE: os.path.join(root, "library"), verdicts.SUBSTITUTION_VARIABLE: entries,
+                    checks.SENTINEL_COUNT_VARIABLE: verdicts.ALL_SENTINELS}
+        with mock.patch.dict(os.environ, settings):
+            for name in (verdicts.FAULT_VARIABLE, verdicts.FAKE_JUDGE_VARIABLE, checks.SENTINEL_SEED_VARIABLE):
+                os.environ.pop(name, None)
+            yield LibraryScene(root, tree)
+
+
+@contextlib.contextmanager
+def fake_cargo_first_on_the_path():
+    """算键时判法闭包里点名的 cargo 要问 --version（admission.py 的 KeyContext.external）：PATH 最前面放一份只打一行版本的假 cargo，不起真 cargo。"""
+    import tempfile
+    from unittest import mock
+    with tempfile.TemporaryDirectory() as directory:
+        path = os.path.join(directory, "cargo")
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write('#!/usr/bin/env bash\necho "cargo 0.0.0 (full_table_run 自证的假 cargo)"\n')
+        os.chmod(path, 0o755)
+        with mock.patch.dict(os.environ, {"PATH": directory + os.pathsep + os.environ.get("PATH", "")}):
+            yield
 
 
 def cell_reuse_three_questions(printer=print) -> bool:
-    """复用三问（.claude/rules/test-script-discipline.md「复用也要自证」；判法 scripts/gate/lib_reuse_checks.py）。"""
+    """复用三问与复用哨兵的三种红（.claude/rules/test-script-discipline.md「复用也要自证」）：long_run_item_verdicts.py reuse-cells 那六格，
+    样板树是空的（它往每一格的树里写假装置入口），起法是本文件的 selftest-round。"""
     import tempfile
-    checks = load_reuse_checks()
-    store = MemoryStore()
-    with tempfile.TemporaryDirectory() as root:
-        os.makedirs(os.path.join(root, "crates", "a", "src"))
-        with open(os.path.join(root, "crates", "a", "src", "lib.rs"), "w", encoding="utf-8") as handle:
-            handle.write("pub fn alpha() {}\n")
-        with open(os.path.join(root, "crates", "a", "README.md"), "w", encoding="utf-8") as handle:
-            handle.write("说明\n")
-        first, first_problems = selftest_round(selftest_tree(root), selftest_rows(), store)
-        second, second_problems = selftest_round(selftest_tree(root), selftest_rows(), store)
-        with open(os.path.join(root, "crates", "a", "README.md"), "a", encoding="utf-8") as handle:
-            handle.write("闭包外的改动：快照摘要只收 .rs 与 Cargo.*\n")
-        unrelated, unrelated_problems = selftest_round(selftest_tree(root), selftest_rows(), store)
-        unit, unit_problems = selftest_round(selftest_tree(root), selftest_rows(changed_row=13), store)
-    for label, states in (("头一趟", first), ("第二趟", second), ("闭包外改动", unrelated), ("改一行的名单行文", unit)):
-        for number, state in sorted(states.items()):
-            printer(f"  · 第 {number} 行：绿，{state}（{label}）")
-    passed, _ = checks.report_three_questions(os.path.relpath(__file__, REPOSITORY_ROOT), {str(key): value for key, value in first.items()},
-                                              {str(key): value for key, value in second.items()}, {str(key): value for key, value in unrelated.items()},
-                                              {str(key): value for key, value in unit.items()}, {"13"}, printer=printer,
-                                              sentinels=sentinel_count(len(first)))
-    problems = first_problems + second_problems + unrelated_problems + unit_problems
-    for problem in problems:
-        printer(f"    reuse-three-questions：{problem}")
-    return passed and not problems
+    verdicts = item_verdicts_module()
+    with tempfile.TemporaryDirectory() as work:
+        template = os.path.join(work, "template")
+        os.makedirs(template)
+        command = [sys.executable, "-B", os.path.realpath(__file__), SELFTEST_ROUND_MODE, "{tree}"]
+        red = verdicts.reuse_cells(SCRIPT_KEY, template, [item_name(number) for number in SELFTEST_ROWS], os.path.join(work, "cells"), 0, command,
+                                   printer=printer)
+    return red == 0
 
 
 def cell_sentinel_detects_a_corrupted_library_entry(printer=print) -> bool:
-    """哨兵（V14）：库里同键的结论被改坏一处，这一趟抽中的哨兵现跑之后判出不同（作废 Z7）。"""
-    store = MemoryStore()
-    tree = TreeInputs("c" * 64, "f" * 64, DEVICE_ARGUMENTS["s1"], DEVICE_FEATURES, "rustc fake", "cpu", (), "d" * 64)
-    selftest_round(tree, selftest_rows(), store)
-    for relative in list(store.entries):
-        store.entries[relative] += b":corrupted"
-    _, problems = selftest_round(tree, selftest_rows(), store)
+    """哨兵（V14）：头一趟入库之后，库里两行换成另一包（判定照写绿、sha256 照新的记：long_run_item_verdicts 照复用），
+    这一趟 5.6 抽中的哨兵重跑之后判出不同（作废 Z7）。"""
+    verdicts = item_verdicts_module()
+    rows = selftest_rows()
+    collected: list[str] = []
+    with selftest_library_scene(rows) as scene:
+        first = scene.work("first")
+        selftest_round(scene.tree, rows, first, collected.append)
+        planned = verdicts.read_plan(os.path.join(first, ITEM_STATE_DIRECTORY))
+        store = verdicts.library_of(planned["kind"], planned["library_directory"])
+        for item, entry in planned["items"].items():
+            verdicts.write_record(store, entry["key"], item, "green", 0, verdicts.COMPARE_TIMING, SCRIPT_KEY, f"corrupted {item}\n".encode("utf-8"))
+        _plan, _states, problems = selftest_round(scene.tree, rows, scene.work("second"), collected.append)
     found = any(problem.endswith(":decision_cells_differ") for problem in problems)
     printer(f"    sentinel-detects-a-corrupted-library-entry：problems={problems}")
+    if not found:
+        printer("    " + "\n    ".join(collected[-12:]))
     return found
+
+
+def cell_refused_rows_are_judged_outside_the_library(printer=print) -> bool:
+    """拒算的两种（要补位的第 13 行、改坏碰到模块集合的第 14 行）两趟都现跑、都不进请求，那一包从产物目录取回；同一趟能算键的第 11 行第二趟复用
+    （5.6 的哨兵抽中它，记强制现判）。"""
+    rows = selftest_rows((11, 13, 14), {13: NEEDS_SUBSTITUTION, 14: MUTATION_TOUCHES_THE_MODULE_SET})
+    collected: list[str] = []
+    with selftest_library_scene(rows) as scene:
+        first_plan, first, first_problems = selftest_round(scene.tree, rows, scene.work("first"), collected.append)
+        second_plan, second, second_problems = selftest_round(scene.tree, rows, scene.work("second"), collected.append)
+    requested = sorted({*first_plan.decisions, *second_plan.decisions})
+    printer(f"    refused-rows-are-judged-outside-the-library：first={first} second={second} requested={requested} "
+            f"problems={first_problems + second_problems}")
+    passed = (first == {11: JUDGED, 13: JUDGED, 14: JUDGED} and second == {11: FORCED, 13: JUDGED, 14: JUDGED} and requested == [11]
+              and not first_problems and not second_problems)
+    if not passed:
+        printer("    " + "\n    ".join(collected[-12:]))
+    return passed
 
 
 def cell_reuse_account(printer=print) -> bool:
     """复用账：结局齐、N + M 等于登记数时没有问题；少一行结局时点名。"""
-    plan = ReusePlan({11: "k11", 12: "k12"}, (11,), (12,), ())
+    plan = ReusePlan({11: "k11", 12: "k12"}, {11: DECISION_JUDGE, 12: DECISION_REUSE}, (11,), (12,), ())
     complete = account_problems(plan, {11: JUDGED, 12: REUSED}, 2)
     short = account_problems(plan, {12: REUSED}, 2)
     printer(f"    reuse-account：complete={complete} short={short}")
@@ -425,6 +671,165 @@ def cell_stored_row_matches_the_full_export(printer=print) -> bool:
                                                          lambda _baseline, rows_root, number: files_of_a_row_directory(rows_root, number, ()))
     printer(f"    stored-row-matches-the-full-export：reading_only_stored={reading_only_stored} reading_the_bulky_files={reading_the_bulky_files}")
     return reading_only_stored == [] and reading_the_bulky_files == ["5:stored_row_differs"]
+
+
+# ── 按需领卡的五格（文件头「卡」）：假的领卡客户端（领一回发一张新卡 card-<序号>，往事件记录里记「take <卡>」「return <卡>」；FAKE_CARD_LEASE=refused 时领卡退 3，
+#    return-unanswered 时还卡退 1）与假装置（记「device <输出目录的上一层名> cards=<看到的卡>」；FAKE_DEVICE_PAIR 设了就等两份装置都起了再记）都是临时目录里的 bash 脚本；
+#    逐行驱动那一边起的是 current_tree_row_driver 自己的 run_device（套着 device_steps_on_leased_cards 那一层），各片那一边起的是本文件的 run_device ──
+
+CARD_LEASE_SELFTEST_CLIENT = """#!/usr/bin/env bash
+log="${FAKE_CARD_LEASE_LOG:?}"
+case "${1:-} ${2:-}" in
+  "lease take")
+    if [[ "${FAKE_CARD_LEASE:-}" == refused ]]; then echo "  ✗ 服务没给这一回领卡：自证演的拒" >&2; exit 3; fi
+    exec 9>>"$log.lock"
+    flock 9
+    number=$(( $(cat "$log.count" 2>/dev/null || echo 0) + 1 ))
+    echo "$number" >"$log.count"
+    echo "take card-$number" >>"$log"
+    echo "card-$number" ;;
+  "lease return")
+    echo "return ${3:-all}" >>"$log"
+    if [[ "${FAKE_CARD_LEASE:-}" == return-unanswered ]]; then echo "  ✗ 还卡的请求 120 秒没有回执（自证演的）" >&2; exit 1; fi ;;
+  *) echo "假领卡客户端只认 lease take、lease return，收到：$*" >&2; exit 2 ;;
+esac
+"""
+CARD_LEASE_SELFTEST_DEVICE = """#!/usr/bin/env bash
+if [[ -n "${FAKE_DEVICE_PAIR:-}" ]]; then
+  echo started >>"$FAKE_CARD_LEASE_LOG.pair"
+  for _ in $(seq 200); do (( $(grep -c . "$FAKE_CARD_LEASE_LOG.pair") >= 2 )) && break; sleep 0.05; done
+fi
+echo "device $(basename "$(dirname "${3:-}")") cards=${GPU_CARDS_BY_PRIORITY:-none}" >>"$FAKE_CARD_LEASE_LOG"
+"""
+
+
+@dataclasses.dataclass(frozen=True)
+class CardLeaseScene:
+    """按需领卡那几格的一份临时现场：根目录、假客户端、假装置、事件记录。"""
+
+    root: str
+    client: str
+    device: str
+    log: str
+
+    def note(self, line: str) -> None:
+        with open(self.log, "a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+
+    def events(self) -> list[str]:
+        with open(self.log, encoding="utf-8") as handle:
+            return handle.read().splitlines()
+
+    def row_directory(self, number: int) -> str:
+        directory = os.path.join(self.root, f"row-{number}")
+        os.makedirs(directory, exist_ok=True)
+        return directory
+
+    def step_directory(self, label: str) -> str:
+        directory = os.path.join(self.root, label)
+        os.makedirs(directory, exist_ok=True)
+        return directory
+
+
+@contextlib.contextmanager
+def card_lease_selftest_scene(**variables: str):
+    """建一份临时现场，环境里给在的领卡通道、凭据与事件记录的路径，再加 variables；出来时环境换回原样。"""
+    import tempfile
+    from unittest import mock
+    with tempfile.TemporaryDirectory() as root:
+        client, device, log = os.path.join(root, "task-server", "task"), os.path.join(root, "device"), os.path.join(root, "events.log")
+        os.makedirs(os.path.dirname(client))
+        for path, text in ((client, CARD_LEASE_SELFTEST_CLIENT), (device, CARD_LEASE_SELFTEST_DEVICE), (log, "")):
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write(text)
+        os.chmod(client, 0o755)
+        os.chmod(device, 0o755)
+        channel = os.path.join(root, "card-lease-channel")
+        os.makedirs(channel)
+        lease = card_steps.device_card_lease
+        with mock.patch.dict(os.environ, {lease.CHANNEL_DIRECTORY_VARIABLE: channel, lease.CHANNEL_TOKEN_VARIABLE: "selftest-token", "FAKE_CARD_LEASE_LOG": log,
+                                          **variables}):
+            for name in ("FAKE_CARD_LEASE", "FAKE_DEVICE_PAIR", lease.CARDS_VARIABLE):
+                if name not in variables:
+                    os.environ.pop(name, None)
+            yield CardLeaseScene(root, client, device, log)
+
+
+def cell_card_held_only_around_each_device_step(printer=print) -> bool:
+    """逐行驱动两行（编在前、装置在后，一条线道）与各片自己起的一步装置：每一步装置之前领一张、之后还那一张，编的时候一张都不持；E170 导出装置那一步（card=False）不领。"""
+    import current_tree_row_driver as driver
+    with card_lease_selftest_scene() as scene, contextlib.redirect_stderr(io.StringIO()):
+        with card_steps.device_steps_on_leased_cards(driver, scene.client):
+            for number in (1, 2):
+                scene.note(f"compile row-{number}")
+                driver.run_device(scene.root, scene.device, scene.row_directory(number), 1, [], 30)
+        step = scene.step_directory("baseline-step")
+        run_device(scene.device, ["baseline"], os.path.join(step, "out"), os.path.join(step, "device.out"), 1, client=scene.client)
+        step = scene.step_directory("export-step")
+        run_device(scene.device, ["dump"], os.path.join(step, "out"), os.path.join(step, "device.out"), 1, card=False, client=scene.client)
+        events = scene.events()
+    wanted = ["compile row-1", "take card-1", "device row-1 cards=card-1", "return card-1", "compile row-2", "take card-2", "device row-2 cards=card-2",
+              "return card-2", "take card-3", "device baseline-step cards=card-3", "return card-3", "device export-step cards=none"]
+    printer(f"    card-held-only-around-each-device-step：events={events}")
+    return events == wanted
+
+
+def cell_lanes_hold_different_cards(printer=print) -> bool:
+    """两条线道同时在装置那一步：各领各的、各持一张不同的卡，各还自己那一张。"""
+    from concurrent.futures import ThreadPoolExecutor
+    import current_tree_row_driver as driver
+    with card_lease_selftest_scene(FAKE_DEVICE_PAIR="1") as scene, contextlib.redirect_stderr(io.StringIO()):
+        with card_steps.device_steps_on_leased_cards(driver, scene.client), ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(driver.run_device, scene.root, scene.device, scene.row_directory(number), 1, [], 30) for number in (1, 2)]
+            exits = [future.result()[0] for future in futures]
+        events = scene.events()
+    seen = sorted(line.split("cards=", 1)[1] for line in events if line.startswith("device "))
+    taken = sorted(line.removeprefix("take ") for line in events if line.startswith("take "))
+    returned = sorted(line.removeprefix("return ") for line in events if line.startswith("return "))
+    printer(f"    lanes-hold-different-cards：exits={exits} seen={seen} taken={taken} returned={returned}")
+    return exits == [0, 0] and len(set(seen)) == 2 and seen == taken and returned == taken
+
+
+def cell_refused_card_lease_starts_no_device(printer=print) -> bool:
+    """领卡没成：逐行驱动那一边抛驱动自己的 MeasurementPipeDefect（card_lease），各片那一边抛 CardLeaseRefused，两边的装置都没起。"""
+    import current_tree_row_driver as driver
+    stage, refused_in_the_shard = "-", False
+    with card_lease_selftest_scene(FAKE_CARD_LEASE="refused") as scene, contextlib.redirect_stderr(io.StringIO()):
+        with card_steps.device_steps_on_leased_cards(driver, scene.client):
+            try:
+                driver.run_device(scene.root, scene.device, scene.row_directory(1), 1, [], 30)
+            except driver.MeasurementPipeDefect as defect:
+                stage = defect.stage
+        step = scene.step_directory("baseline-step")
+        try:
+            run_device(scene.device, ["baseline"], os.path.join(step, "out"), os.path.join(step, "device.out"), 1, client=scene.client)
+        except card_steps.device_card_lease.CardLeaseRefused:
+            refused_in_the_shard = True
+        devices = [line for line in scene.events() if line.startswith("device ")]
+    printer(f"    refused-card-lease-starts-no-device：stage={stage} refused_in_the_shard={refused_in_the_shard} devices={devices}")
+    return stage == card_steps.STAGE_CARD_LEASE and refused_in_the_shard and devices == []
+
+
+def cell_missing_lease_channel_exits_78(printer=print) -> bool:
+    """环境里没有领卡通道：开跑前那一核交 78；有通道交 None。"""
+    with card_lease_selftest_scene() as scene, contextlib.redirect_stderr(io.StringIO()):
+        present = card_steps.refuse_without_a_channel("selftest")
+        os.environ.pop(card_steps.device_card_lease.CHANNEL_DIRECTORY_VARIABLE)
+        missing = card_steps.refuse_without_a_channel("selftest")
+        events = scene.events()
+    printer(f"    missing-lease-channel-exits-78：present={present} missing={missing} events={events}")
+    return present is None and missing == card_steps.device_card_lease.EXIT_NO_CHANNEL and events == []
+
+
+def cell_failed_card_return_is_reported(printer=print) -> bool:
+    """还卡没成：装置那一步照它自己的退出码算，标准错误打一行「!」点名还卡没成。"""
+    captured = io.StringIO()
+    with card_lease_selftest_scene(FAKE_CARD_LEASE="return-unanswered") as scene, contextlib.redirect_stderr(captured):
+        step = scene.step_directory("baseline-step")
+        exit_code = run_device(scene.device, ["baseline"], os.path.join(step, "out"), os.path.join(step, "device.out"), 1, client=scene.client)
+    reported = "还卡没成" in captured.getvalue()
+    printer(f"    failed-card-return-is-reported：exit={exit_code} reported={reported}")
+    return exit_code == 0 and reported
 
 
 # ── 计划 ──
@@ -514,7 +919,8 @@ def segment_rows(segment: str, numbers: list[int]) -> list[int]:
 
 
 def row_inputs_and_list_lines(lines: ResultLines | None, tree: str, numbers: list[int]) -> list[RowInput]:
-    """按名字取行、核锚点（不编不跑，A2 与 F8）：每行一条 name=list_check；照名字取到且锚点恰好一次的行，键里是那一行变异行的 sha256。"""
+    """按名字取行、核锚点（不编不跑，A2 与 F8）：每行一条 name=list_check（照名字取到且锚点恰好一次的行记那一行变异行的 sha256）；
+    这样的行请求里带那一行变异行原文，别的行拒算（NEEDS_SUBSTITUTION），改坏碰到模块集合的同样拒算（touches_the_module_set）。"""
     from bad_implementation_table import STATUS_LOCATED, SelectedRow, anchor_hit_count, locate_by_name, read_mutation_rows
     table = read_mutation_rows(os.path.join(tree, "crates", "mutations.tsv"))
     texts = list_lines_by_number()
@@ -527,9 +933,12 @@ def row_inputs_and_list_lines(lines: ResultLines | None, tree: str, numbers: lis
         if located.status == STATUS_LOCATED and located.row is not None:
             with open(os.path.join(tree, located.row.file), encoding="utf-8") as handle:
                 anchor_hits = anchor_hit_count(handle.read(), located.row)
-        reusable = located.row is not None and anchor_hits == 1
-        line_sha = sha256_bytes(located.row.raw_line.encode("utf-8")) if reusable else "needs_substitution"
-        inputs.append(RowInput(number, texts[number], line_sha))
+        located_once = located.row is not None and anchor_hits == 1
+        line_sha = sha256_bytes(located.row.raw_line.encode("utf-8")) if located_once else NEEDS_SUBSTITUTION
+        refusal = "" if located_once else NEEDS_SUBSTITUTION
+        if located_once and touches_the_module_set(located.row):
+            refusal = MUTATION_TOUCHES_THE_MODULE_SET
+        inputs.append(RowInput(number, texts[number], located.row.raw_line if located_once else "", refusal))
         if name_hits != 1 or anchor_hits != 1:
             not_once.append(number)
         if lines is not None:
@@ -554,7 +963,7 @@ def latest_first_segment_t1() -> str | None:
     return max(found, key=os.path.getmtime) if found else None
 
 
-def plan_step(arguments: argparse.Namespace, plan_directory: str, store) -> int:
+def plan_step(arguments: argparse.Namespace, plan_directory: str) -> int:
     segment = "s2" if arguments.stream_three else "s1"
     date = today_in_tokyo()
     suffix = free_run_suffix(segment, date)
@@ -564,9 +973,7 @@ def plan_step(arguments: argparse.Namespace, plan_directory: str, store) -> int:
     recorded = {path: sha256_file(os.path.join(REPOSITORY_ROOT, path)) for path in recorded_files()}
     mutations_sha = sha256_file(os.path.join(tree, "crates", "mutations.tsv"))
     toolchain = toolchain_text(tree)
-    tree_inputs = TreeInputs(digest, mutations_sha, DEVICE_ARGUMENTS[segment], DEVICE_FEATURES, toolchain, judging_route(),
-                             tuple((path, recorded.get(path) or sha256_file(os.path.join(REPOSITORY_ROOT, path))) for path in KEY_RESEARCH_FILES),
-                             o3_freeze_digest())
+    tree_inputs = TreeInputs(digest, mutations_sha, DEVICE_ARGUMENTS[segment], DEVICE_FEATURES, toolchain, judging_route(), o3_freeze_digest())
     first_t1 = latest_first_segment_t1() if segment == "s2" else None
     plan_only = os.environ.get(PLAN_ONLY_VARIABLE) == "1"
     lines = ResultLines(os.path.join(plan_directory, PLAN_ONLY_PRODUCT) if plan_only else product_path(segment, "plan", date, suffix))
@@ -584,22 +991,20 @@ def plan_step(arguments: argparse.Namespace, plan_directory: str, store) -> int:
     lines.result(f"name=list_rows rows={len(texts)} expected_rows={len(expected)} holds={str(sorted(texts) == expected).lower()}")
     numbers = segment_rows(segment, sorted(texts))
     rows = row_inputs_and_list_lines(lines, tree, numbers)
-    plan = plan_reuse(tree_inputs, rows, store)
-    os.makedirs(os.path.join(plan_directory, "sentinels"))
-    for number, data in read_sentinel_entries(plan, store).items():
-        with open(os.path.join(plan_directory, "sentinels", f"{number}.tar.gz"), "wb") as handle:
-            handle.write(data)
+    plan = plan_reuse(tree, tree_inputs, rows, os.path.join(plan_directory, ITEM_STATE_DIRECTORY))
     shards = [] if plan_only else split_into_shards(plan.fresh)
     if plan_only:
         for index, shard in enumerate(split_into_shards(plan.fresh)):
             lines.result(f"name=plan_only_shard shard={index} rows={len(shard)} numbers={field(','.join(map(str, shard)) or '-')}")
-    lines.result(f"name=reuse rows={len(rows)} fresh={len(plan.fresh)} reused={len(plan.reused)} sentinels={len(plan.sentinels)}")
+    refused = sum(1 for row in rows if plan.keys[row.number] is None)
+    lines.result(f"name=reuse rows={len(rows)} fresh={len(plan.fresh)} reused={len(plan.reused)} sentinels={len(plan.sentinels)} refused={refused}")
     lines.result(f"name=reuse_sample k={len(plan.sentinels)} rows={field(','.join(map(str, plan.sentinels)) or '-')} "
                  f"rule=max(2,ceil(0.02*M))_by_sha256_of_snapshot_and_key")
     for index, shard in enumerate(shards):
         lines.result(f"name=shard_assignment shard={index} rows={len(shard)} numbers={field(','.join(map(str, shard)) or '-')}")
     record = {"segment": segment, "date": date, "run_suffix": suffix, "head": head, "status_lines": status_lines, "recorded": recorded,
               "tree_inputs": dataclasses.asdict(tree_inputs), "keys": {str(number): key for number, key in plan.keys.items()},
+              "decisions": {str(number): decision for number, decision in plan.decisions.items()},
               "fresh": list(plan.fresh), "reused": list(plan.reused), "sentinels": list(plan.sentinels), "shards": shards,
               "rows": [dataclasses.asdict(row) for row in rows], "first_segment_t1": first_t1, "snapshot_files": file_count}
     with open(os.path.join(plan_directory, "plan-record.json"), "w", encoding="utf-8") as handle:
@@ -617,7 +1022,8 @@ def read_plan_record(plan_directory: str) -> dict:
 
 
 def plan_of_record(record: dict) -> ReusePlan:
-    return ReusePlan({int(number): key for number, key in record["keys"].items()}, tuple(record["fresh"]), tuple(record["reused"]), tuple(record["sentinels"]))
+    return ReusePlan({int(number): key for number, key in record["keys"].items()}, {int(number): decision for number, decision in record["decisions"].items()},
+                     tuple(record["fresh"]), tuple(record["reused"]), tuple(record["sentinels"]))
 
 
 def drift_from_the_plan(record: dict, tree: str, repository_root: str = REPOSITORY_ROOT) -> list[str]:
@@ -686,13 +1092,22 @@ def compile_clean_binaries(tree: str, work: str, threads: int, log: str) -> tupl
     return exit_code, os.path.join(release, DEVICE_BINARY_NAME), os.path.join(release, EXPORT_BINARY_NAME)
 
 
-def run_device(binary: str, mode_arguments: list[str], output_directory: str, device_out: str, threads: int) -> int:
-    """装置（或导出装置）套 E171 的 device_timing.py 直接起（不套别的包装），标准输出写进 device_out。"""
+def run_device(binary: str, mode_arguments: list[str], output_directory: str, device_out: str, threads: int, card: bool = True,
+               client: str | None = None) -> int:
+    """装置（或导出装置）套 E171 的 device_timing.py 直接起（不套别的包装），标准输出写进 device_out。`card`（装置）时只在这一步持一张按需领到的卡
+    （文件头「卡」，card_steps.run_on_a_leased_card；领卡没成抛 CardLeaseRefused、装置不起）；E170 导出装置不上卡，调用方给 card=False。`client` 只给自证换假客户端。"""
     import frozen_o3
     import current_tree_row_driver as driver
     command = [sys.executable, "-B", driver.DEVICE_TIMING_SCRIPT, "run", "--", binary, *mode_arguments, "--output-directory", output_directory]
-    with open(device_out, "w", encoding="utf-8") as out, open(device_out + ".err", "w", encoding="utf-8") as err:
-        return subprocess.run(command, cwd=REPOSITORY_ROOT, env=frozen_o3.thread_environment(threads), stdout=out, stderr=err).returncode
+
+    def run(environment: dict[str, str]) -> int:
+        with open(device_out, "w", encoding="utf-8") as out, open(device_out + ".err", "w", encoding="utf-8") as err:
+            return subprocess.run(command, cwd=REPOSITORY_ROOT, env=environment, stdout=out, stderr=err).returncode
+
+    environment = frozen_o3.thread_environment(threads)
+    if not card:
+        return run(environment)
+    return card_steps.run_on_a_leased_card(run, environment, f"装置 {os.path.basename(binary)} {mode_arguments[0]}", client)
 
 
 def verdict_fields(device_out: str) -> dict[str, str]:
@@ -802,8 +1217,8 @@ def stored_row_differences(baseline_path: str, row_directory: str, number: int, 
 
 def driver_command(record: dict, plan_directory: str, work_root: str, output_root: str, baseline_timing: str, timing_output: str,
                    lanes: int, extra: list[str]) -> list[str]:
-    """逐行驱动的整条命令（不套包装；每线道 6 线程）。"""
-    return [sys.executable, "-B", os.path.join(HERE, "current_tree_row_driver.py"), "--repo-root", REPOSITORY_ROOT, "--work-root", work_root,
+    """逐行驱动的整条命令（不套包装；每线道 6 线程）：经 device_steps_on_leased_cards.py 起，装置那一步按需领卡（文件头「卡」）。"""
+    return [sys.executable, "-B", os.path.join(HERE, "device_steps_on_leased_cards.py"), "--repo-root", REPOSITORY_ROOT, "--work-root", work_root,
             "--output-root", output_root, "--snapshot-from", os.path.join(plan_directory, "tree"), "--streams", streams_of(record["segment"]),
             "--threads", str(LANE_THREADS), "--lanes", str(lanes), "--baseline-timing", baseline_timing, "--timing-output", timing_output, *extra]
 
@@ -825,20 +1240,6 @@ def run_driver(command: list[str], log: str, on_poll: Callable[[], None] | None 
     if on_poll is not None:
         on_poll()
     return process.returncode
-
-
-def store_finished_rows(plan: ReusePlan, numbers: list[int], rows_root: str, store, stored: dict[int, int]) -> None:
-    """判完的行（行目录里有 row-result.tsv）入库，记下它的 NOT_RUN 行数；已入库的不重复写。逐行驱动带 --keep-dumps 跑（A7 要完整导出），
-    入库之后哨兵以外的行删掉三个大文件（哨兵留着，片收尾在它上面核 A7）。"""
-    import current_tree_row_driver as driver
-    for number in numbers:
-        row_directory = os.path.join(rows_root, f"row-{number}")
-        if number in stored or not os.path.exists(os.path.join(row_directory, "row-result.tsv")):
-            continue
-        stored[number] = not_run_count([os.path.join(row_directory, "device.out"), os.path.join(row_directory, "dump")])
-        store.write(library_relative(plan.keys[number]), pack_row_directory(row_directory))
-        if number not in plan.sentinels:
-            driver.remove_bulky_dump_files(os.path.join(row_directory, "dump"))
 
 
 def control_units(record: dict, plan_directory: str, output_directory: str, work: str, baseline_timing: str, binary: str,
@@ -890,7 +1291,7 @@ def shard_preliminaries(lines: ResultLines, record: dict, plan_directory: str, o
     differing = second_baseline_differences(baseline, second, names) if second_exit in (0, 3) else ["second_baseline_failed"]
     lines.result(f"name=z1_second_baseline exit={second_exit} differing={field(','.join(differing) or '-')}")
     export_dump = os.path.join(output_directory, "e170-dump")
-    dump_exit = run_device(export_binary, ["dump"], export_dump, export_dump + ".device.out", threads)
+    dump_exit = run_device(export_binary, ["dump"], export_dump, export_dump + ".device.out", threads, card=False)
     bad_exit = subprocess.run([export_binary, "bad-states", "--dump-directory", export_dump, "--seed-hex", O3_CONTROL_SEED], cwd=REPOSITORY_ROOT,
                               env=frozen_o3.thread_environment(threads), capture_output=True).returncode if dump_exit == 0 else -1
     s2 = export_against_the_baseline(dump_exit, baseline, export_dump, names)
@@ -913,7 +1314,7 @@ def shard_preliminaries(lines: ResultLines, record: dict, plan_directory: str, o
         lines.result(f"name=control_unit unit={field(name)} exit={exit_code}")
 
 
-def shard_step(plan_directory: str, output_directory: str, shard_index: int, store) -> int:
+def shard_step(plan_directory: str, output_directory: str, shard_index: int) -> int:
     record = read_plan_record(plan_directory)
     plan = plan_of_record(record)
     tree = os.path.join(plan_directory, "tree")
@@ -953,9 +1354,11 @@ def shard_step(plan_directory: str, output_directory: str, shard_index: int, sto
         rows_root = os.path.join(output_directory, "rows")
         rows_exit = 0
         if numbers:
+            state, outside = os.path.join(plan_directory, ITEM_STATE_DIRECTORY), os.path.join(output_directory, ROWS_OUTSIDE_THE_LIBRARY)
             rows_exit = run_driver(driver_command(record, plan_directory, os.path.join(work, "rows"), rows_root, baseline_out, rows_root + ".timing",
                                                   lanes, ["--keep-dumps", "--rows", ",".join(map(str, numbers))]),
-                                   os.path.join(output_directory, "rows.driver.out"), lambda: store_finished_rows(plan, numbers, rows_root, store, stored))
+                                   os.path.join(output_directory, "rows.driver.out"),
+                                   lambda: store_finished_rows(plan, numbers, rows_root, stored, state, outside))
         lines.result(f"name=rows_driver exit={rows_exit} rows={len(numbers)} stored={len(stored)}")
         for number in numbers:
             lines.result(f"name=shard_row row={number} stored={str(number in stored).lower()} not_run={stored.get(number, '-')}")
@@ -1166,7 +1569,7 @@ def segment_two_model_word(run, difference) -> str:
     return segment_two.model_word_of_the_call(run, difference.stream, difference.call_index)
 
 
-def merge_step(plan_directory: str, store) -> int:
+def merge_step(plan_directory: str) -> int:
     if os.environ.get(PLAN_ONLY_VARIABLE) == "1":  # 干跑：计划写了几行就原样打进任务日志，不起任何一片、不出产物
         with open(os.path.join(plan_directory, PLAN_ONLY_PRODUCT), encoding="utf-8") as handle:
             sys.stdout.write(handle.read())
@@ -1189,24 +1592,16 @@ def merge_step(plan_directory: str, store) -> int:
     for name in ("baseline", "baseline-second"):
         if os.path.isdir(os.path.join(shard_zero, name)):
             shutil.copytree(os.path.join(shard_zero, name), os.path.join(merge, name))
-    missing = []
-    for number in sorted(plan.keys):
-        data = store.read(library_relative(plan.keys[number]))
-        if data is None:
-            missing.append(number)
-        else:
-            unpack_row_directory(data, os.path.join(rows_root, f"row-{number}"))
+    state = os.path.join(plan_directory, ITEM_STATE_DIRECTORY)
+    outside = outside_rows([directory for _, _, directory in outputs])
+    values, missing = merged_rows(plan, state, outside)
+    for number, data in sorted(values.items()):
+        unpack_row_directory(data, os.path.join(rows_root, f"row-{number}"))
     baseline_path = os.path.join(merge, "baseline")
     baseline = load_run_directory(baseline_path)
-    sentinel_before = {}
-    for number in plan.sentinels:
-        with open(os.path.join(plan_directory, "sentinels", f"{number}.tar.gz"), "rb") as handle:
-            sentinel_before[number] = handle.read()
-    sentinel_after = {number: store.read(library_relative(plan.keys[number])) for number in plan.sentinels}
-    sentinels = sentinel_problems(plan, sentinel_before, {number: data for number, data in sentinel_after.items() if data is not None},
+    sentinels = sentinel_problems(plan, sentinel_entries(plan, state), {number: outside[number] for number in plan.sentinels if number in outside},
                                   lambda data: row_decisions(data, baseline, os.path.join(merge, "sentinel-scratch")))
-    states = outcome_states(plan, {number: b"" for number in plan.keys if number not in missing and number not in plan.reused})
-    account = account_problems(plan, states, len(plan.keys))
+    _states, account = reuse_account(plan, state, missing, len(plan.keys))
     path_of = {part: product_path(segment, part, date, suffix) for part in ("t1", "t2", "t3", "contrast", "attribution", "q2", "matrix", "controls", "verdict")}
     with open(os.path.join(shard_zero, "rows.driver.out") if os.path.exists(os.path.join(shard_zero, "rows.driver.out"))
               else os.path.join(shard_zero, "empty.driver.out"), encoding="utf-8") as handle:
@@ -1427,18 +1822,47 @@ def finish_merge(path_of: dict[str, str], record: dict, plan: ReusePlan, outputs
 
 SELFTEST_CELLS = (("reuse-three-questions", cell_reuse_three_questions),
                   ("sentinel-detects-a-corrupted-library-entry", cell_sentinel_detects_a_corrupted_library_entry),
+                  ("refused-rows-are-judged-outside-the-library", cell_refused_rows_are_judged_outside_the_library),
                   ("reuse-account", cell_reuse_account),
-                  ("stored-row-matches-the-full-export", cell_stored_row_matches_the_full_export))
+                  ("stored-row-matches-the-full-export", cell_stored_row_matches_the_full_export),
+                  ("card-held-only-around-each-device-step", cell_card_held_only_around_each_device_step),
+                  ("lanes-hold-different-cards", cell_lanes_hold_different_cards),
+                  ("refused-card-lease-starts-no-device", cell_refused_card_lease_starts_no_device),
+                  ("missing-lease-channel-exits-78", cell_missing_lease_channel_exits_78),
+                  ("failed-card-return-is-reported", cell_failed_card_return_is_reported))
+
+
+def print_at_once(text: str = "") -> None:
+    """自证的打印：每一行马上落进日志（标准输出接的是文件或管道时 print 攒满一块才写，任务服务按日志涨不涨判卡住）。"""
+    print(text, flush=True)
 
 
 def selftest() -> int:
-    """自证：每格各自建自己的假库与临时树（格与格之间不共用状态）；末行 FULL_TABLE_SELFTEST cells=… passed=… failed=…。"""
+    """自证（文件头「自证」）：只在临时 prune-server 底下跑；每格各自建自己的命名空间与临时树（格与格之间不共用状态），逐格串行；
+    各格的说明行经 print_at_once 随打随落盘，每格跑完打一行 FULL_TABLE_SELFTEST_PROGRESS（复用那三格要起子进程现算判法闭包的键，一格就要几分钟）；
+    末行 FULL_TABLE_SELFTEST cells=… passed=… failed=…。"""
+    import time
+    verdicts = item_verdicts_module()
+    problem = verdicts.prune_server_client.selftest_service_problem()
+    if problem:
+        print(f"  ✗ full_table_run 自证没跑：{problem}")
+        print(f"     → 怎么办：{verdicts.prune_server_client.SELFTEST_SERVICE_REMEDY}")
+        return EXIT_USAGE
     failed = []
-    for name, cell in SELFTEST_CELLS:
-        passed = cell()
-        print(f"  {'✓' if passed else '✗'} {name}")  # gate-lint:detail
-        if not passed:
-            failed.append(name)
+    started = time.monotonic()
+    with fake_cargo_first_on_the_path():
+        for done, (name, cell) in enumerate(SELFTEST_CELLS, start=1):
+            cell_started = time.monotonic()
+            try:
+                passed = cell(print_at_once)
+            except Exception as error:  # 一格自己抛出来（弄坏开关下按需领卡那几格会）算这一格红，别的格照跑
+                print_at_once(f"    {name}：抛了 {type(error).__name__}:{error}")
+                passed = False
+            print(f"  {'✓' if passed else '✗'} {name}", flush=True)  # gate-lint:detail
+            print_at_once(f"FULL_TABLE_SELFTEST_PROGRESS cell={name} done={done}/{len(SELFTEST_CELLS)} "
+                          f"cell_seconds={time.monotonic() - cell_started:.0f} total_seconds={time.monotonic() - started:.0f}")
+            if not passed:
+                failed.append(name)
     print(f"FULL_TABLE_SELFTEST cells={len(SELFTEST_CELLS)} passed={len(SELFTEST_CELLS) - len(failed)} failed={len(failed)} "
           f"failed_cells={','.join(failed) or '-'}")
     if failed:
@@ -1449,10 +1873,12 @@ def selftest() -> int:
 def main(argument_list: list[str]) -> int:
     if argument_list == ["--selftest"]:
         return selftest()
+    if len(argument_list) == 2 and argument_list[0] == SELFTEST_ROUND_MODE:
+        return run_selftest_round(argument_list[1])
     if os.environ.get(BREAK_VARIABLE):
         print(f"  ✗ {BREAK_VARIABLE} 只在自证里认，这一趟不是自证", file=sys.stderr)
-        print(f"     → 怎么办：去掉 {BREAK_VARIABLE} 再交；要证红就跑 {BREAK_VARIABLE}=<项> python3 {os.path.relpath(__file__, REPOSITORY_ROOT)} --selftest",
-              file=sys.stderr)
+        print(f"     → 怎么办：去掉 {BREAK_VARIABLE} 再交；要证红就在临时 prune-server 底下跑 {BREAK_VARIABLE}=<项> python3 "
+              f"{os.path.relpath(__file__, REPOSITORY_ROOT)} --selftest（整条写法见文件头第一段）", file=sys.stderr)
         return EXIT_USAGE
     # 线道树与计划树都不是 git 工作树：装置、多机配置判法与 prune-server 客户端要的多机配置显式交过去，之后起的子进程都继承
     os.environ.update(lib_repository_copy.environment_for_commands_in_the_copy(REPOSITORY_ROOT, os.environ))
@@ -1465,16 +1891,21 @@ def main(argument_list: list[str]) -> int:
         print("  ✗ 只经统一任务服务的分片三步起（环境里没有 TASK_SERVER_SHARD_PHASE）", file=sys.stderr)
         print("     → 怎么办：task-server/task submit -- python3 " + os.path.relpath(__file__, REPOSITORY_ROOT) + " run", file=sys.stderr)
         return EXIT_USAGE
-    store = open_library()
     plan_directory = os.environ["TASK_SERVER_SHARD_PLAN_DIRECTORY"]
     if phase == "plan":
-        return plan_step(arguments, plan_directory, store)
+        return plan_step(arguments, plan_directory)
     if phase == "shard":
+        refusal = card_steps.refuse_without_a_channel(f"python3 {os.path.relpath(__file__, REPOSITORY_ROOT)} run")
+        if refusal is not None:
+            return refusal
         output_directory = os.environ["TASK_SERVER_SHARD_OUTPUT_DIRECTORY"]
         os.makedirs(output_directory, exist_ok=True)
         index, _, _count = os.environ["TASK_SERVER_SHARD"].partition("/")
-        return shard_step(plan_directory, output_directory, int(index), store)
-    return merge_step(plan_directory, store)
+        try:
+            return shard_step(plan_directory, output_directory, int(index))
+        except card_steps.device_card_lease.CardLeaseRefused:
+            return EXIT_MEASUREMENT_PIPE_DEFECT   # 领卡没成的那一句与出路 take_card 已经打了
+    return merge_step(plan_directory)
 
 
 if __name__ == "__main__":

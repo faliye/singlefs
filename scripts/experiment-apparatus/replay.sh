@@ -1,17 +1,24 @@
 #!/usr/bin/env bash
 # admission: always 每一次调都判此刻的仓与这一次的参数，上一次的结论不替这一次作保
 # run-condition: command cargo git
-# task-server-gpu-arguments: *   不给实验号就全跑、含点到 CHECKER_TIER_FEATURES 的行，哪几行要卡开跑前才算得出，所以一律由服务在最外层清场、分卡（task-server/task_server_lib.py 文件头「GPU」）
+# task-server-compiles: yes
 # 复跑已入库的实验，把今天的输出和 research/results/ 里那份逐字节比对。
 #
 #   bash scripts/experiment-apparatus/replay.sh [实验号...]      # 不给参数就全跑
-#   bash scripts/experiment-apparatus/replay.sh --list-items     # 逐行打可点名的实验号（几行、二进制或驱动），不编、不跑
+#   bash scripts/experiment-apparatus/replay.sh --list-items     # 逐行打可点名的项：先是实验号（几行、二进制或驱动），再是每一行（<实验号>.<行序号>、1、二进制或驱动），不编、不跑
+#   bash scripts/experiment-apparatus/replay.sh --item E171.5    # 只跑复跑表里 E171 的第 5 行（行序号是这个实验号的行在表里从 1 数的次序），给几次取并集
 #
-# 入口脚本（.claude/rules/test-script-discipline.md「入口脚本：不带参数就是剪枝跑全部项」，C641）：可点名的项是复跑表的实验号。
-#   --list-items 与「实验号写错」都在建本轮输出目录、truncate 镜像之前判（replay_table_experiments 从本文件原文读复跑表）：
-#   表里没有的实验号（选项只认 --admission-only、--selftest、--list-items）一行都不跑、退 2；裸数字照旧由「没带 E」那一判点名。
+# 入口脚本（.claude/rules/test-script-discipline.md「入口脚本：不带参数就是剪枝跑全部项」，C641）：可点名的项是复跑表的实验号与表里的每一行（<实验号>.<行序号>）。
+#   --list-items 与「实验号写错」「行项写错」都在建本轮输出目录、truncate 镜像之前判（replay_table_experiments、replay_table_row_items 从本文件原文读复跑表）：
+#   表里没有的实验号（选项只认 --admission-only、--selftest、--list-items、--item）一行都不跑、退 2；裸数字照旧由「没带 E」那一判点名。
+#   --item 后面缺项名、项名不是表里的行项：列出那个实验号的行项（实验号也认不出就列实验号），退 2。
+#   点到一行的行键、判法、判定库记录都与整表跑同一份：只是复跑表里那个实验号的其余行不进这一趟（--item 点到的实验号只留点名的行，没被 --item 点到的实验号照旧整个跑）。
+#   本趟进度行里的记号（<实验号>.<数>）是这一趟里的先后，不是行序号；--item 点到的行开跑前在标准错误打一行对应。
+#   --item 点到的实验号红了加进「上次红的清单」，绿了不从清单里划掉（只判了其中几行）。
+#   卡不看参数：本脚本不领卡（文件头「GPU」），要卡的行在派行的最后一段一行一行跑，环境里有 GPU_CARDS_BY_PRIORITY 就原样交给它们。
 #   每一行一条结果行（实验号、二进制、判定、说明），末尾 REPLAY_TOTAL 一行报派出、收回、现判、复用、拒算与各判定的条数。
 #   弄坏开关 REPLAY_BREAK=unknown-experiment-accepted：表里没有的实验号照收（匹配 0 行、一行都不跑也退 0）。
+#   弄坏开关 REPLAY_BREAK=item-unknown-accepted：表里没有的行项照收（点不到任何一行）；REPLAY_BREAK=item-row-ignored：--item 不剪行，点到的实验号整个跑。
 #
 # 为什么要有它：kb-discipline.md「所有历史数据都只是参考」——每条实测都绑在当时那个
 # 构建上，要拿它支撑新结论，先复跑一遍确认它今天还成立。手工比对会被抄第二遍，所以做成脚本。
@@ -26,13 +33,15 @@
 # 编译目录（自己用完自己删，不预留生成物）：调用方没设 CARGO_TARGET_DIR 时，这一趟在
 #   ${TMPDIR:-/tmp} 下建自己的运行目录 singlefs-replay-build-<进程号>-XXXXXX（scripts/hosts/run-build-directory.sh 的 run_build_directory_begin），
 #   研究工作区（scripts/experiment-apparatus/）与仓根工作区的 cargo 都编进它的 target/（两个工作区的二进制不重名），研究二进制一律从 $REPLAY_RELEASE_DIRECTORY 起；
-#   不再往固定的 scripts/experiment-apparatus/target/、<仓根>/target 编。调用方设了的照它编、不删（相对路径按仓根算）。
-#   驱动在本轮输出目录（$OUT_DIR）里拷 crates/ 去编的副本（E168 补过的那一份、E175 的仓副本）各编进副本自己的 target/，E171 逐行驱动的线道、E165 变异杀伤界的变体
+#   不往固定的 scripts/experiment-apparatus/target/、<仓根>/target 编。调用方设了 CARGO_TARGET_DIR 的照它编、不删（相对路径按仓根算）：
+#   文件头的会编声明「# task-server-compiles: yes」让统一任务服务给这一次尝试一份，撞内存上限由服务放大重排时给的还是同一份，下一次尝试接着增量编；
+#   它归服务删（任务有了结局之后）。弄坏开关 REPLAY_BREAK=service-build-directory-ignored：不看环境里给的 CARGO_TARGET_DIR，照没给时自己建、跑完删。
+#   驱动在本轮输出目录（$OUT_DIR）里拷 crates/ 去编的副本（E168 补过的那一份）编进副本自己的 target/，E171 逐行驱动的线道、E165 变异杀伤界的变体
 #   也各在本轮输出目录里编；收尾时这些编译目录逐个删（replay_remove_copy_build_directories：认带签名的 CACHEDIR.TAG，不跟符号链接），产物、本轮输出目录与副本的源码照留。
 #   正常结束、出错、被 TERM / INT 停都在 EXIT 钩子 replay_finish 上删：被停时先给在跑的每一行转 TERM（replay_stop → replay_one 再转给手里那一步）、等它们退；
 #   删之前核本机没有进程开着里面的文件（scripts/hosts/run_build_directory.py），有就不删、报出进程、整趟退非 0。判定库、留存产物与本轮输出照留。
 #   驱动里在前台一步一步起的命令（cargo run 这一类）转不到 TERM：被停时那一步还开着编译目录的，照上面不删、报出进程。
-#   弄坏开关 REPLAY_BREAK=build-directory-kept、term-not-forwarded、copy-build-directories-kept（自证 replay_build_directory_selftest 那五格）。
+#   弄坏开关 REPLAY_BREAK=build-directory-kept、term-not-forwarded、copy-build-directories-kept、service-build-directory-ignored（自证 replay_build_directory_selftest 那六格）。
 #
 # 计时行的负载关（C350，.claude/kb/checks-owed.md）：判据写 timing 的行，开比之前先读这一趟新产物每一条 `name=done` 收尾行的负载字段。
 #   约定的收尾行形态：`E7RESULT name=done emitted=N loadavg1=<1 分钟负载> cpus=<在线 CPU 数>`（装置从 /proc/loadavg 与 available_parallelism 取）。
@@ -71,7 +80,7 @@
 #   （开跑前同样写「要现跑：上次判红」；只在复用哨兵强制现判时碰得到：库里有绿的行别的时候不现跑）。本次不判（负载高）不是判定，不记，也不撤绿
 #   （弄坏开关 red-not-recorded 下对不上的不记、broken-not-recorded 下跑不了的不记）。
 #   每一趟末尾打一行 REPLAY_TOTAL dispatched=<派出> collected=<收回> judged=<现判> reused=<复用> refused=<行键拒算> pass= timing_only=
-#     drift= broken= claims_bad= unchanged= load_skipped=（门禁 research-build-and-replay 的 experiment-replay 格读它）。
+#     drift= broken= claims_bad= unchanged= load_skipped= not_run=（门禁 research-build-and-replay 的 experiment-replay 格读它）。
 #   留存产物不在树里（按「每次提交删上一次的实验记录」归档进了版本库）的行：从 git 历史取回再逐字节比（replay_judge_fresh_product：git log --all --diff-filter=D 找最近一次删它的提交，
 #   git show <提交>^:research/results/<名> 读回，放本轮输出目录；结果行写出处）；取回的照字节一致、仅计时不同、对不上判，取不回判「取不回」（跑不了，红）；留存产物不在就不比的一档不存在。
 # E182 的片结果库（E182（被抛弃根读不出的三条岔路）两个段，driver_e182 与 driver_e182_units_kept）：装置读写的是目录、没有缺省的本地库（不设 E182_VERDICT_LIBRARY 退 2），
@@ -81,6 +90,9 @@
 #   各行收齐之后经 library-files store 并回（replay_store_e182_shards），收尾随 replay_finish 删。fetch 或 store 退 75 整趟退 75，别的非 0 整趟退 1。
 #   拉与并回都在驱动外面做：驱动进行键，驱动里起 admission.py 会连上它的程序入口、这两行的键拒算。
 #   弄坏开关 e182-transit-unset 下两个驱动不设 E182_VERDICT_LIBRARY。
+# 输入缺时本次未跑（REPLAY_DEFERRED_ROW_ROOT）：登记了「要读 replay-frozen-roots 下哪个导出根」的行（复跑表前三列「实验号|二进制|参数」为键），导出根不在时不起驱动，
+#   结果行写「本次未跑」，既不红也不绿，往 $GATE_NOT_RUN_FILE 报一行，REPLAY_TOTAL 的 not_run= 计数；导出根在了照常现跑。整趟判的全是本次未跑或本次不判（没有一行比过）退 77。
+#   弄坏开关 REPLAY_BREAK=deferred-rows-ignored：不看这张表，登记的行照旧起驱动。
 # 驱动要读的输入（别的实验的产物、拿来当期望值的留存产物、冻结根、导出根；research/ 可以整个删掉，所以产物缺了是常事）：驱动经 replay_inputs_present 开跑前核。
 #   research/results/ 底下的缺了先从 git 历史取回、放回原处（本趟收尾删掉自己放回去的，replay_finish）；取不回，或冻结根、导出根不在，这一行记「跑不了」（红）：
 #   stderr 里每缺一样一行「✗ 输入不在 test=<这一行> …」，出路在那一行里。冻结根与导出根在固定的位置：工作根下的 replay-frozen-roots/<名>（replay_frozen_root），不经环境变量指。
@@ -94,13 +106,34 @@
 #   试编一次，输出出两份日志落进 $OUT_DIR/gpu-build.log 与旁边的 gpu-build.problems.log。没开（文件不在、没写这个键、写 0）一个字都不变，不起这一次试编。
 #   配置读不出（SINGLEFS_MULTI_HOST_CONFIG 点名的文件不在、文件不可读、读的时候出错、ENABLE_GPU 写了 0、1 之外的值），或开了 GPU 而 gpu 特性编不过：退 78，一条实验都没跑，
 #   stderr 写原因与出路；不悄悄退回不带特性去跑（那样装置把判段当没编进 gpu 特性，报本次未跑或 panic）。
-#   清场与分卡（.claude/rules/verification.md「凡用 GPU 先清场，跑完不复原」）归统一任务服务：服务在最外层给整条复跑套一次清场，清场之后的卡经环境变量
-#   GPU_CARDS_BY_PRIORITY 交下来，装置照它取卡；本脚本不另套清场包装（service_gpu_cards_present）。开了 GPU 而环境里没有 GPU_CARDS_BY_PRIORITY：退 78，
-#   一条实验都没跑，stderr 写原因与出路。没开 GPU 一个字都不变。
+#   卡只归 GPU 批处理验证服务（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：本脚本不领卡、不挑卡、不清场，不另套清场包装。
+#   环境里原有的 GPU_CARDS_BY_PRIORITY 开跑前先收起（不要卡的行看不到卡），派行的最后一段（要卡的行，文件头「派行」）原样交给这一段起的每一行，装置照它取卡；
+#   环境里没有的不设，要卡的行照起：装置自己开不了卡时照它自己的判法报（本次未跑或跑不了），本脚本不另拦。没开 GPU 一个字都不变。
+#   本脚本不交卡的行（登记在 REPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS：E171 第 7、9、10、11 行整表那几趟）：照样算要卡的行（行键要带 GPU 开关：
+#   它们核账时取的项与行在判定库里按开关分键，驱动闭包点到 CHECKER_TIER_FEATURES），派在要卡那一段的末尾，本脚本不交卡（不设 GPU_CARDS_BY_PRIORITY）；
+#   这四行只核账（e171_take_shared_steps、e171_take_rows），不起装置。
 #   GPU 开关与特性集进点到 CHECKER_TIER_FEATURES 的那几行的行键（文件头「复用」）：开关一换，只那几行现跑。开关先读（read_gpu_switch，不编），
-#   试编与核卡（prepare_checker_tier_features）只在要现跑的行里有要卡的行时做：哪一行要卡照 admission.py replay-row-inputs 的第 4 列
-#   （驱动闭包里点到 CHECKER_TIER_FEATURES 的行是 1，与行键里加 line:gpu 的同一判，本脚本不另判）。要现跑的行一行要卡的都没有：开了 GPU 也不试编、
-#   不要 GPU_CARDS_BY_PRIORITY，CHECKER_TIER_FEATURES 是空的，stderr 写一句「都不点 CHECKER_TIER_FEATURES」。
+#   试编（prepare_checker_tier_features）只在要现跑的行里有要卡的行时做：哪一行要卡照 admission.py replay-row-inputs 的第 4 列
+#   （驱动闭包里点到 CHECKER_TIER_FEATURES 的行是 1，与行键里加 line:gpu 的同一判，本脚本不另判）。要现跑的行一行要卡的都没有：开了 GPU 也不试编，
+#   CHECKER_TIER_FEATURES 是空的，stderr 写一句「都不点 CHECKER_TIER_FEATURES」。
+# 派行（replay_row_memory_bound_fits、replay_row_is_exclusive）：同时开几行照内存上限定，线程不累计；只定哪几行一起起、谁先起，行键、判定与标准输出的结果行都不变（结果行照旧按表序回读）。
+#   读数（scripts/experiment-apparatus/replay_row_costs.py read，开跑前判完、编译之前读一次）：上限是统一任务服务交的 TASK_SERVER_MEMORY_CAP_BYTES、多机配置与 memory.max 取小（取法在 scripts/mutation/crates-mutation-rows.py 的 task_memory_cap_bytes）；
+#     每一行量过的峰值与线程数在共享根下的运行记录里（它文件头「峰值记录」），只有装置退 0 的那一次才记。
+#   独占（等别的行都收完才起，起了别的不进）：判据写 timing 的行、E181（长跑脚本自己按内存开并发，F11 带挂钟）。
+#   别的行按表序并行，放得下才起：已起的每行留的内存之和（一行留 峰值 × 1.25 + 64 MiB，推的：比采样间隔还短的尖峰采不到）加底座 REPLAY_ROW_BASE_BYTES（256 MiB，推的：本脚本与监看进程）不超过上限；
+#     没量过的行照峰值 0 留（留 64 MiB），放得下就起，撞了内存上限由统一任务服务放大重排；每行的线程不累计，每行都用满登记的每台默认重活线程数；
+#     同时至多 REPLAY_JOBS 行（没设取登记的每台默认重活线程数，REPLAY_JOBS=1 就是一行一行跑）。取不到上限的不比内存。一行都没在跑时，放不放得下都起。
+#   要卡的行（admission.py replay-row-inputs 第 4 列为 1）不进上面两批，挪到最后一段：环境里有卡串就交给这一段（文件头「GPU」），按表序一行一行跑（每行独占），跑完再收起；
+#     判据写 timing 的要卡的行、E181 要卡的话同样在这一段。弄坏开关 cards-shown-to-every-row（派行之前就交出卡串：不要卡的行也看得到卡）、
+#     gpu-rows-not-serial（这一段几行一起起）。
+#     要卡的行里本脚本不交卡的（文件头「GPU」，REPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS）不进交卡的那一批：那一批跑完、卡串收起之后，按表序一行一行跑，看不到卡串。
+#     弄坏开关 driver-leased-rows-held-by-replay（不看那张登记，这几行进交卡的那一批、看得到卡串）。
+#   次序：可并行的先跑完，再按表序一行一行跑独占的，最后是要卡的那一段；可并行的跑完、独占的起之前等 1 分钟负载落到 REPLAY_TIMING_LOAD_RATIO 以下（计时行的负载关读它），至多等 REPLAY_TIMING_SETTLE_SECONDS 秒（默认 90）。
+#   一行量过的留量比上限还大（留量 + 底座 > 上限）：开跑前判完就退 250（统一任务服务错误类型表的 memory-cap-hit，服务放大上限重排，task-server/task_server_lib.py 文件头「错误类型」），不编、不白跑前面的行。
+#   读数脚本不在或退非 0 时，各行照没量过办、不比内存。
+# 进度（标准错误；标准输出不动）：现跑的每一行起止各一行，「REPLAY_ROW <tag> 开跑」与「REPLAY_ROW <tag> 判 <结局> 用时 <秒> 秒 峰值 <字节或 没量到> 线程 <个数>｜<结果行原样>」；
+#   在跑的每过 REPLAY_PROGRESS_SECONDS 秒（默认 300，.claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」的进度间隔）一行「REPLAY_ROW <tag> 在跑 …」，带这一行错误输出的末行。
+#   被 TERM / INT 停时，已判完的行的结果行照表序打到标准输出，末行 REPLAY_STOPPED finished=<判完几行> dispatched=<这一趟几行>；判定是一行一行进判定库的，不受影响。
 set -uo pipefail
 # 内存额度、线程与挑机器不在本脚本里定：整条命令交 task-server（task-server/task submit -- bash scripts/experiment-apparatus/replay.sh <实验号…>），
 # 内存额度按记录由服务给、撞上限由服务放大重排；驱动里起 cargo run 与二进制都直接起，不套内存包装，不写死上限。
@@ -139,7 +172,7 @@ copy_thread_registry_into() { # <副本目录>
   mkdir -p "$1/.claude" && cp -- .claude/heavy-thread-default "$1/.claude/heavy-thread-default"
 }
 
-# 拷今天这棵树去编译的副本（e168_patched_tree 的副本、driver_e171_s4_comparator 的冻结树、driver_e175 的仓副本）：范围取 scripts/hosts/lib_repository_copy.py 的共用清单与闭包
+# 拷今天这棵树去编译的副本（e168_patched_tree 的副本、driver_e171_s4_comparator 的冻结树）：范围取 scripts/hosts/lib_repository_copy.py 的共用清单与闭包
 # （path 依赖的 prune-server/、编译期读的 .claude/heavy-thread-default、运行期起的脚本都在里面），经 scripts/hosts/minimal-copy.py 拷，这里不写清单；
 # 它打的两行进 stderr（驱动的 stdout 是产物）。在仓根调。副本里起命令的，多机配置照 replay_configuration_for_the_copy 交。
 # 弄坏开关 REPLAY_BREAK=copy-list-fixed：照写死的那几样拷（共用清单里的四样加登记文件，没有 prune-server/）。
@@ -152,7 +185,7 @@ replay_copy_closure_into() { # <副本目录>
 }
 
 # 副本里起命令用的多机配置（scripts/hosts/lib_repository_copy.py configuration-path：调用方设了 SINGLEFS_MULTI_HOST_CONFIG 照它，没设取主工作区那一份）：
-# 副本不在 git 里，判法照副本的位置找不到配置。打一行绝对路径。在仓根调。弄坏开关 REPLAY_BREAK=copy-configuration-unset：什么都不打（副本里不交）。
+# 副本是新 init 的仓、不带 multi-host.env，判法照副本的位置找不到配置。打一行绝对路径。在仓根调。弄坏开关 REPLAY_BREAK=copy-configuration-unset：什么都不打（副本里不交）。
 replay_configuration_for_the_copy() {
   [[ "$REPLAY_BROKEN" == copy-configuration-unset ]] && return 0
   python3 scripts/hosts/lib_repository_copy.py configuration-path .
@@ -255,17 +288,12 @@ build_research_driver_binary() { # <特性> <bin 名>
   return 1
 }
 
-# 开了 GPU 时的卡（文件头「GPU」）：清场与分卡归统一任务服务，服务在最外层给整条复跑套一次清场、把清场之后的卡经环境 GPU_CARDS_BY_PRIORITY 交下来；
-# 这里不另套清场，装置照环境里的 GPU_CARDS_BY_PRIORITY 取卡。环境里没有它（不是经服务起的，或服务没交卡）返回 1（打 ✗ 与 → 出路）：
-# 装置没有它就拒，那样每一行都红在装置里，不如这里一次说清。弄坏开关 REPLAY_BREAK=service-cards-unchecked：不核（改错的样子：每一行到装置里才红）。
-service_gpu_cards_present() {
-  [[ "$REPLAY_BROKEN" == service-cards-unchecked ]] && return 0
-  if [[ -z "${GPU_CARDS_BY_PRIORITY:-}" || -z "${GPU_CARDS_BY_PRIORITY//[[:space:]]/}" ]]; then
-    echo "  ✗ replay: 多机配置开了 GPU（ENABLE_GPU=1），环境里却没有 GPU_CARDS_BY_PRIORITY（统一任务服务清场之后交的卡），一条实验都没跑" >&2
-    echo "  → 怎么办：整条经 task-server/task submit -- bash scripts/experiment-apparatus/replay.sh … 交，清场与分卡由服务在最外层办，本脚本与命令里都不另套清场包装；确实不用 GPU 就把多机配置的 ENABLE_GPU 改成 0" >&2
-    return 1
-  fi
-  return 0
+# 本脚本不交卡的行（文件头「GPU」「派行」）：复跑表第 2 列是 @<驱动名>、驱动名在这张登记里的行。开了 GPU 照样算要卡的行，派在要卡那一段的末尾，
+# 本脚本不交卡；登记的 E171 那四行只核账、不起装置。
+REPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS=(driver_e171_s2_comparator driver_e171_s4_comparator driver_e171_s4_f4_comparator driver_e171_s4_f4_substitutes_comparator)
+# replay_row_driver_leases_its_own_card <复跑表第 2 列>：这一行的驱动在上面那张登记里返回 0。弄坏开关 REPLAY_BREAK=driver-leased-rows-held-by-replay 下一律返回 1。
+replay_row_driver_leases_its_own_card() {
+  [[ "$REPLAY_BROKEN" != driver-leased-rows-held-by-replay && "$1" == @* && " ${REPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS[*]} " == *" ${1#@} "* ]]
 }
 
 # 配置开了 GPU 时，起 验证包装置（cargo run … -p singlefs-verification --bin <装置>）带 --features gpu 编（文件头「GPU」）：
@@ -275,8 +303,7 @@ service_gpu_cards_present() {
 # 返回 78（打 ✗ 与 → 出路）：配置读不出（SINGLEFS_MULTI_HOST_CONFIG 点名的文件不在、文件不可读、读的时候出错、ENABLE_GPU 写了 0、1 之外的值），
 # 或开了 GPU 而 gpu 特性编不过。不悄悄退回不带特性：那样装置会把判段当没编进 gpu 特性、报本次未跑或 panic，复跑结论不是配置要的那一份。
 # 弄坏开关 REPLAY_BREAK=gpu-features-dropped：读配置、编也编，但开了 GPU 也不带特性。
-# 开了 GPU、试编也过了之后接着核服务交的卡（service_gpu_cards_present）。
-resolve_checker_tier_features() { # <gpu 编译日志>：先读开关、开着再试编与核卡（两步分开的写法见 read_gpu_switch、prepare_checker_tier_features）
+resolve_checker_tier_features() { # <gpu 编译日志>：先读开关、开着再试编（两步分开的写法见 read_gpu_switch、prepare_checker_tier_features）
   read_gpu_switch "$1" || return $?
   prepare_checker_tier_features "$1"
 }
@@ -327,7 +354,7 @@ read_gpu_switch() { # <gpu 编译日志>（读配置出错时把那几行落在 
   esac
 }
 
-# 开了 GPU（read_gpu_switch 读出 1）时试编 gpu 特性、核服务交的卡，设 CHECKER_TIER_FEATURES；没开一个字都不变。编不过、环境里没有卡返回 78。
+# 开了 GPU（read_gpu_switch 读出 1）时试编 gpu 特性，设 CHECKER_TIER_FEATURES；没开一个字都不变。编不过返回 78。
 prepare_checker_tier_features() { # <gpu 编译日志>
   local log="$1" configuration_file="${REPLAY_GPU_CONFIGURATION_FILE:-}" build_exit
   CHECKER_TIER_FEATURES=()
@@ -340,7 +367,6 @@ prepare_checker_tier_features() { # <gpu 编译日志>
     build_exit=$?
   fi
   if (( build_exit == 0 )); then
-    service_gpu_cards_present || return 78
     [[ "$REPLAY_BROKEN" == gpu-features-dropped ]] || CHECKER_TIER_FEATURES=(--features gpu)
     return 0
   fi
@@ -456,6 +482,27 @@ default_replay_jobs() {
   fi
 }
 
+# 派行的判法（文件头「派行」）。下面两个函数读这几个全局量：在跑几行 running、留的内存之和 running_bytes，
+#   同时至多几行 REPLAY_JOBS，内存上限 REPLAY_MEMORY_CAP（字节，取不到是空串）。要卡的行不经它们，在最后一段（文件头「GPU」）。
+REPLAY_ROW_BASE_BYTES=$((256 << 20))
+replay_row_reservation() { # <量到的峰值字节>：这一行留多少内存
+  echo $(( $1 + $1 / 4 + (64 << 20) ))
+}
+# 这一行独占吗：<实验号> <判据> <量到的峰值，没量过是空串> <量到的线程数，没量过是空串，只给弄坏开关 threads-bound-kept>。弄坏开关 unmeasured-row-exclusive、threads-bound-kept、exclusive-row-shared
+replay_row_is_exclusive() {
+  [[ -n "$3" || "$REPLAY_BROKEN" != unmeasured-row-exclusive ]] || return 0
+  if [[ "$REPLAY_BROKEN" == threads-bound-kept ]] && (( ${4:-1} > REPLAY_JOBS )); then return 0; fi
+  [[ "$REPLAY_BROKEN" != exclusive-row-shared ]] || return 1
+  [[ "$2" == timing || "$1" == E181 ]]
+}
+# 这一行现在起放得下吗：<留的内存字节>。弄坏开关 row-count-unbound、memory-bound-ignored
+replay_row_memory_bound_fits() {
+  (( running == 0 )) && return 0
+  if (( running >= REPLAY_JOBS )) && [[ "$REPLAY_BROKEN" != row-count-unbound ]]; then return 1; fi
+  if [[ -n "$REPLAY_MEMORY_CAP" ]] && (( running_bytes + $1 + REPLAY_ROW_BASE_BYTES > REPLAY_MEMORY_CAP )) && [[ "$REPLAY_BROKEN" != memory-bound-ignored ]]; then return 1; fi
+  return 0
+}
+
 # 复跑表里的实验号（文件头「入口脚本」）：从本文件原文读 TABLE 那一段（在仓根调，脚本开头已 cd 到仓根），每个实验号一行
 # 「<实验号><TAB><几行><TAB><二进制或驱动，逗号连>」，按表里头一次出现的次序。--list-items 打它，「实验号写错退 2」拿实验号那一列比。
 replay_table_experiments() {
@@ -466,6 +513,15 @@ replay_table_experiments() {
     scripts/experiment-apparatus/replay.sh
 }
 
+# 复跑表里的每一行（文件头「入口脚本」）：「<实验号>.<行序号><TAB>1<TAB>二进制或驱动」，行序号是这个实验号的行在表里从 1 数的次序，按表里的次序。
+# --list-items 接在实验号后面打它，--item 后面的项名拿第一列比。
+replay_table_row_items() {
+  awk -F'|' '/^TABLE=\$\(cat <<.TSV.$/ { inside = 1; next }
+             inside && /^TSV$/ { exit }
+             inside && /^E[0-9A-Za-z]*\|/ { ordinal[$1]++; printf "%s.%d\t1\t%s\n", $1, ordinal[$1], $2 }' \
+    scripts/experiment-apparatus/replay.sh
+}
+
 # 自证（bash scripts/experiment-apparatus/replay.sh --selftest）：PATH 最前面放一个假 cargo，只演 build_research_binaries 的两种结局，不编、不跑任何实验。
 #   build-red    假 cargo 打一行 error[E0425] 退 101：要返回 2，stderr 有第一处错、日志末尾、日志路径与重现命令，日志落了盘
 #   build-green  假 cargo 退 0：要返回 0，stderr 一个字都没有
@@ -473,9 +529,8 @@ replay_table_experiments() {
 #     写 ENABLE_GPU=1 → 试编一次、CHECKER_TIER_FEATURES 是 --features gpu；写 0 或没写 → 不带、不起 cargo；写 yes、点名的文件不在、文件不可读 → 78 点名原因；
 #     开了而试编红 → 78、第一处错、日志路径、「不退回不带 gpu 特性去跑」
 #   run-lines-with-features  起 验证包装置的 cargo run 行（本文件里 grep 出来）每一行都带数组
-#   gpu-cards-from-service / gpu-service-cards-missing  开了 GPU 的卡由统一任务服务交（service_gpu_cards_present；多机配置里的清场命令是假的、只往临时目录的日志记一笔）：
-#     gpu-cards-from-service  环境里有 GPU_CARDS_BY_PRIORITY → 返回 0，照装置那样直接起的命令看到的就是那一份，假清场命令一笔都没记（不另套清场）
-#     gpu-service-cards-missing  环境里没有 GPU_CARDS_BY_PRIORITY → 78、点名这个变量，假清场命令一笔都没记
+#   gpu-probe-takes-no-cards  开了 GPU、环境里没有 GPU_CARDS_BY_PRIORITY（多机配置里的清场命令是假的、只往临时目录的日志记一笔）：resolve_checker_tier_features 返回 0，
+#     照装置那样直接起的命令看不到卡（不领卡、不设卡串），假清场命令一笔都没记（不另套清场）
 #   run-lines-without-quiesce-wrapper  起 验证包装置的 cargo run 行没有一行另套清场，本文件不是注释的行里也不起清场包装
 #   row-key      一张两行的假键表（E1 第二行指明 E1/second）：admission_key_of_row 给第二行的键要是 E1/second，不是实验号
 #   jobs-default 没设 SINGLEFS_THREAD_CAP 时 default_replay_jobs 要等于登记文件第一条非注释行的数；设成 7 时要是 7
@@ -507,9 +562,13 @@ replay_table_experiments() {
 #                          ⇒ E1 跑不了、整趟退 1，库里这把行键记成 broken；下一趟：只起 e1、开跑前写「E1 要现跑：上次判红」、判回字节一致，E2 复用；再下一趟两行全复用
 #     reuse-outside-git-exits-2  另搭一棵样本仓、删掉它的 .git，跑一趟：整趟退 2、点名不是 git 工作树、一个装置都没起、不打 REPLAY_TOTAL
 #     reuse-unreachable-exits-75  服务连不上（socket 不在、TCP 端口刚放掉、重连总时长 2 秒）：整趟退 75、点名 prune-server 不可用、一个装置都没起、不打 REPLAY_TOTAL
-#     reuse-gpu-only-for-feature-rows  另搭一棵样本仓、复跑表加一行点到 CHECKER_TIER_FEATURES 的驱动 E3，多机配置 ENABLE_GPU=1、环境里没有 GPU_CARDS_BY_PRIORITY：
-#                          只跑 E1 E2 退 0、两行都起、不试编 gpu 特性、stderr 写「都不点 CHECKER_TIER_FEATURES」；只跑 E3 退 78、点名 GPU_CARDS_BY_PRIORITY、一个装置都没起
+#     reuse-gpu-only-for-feature-rows  另搭一棵样本仓、复跑表加一行点到 CHECKER_TIER_FEATURES 的驱动 E3，多机配置 ENABLE_GPU=1、环境里没有卡串：
+#                          只跑 E1 E2 退 0、两行都起、不试编 gpu 特性、stderr 写「都不点 CHECKER_TIER_FEATURES」；样本仓里放 E3 的留存产物 e3-sample.out（与驱动打的字节相同），
+#                          只跑 E3 退 0、试编了 gpu 特性、E3 的驱动带着 --features gpu 起了（驱动的 stderr 落在这一趟输出目录里这一行的 .err）
 #   这几趟的哨兵数设 1000（键相同的全当哨兵、不抽强制现判），reuse-sentinel 那两趟除外；上次红的清单写临时目录（SINGLEFS_LAST_RUNS_DIRECTORY）
+#   这份自证里起样本仓的副本，每一处都带字面实验号或行项（样本表只有 E1、E2 的趟写 E1 E2，派行各格写这一格表里的全部实验号）：不带实验号、只带选项或参数折不出的起法
+#   让 --selftest 的单元闭包连整张真复跑表与表里的驱动（scripts/gate/lib_function_units.py 文件头「shell 起法带字面参数」）。所以不给实验号那一趟才走的几支
+#   （want 在 ONLY 为空时放行每一行、上次红的清单整份换）与经入口起的 --list-items 不在自证里起
 #   留存产物取回与装置读不到输入（replay_archived_selftest：同一份临时仓，E2 的留存产物只在 git 历史里）三格：
 #     archived-retrieved-green    E2 字节一致、结果行写出处「取自 git show <提交>^:research/results/e2-sample.out」、整趟退 0
 #     archived-unrecoverable-red  E2 的留存产物名改成历史里也没有的：判「取不回」、结果行点名这个产物、整趟退 1
@@ -520,9 +579,32 @@ replay_table_experiments() {
 #   驱动开跑前核输入（replay_inputs_present）：driver_e142、E170 两行判镜像、E171 第一段读冻结参照的七行、E171 第 1 次重跑三个比对器、
 #     E174 三个 judge、E158 r3 / r4 比对、E165 七个变异杀伤界驱动，从本文件取出定义，在没有 research/、冻结根与导出根都没给的空目录里各起一次：
 #     都要退 1、stderr 里点名自己的「✗ 输入不在 test=<驱动名>」行数恰好是缺的样数（E158 r4 六十六份臂产物逐份报），stdout 不打
-#   编译目录（文件头「编译目录」；replay_build_directory_selftest：同一份临时仓，假 cargo 编的时候把假装置拷进 CARGO_TARGET_DIR 的 release/）五格：
+#   E171 整表那四行只核账（replay_e171_library_selftest，一格 e171-missing-row-refused）：样本仓里放假的取行程序（shared_steps.py 的 take、take-rows）与假比对器，
+#     库里缺一行时 driver_e171_s2_comparator、driver_e171_s4_comparator、driver_e171_s4_f4_comparator、driver_e171_s4_f4_substitutes_comparator 各起一次：
+#     都要退非 0、stderr 有分片入口的整条命令（带范围声明）、stdout 不打，取行程序之外一笔都没记（假 cargo 与比对器一次没起）
+#   编译目录（文件头「编译目录」；replay_build_directory_selftest：同一份临时仓，假 cargo 编的时候把假装置拷进 CARGO_TARGET_DIR 的 release/）六格：
 #     跑绿、编不过、装置开跑之后被 TERM 三种结局之后这一格的 TMPDIR 底下都不剩这一趟的编译目录，调用方给了 CARGO_TARGET_DIR 照它编且不删，
+#     服务给的 CARGO_TARGET_DIR 里有上一次尝试编出的产物：照它编、那份产物照留、不删（service-build-directory-kept），
 #     装置在本轮输出目录里造的带 CACHEDIR.TAG 的副本编译目录跑完不在、本轮输出照留
+#   派行与进度（文件头「派行」「进度」；replay_dispatch_selftest：每格一棵样本仓，复跑表换成这一格的几行，假装置记起止与看到的卡并在 REPLAY_SELFTEST_BARRIER 条起来之前等着，上限经 TASK_SERVER_MEMORY_CAP_BYTES 交，峰值记录放这一格的临时目录；
+#   要卡那几格在环境里给卡串 GPU_CARDS_BY_PRIORITY=selftest-card，没有卡串那一格不给）十九格：
+#     dispatch-memory-bound         三行量过、各 1 GiB，上限 3 GiB：同时至多两行，也真有两行一起跑
+#     dispatch-threads-unbounded    三行各量过 31 线程、REPLAY_JOBS=8：三行一起跑，线程不累计
+#     dispatch-row-count-bound      REPLAY_JOBS=2，三行单线程：同时恰好两行
+#     dispatch-exclusive-rows       timing 行单独跑、排在别的行之后，没量过的一行与量过的两行一起跑，结果行照旧按表序
+#     dispatch-gpu-rows-serial      要卡的两行（驱动，表里排在不要卡的那一行前面）挪到最后：不要卡的一行先跑完、看不到卡，两行要卡的不同时跑、都看到环境里给的那一串，整趟退 0
+#     dispatch-gpu-rows-without-cards  同形的三行，环境里没有卡串：照样不拦，要卡的两行一行一行跑、看不到卡，三行都判字节一致，整趟退 0
+#     dispatch-driver-leased-rows   要卡的两行（一行登记成本脚本不交卡、排在表里最前，一行照常交卡）加不要卡的一行：卡串只交给照常交卡的那一行，
+#                                   登记的那一行在那一段跑完之后跑、看不到卡，三行都字节一致，整趟退 0
+#     dispatch-oversized-row-refused  量过 40 GiB、上限 3 GiB：退 250、点名那一行、不编、一个装置都不起
+#     row-progress-lines            每一行现跑的起止各一行、峰值是正整数，在跑的报进度，标准输出里没有这几行
+#     row-peak-recorded-then-shared  跑一趟量到的峰值进记录，改一处装置源码（行键变、照现跑）再跑一趟：这两行一起跑
+#     row-failed-peak-not-recorded  装置退 3 的那一行不记峰值
+#     stopped-keeps-finished-rows   一行判完、下一行在跑时发 TERM：退 143，标准输出有判完那一行的结果行与 REPLAY_STOPPED，没有在跑那一行的
+#     dispatch-item-selects-one-row  一个实验号三行：--item E1.2 只起第 2 行、E1 --item E1.3 只起第 3 行，派出都是 1 行，退 0
+#     dispatch-item-unknown-refused  --item E1.9 与 E1 --item（缺项名）退 2、点名项名、列出 E1 的行项、不建本轮输出目录、一个装置都不起
+#     dispatch-deferred-row-not-run  登记成输入缺的行（REPLAY_DEFERRED_ROW_ROOT，导出根不在）记「本次未跑」、装置不起、整趟退 0，REPLAY_TOTAL 带 not_run=1；只剩这一行时整趟退 77
+#     e181-goes-through-long-run    E181 这一行不带参数起长跑脚本（这一格里是假的）、经 E181_PRODUCT_DIRECTORY 取它拼出的产物交给判法，不起 cargo run；驱动正文字面点名装置（行键收装置 main 靠它）
 # 弄坏开关：
 #   REPLAY_BREAK=build-output-dropped  构建输出丢进 /dev/null、红了只说「replay: 构建失败」
 #       build-red（「✗ 自检：构建失败时应当返回 2、打第一处错」）
@@ -543,8 +625,6 @@ replay_table_experiments() {
 #       gpu-features-on（「✗ 自检：配置写了 ENABLE_GPU=1，应当先试编 gpu 特性…」）
 #   REPLAY_BREAK=run-lines-without-features  自检里核「cargo run 行都带特性数组」时当没有数组（模拟新加的一行忘了带）
 #       run-lines-with-features（「✗ 自检：起 验证包装置的 cargo run 行…应当每一行都带…」）
-#   REPLAY_BREAK=service-cards-unchecked  开了 GPU 不核环境里有没有服务交的 GPU_CARDS_BY_PRIORITY（改错的样子）
-#       gpu-service-cards-missing（「✗ 自检：开了 GPU 而环境里没有服务交的 GPU_CARDS_BY_PRIORITY」）
 #   REPLAY_BREAK=run-line-quiesce-wrapped  自检里核「不另套清场」时多塞一行经清场包装起的 cargo run（模拟新加的一行又套了清场）
 #       run-lines-without-quiesce-wrapper（「✗ 自检：起 验证包装置不另套清场」）
 #   REPLAY_BREAK=reuse-ignored  按行复用的判定库只记不读（每一趟全跑）
@@ -563,8 +643,13 @@ replay_table_experiments() {
 #   REPLAY_BREAK=reuse-key-by-row-only  按行复用的键只按复跑表那一行算，不看装置源码与工具链
 #       reuse-first-run（「✗ 自检：按行复用 reuse-first-run：」：键不经准入模块算，判定库那两份不带组成清单）、
 #       reuse-device-source（「✗ 自检：按行复用 reuse-device-source：」）
-#       连带红的格：「✗ 自检：按行复用 reuse-three-questions：reuse-three-questions：③ 改闭包里一个函数单元：闭包含…」
-#   REPLAY_BREAK=gpu-for-every-run  开了 GPU 时要现跑的行一律当要卡（不看 admission.py replay-row-inputs 第 4 列，有行要现跑就试编 gpu 特性、要服务交的卡）
+#       连带红的格：「✗ 自检：按行复用 reuse-three-questions：reuse-three-questions：③ 改闭包里一个函数单元：闭包含…」；
+#       另外十格：键不看装置源码，同一份临时库里同名的行键相同，这几格本该真起装置的那一趟照复用、装置不跑：
+#       「✗ 自检：留存产物取回 device-not-run-red：」、「✗ 自检：留存产物取回 archived-unrecoverable-red：」、「✗ 自检：留存产物 .gz gz-stored-red：」、
+#       「✗ 自检：入口与完整性闸 integrity-previous-output：」、「✗ 自检：编译目录 build-directory-removed-when-build-fails：」、
+#       「✗ 自检：编译目录 build-directory-removed-when-stopped：」、「✗ 自检：编译目录 caller-target-directory-kept：」、
+#       「✗ 自检：编译目录 service-build-directory-kept：」、「✗ 自检：编译目录 copy-build-directories-removed：」、「✗ 自检：派行 row-peak-recorded-then-shared：」
+#   REPLAY_BREAK=gpu-for-every-run  开了 GPU 时要现跑的行一律当要卡（不看 admission.py replay-row-inputs 第 4 列，有行要现跑就试编 gpu 特性）
 #       reuse-gpu-only-for-feature-rows（「✗ 自检：按行复用 reuse-gpu-only-for-feature-rows：」）
 #   REPLAY_BREAK=build-everything  有行要现跑时一律整编（不按要现跑的行只编那几个 bin）
 #       reuse-device-source（「✗ 自检：按行复用 reuse-device-source：」）
@@ -582,9 +667,9 @@ replay_table_experiments() {
 #       thread-registry-copied（「✗ 自检：拷 crates/ 去编译的副本要带上每台默认重活线程数的登记文件…」）
 #   REPLAY_BREAK=copy-lines-without-registry  自检里核「拷 crates 的行都接着拷登记文件」时当没有那一句（模拟新加的一行忘了带）
 #       copy-lines-with-registry（「✗ 自检：拷 crates/ 去编译的行…应当每一行都接着 copy_thread_registry_into…」）
-#   REPLAY_BREAK=copy-list-fixed  拷今天这棵树去编译的副本（e168_patched_tree、driver_e171_s4_comparator、driver_e175）照写死的四样加登记文件拷，不取共用库的闭包（没有 prune-server/）
+#   REPLAY_BREAK=copy-list-fixed  拷今天这棵树去编译的副本（e168_patched_tree、driver_e171_s4_comparator）照写死的四样加登记文件拷，不取共用库的闭包（没有 prune-server/）
 #       copies-take-the-shared-closure（「✗ 自检：拷今天这棵树去编译的副本要照共用库的闭包拷全…」）
-#   REPLAY_BREAK=copy-configuration-unset  副本里起命令不交多机配置（副本不在 git 里，照副本的位置找不到配置）
+#   REPLAY_BREAK=copy-configuration-unset  副本里起命令不交多机配置（副本不带 multi-host.env，照副本的位置找不到配置）
 #       copy-configuration-from-the-main-tree（「✗ 自检：副本里起命令的多机配置要取主工作区那一份…」）
 #   REPLAY_BREAK=build-directory-kept  收尾不删这一趟自己建的编译目录与运行目录（编进固定的 scripts/experiment-apparatus/target/，跨趟留着）
 #       build-directory-removed-when-green、build-directory-removed-when-build-fails、build-directory-removed-when-stopped、
@@ -594,6 +679,42 @@ replay_table_experiments() {
 #       build-directory-removed-when-stopped（「✗ 自检：编译目录 build-directory-removed-when-stopped：」）
 #   REPLAY_BREAK=copy-build-directories-kept  收尾不删驱动在本轮输出目录里的副本编出来的编译目录
 #       copy-build-directories-removed（「✗ 自检：编译目录 copy-build-directories-removed：」）
+#   REPLAY_BREAK=service-build-directory-ignored  不看环境里给的 CARGO_TARGET_DIR（调用方或服务给的），照自己在 TMPDIR 底下建、跑完删
+#       caller-target-directory-kept、service-build-directory-kept（「✗ 自检：编译目录 caller-target-directory-kept：」、「✗ 自检：编译目录 service-build-directory-kept：」）
+#   REPLAY_BREAK=e181-whole-process  E181 这一行照旧起一个不带段名的整进程（cargo run 跑全部 11 段、默认每台重活线程数），不走长跑脚本
+#       e181-goes-through-long-run（「✗ 自检：派行 e181-goes-through-long-run：」）
+#   REPLAY_BREAK=memory-bound-ignored  派行不比内存上限
+#       dispatch-memory-bound（「✗ 自检：派行 dispatch-memory-bound：」）
+#   REPLAY_BREAK=threads-bound-kept  量过的线程数超过 REPLAY_JOBS 的行独占（线程还在限制同时开几行的样子）
+#       dispatch-threads-unbounded（「✗ 自检：派行 dispatch-threads-unbounded：」）
+#       dispatch-exclusive-rows（「✗ 自检：派行 dispatch-exclusive-rows：」）
+#   REPLAY_BREAK=row-count-unbound  派行不比 REPLAY_JOBS，放得下就起
+#       dispatch-row-count-bound（「✗ 自检：派行 dispatch-row-count-bound：」）
+#   REPLAY_BREAK=exclusive-row-shared  timing 行与 E181 不独占
+#       dispatch-exclusive-rows（「✗ 自检：派行 dispatch-exclusive-rows：」）
+#   REPLAY_BREAK=unmeasured-row-exclusive  没量过的行独占
+#       dispatch-exclusive-rows（「✗ 自检：派行 dispatch-exclusive-rows：」）
+#   REPLAY_BREAK=load-settle-builtin-name  自证读到的文本里等负载那一段的 awk 变量换成 gawk 的内建名字 load（gawk 起不来、照满上限等下去，mawk 不报）
+#       load-settle-awk-names（「✗ 自检：静态核 load-settle-awk-names：」）
+#   REPLAY_BREAK=mutation-driver-modules-unchecked  变异驱动的表与单测模块不核，一律当配得上
+#       mutation-driver-tables（「✗ 自检：静态核 mutation-driver-tables：」）
+#   REPLAY_BREAK=gpu-rows-not-serial  要卡的那一段几行一起起，不一行一行跑
+#       dispatch-gpu-rows-serial（「✗ 自检：派行 dispatch-gpu-rows-serial：」）、dispatch-gpu-rows-without-cards（「✗ 自检：派行 dispatch-gpu-rows-without-cards：」）
+#       （环境里没有卡串的那一格同样核要卡的两行一行一行跑）
+#   REPLAY_BREAK=cards-shown-to-every-row  派行之前就把环境里的卡串交出去：不要卡的行也看得到卡
+#       dispatch-gpu-rows-serial（「✗ 自检：派行 dispatch-gpu-rows-serial：」）、dispatch-driver-leased-rows（「✗ 自检：派行 dispatch-driver-leased-rows：」）
+#   REPLAY_BREAK=driver-leased-rows-held-by-replay  不看 REPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS：本脚本不交卡的行也进交卡的那一批、看得到卡串
+#       dispatch-driver-leased-rows（「✗ 自检：派行 dispatch-driver-leased-rows：」）
+#   REPLAY_BREAK=oversized-row-not-refused  一行比上限还大也不退 250，照起
+#       dispatch-oversized-row-refused（「✗ 自检：派行 dispatch-oversized-row-refused：」）
+#   REPLAY_BREAK=row-progress-silent  不报每一行的起止与在跑的进度
+#       row-progress-lines（「✗ 自检：派行 row-progress-lines：」）
+#   REPLAY_BREAK=row-peak-unrecorded  量到的峰值不进记录（下一趟这些行照没量过办）
+#       row-peak-recorded-then-shared（「✗ 自检：派行 row-peak-recorded-then-shared：」）
+#   REPLAY_BREAK=failed-row-peak-recorded  装置退非 0 的那一次也记峰值
+#       row-failed-peak-not-recorded（「✗ 自检：派行 row-failed-peak-not-recorded：」）
+#   REPLAY_BREAK=finished-rows-lost-when-stopped  被停时不打已判完的行的结果行
+#       stopped-keeps-finished-rows（「✗ 自检：派行 stopped-keeps-finished-rows：」）
 #   REPLAY_BREAK=guard-off  平常跑设了弄坏开关也不拒（认不得的选项先被「复跑表里没有」当用法错拒，不点名变量）
 #       break-switch-refused-outside-selftest（「✗ 自检：平常跑设了弄坏开关应当退 2 并点名」）
 # 弄坏开关 REPLAY_BREAK 只在 --selftest 起的那几趟里认（自证设 REPLAY_SELFTEST_MARK 指到它建的标记文件，子进程继承）：平常跑设了就在一切之前退 2、点名它只在自证里认。
@@ -619,8 +740,9 @@ replay_selftest_sample_repository() { # <目录>
   ln -s "$real_root/scripts/hosts/two_logs.py" "$root/scripts/hosts/two_logs.py"
   ln -s "$real_root/scripts/hosts/run-build-directory.sh" "$root/scripts/hosts/run-build-directory.sh"   # 这一趟的编译目录（文件头「编译目录」）
   ln -s "$real_root/scripts/hosts/run_build_directory.py" "$root/scripts/hosts/run_build_directory.py"
+  ln -s "$real_root/scripts/experiment-apparatus/replay_row_costs.py" "$root/scripts/experiment-apparatus/replay_row_costs.py"   # 派行的读数（文件头「派行」），它按自己的真实路径找上限的取法
   printf '%s\n' '.claude/scripts' '.claude/singlefs-ai-sop' 'scripts/gate' 'scripts/crash' 'scripts/hosts/two-logs.sh' 'scripts/hosts/two_logs.py' \
-    'scripts/hosts/run-build-directory.sh' 'scripts/hosts/run_build_directory.py' >"$root/.gitignore"
+    'scripts/hosts/run-build-directory.sh' 'scripts/hosts/run_build_directory.py' 'scripts/experiment-apparatus/replay_row_costs.py' >"$root/.gitignore"
   printf '%s\n' '# 自证的登记表：一行都不登记准入' >"$root/.claude/gate.d/stage-inputs.tsv"
   printf '%s\n' '# 自证的滞后表' >"$root/.claude/gate.d/timing-load-field-lag.tsv"
   printf '%s\n' '[package]' 'name = "e7-index-bench"' 'version = "0.1.0"' '' '[lib]' 'path = "lib.rs"' '' '[[bin]]' 'name = "e1-sample"' 'path = "e1_sample.rs"' \
@@ -682,12 +804,22 @@ replay_reuse_selftest() {
   root="$work/root"; calls="$work/devices-ran.log"; cargo_calls="$work/cargo-calls.log"
   replay_selftest_sample_repository "$work" || return 1
   library="$(replay_selftest_row_library_name "$root")" || { echo "reuse-first-run bad 临时仓 $root 取不到 git common-dir，库名拼不出"; return 1; }
-  reuse_run() { # [参数…]：在临时仓里跑一趟副本；输出进 $out、这一趟起了哪几个装置进 $calls（每趟先清空）、末行 REPLAY_TOTAL 进 $total、退出码进 reuse_exit
+  reuse_run() { # <参数…>：在临时仓里跑一趟副本；输出进 $out、这一趟起了哪几个装置进 $calls（每趟先清空）、末行 REPLAY_TOTAL 进 $total、退出码进 reuse_exit
+    # 参数只认 case 里那几组，各写成一条带字面实验号或行项的起法：闭包按起法里的字面词收复跑表的行，参数折不出（"$@" 这类）或不带实验号就连整张复跑表
+    # （scripts/gate/lib_function_units.py 文件头「shell 起法带字面参数」）。样本仓的表只有 E1、E2 两行，要两行都跑的写 E1 E2
     run_number=$((run_number + 1)); out="$work/out.$run_number"; : >"$calls"; : >"$cargo_calls"; : >"$work/not-run.$run_number"
     # 复用哨兵：键相同的全当哨兵、不抽强制现判（reuse_sentinel 设了的那几趟照它）；上次红的清单写临时目录
-    if (cd "$root" && env -u SINGLEFS_MULTI_HOST_CONFIG -u SINGLEFS_REUSE_SENTINEL_SEED -u CARGO_TARGET_DIR TMPDIR="$work/tmp" PATH="$work/bin:$PATH" REPLAY_OUT="$work/replay-out.$run_number" REPLAY_JOBS=1 \
-          REPLAY_SELFTEST_RUN_LOG="$calls" REPLAY_SELFTEST_CARGO_LOG="$cargo_calls" GATE_NOT_RUN_FILE="$work/not-run.$run_number" \
-          SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 ${reuse_sentinel[@]+"${reuse_sentinel[@]}"} bash scripts/experiment-apparatus/replay.sh "$@") >"$out" 2>&1; then
+    if (cd "$root" && unset SINGLEFS_MULTI_HOST_CONFIG SINGLEFS_REUSE_SENTINEL_SEED CARGO_TARGET_DIR \
+          && export TMPDIR="$work/tmp" PATH="$work/bin:$PATH" REPLAY_OUT="$work/replay-out.$run_number" REPLAY_JOBS=1 \
+               REPLAY_SELFTEST_RUN_LOG="$calls" REPLAY_SELFTEST_CARGO_LOG="$cargo_calls" GATE_NOT_RUN_FILE="$work/not-run.$run_number" \
+               SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 \
+          && { [[ -z "${reuse_sentinel[*]-}" ]] || export "${reuse_sentinel[@]}"; } \
+          && case "$*" in
+               "E1 E2") bash scripts/experiment-apparatus/replay.sh E1 E2 ;;
+               E1) bash scripts/experiment-apparatus/replay.sh E1 ;;
+               E3) bash scripts/experiment-apparatus/replay.sh E3 ;;
+               *) echo "reuse_run：参数「$*」没有字面起法（只认 E1 E2、E1、E3）" >&2; exit 2 ;;
+             esac) >"$out" 2>&1; then
       reuse_exit=0
     else
       reuse_exit=$?
@@ -699,7 +831,7 @@ replay_reuse_selftest() {
   }
   local reuse_sentinel=()
   ran() { sort "$calls" | tr '\n' ' '; }
-  reuse_run
+  reuse_run E1 E2
   if [[ "$reuse_exit" == 0 && "$(ran)" == "e1 e2 " && "$total" == *" reused=0 "* ]] && grep -qE '^E1 .*字节一致' "$out" && grep -qE '^E2 .*字节一致.*取自 git show' "$out" \
      && [[ "$(replay_selftest_library_counts "$library" "$work/fetched")" == "2 2" && ! -e "${library%/*}" ]] \
      && [[ ! -s "$work/not-run.$run_number" ]]; then
@@ -707,7 +839,7 @@ replay_reuse_selftest() {
   else
     echo "reuse-first-run bad 头一趟应当两行都跑、E1 字节一致、E2 字节一致（留存产物从 git 历史取回）、判定库记两份（各带组成清单）、临时仓里不建 singlefs-unit-verdicts/、没有逐字节比对本次未跑的报告；退 $reuse_exit，起了 $(ran)，$total，判定库「判定 组成清单」$(replay_selftest_library_counts "$library" "$work/fetched") 份，临时仓里 singlefs-unit-verdicts/ $([[ -e "${library%/*}" ]] && echo 建了 || echo 没建)，本次未跑「$(tr '\n' ' ' <"$work/not-run.$run_number")」，输出尾部 $(tail -n 4 "$out" | tr '\n' ' ')"
   fi
-  reuse_run
+  reuse_run E1 E2
   if [[ "$reuse_exit" == 0 && -z "$(ran)" && "$total" == *" judged=0 reused=2 "* ]] && grep -qE '^E1 .*复用 +字节一致：行键相同' "$out" && grep -qE '^E2 .*复用 +字节一致：行键相同' "$out" \
      && ! grep -q '^build' "$cargo_calls" && grep -qF '要现跑的 0 行，不试编 gpu 特性、不编' "$out"; then
     echo "reuse-second-run ok"
@@ -715,7 +847,7 @@ replay_reuse_selftest() {
     echo "reuse-second-run bad 第二趟行键没变应当两行都复用、一个装置都不起、cargo build 一次都不起（不编）；退 $reuse_exit，起了「$(ran)」，cargo 收到「$(tr '\n' ';' <"$cargo_calls")」，$total"
   fi
   printf '%s\n' 'fn main() { println!("uno"); }' >"$root/scripts/experiment-apparatus/e1_sample.rs"
-  reuse_run
+  reuse_run E1 E2
   if [[ "$reuse_exit" == 0 && "$(ran)" == "e1 " && "$total" == *" reused=1 "* ]] && grep -qE '^E1 .*字节一致' "$out" && grep -qE '^E2 .*复用' "$out" \
      && grep -q -- '^build .*--bin e1-sample' "$cargo_calls" && ! grep -q -- '--bin e2-sample' "$cargo_calls" && grep -q 'E1 要现跑：键对不上.*变了 fn e1_sample.rs::main' "$out"; then
     echo "reuse-device-source ok"
@@ -723,7 +855,7 @@ replay_reuse_selftest() {
     echo "reuse-device-source bad 改了 E1 装置 main 的一行代码应当只重跑 E1（只编 --bin e1-sample、报出变了 fn e1_sample.rs::main）、E2 复用；退 $reuse_exit，起了「$(ran)」，cargo 收到「$(tr '\n' ';' <"$cargo_calls")」，$total，输出 $(grep '要现跑' "$out" | head -n 2 | tr '\n' ' ')"
   fi
   printf '%s\n' '// 只改一行注释：行键取单元的去注释指纹，注释不算' 'fn main() { println!("two"); }' >"$root/scripts/experiment-apparatus/e2_sample.rs"
-  reuse_run
+  reuse_run E1 E2
   if [[ "$reuse_exit" == 0 && -z "$(ran)" && "$total" == *" reused=2 "* ]]; then
     echo "reuse-comment-only ok"
   else
@@ -750,13 +882,13 @@ replay_reuse_selftest() {
   # 别的开关打开时这一格不跟着红（弄坏开关只红在文件头点名的格）。前面几趟是在调用方的开关下记的库（reuse-key-by-row-only 下键的算法都不同），
   # 所以先清空开关垫一趟（哨兵数 1000、不抽强制现判），库里是照常算的键，再起那两趟
   reuse_sentinel=(REPLAY_BREAK=)
-  reuse_run
+  reuse_run E1 E2
   local sentinel_primed_exit="$reuse_exit"
   reuse_sentinel=(SINGLEFS_REUSE_SENTINEL_COUNT=1 SINGLEFS_REUSE_SENTINEL_SEED=5 REPLAY_BREAK=)
-  reuse_run
+  reuse_run E1 E2
   local sentinel_green_exit="$reuse_exit" sentinel_green_out="$out"
   reuse_sentinel=(SINGLEFS_REUSE_SENTINEL_COUNT=1 SINGLEFS_REUSE_SENTINEL_SEED=5 REPLAY_BREAK=reuse-ignored)
-  reuse_run
+  reuse_run E1 E2
   reuse_sentinel=()
   if [[ "$sentinel_primed_exit" == 0 && "$sentinel_green_exit" == 0 ]] && grep -qF '复用哨兵（复跑表）：种子 5' "$sentinel_green_out" && grep -qF '复用哨兵抽中强制现判' "$sentinel_green_out" \
      && [[ "$reuse_exit" == 1 ]] && grep -qF '复用失灵：' "$out"; then
@@ -770,16 +902,16 @@ replay_reuse_selftest() {
   local red_break=""
   [[ "$REPLAY_BROKEN" == red-not-recorded ]] && red_break=red-not-recorded
   reuse_sentinel=(REPLAY_BREAK=)
-  reuse_run
+  reuse_run E1 E2
   local red_primed_exit="$reuse_exit"
   reuse_sentinel=(REPLAY_BREAK="$red_break" REPLAY_SELFTEST_DRIFT_DEVICE=e1 SINGLEFS_REUSE_SENTINEL_COUNT=1 SINGLEFS_REUSE_SENTINEL_SEED=5)
-  reuse_run
+  reuse_run E1 E2
   local red_drift_exit="$reuse_exit" red_drift_out="$out"
   reuse_sentinel=(REPLAY_BREAK=)
-  reuse_run
+  reuse_run E1 E2
   local red_rejudge_exit="$reuse_exit" red_rejudge_out="$out" red_rejudge_ran
   red_rejudge_ran="$(ran)"
-  reuse_run
+  reuse_run E1 E2
   if [[ "$red_primed_exit" == 0 && "$red_drift_exit" == 1 ]] && grep -qE '^E1 .*对不上' "$red_drift_out" \
      && [[ "$red_rejudge_exit" == 0 && "$red_rejudge_ran" == "e1 " ]] && grep -qF 'E1 要现跑：上次判红' "$red_rejudge_out" \
      && grep -qE '^E1 .*字节一致' "$red_rejudge_out" && grep -qE '^E2 .*复用' "$red_rejudge_out" \
@@ -794,16 +926,16 @@ replay_reuse_selftest() {
   local broken_break=""
   [[ "$REPLAY_BROKEN" == broken-not-recorded ]] && broken_break=broken-not-recorded
   reuse_sentinel=(REPLAY_BREAK=)
-  reuse_run
+  reuse_run E1 E2
   local broken_primed_exit="$reuse_exit"
   reuse_sentinel=(REPLAY_BREAK="$broken_break" REPLAY_SELFTEST_BROKEN_DEVICE=e1 SINGLEFS_REUSE_SENTINEL_COUNT=1 SINGLEFS_REUSE_SENTINEL_SEED=5)
-  reuse_run
+  reuse_run E1 E2
   local broken_run_exit="$reuse_exit" broken_run_out="$out"
   reuse_sentinel=(REPLAY_BREAK=)
-  reuse_run
+  reuse_run E1 E2
   local broken_rejudge_exit="$reuse_exit" broken_rejudge_out="$out" broken_rejudge_ran
   broken_rejudge_ran="$(ran)"
-  reuse_run
+  reuse_run E1 E2
   if [[ "$broken_primed_exit" == 0 && "$broken_run_exit" == 1 ]] && grep -qE '^E1 .*跑不了 +退出码 3' "$broken_run_out" \
      && [[ "$broken_rejudge_exit" == 0 && "$broken_rejudge_ran" == "e1 " ]] && grep -qF 'E1 要现跑：上次判红' "$broken_rejudge_out" \
      && grep -qE '^E1 .*字节一致' "$broken_rejudge_out" && grep -qE '^E2 .*复用' "$broken_rejudge_out" \
@@ -818,9 +950,9 @@ replay_reuse_selftest() {
   [[ "$REPLAY_BROKEN" == row-library-failure-tolerated ]] && outside_break=row-library-failure-tolerated
   replay_selftest_sample_repository "$work/outside-git-cell" || return 1
   root="$work/outside-git-cell/root"
-  rm -rf -- "${root:?}/.git"
+  replay_remove_directory_below "$work" "$root/.git" || return 1
   reuse_sentinel=(REPLAY_BREAK="$outside_break")
-  reuse_run
+  reuse_run E1 E2
   reuse_sentinel=()
   root="$first_root"
   if [[ "$reuse_exit" == 2 && -z "$(ran)" && -z "$total" ]] && grep -qF '不是 git 工作树' "$out"; then
@@ -835,18 +967,20 @@ replay_reuse_selftest() {
   unreachable_address="$(python3 -B -c 'import socket; s = socket.socket(); s.bind(("127.0.0.1", 0)); print("127.0.0.1:%d" % s.getsockname()[1]); s.close()')"
   reuse_sentinel=(REPLAY_BREAK="$unreachable_break" SINGLEFS_PRUNE_SERVER_SOCKET="$work/no-such.sock" SINGLEFS_PRUNE_SERVER_TCP_ADDRESS="$unreachable_address"
     SINGLEFS_PRUNE_SERVER_RECONNECT_SECONDS=2)
-  reuse_run
+  reuse_run E1 E2
   reuse_sentinel=()
   if [[ "$reuse_exit" == 75 && -z "$(ran)" && -z "$total" ]] && grep -qF 'prune-server 不可用' "$out"; then
     echo "reuse-unreachable-exits-75 ok"
   else
     echo "reuse-unreachable-exits-75 bad 判定库服务连不上应当整趟退 75、点名 prune-server 不可用、一个装置都不起、不打 REPLAY_TOTAL；退 $reuse_exit，起了「$(ran)」，$total，$(grep -F 'prune-server' "$out" | head -n 2 | tr '\n' ' ' | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)"
   fi
-  # 开了 GPU 只在要现跑的行里有要卡的行时才试编、要服务交的卡（文件头「GPU」，reuse-gpu-only-for-feature-rows）：另搭一棵样本仓，复跑表加一行
-  # E3|@replay_selftest_gpu_driver（驱动闭包点到 CHECKER_TIER_FEATURES，admission.py replay-row-inputs 第 4 列给 1），多机配置写 ENABLE_GPU=1、环境里 GPU_CARDS_BY_PRIORITY 是空的：
-  # 只跑 E1 E2（都不点）整趟退 0、两行都起、cargo 一次 --features gpu 都没收到、stderr 写「都不点 CHECKER_TIER_FEATURES」；只跑 E3 退 78、点名 GPU_CARDS_BY_PRIORITY、一个装置都不起。
-  # 弄坏开关 gpu-for-every-run（要现跑的行一律当要卡）让只跑 E1 E2 那一趟退 78；这一格只接这一个开关
-  local gpu_break="" gpu_plain_exit gpu_plain_out gpu_plain_ran gpu_plain_cargo
+  # 开了 GPU 只在要现跑的行里有要卡的行时才试编（文件头「GPU」，reuse-gpu-only-for-feature-rows）：另搭一棵样本仓，复跑表加一行
+  # E3|@replay_selftest_gpu_driver（驱动闭包点到 CHECKER_TIER_FEATURES，admission.py replay-row-inputs 第 4 列给 1），多机配置写 ENABLE_GPU=1、环境里没有卡串：
+  # 只跑 E1 E2（都不点）整趟退 0、两行都起、cargo 一次 --features gpu 都没收到、stderr 写「都不点 CHECKER_TIER_FEATURES」；
+  # 只跑 E3 整趟退 0（不领卡、环境里没有卡串也不拦；样本仓里放了 E3 的留存产物 e3-sample.out，与驱动打的字节相同，判字节一致）、cargo 收到试编 gpu 特性那一条、
+  # E3 的驱动带着 --features gpu 起了（驱动的 stderr 由 replay_one 落进这一趟输出目录里这一行的 <tag>.err，里面有它打的 features=--features gpu；不进这一趟的输出）。
+  # 弄坏开关 gpu-for-every-run（要现跑的行一律当要卡）让只跑 E1 E2 那一趟试编 gpu 特性；这一格只接这一个开关
+  local gpu_break="" gpu_plain_exit gpu_plain_out gpu_plain_ran gpu_plain_cargo gpu_feature_cargo gpu_feature_driver_err
   [[ "$REPLAY_BROKEN" == gpu-for-every-run ]] && gpu_break=gpu-for-every-run
   replay_selftest_sample_repository "$work/gpu-cell" || return 1
   root="$work/gpu-cell/root"
@@ -866,17 +1000,20 @@ text = text[:start] + driver + text[start:row_end] + "\nE3|@replay_selftest_gpu_
 open(path, "w", encoding="utf-8").write(text)
 PY
   printf '%s\n' '# 自证的多机配置' 'ENABLE_GPU=1' >"$work/gpu-cell/multi-host.env"
-  reuse_sentinel=(REPLAY_BREAK="$gpu_break" SINGLEFS_MULTI_HOST_CONFIG="$work/gpu-cell/multi-host.env" GPU_CARDS_BY_PRIORITY=)
+  printf 'E7RESULT name=config arm=e3\nE7RESULT name=done emitted=2\n' >"$root/research/results/e3-sample.out"
+  reuse_sentinel=(REPLAY_BREAK="$gpu_break" SINGLEFS_MULTI_HOST_CONFIG="$work/gpu-cell/multi-host.env")
   reuse_run E1 E2
   gpu_plain_exit="$reuse_exit"; gpu_plain_out="$out"; gpu_plain_ran="$(ran)"; gpu_plain_cargo="$(tr '\n' ';' <"$cargo_calls")"
   reuse_run E3
+  gpu_feature_cargo="$(tr '\n' ';' <"$cargo_calls")"
+  gpu_feature_driver_err="$(cat -- "$work/replay-out.$run_number"/E3.*.err 2>/dev/null)"
   reuse_sentinel=()
   root="$first_root"
   if [[ "$gpu_plain_exit" == 0 && "$gpu_plain_ran" == "e1 e2 " && "$gpu_plain_cargo" != *"--features gpu"* ]] && grep -qF '都不点 CHECKER_TIER_FEATURES' "$gpu_plain_out" \
-     && [[ "$reuse_exit" == 78 && -z "$(ran)" ]] && grep -qF '环境里却没有 GPU_CARDS_BY_PRIORITY' "$out"; then
+     && [[ "$reuse_exit" == 0 && "$gpu_feature_cargo" == *"--features gpu"* && "$gpu_feature_driver_err" == *"features=--features gpu"* ]]; then
     echo "reuse-gpu-only-for-feature-rows ok"
   else
-    echo "reuse-gpu-only-for-feature-rows bad 开了 GPU、环境里没有卡：只跑不点 CHECKER_TIER_FEATURES 的 E1 E2 应当退 0、两行都起、不试编 gpu 特性，只跑点到的 E3 应当退 78、点名 GPU_CARDS_BY_PRIORITY；E1 E2 那一趟退 $gpu_plain_exit、起了「$gpu_plain_ran」、cargo 收到「$gpu_plain_cargo」、$(grep -E '✗|都不点' "$gpu_plain_out" | head -n 2 | tr '\n' ' ' | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)；E3 那一趟退 $reuse_exit、起了「$(ran)」、$(grep -F '✗' "$out" | head -n 2 | tr '\n' ' ' | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)"
+    echo "reuse-gpu-only-for-feature-rows bad 开了 GPU、环境里没有卡串：只跑不点 CHECKER_TIER_FEATURES 的 E1 E2 应当退 0、两行都起、不试编 gpu 特性，只跑点到的 E3 应当退 0（E3 字节一致）、试编 gpu 特性、驱动带着 --features gpu 起（它那一行的 .err 里有 features=--features gpu）；E1 E2 那一趟退 $gpu_plain_exit、起了「$gpu_plain_ran」、cargo 收到「$gpu_plain_cargo」、$(grep -E '✗|都不点' "$gpu_plain_out" | head -n 2 | tr '\n' ' ' | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)；E3 那一趟退 $reuse_exit、cargo 收到「$gpu_feature_cargo」、结果行「$(grep -E '^E3 ' "$out" | head -n 1 | cut -c1-200 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)」、驱动的 stderr「$(head -c 200 <<<"$gpu_feature_driver_err" | tr '\n' ' ' | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)」、$(grep -E '✗' "$out" | head -n 2 | tr '\n' ' ' | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)"
   fi
 }
 
@@ -900,13 +1037,13 @@ replay_archived_selftest() {
   local work="$1" root calls out total exit_code=0
   root="$work/root"; calls="$work/devices-ran.log"
   replay_selftest_sample_repository "$work" || return 1
-  archived_round() { # <趟号> [环境变量赋值…]：在临时仓里跑一趟副本；输出进 $out、起了哪几个装置进 $calls、末行 REPLAY_TOTAL 进 $total、退出码进 exit_code
+  archived_round() { # <趟号> [环境变量赋值…]：在临时仓里跑一趟副本（样本表的两行 E1、E2 都跑，起法写字面实验号：闭包按它收复跑表的行）；输出进 $out、起了哪几个装置进 $calls、末行 REPLAY_TOTAL 进 $total、退出码进 exit_code
     out="$work/out.$1"; : >"$calls"; : >"$work/not-run.$1"
     printf 'fn main() { println!("one-archived-%s"); }\n' "$1" >"$root/scripts/experiment-apparatus/e1_sample.rs"
     printf 'fn main() { println!("two-archived-%s"); }\n' "$1" >"$root/scripts/experiment-apparatus/e2_sample.rs"
     if (cd "$root" && env -u SINGLEFS_MULTI_HOST_CONFIG -u SINGLEFS_REUSE_SENTINEL_SEED -u CARGO_TARGET_DIR TMPDIR="$work/tmp" PATH="$work/bin:$PATH" REPLAY_OUT="$work/replay-out.$1" REPLAY_JOBS=1 \
           REPLAY_SELFTEST_RUN_LOG="$calls" REPLAY_SELFTEST_CARGO_LOG="$work/cargo-calls.log" GATE_NOT_RUN_FILE="$work/not-run.$1" \
-          SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 "${@:2}" bash scripts/experiment-apparatus/replay.sh) >"$out" 2>&1; then
+          SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 "${@:2}" bash scripts/experiment-apparatus/replay.sh E1 E2) >"$out" 2>&1; then
       exit_code=0
     else
       exit_code=$?
@@ -966,12 +1103,12 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
   rm -f -- "$root/research/results/e1-sample.out"
   printf 'E7RESULT name=config arm=e1\nE7RESULT name=done emitted=2\n' | gzip -c >"$root/research/results/e1-sample.out.gz"
-  gz_round() { # <趟号> [参数…]：在临时仓里只跑 E1；输出进 $out、退出码进 exit_code。先把 E1 的装置源码改一个字（行键变，不读上一趟记的判定）
+  gz_round() { # <趟号>：在临时仓里只跑 E1（起法写字面实验号：闭包按它收复跑表的行）；输出进 $out、退出码进 exit_code。先把 E1 的装置源码改一个字（行键变，不读上一趟记的判定）
     out="$work/out.$1"; : >"$work/devices-ran.log"; : >"$work/not-run.$1"
     printf 'fn main() { println!("one-gz-%s"); }\n' "$1" >"$root/scripts/experiment-apparatus/e1_sample.rs"
     if (cd "$root" && env -u SINGLEFS_MULTI_HOST_CONFIG -u SINGLEFS_REUSE_SENTINEL_SEED -u CARGO_TARGET_DIR TMPDIR="$work/tmp" PATH="$work/bin:$PATH" REPLAY_OUT="$work/replay-out.$1" REPLAY_JOBS=1 \
           REPLAY_SELFTEST_RUN_LOG="$work/devices-ran.log" REPLAY_SELFTEST_CARGO_LOG="$work/cargo-calls.log" GATE_NOT_RUN_FILE="$work/not-run.$1" \
-          SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 bash scripts/experiment-apparatus/replay.sh "${@:2}" E1) >"$out" 2>&1; then
+          SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 bash scripts/experiment-apparatus/replay.sh E1) >"$out" 2>&1; then
       exit_code=0
     else
       exit_code=$?
@@ -994,7 +1131,7 @@ PY
 
 # 入口脚本格式与三条完整性闸（文件头「入口脚本」「三条完整性闸」）的自证，replay_selftest 调：同一份临时仓（replay_selftest_sample_repository），
 # 每一格往 stdout 打一行「<格名> ok」或「<格名> bad <一句>」，每一趟之前先把 E1、E2 的装置源码各改一个字（entry_round：装置源码进行键，各格键不同，互不复用）：
-#   list-items              --list-items 逐行打 E1、E2（几行、二进制），退 0，本轮输出目录（REPLAY_OUT）不建、一个装置都不起
+#   list-items              --list-items 那一支打的两个函数在临时仓里直接调（不经入口起：--list-items 带不了实验号）：逐行打 E1、E2（几行、二进制），再逐行打每一行的行项 E1.1、E2.1，都退 0
 #   unknown-experiment      点名表里没有的 E9：退 2、点名 E9，本轮输出目录不建、一个装置都不起
 #   integrity-exit-code     闸 3：E1 的装置照常打两行却退 3，E1 记「跑不了 退出码 3」、整趟退 1（不当成跑过了）
 #   integrity-emitted       闸 2：E2 的装置收尾行说 emitted=3、实收 2 条，E2 记「跑不了」、整趟退 1
@@ -1004,13 +1141,21 @@ replay_entry_selftest() {
   local work="$1" root calls out total exit_code=0
   root="$work/root"; calls="$work/devices-ran.log"
   replay_selftest_sample_repository "$work" || return 1
-  entry_round() { # <趟号> <REPLAY_OUT 的名字> [参数…]：在临时仓里跑一趟副本；输出进 $out、起了哪几个装置进 $calls、末行 REPLAY_TOTAL 进 $total、退出码进 exit_code。先把 E1、E2 的装置源码各改一个字（行键变，各趟互不复用）
+  entry_round() { # <趟号> <REPLAY_OUT 的名字> <参数>：在临时仓里跑一趟副本；输出进 $out、起了哪几个装置进 $calls、末行 REPLAY_TOTAL 进 $total、退出码进 exit_code。先把 E1、E2 的装置源码各改一个字（行键变，各趟互不复用）
+    # 参数只认 E9、E1、E2，各写成一条带字面实验号的起法：闭包按起法里的字面实验号收复跑表的行，参数折不出（"${@:3}" 这类）或不带实验号就连整张复跑表
     out="$work/out.$1"; : >"$calls"; : >"$work/not-run.$1"
     printf 'fn main() { println!("one-entry-%s"); }\n' "$1" >"$root/scripts/experiment-apparatus/e1_sample.rs"
     printf 'fn main() { println!("two-entry-%s"); }\n' "$1" >"$root/scripts/experiment-apparatus/e2_sample.rs"
-    if (cd "$root" && env -u SINGLEFS_MULTI_HOST_CONFIG -u SINGLEFS_REUSE_SENTINEL_SEED -u CARGO_TARGET_DIR TMPDIR="$work/tmp" PATH="$work/bin:$PATH" REPLAY_OUT="$work/$2" REPLAY_JOBS=1 \
-          REPLAY_SELFTEST_RUN_LOG="$calls" REPLAY_SELFTEST_CARGO_LOG="$work/cargo-calls.log" GATE_NOT_RUN_FILE="$work/not-run.$1" \
-          SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 bash scripts/experiment-apparatus/replay.sh "${@:3}") >"$out" 2>&1; then
+    if (cd "$root" && unset SINGLEFS_MULTI_HOST_CONFIG SINGLEFS_REUSE_SENTINEL_SEED CARGO_TARGET_DIR \
+          && export TMPDIR="$work/tmp" PATH="$work/bin:$PATH" REPLAY_OUT="$work/$2" REPLAY_JOBS=1 \
+               REPLAY_SELFTEST_RUN_LOG="$calls" REPLAY_SELFTEST_CARGO_LOG="$work/cargo-calls.log" GATE_NOT_RUN_FILE="$work/not-run.$1" \
+               SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 \
+          && case "$3" in
+               E9) bash scripts/experiment-apparatus/replay.sh E9 ;;
+               E1) bash scripts/experiment-apparatus/replay.sh E1 ;;
+               E2) bash scripts/experiment-apparatus/replay.sh E2 ;;
+               *) echo "entry_round：参数 $3 没有字面起法（只认 E9、E1、E2）" >&2; exit 2 ;;
+             esac) >"$out" 2>&1; then
       exit_code=0
     else
       exit_code=$?
@@ -1022,12 +1167,16 @@ replay_entry_selftest() {
       "printf 'E7RESULT name=config arm=$1\\nE7RESULT name=done emitted=$3\\n'" "exit $2" >"$work/devices/$1-sample"
     chmod +x "$work/devices/$1-sample"
   }
-  entry_round 1 list-out --list-items
-  # 临时仓里没有 scripts/hosts/heavy-threads.sh，载入时 stderr 有一句找不到它（与这一格无关）：只比制表符隔开的那几行
-  if [[ "$exit_code" == 0 && "$(grep -P '\t' "$out")" == $'E1\t1\te1-sample\nE2\t1\te2-sample' && ! -e "$work/list-out" && ! -s "$calls" ]]; then
+  # list-items：--list-items 只能单独带（主体里 --list-items 那一判见了别的参数就退 2），起法里带不了实验号，只带选项起副本又让闭包连整张复跑表
+  # （scripts/gate/lib_function_units.py 文件头「shell 起法带字面参数」）。这一格不经入口起：在临时仓里直接调 --list-items 那一支打的两个函数
+  # （replay_table_experiments、replay_table_row_items 从当前目录下的 scripts/experiment-apparatus/replay.sh 原文读复跑表，读到的是样本仓那一份），整份比它们打的行；
+  # 经入口起 --list-items 时退 0、不建本轮输出目录、不起装置，这一格不判
+  out="$work/out.list-items"
+  if (cd "$root" && replay_table_experiments && replay_table_row_items) >"$out" 2>&1; then exit_code=0; else exit_code=$?; fi
+  if [[ "$exit_code" == 0 && "$(cat -- "$out")" == $'E1\t1\te1-sample\nE2\t1\te2-sample\nE1.1\t1\te1-sample\nE2.1\t1\te2-sample' ]]; then
     echo "list-items ok"
   else
-    echo "list-items bad --list-items 应当逐行打 E1、E2（几行、二进制）、退 0、不建本轮输出目录、不起装置；退 $exit_code，输出「$(tr '\n' ';' <"$out" | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)」，输出目录 $([[ -e "$work/list-out" ]] && echo 建了 || echo 没建)"
+    echo "list-items bad 样本仓里 replay_table_experiments 与 replay_table_row_items 应当逐行打 E1、E2（几行、二进制）与行项 E1.1、E2.1、都退 0；退 $exit_code，输出「$(tr '\n' ';' <"$out" | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)」"
   fi
   entry_round 2 unknown-out E9
   if [[ "$exit_code" == 2 ]] && grep -qF '复跑表里没有：E9' "$out" && [[ ! -e "$work/unknown-out" && ! -s "$calls" ]]; then
@@ -1065,6 +1214,336 @@ replay_entry_selftest() {
   fi
 }
 
+# 派行与进度（文件头「派行」「进度」）的自证，replay_selftest 调：每格一棵样本仓（replay_selftest_sample_repository），复跑表换成这一格的几行（都是假装置 e1-sample，参数是行的名字），
+# 峰值记录放这一格的 records/（REPLAY_ROW_COSTS_DIRECTORY），上限经 TASK_SERVER_MEMORY_CAP_BYTES 交、cgroup 那一档指到不在的文件（不收窄），负载关阈值放宽、不等负载（这几格不判负载关）。
+# 假装置往 $REPLAY_SELFTEST_RUN_LOG 记「start <名字>」「end <名字>」，起来之后等到 REPLAY_SELFTEST_BARRIER 行起来了（至多 3 秒）再拿住 REPLAY_SELFTEST_DEVICE_SECONDS 秒：放得下的行真的一起跑，放不下的等不到也照走。
+# 每一格往 stdout 打一行「<格名> ok」或「<格名> bad <一句>」。
+replay_dispatch_selftest() {
+  local work="$1" real_root="$PWD" cell root calls exit_code=0 replay_pid
+  local costs_script="$real_root/scripts/experiment-apparatus/replay_row_costs.py"
+  local -a dispatch_env=()
+  local e1=e1-sample.out one_gibibyte=1073741824 big_cap=68719476736
+  dispatch_tree() { # <格名> <多机配置里多写的一行，没有写空串> <复跑表的行…>
+    cell="$work/$1"; root="$cell/root"; calls="$cell/devices-ran.log"
+    local configuration_line="$2"
+    shift 2
+    replay_selftest_sample_repository "$cell" || return 1
+    mkdir -p "$cell/records"
+    printf '%s\n' '# 自证的多机配置' "$configuration_line" >"$cell/multi-host.env"
+    printf '%s\n' '#!/usr/bin/env bash' \
+      'echo "start ${1:-none} cards=${GPU_CARDS_BY_PRIORITY:-none}" >>"$REPLAY_SELFTEST_RUN_LOG"' \
+      'if [[ "${1:-}" == hold ]]; then [[ -p "$REPLAY_SELFTEST_DEVICE_HOLD.fifo" ]] || mkfifo -- "$REPLAY_SELFTEST_DEVICE_HOLD.fifo" || exit 1; echo "$$" >"$REPLAY_SELFTEST_DEVICE_HOLD"; read -r -t 8 _ <>"$REPLAY_SELFTEST_DEVICE_HOLD.fifo"; fi' \
+      'for _ in {1..60}; do (( $(grep -c "^start " "$REPLAY_SELFTEST_RUN_LOG") >= ${REPLAY_SELFTEST_BARRIER:-1} )) && break; sleep 0.05; done' \
+      'sleep "${REPLAY_SELFTEST_DEVICE_SECONDS:-0.4}"' \
+      'echo "end ${1:-none}" >>"$REPLAY_SELFTEST_RUN_LOG"' \
+      'printf "E7RESULT name=config arm=e1\n"' \
+      'if [[ "${1:-}" == timing ]]; then printf "E7RESULT name=done emitted=2 loadavg1=0.00 cpus=32\n"; else printf "E7RESULT name=done emitted=2\n"; fi' \
+      '[[ "${1:-}" != fail ]] || exit 3' >"$cell/devices/e1-sample"
+    chmod +x "$cell/devices/e1-sample"
+    printf 'E7RESULT name=config arm=e1\nE7RESULT name=done emitted=2 loadavg1=0.00 cpus=32\n' >"$root/research/results/e1-timing.out"
+    python3 - "$root/scripts/experiment-apparatus/replay.sh" "$@" <<'PY' || return 1
+import sys
+path, rows = sys.argv[1], sys.argv[2:]
+text = open(path, encoding="utf-8").read()
+table = "TABLE=$(cat <<'TSV'\n"
+table_start = text.index(table) + len(table)
+table_end = text.index("\nTSV\n)\n", table_start)
+drivers = ("replay_selftest_gpu_row_one() {\n  : \"${CHECKER_TIER_FEATURES[*]-}\"\n  \"$REPLAY_RELEASE_DIRECTORY/e1-sample\" gpu-one\n}\n"
+           "replay_selftest_gpu_row_two() {\n  : \"${CHECKER_TIER_FEATURES[*]-}\"\n  \"$REPLAY_RELEASE_DIRECTORY/e1-sample\" gpu-two\n}\n"
+           "replay_selftest_driver_leased_row() {\n  : \"${CHECKER_TIER_FEATURES[*]-}\"\n"
+           "  \"$REPLAY_RELEASE_DIRECTORY/e1-sample\" own-cards\n}\n")
+text = text[:table_start - len(table)] + drivers + table + "\n".join(rows) + text[table_end:]
+open(path, "w", encoding="utf-8").write(text)
+PY
+    chmod +x "$root/scripts/experiment-apparatus/replay.sh"
+  }
+  dispatch_seed() { # <身份> <峰值字节> <线程数>：造一份量过的记录
+    python3 "$costs_script" record "$cell/records" "$1" "$2" "$3"
+  }
+  dispatch_settings() { # 这一格每一趟共用的环境（dispatch_env 接在后面）
+    printf '%s\0' SINGLEFS_MULTI_HOST_CONFIG="$cell/multi-host.env" GATE_MUTATION_CGROUP_LISTING="$cell/no-such-cgroup-listing" TMPDIR="$cell/tmp" PATH="$cell/bin:$PATH" \
+      REPLAY_OUT="$cell/replay-out" REPLAY_SELFTEST_RUN_LOG="$calls" REPLAY_SELFTEST_CARGO_LOG="$cell/cargo-calls.log" GATE_NOT_RUN_FILE="$cell/not-run" \
+      SINGLEFS_LAST_RUNS_DIRECTORY="$cell/last-runs" SINGLEFS_REUSE_SENTINEL_COUNT=1000 REPLAY_ROW_COSTS_DIRECTORY="$cell/records" REPLAY_TIMING_SETTLE_SECONDS=0 REPLAY_TIMING_LOAD_RATIO=1000 \
+      ${dispatch_env[@]+"${dispatch_env[@]}"}
+  }
+  dispatch_run() { # <参数…>：在这一格的样本仓里跑一趟：标准输出与标准错误分开进 stdout、stderr，起止记录先清空，退出码进 exit_code
+    # 参数只认 case 里那几组，各写成一条带字面实验号或行项的起法（要整张样本表都跑的，写这一格表里的全部实验号）：闭包按起法里的字面词收复跑表的行，
+    # 参数折不出（"$@" 这类）或不带实验号就连整张复跑表（scripts/gate/lib_function_units.py 文件头「shell 起法带字面参数」）
+    local -a settings=()
+    mapfile -d '' -t settings < <(dispatch_settings)
+    : >"$calls"
+    if (cd "$root" && unset SINGLEFS_REUSE_SENTINEL_SEED CARGO_TARGET_DIR TASK_SERVER_MEMORY_CAP_BYTES && export "${settings[@]}" \
+          && case "$*" in
+               "E1A E1B E1C E1D") bash scripts/experiment-apparatus/replay.sh E1A E1B E1C E1D ;;
+               "E1A E1B E1C") bash scripts/experiment-apparatus/replay.sh E1A E1B E1C ;;
+               "E1A E1B") bash scripts/experiment-apparatus/replay.sh E1A E1B ;;
+               E1A) bash scripts/experiment-apparatus/replay.sh E1A ;;
+               E1) bash scripts/experiment-apparatus/replay.sh E1 ;;
+               E181) bash scripts/experiment-apparatus/replay.sh E181 ;;
+               "--item E1.2") bash scripts/experiment-apparatus/replay.sh --item E1.2 ;;
+               "E1 --item E1.3") bash scripts/experiment-apparatus/replay.sh E1 --item E1.3 ;;
+               "--item E1.9") bash scripts/experiment-apparatus/replay.sh --item E1.9 ;;
+               "E1 --item") bash scripts/experiment-apparatus/replay.sh E1 --item ;;
+               *) echo "dispatch_run：参数「$*」没有字面起法（只认 E1A E1B E1C E1D、E1A E1B E1C、E1A E1B、E1A、E1、E181、--item E1.2、E1 --item E1.3、--item E1.9、E1 --item）" >&2; exit 2 ;;
+             esac) >"$cell/stdout" 2>"$cell/stderr"; then
+      exit_code=0
+    else
+      exit_code=$?
+    fi
+  }
+  dispatch_most_at_once() { # 同时在跑的行数最多几行
+    awk '$1 == "start" { running++; if (running > most) most = running } $1 == "end" { running-- } END { print most + 0 }' "$calls"
+  }
+  dispatch_company_of() { # <名字>：这一行在跑的时候，同时在跑的行数（连它自己）最多几行
+    awk -v row="$1" '$1 == "start" { running++; on[$2] = 1; if (on[row] && running > most) most = running } $1 == "end" { running--; delete on[$2] } END { print most + 0 }' "$calls"
+  }
+  dispatch_seen() { # 这一趟的起止记录，一行写完（报错用）
+    tr '\n' ' ' <"$calls" | cut -c1-300
+  }
+  dispatch_tail() { # 这一趟标准错误的末尾（报错用）
+    tail -n 4 "$cell/stderr" | tr '\n' ' ' | cut -c1-400 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null
+  }
+
+  dispatch_tree dispatch-memory-bound "" "E1A|e1-sample|a|$e1|exact" "E1B|e1-sample|b|$e1|exact" "E1C|e1-sample|c|$e1|exact" || return 1
+  dispatch_seed 'E1A|e1-sample|a' "$one_gibibyte" 1 && dispatch_seed 'E1B|e1-sample|b' "$one_gibibyte" 1 && dispatch_seed 'E1C|e1-sample|c' "$one_gibibyte" 1 || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES=3221225472 REPLAY_SELFTEST_BARRIER=2)
+  dispatch_run E1A E1B E1C
+  if [[ "$exit_code" == 0 && "$(dispatch_most_at_once)" == 2 ]]; then
+    echo "dispatch-memory-bound ok"
+  else
+    echo "dispatch-memory-bound bad 三行各量过 1 GiB、上限 3 GiB，应当退 0、同时恰好两行；退 $exit_code，同时至多 $(dispatch_most_at_once) 行，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+
+  dispatch_tree dispatch-threads-unbounded "" "E1A|e1-sample|a|$e1|exact" "E1B|e1-sample|b|$e1|exact" "E1C|e1-sample|c|$e1|exact" || return 1
+  dispatch_seed 'E1A|e1-sample|a' "$one_gibibyte" 31 && dispatch_seed 'E1B|e1-sample|b' "$one_gibibyte" 31 && dispatch_seed 'E1C|e1-sample|c' "$one_gibibyte" 31 || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" REPLAY_SELFTEST_BARRIER=3)
+  dispatch_run E1A E1B E1C
+  if [[ "$exit_code" == 0 && "$(dispatch_most_at_once)" == 3 ]]; then
+    echo "dispatch-threads-unbounded ok"
+  else
+    echo "dispatch-threads-unbounded bad 三行各量过 31 线程、REPLAY_JOBS=8、内存放得下：线程不累计，应当三行一起跑；退 $exit_code，同时至多 $(dispatch_most_at_once) 行，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+
+  dispatch_tree dispatch-row-count-bound "" "E1A|e1-sample|a|$e1|exact" "E1B|e1-sample|b|$e1|exact" "E1C|e1-sample|c|$e1|exact" || return 1
+  dispatch_seed 'E1A|e1-sample|a' "$one_gibibyte" 1 && dispatch_seed 'E1B|e1-sample|b' "$one_gibibyte" 1 && dispatch_seed 'E1C|e1-sample|c' "$one_gibibyte" 1 || return 1
+  dispatch_env=(REPLAY_JOBS=2 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" REPLAY_SELFTEST_BARRIER=2)
+  dispatch_run E1A E1B E1C
+  if [[ "$exit_code" == 0 && "$(dispatch_most_at_once)" == 2 ]]; then
+    echo "dispatch-row-count-bound ok"
+  else
+    echo "dispatch-row-count-bound bad REPLAY_JOBS=2、内存放得下：应当同时恰好两行；退 $exit_code，同时至多 $(dispatch_most_at_once) 行，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+
+  dispatch_tree dispatch-exclusive-rows "" "E1A|e1-sample|timing|e1-timing.out|timing" "E1B|e1-sample|a|$e1|exact" "E1C|e1-sample|unmeasured|$e1|exact" "E1D|e1-sample|b|$e1|exact" || return 1
+  dispatch_seed 'E1A|e1-sample|timing' "$one_gibibyte" 1 && dispatch_seed 'E1B|e1-sample|a' "$one_gibibyte" 1 && dispatch_seed 'E1D|e1-sample|b' "$one_gibibyte" 1 || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" REPLAY_SELFTEST_BARRIER=3)
+  dispatch_run E1A E1B E1C E1D
+  if [[ "$exit_code" == 0 && "$(dispatch_company_of a)" == 3 && "$(dispatch_company_of timing)" == 1 && "$(dispatch_company_of unmeasured)" == 3 ]] \
+     && [[ "$(awk '$1 == "start" { last = $2 } END { print last }' "$calls")" == timing ]] \
+     && [[ "$(grep -E '^E1[A-D] ' "$cell/stdout" | awk '{ printf "%s ", $1 }')" == "E1A E1B E1C E1D " ]]; then
+    echo "dispatch-exclusive-rows ok"
+  else
+    echo "dispatch-exclusive-rows bad a、b 与没量过的那一行应当一起跑，timing 行单独跑、排在后面，结果行照旧按表序；退 $exit_code，a 那时 $(dispatch_company_of a) 行、timing 那时 $(dispatch_company_of timing) 行、没量过的那时 $(dispatch_company_of unmeasured) 行，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+
+  # 要卡的那一段（文件头「GPU」「派行」）：要卡的两行在表里排在不要卡的那一行前面，派行把它们挪到最后；起止记录里逐条记「start <参数> cards=<看到的卡>」「end <参数>」，
+  #   dispatch_card_events 把它们连成一串（start 带看到的卡），这三格比的是这一串
+  dispatch_card_events() {
+    awk '$1 == "start" { sub(/^cards=/, "", $3); printf "%s:%s:%s ", $1, $2, $3; next } { printf "%s:%s ", $1, $2 }' "$calls"
+  }
+  local card_rows_events gpu_rows_serial_events="start:cpu:none end:cpu start:gpu-one:selftest-card end:gpu-one start:gpu-two:selftest-card end:gpu-two "
+  dispatch_tree dispatch-gpu-rows-serial "ENABLE_GPU=1" "E1A|@replay_selftest_gpu_row_one||$e1|exact" "E1B|@replay_selftest_gpu_row_two||$e1|exact" "E1C|e1-sample|cpu|$e1|exact" || return 1
+  dispatch_seed 'E1A|@replay_selftest_gpu_row_one|' "$one_gibibyte" 1 && dispatch_seed 'E1B|@replay_selftest_gpu_row_two|' "$one_gibibyte" 1 && dispatch_seed 'E1C|e1-sample|cpu' "$one_gibibyte" 1 || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" GPU_CARDS_BY_PRIORITY=selftest-card)
+  dispatch_run E1A E1B E1C
+  card_rows_events="$(dispatch_card_events)"
+  if [[ "$exit_code" == 0 && "$card_rows_events" == "$gpu_rows_serial_events" ]] \
+     && [[ "$(grep -E '^E1[A-C] ' "$cell/stdout" | awk '{ printf "%s:%s ", $1, $3 }')" == "E1A:字节一致 E1B:字节一致 E1C:字节一致 " ]]; then
+    echo "dispatch-gpu-rows-serial ok"
+  else
+    echo "dispatch-gpu-rows-serial bad 不要卡的一行应当先跑完、看不到卡，要卡的两行一行一行跑、都看到环境里给的卡串，三行都字节一致、结果行照表序，整趟退 0（应为「$gpu_rows_serial_events」）；退 $exit_code，实得「$card_rows_events」，结果行「$(grep -E '^E1[A-C] ' "$cell/stdout" | awk '{ printf "%s:%s ", $1, $3 }')」，$(dispatch_tail)"
+  fi
+
+  local gpu_rows_without_cards_events="start:cpu:none end:cpu start:gpu-one:none end:gpu-one start:gpu-two:none end:gpu-two "
+  dispatch_tree dispatch-gpu-rows-without-cards "ENABLE_GPU=1" "E1A|@replay_selftest_gpu_row_one||$e1|exact" "E1B|@replay_selftest_gpu_row_two||$e1|exact" "E1C|e1-sample|cpu|$e1|exact" || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap")
+  dispatch_run E1A E1B E1C
+  card_rows_events="$(dispatch_card_events)"
+  if [[ "$exit_code" == 0 && "$card_rows_events" == "$gpu_rows_without_cards_events" ]] \
+     && [[ "$(grep -E '^E1[A-C] ' "$cell/stdout" | awk '{ printf "%s:%s ", $1, $3 }')" == "E1A:字节一致 E1B:字节一致 E1C:字节一致 " ]]; then
+    echo "dispatch-gpu-rows-without-cards ok"
+  else
+    echo "dispatch-gpu-rows-without-cards bad 环境里没有卡串：照样不拦，要卡的两行一行一行跑、看不到卡，三行都字节一致，整趟退 0（应为「$gpu_rows_without_cards_events」）；退 $exit_code，实得「$card_rows_events」，结果行「$(grep -E '^E1[A-C] ' "$cell/stdout" | awk '{ printf "%s:%s ", $1, $3 }')」，$(dispatch_tail)"
+  fi
+
+  # 本脚本不交卡的行（文件头「GPU」「派行」，REPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS）：样本仓里那张登记加上 replay_selftest_driver_leased_row（它起假装置 own-cards），
+  #   排在表里最前；照常交卡的 gpu-two 与不要卡的 cpu 各一行。卡串只交给 gpu-two，own-cards 在那一段跑完之后跑、看不到卡
+  local driver_leased_events="start:cpu:none end:cpu start:gpu-two:selftest-card end:gpu-two start:own-cards:none end:own-cards "
+  dispatch_tree dispatch-driver-leased-rows "ENABLE_GPU=1" "E1A|@replay_selftest_driver_leased_row||$e1|exact" "E1B|@replay_selftest_gpu_row_two||$e1|exact" "E1C|e1-sample|cpu|$e1|exact" || return 1
+  python3 - "$root/scripts/experiment-apparatus/replay.sh" <<'PY' || return 1
+import sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+head = "\nREPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS=("
+assert text.count(head) == 1
+text = text.replace(head, head + "replay_selftest_driver_leased_row ")
+open(path, "w", encoding="utf-8").write(text)
+PY
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" GPU_CARDS_BY_PRIORITY=selftest-card)
+  dispatch_run E1A E1B E1C
+  card_rows_events="$(dispatch_card_events)"
+  if [[ "$exit_code" == 0 && "$card_rows_events" == "$driver_leased_events" ]] \
+     && [[ "$(grep -E '^E1[A-C] ' "$cell/stdout" | awk '{ printf "%s:%s ", $1, $3 }')" == "E1A:字节一致 E1B:字节一致 E1C:字节一致 " ]]; then
+    echo "dispatch-driver-leased-rows ok"
+  else
+    echo "dispatch-driver-leased-rows bad 登记成本脚本不交卡的一行应当在交卡那一段跑完之后跑、看不到卡，卡串只交给照常交卡的那一行，三行都字节一致，整趟退 0（应为「$driver_leased_events」）；退 $exit_code，实得「$card_rows_events」，结果行「$(grep -E '^E1[A-C] ' "$cell/stdout" | awk '{ printf "%s:%s ", $1, $3 }')」，$(dispatch_tail)"
+  fi
+
+  dispatch_tree dispatch-oversized-row-refused "" "E1A|e1-sample|a|$e1|exact" || return 1
+  dispatch_seed 'E1A|e1-sample|a' 42949672960 1 || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES=3221225472)
+  dispatch_run E1A
+  if [[ "$exit_code" == 250 && ! -s "$calls" ]] && grep -qF 'E1A.1（量过 42949672960 字节）' "$cell/stderr" && ! grep -qs '^build ' "$cell/cargo-calls.log"; then
+    echo "dispatch-oversized-row-refused ok"
+  else
+    echo "dispatch-oversized-row-refused bad 量过 40 GiB、上限 3 GiB，应当退 250、点名那一行、不编、不起装置；退 $exit_code，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+
+  dispatch_tree row-progress-lines "" "E1A|e1-sample|a|$e1|exact" "E1B|e1-sample|b|$e1|exact" || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" REPLAY_PROGRESS_SECONDS=1 REPLAY_SELFTEST_DEVICE_SECONDS=1.6)
+  dispatch_run E1A E1B
+  if [[ "$exit_code" == 0 ]] \
+     && (( $(grep -c '^REPLAY_ROW E1A\.1 开跑$' "$cell/stderr") == 1 && $(grep -c '^REPLAY_ROW E1B\.2 开跑$' "$cell/stderr") == 1 )) \
+     && (( $(grep -cE '^REPLAY_ROW E1A\.1 判 字节一致 用时 [0-9]+ 秒 峰值 [1-9][0-9]* 线程 [1-9][0-9]*｜E1A ' "$cell/stderr") == 1 )) \
+     && (( $(grep -cE '^REPLAY_ROW E1B\.2 判 字节一致 用时 [0-9]+ 秒 峰值 [1-9][0-9]* 线程 [1-9][0-9]*｜E1B ' "$cell/stderr") == 1 )) \
+     && grep -qE '^REPLAY_ROW E1[AB]\.[12] 在跑 用时 [0-9]+ 秒 峰值 ' "$cell/stderr" && ! grep -q '^REPLAY_ROW' "$cell/stdout"; then
+    echo "row-progress-lines ok"
+  else
+    echo "row-progress-lines bad 现跑的每一行应当起止各一行、峰值是正整数、在跑的报进度、标准输出里没有这几行；退 $exit_code，标准错误里的进度「$(grep '^REPLAY_ROW' "$cell/stderr" | cut -c1-90 | tr '\n' ';' | cut -c1-500 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)」，$(dispatch_tail)"
+  fi
+
+  dispatch_tree row-peak-recorded-then-shared "" "E1A|e1-sample|a|$e1|exact" "E1B|e1-sample|b|$e1|exact" || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap")
+  dispatch_run E1A E1B
+  local records_after_unshared_run
+  records_after_unshared_run="$(find "$cell/records" -type f | wc -l)"
+  printf 'fn main() { println!("one-second-round"); }\n' >"$root/scripts/experiment-apparatus/e1_sample.rs"
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" REPLAY_SELFTEST_BARRIER=2)
+  dispatch_run E1A E1B
+  if [[ "$exit_code" == 0 && "$(dispatch_most_at_once)" == 2 ]] && (( records_after_unshared_run >= 2 )); then
+    echo "row-peak-recorded-then-shared ok"
+  else
+    echo "row-peak-recorded-then-shared bad 跑一趟两行量到的峰值都进记录，下一趟这两行应当一起跑；头一趟之后记录 $records_after_unshared_run 份，下一趟退 $exit_code、同时至多 $(dispatch_most_at_once) 行，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+
+  dispatch_tree row-failed-peak-not-recorded "" "E1A|e1-sample|fail|$e1|exact" || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap")
+  dispatch_run E1A
+  if [[ "$exit_code" == 1 ]] && grep -qE '^E1A +e1-sample +跑不了 +退出码 3' "$cell/stdout" && [[ -z "$(find "$cell/records" -type f)" ]]; then
+    echo "row-failed-peak-not-recorded ok"
+  else
+    echo "row-failed-peak-not-recorded bad 装置退 3 应当记跑不了、整趟退 1、不记峰值；退 $exit_code，记录 $(find "$cell/records" -type f | wc -l) 份，$(dispatch_tail)"
+  fi
+
+  dispatch_tree stopped-keeps-finished-rows "" "E1A|e1-sample|a|$e1|exact" "E1B|e1-sample|hold|$e1|exact" || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap" REPLAY_SELFTEST_DEVICE_HOLD="$cell/device-hold.pid")
+  local -a stop_settings=()
+  mapfile -d '' -t stop_settings < <(dispatch_settings)
+  : >"$calls"
+  # 起法写这一格表里的全部实验号（同 dispatch_run 那一句：闭包按字面实验号收复跑表的行）
+  env -C "$root" -u SINGLEFS_REUSE_SENTINEL_SEED -u CARGO_TARGET_DIR -u TASK_SERVER_MEMORY_CAP_BYTES "${stop_settings[@]}" bash scripts/experiment-apparatus/replay.sh E1A E1B >"$cell/stdout" 2>"$cell/stderr" &
+  replay_pid=$!
+  for _ in {1..150}; do
+    [[ -s "$cell/device-hold.pid" && -f "$cell/replay-out/E1A.1.line" ]] && break
+    sleep 0.1
+  done
+  kill -TERM "$replay_pid" 2>/dev/null
+  wait "$replay_pid"
+  exit_code=$?
+  if [[ "$exit_code" == 143 ]] && grep -qE '^E1A +e1-sample +字节一致' "$cell/stdout" && grep -qx 'REPLAY_STOPPED finished=1 dispatched=2' "$cell/stdout" && ! grep -qE '^E1B ' "$cell/stdout"; then
+    echo "stopped-keeps-finished-rows ok"
+  else
+    echo "stopped-keeps-finished-rows bad E1A 判完、E1B 在跑时发 TERM，应当退 143、标准输出有 E1A 的结果行与 REPLAY_STOPPED，没有 E1B 的；退 $exit_code，标准输出「$(tr '\n' ';' <"$cell/stdout" | cut -c1-300 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)」，$(dispatch_tail)"
+  fi
+
+  local e181_product=e181-landing-check-fixed-point-and-mount-lower-bound-landing.out
+  dispatch_tree e181-goes-through-long-run "" "E181|@driver_e181||$e181_product|timing" || return 1
+  printf 'E7RESULT name=row\nE7RESULT name=done emitted=2 loadavg1=0.00 cpus=32\n' >"$root/research/results/$e181_product"
+  printf '%s\n' '#!/usr/bin/env bash' 'echo "long-run arguments=[$*]" >>"$REPLAY_SELFTEST_RUN_LOG"' 'echo "片 checks：开跑"' 'mkdir -p -- "$E181_PRODUCT_DIRECTORY"' \
+    "printf 'E7RESULT name=row\nE7RESULT name=done emitted=2 loadavg1=0.00 cpus=32\n' >\"\$E181_PRODUCT_DIRECTORY/$e181_product\"" >"$root/scripts/experiment-apparatus/e181-landing-check-long-run.sh"
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap")
+  dispatch_run E181
+  local e181_driver_text
+  e181_driver_text="$(sed -n '/^driver_e181() {$/,/^}$/p' "$root/scripts/experiment-apparatus/replay.sh")"
+  if [[ "$exit_code" == 0 ]] && grep -qE '^E181 +@driver_e181 +字节一致' "$cell/stdout" \
+     && grep -qx 'long-run arguments=\[\]' "$calls" && ! grep -q '^run ' "$cell/cargo-calls.log" \
+     && grep -qF -e '-p singlefs-verification --bin e181_landing_check_fixed_point_and_mount_lower_bound' <<<"$e181_driver_text"; then
+    echo "e181-goes-through-long-run ok"
+  else
+    echo "e181-goes-through-long-run bad E181 应当不带参数起长跑脚本、把它拼出的产物交给判法（判字节一致、整趟退 0），不起 cargo run，驱动正文字面点名装置；退 $exit_code，结果行「$(grep -E '^E181 ' "$cell/stdout" | cut -c1-200)」，长跑脚本「$(cat "$calls")」，cargo「$(tr '\n' ';' <"$cell/cargo-calls.log" | cut -c1-300)」，$(dispatch_tail)"
+  fi
+
+  # --item（文件头「入口脚本」）：一个实验号三行（参数 a、b、c，假装置往起止记录里写自己的参数）；点 E1.2 只起 b，E1 加 --item E1.3 只起 c，
+  #   起的行数、派出数（REPLAY_TOTAL dispatched=）都是 1；行项写错与 --item 缺项名都退 2、点名项名、列出 E1 的行项、不建本轮输出目录、一个装置都不起
+  #   （缺项名那一趟写成 E1 --item：只带 --item 的起法里没有实验号，闭包照只带选项连整张复跑表）
+  dispatch_tree dispatch-item-selects-one-row "" "E1|e1-sample|a|$e1|exact" "E1|e1-sample|b|$e1|exact" "E1|e1-sample|c|$e1|exact" || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap")
+  dispatch_run --item E1.2
+  local item_alone_exit="$exit_code" item_alone_started item_alone_total
+  item_alone_started="$(awk '$1 == "start" { printf "%s ", $2 }' "$calls")"; item_alone_total="$(grep -c '^REPLAY_TOTAL dispatched=1 ' "$cell/stdout")"
+  dispatch_run E1 --item E1.3
+  if [[ "$item_alone_exit" == 0 && "$item_alone_started" == "b " && "$item_alone_total" == 1 ]] \
+     && [[ "$exit_code" == 0 && "$(awk '$1 == "start" { printf "%s ", $2 }' "$calls")" == "c " ]] && grep -q '^REPLAY_TOTAL dispatched=1 ' "$cell/stdout"; then
+    echo "dispatch-item-selects-one-row ok"
+  else
+    echo "dispatch-item-selects-one-row bad 一个实验号三行：--item E1.2 应当只起 b、派出 1 行，E1 --item E1.3 应当只起 c、派出 1 行，都退 0；--item E1.2 退 $item_alone_exit，起了「$item_alone_started」；E1 --item E1.3 退 $exit_code，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+  dispatch_tree dispatch-item-unknown-refused "" "E1|e1-sample|a|$e1|exact" "E1|e1-sample|b|$e1|exact" "E1|e1-sample|c|$e1|exact" || return 1
+  dispatch_run --item E1.9
+  local item_unknown_exit="$exit_code" item_unknown_listed item_unknown_named item_missing_exit
+  item_unknown_listed="$(grep -c 'E1.1 E1.2 E1.3' "$cell/stderr")"
+  item_unknown_named="$(grep -cF 'E1.9' "$cell/stderr")"
+  dispatch_run E1 --item
+  item_missing_exit="$exit_code"
+  if [[ "$item_unknown_exit" == 2 && "$item_missing_exit" == 2 && "$item_unknown_listed" == 1 && "$item_unknown_named" -ge 1 && ! -s "$calls" && ! -e "$cell/replay-out" ]]; then
+    echo "dispatch-item-unknown-refused ok"
+  else
+    echo "dispatch-item-unknown-refused bad --item E1.9 与 E1 --item（缺项名）应当都退 2、点名项名、列出 E1 的行项 E1.1 E1.2 E1.3、不建本轮输出目录、一个装置都不起；E1.9 退 $item_unknown_exit（列项 $item_unknown_listed 行），缺项名退 $item_missing_exit，起止「$(dispatch_seen)」，输出目录 $([[ -e "$cell/replay-out" ]] && echo 建了 || echo 没建)，$(dispatch_tail)"
+  fi
+
+  # 输入缺时本次未跑（REPLAY_DEFERRED_ROW_ROOT）：样本仓里没有工作根，登记了的行要读的导出根一定不在。
+  #   两行（a 没登记、deferred 登记）：deferred 记「本次未跑」、装置不起（起止记录里只有 a）、整趟退 0、REPLAY_TOTAL 带 not_run=1、dispatched=2；
+  #   只有登记了的一行：整趟退 77（一项都没跑到）、一个装置都不起、REPLAY_TOTAL 带 not_run=1
+  deferred_register() { # <行的身份…>：样本仓里 replay.sh 的 REPLAY_DEFERRED_ROW_ROOT 加上这几行（都要读 selftest-missing-root）
+    python3 - "$root/scripts/experiment-apparatus/replay.sh" "$@" <<'PY'
+import sys
+path, identities = sys.argv[1], sys.argv[2:]
+text = open(path, encoding="utf-8").read()
+head = "declare -A REPLAY_DEFERRED_ROW_ROOT=(\n"
+assert text.count(head) == 1
+text = text.replace(head, head + "".join(f'  ["{identity}"]=selftest-missing-root\n' for identity in identities))
+open(path, "w", encoding="utf-8").write(text)
+PY
+  }
+  dispatch_tree dispatch-deferred-row-not-run "" "E1|e1-sample|a|$e1|exact" "E1|e1-sample|deferred|$e1|exact" || return 1
+  deferred_register "E1|e1-sample|deferred" || return 1
+  dispatch_env=(REPLAY_JOBS=8 TASK_SERVER_MEMORY_CAP_BYTES="$big_cap")
+  dispatch_run E1
+  local deferred_mixed_exit="$exit_code" deferred_mixed_started deferred_mixed_total deferred_mixed_line
+  deferred_mixed_started="$(awk '$1 == "start" { printf "%s ", $2 }' "$calls")"
+  deferred_mixed_total="$(grep -c '^REPLAY_TOTAL dispatched=2 .* not_run=1$' "$cell/stdout")"
+  deferred_mixed_line="$(grep -c '^E1 .*本次未跑 ' "$cell/stdout")"
+  dispatch_tree dispatch-deferred-row-not-run-alone "" "E1|e1-sample|deferred|$e1|exact" || return 1
+  deferred_register "E1|e1-sample|deferred" || return 1
+  dispatch_run E1
+  if [[ "$deferred_mixed_exit" == 0 && "$deferred_mixed_started" == "a " && "$deferred_mixed_total" == 1 && "$deferred_mixed_line" == 1 ]] \
+     && [[ "$exit_code" == 77 && ! -s "$calls" ]] && grep -q '^REPLAY_TOTAL dispatched=1 .* not_run=1$' "$cell/stdout"; then
+    echo "dispatch-deferred-row-not-run ok"
+  else
+    echo "dispatch-deferred-row-not-run bad 登记成输入缺的行应当记本次未跑、装置不起、不判红：两行（a、deferred）整趟退 0、只起 a、REPLAY_TOTAL 带 not_run=1；只剩 deferred 一行整趟退 77、一个装置都不起；两行那趟退 $deferred_mixed_exit，起了「$deferred_mixed_started」，REPLAY_TOTAL 命中 $deferred_mixed_total、本次未跑行 $deferred_mixed_line；单行那趟退 $exit_code，起止「$(dispatch_seen)」，$(dispatch_tail)"
+  fi
+}
+
 # 编译目录（文件头「编译目录」）的自证，replay_selftest 调：同一份临时仓（replay_selftest_sample_repository），假 cargo 编的时候把假装置拷进 CARGO_TARGET_DIR 的 release/；
 # 每一格往 stdout 打一行「<格名> ok」或「<格名> bad <一句>」，每一趟之前先把 E1 的装置源码改一个字（行键变了，各格互不复用）、只跑 E1，各格一个自己的 TMPDIR（$work/tmp-<格名>，这一趟的编译目录建在它底下）
 # 与自己的本轮输出目录（REPLAY_OUT=$work/out-<格名>）：
@@ -1074,6 +1553,8 @@ replay_entry_selftest() {
 #   build-directory-removed-when-stopped      E1 的装置开跑之后只给副本那一个进程（$!）发 TERM：5 秒内退 143，装置跟着停（它开着编译目录里自己那份文件），TMPDIR 底下不剩编译目录；
 #                                             副本退了之后不在一个读的时刻上判：限时 5 秒，按装置的进程号等它真退出、轮询到 TMPDIR 底下不剩编译目录，两样都成了才不再等
 #   caller-target-directory-kept              调用方设了 CARGO_TARGET_DIR：假 cargo 拿到的就是它、装置从它的 release/ 起，跑完它与里面的装置都在，TMPDIR 底下不另建
+#   service-build-directory-kept              服务给的 CARGO_TARGET_DIR 里有上一次尝试编出的产物（撞上限重排接着用的那一份）：照它编、装置从它的 release/ 起，
+#                                             跑完它、里面的装置与上一次的产物都在，TMPDIR 底下不另建
 #   copy-build-directories-removed            E1 的装置在本轮输出目录里造一份副本（target/ 带 CACHEDIR.TAG，旁边一个 source/）：跑完 target/ 不在、source/ 与 E1 的产物照留
 replay_build_directory_selftest() {
   local work="$1" root out exit_code=0 tmp leftover replay_pid waited settled stat_line device_pid device_state device_command
@@ -1153,6 +1634,16 @@ replay_build_directory_selftest() {
   else
     echo "caller-target-directory-kept bad 调用方给了 CARGO_TARGET_DIR，应当照它编、装置从它的 release/ 起、跑完它还在、不另建编译目录；退 $exit_code，cargo 拿到「$(sort -u "$work/cargo-calls.log.target" | tr '\n' ' ')」，装置在「$(tr '\n' ' ' <"$work/device-paths.caller-target-directory-kept")」，剩「$leftover」"
   fi
+  # service-build-directory-kept（文件头「编译目录」）：服务给的 CARGO_TARGET_DIR 里有上一次尝试编出的产物：照它编、装置从它的 release/ 起、跑完它与上一次的产物都在、TMPDIR 底下不另建
+  mkdir -p "$work/service-build/release" && echo earlier >"$work/service-build/release/earlier-attempt"
+  build_round service-build-directory-kept CARGO_TARGET_DIR="$work/service-build"
+  if [[ "$exit_code" == 0 && -z "$leftover" && -x "$work/service-build/release/e1-sample" && -f "$work/service-build/release/earlier-attempt" ]] \
+     && grep -qxF "$work/service-build" "$work/cargo-calls.log.target" \
+     && grep -qxF "$work/service-build/release/e1-sample" "$work/device-paths.service-build-directory-kept"; then
+    echo "service-build-directory-kept ok"
+  else
+    echo "service-build-directory-kept bad 服务给了 CARGO_TARGET_DIR，应当照它编、装置从它的 release/ 起、跑完它与上一次尝试的产物都在、不另建编译目录；退 $exit_code，cargo 拿到「$(sort -u "$work/cargo-calls.log.target" | tr '\n' ' ')」，装置在「$(tr '\n' ' ' <"$work/device-paths.service-build-directory-kept")」，剩「$leftover」"
+  fi
   build_round copy-build-directories-removed REPLAY_SELFTEST_COPY_TARGET=1
   if [[ "$exit_code" == 0 && -z "$leftover" && ! -e "$work/out-copy-build-directories-removed/selftest-copy/target" && -d "$work/out-copy-build-directories-removed/selftest-copy/source" \
         && -s "$work/out-copy-build-directories-removed/E1.1.out" ]]; then
@@ -1166,16 +1657,287 @@ replay_build_directory_selftest() {
 #       jobs-default（「✗ 自检：没设 REPLAY_JOBS 时同时跑几条实验要取登记的重活默认」）
 #   REPLAY_BREAK=unknown-experiment-accepted  表里没有的实验号照收
 #       unknown-experiment（「✗ 自检：入口与完整性闸 unknown-experiment：」）
+#   REPLAY_BREAK=deferred-rows-ignored  不看 REPLAY_DEFERRED_ROW_ROOT，登记成输入缺的行照旧起驱动
+#       dispatch-deferred-row-not-run（「✗ 自检：派行 dispatch-deferred-row-not-run：」）
+#   REPLAY_BREAK=item-unknown-accepted  表里没有的行项照收（点不到任何一行）
+#       dispatch-item-unknown-refused（「✗ 自检：派行 dispatch-item-unknown-refused：」）
+#   REPLAY_BREAK=item-row-ignored  --item 不剪行，点到的实验号整个跑
+#       dispatch-item-selects-one-row（「✗ 自检：派行 dispatch-item-selects-one-row：」）
 #   REPLAY_BREAK=emitted-unchecked  闸 2 不核收尾行的 emitted= 与实收条数
 #       integrity-emitted（「✗ 自检：入口与完整性闸 integrity-emitted：」）
 #   REPLAY_BREAK=exit-code-ignored  闸 3 不看装置的退出码
 #       integrity-exit-code（「✗ 自检：入口与完整性闸 integrity-exit-code：」）
-#       连带红的格：「✗ 自检：留存产物取回 device-not-run-red：E1 的装置退 77 应当记跑不了、退出码 77」
+#       连带红的格（装置退非 0 照往下判，本该判跑不了的两格判不出）：「✗ 自检：留存产物取回 device-not-run-red：E1 的装置打了 NOT_RUN 行退 77，应当记跑不了（退出码 77）」、「✗ 自检：派行 row-failed-peak-not-recorded：」
 #   REPLAY_BREAK=e182-transit-unset  driver_e182 与 driver_e182_units_kept 起装置时不设 E182_VERDICT_LIBRARY（装置删了缺省本地库之后退 2）
 #       e182-transit 两个驱动各一格（「✗ 自检：driver_e182 起装置时要把 E182_VERDICT_LIBRARY 设成这一趟的中转目录」
 #       「✗ 自检：driver_e182_units_kept 起装置时要把 E182_VERDICT_LIBRARY 设成这一趟的中转目录」）
 #   REPLAY_BREAK=load-errors-unchecked  command_not_found_handle 不记找不到的命令（载入期一句注释丢了 # 只在 stderr 打一句、自证照判通过）
 #       load-commands-not-found 的第二格（「✗ 自检：现调一个不存在的命令，command_not_found_handle 应当记下它的名字」）
+#   REPLAY_BREAK=missing-row-driver-passes  E171 整表四行的驱动取行时库里缺行（take-rows 退 4）打了出路照往下走（e171_take_rows 返回 0，驱动接着起比对器、退 0）
+#       e171-missing-row-refused（「✗ 自检：E171 整表行只核账 e171-missing-row-refused：」）
+#   REPLAY_BREAK=missing-row-remedy-silent  E171 整表四行库里缺项缺行时不打出路句（e171_library_remedy 什么都不打、照返回 1）
+#       e171-missing-row-refused（「✗ 自检：E171 整表行只核账 e171-missing-row-refused：」）
+# 变异驱动点的变异表与单测模块配得上吗（驱动 python3 mutation_driver.py --table … 里的表，这一族是 mutation_driver.py 认 --unit-test-module 的目录）：<仓根> <读哪份脚本的驱动>。
+#   一个驱动给的单测模块（没给是 mutation_driver.py 的 TEST_MODULES）顺 import 够不着的源文件上改坏的行，单测一条都不红，产物是 survived= 等于表的行数、caught=0：
+#   表里每一行的原文落在的源文件，要有一份在这些模块的 import 闭包里；表头写了 --unit-test-module <模块> 的，驱动要给这个模块。原文一处都没命中的归 mutation_driver.py 自己的锚点核对（退 3），这里不判。
+#   配不上的逐行打「<驱动>：…」、退 1；全配得上打「drivers=<核了几个驱动> rows=<几行>」、退 0。只读文本，不起驱动、不跑单测。弄坏开关 mutation-driver-modules-unchecked：不核、退 0、打 drivers=0。
+replay_mutation_driver_table_problems() {
+  if [[ "$REPLAY_BROKEN" == mutation-driver-modules-unchecked ]]; then echo "drivers=0 rows=0"; return 0; fi
+  python3 -B - "$1" "$2" <<'PY'
+import ast, os, re, sys
+
+root, script = sys.argv[1:3]
+with open(script, encoding="utf-8") as handle:
+    script_text = handle.read()
+
+
+def imports_of(path):
+    with open(path, encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    named = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            named |= {alias.name.split(".")[0] for alias in node.names}
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            named.add(node.module.split(".")[0])
+    return named
+
+
+problems, drivers, rows_checked = [], 0, 0
+for found in re.finditer(r"^(driver_\w+)\(\) \{\n(.*?)^\}", script_text, re.M | re.S):
+    name, body = found.groups()
+    if "mutation_driver.py" not in body:
+        continue
+    directory_named = re.search(r'cd "\$repository_root/([^"]+)"', body)
+    table_named = re.search(r'--table "\$repository_root/([^"]+)"', body)
+    if not directory_named or not table_named:
+        problems.append(f'{name}：驱动里认不出 cd "$repository_root/<目录>" 或 --table "$repository_root/<表>"，核不了它的表与单测模块')
+        continue
+    directory = os.path.join(root, directory_named.group(1))
+    table = os.path.join(root, table_named.group(1))
+    driver_path = os.path.join(directory, "mutation_driver.py")
+    if not os.path.isfile(driver_path):
+        problems.append(f"{name}：{driver_path} 不在")
+        continue
+    with open(driver_path, encoding="utf-8") as handle:
+        driver_text = handle.read()
+    if "--unit-test-module" not in driver_text:
+        continue   # 这个目录的驱动不认这个选项：表与单测是一一对应的一份，没有配错的余地
+    if not os.path.isfile(table):
+        problems.append(f"{name}：变异表 {table} 不在")
+        continue
+    given = re.findall(r"--unit-test-module (\S+)", body)
+    default_named = re.search(r"^TEST_MODULES = (.*)$", driver_text, re.M)
+    modules = given or (list(ast.literal_eval(default_named.group(1))) if default_named else [])
+    module_names = {entry[:-3] for entry in os.listdir(directory) if entry.endswith(".py")}
+    closure, pending = set(), list(modules)
+    while pending:
+        module = pending.pop()
+        if module in closure or module not in module_names:
+            continue
+        closure.add(module)
+        pending += imports_of(os.path.join(directory, module + ".py")) & module_names
+    sources = sorted(entry for entry in module_names if entry != "mutation_driver" and not entry.startswith("test_"))
+    source_texts = {}
+    for source in sources:
+        with open(os.path.join(directory, source + ".py"), encoding="utf-8") as handle:
+            source_texts[source] = handle.read()
+    with open(table, encoding="utf-8") as handle:
+        table_lines = handle.read().splitlines()
+    declared = set(re.findall(r"--unit-test-module (test_\w+)", "\n".join(line for line in table_lines if line.startswith("#"))))
+    if declared - set(modules):
+        problems.append(f"{name}：{table_named.group(1)} 表头写的单测模块 {sorted(declared - set(modules))} 驱动没给（驱动给的是 {modules}）")
+    drivers += 1
+    unreached = []
+    for line in table_lines:
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("	")
+        rows_checked += 1
+        anchor = fields[1].replace("\\n", "\n") if len(fields) > 1 else ""
+        hit = [source for source in sources if anchor and anchor in source_texts[source]]
+        if hit and not closure & set(hit):
+            unreached.append(fields[0])
+    if unreached:
+        problems.append(f"{name}：{table_named.group(1)} 有 {len(unreached)} 行改的源文件不在单测模块 {modules} 的 import 闭包里，这些行单测不会红（头一行 {unreached[0]}）")
+for problem in problems:
+    print(problem)
+if problems:
+    sys.exit(1)
+print(f"drivers={drivers} rows={rows_checked}")
+PY
+}
+# 两格静态核（replay_selftest 的一组，一格一行「<格名> ok」或「<格名> bad <说明>」）：只读这份脚本与它点到的表和单测，不编、不跑实验
+#   load-settle-awk-names  这份脚本里每处 awk -v 的变量名都不是 gawk 的内建名字，等负载那一段（replay_wait_for_load_to_settle）照 gawk 起：比值在阈值以内不睡、超了睡（sleep 换成只记一笔的假的）
+#     （gawk 见到内建名字直接退 2：比值判不出来，这一段照满上限等，stderr 一句 fatal，mawk 不报，所以名字另按名单静态判，两台判的一样）
+#   mutation-driver-tables  真仓这份脚本里的变异驱动都配得上；样本（两张表、两份单测）里漏了 --unit-test-module 的驱动判红、点名它，给对了的不点名，表头写的模块没给的判红
+replay_static_selftest() {
+  local work="$1" script_text settle_text awk_names name reserved_used=() settle_path sleep_log settle_status
+  mkdir -p "$work/bin"
+  script_text="$(<"${BASH_SOURCE[0]}")"
+  settle_text="$(sed -n '/^replay_wait_for_load_to_settle() {$/,/^}$/p' "${BASH_SOURCE[0]}")"
+  if [[ "$REPLAY_BROKEN" == load-settle-builtin-name ]]; then
+    script_text="${script_text//load_average/load}"
+    settle_text="${settle_text//load_average/load}"
+  fi
+  awk_names="$(grep -E '(^|[^[:alnum:]_])awk[[:space:]]' <<<"$script_text" | grep -oE -- '-v [A-Za-z_]+=' | sed -E 's/^-v //; s/=$//' | sort -u)"
+  for name in $awk_names; do
+    case " BEGIN BEGINFILE END ENDFILE and asort asorti atan2 bindtextdomain break case close compl continue cos dcgettext dcngettext default delete do else eval exit exp fflush for func function gensub getline gsub if in include index int intdiv intdiv0 isarray length load log lshift match mkbool mktime namespace next nextfile or patsplit print printf rand return rshift sin split sprintf sqrt srand stopme strftime strtonum sub substr switch system systime tolower toupper typeof while xor " in
+      *" $name "*) reserved_used+=("$name") ;;
+    esac
+  done
+  printf '%s\n' '#!/usr/bin/env bash' 'echo slept >>"$REPLAY_SELFTEST_SLEEP_LOG"' >"$work/bin/sleep"
+  chmod +x "$work/bin/sleep"
+  settle_path="$work/bin:$PATH"
+  if command -v gawk >/dev/null 2>&1; then ln -s "$(command -v gawk)" "$work/bin/awk"; fi
+  sleep_log="$work/slept.log"
+  : >"$sleep_log"
+  # 等负载那一段在子 shell 里照 settle_text 定义一遍（弄坏开关 load-settle-builtin-name 换过名字的那一份）、export -f 交给子 bash；
+  # -c 的串整个是字面的：单元闭包认得出它起什么，串里拼函数正文的折不出、会拒算。replay_selftest 在仓根调这一组，heavy-threads.sh 照仓根的相对路径 source
+  (eval "$settle_text"; export -f replay_wait_for_load_to_settle
+   PATH="$settle_path" REPLAY_SELFTEST_SLEEP_LOG="$sleep_log" TIMING_LOAD_RATIO=1000000 REPLAY_TIMING_SETTLE_SECONDS=1 bash -c 'source scripts/hosts/heavy-threads.sh; replay_wait_for_load_to_settle') >"$work/settle-within.out" 2>&1
+  settle_status=$?
+  local slept_within slept_beyond
+  slept_within="$(grep -c . "$sleep_log")"
+  : >"$sleep_log"
+  (eval "$settle_text"; export -f replay_wait_for_load_to_settle
+   PATH="$settle_path" REPLAY_SELFTEST_SLEEP_LOG="$sleep_log" TIMING_LOAD_RATIO=-1 REPLAY_TIMING_SETTLE_SECONDS=1 bash -c 'source scripts/hosts/heavy-threads.sh; replay_wait_for_load_to_settle') >"$work/settle-beyond.out" 2>&1
+  slept_beyond="$(grep -c . "$sleep_log")"
+  if (( ${#reserved_used[@]} == 0 )) && [[ "$settle_status" == 0 && "$slept_within" == 0 && "$slept_beyond" == 1 && ! -s "$work/settle-within.out" && ! -s "$work/settle-beyond.out" ]]; then
+    echo "load-settle-awk-names ok"
+  else
+    echo "load-settle-awk-names bad awk -v 不许用 gawk 的内建名字（用了：${reserved_used[*]-无}），比值在阈值以内不睡、超了睡一次；实际退 $settle_status、阈值以内睡 $slept_within 次、超了睡 $slept_beyond 次，输出「$(cat "$work/settle-within.out" "$work/settle-beyond.out" | tr '\n' ' ' | cut -c1-300)」"
+  fi
+
+  local sample="$work/driver-sample" real_output real_status sample_output sample_status
+  mkdir -p "$sample/device"
+  printf '%s\n' 'TEST_MODULES = ("test_alpha",)' '# 认 --unit-test-module' >"$sample/device/mutation_driver.py"
+  printf '%s\n' 'import alpha' >"$sample/device/test_alpha.py"
+  printf '%s\n' 'import beta' >"$sample/device/test_beta.py"
+  printf '%s\n' 'def alpha_answer():' '    return 41' >"$sample/device/alpha.py"
+  printf '%s\n' 'def beta_answer():' '    return 42' >"$sample/device/beta.py"
+  printf '# 样本表\nS1 改 beta\treturn 42\treturn 43\n' >"$sample/beta.tsv"
+  printf '# 样本表，经 mutation_driver.py 带 --unit-test-module test_beta 跑\nF1 改 alpha\treturn 41\treturn 40\n' >"$sample/alpha-declared.tsv"
+  printf '%s\n' 'driver_sample_missing() {' \
+    '  (cd "$repository_root/device" && python3 mutation_driver.py --table "$repository_root/beta.tsv" --scratch s --output o)' '}' \
+    'driver_sample_given() {' \
+    '  (cd "$repository_root/device" && python3 mutation_driver.py --table "$repository_root/beta.tsv" --unit-test-module test_beta --scratch s --output o)' '}' \
+    'driver_sample_declared_other() {' \
+    '  (cd "$repository_root/device" && python3 mutation_driver.py --table "$repository_root/alpha-declared.tsv" --unit-test-module test_alpha --scratch s --output o)' '}' >"$sample/script.sh"
+  if real_output="$(replay_mutation_driver_table_problems "$PWD" "${BASH_SOURCE[0]}" 2>&1)"; then real_status=0; else real_status=$?; fi
+  if sample_output="$(replay_mutation_driver_table_problems "$sample" "$sample/script.sh" 2>&1)"; then sample_status=0; else sample_status=$?; fi
+  if [[ "$real_status" == 0 && "$sample_status" == 1 && "$real_output" =~ ^drivers=[1-9] ]] \
+     && grep -q '^driver_sample_missing：beta.tsv 有 1 行改的源文件不在单测模块' <<<"$sample_output" \
+     && grep -q '^driver_sample_declared_other：alpha-declared.tsv 表头写的单测模块' <<<"$sample_output" \
+     && ! grep -q '^driver_sample_given：' <<<"$sample_output"; then
+    echo "mutation-driver-tables ok"
+  else
+    echo "mutation-driver-tables bad 真仓的变异驱动要都配得上、样本里漏 --unit-test-module 与表头写的模块没给的两个驱动要判红、给对了的不点名；真仓退 $real_status「$(tr '\n' ' ' <<<"$real_output" | cut -c1-400)」，样本退 $sample_status「$(tr '\n' ' ' <<<"$sample_output" | cut -c1-400)」"
+  fi
+}
+# E171 整表那四行只核账的一格（replay_selftest 的一组，一格一行「<格名> ok」或「<格名> bad <说明>」）：
+#   e171-missing-row-refused  样本仓（replay_selftest_sample_repository：假 cargo 记下每一次起它）里放假的取行程序 shared_steps.py（take 照取到；take-rows 点到
+#     REPLAY_SELFTEST_MISSING_ROWS_ROOT 那张表退 4、别的表照取到）、假比对器 comparator.py 与假的 scripts/hosts/minimal-copy.py（只建目录），三样每起一回往
+#     REPLAY_SELFTEST_RUN_LOG 记一笔（拷副本的不记）；从本文件取出四个驱动与它们用的函数，在样本仓里各起一次，每个驱动缺的是它自己那张表的行
+#     （F4、补位两行先把前面的段记成这一趟做完：driver_e171_s4_comparator 照记号直接交它留下的产物）：都要退非 0、stderr 有分片入口的整条命令（带范围声明）、
+#     stdout 不打，记录里只有取行程序那几笔（共用前置一笔、缺的那张表一笔；F4、补位两行只有缺的那张表一笔），假 cargo 一次没起
+#   REPLAY_BREAK 在这一格里只认 missing-row-driver-passes、missing-row-remedy-silent 两条，别的开关打开时这一格照清空开关跑（不跟着红）
+replay_e171_library_selftest() {
+  local work="$1" root tools definitions e171_case driver rest missing stages out status expected remedy_line problems=""
+  if ! replay_selftest_sample_repository "$work" >"$work.sample.log" 2>&1; then
+    echo "e171-missing-row-refused bad 样本仓搭不起来（replay_selftest_sample_repository 退非 0）：$(tail -n 3 "$work.sample.log" | tr '\n' ' ' | cut -c1-300)"
+    return 0
+  fi
+  root="$work/root"
+  tools="$root/scripts/experiment-apparatus/e171_three_oracle_collusion"
+  mkdir -p "$tools" || return 1
+  cat >"$tools/shared_steps.py" <<'FAKE_TAKE'
+import os
+import sys
+
+arguments = sys.argv[1:]
+command = arguments[0] if arguments else "-"
+output_root = os.path.basename(arguments[arguments.index("--output-root") + 1]) if "--output-root" in arguments else "-"
+with open(os.environ["REPLAY_SELFTEST_RUN_LOG"], "a", encoding="utf-8") as log:
+    log.write(f"shared_steps {command} {output_root}\n")
+if command == "take-rows" and output_root == os.environ.get("REPLAY_SELFTEST_MISSING_ROWS_ROOT"):
+    print(f"row=5 reason=库里没有这把键 output_root={output_root}", file=sys.stderr)
+    sys.exit(4)
+if command == "take-rows":
+    print("table lanes=0 selftest")
+FAKE_TAKE
+  cat >"$tools/comparator.py" <<'FAKE_COMPARATOR'
+import os
+import sys
+
+arguments = sys.argv[1:]
+with open(os.environ["REPLAY_SELFTEST_RUN_LOG"], "a", encoding="utf-8") as log:
+    log.write("comparator\n")
+if "--print-q3-core-rows" in arguments:
+    print("q3_core_rows=8")
+elif "--output" in arguments:
+    with open(arguments[arguments.index("--output") + 1], "w", encoding="utf-8") as handle:
+        handle.write("E7RESULT name=selftest-comparator\n")
+FAKE_COMPARATOR
+  printf '%s\n' 'import os' 'import sys' 'os.makedirs(sys.argv[2], exist_ok=True)' >"$root/scripts/hosts/minimal-copy.py"
+  # 驱动定义在这个函数被调用之后才读到：从本文件里取出来，在子 shell 里 eval（同「驱动开跑前核输入」那几格）
+  definitions="$(awk '
+    /^E171_FREEZE_REFERENCE=/ { print; next }
+    /^e171_s4_stage_(done|mark)\(\) \{/ { print; next }
+    /^(e171_library_remedy|e171_take_shared_steps|e171_take_rows|driver_e171_s2_comparator|driver_e171_s4_comparator|driver_e171_s4_f4_comparator|driver_e171_s4_f4_substitutes_comparator)\(\) \{/ { inside = 1 }
+    inside { print; if ($0 ~ /^\}/) inside = 0 }' "${BASH_SOURCE[0]}")"
+  # <驱动>:<缺行的那张表（输出根的名字）>:<先记成做完的段>
+  for e171_case in driver_e171_s2_comparator:rows-s2-trial: driver_e171_s4_comparator:rows-s4: \
+    driver_e171_s4_f4_comparator:rows-s4-f4:s4 driver_e171_s4_f4_substitutes_comparator:rows-s4-f4-substitutes:s4,f4; do
+    driver="${e171_case%%:*}"; rest="${e171_case#*:}"; missing="${rest%%:*}"; stages="${rest#*:}"
+    out="$work/out-$driver"
+    mkdir -p "$out" || return 1
+    if (
+      cd "$root" || exit 2
+      eval "$definitions" || exit 2
+      case "$REPLAY_BROKEN" in missing-row-driver-passes|missing-row-remedy-silent) ;; *) REPLAY_BROKEN= ;; esac
+      OUT_DIR="$out"
+      CHECKER_TIER_FEATURES=()   # 驱动里点到这个数组；这一格不开 GPU，给空数组（没设时 set -u 下驱动第一行就退）
+      export PATH="$work/bin:$PATH" REPLAY_SELFTEST_RUN_LOG="$out.run.log" REPLAY_SELFTEST_CARGO_LOG="$out.cargo.log" REPLAY_SELFTEST_MISSING_ROWS_ROOT="$missing"
+      : >"$E171_FREEZE_REFERENCE" && mkdir -p "$OUT_DIR/e171-s4-comparator" || exit 2
+      printf 'E7RESULT name=selftest-s4\n' >"$OUT_DIR/e171-s4-comparator/comparator.out"
+      printf 'E7RESULT name=selftest-s4-f4\n' >"$OUT_DIR/e171-s4-comparator/comparator-f4.out"
+      for stage in ${stages//,/ }; do e171_s4_stage_mark "$OUT_DIR/e171-s4-comparator" "$stage" || exit 2; done
+      "$driver"
+    ) >"$out.stdout" 2>"$out.stderr"; then status=0; else status=$?; fi
+    expected="shared_steps take-rows $missing"
+    [[ -n "$stages" ]] || expected="shared_steps take -"$'\n'"$expected"
+    remedy_line="$(grep -F -- "task-server/task submit --cwd $root -- bash scripts/experiment-apparatus/e171-row-shard.sh --root " "$out.stderr" | head -n 1)"
+    if [[ "$status" == 0 || "$(cat -- "$out.run.log" 2>/dev/null)" != "$expected" || -s "$out.cargo.log" || -s "$out.stdout" \
+          || "$remedy_line" != *"SINGLEFS_RUN_SCOPE='种类=whole; 跑什么="*"; 范围="*"; 为什么="* ]]; then
+      problems+="${driver} 退 $status、出路句「${remedy_line:-没有}」、记录「$(tr '\n' ' ' <"$out.run.log" 2>/dev/null)」（要「$(tr '\n' ' ' <<<"$expected")」）、cargo「$(tr '\n' ' ' <"$out.cargo.log" 2>/dev/null)」、stdout「$(tr '\n' ' ' <"$out.stdout")」、stderr「$(tr '\n' ' ' <"$out.stderr" | cut -c1-200)」；"
+    fi
+  done
+  if [[ -z "$problems" ]]; then
+    echo "e171-missing-row-refused ok"
+  else
+    echo "e171-missing-row-refused bad 库里缺一行时四个驱动都要退非 0、stderr 打带范围声明的分片入口整条命令、stdout 不打、只起取行程序：$(cut -c1-1500 <<<"$problems" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)"
+  fi
+}
+# 递归删目录前的守卫（目标是几段变量拼出来的，如「$OUT_DIR/名字」，其中一段为空就删到别处，「${变量:?}」只挡整串为空）：
+# <根> 非空，且每个 <目标> 都严格落在 <根>/ 底下（比「<根>/」长），才删；不满足的什么都不删，退 1、stderr 点名。
+replay_remove_directory_below() { # <根> <目标>…
+  local root_directory="${1:-}" directory_to_remove
+  if [[ -z "$root_directory" ]]; then
+    echo "  ✗ replay_remove_directory_below：根是空的，不删（目标 ${2:-}）" >&2
+    echo "     → 怎么办：调用方先把根（\$OUT_DIR 这类）定下来再删" >&2
+    return 1
+  fi
+  shift
+  for directory_to_remove in "$@"; do
+    if [[ "$directory_to_remove" != "$root_directory"/?* ]]; then
+      echo "  ✗ replay_remove_directory_below：「$directory_to_remove」不在「$root_directory」底下，不删" >&2
+      echo "     → 怎么办：目标由几段变量拼成，查哪一段是空的或指到了别处" >&2
+      return 1
+    fi
+    rm -rf -- "${directory_to_remove:?}"
+  done
+}
 replay_selftest() {
   local scratch failures=0 checked=0 status problems_last_line
   # 载入期找不到的命令（command_not_found_handle 记的），在自证别的步骤跑之前先存一份：load-commands-not-found 那一格判它
@@ -1190,6 +1952,8 @@ replay_selftest() {
     echo "     → 怎么办：照 scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service 那一条，在临时服务底下起这一份自证（带 --server-binary 就不编）"
     return 2
   fi
+  # 服务交给这一条自证的编译目录（CARGO_TARGET_DIR）与调用方的卡串（文件头「编译目录」「GPU」）不传给自证起的副本：要它们的那几格各自在环境里给
+  unset CARGO_TARGET_DIR GPU_CARDS_BY_PRIORITY
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/replay-selftest-XXXXXX")"
   # 中途报错、被打断也删（成功、失败都删；local 变量到退出时已不在，路径在这里就展开）
   trap "rm -rf -- '$scratch'" EXIT
@@ -1201,7 +1965,9 @@ replay_selftest() {
   checked=$((checked + 1))
   local guard_probe_break=thread-registry-not-copied guard_probe_output guard_probe_status
   [[ "$REPLAY_BROKEN" != guard-off ]] || guard_probe_break=guard-off
-  if guard_probe_output="$(env REPLAY_SELFTEST_MARK= REPLAY_BREAK="$guard_probe_break" bash scripts/experiment-apparatus/replay.sh --force --break-guard-probe-unknown-option 2>&1 </dev/null)"; then guard_probe_status=0; else guard_probe_status=$?; fi
+  # 探针带一个表里没有的实验号 break-guard-probe-unknown-experiment（不以 - 起头）：闭包按这个字面实验号收复跑表的行（一行都不收）；只带选项就连整张复跑表。
+  # 守卫在读参数之前就拒，带不带它退出码与拒绝说明都一样；guard-off 下它与那个选项一起照「复跑表里没有」退 2
+  if guard_probe_output="$(env REPLAY_SELFTEST_MARK= REPLAY_BREAK="$guard_probe_break" bash scripts/experiment-apparatus/replay.sh --force --break-guard-probe-unknown-option break-guard-probe-unknown-experiment 2>&1 </dev/null)"; then guard_probe_status=0; else guard_probe_status=$?; fi
   if [[ "$guard_probe_status" != 2 ]] || ! grep -qE 'REPLAY_BREAK.*(自证|selftest)' <<<"$guard_probe_output"; then
     echo "  ✗ 自检：平常跑设了弄坏开关应当退 2 并点名 REPLAY_BREAK 只在自证里认；实际退 $guard_probe_status：$(head -n 3 <<<"$guard_probe_output" | tr '\n' ' ')"
     echo "     → 怎么办：看文件头附近那一道拒（REPLAY_BREAK 非空而没有自证的标记就退 2）；REPLAY_BREAK=guard-off 设着的话这里本来就该红"
@@ -1281,12 +2047,16 @@ replay_selftest() {
   done
   # E182 两个驱动（文件头「E182 的片结果库」）：起装置时 E182_VERDICT_LIBRARY 设成这一趟中转目录里各自那一种；从本文件取出两段定义、在子 shell 里 eval，假 cargo 记收到的值
   printf '%s\n' '#!/usr/bin/env bash' 'echo "$*|E182_VERDICT_LIBRARY=${E182_VERDICT_LIBRARY-没设}" >>"${FAKE_CARGO_LOG:?}"' 'exit 0' >"$scratch/driver-bin/cargo"
-  local e182_definitions
+  # 驱动名写成 for 的字面词（不从带 $scratch 的串里切）：单元闭包把下面命令位置上的 "$driver_name" 折成这几个驱动函数（lib_function_units.py 文件头「起代码的写法逐种认」），
+  # 带 $scratch 的串折不出，同一个函数里两处 "$driver_name" 都会拒算
+  local e182_definitions e182_mode
   e182_definitions="$(awk '/^(driver_e182|driver_e182_units_kept)\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
-  for driver_case in \
-    "driver_e182|run -q --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks -- single-device|E182_VERDICT_LIBRARY=$scratch/e182-shards/e182-single-device" \
-    "driver_e182_units_kept|run -q --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks -- single-device-units-kept|E182_VERDICT_LIBRARY=$scratch/e182-shards/e182-single-device-units-kept"; do
-    driver_name="${driver_case%%|*}"; driver_expected="${driver_case#*|}"
+  for driver_name in driver_e182 driver_e182_units_kept; do
+    case "$driver_name" in
+      driver_e182) e182_mode=single-device ;;
+      driver_e182_units_kept) e182_mode=single-device-units-kept ;;
+    esac
+    driver_expected="run -q --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks -- $e182_mode|E182_VERDICT_LIBRARY=$scratch/e182-shards/e182-$e182_mode"
     : >"$scratch/driver-cargo.log"
     checked=$((checked + 1))
     (unset E182_VERDICT_LIBRARY; CHECKER_TIER_FEATURES=(); REPLAY_E182_SHARDS="$scratch/e182-shards"; eval "$e182_definitions"
@@ -1312,7 +2082,7 @@ replay_selftest() {
   gpu_probe() { # <配置文件路径> <假 cargo 的结局>：子 shell 里跑一遍，打「状态 特性数组」一行；stderr 进 gpu-probe.stderr，cargo 的调用进 gpu-calls.log
     : >"$scratch/gpu-calls.log"
     ( export SINGLEFS_MULTI_HOST_CONFIG="$1" FAKE_CARGO_LOG="$scratch/gpu-calls.log" FAKE_CARGO_OUTCOME="$2" PATH="$scratch/gpu-bin:$PATH" \
-        QUIESCE_CALLS="$scratch/quiesce-calls.log" GPU_CARDS_BY_PRIORITY=127.0.0.1:0:28G
+        QUIESCE_CALLS="$scratch/quiesce-calls.log"
       resolve_checker_tier_features "$scratch/gpu-probe.log" 2>"$scratch/gpu-probe.stderr"; probe_status=$?
       echo "$probe_status ${CHECKER_TIER_FEATURES[*]:-}" )
   }
@@ -1363,28 +2133,19 @@ replay_selftest() {
     echo "  ✗ 自检：开了 GPU 而 gpu 特性编不过，应当退 78、打第一处错与日志路径、不带特性数组；实际「$gpu_reading」：$(cat "$scratch/gpu-probe.stderr")"  # gate-lint:detail
     failures=$((failures + 1))
   fi
-  # 开了 GPU 的卡由服务交（service_gpu_cards_present）：cards_run 打「resolve=<返回值>」，过了再打照装置那样直接起的一条命令看到的「cards=<GPU_CARDS_BY_PRIORITY>」；
-  #   多机配置里的清场命令是假的、往 quiesce-calls.log 记一笔（不另套清场，一笔都不该有）
-  cards_run() { # <配置文件路径> <环境里的 GPU_CARDS_BY_PRIORITY，空串就是不设>
-    : >"$scratch/gpu-calls.log"; : >"$scratch/quiesce-calls.log"
-    ( export SINGLEFS_MULTI_HOST_CONFIG="$1" FAKE_CARGO_LOG="$scratch/gpu-calls.log" FAKE_CARGO_OUTCOME=green PATH="$scratch/gpu-bin:$PATH" QUIESCE_CALLS="$scratch/quiesce-calls.log"
-      unset GPU_CARDS_BY_PRIORITY
-      if [[ -n "$2" ]]; then export GPU_CARDS_BY_PRIORITY="$2"; fi
-      resolve_checker_tier_features "$scratch/gpu-probe.log" 2>"$scratch/gpu-probe.stderr"; probe_status=$?
-      echo "resolve=$probe_status"
-      if (( probe_status == 0 )); then bash -c 'echo "cards=${GPU_CARDS_BY_PRIORITY-unset}"'; fi )
-  }
+  # gpu-probe-takes-no-cards（文件头「GPU」：不领卡）：开了 GPU、环境里没有卡串，resolve_checker_tier_features 返回 0，
+  #   照装置那样直接起的一条命令看到的是「cards=unset」（不领卡、不设卡串）；多机配置里的清场命令是假的、往 quiesce-calls.log 记一笔（不另套清场，一笔都不该有）
   local cards_reading
   checked=$((checked + 1))
-  cards_reading="$(cards_run "$scratch/gpu-on.env" 127.0.0.1:0:28G | tr '\n' ' ')"
-  if [[ "$cards_reading" != "resolve=0 cards=127.0.0.1:0:28G " || -s "$scratch/quiesce-calls.log" ]]; then
-    echo "  ✗ 自检：开了 GPU、环境里有服务交的 GPU_CARDS_BY_PRIORITY，应当返回 0、照装置那样起的命令看到的就是那一份 127.0.0.1:0:28G、一条清场命令都不跑；实际「$cards_reading」，假清场命令记了「$(tr '\n' '|' <"$scratch/quiesce-calls.log")」：$(tail -n 3 "$scratch/gpu-probe.stderr" | tr '\n' ' ')"  # gate-lint:detail
-    failures=$((failures + 1))
-  fi
-  checked=$((checked + 1))
-  cards_reading="$(cards_run "$scratch/gpu-on.env" '' | tr '\n' ' ')"
-  if [[ "$cards_reading" != "resolve=78 " ]] || ! grep -qF "环境里却没有 GPU_CARDS_BY_PRIORITY" "$scratch/gpu-probe.stderr" || [[ -s "$scratch/quiesce-calls.log" ]]; then
-    echo "  ✗ 自检：开了 GPU 而环境里没有服务交的 GPU_CARDS_BY_PRIORITY，应当退 78、点名 GPU_CARDS_BY_PRIORITY、一条清场命令都不跑；实际「$cards_reading」，假清场命令记了「$(tr '\n' '|' <"$scratch/quiesce-calls.log")」：$(tail -n 3 "$scratch/gpu-probe.stderr" | tr '\n' ' ')"  # gate-lint:detail
+  : >"$scratch/gpu-calls.log"; : >"$scratch/quiesce-calls.log"
+  cards_reading="$( ( export SINGLEFS_MULTI_HOST_CONFIG="$scratch/gpu-on.env" FAKE_CARGO_LOG="$scratch/gpu-calls.log" FAKE_CARGO_OUTCOME=green PATH="$scratch/gpu-bin:$PATH" \
+                      QUIESCE_CALLS="$scratch/quiesce-calls.log"
+                    unset GPU_CARDS_BY_PRIORITY
+                    resolve_checker_tier_features "$scratch/gpu-probe.log" 2>"$scratch/gpu-probe.stderr"; probe_status=$?
+                    echo "resolve=$probe_status"
+                    if (( probe_status == 0 )); then bash -c 'echo "cards=${GPU_CARDS_BY_PRIORITY-unset}"'; fi ) | tr '\n' ' ')"
+  if [[ "$cards_reading" != "resolve=0 cards=unset " || -s "$scratch/quiesce-calls.log" ]]; then
+    echo "  ✗ 自检：开了 GPU、环境里没有卡串，应当返回 0、照装置那样起的命令看不到卡（不领卡）、一条清场命令都不跑；实际「$cards_reading」，假清场命令记了「$(tr '\n' '|' <"$scratch/quiesce-calls.log")」：$(tail -n 3 "$scratch/gpu-probe.stderr" | tr '\n' ' ')"  # gate-lint:detail
     failures=$((failures + 1))
   fi
   # 起 验证包装置的 cargo run 行（用到给定状态引擎的那几个装置）每一行都带特性数组：新加一行忘了带，开了 GPU 时那一行拿不到判段结论
@@ -1427,13 +2188,12 @@ replay_selftest() {
     failures=$((failures + 1))
   fi
   # 拷今天这棵树去编译的副本照共用库的闭包拷全（replay_copy_closure_into）：lib_repository_copy.py entries 列的每一条（path 依赖的 prune-server/、
-  # 编译期读的 .claude/heavy-thread-default、运行期起的脚本）在副本里都在；e168_patched_tree、driver_e171_s4_comparator 与 driver_e175 都经它拷
-  local closure_entries closure_entry closure_missing="" patched_tree_definition frozen_tree_definition positive_controls_definition repository_copy_definition
-  # 驱动定义在这个函数被调用之后才读到：从本文件里取出那四段定义，落进变量再比（管道收尾的 grep -q 在 pipefail 下会把命中读成没命中）
+  # 编译期读的 .claude/heavy-thread-default、运行期起的脚本）在副本里都在；e168_patched_tree 与 driver_e171_s4_comparator 都经它拷
+  local closure_entries closure_entry closure_missing="" patched_tree_definition frozen_tree_definition positive_controls_definition
+  # 驱动定义在这个函数被调用之后才读到：从本文件里取出那三段定义，落进变量再比（管道收尾的 grep -q 在 pipefail 下会把命中读成没命中）
   patched_tree_definition="$(awk '/^e168_patched_tree\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
   frozen_tree_definition="$(awk '/^driver_e171_s4_comparator\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
   positive_controls_definition="$(awk '/^driver_e168_positive_controls\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
-  repository_copy_definition="$(awk '/^driver_e175\(\) \{/,/^}/' "${BASH_SOURCE[0]}")"
   checked=$((checked + 1))
   closure_entries="$(python3 scripts/hosts/lib_repository_copy.py entries . | awk -F'\t' '/^REPOSITORY_COPY entry /{ sub(/^REPOSITORY_COPY entry /, "", $1); print $1 }')"
   replay_copy_closure_into "$scratch/closure-tree" 2>"$scratch/closure-tree.err"
@@ -1441,11 +2201,11 @@ replay_selftest() {
     [[ -z "$closure_entry" || -e "$scratch/closure-tree/$closure_entry" ]] || closure_missing+=" $closure_entry"
   done <<<"$closure_entries"
   if [[ -z "$closure_entries" || -n "$closure_missing" || "$patched_tree_definition" != *replay_copy_closure_into* \
-        || "$frozen_tree_definition" != *replay_copy_closure_into* || "$repository_copy_definition" != *replay_copy_closure_into* ]]; then
-    echo "  ✗ 自检：拷今天这棵树去编译的副本要照共用库的闭包拷全（lib_repository_copy.py entries 列的 $(grep -c . <<<"$closure_entries") 条都在，e168_patched_tree、driver_e171_s4_comparator 与 driver_e175 都经 replay_copy_closure_into 拷）；副本里缺的：${closure_missing:- 没有}；$(tail -n 2 "$scratch/closure-tree.err" 2>/dev/null | tr '\n' ' ' | cut -c1-300)"  # gate-lint:detail
+        || "$frozen_tree_definition" != *replay_copy_closure_into* ]]; then
+    echo "  ✗ 自检：拷今天这棵树去编译的副本要照共用库的闭包拷全（lib_repository_copy.py entries 列的 $(grep -c . <<<"$closure_entries") 条都在，e168_patched_tree 与 driver_e171_s4_comparator 都经 replay_copy_closure_into 拷）；副本里缺的：${closure_missing:- 没有}；$(tail -n 2 "$scratch/closure-tree.err" 2>/dev/null | tr '\n' ' ' | cut -c1-300)"  # gate-lint:detail
     failures=$((failures + 1))
   fi
-  rm -rf -- "${scratch:?}/closure-tree"
+  replay_remove_directory_below "${TMPDIR:-/tmp}" "$scratch/closure-tree"
   # 副本里起命令的多机配置取主工作区那一份（replay_configuration_for_the_copy）：没设 SINGLEFS_MULTI_HOST_CONFIG 时打 <主工作区>/multi-host.env，设了的照原样；
   # driver_e168_positive_controls 在副本里起 cargo 之前把它交给 SINGLEFS_MULTI_HOST_CONFIG
   local configuration_unset configuration_given main_tree
@@ -1556,10 +2316,19 @@ replay_selftest() {
     failures=$((failures + 1))
   fi
   # 留存产物只以 .gz 存在时的比对（replay_gzip_selftest，两格）与入口脚本格式、三条完整性闸（replay_entry_selftest，五格）：每格一行收回来，
-  # 收回的格数对不上整个算一处不对。一组一行「<函数>;<报告名>;<格名的式样>;<要几格>;<报的时候怎么称呼>」。
+  # 收回的格数对不上整个算一处不对。一组一条 case 分支：报告名、格名的式样、要几格、报的时候怎么称呼。
   # 两组共用这一段收法：这份文件里程序读的注释（gate-lint 的明细标记这一类）进复跑表每一行的行键（lib_function_units.py 的 kept-comments），多一处就让每一行都现跑
+  # 组的函数名写成 for 的字面词：单元闭包把命令位置上的 "$group_function" 折成这几个函数（read 读进来的值折不出，会拒算）
   local group_function group_report group_cells group_wanted group_title group_cell group_verdict group_detail group_collected
-  while IFS=';' read -r group_function group_report group_cells group_wanted group_title; do
+  for group_function in replay_gzip_selftest replay_entry_selftest replay_build_directory_selftest replay_dispatch_selftest replay_static_selftest replay_e171_library_selftest; do
+    case "$group_function" in
+      replay_gzip_selftest) group_report=gzip group_cells='gz-stored-[a-z]+' group_wanted=2 group_title='留存产物 .gz' ;;
+      replay_entry_selftest) group_report=entry group_cells='list-items|unknown-experiment|integrity-[a-z-]+' group_wanted=5 group_title='入口与完整性闸' ;;
+      replay_build_directory_selftest) group_report=build-directory group_cells='build-directory-[a-z-]+|caller-target-directory-kept|service-build-directory-kept|copy-build-directories-removed' group_wanted=6 group_title='编译目录' ;;
+      replay_dispatch_selftest) group_report=dispatch group_cells='dispatch-[a-z-]+|row-[a-z-]+|stopped-keeps-finished-rows|e181-goes-through-long-run' group_wanted=16 group_title='派行' ;;
+      replay_static_selftest) group_report=static group_cells='load-settle-awk-names|mutation-driver-tables' group_wanted=2 group_title='静态核' ;;
+      replay_e171_library_selftest) group_report=e171-library group_cells='e171-missing-row-refused' group_wanted=1 group_title='E171 整表行只核账' ;;
+    esac
     group_collected=0
     "$group_function" "$scratch/$group_report" >"$scratch/$group_report.report" 2>&1
     while read -r group_cell group_verdict group_detail; do
@@ -1573,18 +2342,14 @@ replay_selftest() {
       echo "  ✗ 自检：$group_title 的自证只收回 $group_collected 格（要 $group_wanted 格）：$(tail -n 6 "$scratch/$group_report.report" | tr '\n' ' ' | cut -c1-800 | iconv -c -f UTF-8 -t UTF-8 2>/dev/null)"  # gate-lint:detail
       failures=$((failures + 1))
     fi
-  done <<'SELFTEST_GROUPS'
-replay_gzip_selftest;gzip;gz-stored-[a-z]+;2;留存产物 .gz
-replay_entry_selftest;entry;list-items|unknown-experiment|integrity-[a-z-]+;5;入口与完整性闸
-replay_build_directory_selftest;build-directory;build-directory-[a-z-]+|caller-target-directory-kept|copy-build-directories-removed;5;编译目录
-SELFTEST_GROUPS
+  done
   # 驱动开跑前核输入（replay_inputs_present）：从本文件取出这几个驱动与它们用的函数、全局量，在一个没有 research/ 的空目录里起，
   # 冻结根与导出根在固定的位置（工作根下 replay-frozen-roots/，这里没建）；每个都要退 1、stderr 里打「✗ 输入不在 test=<驱动名>」行恰好那么多行（缺几样报几样），stdout 不打。
   # 弄坏开关 REPLAY_BREAK=inputs-not-checked 下它们往下去起编不存在的脚本，退的不是 1，这几格转红。
   local input_driver_definitions input_case input_driver input_expected input_lines input_status
   input_driver_definitions="$(awk '
     /^(E171_FREEZE_REFERENCE|E171_R1_DUMPS_REMEDY|E158_[A-Z0-9_]*ARMS)=/ { print; next }
-    /^(driver_e142|e170_r2_judge_images|driver_e170_r2_v2_487_z3_images|driver_e170_r2_v2_487_z4_images|driver_e171_s2_images_o3|driver_e171_s2_o3_control_baseline|driver_e171_s2_comparator|driver_e171_s3_comparator_mutations|driver_e171_s4_comparator|driver_e171_s4_f4_comparator|driver_e171_s4_f4_substitutes_comparator|e171_r1_revision_6_python|e171_r1_inputs_present|e171_r1_view|driver_e171_r1_s1_revision_6_comparator|driver_e171_r1_s1_revision_6_cross_host_check|driver_e171_r1_s2_revision_6_comparator|driver_e174_simulated_judge|driver_e174_segment_one_judge|driver_e174_segment_two_judge|driver_e158_r3_seg1_compare|driver_e158_r4_compare|driver_e165_segment2|driver_e165_r3_segment3_root_choice_kill_bounds|driver_e165_r4_segment2_root_choice_faults_kill_bounds|driver_e165_r5_segment2_r2_mode_kill_bounds|driver_e165_r5_segment2_r3_mode_kill_bounds|driver_e165_r5_segment2_r4_mode_kill_bounds|driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds)\(\) \{/ {
+    /^(replay_remove_directory_below|driver_e142|e170_r2_judge_images|driver_e170_r2_v2_487_z3_images|driver_e170_r2_v2_487_z4_images|driver_e171_s2_images_o3|driver_e171_s2_o3_control_baseline|driver_e171_s2_comparator|driver_e171_s3_comparator_mutations|driver_e171_s4_comparator|driver_e171_s4_f4_comparator|driver_e171_s4_f4_substitutes_comparator|e171_r1_revision_6_python|e171_r1_inputs_present|e171_r1_view|driver_e171_r1_s1_revision_6_comparator|driver_e171_r1_s1_revision_6_cross_host_check|driver_e171_r1_s2_revision_6_comparator|driver_e174_simulated_judge|driver_e174_segment_one_judge|driver_e174_segment_two_judge|driver_e158_r3_seg1_compare|driver_e158_r4_compare|driver_e165_segment2|driver_e165_r3_segment3_root_choice_kill_bounds|driver_e165_r4_segment2_root_choice_faults_kill_bounds|driver_e165_r5_segment2_r2_mode_kill_bounds|driver_e165_r5_segment2_r3_mode_kill_bounds|driver_e165_r5_segment2_r4_mode_kill_bounds|driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds)\(\) \{/ {
       if ($0 ~ /; \}[[:space:]]*$/) { print; next }
       inside = 1
     }
@@ -1611,8 +2376,9 @@ SELFTEST_GROUPS
   checked=$((checked + 1))
   local registered_default capped_jobs unset_jobs
   registered_default="$(grep -vE '^[[:space:]]*(#|$)' .claude/heavy-thread-default | head -n 1 | awk '{print $1}')"
-  unset_jobs="$(env -u SINGLEFS_THREAD_CAP bash -c 'source scripts/hosts/heavy-threads.sh; REPLAY_BROKEN="$1"; '"$(declare -f default_replay_jobs)"'; default_replay_jobs' _ "$REPLAY_BROKEN")"
-  capped_jobs="$(SINGLEFS_THREAD_CAP=7 bash -c 'source scripts/hosts/heavy-threads.sh; REPLAY_BROKEN="$1"; '"$(declare -f default_replay_jobs)"'; default_replay_jobs' _ "$REPLAY_BROKEN")"
+  # default_replay_jobs 经 export -f 交给子 bash（只在这一层命令替换里导出），-c 的串整个是字面的：单元闭包认得出它起什么，串里拼函数正文的折不出、会拒算
+  unset_jobs="$(export -f default_replay_jobs; env -u SINGLEFS_THREAD_CAP bash -c 'source scripts/hosts/heavy-threads.sh; REPLAY_BROKEN="$1"; default_replay_jobs' _ "$REPLAY_BROKEN")"
+  capped_jobs="$(export -f default_replay_jobs; SINGLEFS_THREAD_CAP=7 bash -c 'source scripts/hosts/heavy-threads.sh; REPLAY_BROKEN="$1"; default_replay_jobs' _ "$REPLAY_BROKEN")"
   if [[ -z "$registered_default" || "$unset_jobs" != "$registered_default" || "$capped_jobs" != 7 ]]; then
     echo "  ✗ 自检：没设 REPLAY_JOBS 时同时跑几条实验要取登记的重活默认（登记「$registered_default」，没设上限得「$unset_jobs」，上限 7 得「$capped_jobs」）"  # gate-lint:detail
     failures=$((failures + 1))
@@ -1631,13 +2397,13 @@ SELFTEST_GROUPS
     echo "  ✗ 自检：现调一个不存在的命令，command_not_found_handle 应当记下它的名字，实际没记：载入期找不到命令的行这一格认不出"  # gate-lint:detail
     failures=$((failures + 1))
   fi
-  rm -rf -- "${scratch:?}"
+  replay_remove_directory_below "${TMPDIR:-/tmp}" "$scratch"
   if ((failures)); then
     echo "  ✗ replay.sh 自检 $failures 处不对（查了 $checked 项）"
     echo "    → 怎么办：看 build_research_binaries、admission_key_of_row 与计时行的负载关（timing_load_decide、load_timing_lag）；「按行复用 <格名>」那几处看 replay_reuse_selftest 里那一格的条件与它打的那一句（不在 git 工作树里那一格看取库名那一段对 replay_row_library_failure 的调用）；REPLAY_BREAK 设着的话这里本来就该红"
     return 1
   fi
-  echo "  ✓ replay.sh 自检通过（查了 $checked 项：构建失败返回 2 并打第一处错、日志末尾、日志路径与重现命令，构建成功一个字都不打，驱动开跑前编研究二进制经 --manifest-path 指到研究工作区、编不过的输出进 .err（build_research_driver_binary 与 E162、E163 那三个驱动），指明了准入键的行按它问准入，按行复用接连五趟（头一趟两行都跑并记进判定库、第二趟都复用、改一行装置源码只重跑那一行、只改注释照样复用），开了 GPU 而要现跑的行都不点特性数组时不试编、不要卡，点到的才退 78，计时行负载超阈值记本次不判、没超照判、没字段判红、没字段但在滞后表照判，滞后表的登记错误逐条点名，配置开了 GPU 时 验证包装置带 gpu 特性（开了先试编、没开不起 cargo、配置读不出或试编红退 78 点名原因、起装置的 cargo run 行都带特性数组，开了 GPU 不另套清场、卡读服务交的 GPU_CARDS_BY_PRIORITY（没有退 78），起装置的 cargo run 行都不带清场前缀、本文件不起清场包装），同时跑几条实验的缺省取登记的重活默认，拷 crates/ 去编译的副本都带上每台默认重活线程数的登记文件，留存产物只在 git 历史里的行取回再比（字节一致并写出处）、取不回判「取不回」，装置退 77 打了 NOT_RUN 行的记跑不了、没有本次未跑的一档，读别的实验产物与留存产物的二十五个驱动缺输入时退 1、缺几样报几样，--list-items 只列实验号、表里没有的实验号退 2，三条完整性闸各一格：退出码非 0、收尾行 emitted= 与实收对不上、同一输出目录里上一趟取回的留存产物不压过树里的，编译目录五格：跑绿、编不过、装置开跑之后被 TERM 三种结局之后都不剩这一趟的编译目录，调用方给了 CARGO_TARGET_DIR 照它编且不删，副本编出来的编译目录跑完删、产物照留）"
+  echo "  ✓ replay.sh 自检通过（查了 $checked 项：构建失败返回 2 并打第一处错、日志末尾、日志路径与重现命令，构建成功一个字都不打，驱动开跑前编研究二进制经 --manifest-path 指到研究工作区、编不过的输出进 .err（build_research_driver_binary 与 E162、E163 那三个驱动），指明了准入键的行按它问准入，按行复用接连五趟（头一趟两行都跑并记进判定库、第二趟都复用、改一行装置源码只重跑那一行、只改注释照样复用），开了 GPU 而要现跑的行都不点特性数组时不试编，点到的才试编、环境里没有卡串也照起，计时行负载超阈值记本次不判、没超照判、没字段判红、没字段但在滞后表照判，滞后表的登记错误逐条点名，配置开了 GPU 时 验证包装置带 gpu 特性（开了先试编、没开不起 cargo、配置读不出或试编红退 78 点名原因、起装置的 cargo run 行都带特性数组，开了 GPU 不另套清场、不领卡，要卡的行挪到最后一段、一行一行跑、看到环境里给的卡串（没有的不设）、不要卡的行看不到卡，起装置的 cargo run 行都不带清场前缀、本文件不起清场包装），同时跑几条实验的缺省取登记的重活默认，拷 crates/ 去编译的副本都带上每台默认重活线程数的登记文件，留存产物只在 git 历史里的行取回再比（字节一致并写出处）、取不回判「取不回」，装置退 77 打了 NOT_RUN 行的记跑不了、没有本次未跑的一档，读别的实验产物与留存产物的二十五个驱动缺输入时退 1、缺几样报几样，E171 整表四行库里缺一行时各退非 0、打带范围声明的分片入口整条命令、只起取行程序，--list-items 只列实验号、表里没有的实验号退 2，三条完整性闸各一格：退出码非 0、收尾行 emitted= 与实收对不上、同一输出目录里上一趟取回的留存产物不压过树里的，编译目录六格：跑绿、编不过、装置开跑之后被 TERM 三种结局之后都不剩这一趟的编译目录，调用方或服务给了 CARGO_TARGET_DIR 都照它编且不删（服务给的里面上一次尝试的产物照留），副本编出来的编译目录跑完删、产物照留）"
   return 0
 }
 if [[ "${1:-}" == "--selftest" ]]; then
@@ -1653,18 +2419,39 @@ if [[ "${1:-}" == "--list-items" ]]; then
     exit 2
   fi
   replay_table_experiments
+  replay_table_row_items
   exit 0
 fi
 replay_known_experiments="$(replay_table_experiments | cut -f1)"
+replay_known_row_items="$(replay_table_row_items | cut -f1)"
 replay_unknown_experiments=()
+replay_unknown_items=()
+replay_expecting_item=0
 for replay_argument in "$@"; do
-  case "$replay_argument" in --admission-only) continue ;; esac
+  if ((replay_expecting_item)); then   # --item 后面的词是项名，不当实验号
+    replay_expecting_item=0
+    grep -qxF -- "$replay_argument" <<<"$replay_known_row_items" || replay_unknown_items+=("$replay_argument")
+    continue
+  fi
+  case "$replay_argument" in --admission-only) continue ;; --item) replay_expecting_item=1; continue ;; esac
   [[ "$replay_argument" =~ ^[0-9]+$ ]] && continue   # 裸数字由下面「没带 E」那一判点名
   grep -qxF -- "$replay_argument" <<<"$replay_known_experiments" || replay_unknown_experiments+=("$replay_argument")
 done
+if ((replay_expecting_item)); then replay_unknown_items+=("（--item 后面缺项名）"); fi
 if ((${#replay_unknown_experiments[@]})) && [[ "$REPLAY_BROKEN" != unknown-experiment-accepted ]]; then
   echo "  ✗ 复跑表里没有：${replay_unknown_experiments[*]}（一行都没跑；表里 $(grep -c . <<<"$replay_known_experiments") 个实验号）" >&2
-  echo "     → 怎么办：照 bash scripts/experiment-apparatus/replay.sh --list-items 列的实验号那一列写（带 E、区分大小写，例 E142、E16R5）；选项只认 --admission-only、--selftest、--list-items" >&2
+  echo "     → 怎么办：照 bash scripts/experiment-apparatus/replay.sh --list-items 列的实验号那一列写（带 E、区分大小写，例 E142、E16R5）；选项只认 --admission-only、--selftest、--list-items、--item" >&2
+  exit 2
+fi
+if ((${#replay_unknown_items[@]})) && [[ "$REPLAY_BROKEN" != item-unknown-accepted ]]; then
+  replay_item_experiment="${replay_unknown_items[0]%%.*}"
+  echo "  ✗ 复跑表里没有这样的行项：${replay_unknown_items[*]}（一行都没跑）" >&2
+  if grep -qxF -- "$replay_item_experiment" <<<"$replay_known_experiments"; then
+    echo "     $replay_item_experiment 可点名的行项：$(replay_table_row_items | cut -f1 | grep -F -- "$replay_item_experiment." | tr '\n' ' ')" >&2   # gate-lint:detail
+  else
+    echo "     可点名的实验号：$(tr '\n' ' ' <<<"$replay_known_experiments")" >&2   # gate-lint:detail
+  fi
+  echo "     → 怎么办：--item 后面写 <实验号>.<行序号>，照 bash scripts/experiment-apparatus/replay.sh --list-items 列的第一列写（例 E171.5）" >&2
   exit 2
 fi
 
@@ -1697,6 +2484,7 @@ replay_remove_copy_build_directories() {
 replay_finish() {
   local status=$? problems=0
   trap - EXIT TERM INT
+  replay_row_sampler_stop
   # 按行复用的中转目录（文件头「按行复用」）：判定库在 prune-server 里，这一份只给这一趟读写用，收尾删掉，不留给下一趟
   [[ -n "${REPLAY_ROW_RECORDS:-}" ]] && rm -rf -- "$REPLAY_ROW_RECORDS"
   [[ -n "${REPLAY_E182_SHARDS:-}" ]] && rm -rf -- "$REPLAY_E182_SHARDS"   # E182 的片结果库的中转目录（文件头「E182 的片结果库」），并回之后删
@@ -1733,12 +2521,41 @@ replay_stop() { # <退出码>
   trap - TERM INT
   for pid in ${REPLAY_PIDS[@]+"${REPLAY_PIDS[@]}"}; do replay_forward_term "$pid"; done
   for pid in ${REPLAY_PIDS[@]+"${REPLAY_PIDS[@]}"}; do wait "$pid" 2>/dev/null; done
+  replay_row_sampler_stop
+  replay_print_finished_rows
   exit "$1"
+}
+# 停掉监看进程（replay_row_costs.py sample）：写下 stop，它把这之前收尾的行记完就退；至多等 10 秒，还没退发 TERM。没起过的不做。起它的那一步在主循环上面
+replay_row_sampler_stop() {
+  local waited=0 stat_line
+  [[ -n "${REPLAY_ROW_SAMPLER_PID:-}" ]] || return 0
+  : >"$REPLAY_ROW_WATCH/stop"
+  while (( waited < 100 )) && IFS= read -r stat_line 2>/dev/null <"/proc/$REPLAY_ROW_SAMPLER_PID/stat" && [[ "${stat_line##*) }" != Z* ]]; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  (( waited < 100 )) || kill -TERM "$REPLAY_ROW_SAMPLER_PID" 2>/dev/null
+  wait "$REPLAY_ROW_SAMPLER_PID" 2>/dev/null
+  REPLAY_ROW_SAMPLER_PID=""
+}
+# 被停时已判完的行的结果行（文件头「进度」）：照表序打到标准输出。还没开始派行的不打。弄坏开关 finished-rows-lost-when-stopped
+replay_print_finished_rows() {
+  local tag finished=0
+  [[ -n "${REPLAY_DISPATCH_STARTED:-}" && "$REPLAY_BROKEN" != finished-rows-lost-when-stopped ]] || return 0
+  for tag in ${REPLAY_ORDER[@]+"${REPLAY_ORDER[@]}"}; do
+    [[ -f "$OUT_DIR/$tag.line" ]] || continue
+    cat -- "$OUT_DIR/$tag.line"
+    finished=$((finished + 1))
+  done
+  echo "REPLAY_STOPPED finished=$finished dispatched=${#REPLAY_ORDER[@]}"
 }
 trap replay_finish EXIT
 trap 'replay_stop 143' TERM
 trap 'replay_stop 130' INT
+# 弄坏开关 service-build-directory-ignored（文件头「编译目录」）：环境里给的 CARGO_TARGET_DIR 不看，照没给时自己在 TMPDIR 底下建、跑完删
+[[ "$REPLAY_BROKEN" != service-build-directory-ignored ]] || unset CARGO_TARGET_DIR
 if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
+  # 调用方或统一任务服务给的编译目录（文件头「编译目录」）：照它编、不删，撞上限重排的下一次尝试接着用
   [[ "$CARGO_TARGET_DIR" == /* ]] || CARGO_TARGET_DIR="$PWD/$CARGO_TARGET_DIR"
   export CARGO_TARGET_DIR
 elif ! REPLAY_BUILD_RUN_DIRECTORY="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-replay-build-$$-XXXXXX")"; then
@@ -1776,7 +2593,7 @@ TABLE=$(cat <<'TSV'
 E14|e14-discrimination||e14-discrimination-2026-08-29.out|exact
 E18|e18-branch||e18-branch-2026-08-28.out|exact
 E19|e19-defer||e19-defer-2026-08-28.out|exact
-E23|e23_journal_geom||e23-journal-geom-2026-08-29.out|exact
+E23|e23_journal_geom||e23-journal-geom-2026-11-08.out|exact
 E24|e24_recovery||e24-recovery-2026-08-29.out|exact
 E25|e25_journal_reserve||e25-journal-reserve-2026-08-29.out|exact
 E26|e26_accounting||e26-accounting-2026-08-29.out|exact
@@ -1819,11 +2636,11 @@ E115|e115-system-configuration-completeness||e115-system-configuration-completen
 E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
 E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
-E83|e83-tombstone-grain||e83-tombstone-grain-2026-10-04-r2.out|exact
+E83|e83-tombstone-grain||e83-tombstone-grain-2026-11-14.out|exact
 E84|e84-tombstone-pinning||e84-tombstone-pinning-2026-09-03.out|exact
 E85|e85-unit-header||e85-unit-header-2026-09-02.out|exact
 E86|e86-scan-step||e86-scan-step-2026-09-02.out|exact
-E87|e87-fixed-placement||e87-fixed-placement-2026-09-02.out|exact
+E87|e87-fixed-placement||e87-fixed-placement-2026-11-08.out|exact
 E88|e88-impostor-orphan||e88-impostor-orphan-2026-09-02.out|exact
 E89|e89-interval-frontier||e89-interval-frontier-2026-09-03.out|exact
 E90|e90-tree-aad||e90-tree-aad-2026-09-03.out|exact
@@ -1838,12 +2655,12 @@ E95|e95-node-layout-arms||e95-node-layout-arms-2026-09-09.out|exact
 E94|e94-move-touchset||e94-move-touchset-2026-09-03.out|exact
 E96|e96-hybrid-consistency||e96-hybrid-consistency-2026-09-03.out|exact
 E97|e97-entry-encoding||e97-entry-encoding-2026-09-07.out|exact
-E97|e97-entry-encoding-single-generation||e97-entry-encoding-single-generation-2026-10-20.out|exact
+E97|e97-entry-encoding-single-generation||e97-entry-encoding-single-generation-2026-11-14.out|exact
 E98|e98-inode-record||e98-inode-record-2026-09-07.out|exact
 E99|e99-writebuffer-sequence||e99-writebuffer-seq-2026-09-03.out|exact
 E100|e100-system-configuration-slot||e100-system-configuration-slot-2026-09-03.out|exact
-E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
-E102|e102-unit-class-registry||e102-unit-class-registry-2026-10-04.out|exact
+E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-11-08.out|exact
+E102|e102-unit-class-registry||e102-unit-class-registry-2026-11-14.out|exact
 E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-14-round2.out|exact
 E104|e104-current-version||e104-current-version-2026-09-05.out|exact
 E105|e105-extent-leaf-packed||e105-extent-leaf-packed-2026-09-12.out|exact
@@ -1893,7 +2710,7 @@ E133|e133_map_key_format_cost||e133-map-key-format-cost-2026-09-11.out|exact
 E134|e134_map_key_slot_baselines||e134-map-key-slot-baselines-2026-09-11.out|exact
 E136|e136_fork_cost_rows||e136-fork-cost-rows-2026-09-11.out|exact
 E138|e138_per_disk_floor||e138-per-disk-floor-2026-09-11.out|exact
-E139|e139_tightened_floor||e139-tightened-floor-2026-10-29.out|exact
+E139|e139_tightened_floor||e139-tightened-floor-2026-11-14.out|exact
 E139|@driver_e139||e139-tightened-floor-2026-10-05.out|exact
 E141|e141_switch_reserve_mount_admission||e141-switch-reserve-mount-admission-2026-09-14-row-writing.out|exact
 E142|@driver_e142||e142-new-pool-file-creation-dry-run-r25-main-2026-10-13.out|exact
@@ -1902,7 +2719,7 @@ E143|e143-one-unit-per-txn-journal||e143-one-unit-per-txn-journal-2026-09-13.out
 E145|e145-self-describing-node-header||e145-self-describing-node-header-2026-09-16-tree-table-200.out|exact
 E146|e146-livelist-entry-width||e146-livelist-entry-width-2026-09-16-tree-table-200.out|exact
 E147|e147-system-configuration-recompute-from-layout||e147-system-configuration-recompute-from-layout-2026-09-13.out|exact
-E148|e148-commit-fixpoint-two-record-trees||e148-commit-fixpoint-two-record-trees-2026-09-13.out|exact
+E148|e148-commit-fixpoint-two-record-trees||e148-commit-fixpoint-two-record-trees-2026-11-08.out|exact
 E150|e150-rollback-reuse-of-abandoned-roots||e150-rollback-reuse-of-abandoned-roots-2026-09-13-admission.out|exact
 E151|e151-arrival-and-container-arms||e151-arrival-and-container-arms-2026-09-13-region.out|exact
 E149|e149-pack-container-repair-options||e149-pack-container-repair-options-2026-09-13.out|exact
@@ -1918,25 +2735,14 @@ E155R4|e155-fourth-run-group-commit-concurrency||e155-fourth-run-group-commit-co
 E156|@driver_e156||e156-alloc-basis-counts-2026-10-18.out|exact
 E157|e157-parallel-line-one-clauses||e157-parallel-line-one-clauses-2026-10-04-h487.out|exact
 E160|e160-random-small-read-share||e160-random-small-read-share-segment1-2026-09-24-realweight.out|exact
-E158|@driver_e158||e158-root-choice-repair-2026-09-25-segment1-rerun.out|exact
-E158|@driver_e158_q3_1_g0||e158-root-choice-repair-2026-09-25-q3-1-g0.out|exact
-E158|@driver_e158_q3_1_s16||e158-root-choice-repair-2026-09-25-q3-1-s16.out|exact
-E158|@driver_e158_q3_1_small_ring||e158-root-choice-repair-2026-09-25-q3-1-small-ring.out|exact
-E158|@driver_e158_q3_1_s4||e158-root-choice-repair-2026-09-25-q3-1-s4.out|exact
-E158|@driver_e158_q1_g0||e158-root-choice-repair-2026-09-25-q1-g0-today.out|exact
-E158|@driver_e158_q2_1_g0||e158-root-choice-repair-2026-09-24-q2-1-g0-today.out|exact
-E158|@driver_e158_q2_2a_g0||e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out|exact
-E158|@driver_e158_q2_1_pc2||e158-root-choice-repair-2026-09-24-pc2-today.out|exact
-E158|@driver_e158_q2_1_g0_session_s5||e158-root-choice-repair-2026-09-24-q2-1-g0-today-session-s5.out|exact
-E158|@driver_e158_q1_s16||e158-root-choice-repair-2026-09-25-q1-s16.out|exact
-E158|@driver_e158_q1_s4||e158-root-choice-repair-2026-09-25-q1-s4.out|exact
-E158|@driver_e158_q2_1_hc1||e158-root-choice-repair-2026-09-24-q2-1-hc1.out|exact
-E158|@driver_e158_q2_1_hc1_lower_bound||e158-root-choice-repair-2026-09-24-q2-1-hc1-lower-bound.out|exact
-E158|@driver_e158_r2_all||e158-root-choice-repair-2026-09-27-r2-all-today.out|exact
-E158|@driver_e158_r3_seg1_today||e158-root-choice-repair-2026-09-27-r3-seg1-today.out|exact
+E158|@driver_e158||e158-root-choice-repair-2026-11-09-segment1-rerun.out|exact
+E158|@driver_e158_q3_1_g0||e158-root-choice-repair-2026-11-09-q3-1-g0.out|exact
+E158|@driver_e158_q3_1_s16||e158-root-choice-repair-2026-11-09-q3-1-s16.out|exact
+E158|@driver_e158_q3_1_small_ring||e158-root-choice-repair-2026-11-09-q3-1-small-ring.out|exact
+E158|@driver_e158_q3_1_s4||e158-root-choice-repair-2026-11-09-q3-1-s4.out|exact
 E158|@driver_e158_r3_seg1_compare||e158-root-choice-repair-2026-09-27-r3-seg1-compare.out|exact
 E158|@driver_e158_r4_compare||e158-root-choice-repair-2026-09-27-r4-compare.out|exact
-E181|@driver_e181||e181-landing-check-fixed-point-and-mount-lower-bound-checks.out|timing
+E181|@driver_e181||e181-landing-check-fixed-point-and-mount-lower-bound-landing.out|timing
 E182|@driver_e182||e182-unreadable-abandoned-root-forks-single-device-2026-10-19.out|exact
 E182|@driver_e182_units_kept||e182-unreadable-abandoned-root-forks-single-device-units-kept.out|exact
 E159|e159-fsync-wait-group-commit|anchors|e159-fsync-wait-group-commit-2026-09-25-h311-replay.out|exact
@@ -1947,16 +2753,16 @@ E162|@driver_e162_s2_all_arms||e162-crash-verdict-block-store-s2-all-arms.out|ti
 E162|@driver_e162_s4_all_arms||e162-verdict-store-power-cut-s4-all-arms.out|timing
 E161|@driver_e161_segment_one||e161-crash-state-dedup-and-time-split-segment-one.out|timing
 E163|@driver_e163_r1_merge||e163-gpu-multicard-crc32c-2026-09-27-r1-merge.out|exact
-E164|e164-crash-amplification-design-function-test|models|e164-crash-amplification-design-function-test-2026-09-28-models.out|exact
-E167|e167-multi-inflight-crash-cut|first|e167-multi-inflight-crash-cut-2026-10-01-r2.out|exact
-E167|e167-multi-inflight-crash-cut|second|e167-multi-inflight-crash-cut-second-2026-10-01-r3.out|exact
-E167|e167-multi-inflight-crash-cut|third|e167-multi-inflight-crash-cut-third-2026-10-01.out|exact
+E164|e164-crash-amplification-design-function-test|models|e164-crash-amplification-design-function-test-2026-09-28-models-2026-11-14.out|exact
+E167|e167-multi-inflight-crash-cut|first|e167-multi-inflight-crash-cut-2026-11-14.out|exact
+E167|e167-multi-inflight-crash-cut|second|e167-multi-inflight-crash-cut-second-2026-11-14.out|exact
+E167|e167-multi-inflight-crash-cut|third|e167-multi-inflight-crash-cut-third-2026-11-14.out|exact
 E168|@driver_e168_s1_history||e168-delete-ring-window-borrow-s1-history-2026-10-03.out|exact
 E168|@driver_e168_positive_controls||e168-delete-ring-window-borrow-positive-controls-2026-10-03.out|exact
 E173|e173-admission-ceiling-bad-ring-slot-dispositions|checks|e173-admission-ceiling-bad-ring-slot-dispositions-checks-2026-10-05.out|exact
 E173|e173-admission-ceiling-bad-ring-slot-dispositions|first|e173-admission-ceiling-bad-ring-slot-dispositions-segment-one-2026-10-05.out|exact
 E173|e173-admission-ceiling-bad-ring-slot-dispositions|second|e173-admission-ceiling-bad-ring-slot-dispositions-segment-two-2026-10-05.out|exact
-E173|@driver_e173_checkpoint_cost||e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out|exact
+E173|@driver_e173_checkpoint_cost||e173-checkpoint-cost-against-empty-publish-cost-2026-11-13-r2.out|exact
 E173|e173-admission-ceiling-bad-ring-slot-dispositions|checkpoint-cost-reserve|e173-admission-ceiling-bad-ring-slot-dispositions-checkpoint-cost-reserve-2026-11-02.out|exact
 E174|@driver_e174_checks||e174-lease-drop-wait-memory-return-checks-2026-10-08.out|exact
 E174|@driver_e174_simulated_judge||e174-lease-drop-wait-memory-return-simulated-second-judge-2026-10-08.out|exact
@@ -1964,9 +2770,9 @@ E174|@driver_e174_segment_one_judge||e174-lease-drop-wait-memory-return-segment-
 E174|@driver_e174_segment_two_judge||e174-lease-drop-wait-memory-return-segment-two-judge-2026-10-08.out|exact
 E174|@driver_e174_run_segment_one||e174-lease-drop-wait-memory-return-segment-one-2026-10-08.out|timing
 E174|@driver_e174_run_segment_two||e174-lease-drop-wait-memory-return-segment-two-2026-10-08.out|timing
-E176|e176-inode-leaf-merge-capacity-and-rewrites|segment-one|e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out|exact
-E176|e176-inode-leaf-merge-capacity-and-rewrites|segment-two|e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out|exact
-E177|e177-per-tree-resurrection-without-tombstones|segment-one|e177-per-tree-resurrection-without-tombstones-segment-one.out|exact
+E176|e176-inode-leaf-merge-capacity-and-rewrites|segment-one|e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out|exact
+E176|e176-inode-leaf-merge-capacity-and-rewrites|segment-two|e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out|exact
+E177|e177-per-tree-resurrection-without-tombstones|segment-one|e177-per-tree-resurrection-without-tombstones-segment-one-2026-11-14.out|exact
 E178|e178-leaf-and-record-death-counts|segment-one|e178-leaf-and-record-death-counts-segment-one.out|exact
 E178|e178-leaf-and-record-death-counts|segment-two|e178-leaf-and-record-death-counts-segment-two.out|exact
 E178|e178-leaf-and-record-death-counts|segment-three|e178-leaf-and-record-death-counts-segment-three.out|exact
@@ -1996,11 +2802,11 @@ E165|@driver_e165_r5_segment3_odd_marker_legal||e165-replay-bounded-enumeration-
 E165|@driver_e165_r5_segment3_odd_marker_adversarial||e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out|exact
 E165|@driver_e165_r5_segment5_r2_gate_root_choice_faults||e165-replay-bounded-enumeration-2026-10-23-r7-r5-gate-r2-root-choice-faults.out|exact
 E165|@driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds||e165-replay-bounded-enumeration-2026-10-04-r5-segment5b-r4-gate-r2-mode-kill-bounds.out|exact
-E166|e166-parallel-commit-shared-state-partition||e166-parallel-commit-shared-state-partition-r2-main-2026-10-02.out|exact
-E169|e169-parallel-commit-append-and-prefix-recovery|segment-one|e169-parallel-commit-append-and-prefix-recovery-2026-10-01-r3.out|exact
-E169|e169-parallel-commit-append-and-prefix-recovery|segment-two|e169-parallel-commit-append-and-prefix-recovery-segment-two-2026-10-01-r2.out|exact
-E169|e169-parallel-commit-append-and-prefix-recovery|segment-three|e169-parallel-commit-append-and-prefix-recovery-segment-three-2026-10-01.out|exact
-E169|e169-parallel-commit-append-and-prefix-recovery|replay-core-inputs|e169-parallel-commit-append-and-prefix-recovery-replay-core-inputs-2026-10-01.out|exact
+E166|e166-parallel-commit-shared-state-partition||e166-parallel-commit-shared-state-partition-r2-main-2026-11-14.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery|segment-one|e169-parallel-commit-append-and-prefix-recovery-2026-11-14.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery|segment-two|e169-parallel-commit-append-and-prefix-recovery-segment-two-2026-11-14.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery|segment-three|e169-parallel-commit-append-and-prefix-recovery-segment-three-2026-11-14.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery|replay-core-inputs|e169-parallel-commit-append-and-prefix-recovery-replay-core-inputs-2026-11-14.out|exact
 E170|@driver_e170_r2_dump_compare||e170-r2-o3-spec-executor-2026-10-05-s2b-dump-compare.out|exact
 E170|@driver_e170_r2_bad_states_second_run_export||e170-r2-o3-spec-executor-2026-10-05-s2b-bad-states-second-run-export.out|exact
 E170|@driver_e170_r2_v2_487_unit_tests||e170-r2-o3-spec-executor-2026-10-04-s1a-v2-487-unit-tests-2026-10-05.out|exact
@@ -2016,11 +2822,11 @@ E171|@driver_e171_s2_bad_states_export||e171-three-oracle-collusion-2026-10-03-s
 E171|@driver_e171_s2_known_bad_images||e171-three-oracle-collusion-2026-10-03-s2-known-bad-images.out|exact
 E171|@driver_e171_s2_images_o3||e171-three-oracle-collusion-2026-10-03-s2-images-o3.out|exact
 E171|@driver_e171_s2_o3_control_baseline||e171-three-oracle-collusion-2026-10-03-s2-o3-control-baseline.out|exact
-E171|@driver_e171_s2_comparator||e171-three-oracle-collusion-2026-10-03-s2-comparator.out|exact
-E171|@driver_e171_s3_comparator_mutations||e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r7.out|exact
-E171|@driver_e171_s4_comparator||e171-three-oracle-collusion-2026-10-03-s4-comparator.out|exact
-E171|@driver_e171_s4_f4_comparator||e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out|exact
-E171|@driver_e171_s4_f4_substitutes_comparator||e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-comparator.out|exact
+E171|@driver_e171_s2_comparator||e171-three-oracle-collusion-2026-10-03-s2-comparator-e171-r3.out|exact
+E171|@driver_e171_s3_comparator_mutations||e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r7-e171-r3.out|exact
+E171|@driver_e171_s4_comparator||e171-three-oracle-collusion-2026-10-03-s4-comparator-e171-r3.out|exact
+E171|@driver_e171_s4_f4_comparator||e171-three-oracle-collusion-2026-10-03-s4-f4-comparator-e171-r3.out|exact
+E171|@driver_e171_s4_f4_substitutes_comparator||e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-comparator-e171-r3.out|exact
 E171|@driver_e171_r1_s1_revision_6_comparator||e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3-2026-10-07.out|exact
 E171|@driver_e171_r1_s1_revision_6_cross_host_check||e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-rows-cross-host-check-resume2-r6-r3-2026-10-07-r3.out|exact
 E171|@driver_e171_r1_s1_research_mutations||e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-research-mutations-2026-10-07-r3.out|exact
@@ -2029,7 +2835,7 @@ E171|@driver_e171_r1_s2_research_mutations||e171-r1-three-oracle-collusion-after
 E171|@driver_e171_r1_s1_revision_8_tools_research_mutations||e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-07-s1-revision-8-tools-research-mutations-2026-11-02-r3.out|exact
 E171|@driver_e171_r1_s2_revision_10_tools_research_mutations||e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-08-s2-revision-10-tools-research-mutations.out|exact
 E171|@driver_e171_r1_revision_11_tools_research_mutations||e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-08-revision-11-tools-research-mutations.out|exact
-E171|@driver_e171_r1_revision_12_stream_constants||e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-stream-constants-r2.out|exact
+E171|@driver_e171_r1_revision_12_stream_constants||e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-stream-constants-r2-2026-11-08.out|exact
 E171|@driver_e171_second_rerun_list_check||e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-list-check-2026-11-01.out|exact
 E171|@driver_e171_second_rerun_removal_effect_on_the_whole_table_and_expansion_table||e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-removal-effect-on-the-s4-f4-2026-11-01.out|exact
 E171|@driver_e171_second_rerun_removal_effect_on_the_whole_table_and_expansion_table_substitutes||e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-removal-effect-on-the-s4-f4-substitutes-2026-11-01.out|exact
@@ -2041,22 +2847,32 @@ E171|@driver_e171_second_rerun_current_state_announcement_research_mutations||e1
 E171|@driver_e171_second_rerun_current_state_threads_and_contrast_research_mutations||e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-02-current-state-threads-and-contrast-research-mutations-2026-11-02.out|exact
 E172|@driver_e172||e172-r3-deletion-write-dry-run-2026-11-02.out|exact
 E175|@driver_e175||e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out|exact
-E183|@driver_e183||e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30.out|exact
-E183|@driver_e183_anchor_check||e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30-anchor-check.out|exact
+E183|@driver_e183||e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08.out|exact
+E183|@driver_e183_anchor_check||e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08-anchor-check.out|exact
 E184|@driver_e184||e184-regular-layer-cost-counts-selfcheck-2026-10-23.out|exact
 E184|@driver_e184_segment_one||e184-regular-layer-cost-counts-segment-one-2026-10-24.out|timing
 E183|@driver_e183_h5_anchor_check||e183-capacity-read-cache-reserve-and-sweep-costs-h5-2026-10-19-anchor-check.out|exact
 E186|e186-unknown-tree-accounting-rederive||e186-unknown-tree-accounting-rederive.out.gz|exact
 E186|e186-unknown-tree-accounting-rederive|--judgement dangling-u5|e186-unknown-tree-accounting-rederive-second-run-2026-10-20.out.gz|exact
-E187|e187-quarantine-mark-cost|segment-one|e187-quarantine-mark-cost-segment-one-2026-10-21.out|exact
+E187|e187-quarantine-mark-cost|segment-one|e187-quarantine-mark-cost-segment-one-2026-11-08.out|exact
 E187|e187-quarantine-mark-cost|segment-two|e187-quarantine-mark-cost-segment-two-2026-10-22.out|exact
-E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out|exact
-E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact
+E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-10.out|exact
+E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two-2026-11-10.out|exact
 E199|e199-transaction-output-copy||e199-transaction-output-copy-2026-11-05-r2.out|exact
-E205|@driver_e205||e205-c971-inverted-first-txg-arm-costs-six-cells.out|exact
-E205|@driver_e205_torn_rotation||e205-c971-inverted-first-txg-arm-costs-torn-rotation.out|exact
-E205|@driver_e205_first_txg_skips_s8||e205-c971-inverted-first-txg-arm-costs-first-txg-skips-s8.out|exact
-E205|@driver_e205_first_txg_skips_s4_s16||e205-c971-inverted-first-txg-arm-costs-first-txg-skips-s4-s16.out|exact
+E203|@driver_e203_report||e203-admission-scan-cost-report-2026-11-13.out|exact
+E203Y1|@driver_e203_many_unlinks||e203-admission-scan-cost-many-unlinks-completion.out|exact
+E206|@driver_e206_report||e206-fixed-point-cost-report-2026-11-14.out|exact
+E207|@driver_e207_report_first||e207-strict-scan-steps-report-first-2026-11-13-r4.out|exact
+E207|@driver_e207_report_second||e207-strict-scan-steps-report-second-2026-11-13-r2.out|exact
+E207|@driver_e207_report_third||e207-strict-scan-steps-report-third-2026-11-13-r2.out|exact
+E207|@driver_e207_report_hundred_units_per_file_repeat||e207-strict-scan-steps-report-hundred-units-per-file-repeat-2026-11-13-r2.out|exact
+E207|@driver_e207_report_reconciliation_split||e207-strict-scan-steps-report-reconciliation-split-2026-11-13-r2.out|exact
+E207|@driver_e207_report_fourth||e207-strict-scan-steps-report-fourth-2026-11-14.out|exact
+E209|@driver_e209_report_first||e209-spike-cause-report-first-2026-11-13-r3.out|exact
+E209|@driver_e209_report_second||e209-spike-cause-report-second-2026-11-13-r2.out|exact
+E209|@driver_e209_report_third||e209-spike-cause-report-third-2026-11-14.out|exact
+E210|e210-capacity-grow-reader-rules|write-counts-and-root-level|e210-capacity-grow-reader-rules-write-counts-and-root-level-2026-11-18.out|exact
+E210|e210-capacity-grow-reader-rules|reader-rules-on-histories|e210-capacity-grow-reader-rules-reader-rules-on-histories-2026-11-18.out|exact
 TSV
 )
 
@@ -2606,7 +3422,7 @@ driver_e165_r5_segment5b_r4_gate_r2_mode_kill_bounds() {
 # 入库产物是第一段 r8 那一次在当时主工作区 `crates/` 的快照上编、跑的，快照逐文件的 sha256 在
 # `e168-delete-ring-window-borrow-segment1-tree-2026-10-03.sha256`（不含补丁表）； `crates/singlefs-core/` 里的几份文件
 # （extent_tree.rs、records.rs、recovery.rs 等）会随主工作区变，今天复出来对不上是新观测，先对着那份清单查。
-# 计数与线程数无关（单测 segment_one_on_p2_s4_prints_the_same_lines_on_one_thread_and_on_eight_threads），线程数照那一次钉 4、P4 的片一次一片。
+# 计数与线程数无关（单测 segment_one_on_the_narrow_disk_with_four_slots_per_region_prints_the_same_lines_on_one_thread_and_on_eight_threads），线程数照那一次钉 4、P4 的片一次一片。
 # positive-controls 峰值约 15 GB，s1-history 峰值约 2.3 GB，
 # 只在提交时由主 agent 跑。
 e168_wrap() {
@@ -2657,11 +3473,11 @@ e170_r2_cargo_run() { # <bin> <参数…>：在仓根照今天的 crates/ 起入
 e170_r2_build_exports_e170() {
   local directory="$1"
   (set -o pipefail \
-    && e170_r2_cargo_run e170_o3_spec_executor_export dump --output-directory "$directory/e170-dump" >/dev/null \
-    && e170_r2_cargo_run e170_o3_spec_executor_export dump --output-directory "$directory/e170-dump-repeat" --compare-with "$directory/e170-dump" \
+    && e170_r2_cargo_run e170_specification_executor_export dump --output-directory "$directory/e170-dump" >/dev/null \
+    && e170_r2_cargo_run e170_specification_executor_export dump --output-directory "$directory/e170-dump-repeat" --compare-with "$directory/e170-dump" \
          | grep '^E7RESULT ' >"$directory/dump-compare.lines" \
     && cp -r "$directory/e170-dump" "$directory/e170-bad-states-second-run" \
-    && e170_r2_cargo_run e170_o3_spec_executor_export bad-states-second-run --dump-directory "$directory/e170-bad-states-second-run" --seed-hex 85441ae491419411 \
+    && e170_r2_cargo_run e170_specification_executor_export bad-states-second-run --dump-directory "$directory/e170-bad-states-second-run" --seed-hex 85441ae491419411 \
          | grep '^E7RESULT ' >"$directory/bad-states-second-run.lines")
 }
 e170_r2_build_exports_e171() {
@@ -2669,7 +3485,7 @@ e170_r2_build_exports_e171() {
   (set -o pipefail \
     && e170_r2_cargo_run e171_three_oracle_collusion baseline --output-directory "$directory/e171-baseline-run1" >/dev/null \
     && cp -r "$directory/e171-baseline-run1" "$directory/e170-bad-states-copy-s2" \
-    && e170_r2_cargo_run e170_o3_spec_executor_export bad-states --dump-directory "$directory/e170-bad-states-copy-s2" --seed-hex 85441ae491419411 >/dev/null \
+    && e170_r2_cargo_run e170_specification_executor_export bad-states --dump-directory "$directory/e170-bad-states-copy-s2" --seed-hex 85441ae491419411 >/dev/null \
     && e170_r2_cargo_run e171_three_oracle_collusion known-bad-images --dump-directory "$directory/e170-bad-states-copy-s2" \
          --output-directory "$directory/known-bad-s2" --e170-bad-rows >/dev/null)
 }
@@ -2703,17 +3519,17 @@ driver_e170_r2_bad_states_second_run_export() {
 }
 e170_r2_unit_tests() { # <臂名> <执行器目录名>
   local scratch="$OUT_DIR/e170-r2-unit-tests-$1"
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e170_r2_python "$(e170_r2_bin e170_o3_spec_executor_with_witness_predicates_journal_header_487)/run_replay_result_lines.py" unit-tests \
     --executor-directory "$(e170_r2_bin "$2")" --arm "$1" --scratch "$scratch/test-scratch" --output "$scratch/result.out" >&2 || return 1
   cat "$scratch/result.out"
 }
 driver_e170_r2_v2_487_unit_tests() { e170_r2_unit_tests v2-487 e170_o3_spec_executor_with_witness_predicates_journal_header_487; }
 driver_e170_r2_v1_487_unit_tests() { e170_r2_unit_tests v1-487 e170_second_run_o3_spec_executor_journal_header_487; }
-# 单测层变异：表整张跑（XC 起头的行也在内，不排除）。
+# 单测层变异：表整张跑。
 e170_r2_unit_level_mutations() { # <臂名> <执行器目录名>
   local scratch="$OUT_DIR/e170-r2-unit-level-mutations-$1" table="e170_o3_spec_executor_with_witness_predicates_journal_header_487"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   e170_r2_python "$(e170_r2_bin e170_o3_spec_executor_with_witness_predicates)/mutation_driver_unit_level.py" --executor-directory "$(e170_r2_bin "$2")" \
     --table "scripts/mutation/tables/$table.tsv" --scratch "$scratch/work" --output "$scratch/raw.out" >&2 || return 1
   e170_r2_wrap "$scratch/raw.out" "$scratch/result.out"
@@ -2723,7 +3539,7 @@ driver_e170_r2_v1_487_unit_level_mutations() { e170_r2_unit_level_mutations v1-4
 driver_e170_r2_v2_487_z1() {
   local scratch="$OUT_DIR/e170-r2-v2-487-z1" exports
   exports="$(e170_r2_shared_exports e170)" || return 1
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e170_r2_python "$(e170_r2_bin e170_o3_spec_executor_with_witness_predicates_journal_header_487)/executor_main.py" --dumps "$exports/e170-dump" \
     --workers 1 --output "$scratch/raw.out" >&2 || return 1
   e170_r2_wrap "$scratch/raw.out" "$scratch/result.out"
@@ -2734,7 +3550,7 @@ e170_r2_judge_images() { # <输入名> <导出组> <含 bad-*.tsv 的导出目�
   local scratch="$OUT_DIR/e170-r2-v2-487-${1,,}-images" exports known=() freeze_product="research/results/e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out"
   replay_inputs_present "${FUNCNAME[1]:-${FUNCNAME[0]}}" "冻结参照：${REPLAY_ARCHIVED_REMEDY}" "$freeze_product" || return $?
   exports="$(e170_r2_shared_exports "$2")" || return 1
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   grep -E '^name=freeze(_seed)? ' "$freeze_product" | grep -v ' arm=' >"$scratch/v2-487-freeze-reference.out" || return 1
   # 已知坏镜像：给了目录名就比（Z4）；没给的（Z3）这一份输入不适用，显式写 --known-bad-not-applicable（与 --known-bad-dir 互斥，结果行写 known_bad=not_applicable），不留空
   if [[ $# -ge 4 ]]; then known=(--known-bad-dir "$exports/$4"); else known=(--known-bad-not-applicable); fi
@@ -2755,32 +3571,34 @@ driver_e170_r2_v2_487_z4_images() { e170_r2_judge_images Z4 e171 e170-bad-states
 # 表里别处加了核心实现的行、或改了那 117 行，这几行会变，不是装置坏了。
 # E170 导出装置在 `bad-states` 模式、第一次的表（`bad-states`，不是 `bad-states-second-run`）上造 P 行与 N 行；第一段的 known-bad-images 用占位种子
 # 0000000000000000（P、N 行与种子无关），第二段的盲测族用冻结执行器的种子（见下）。它在 E170 第 1 次重跑里加了第二套表，第一套的输出与加之前逐字节相同。
-# 冻结执行器的冻结行参照（E170 第 1 次重跑的产物，research/results/ 下、可以被归档删掉）：第二段起读 O3 的几行驱动开跑前核它，不在记跑不了
-# （文件头「驱动要读的输入」；Python 一侧 scripts/experiment-apparatus/e171_three_oracle_collusion/frozen_o3.py 的 FreezeReferenceMissing 同一句）
-E171_FREEZE_REFERENCE="research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out"
+# O3 的执行器目录（对今天盘上格式的独立规范，journal 记录头 496 字节）与它的冻结行参照（该目录全量输出的产物，research/results/ 下、可以被归档删掉）：
+# 第二段起读 O3 的几行驱动开跑前核参照，不在记跑不了（文件头「驱动要读的输入」；Python 一侧 scripts/experiment-apparatus/e171_three_oracle_collusion/frozen_o3.py
+# 的 FROZEN_DIRECTORY_RELATIVE、FREEZE_REFERENCE_RELATIVE 与 FreezeReferenceMissing 同一句）。
+# 冻结执行器在 E171 整表那几行里只经判定库取它的产物（共用前置 prerequisites 那一项，shared_steps.py），这里不起它；比对器读执行器产物按（流名、状态号）归位，行次序不影响结果行。
+E171_FREEZE_REFERENCE="research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out"
 e171_device() {
   cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e171_three_oracle_collusion -- "$@"
 }
 e171_e170_exporter() {
-  cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e170_o3_spec_executor_export -- "$@"
+  cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e170_specification_executor_export -- "$@"
 }
 driver_e171_s1_baseline() {
   local scratch="$OUT_DIR/e171-baseline"
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   (set -o pipefail && e171_device baseline --output-directory "$scratch/baseline-run1" | grep '^E7RESULT ')
 }
 driver_e171_s1_known_bad_images() {
   local scratch="$OUT_DIR/e171-known-bad"
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   (set -o pipefail \
     && e171_device baseline --output-directory "$scratch/baseline-run1" >/dev/null \
     && cp -r "$scratch/baseline-run1" "$scratch/e170-bad-states-copy" \
     && e171_e170_exporter bad-states --dump-directory "$scratch/e170-bad-states-copy" --seed-hex 0000000000000000 >/dev/null \
     && e171_device known-bad-images --dump-directory "$scratch/e170-bad-states-copy" --output-directory "$scratch/known-bad" --e170-bad-rows | grep '^E7RESULT ')
 }
-# E171 第二段（登记 `research/prompts/e171-preregistration.md` 5.4、5.5、第十二节修订）：O3 用 E170 第 1 次重跑冻结的执行器
-#（`scripts/experiment-apparatus/e170_second_run_o3_spec_executor/`，冻结行在 `e170-r1-o3-spec-executor-2026-10-03-s1-executor.out`；
-# 盲测族种子取那份产物 `name=freeze_seed` 行的 85441ae491419411）。第一段的比对器与变异表产物（`e171-…-s1-comparator.out`、`…-s1-comparator-mutations.out`）
+# E171 第二段（登记 `research/prompts/e171-preregistration.md` 5.4、5.5、第十二节修订）：O3 用 journal 记录头 496 字节的执行器
+#（`scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496/`，冻结行在
+# `e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out`；盲测族种子 85441ae491419411 写死在各驱动里，不取自冻结行）。第一段的比对器与变异表产物（`e171-…-s1-comparator.out`、`…-s1-comparator-mutations.out`）
 # 是第一段那一版比对器、九条变异跑出来的，留在 `research/results/` 里当历史；比对器、变异表在第二段改了，那两份不再复跑，由下面的 s2 两份取代。
 # 坏镜像那三份（bad-states-export、known-bad-images、images-o3）共用「基线 → 拷一份 → E170 导出装置 bad-states（冻结的种子）」这三步，各带自己的临时目录。
 # images-o3 的 config 行写两个目录名（e170-bad-states-copy-s2、known-bad-s2）与两个源文件的 sha256（本实验那份 `o3_bad_image_judge.py` 与它拷来的 E170
@@ -2802,20 +3620,20 @@ e171_s2_python() {
 }
 driver_e171_s2_bad_states_export() {
   local scratch="$OUT_DIR/e171-s2-bad-states"
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e171_s2_prepare_bad_states "$scratch" || return 1
   grep '^E7RESULT ' "$scratch/e170-bad-states.stdout"
 }
 driver_e171_s2_known_bad_images() {
   local scratch="$OUT_DIR/e171-s2-known-bad"
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e171_s2_prepare_bad_states "$scratch" && e171_s2_known_bad "$scratch" || return 1
   grep '^E7RESULT ' "$scratch/known-bad-images.stdout"
 }
 driver_e171_s2_images_o3() {
   local scratch="$OUT_DIR/e171-s2-images-o3"
   replay_inputs_present "${FUNCNAME[0]}" "冻结执行器的参照：${REPLAY_ARCHIVED_REMEDY}" "$E171_FREEZE_REFERENCE" || return $?
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e171_s2_prepare_bad_states "$scratch" && e171_s2_known_bad "$scratch" || return 1
   (e171_s2_python scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py judge \
       --e170-dumps "$scratch/e170-bad-states-copy-s2" --known-bad-dir "$scratch/known-bad-s2" --output "$scratch/images-o3.out" >&2) || return 1
@@ -2824,55 +3642,77 @@ driver_e171_s2_images_o3() {
 driver_e171_s2_o3_control_baseline() {
   local scratch="$OUT_DIR/e171-s2-o3-control"
   replay_inputs_present "${FUNCNAME[0]}" "冻结执行器的参照：${REPLAY_ARCHIVED_REMEDY}" "$E171_FREEZE_REFERENCE" || return $?
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e171_s2_prepare_bad_states "$scratch" || return 1
   (e171_s2_python scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py control \
       --dumps "$scratch/baseline-run1" --e170-dumps "$scratch/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control.out" >&2) || return 1
   grep '^E7RESULT ' "$scratch/o3-control.out"
 }
 # 比对器那一份（第二段）：基线两趟、E170 导出装置的 dump、冻结的执行器在基线上（A3 的 O3 一份）、已知坏镜像与 E170 的 P、N、盲测各行（O2 与 O3）、关一条（O1、O2）、
-# 阳性对照四条（基线与空变异各一趟）、逐行驱动全表（不给选行参数；三条线道、每条线道两个线程）、
+# 阳性对照四条（基线与空变异各一趟）、逐行驱动全表（不给选行参数）、
 # Q3-核的机制试跑（第一刀的第 8 行，关 O1、关 O2、驱动不跑执行器各一趟）；目录的名字（baseline-run1、rows-s2-trial、disable-O1……）进产物，改了名产物就变。
+# E171 整表那几行（第 7、9、10、11 行用的 s2、s4、扩表、补位四趟）只核账：项与行都由 scripts/experiment-apparatus/e171-row-shard.sh 经服务分片判进判定库
+# （共用前置一项一条、逐行驱动一行一条，prune-server 的 apparatus-items 族；shared_steps.py、row_driver.py 文件头「判定库」），这四个驱动一样都不现判：
+# 共用前置与四条阳性对照五项经 e171_take_shared_steps 照键从判定库取（shared_steps.py 的 take：五项都在才逐项解进这个驱动的草稿目录、拷进来，名字与比对器读的相同），
+# 整表与 Q3-核各趟的行经 e171_take_rows 照键取（shared_steps.py take-rows：row_driver.py 文件头「只取」，库里有键相同、判绿的才解进输出根）。
+# 缺一项、缺一行，这一行记跑不了（驱动退 1），标准错误点名缺的、末尾一句出路是经服务交分片入口的整条命令（e171_library_remedy）。
+# 这一条与 s4、F4、补位三条登记在 REPLAY_DRIVERS_LEASING_THEIR_OWN_CARDS（文件头「GPU」）：本脚本不替这几行持卡；它们只取、不起装置，一张卡都不领。
+# 行键（scripts/gate/admission.py 的 replay_row_request 照驱动闭包里各函数的原文认 -p、--bin 与 CHECKER_TIER_FEATURES）：这几行的结局读判定库里两份装置判的项与行，
+# 判它们的装置（e171_take_shared_steps、e171_take_rows 的函数体里各有一行「行键：」注释写着它的 cargo run 那一句）进行键，GPU 开关经 CHECKER_TIER_FEATURES
+# 进行键（e171_take_shared_steps 读它定 --device-features）：装置或开关一变，这几行照现跑（核账），不复用上一趟的结局。
+# e171_library_remedy：库里缺项缺行时这一行的出路句（✗ 与 →，带范围声明、能照抄的那一条分片入口命令），返回 1。
+# 弄坏开关 REPLAY_BREAK=missing-row-remedy-silent：什么都不打、照返回 1（自证 e171-missing-row-refused 那一格转红）。
+e171_library_remedy() {
+  local work_root
+  [[ "$REPLAY_BROKEN" == missing-row-remedy-silent ]] && return 1
+  work_root="$(python3 "$REPLAY_REPOSITORY_ROOT/.claude/hooks/lib_work_root.py" 2>/dev/null)" || work_root="<工作根>"
+  echo "  ✗ replay: E171 整表那几行只核账，判定库里缺上面点名的项或行，这一行记跑不了（这一趟一样都没现判）" >&2
+  echo "  → 怎么办：经服务交分片入口把缺的判进库，再复跑这一行：SINGLEFS_RUN_SCOPE='种类=whole; 跑什么=E171 整表行的分片入口 e171-row-shard.sh（判库里缺的项与行、核账）; 范围=整轮全部项; 为什么=复跑表 E171 整表那几行只核账，库里缺的项与行经服务分片补判' task-server/task submit --cwd $PWD -- bash scripts/experiment-apparatus/e171-row-shard.sh --root ${work_root:-<工作根>}/e171-row-shards" >&2
+  return 1
+}
+# e171_take_shared_steps <导出目录> <草稿目录> <E170 dump 导出在这个驱动里的名字>：共用前置与四条阳性对照五项照键从判定库取、解进 <草稿目录>/shared-steps，再拷进来
+e171_take_shared_steps() {
+  # 行键：判这五项的装置 cargo run -q --release -p singlefs-verification --bin e171_three_oracle_collusion 与 --bin e170_specification_executor_export
+  local features=none code
+  (( ${#CHECKER_TIER_FEATURES[@]} == 0 )) || features=gpu
+  if PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/shared_steps.py take --root "$2/shared-steps" --repo-root "$PWD" \
+       --device-features "$features" --dumps "$1" --scratch "$2" --e170-dump-name "$3" >&2; then
+    return 0
+  else
+    code=$?
+  fi
+  (( code != 4 )) || e171_library_remedy
+  return 1
+}
+# e171_take_rows <工作根> <输出根> <row_driver.py 的选行与键的参数…>：逐行驱动的行照键从判定库取进输出根（只取，一行都不编、不起装置）；
+# 标准输出是 `row …`、`table …` 那几行（比对器的 --driver-output 读 table 行），缺行退 1 并打出路。
+# 弄坏开关 REPLAY_BREAK=missing-row-driver-passes：缺行（take-rows 退 4）打了出路照返回 0，驱动往下照起比对器（自证 e171-missing-row-refused 那一格转红）。
+e171_take_rows() {
+  # 行键：判这些行的装置 cargo run -q --release -p singlefs-verification --bin e171_three_oracle_collusion
+  local work="$1" output="$2" code
+  shift 2
+  if PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/shared_steps.py take-rows --repo-root "$PWD" \
+       --work-root "$work" --output-root "$output" "$@"; then
+    return 0
+  else
+    code=$?
+  fi
+  (( code != 4 )) || e171_library_remedy
+  [[ "$REPLAY_BROKEN" == missing-row-driver-passes && "$code" == 4 ]] && return 0
+  return 1
+}
 driver_e171_s2_comparator() {
-  local scratch="$OUT_DIR/e171-s2-comparator" dumps control name flag
+  local scratch="$OUT_DIR/e171-s2-comparator" dumps name flag
   replay_inputs_present "${FUNCNAME[0]}" "冻结执行器的参照：${REPLAY_ARCHIVED_REMEDY}" "$E171_FREEZE_REFERENCE" || return $?
   dumps="$scratch/dumps"
-  rm -rf "$scratch" && mkdir -p "$dumps" "$scratch/work" || return 1
-  (set -o pipefail \
-    && e171_device baseline --output-directory "$dumps/baseline-run1" >"$scratch/baseline-run1.stdout" \
-    && e171_device baseline --output-directory "$dumps/baseline-run2" >/dev/null \
-    && e171_e170_exporter dump --output-directory "$dumps/e170-dump" >/dev/null \
-    && cp -r "$dumps/baseline-run1" "$dumps/e170-bad-states-copy-s2" \
-    && e171_e170_exporter bad-states --dump-directory "$dumps/e170-bad-states-copy-s2" --seed-hex 85441ae491419411 >/dev/null \
-    && e171_device known-bad-images --dump-directory "$dumps/e170-bad-states-copy-s2" --output-directory "$dumps/known-bad-s2" --e170-bad-rows >/dev/null \
-    && e171_device baseline --output-directory "$dumps/disable-O1" --disable-oracle O1 >/dev/null \
-    && e171_device baseline --output-directory "$dumps/disable-O2" --disable-oracle O2 >/dev/null \
-    && e171_s2_python scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py judge \
-         --e170-dumps "$dumps/e170-bad-states-copy-s2" --known-bad-dir "$dumps/known-bad-s2" --output "$scratch/images-o3.out" >&2 \
-    && e171_s2_python scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py control \
-         --dumps "$dumps/baseline-run1" --e170-dumps "$dumps/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control-baseline.out" >&2 \
-    && (root="$PWD" && cd scripts/experiment-apparatus/e170_second_run_o3_spec_executor && PYTHONDONTWRITEBYTECODE=1 \
-          python3 executor_main.py --dumps "$dumps/baseline-run1" \
-          --workers 6 --output "$scratch/o3-baseline.out" >&2)) || return 1
-  for control in O1-对拍 O1-崩溃判官 O2; do
-    (e171_device baseline --output-directory "$dumps/control-baseline-$control" --positive-control "$control" >/dev/null \
-      && PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-           --work-root "$scratch/work" --output-root "$dumps/rows-controls-$control" --empty-mutation --positive-control "$control" \
-           >&2) || return 1
-  done
-  (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-      --work-root "$scratch/work" --output-root "$dumps/rows-controls-O3" --empty-mutation --positive-control O3 \
-      --o3-control-bad-states "$dumps/e170-bad-states-copy-s2" >&2 \
-    && PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-      --work-root "$scratch/work" --output-root "$dumps/rows-s2-trial" --empty-mutation --lanes 3 --threads 2 \
-      >"$scratch/driver-tables.log") || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$dumps" "$scratch/work" || return 1
+  e171_take_shared_steps "$dumps" "$scratch" e170-dump || return 1
+  e171_take_rows "$scratch/work" "$dumps/rows-s2-trial" --empty-mutation >"$scratch/driver-tables.log" || return 1
   for name in O1 O2 no-executor; do
     flag="--disable-oracle ${name}"
     [[ "$name" == no-executor ]] && flag="--no-executor"
     # shellcheck disable=SC2086
-    (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-        --work-root "$scratch/work" --output-root "$dumps/rows-s2-q3core-$name" --rows 8 $flag \
-        | grep '^table ' >>"$scratch/driver-tables.log") || return 1
+    (set -o pipefail && e171_take_rows "$scratch/work" "$dumps/rows-s2-q3core-$name" --rows 8 $flag | grep '^table ' >>"$scratch/driver-tables.log") || return 1
   done
   (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py --output "$scratch/comparator.out" \
       --mutations-table crates/mutations.tsv --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$scratch/baseline-run1.stdout" \
@@ -2891,50 +3731,31 @@ driver_e171_s2_comparator() {
 driver_e171_s3_comparator_mutations() {
   local scratch="$OUT_DIR/e171-s3-comparator-mutations" repository_root="$PWD"
   replay_inputs_present "${FUNCNAME[0]}" "冻结执行器的参照：${REPLAY_ARCHIVED_REMEDY}" "$E171_FREEZE_REFERENCE" || return $?
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion" && PYTHONDONTWRITEBYTECODE=1 python3 mutation_driver.py \
       --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion.tsv" --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   grep '^E7RESULT ' "$scratch/mutations.out"
 }
+# E171 的 s4、F4、补位三行（driver_e171_s4_comparator、driver_e171_s4_f4_comparator、driver_e171_s4_f4_substitutes_comparator）共用 $OUT_DIR/e171-s4-comparator
+# 这一份草稿目录与冻住的树，后一行的驱动第一步先做前一行那一段。每一段做完在 $1/.stage-$2-done 里写本趟复跑的进程号（$$，子 shell 里不变）：
+# 同一趟里后一行的驱动见到前一段的记号就不重做，只读那一段留下的产物；别的趟留下的记号（进程号不同）不认，不跨趟复用。
+# 三行都在同一台、同一个 $OUT_DIR 里依次跑（要卡的行互相串行），三段各做一次。
+e171_s4_stage_done() { [[ "$(cat -- "$1/.stage-$2-done" 2>/dev/null)" == "$$" ]]; }   # <草稿目录> <段名>
+e171_s4_stage_mark() { printf '%s\n' "$$" >"$1/.stage-$2-done"; }   # <草稿目录> <段名>
 # E171 s4 整表（登记修订 5）：第二段比对器那一串前置（基线两趟、E170 导出装置 dump 与 bad-states、已知坏镜像、关一条两趟、冻结执行器在基线与坏镜像上、
-# 阳性对照四条在基线与空变异各一趟），加逐行驱动跑全部 117 行（两条线道、每条 2 线程，各趟都从同一份冻住的树拍快照）与 Q3-核三趟，再出比对器。
-# 推的挂钟约两小时（s4 整表 5 569.6 秒、Q3-核三趟各约两分钟）。117 行的读数与 A4–A7 都读今天的 `crates/`：实现、O2、O1、装置或 `crates/mutations.tsv`
+# 阳性对照四条在基线与空变异各一趟），加逐行驱动全部 117 行与 Q3-核三趟，再出比对器。前置与行都只取（上面「E171 整表那几行」）：各趟都从同一份冻住的树
+# 拍快照算键（--snapshot-from），三行核的是同一棵树。117 行的读数与 A4–A7 都读今天的 `crates/`：实现、O2、O1、装置或 `crates/mutations.tsv`
 # 里那 117 行变了，产物就变，不是复跑坏了。目录的名字（baseline-run1、rows-s4、disable-O1、disable-O2）进产物，改了名产物就变。
 driver_e171_s4_comparator() {
-  local scratch="$OUT_DIR/e171-s4-comparator" dumps frozen control rows name flag
+  local scratch="$OUT_DIR/e171-s4-comparator" dumps frozen rows name flag
   replay_inputs_present "${FUNCNAME[0]}" "冻结执行器的参照：${REPLAY_ARCHIVED_REMEDY}" "$E171_FREEZE_REFERENCE" || return $?
+  if e171_s4_stage_done "$scratch" s4; then grep '^E7RESULT ' "$scratch/comparator.out"; return; fi
   dumps="$scratch/dumps"
   frozen="$scratch/frozen-tree"
-  rm -rf "$scratch" && mkdir -p "$dumps" "$scratch/work" "$frozen" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$dumps" "$scratch/work" "$frozen" || return 1
   replay_copy_closure_into "$frozen" || return 1
-  (set -o pipefail \
-    && e171_device baseline --output-directory "$dumps/baseline-run1" >"$scratch/baseline-run1.stdout" \
-    && e171_device baseline --output-directory "$dumps/baseline-run2" >/dev/null \
-    && e171_e170_exporter dump --output-directory "$dumps/e170-pinned-dump" >/dev/null \
-    && cp -r "$dumps/baseline-run1" "$dumps/e170-bad-states-copy-s2" \
-    && e171_e170_exporter bad-states --dump-directory "$dumps/e170-bad-states-copy-s2" --seed-hex 85441ae491419411 >/dev/null \
-    && e171_device known-bad-images --dump-directory "$dumps/e170-bad-states-copy-s2" --output-directory "$dumps/known-bad-s2" --e170-bad-rows >/dev/null \
-    && e171_device baseline --output-directory "$dumps/disable-O1" --disable-oracle O1 >/dev/null \
-    && e171_device baseline --output-directory "$dumps/disable-O2" --disable-oracle O2 >/dev/null \
-    && e171_s2_python scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py judge \
-         --e170-dumps "$dumps/e170-bad-states-copy-s2" --known-bad-dir "$dumps/known-bad-s2" --output "$scratch/images-o3.out" >&2 \
-    && e171_s2_python scripts/experiment-apparatus/e171_three_oracle_collusion/o3_bad_image_judge.py control \
-         --dumps "$dumps/baseline-run1" --e170-dumps "$dumps/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control-baseline.out" >&2 \
-    && (root="$PWD" && cd scripts/experiment-apparatus/e170_second_run_o3_spec_executor && PYTHONDONTWRITEBYTECODE=1 \
-          python3 executor_main.py --dumps "$dumps/baseline-run1" \
-          --workers 6 --output "$scratch/o3-baseline.out" >&2)) || return 1
-  for control in O1-对拍 O1-崩溃判官 O2; do
-    (e171_device baseline --output-directory "$dumps/control-baseline-$control" --positive-control "$control" >/dev/null \
-      && PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-           --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-controls-$control" --empty-mutation \
-           --positive-control "$control" >&2) || return 1
-  done
-  (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-      --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-controls-O3" --empty-mutation --positive-control O3 \
-      --o3-control-bad-states "$dumps/e170-bad-states-copy-s2" >&2 \
-    && PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-      --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-s4" --lanes 2 --threads 2 \
-      --keep-compile-failures-as-they-are >"$scratch/table-driver.out") || return 1
+  e171_take_shared_steps "$dumps" "$scratch" e170-pinned-dump || return 1
+  e171_take_rows "$scratch/work" "$dumps/rows-s4" --snapshot-from "$frozen" >"$scratch/table-driver.out" || return 1
   rows=$(PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py --print-q3-core-rows \
            --rows-root "$dumps/rows-s4" --baseline-dir "$dumps/baseline-run1" | grep -o 'q3_core_rows=[0-9,]*' | cut -d= -f2)
   [[ -n "$rows" ]] || return 1
@@ -2942,9 +3763,7 @@ driver_e171_s4_comparator() {
     flag="--disable-oracle ${name}"
     [[ "$name" == no-executor ]] && flag="--no-executor"
     # shellcheck disable=SC2086
-    (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-        --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-s4-q3core-$name" --rows "$rows" $flag --lanes 2 --threads 2 \
-        >"$scratch/q3core-$name-driver.out") || return 1
+    e171_take_rows "$scratch/work" "$dumps/rows-s4-q3core-$name" --snapshot-from "$frozen" --rows "$rows" $flag >"$scratch/q3core-$name-driver.out" || return 1
   done
   (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py --output "$scratch/comparator.out" \
       --mutations-table crates/mutations.tsv --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$scratch/baseline-run1.stdout" \
@@ -2958,23 +3777,21 @@ driver_e171_s4_comparator() {
       --rows-root "$dumps/rows-s4" --driver-output "$scratch/table-driver.out" \
       --q3-core "O1:$dumps/rows-s4:$dumps/rows-s4-q3core-O1" --q3-core "O2:$dumps/rows-s4:$dumps/rows-s4-q3core-O2" \
       --q3-core "no_executor:$dumps/rows-s4:$dumps/rows-s4-q3core-no-executor" >&2) || return 1
+  e171_s4_stage_mark "$scratch" s4 || return 1
   grep '^E7RESULT ' "$scratch/comparator.out"
 }
-# E171 F4 扩表（登记 5.2「扩表」、第十节 F4）：先整条跑 driver_e171_s4_comparator（它的草稿目录留着 s4 的导出、冻住的树与编译目录），再在同一份冻住的树、
-# 同一个工作根上跑扩表（`bad-implementations-step-4-only.tsv`，补位跳过步长 8 那张表 `bad-implementations-step-8.tsv` 的名字；E171 第 2 次重跑撤项之后 163 行），比对器把 rows-s4 与 rows-s4-f4 并成一张、
-# 带 `--expansion-rows`、段名 s4-f4。推的挂钟约四小时（s4 那一串约两小时、扩表 164 行约两小时）。读数读今天的 `crates/`，同 s4 那一条的口径。
-# 编不过的行补位那一趟（第八段起驱动在编不过之后照登记 5.2 补位）见下面的 driver_e171_s4_f4_substitutes_comparator。s4 与这一条的整表都带
-# `--keep-compile-failures-as-they-are`：两份产物是编不过不补位的那一版驱动跑的，不带它，第 33、59、127、163、206、243 行会补位、产物就变。
+# E171 F4 扩表（登记 5.2「扩表」、第十节 F4）：先整条跑 driver_e171_s4_comparator（它的草稿目录留着 s4 的导出与冻住的树），再从同一份冻住的树
+# 取扩表的行（`bad-implementations-step-4-only.tsv`；E171 第 2 次重跑撤项之后 163 行），比对器把 rows-s4 与 rows-s4-f4 并成一张、
+# 带 `--expansion-rows`、段名 s4-f4。读数读今天的 `crates/`，同 s4 那一条的口径。编不过的行补位那一趟见下面的 driver_e171_s4_f4_substitutes_comparator。
+# 两张表的行是分片入口照编不过不补位（--keep-compile-failures-as-they-are）判进库的，这个开关不进行键（row_driver.py 文件头「判定库」）。
 driver_e171_s4_f4_comparator() {
   local s4="$OUT_DIR/e171-s4-comparator" dumps
   replay_inputs_present "${FUNCNAME[0]}" "冻结执行器的参照：${REPLAY_ARCHIVED_REMEDY}" "$E171_FREEZE_REFERENCE" || return $?
   driver_e171_s4_comparator >/dev/null || return 1
+  if e171_s4_stage_done "$s4" f4; then grep '^E7RESULT ' "$s4/comparator-f4.out"; return; fi
   dumps="$s4/dumps"
-  (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-      --work-root "$s4/work" --snapshot-from "$s4/frozen-tree" --output-root "$dumps/rows-s4-f4" \
-      --selected-rows scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-4-only.tsv \
-      --other-selected-rows scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-8.tsv --lanes 2 --threads 2 \
-      --keep-compile-failures-as-they-are >"$s4/table-f4-driver.out") || return 1
+  e171_take_rows "$s4/work" "$dumps/rows-s4-f4" --snapshot-from "$s4/frozen-tree" \
+    --selected-rows scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-4-only.tsv >"$s4/table-f4-driver.out" || return 1
   (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py --output "$s4/comparator-f4.out" \
       --mutations-table "$s4/frozen-tree/crates/mutations.tsv" --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$s4/baseline-run1.stdout" \
       --baseline-repeat-dir "$dumps/baseline-run2" --e170-dump "$dumps/e170-pinned-dump" --o3-baseline "$s4/o3-baseline.out" \
@@ -2989,24 +3806,22 @@ driver_e171_s4_f4_comparator() {
       --driver-output "$s4/table-driver.out" --driver-output "$s4/table-f4-driver.out" \
       --q3-core "O1:$dumps/rows-s4:$dumps/rows-s4-q3core-O1" --q3-core "O2:$dumps/rows-s4:$dumps/rows-s4-q3core-O2" \
       --q3-core "no_executor:$dumps/rows-s4:$dumps/rows-s4-q3core-no-executor" >&2) || return 1
+  e171_s4_stage_mark "$s4" f4 || return 1
   grep '^E7RESULT ' "$s4/comparator-f4.out"
 }
-# E171 编不过的 6 行补位（登记 5.2、第一节读法 5「替换之后编不过」）：先整条跑 driver_e171_s4_f4_comparator（它的草稿目录留着 s4 与 F4 的导出、冻住的树与编译目录；
-# 两趟整表都带 `--keep-compile-failures-as-they-are`，所以第 33、59、127、163、206、243 行在两份输出根里的结局还是编不过），再在同一份冻住的树、同一个工作根上
-# 跑补位那一趟（逐行驱动不再单列那六行：编不过的行由驱动按键复用时现判；原行先编，编不过就换同一文件组的下一行、至多三次，
-# 补位跳过 117 行与扩表两张表的全部名字，补位那一趟不带 `--keep-compile-failures-as-they-are`），比对器把 rows-s4、rows-s4-f4 并上补位根（`--substitution-rows-root`）、段名 s4-f4-substitutes。
-# 推的挂钟约四个半小时（F4 那一串约四小时、补位 6 行 1 277.9 秒）。读今天的 `crates/`，同 s4 那一条的口径；补位挑中哪几行取决于 `crates/mutations.tsv` 与那六行
-# 今天编不编得过，表或实现变了换上的行就变、产物就变。目录的名字（rows-s4-f4-substitutes）进产物的 config 行。
+# E171 编不过的行补位（登记 5.2、第一节读法 5「替换之后编不过」）：先整条跑 driver_e171_s4_f4_comparator（它的草稿目录留着 s4 与 F4 的导出与冻住的树），
+# 再从同一份冻住的树取步长 8 那张表的行进补位根（分片入口的 substitutes 那一项照补位判过：原行先编，编不过就换同一文件组的下一行、至多三次，补位跳过两张表的
+# 全部名字；补位换了行的结局不入库，那几行库里没有，这一行就记跑不了），比对器把 rows-s4、rows-s4-f4 并上补位根（`--substitution-rows-root`）、段名 s4-f4-substitutes。
+# 读今天的 `crates/`，同 s4 那一条的口径；补位挑中哪几行取决于 `crates/mutations.tsv` 与那几行今天编不编得过，表或实现变了换上的行就变、产物就变。
+# 目录的名字（rows-s4-f4-substitutes）进产物的 config 行。
 driver_e171_s4_f4_substitutes_comparator() {
   local s4="$OUT_DIR/e171-s4-comparator" dumps
   replay_inputs_present "${FUNCNAME[0]}" "冻结执行器的参照：${REPLAY_ARCHIVED_REMEDY}" "$E171_FREEZE_REFERENCE" || return $?
   driver_e171_s4_f4_comparator >/dev/null || return 1
+  if e171_s4_stage_done "$s4" substitutes; then grep '^E7RESULT ' "$s4/comparator-f4-substitutes.out"; return; fi
   dumps="$s4/dumps"
-  (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
-      --work-root "$s4/work" --snapshot-from "$s4/frozen-tree" --output-root "$dumps/rows-s4-f4-substitutes" \
-      --selected-rows scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-8.tsv \
-      --other-selected-rows scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-4-only.tsv \
-      --lanes 2 --threads 2 >"$s4/substitution-driver.out") || return 1
+  e171_take_rows "$s4/work" "$dumps/rows-s4-f4-substitutes" --snapshot-from "$s4/frozen-tree" \
+    --selected-rows scripts/experiment-apparatus/e171_three_oracle_collusion/bad-implementations-step-8.tsv >"$s4/substitution-driver.out" || return 1
   (PYTHONDONTWRITEBYTECODE=1 python3 scripts/experiment-apparatus/e171_three_oracle_collusion/comparator.py --output "$s4/comparator-f4-substitutes.out" \
       --mutations-table "$s4/frozen-tree/crates/mutations.tsv" --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$s4/baseline-run1.stdout" \
       --baseline-repeat-dir "$dumps/baseline-run2" --e170-dump "$dumps/e170-pinned-dump" --o3-baseline "$s4/o3-baseline.out" \
@@ -3022,6 +3837,7 @@ driver_e171_s4_f4_substitutes_comparator() {
       --driver-output "$s4/q3core-no-executor-driver.out" --driver-output "$s4/table-f4-driver.out" --driver-output "$s4/substitution-driver.out" \
       --q3-core "O1:$dumps/rows-s4:$dumps/rows-s4-q3core-O1" --q3-core "O2:$dumps/rows-s4:$dumps/rows-s4-q3core-O2" \
       --q3-core "no_executor:$dumps/rows-s4:$dumps/rows-s4-q3core-no-executor" >&2) || return 1
+  e171_s4_stage_mark "$s4" substitutes || return 1
   grep '^E7RESULT ' "$s4/comparator-f4-substitutes.out"
 }
 # E171 第 1 次重跑第一段·修订 6 那一趟（登记 `research/prompts/e171-r1-prereg.md` 修订 6–8 与其后各条「主 agent 认定」；第 0–10 步后缀 -r6-r3，
@@ -3032,8 +3848,8 @@ driver_e171_s4_f4_substitutes_comparator() {
 # 导出根没给、它或要读的子目录与 research/results/ 下的产物缺了，这几行逐项记跑不了（文件头「驱动要读的输入」），不起比对器。
 # 第 0–13 步本身（装置各趟、逐行驱动、O3 执行器、多机编排）要冻结树、真跑各行或第二台，推的挂钟几十小时，不登记。
 E171_R1_DUMPS_REMEDY="导出根：照登记 research/prompts/e171-r1-prereg.md 修订 6–8 的第 0–13 步重出那一趟的导出，放到固定位置（工作根下 replay-frozen-roots/e171-r1-dumps，replay_frozen_root 取；不放 scripts/experiment-apparatus/target/）"
-e171_r1_revision_6_python() { # 在当前目录（仓根或 e171_r1_view 搭的视图）起研究一侧的 Python
-  (PYTHONDONTWRITEBYTECODE=1 nice -n 19 python3 -B "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/$1" "${@:2}")
+e171_r1_revision_6_python() { # <脚本的字面全路径> <参数…>：在当前目录（仓根或 e171_r1_view 搭的视图）起研究一侧的 Python；各调用处把脚本写成字面全路径，算键的闭包只收调用处点名的那几份
+  (PYTHONDONTWRITEBYTECODE=1 nice -n 19 python3 -B "$@")
 }
 # e171_r1_inputs_present <这一行> <导出根下要读的子路径…> -- <research/results 下要读的产物…>：导出根没给只报它与产物，给了再逐个核子路径；缺的逐项报、返回 77
 e171_r1_inputs_present() {
@@ -3057,7 +3873,7 @@ e171_r1_view() {
   E171_R1_VIEW="$1/view"
   [[ "$E171_R1_VIEW" == /* ]] || E171_R1_VIEW="$PWD/$E171_R1_VIEW"
   dumps_root="$(replay_frozen_root e171-r1-dumps)" && dumps_root="$(realpath -- "$dumps_root")" || return 1
-  rm -rf -- "${E171_R1_VIEW:?}" && mkdir -p "$experiments/target" || return 1
+  rm -rf -- "${1:?}/view" && mkdir -p "$experiments/target" || return 1   # 与 E171_R1_VIEW 同一个目录：它就是 $1/view（相对的补上 $PWD）
   ln -s "$PWD/research" "$1/view/research" && ln -s "$PWD/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" "$experiments/" \
     && ln -s "$dumps_root" "$experiments/target/e171-r1-dumps" || return 1
   frozen_tree="$(replay_frozen_root e171-r1-frozen-tree-revision-6)" || return 1
@@ -3074,9 +3890,9 @@ driver_e171_r1_s1_revision_6_comparator() {
   e171_r1_inputs_present "${FUNCNAME[0]}" revision-6-2026-10-05-r3/baseline-run1 revision-6-2026-10-05-r3/baseline-run2 revision-6-2026-10-05-r3/segment1-rows-resume2 \
     -- "$prefix-o3-baseline-run1-r6-r3.out" "$prefix-q5-main-before-the-first-barrier-of-call-3-run-1-r6-r3.out" \
     "$prefix-q5-reverse-at-the-return-point-of-call-2-r6-r3.out" "${control_products[@]}" || return $?
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e171_r1_view "$scratch" || return 1
-  (cd "$E171_R1_VIEW" && e171_r1_revision_6_python segment_one_comparator.py --baseline "$dumps/baseline-run1" --second-baseline "$dumps/baseline-run2" \
+  (cd "$E171_R1_VIEW" && e171_r1_revision_6_python scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_comparator.py --baseline "$dumps/baseline-run1" --second-baseline "$dumps/baseline-run2" \
     --baseline-o3 "$prefix-o3-baseline-run1-r6-r3.out" --rows-root "$dumps/segment1-rows-resume2" \
     --q5-main "$prefix-q5-main-before-the-first-barrier-of-call-3-run-1-r6-r3.out" --q5-reverse "$prefix-q5-reverse-at-the-return-point-of-call-2-r6-r3.out" \
     --control "O1-对拍=$prefix-positive-control-o1-comparison-r6-r3.out" --control "O1-对拍-卸载=$prefix-positive-control-o1-comparison-unmount-r6-r3.out" \
@@ -3097,9 +3913,9 @@ driver_e171_r1_s1_revision_6_cross_host_check() {
   e171_r1_inputs_present "${FUNCNAME[0]}" revision-6-2026-10-05-r3/segment1-rows-resume2/row-0 revision-6-2026-10-05-r3/segment1-rows-resume2-cross-host/row-0 \
     revision-6-2026-10-05-r3/segment1-rows-resume2-shards/row-hosts.tsv \
     -- "$prefix-rows-driver-resume2-r6-r3.out" "$prefix-rows-cross-host-row-0-driver-resume2-r6-r3.out" || return $?
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e171_r1_view "$scratch" || return 1
-  (cd "$E171_R1_VIEW" && e171_r1_revision_6_python cross_host_o3_check.py compare --repo . --step-12-row-0 "$dumps/segment1-rows-resume2/row-0" \
+  (cd "$E171_R1_VIEW" && e171_r1_revision_6_python scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/cross_host_o3_check.py compare --repo . --step-12-row-0 "$dumps/segment1-rows-resume2/row-0" \
     --cross-host-row-0 "$dumps/segment1-rows-resume2-cross-host/row-0" --step-12-product "$prefix-rows-driver-resume2-r6-r3.out" \
     --cross-host-product "$prefix-rows-cross-host-row-0-driver-resume2-r6-r3.out" --ledger "$dumps/segment1-rows-resume2-shards/row-hosts.tsv") \
     >"$scratch/compare.out" || return 1
@@ -3107,7 +3923,7 @@ driver_e171_r1_s1_revision_6_cross_host_check() {
 }
 driver_e171_r1_s1_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s1-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
       --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv" --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
@@ -3126,9 +3942,9 @@ driver_e171_r1_s2_revision_6_comparator() {
   replay_inputs_present "${FUNCNAME[0]}" "冻结树：照登记 research/prompts/e171-r1-prereg.md 修订 6 的冻结树清单重建一份，放到固定位置（工作根下 replay-frozen-roots/e171-r1-frozen-tree-revision-6，replay_frozen_root 取；不放 scripts/experiment-apparatus/target/）" \
     "${frozen_tree:+$frozen_tree/crates/mutations.tsv}" || status=$?
   (( status == 0 )) || return "$status"
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   e171_r1_view "$scratch" || return 1
-  (cd "$E171_R1_VIEW" && e171_r1_revision_6_python segment_two_comparator.py --baseline "$dumps/revision-6-2026-10-05-r3/s2-device-baseline-streams-1-2" \
+  (cd "$E171_R1_VIEW" && e171_r1_revision_6_python scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_two_comparator.py --baseline "$dumps/revision-6-2026-10-05-r3/s2-device-baseline-streams-1-2" \
     --stability-baseline "$dumps/revision-6-2026-10-05-r3/baseline-run1" --stability-baseline "$dumps/revision-6-2026-10-05-r3/baseline-run2" \
     --rows-root "$dumps/revision-6-segment-2/segment2-rows" \
     --driver-product "$driver_product" \
@@ -3140,25 +3956,25 @@ driver_e171_r1_s2_revision_6_comparator() {
 }
 driver_e171_r1_s2_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s2-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_segment_two.tsv" \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_segment_two.tsv" --unit-test-module test_segment_two \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
 driver_e171_r1_s1_revision_8_tools_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s1-revision-8-tools-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_8.tsv" \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_8.tsv" --unit-test-module test_revision_8 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
 driver_e171_r1_s2_revision_10_tools_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-s2-revision-10-tools-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_10.tsv" \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_10.tsv" --unit-test-module test_revision_10 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -3168,7 +3984,7 @@ driver_e171_r1_s2_revision_10_tools_research_mutations() {
 # 复用库只在 prune-server 里、单测只在临时服务上跑（reuse_library.py 文件头「库」）：变异驱动整条套在临时服务底下起（客户端文件头「命令行」--with-temporary-service）
 driver_e171_r1_revision_11_tools_research_mutations() {
   local scratch="$OUT_DIR/e171-r1-revision-11-tools-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B \
       "$repository_root/scripts/prune-server/prune_server_client_selftest.py" --with-temporary-service -- python3 -B mutation_driver.py \
       --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv" --unit-test-module test_revision_11 \
@@ -3184,11 +4000,11 @@ driver_e171_r1_revision_12_stream_constants() {
 }
 # E171 第 2 次重跑（登记 research/prompts/e171-r2-prereg.md 第五节 5.3）：名单核对读工作区的 crates/mutations.tsv、改后的两张名单与开工那一刻的提交；
 # 变异表或名单改了这一行会红（同 stream-constants 那一行，红了照登记读法 3 重分）。r1 逐行驱动产物从 git 对象库取（59ce5a865 里有它），文件名照原名，产物 config 行只写名字。
-# 名单核对的 name=pinned_values 一行还载入同目录 count_reusable_units.py（它载入 reuse_library.py）：载入报错时那一格照实写进产物，产物随之不同。
+# 名单核对的 name=pinned_values 一行还读同目录 segment_two_comparator.py 与 count_reusable_units.py 的源文本（不载入它们），核整表行数那一行仍是照名单现算的写法：改成别的写法或读不了，那一格照实写进产物（not_derived、unreadable:…），产物随之不同。
 # 四条登记行指登记修订 2 第 2.5 条 Z12 之后的重跑产物（名后接跑的那天）；作废那一趟的四份留在 research/results/，不登记复跑。
 driver_e171_second_rerun_list_check() {
   local scratch="$OUT_DIR/e171-r2-list-check" repository_root="$PWD" driver_product=e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-07-s2-rows-driver-r6.out
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   git show "59ce5a86550de2c2c9bc6b51b34b4f881313682c:research/results/$driver_product" >"$scratch/$driver_product" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B list_check.py \
       --repository "$repository_root" --reference-commit 59ce5a86550de2c2c9bc6b51b34b4f881313682c --r1-rows-driver-product "$scratch/$driver_product" \
@@ -3200,7 +4016,7 @@ e171_second_rerun_removal_effect() { # <调用它的驱动名> <kind> <取产物
   local row="$1" kind="$2" commit="$3" name="$4" digest="$5" count="$6" repository_root="$PWD"
   local scratch="$OUT_DIR/$row" list_check_product=research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-list-check-2026-11-01.out
   replay_inputs_present "$row" "名单核对产物：先跑 driver_e171_second_rerun_list_check 那一行" "$list_check_product" || return $?
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch" || return 1
   git show "$commit:research/results/$name" >"$scratch/$name" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B removal_effect.py \
       --kind "$kind" --product "$scratch/$name" --expected-sha256 "$digest" --expected-lines "$count" \
@@ -3221,9 +4037,9 @@ driver_e171_second_rerun_removal_effect_on_the_revision_6_segment_two() {
 }
 driver_e171_second_rerun_list_removal_research_mutations() {
   local scratch="$OUT_DIR/e171-r2-list-removal-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_list_removal.tsv" \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_list_removal.tsv" --unit-test-module test_list_check --unit-test-module test_removal_effect \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -3231,15 +4047,15 @@ driver_e171_second_rerun_list_removal_research_mutations() {
 # H16、冻结树两处运行条件（单测 test_revision_8），复用库根两台同一（单测 test_revision_11）；结果行不带耗时，exact 比。
 driver_e171_second_rerun_current_state_preconditions_research_mutations() {
   local scratch="$OUT_DIR/e171-r2-current-state-preconditions-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_preconditions.tsv" \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_preconditions.tsv" --unit-test-module test_revision_8 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
 driver_e171_second_rerun_current_state_library_root_research_mutations() {
   local scratch="$OUT_DIR/e171-r2-current-state-library-root-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B \
       "$repository_root/scripts/prune-server/prune_server_client_selftest.py" --with-temporary-service -- python3 -B mutation_driver.py \
       --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_library_root.tsv" \
@@ -3249,9 +4065,9 @@ driver_e171_second_rerun_current_state_library_root_research_mutations() {
 # E171 第 2 次重跑修订 5（登记 research/prompts/e171-r2-prereg.md 第 5.6 条）：第 0 步判法读宣布行的行首与调度记录（单测 test_revision_8）；exact 比。
 driver_e171_second_rerun_current_state_announcement_research_mutations() {
   local scratch="$OUT_DIR/e171-r2-current-state-announcement-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_announcement.tsv" \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_announcement.tsv" --unit-test-module test_revision_8 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -3259,9 +4075,9 @@ driver_e171_second_rerun_current_state_announcement_research_mutations() {
 # 第一段对照 ②③ 报造不回来与 ④ 没账时的台（单测 test_revision_8）；exact 比。
 driver_e171_second_rerun_current_state_threads_and_contrast_research_mutations() {
   local scratch="$OUT_DIR/e171-r2-current-state-threads-and-contrast-research-mutations" repository_root="$PWD"
-  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  replay_remove_directory_below "$OUT_DIR" "$scratch" && mkdir -p "$scratch/work" || return 1
   (cd "$repository_root/scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes" && PYTHONDONTWRITEBYTECODE=1 python3 -B mutation_driver.py \
-      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_threads_and_contrast.tsv" \
+      --table "$repository_root/scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes_current_state_threads_and_contrast.tsv" --unit-test-module test_thread_shares --unit-test-module test_revision_8 \
       --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
   cat "$scratch/mutations.out"
 }
@@ -3269,6 +4085,7 @@ driver_e171_second_rerun_current_state_threads_and_contrast_research_mutations()
 # E173 第 1 次重跑第一段（入库装置，重跑登记 research/prompts/e173-r1-prereg.md「装置写在哪」）：同 E156 的先例；
 # `segment-one` 模式跑 9 个几何（S × 池大小）上的 κ 与一次空发布实际新占的固定点、两条路对拍、本地常量回比；
 # 输出里只有一处与线程数相关：config 行的 `threads_of_the_geometries` = min(线程数, 21)，线程数取登记的每台默认重活线程数（31）时是 21。
+# 期望产物是重跑登记 research/prompts/e173-r2-prereg.md 的 …-2026-11-13-r2.out（在这棵树的 crates/ 上现跑；与同目录 …-2026-11-02.out 那份只有 g_min_trial 两行的结局名不同，那份也留在 research/results/）。
 driver_e173_checkpoint_cost() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e173_checkpoint_cost_against_empty_publish_cost -- segment-one)
 }
@@ -3280,19 +4097,21 @@ driver_e156() {
 # E158（第一段，入库装置，跑前登记「装置写在哪」写死第 5 行）：同 E156 的先例，两个 cargo workspace
 # 互相看不到对方，不能合并成一次调用。`all` 模式跑 5.7 常量回比、第七节锚点、S5 独立解码对拍、
 # H3（岔路 3）四个几何点不注入全枚举、Q3-2/Q2-3 算术、PC3。
-# 这一行承重 `e158-root-choice-repair-2026-09-25-segment1-rerun.out`。`…-2026-09-24-segment1-rerun.out` 与 `…-2026-09-23-segment1.out`（后者对应 C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 落地之前的代码）
-# 原样留着，不是这一行比对的对象。工作树 `crates/` 里 mount.rs、allocator.rs、allocation_record_tree.rs 一变，`pc3` 一行（`recover_verdict`、`recover_root`）会随之变，
-# 对不上是新观测，先对着实验页与跑前登记「十二、修订」查。
+# 这一行承重 `e158-root-choice-repair-2026-11-09-segment1-rerun.out`（按如实账本重出：H3 四个几何点的 `peak_events_live` 与 N_w 是 0，
+# PC3 判 `not_applicable`，`pc3` 一行不再打，这几行是空域，不是「打不中」；Q3-2、Q2-3 的算术行按 N_w=0 打）。`…-2026-09-25-segment1-rerun.out` 与更早的
+# 原样留在 git 历史里，不是这一行比对的对象。
 driver_e158() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- all)
 }
 
 # E158 第二段 Q3-1（岔路 3 候选 3 那一半）：`q3-1-g0` 模式只跑 G0 几何上的
 # H3 × Φ3（|F|≤2）违例枚举，不跑第一段的 H3 全枚举（那部分归 `driver_e158`）。
-# 产物里 G0/S16/小环三点的 `pairs_with_any_violation` 是 0（`cold_recover_with_fault_failed`/`mount_writable_with_fault_failed` 也是 0：判定本身不再违例）；S4 那一点
-# `pairs_with_any_violation` 是 0，`cold_recover_with_fault_failed`/`mount_writable_with_fault_failed` 是 239：同一批构造里有 239 个是「调用直接报错」，
-# 与「成功但违例」是两种不同的失效形态。C332 正文钉的「2 个故障就能撤销回退」在这份 `crates/` 上测不出来，详见跑前登记「十二、修订」。
-# 登记的产物是 `e158-root-choice-repair-2026-09-25-{q3-1-g0,q3-1-s16,q3-1-small-ring,q3-1-s4}.out`，`…-09-24-…` 原样留着、不登记。
+# 登记的产物按如实账本（回退是向前发布，账上时间线不截、不记被抛弃的根）重出：G0/S16/小环三点都是 `nodes_visited=1371 pairs=153398`，
+# S4 是 `nodes_visited=15956 pairs=1258176`，四点的 `pairs_with_any_violation` 都是 0；
+# `cold_recover_with_fault_failed` 四点都是 0，`mount_writable_with_fault_failed` G0/S16/小环是 115、S4 是 1236（调用直接报错，不是「成功但违例」；两个数各等于同一份产物 `effective_root_is_not_the_tip` 的数，为什么相等没单查）。
+# 新判据 `content_differs_from_its_effective_root` 与 `effective_root_off_the_timeline` 等六个量任一非 0，这一档打 `name=stop` 退 1；四点都是 0。
+# 旧判据 `faulted_cold_content_differs_from_its_root` 只留着当读数（G0/S16/小环 10351，S4 93530），不判红。
+# 登记的产物是 `e158-root-choice-repair-2026-11-09-{q3-1-g0,q3-1-s16,q3-1-small-ring,q3-1-s4}.out`，`…-09-25-…` 与更早的原样留在 git 历史里、不登记。
 driver_e158_q3_1_g0() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q3-1-g0)
 }
@@ -3307,103 +4126,8 @@ driver_e158_q3_1_small_ring() {
 driver_e158_q3_1_s4() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q3-1-s4)
 }
-# E158 岔路单第 1 行（C393）：`q1-g0` 模式在今天的 `crates/`（候选 (c)）上跑 H1 家族 + Φ1 故障注入 +
-# PC1-a/PC1-b，只跑 G0 几何（见实验页）。候选 (a)（A1 副本）的同一份数只存产物
-# `e158-root-choice-repair-2026-09-24-q1-g0-a1-arm.out`，**不登记在这张表里**：它要在
-# `scripts/mutation/tables/e158_arms.tsv` 描述的副本上重新编译才跑得出来，这张表假设「跑这一行就等于跑今天
-# committed 的 crates/」，副本不满足这个假设；复跑它的步骤见实验页「复跑」一节。产物里
-# 多了 171 格差集的分类诊断（`q1_2_subset_diff_pair*`，根因是 `RootRecord::instance_table` 没被走
-# 全版本走到）与 op1 起三步挂载的持续/瞬时故障轨迹（`q1_1a_op1_trajectory`）。
-# op1 有第三种变体（`MountWritableThenRaiseFloorTo`），对应 `q1_1a_raise_floor_trigger_summary`/`q1_1a_raise_floor_by_aspect_severity`（G0：
-# `pairs=96 trigger_count=32 history_nodes_without_room=26`，both_copies 两个指称各 16/16 触发、
-# disk0_only/disk1_only 各 0/16，与另外两种 op1 变体同一批构造上的模式一致），是真实数据、不是噪声。
-# 同一份产物里还有随 `crates/`（`mount.rs`/`recovery.rs`）变的量：
-# `q1_2_tree_table_crates_has_a_path`（`verify_named_units=false`）是「189+0」（不碰物理拷贝就能复算出指针的格数是 0）、`pc1_a` 的 `device_write_bytes` 是
-# 353792（`AllocationRecordTreeNode` 写得更多，与 `q2_2a_g0` 那条同一根因），
-# 这两条与 e158 装置本身无关，随 `crates/` 变。
-# 登记的产物是 `e158-root-choice-repair-2026-09-25-{q1-g0-today,q1-s16,q1-s4}.out`，`…-09-24-…` 原样留着、不登记。
-driver_e158_q1_g0() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q1-g0)
-}
-# E158 岔路单第 2 行 ①（C331 修法）：`q2-1-g0` 在今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族（op2=`mount_writable`，只 n1∈{0,1,2,3}、n2=1）的穷举
-# 下界搜索。这条产物是在故障装配 bug 存在时跑出来的（`attempt_rootback_probe_and_advance` 一块盘只装得上一个故障目标，权重 ≥ 2 就可能漏装——见跑前登记「十二、修订」）：
-# 修好之后同一个 n1 范围给出不同结果（甲-txg 臂是「k_min=4」，不是「0 命中」），这条产物不当「今天/丙 0 命中」的依据引用，只当 bug 在时的对照；
-# 承重的是下面 `driver_e158_q2_1_g0_session_s5`。
-driver_e158_q2_1_g0() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-g0)
-}
-# E158 岔路单第 2 行 ②（每条修法每次发布多写几字节）：`q2-2a-g0` 在今天的 `crates/` 上跑
-# 固定脚本，按结构种类报每次发布写的字节。甲-txg 臂的同一份数只存产物，同上不登记在这张表里。
-# `AllocationRecordTreeNode` 每次发布的 `write_calls`/
-# `written_bytes` 较大（例如 `second_mount_row_publish` 是 `write_calls=10 written_bytes=163840`），
-# 与 `q1_g0` 的 `pc1_a` 字节同一根因
-# （`allocator.rs`/`allocation_record_tree.rs`，与 e158 装置本身无关）。
-# 登记的产物是 `e158-root-choice-repair-2026-09-25-q2-2a-g0-today.out`，`…-09-24-…` 原样留着。
-driver_e158_q2_2a_g0() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-2a-g0)
-}
-# E158 岔路单第 2 行 PC2 是阳性对照：复现判决 K2 的两个具体构造（甲-txg 4 个瞬时根槽
-# 读失败、乙-只配置 0 个注入故障 + 1 个崩溃点），不靠穷举——见跑前登记「十二、修订」。
-# 乙-只配置候选的同一份数只存产物（副本上的数，副本没有 `published_txg` 字段就编不过，不登记在这张
-# 表里，复跑步骤见实验页与 `scripts/mutation/tables/e158_arms.tsv`）。
-driver_e158_q2_1_pc2() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-pc2)
-}
-# E158 岔路单第 2 行 ①（C331 修法，承重）：`q2-1-g0` 在今天的 `crates/`（丙 = 甲-jsn）上跑 H2 主族，n1 范围是跑前登记 5.1 要求的
-# {0,...,6}。甲-txg 臂的同一份数只存产物，同上不登记在这张表里（复跑步骤见实验页）。穷举按权重档边界停（`weight_ceiling`），
-# 没有会在权重档中途停手的计数上限：n1=0..3 是完整穷举（`subsets_tried`==`full_space_subset_count`）；n1=4、
-# 6 找到 `k_min=12`；n1=5 如实报
-# `k_min=not_found_up_to_weight_ceiling`（完整空间 131072、只搜到权重 12 为止，未截断，见跑前登记
-# 「十二、修订」）。与 `q2_1_pc2`/`q2_1_hc1`/`q2_1_hc1_lower_bound` 三行一样不受 `crates/` 里 `mount.rs`/`allocator.rs`/`allocation_record_tree.rs`（`q3-1`/`q1-g0`/`q2-2a-g0` 会读到的路径）变动的影响：
-# H2 主族的穷举下界搜索走的是 `first_txg_of_new_instance`/`next_counter`/根环读取，不经过那几处，
-# 行 2「够判」的结论不随这几处变。
-driver_e158_q2_1_g0_session_s5() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-g0)
-}
-# 第八节几何敏感性（行 1）：岔路单第 1 行判决格 = Q1-1a 的 N_trig，S16（根环
-# 大一倍）与 S4（根环小一半）两个方向相反的取样点，复用 H1 装置代码（`run_ledger_fault_family` 本身
-# 就是几何参数化的）。两点都与 G0 逐字节等值（N_trig=798），判定不翻面，判别力自证「两点同值，自证
-# 不适用」。
-driver_e158_q1_s16() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q1-s16)
-}
-driver_e158_q1_s4() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q1-s4)
-}
-# H-C1 直接构造（岔路单第 2 行 ①，丙的具体历史）：判决 K2 说丙需要 12 个
-# 故障（4 根槽 + 4 条记录各两块盘）才打得中；这里不靠 `run_rootback_tolerance_family` 的穷举，
-# 直接按这个具体构造跑一次（hit=true, weight=12），
-# 附一个只挡 4 条根槽、不挡记录的负对照（hit=false，证明「只挡根环挡不住丙」）。
-driver_e158_q2_1_hc1() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-hc1)
-}
-# H-C1 下界探针（参数 weight_ceiling）：在同一个 n1=4 节点
-# 上，穷举权重 0..11 的全部组合（`subsets_tried=22558`，`full_space_subset_count=32768`，没有撞
-# 顶）都没有命中，权重 12 上第一个尝试的组合就命中。**这是「恰好 12」的严格证据**：不是构造上界，是
-# 穷举下界真正走到了 12 且之下全空。不传第二个参数时 `weight_ceiling=None`——n1=4 这个节点的完整
-# 空间只有 2^15=32768，在 `FEASIBLE_FULL_SEARCH_SUBSET_BUDGET`=100000 预算内，`None` 就等于穷举到
-# 完整空间的顶，与手动调高到 60000 效果相同（60000 > 这段历史任何可能的权重值）。
-driver_e158_q2_1_hc1_lower_bound() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- q2-1-hc1-lower-bound)
-}
-# E158 第 2 次跑第一段（重跑登记 `research/prompts/e158-r2-prereg.md`）：`r2-all` 在工作树的 `crates/`（今天那一臂）上
-# 跑第 2 次跑的开跑检查、H1d、Q1-0、PC1-a/b/c 与实七两段复现历史。另外七臂（A1、甲-txg、乙F-留环、乙 / 丁四臂）的产物
-# `e158-root-choice-repair-2026-09-26-r2-all-<臂>.out` 要在 `scripts/mutation/tables/e158_arms.tsv` 套出来的副本上重编才跑得出来，
-# 不登记在这张表里（同第一次跑 A1 产物的先例）；`…-r2-all-today-snapshot.out` 是同一装置在那几份副本共用的快照上跑的今天那一臂，
-# 与这一行的产物只在实七崩溃注入那一段不同（快照之后 harness 的记录核对器改过，实验页写明）。
-driver_e158_r2_all() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- r2-all)
-}
-# E158 第 3 次跑第一段（重跑登记 `research/prompts/e158-r3-prereg.md`）：`r2-all` 那一行的产物是在开工快照上重出的
-# （工作树的 `crates/` 那一刻与快照逐字节相同，登记 S8）`…-2026-09-27-r2-all-today.out`，更早的产物原样留着。
-# `r3-seg1` 在九份臂副本上各跑一遍，这里只登记今天那一臂（工作树的 `crates/` 就是它）；另外八臂的产物
-# `e158-root-choice-repair-2026-09-27-r3-seg1-<臂>.out` 要在 `scripts/mutation/tables/e158_arms.tsv` 的 r3 行套出来的副本上重编才跑得出来，
-# 不登记（同第 2 次跑的先例）。`r3-compare` 只读 `research/results/` 下九份产物、不碰 `crates/`，复跑逐字节可比。
-# 产物头的 `E7INPUT name=crates_snapshot` 那一行是开工快照的汇总 sha256，比对前删掉。工作树的 `crates/` 与快照不同时，
-# 这两行里读 `crates/` 的那一行（r3-seg1 今天、r2-all）会随之漂，不归这一次（登记第一节「上一次执行员交来的两件」）。
-driver_e158_r3_seg1_today() {
-  (SINGLEFS_E158_ARM=today cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- r3-seg1)
-}
+# E158 的 q2、r2、r3-今天 七行：它们的驱动在这里没有（依据见实验页里删这七行的那一节）。`r3-compare` 只读 `research/results/` 下九份产物、不碰 `crates/`，复跑逐字节可比；
+# 产物头的 `E7INPUT name=crates_snapshot` 那一行是开工快照的汇总 sha256，比对前删掉。留存产物原样在 git 历史里，不删。
 # r3-compare 与 r4-compare 读的臂产物在 research/results/ 下、可以被归档删掉（现查：r3 九臂只剩今天那一臂，r4 五段一份都不在）。装置那一侧缺一份时
 # r3 打 verdict=stop 照退 0、r4 静默跳过一个字不报（crates/singlefs-verification/src/bin/e158_root_choice_repair.rs 的 run_third_run_compare、
 # run_fourth_run_compare），这里开跑前照登记的臂逐份核，缺的逐项记跑不了（文件头「驱动要读的输入」），不起装置。
@@ -3433,12 +4157,22 @@ driver_e158_r4_compare() {
   (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e158_root_choice_repair -- r4-compare research/results/e158-root-choice-repair-2026-09-27-r4-seg1 research/results/e158-root-choice-repair-2026-09-27-r4-seg2b research/results/e158-root-choice-repair-2026-09-27-r4-seg3 research/results/e158-root-choice-repair-2026-09-27-r4-seg4 research/results/e158-root-choice-repair-2026-09-27-r4-seg5)
 }
 
-# E181（落得下那一判与挂载下界）第一段（入库装置，跑前登记 5.5 节「第一段」）：装置不带段名就跑全部 11 段——常量回比、第七节锚点、18 条自证、小几何的阳性对照，
-# 以及长段（F9 的边界二分与窗口、F10 的走种子、F11 的挂钟，一趟要一两个小时）；F11 带计时，所以这一行 timing 比结构，段用时打到标准错误。
-# 长跑的分片起法在 scripts/experiment-apparatus/e181-landing-check-long-run.sh 文件头，它拼出的产物就是这条登记比的产物。
+# E181（落得下那一判与挂载下界）第一段（入库装置，跑前登记 5.5 节「第一段」）：全部 11 段走长跑脚本 scripts/experiment-apparatus/e181-landing-check-long-run.sh，十一段切成八片，
+# 按它的内存预算开 F9 的试写拷贝与 F10 的走种子线程，判完的片在 prune-server 里（片键不含这个驱动），断了重起只补没判的。这一行 timing：F11 带计时，比结构。
+# 片的输出与进度进这一行的 .err，标准输出只交它拼出的产物（落地那一份，每段各有收尾行）。编译归长跑脚本：有片要现判才编，全部复用就不编。
+# echo 那一行不能删：行键照驱动正文里字面的 `-p <包>` 与 `--bin <名>` 收装置的 main（admission.py 文件头「复跑表每一行的行键」），长跑脚本里的变量认不出，少了它装置改了行键也不变。
+# 这个装置没有 gpu 特性的用法，长跑脚本的片键也不带特性：不带 CHECKER_TIER_FEATURES。
 driver_e181() {
-  (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e181_landing_check_fixed_point_and_mount_lower_bound)
+  local products="$OUT_DIR/e181-long-run-products"
+  echo "装置 cargo build --release -p singlefs-verification --bin e181_landing_check_fixed_point_and_mount_lower_bound，有片要现判时由长跑脚本编" >&2
+  rm -rf -- "${products:?}"
+  E181_PRODUCT_DIRECTORY="$products" E181_LOG_DIRECTORY="$OUT_DIR/e181-long-run" bash scripts/experiment-apparatus/e181-landing-check-long-run.sh >&2 || return $?
+  cat -- "$products/e181-landing-check-fixed-point-and-mount-lower-bound-landing.out"
 }
+# 弄坏开关 REPLAY_BREAK=e181-whole-process：载入时换掉驱动（不写进驱动正文，驱动正文进这一行的行键）
+if [[ "$REPLAY_BROKEN" == e181-whole-process ]]; then
+  eval 'driver_e181() { (cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e181_landing_check_fixed_point_and_mount_lower_bound); }'
+fi
 
 # E182（被抛弃根读不出的三条岔路）第一段（入库装置，跑前登记 5.4「单盘择根段」）：`single-device` 模式打整份产物，没有计时字段。
 # 片结果按复用键存在片结果库里（装置文件头「复用键」）：复跑时键相同的片直接取、产物逐字节相同；库不在就全部现判。
@@ -3497,6 +4231,13 @@ driver_e162_s4_all_arms() {
 # e7_index_bench::Emitter 的 E7RESULT 协议，这里在驱动函数里把 merge 的原始输出包一层，
 # 满足下面「跑不了」判定要的 E7RESULT / name=done 收尾行；要机器上至少两张能起上下文的 NVIDIA 独显卡。
 # 开跑前经 build_research_driver_binary 编（编不过的输出进这一行的 .err）。
+# run-shard 与 merge 读写判定库，装置要代码键（--code-key-file）与转交判定库的管道：经 device-code-key.py run 起，参照、片、合并三个入口一起给
+# （装置文件头「先录后判」那一条命令）；gen-input 不碰库，直接起。
+e163_run_with_code_key() {
+  python3 scripts/experiment-apparatus/device-code-key.py run . --binary e163-gpu-multicard-crc32c --feature e163-gpu \
+    --entry e7_index_bench::reference_values_of_the_batch --entry e7_index_bench::gpu_values_of_the_shard --entry e7_index_bench::merge_lines_of \
+    -- "$@"
+}
 driver_e163_r1_merge() {
   build_research_driver_binary e163-gpu e163-gpu-multicard-crc32c || return 1
   local bin="$REPLAY_RELEASE_DIRECTORY"/e163-gpu-multicard-crc32c
@@ -3504,10 +4245,10 @@ driver_e163_r1_merge() {
   local shard0="$OUT_DIR/e163-r1-merge-shard0.out"
   local shard1="$OUT_DIR/e163-r1-merge-shard1.out"
   "$bin" gen-input --output "$input" --units 2560 --seed 0xE163092700000001 >/dev/null || return 1
-  "$bin" run-shard --input "$input" --start 0 --count 1280 --adapter-index 0 --output "$shard0" >/dev/null || return 1
-  "$bin" run-shard --input "$input" --start 1280 --count 1280 --adapter-index 1 --output "$shard1" >/dev/null || return 1
+  e163_run_with_code_key run-shard --input "$input" --start 0 --count 1280 --adapter-index 0 --output "$shard0" >/dev/null || return 1
+  e163_run_with_code_key run-shard --input "$input" --start 1280 --count 1280 --adapter-index 1 --output "$shard1" >/dev/null || return 1
   local merge_output line_count
-  merge_output="$("$bin" merge --original-input "$input" --total-units 2560 --shard "$shard0" --shard "$shard1")" || return 1
+  merge_output="$(e163_run_with_code_key merge --original-input "$input" --total-units 2560 --shard "$shard0" --shard "$shard1")" || return 1
   line_count=$(printf '%s\n' "$merge_output" | grep -c .)
   printf '%s\n' "$merge_output" | awk '{print "E7RESULT name=merge_line body=" $0}'
   echo "E7RESULT name=done emitted=$((line_count + 1))"
@@ -3582,24 +4323,17 @@ driver_e172() {
   "$REPLAY_RELEASE_DIRECTORY"/e172-deletion-write-dry-run "$h1h2_snapshot" "$h3_snapshot" || return 1
 }
 
-# E175（产品路径上 inode 号水位退回与重发号）：仓副本装置（跑前登记 research/prompts/e175-preregistration.md 第五节「装置写在哪」写死，
-# 形式化线冻结期主工作区 crates/ 不动），装置源码在 scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs
-# （反复要用的装置不放 research/，
-# .claude/rules/directory-layout.md；sha256 cdb5d7be…）。驱动照共用库的闭包把今天的工作区拷进
-# $OUT_DIR 下的副本（replay_copy_closure_into，不写清单）、放进那份源码、编一次，跑 D 族 P 臂（8 段，D 族结果行不带挂钟），只留 E7RESULT 行并补收尾行（闸 2）。
+# E175（产品路径上 inode 号水位退回与重发号）：装置是验证包的 bin e175_product_path_inode_watermark_regression（跑前登记
+# research/prompts/e175-preregistration.md 第五节「装置写在哪」），直接在仓根 cargo run，不拷副本。跑 D 族 P 臂（8 段，D 族结果行不带挂钟），
+# 结果文件由 E175_RESULT_FILE 点名、每趟先删（装置见到已有的结果文件就续写），驱动只留 E7RESULT 行并补收尾行（闸 2）。
 driver_e175() {
-  local scratch="$OUT_DIR/e175-repository-copy" device_source="$PWD/scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs" binary worker_threads
-  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
-  replay_copy_closure_into "$scratch" || return 1
-  cp "$device_source" "$scratch/crates/singlefs-verification/tests/e175_product_path_inode_watermark_regression.rs" || return 1
-  (cd "$scratch" && unset CARGO_TARGET_DIR && nice -n 19 cargo test -q --release -p singlefs-verification --test e175_product_path_inode_watermark_regression --no-run >&2) || return 1
-  binary="$(find "$scratch/target/release/deps" -maxdepth 1 -type f -executable -name 'e175_product_path_inode_watermark_regression-*' | head -n 1)"
-  [[ -n "$binary" ]] || return 1
-  # 装置没给 E175_WORKER_THREADS 时取本机可用并行度（装置源码冻结、不改），这里交每台默认重活线程数
+  local result_file="$OUT_DIR/e175-d-P.tmp" worker_threads
+  rm -f -- "$result_file" || return 1
+  # 装置没给 E175_WORKER_THREADS 时取本机可用并行度，这里交每台默认重活线程数
   worker_threads="$(heavy_thread_default)" || return 1
-  E175_ARM=P E175_FAMILY=D E175_RESULT_FILE="$scratch/d-P.out" E175_WORKER_THREADS="$worker_threads" \
-    "$binary" --exact run_one_family_on_one_arm_into_the_result_file >&2 || return 1
-  awk '/^E7RESULT /{print; n++} END{print "E7RESULT name=done emitted=" n + 1}' "$scratch/d-P.out"
+  E175_ARM=P E175_FAMILY=D E175_RESULT_FILE="$result_file" E175_WORKER_THREADS="$worker_threads" \
+    cargo run -q --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression >&2 || return 1
+  awk '/^E7RESULT /{print; n++} END{print "E7RESULT name=done emitted=" n + 1}' "$result_file"
 }
 
 # E183（容量斜率、读缓存、小盘准入与清扫阈值的代价数）第一段（入库装置，跑前登记 research/prompts/e183-preregistration.md「装置写在哪」写死）：
@@ -3612,7 +4346,7 @@ driver_e183() {
 # 读的产物是 driver_e183 的登记产物（research/results/ 下，不是这一趟新跑出来的）。
 driver_e183_anchor_check() {
   local directory="scripts/experiment-apparatus/e183_capacity_read_cache_reserve_and_sweep_costs"
-  python3 -B -I "$directory/small_disk_anchor_check.py" "$directory/anchors_e183.py" research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30.out
+  python3 -B -I "$directory/small_disk_anchor_check.py" "$directory/anchors_e183.py" research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08.out
 }
 
 # E184（常规层与大负载层的代价计数）第一段（入库装置，跑前登记 research/prompts/e184-preregistration.md「装置写在哪」写死）：
@@ -3629,6 +4363,9 @@ driver_e184() {
 # 装置用这棵树里编的（--build-here），不跨趟留；产物带挂钟字段，timing 比结构。
 driver_e184_segment_one() {
   local product_directory="$OUT_DIR/e184-segment-one-product"
+  # echo 那一行不能删：行键照驱动正文里字面的 `-p <包>` 与 `--bin <名>` 收装置的 main（admission.py 文件头「复跑表每一行的行键」），长跑脚本里的变量认不出；
+  # 这两个名字要与 e184-segment-one-long-run.sh 的 MAIN_BINARY_NAME、DUMP_BINARY_NAME 相同
+  echo "装置 cargo build --release -p singlefs-verification --bin e184_regular_layer_cost_counts --bin e184_regular_layer_cost_counts_write_dump，由长跑脚本 --build-here 编" >&2
   rm -rf "$product_directory" && mkdir -p "$product_directory" || return 1
   E184_WORK_DIRECTORY="$OUT_DIR/e184-segment-one-work" E184_PRODUCT_DIRECTORY="$product_directory" \
     bash scripts/experiment-apparatus/e184-segment-one-long-run.sh --build-here >&2 || return 1
@@ -3656,30 +4393,265 @@ driver_e198_segment_two() {
   (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e198_instance_table_pointer_birth_skip_premise -- segment-two | grep '^E7RESULT ')
 }
 
-# E205（多处读坏倒挂三条改法的代价）三段（入库装置，跑前登记 research/prompts/e205-preregistration.md 第五节「装置写在哪」写死）：
-# 一段一个进程，全部判完之后按件号的次序一次打出，产物里没有计时（进度打到标准错误），exact 比。
-# 配置行报线程数：装置没设 E205_THREADS 时取每台默认重活线程数（task-server 设的 SINGLEFS_THREAD_CAP，再没设取 .claude/heavy-thread-default），这里不写死；换了线程数只有配置行那一格不同。
-driver_e205() {
-  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- six-cells | grep '^E7RESULT ')
+# E203（准入之前扫类的步代价）合并报告（跑前登记 research/prompts/e203-preregistration.md 第十二节修订 7、8）：18 个点各两个构建的 36 份产物重算一遍。
+# 输入：树里有的取树里的，树里没有的取提交 84b4ae23f 里那一份，再没有取最近一次删它的提交之前那一版，都拷进这一行自己的临时目录；都取不到这一行记跑不了。
+# 模型的报告行以 name= 起头，这里加 E7RESULT 前缀与收尾行（完整性闸 2 要的形状），exact 比。
+e203_report_input() { # <产物名> <放到哪个目录>
+  local name="$1" target="$2/$1"
+  if [[ -f "research/results/$name" ]]; then cp -- "research/results/$name" "$target"; return $?; fi
+  if git show "84b4ae23f:research/results/$name" >"$target" 2>/dev/null && [[ -s "$target" ]]; then return 0; fi
+  if replay_archived_product_copy "$name" "$target" >/dev/null; then return 0; fi
+  printf '  ✗ 输入不在 test=driver_e203_report %s 不在（树里没有、提交 84b4ae23f 里没有、git 历史里也取不回），这一行记跑不了\n' "$name" >&2
+  printf '     → 怎么办：%s\n' "$REPLAY_ARCHIVED_REMEDY" >&2
+  return 1
+}
+driver_e203_report() {
+  local inputs="$OUT_DIR/e203-report-inputs" build point name
+  local -a counts=() timing=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for build in counts timing; do
+    for point in base data_units_1 data_units_100 data_units_1000 data_units_10000 diagonal files_1 files_100 files_1000 files_10000 unit_area_2_pow_14 unit_area_2_pow_20 unit_area_2_pow_24 unlinks_1 unlinks_100 unlinks_1000 unlinks_10000; do
+      name="e203-admission-scan-cost-$build-$point-2026-11-07.out"
+      e203_report_input "$name" "$inputs" || return 1
+      if [[ "$build" == counts ]]; then counts+=("$inputs/$name"); else timing+=("$inputs/$name"); fi
+    done
+    name="e203-admission-scan-cost-$build-user_scale_unit_area-2026-11-07-r2.out"
+    e203_report_input "$name" "$inputs" || return 1
+    if [[ "$build" == counts ]]; then counts+=("$inputs/$name"); else timing+=("$inputs/$name"); fi
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e203-admission-scan-cost report "${counts[@]}" --timing "${timing[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
 }
 
-driver_e205_torn_rotation() {
-  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- torn-rotation | grep '^E7RESULT ')
+# E203 的 Y1（跑前登记第十二节修订 6）：表里单列实验号 E203Y1，点名 E203 不点到它，只有不带实验号的全量复跑与点名 E203Y1 才跑。两个构建依次起入口，判定照入口的单元键进判定库，之后照键复用；
+# 源树是修订 7 那一趟的冻结副本（停机条款第 3 条）。入口的输出进 stderr；产物由入口写。这一行只比两个构建都做完（完成标记两行加收尾行），读数由实验页照原判据再判一次。
+driver_e203_many_unlinks() {
+  local frozen_source build
+  frozen_source="$(replay_frozen_root e203-segment-two-source)" || return 1
+  replay_inputs_present "${FUNCNAME[0]}" "冻结根：照实验页 E203（准入之前扫类的步代价）「复跑」用的那棵冻结源树拷一份到这个位置" "$frozen_source" || return $?
+  for build in counts timing; do
+    bash scripts/experiment-apparatus/e203-admission-scan-cost-run.sh --build "$build" --work "$OUT_DIR/e203-many-unlinks-$build" --source "$frozen_source" --item many_unlinks_unit_area_2_pow_16 >&2 || return $?
+    printf 'E7RESULT name=item_done build=%s point=many_unlinks_unit_area_2_pow_16\n' "$build"
+  done
+  printf 'E7RESULT name=done emitted=3\n'
 }
 
-driver_e205_first_txg_skips_s8() {
-  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- first-txg-skips s8 | grep '^E7RESULT ')
+# E206（发布固定点轮数的代价）合并报告（跑前登记 research/prompts/e206-preregistration.md 第十二节修订 1）：第一段 40 份产物（16 个点的 p1、p2a，三个点的 single_step、closure_off，两个点的 plain）重算一遍。
+# 输入：树里有的取树里的，树里没有的取最近一次删它的提交之前那一版，都拷进这一行自己的临时目录；都取不到这一行记跑不了。
+# 模型的报告行以 name= 起头，这里加 E7RESULT 前缀与收尾行（完整性闸 2 要的形状），exact 比；留存产物（登记的那一份）是装置重算的整份（比 -r2 多 38 行 by_delta_pooled_fallback 与收尾行条数，别的行逐字不变）；-r2 是任务 11102 的合并报告（同目录不带 -r2 的那份）照同一个 awk 加了前缀与收尾行，留着。
+e206_report_input() { # <产物名> <放到哪个目录>
+  local name="$1" target="$2/$1"
+  if [[ -f "research/results/$name" ]]; then cp -- "research/results/$name" "$target"; return $?; fi
+  if replay_archived_product_copy "$name" "$target" >/dev/null; then return 0; fi
+  printf '  ✗ 输入不在 test=driver_e206_report %s 不在（树里没有、git 历史里也取不回），这一行记跑不了\n' "$name" >&2
+  printf '     → 怎么办：%s\n' "$REPLAY_ARCHIVED_REMEDY" >&2
+  return 1
+}
+driver_e206_report() {
+  local inputs="$OUT_DIR/e206-report-inputs" point arm name
+  local -a names=() products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for point in data_units_100 data_units_1000 data_units_10000 files_10000 files_1000_unit_area_2_pow_14 files_1000_unit_area_2_pow_20 files_1000_unit_area_2_pow_24 files_1000_units_100 files_1000_units_10 files_30000 unlinks_100 unlinks_1000 unlinks_10000; do
+    for arm in p1 p2a; do names+=("e206-fixed-point-cost-$point-$arm-2026-11-09.out"); done
+  done
+  for point in base files_100 files_1000; do
+    for arm in p1 p2a single_step closure_off; do names+=("e206-fixed-point-cost-$point-$arm-2026-11-09.out"); done
+  done
+  names+=("e206-fixed-point-cost-base-plain-2026-11-09.out" "e206-fixed-point-cost-files_1000-plain-2026-11-09.out")
+  while IFS= read -r name; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done < <(printf '%s\n' "${names[@]}" | LC_ALL=C sort)
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e206-fixed-point-cost report "${products[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
 }
 
-driver_e205_first_txg_skips_s4_s16() {
-  (set -o pipefail && cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e205_c971_inverted_first_txg_arm_costs -- first-txg-skips s4-s16 | grep '^E7RESULT ')
+# E207（严格判据下的扫类步数）第一段合并报告（跑前登记 research/prompts/e207-preregistration.md 第五节与执行员修订 4–6）：第一段 14 份产物（12 个点的 head、base 与 files_1000 的 plain）加 16 份 E206 p2a 产物（回扫）重算 `report --segment first`。
+# 输入同 E206 那一行：树里有的取树里的，树里没有的取最近一次删它的提交之前那一版，都拷进这一行自己的临时目录；都取不到这一行记跑不了。
+# 模型的报告行以 name= 起头，这里加 E7RESULT 前缀与收尾行（完整性闸 2 要的形状），exact 比；留存产物 -r4 是同目录 -r3 那份原始报告（档名写全后用新装置重出的）照同一个 awk 加了前缀与收尾行，行号不变。
+driver_e207_report_first() {
+  local inputs="$OUT_DIR/e207-report-inputs" point name
+  local -a names=() retro_names=() products=() retro_products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for point in base files_1000 files_10000 files_1000_units_100 files_100_units_100 files_10_units_1000 files_100_units_1000 files_10_units_10000 \
+    files_then_big_1000 files_then_big_10000 files_10_units_1000_unit_area_2_pow_17 files_100_units_1000_unit_area_2_pow_20; do
+    names+=("e207-strict-scan-steps-$point-head-2026-11-13.out")
+  done
+  names+=("e207-strict-scan-steps-base-plain-2026-11-13.out" "e207-strict-scan-steps-files_1000-plain-2026-11-13.out")
+  for point in base data_units_100 data_units_1000 data_units_10000 files_100 files_1000 files_10000 files_1000_units_10 files_1000_units_100 files_30000 \
+    files_1000_unit_area_2_pow_14 files_1000_unit_area_2_pow_20 files_1000_unit_area_2_pow_24 unlinks_100 unlinks_1000 unlinks_10000; do
+    retro_names+=("e206-fixed-point-cost-$point-p2a-2026-11-09.out")
+  done
+  while IFS= read -r name; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done < <(printf '%s\n' "${names[@]}" | LC_ALL=C sort)
+  while IFS= read -r name; do
+    e206_report_input "$name" "$inputs" || return 1
+    retro_products+=("$inputs/$name")
+  done < <(printf '%s\n' "${retro_names[@]}" | LC_ALL=C sort)
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e207-strict-scan-steps report --segment first "${products[@]}" --retro "${retro_products[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
 }
 
+# E207 第二段合并报告（跑前登记第五节「第二段」与第十二节执行员修订 7）：第一段 `files_1000_units_100` 的 head（复现钉的 `standard` 探针）加第二段三份探针产物（cold_first、create_first、
+# young_first）重算 `report --segment second`；输入的取法同 driver_e207_report_first，加前缀与收尾行的 awk 同它，留存产物 -r2 是同目录不带 -r2 那份原始报告照这个 awk 加了前缀与收尾行。
+driver_e207_report_second() {
+  local inputs="$OUT_DIR/e207-report-second-inputs" name
+  local -a names=("e207-strict-scan-steps-files_1000_units_100-head-2026-11-13.out" "e207-strict-scan-steps-files_1000_units_100-head-cold_first-2026-11-13.out" \
+    "e207-strict-scan-steps-files_1000_units_100-head-create_first-2026-11-13.out" "e207-strict-scan-steps-files_1000_units_100-head-young_first-2026-11-13.out") products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for name in "${names[@]}"; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e207-strict-scan-steps report --segment second "${products[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
+
+# E207 第三段合并报告（跑前登记第五节「第三段」）：`files_30000` 的 head（带扩展窗口 W5–W7）一份产物重算 `report --segment third`；输入与前缀、收尾行同 driver_e207_report_second，
+# 留存产物 -r2 是同目录不带 -r2 那份原始报告照这个 awk 加了前缀与收尾行。
+driver_e207_report_third() {
+  local inputs="$OUT_DIR/e207-report-third-inputs" name="e207-strict-scan-steps-files_30000-head-2026-11-13.out"
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  e206_report_input "$name" "$inputs" || return 1
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e207-strict-scan-steps report --segment third "$inputs/$name" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
+
+# E207 第四段两个小点的合并报告（任务 16080 那一条命令）：低端点 `files_10_units_1000_unit_area_2_pow_21` 的 head 原始产物与中点 `files_100_units_1000_unit_area_2_pow_21` 的 head 各一份，重算 `report --segment fourth`；
+# 输入的取法与前缀、收尾行同 driver_e207_report_third；留存产物 -r2 是同目录不带 -r2 那份原始报告（760 行）照这个 awk 加了前缀与收尾行（761 行），行号不变。
+driver_e207_report_fourth() {
+  local inputs="$OUT_DIR/e207-report-fourth-inputs" name
+  local -a names=("e207-strict-scan-steps-files_10_units_1000_unit_area_2_pow_21-head-2026-11-13.out" "e207-strict-scan-steps-files_100_units_1000_unit_area_2_pow_21-head-2026-11-13.out") products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for name in "${names[@]}"; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e207-strict-scan-steps report --segment fourth "${products[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
+
+# E209（扫类尖峰成因）第一段合并报告（跑前登记 research/prompts/e209-preregistration.md 第五节「第一段」）：训练点 files_100_units_100 的 head 五份（first_mount_first、first_repeated、
+# mount_then_first、mount_twice_first、walk_forward）、重出的孪生项（-r2，旧孪生那份缺 name=point 一行，不进输入）、plain 的 walk_forward，共 7 份产物重算 `report`。
+# 输入都在树里（取不到的走 e206_report_input 的归档回取）；--crates-root 取仓根，报告里行表各行在 crates/ 里的函数行号现取（crates/ 里那几个函数挪了行，这一行会红，是该红的）。
+# 模型的报告行以 name= 起头，这里加 E7RESULT 前缀与收尾行（完整性闸 2 要的形状），exact 比；留存产物 -r3 是模型原始报告照同一个 awk 加了前缀与收尾行的形态。
+driver_e209_report_first() {
+  local inputs="$OUT_DIR/e209-report-first-inputs" name
+  local -a names=() products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for name in first_mount_first first_repeated mount_then_first mount_twice_first walk_forward; do
+    names+=("e209-spike-cause-files_100_units_100-head-$name-2026-11-13.out")
+  done
+  names+=("e209-spike-cause-files_100_units_100-head-walk_forward-twin-2026-11-13-r2.out" "e209-spike-cause-files_100_units_100-plain-walk_forward-2026-11-13.out")
+  for name in "${names[@]}"; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e209-spike-cause report --crates-root "$REPLAY_REPOSITORY_ROOT" "${products[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
+
+# E209（扫类尖峰成因）第二段合并报告（跑前登记第五节「第二段」）：训练点 files_100_units_100 的第一段 7 份（head 五份、孪生项 -r2、plain 的 walk_forward）加第二段 20 份（head），共 27 份产物重算 `report`。
+# 旧孪生那份（缺 name=point 一行）不进输入。其余同 driver_e209_report_first：输入走 e206_report_input，--crates-root 取仓根，加 E7RESULT 前缀与收尾行，exact 比；留存产物是 -r2。
+driver_e209_report_second() {
+  local inputs="$OUT_DIR/e209-report-second-inputs" name
+  local -a names=() products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for name in first_mount_first first_repeated mount_then_first mount_twice_first walk_forward; do
+    names+=("e209-spike-cause-files_100_units_100-head-$name-2026-11-13.out")
+  done
+  names+=("e209-spike-cause-files_100_units_100-head-walk_forward-twin-2026-11-13-r2.out" "e209-spike-cause-files_100_units_100-plain-walk_forward-2026-11-13.out")
+  for name in walk_backward walk_from_middle create_then_first filler_create_1 filler_create_2 filler_create_4 filler_create_8 filler_create_16 \
+    filler_young_1 filler_young_4 filler_young_8 presweep_1 presweep_2 presweep_4 presweep_8 presweep_16 presweep_32 presweep_64 young_mount_first old_mount_old; do
+    names+=("e209-spike-cause-files_100_units_100-head-$name-2026-11-13.out")
+  done
+  for name in "${names[@]}"; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e209-spike-cause report --crates-root "$REPLAY_REPOSITORY_ROOT" "${products[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
+
+# E209（扫类尖峰成因）第三段合并报告（跑前登记第五节「第三段」）：第二段的 27 份加第三段 48 份（五个检验点各自的 head 项：files_10_units_1000 八项，其余四点各十项），共 75 份产物重算 `report`；留存文件是 e209-spike-cause-report-third-2026-11-13.out（合并报告落盘之前这一行不要跑）。
+driver_e209_report_third() {
+  local inputs="$OUT_DIR/e209-report-third-inputs" name point script
+  local -a names=() products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for name in first_mount_first first_repeated mount_then_first mount_twice_first walk_forward; do
+    names+=("e209-spike-cause-files_100_units_100-head-$name-2026-11-13.out")
+  done
+  names+=("e209-spike-cause-files_100_units_100-head-walk_forward-twin-2026-11-13-r2.out" "e209-spike-cause-files_100_units_100-plain-walk_forward-2026-11-13.out")
+  for name in walk_backward walk_from_middle create_then_first filler_create_1 filler_create_2 filler_create_4 filler_create_8 filler_create_16 \
+    filler_young_1 filler_young_4 filler_young_8 presweep_1 presweep_2 presweep_4 presweep_8 presweep_16 presweep_32 presweep_64 young_mount_first old_mount_old; do
+    names+=("e209-spike-cause-files_100_units_100-head-$name-2026-11-13.out")
+  done
+  for point in files_75_units_100 files_200_units_100 files_100_units_100_unit_area_2_pow_17 files_100_units_100_unit_area_2_pow_20; do
+    for script in filler_create_4 filler_young_4 first_mount_first first_repeated mount_then_first mount_twice_first presweep_32 presweep_8 walk_backward walk_forward; do
+      names+=("e209-spike-cause-$point-head-$script-2026-11-13.out")
+    done
+  done
+  for script in filler_create_4 filler_young_4 first_mount_first first_repeated mount_then_first mount_twice_first walk_backward walk_forward; do
+    names+=("e209-spike-cause-files_10_units_1000-head-$script-2026-11-13.out")
+  done
+  for name in "${names[@]}"; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e209-spike-cause report --crates-root "$REPLAY_REPOSITORY_ROOT" "${products[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
+
+# E207 复量段合并报告（登记设计员修订 2）：复量段五项产物（四个新点加 files_100_units_100 再跑一次）加第一段 files_1000_units_100 的 head，钉对第一段 files_100_units_100 的 head；
+# 复量段的产物同天同名已有的第一段那份，所以 files_100_units_100 这一份是 -r2（入口 new_product_name 的拼法）。登记行比的留存产物是加了 E7RESULT 前缀与收尾行的形态（同上）。
+driver_e207_report_hundred_units_per_file_repeat() {
+  local inputs="$OUT_DIR/e207-report-hundred-units-per-file-repeat-inputs" name
+  local -a names=("e207-strict-scan-steps-files_56_units_100-head-2026-11-13.out" "e207-strict-scan-steps-files_100_units_100-head-2026-11-13-r2.out" \
+    "e207-strict-scan-steps-files_178_units_100-head-2026-11-13.out" "e207-strict-scan-steps-files_316_units_100-head-2026-11-13.out" \
+    "e207-strict-scan-steps-files_562_units_100-head-2026-11-13.out" "e207-strict-scan-steps-files_1000_units_100-head-2026-11-13.out" \
+    "e207-strict-scan-steps-files_100_units_100-head-2026-11-13.out") products=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for name in "${names[@]}"; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e207-strict-scan-steps report --segment hundred_units_per_file_repeat "${products[@]:0:6}" --pin-against "${products[6]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
+
+# E207 对账分辨段合并报告（登记设计员修订 3）：四项新产物（base、files_1000 各 head 与 plain；同天同名已有第一段那份，所以都是 -r2）加第一段 base、files_1000、files_10000 的 head（--previous）
+# 与 E206 的 base、files_1000、files_10000 三份 p2a 产物（--retro）。登记行比的留存产物是加了 E7RESULT 前缀与收尾行的形态。
+driver_e207_report_reconciliation_split() {
+  local inputs="$OUT_DIR/e207-report-reconciliation-split-inputs" name point
+  local -a products=() previous=() retro=()
+  rm -rf -- "$inputs" && mkdir -p "$inputs" || return 1
+  for name in e207-strict-scan-steps-base-head-2026-11-13-r2.out e207-strict-scan-steps-base-plain-2026-11-13-r2.out \
+    e207-strict-scan-steps-files_1000-head-2026-11-13-r2.out e207-strict-scan-steps-files_1000-plain-2026-11-13-r2.out; do
+    e206_report_input "$name" "$inputs" || return 1
+    products+=("$inputs/$name")
+  done
+  for point in base files_1000 files_10000; do
+    name="e207-strict-scan-steps-$point-head-2026-11-13.out"
+    e206_report_input "$name" "$inputs" || return 1
+    previous+=("$inputs/$name")
+    name="e206-fixed-point-cost-$point-p2a-2026-11-09.out"
+    e206_report_input "$name" "$inputs" || return 1
+    retro+=("$inputs/$name")
+  done
+  (set -o pipefail && "$REPLAY_RELEASE_DIRECTORY"/e207-strict-scan-steps report --segment reconciliation_split "${products[@]}" --previous "${previous[@]}" --retro "${retro[@]}" \
+    | awk '{ print "E7RESULT " $0; emitted++ } END { print "E7RESULT name=done emitted=" (emitted + 1) }')
+}
 # --admission-only：只问准入（scripts/gate/admission.py，登记表 .claude/gate.d/stage-inputs.tsv），不编、不跑、不比。
 ADMISSION_ONLY=0
 ONLY=()
+ITEM_ARGUMENTS=()
+replay_expecting_item=0
 for replay_argument in "$@"; do
-  if [[ "$replay_argument" == "--admission-only" ]]; then ADMISSION_ONLY=1
+  if ((replay_expecting_item)); then ITEM_ARGUMENTS+=("$replay_argument"); replay_expecting_item=0
+  elif [[ "$replay_argument" == "--admission-only" ]]; then ADMISSION_ONLY=1
+  elif [[ "$replay_argument" == "--item" ]]; then replay_expecting_item=1
   else ONLY+=("$replay_argument"); fi
 done
 # 替换表按 E103 这种带 E 的形态登记；裸数字会匹配 0 条并报全零。
@@ -3691,6 +4663,27 @@ for wanted in ${ONLY[@]+"${ONLY[@]}"}; do
   fi
 done
 want() { [[ ${#ONLY[@]} -eq 0 ]] && return 0; local e; for e in "${ONLY[@]}"; do [[ "$e" == "$1" ]] && return 0; done; return 1; }
+# --item <实验号.行序号>（文件头「入口脚本」）：行序号是这个实验号的行在复跑表里从 1 数的次序。点到的实验号进 ONLY（want 认它），
+# 并且只留点名的行（want_row）；没被 --item 点到的实验号照旧整个跑。行的身份是「实验号|二进制|参数」（复跑表前三列），与按行复用的行键用同一个身份。
+declare -A ITEM_EXPERIMENT=() ITEM_ROW=() ROW_ORDINAL=() replay_ordinal_of_experiment=()
+while IFS='|' read -r exp bin args _rest; do
+  [[ "$exp" == E* ]] || continue
+  replay_ordinal_of_experiment["$exp"]=$(( ${replay_ordinal_of_experiment["$exp"]:-0} + 1 ))
+  ROW_ORDINAL["$exp|$bin|$args"]="${replay_ordinal_of_experiment["$exp"]}"
+done <<<"$TABLE"
+for replay_item in ${ITEM_ARGUMENTS[@]+"${ITEM_ARGUMENTS[@]}"}; do
+  ITEM_EXPERIMENT["${replay_item%.*}"]=1
+  [[ " ${ONLY[*]-} " == *" ${replay_item%.*} "* ]] || ONLY+=("${replay_item%.*}")
+  for replay_identity in "${!ROW_ORDINAL[@]}"; do
+    [[ "${replay_identity%%|*}" == "${replay_item%.*}" && "${ROW_ORDINAL["$replay_identity"]}" == "${replay_item##*.}" ]] && ITEM_ROW["$replay_identity"]=1
+  done
+done
+want_row() { # <实验号> <二进制> <参数>：复跑表的这一行这一趟要不要判（弄坏开关 item-row-ignored：--item 点到的实验号整个判）
+  want "$1" || return 1
+  [[ -n "${ITEM_EXPERIMENT["$1"]+set}" ]] || return 0
+  [[ "$REPLAY_BROKEN" == item-row-ignored ]] && return 0
+  [[ -n "${ITEM_ROW["$1|$2|$3"]+set}" ]]
+}
 
 # 产物列是 research/results/ 底下的纯文件名，不是仓库根起的路径：写成路径时下面拼出 research/results/research/results/… 指不到文件，
 # 而 diff 失败会被报成「对不上，N 行不同」——看着像产物变了，其实是登记表坏了。
@@ -3766,7 +4759,7 @@ if (( ADMISSION_ONLY )); then
   admission_judged=0; admission_unregistered=0; admission_errors=0
   while IFS='|' read -r exp bin row_arguments stored _kind; do
     [[ -z "$exp" ]] && continue
-    want "$exp" || continue
+    want_row "$exp" "$bin" "$row_arguments" || continue
     admission_judged=$((admission_judged+1))
     admission_key_of_row "$exp" "$bin" "$row_arguments"
     if [[ -z "${ADMISSION_REGISTERED[$ROW_ADMISSION_KEY]:-}" ]]; then
@@ -3872,8 +4865,8 @@ fi
 REPLAY_E182_SHARD_KINDS=(e182-single-device e182-single-device-units-kept)
 REPLAY_E182_SHARDS=""   # 拉过才设：$OUT_DIR/e182-shards-from-prune-server（底下 <种类>/ 一种一份）
 replay_e182_wanted=0
-while IFS='|' read -r exp bin _args _stored _kind; do
-  [[ -n "$exp" ]] && want "$exp" && [[ "$bin" == @driver_e182 || "$bin" == @driver_e182_units_kept ]] && replay_e182_wanted=1
+while IFS='|' read -r exp bin args _stored _kind; do
+  [[ -n "$exp" ]] && want_row "$exp" "$bin" "$args" && [[ "$bin" == @driver_e182 || "$bin" == @driver_e182_units_kept ]] && replay_e182_wanted=1
 done <<<"$TABLE"
 if (( replay_e182_wanted )) && [[ -n "${replay_common_directory:-}" ]]; then
   REPLAY_E182_SHARDS="$OUT_DIR/e182-shards-from-prune-server"
@@ -3928,7 +4921,7 @@ else
   candidate_sequence=0
   while IFS='|' read -r exp bin args stored kind; do
     [[ -z "$exp" ]] && continue
-    want "$exp" || continue
+    want_row "$exp" "$bin" "$args" || continue
     candidate_sequence=$((candidate_sequence + 1))
     candidate_key="${ROW_REUSE_KEY["$exp|$bin|$args"]-}"
     [[ -n "$candidate_key" && -f "$REPLAY_ROW_RECORDS/keys/$candidate_key/verdict" && -f "$REPLAY_ROW_RECORDS/keys/$candidate_key/product" ]] || continue
@@ -3976,6 +4969,15 @@ remember_row_verdict() { # <记录目录，空串不记> <判定> <结果行> <�
 pass=0; drift=0; timing_only=0; broken=0; claim_bad=0; unchanged=0; UNCHANGED_ROWS=()
 reused=0; REUSED_ROWS=(); refused_rows=0   # 按行复用的行（文件头「按行复用」）；行键拒算的行
 load_skipped=0; load_passed=0; load_lagged=0; LOAD_SKIPPED_ROWS=()   # 计时行的负载关：本次不判、放行（含滞后）、其中滞后；本次不判的逐个记名字与比值
+not_run=0; NOT_RUN_ROWS=()   # 输入缺而登记了「本次未跑」的行（REPLAY_DEFERRED_ROW_ROOT）：既不红也不绿
+# 输入缺时本次未跑的行：键是复跑表那一行的前三列「实验号|二进制|参数」，值是 replay-frozen-roots 下它要读的导出根的名字。
+# E171 复跑表里读 r1 导出根的三行，导出根要等里程碑四收口做全量时重建（.claude/kb/milestone/04-fourth-txn.md 八·8）；根不在这一行记本次未跑，根在了照常现跑。
+# 弄坏开关 REPLAY_BREAK=deferred-rows-ignored：不看这张表，三行照旧起驱动、缺输入退 1 记跑不了。
+declare -A REPLAY_DEFERRED_ROW_ROOT=(
+  ["E171|@driver_e171_r1_s1_revision_6_comparator|"]=e171-r1-dumps
+  ["E171|@driver_e171_r1_s1_revision_6_cross_host_check|"]=e171-r1-dumps
+  ["E171|@driver_e171_r1_s2_revision_6_comparator|"]=e171-r1-dumps
+)
 CLAIM_QUEUE=()
 
 printf '%-5s %-24s %-10s %s\n' 实验 二进制 判定 说明
@@ -4067,9 +5069,17 @@ fi
 
 # 开跑前的那一判（准入与按行复用）：照判定写 $OUT_DIR/<tag>.decision（reuse、unchanged、broken、run 之一），准入放行的产物头写 <tag>.header；
 # 复用、输入没变、跑不了的那几行同时把结果行与结论写好，replay_one 读到不是 run 的就直接收尾。主循环先把每一行都判完，再定编不编（文件头「按行复用」）。
-decide_row() { # <实验号> <tag> <二进制> <留存产物> <准入键> <行键，空串不复用>
-  local exp="$1" tag="$2" bin="$3" stored="$4" row_key="$5" reuse_key="$6" reuse_record="" reused_verdict reused_title admission_exit_code=0
+decide_row() { # <实验号> <tag> <二进制> <留存产物> <准入键> <行键，空串不复用> <行的身份：实验号|二进制|参数>
+  local exp="$1" tag="$2" bin="$3" stored="$4" row_key="$5" reuse_key="$6" identity="$7" reuse_record="" reused_verdict reused_title admission_exit_code=0 deferred_root
   rm -f "$OUT_DIR/$tag.decision" "$OUT_DIR/$tag.header" "$OUT_DIR/$tag.admission"
+  # 登记了「输入缺时本次未跑」的行（REPLAY_DEFERRED_ROW_ROOT）：导出根不在就不起、不判红，结果行写本次未跑；根在了照常现跑
+  if [[ -n "${REPLAY_DEFERRED_ROW_ROOT["$identity"]+set}" && "$REPLAY_BROKEN" != deferred-rows-ignored ]]; then
+    deferred_root="$(replay_frozen_root "${REPLAY_DEFERRED_ROW_ROOT["$identity"]}")" || deferred_root=""
+    if [[ -z "$deferred_root" || ! -d "$deferred_root" ]]; then
+      printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 本次未跑 "输入缺：导出根 ${REPLAY_DEFERRED_ROW_ROOT["$identity"]} 不在 replay-frozen-roots 下，里程碑四收口做全量时重建再跑（.claude/kb/milestone/04-fourth-txn.md 八·8）；这一行不判红、不判绿" >"$OUT_DIR/$tag.line"
+      echo not_run >"$OUT_DIR/$tag.verdict"; echo not_run >"$OUT_DIR/$tag.decision"; return
+    fi
+  fi
   if [[ -n "${ADMISSION_REGISTERED[$row_key]:-}" ]]; then
     if python3 "$ADMISSION_MODULE" experiment . "$row_key" >"$OUT_DIR/$tag.header" 2>"$OUT_DIR/$tag.admission"; then admission_exit_code=0; else admission_exit_code=$?; fi
     if [[ $admission_exit_code -eq 77 ]]; then
@@ -4119,12 +5129,14 @@ replay_one() {
   fresh="$OUT_DIR/$tag.out"
   [[ "$(cat -- "$OUT_DIR/$tag.decision" 2>/dev/null)" == run ]] || return   # 复用、输入没变、跑不了：开跑前那一判已经写好了这一行
   # 闸 1：不许跨轮复用（负载关的记录、取回的留存产物同样）：跑前删上一趟留在同一个 REPLAY_OUT 里的这一行的记录
-  rm -f "$fresh" "$OUT_DIR/$tag.load" "$OUT_DIR/$tag.skip" "${OUT_DIR:?}/${tag:?}.stored"
+  rm -f "$fresh" "$OUT_DIR/$tag.load" "$OUT_DIR/$tag.skip" "${OUT_DIR:?}/${tag:?}.stored" "$OUT_DIR/$tag.line" "$OUT_DIR/$tag.verdict" "$OUT_DIR/$tag.claim"
   [[ -n "$reuse_key" && -n "$REPLAY_ROW_LIBRARY" ]] && reuse_record="$REPLAY_ROW_RECORDS/keys/$reuse_key"
   # 手里那一步放后台、wait 等它（文件头「编译目录」）：父进程 replay_stop 给这一行转 TERM 时 trap 当场跑，再转给它（`&` 起、`$!` 记下的那一个进程）、等它退，退 143。
   # 弄坏开关 REPLAY_BREAK=term-not-forwarded：不转（这一行自己退了，手里那一步照跑）
   local payload=""
-  [[ "$REPLAY_BROKEN" == term-not-forwarded ]] || trap '[[ -z "$payload" ]] || { kill -TERM "$payload" 2>/dev/null; wait "$payload" 2>/dev/null; }; exit 143' TERM
+  [[ "$REPLAY_BROKEN" == term-not-forwarded ]] || trap '[[ -z "$payload" ]] || { kill -TERM "$payload" 2>/dev/null; wait "$payload" 2>/dev/null; }; replay_row_tell_sampler "$tag" end "143 1"; exit 143' TERM
+  local started_at="${EPOCHREALTIME/[.,]/}" row_threads wall_milliseconds
+  replay_row_progress_line "REPLAY_ROW $tag 开跑"
   if [[ "$bin" == @* ]]; then
     "${bin#@}" >"$fresh" 2>"$OUT_DIR/$tag.err" &
   else
@@ -4132,22 +5144,58 @@ replay_one() {
     "$REPLAY_RELEASE_DIRECTORY/$bin" $args >"$fresh" 2>"$OUT_DIR/$tag.err" &
   fi
   payload=$!
+  replay_row_tell_sampler "$tag" payload "$payload"$'\t'"$identity"
   wait "$payload"
   rc=$?
   payload=""
+  times >"$OUT_DIR/$tag.times"   # 不进命令替换：子 shell 里读到的子进程用时是 0
+  wall_milliseconds=$(( (${EPOCHREALTIME/[.,]/} - started_at) / 1000 ))
+  row_threads="$(replay_row_threads_used "$OUT_DIR/$tag.times" "$wall_milliseconds")"
+  replay_row_tell_sampler "$tag" end "$rc $row_threads"
   if [[ $rc -ne 0 && "$REPLAY_BROKEN" != exit-code-ignored ]]; then   # 闸 3（弄坏开关 REPLAY_BREAK=exit-code-ignored：退出码非 0 照往下判）
     printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "退出码 $rc，见 $OUT_DIR/$tag.err" >"$OUT_DIR/$tag.line"; echo broken >"$OUT_DIR/$tag.verdict"
-    remember_row_outcome "$tag" "$reuse_record" "$fresh" "$identity"; return
+    remember_row_outcome "$tag" "$reuse_record" "$fresh" "$identity"
+    replay_row_report_end "$tag" "$wall_milliseconds" "$row_threads"; return
   fi
   # 产物头由这里写的行（ADMISSION_ROW_KEYS 第三列 replay：跑的东西不接准入）：准入放行时给的 E7INPUT 行接在新产物最前面，与装置自己打的同一个样子
   if [[ -n "${ADMISSION_REGISTERED[$row_key]:-}" && "$header_writer" == replay ]]; then
     if ! { cat -- "$OUT_DIR/$tag.header" "$fresh" >"$fresh.stamped" && mv -- "$fresh.stamped" "$fresh"; }; then
       printf '%-5s %-24s %-10s %s\n' "$exp" "$bin" 跑不了 "准入键 $row_key 的产物头接不到新产物前面（$OUT_DIR/$tag.header）" >"$OUT_DIR/$tag.line"; echo broken >"$OUT_DIR/$tag.verdict"
-      remember_row_outcome "$tag" "$reuse_record" "$fresh" "$identity"; return
+      remember_row_outcome "$tag" "$reuse_record" "$fresh" "$identity"
+      replay_row_report_end "$tag" "$wall_milliseconds" "$row_threads"; return
     fi
   fi
   replay_judge_fresh_product "$exp" "$bin" "$stored" "$kind" "$row_key" "$tag" "$fresh"
   remember_row_outcome "$tag" "$reuse_record" "$fresh" "$identity"
+  replay_row_report_end "$tag" "$wall_milliseconds" "$row_threads"
+}
+
+# 进度（文件头「进度」）：打一行到标准错误。弄坏开关 row-progress-silent 下不打
+replay_row_progress_line() { # <一行>
+  [[ "$REPLAY_BROKEN" == row-progress-silent ]] || printf '%s\n' "$1" >&2
+}
+# 告诉监看进程（replay_row_costs.py 文件头「用法」）：改名换上，它读不到半行。没起监看进程的不做
+replay_row_tell_sampler() { # <tag> <payload|end> <内容>
+  [[ -n "${REPLAY_ROW_SAMPLER_PID:-}" ]] || return 0
+  printf '%s\n' "$3" >"$REPLAY_ROW_WATCH/$1.$2.tmp" && mv -f -- "$REPLAY_ROW_WATCH/$1.$2.tmp" "$REPLAY_ROW_WATCH/$1.$2"
+}
+# 这一行平均同时占几个核：bash 内建 times 记下的子进程用户态加内核态用时 ÷ 墙钟，向上取整，至少 1；读不出交 1
+replay_row_threads_used() { # <times 的输出文件> <墙钟毫秒>
+  local children cpu_milliseconds
+  children="$(sed -n 2p -- "$1" 2>/dev/null)"
+  if [[ "$children" =~ ^([0-9]+)m([0-9]+)[.,]([0-9]+)s[[:space:]]+([0-9]+)m([0-9]+)[.,]([0-9]+)s$ ]]; then
+    cpu_milliseconds=$(( (10#${BASH_REMATCH[1]} + 10#${BASH_REMATCH[4]}) * 60000 + (10#${BASH_REMATCH[2]} + 10#${BASH_REMATCH[5]}) * 1000 + 10#${BASH_REMATCH[3]} + 10#${BASH_REMATCH[6]} ))
+    (( $2 > 0 && cpu_milliseconds > $2 )) && { echo $(( (cpu_milliseconds + $2 - 1) / $2 )); return 0; }
+  fi
+  echo 1
+}
+# 一行收尾的那一条进度：结局取结果行的判定那一列，峰值取监看进程写下的
+replay_row_report_end() { # <tag> <墙钟毫秒> <线程数>
+  local line title peak
+  line="$(cat -- "$OUT_DIR/$1.line" 2>/dev/null)"
+  read -r _ _ title _ <<<"$line"
+  peak="$(cat -- "${REPLAY_ROW_WATCH:-/nonexistent}/$1.peak" 2>/dev/null)"
+  replay_row_progress_line "REPLAY_ROW $1 判 ${title:-没判} 用时 $(( $2 / 1000 )) 秒 峰值 ${peak:-没量到} 线程 $3｜$line"
 }
 
 # 一行判完记进判定库（文件头「按行复用」）：照这一行的行键记下判法写的那个判定（$OUT_DIR/<tag>.verdict）。判绿的（字节一致、仅计时不同）记绿；
@@ -4169,36 +5217,75 @@ remember_row_outcome() { # <tag> <记录目录，空串不记> <新产物> <前�
 }
 
 
+
 # 开跑前那一判：按表里的次序给每一行定 tag 与判定（decide_row），数出要现跑的几行；一行都不用现跑就不试编 gpu 特性、不编（文件头「按行复用」）；
-# 要现跑的行里一行要卡的都没有（admission.py replay-row-inputs 第 4 列全是 0）就不试编 gpu 特性、不要服务交的卡（文件头「GPU」）。
+# 要现跑的行里一行要卡的都没有（admission.py replay-row-inputs 第 4 列全是 0）就不试编 gpu 特性（文件头「GPU」）。
 # 弄坏开关 REPLAY_BREAK=gpu-for-every-run：要现跑的行一律当要卡
 declare -a ROW_TEXTS=() REPLAY_ORDER=() TO_RUN_BINARIES=()
 row_sequence=0; to_run=0; to_run_drivers=0; to_run_gpu=0
+: >"$OUT_DIR/row-costs.request"
 while IFS='|' read -r exp bin args stored kind; do
   [[ -z "$exp" ]] && continue
-  want "$exp" || continue
+  want_row "$exp" "$bin" "$args" || continue
   row_sequence=$((row_sequence+1))
+  if [[ -n "${ITEM_EXPERIMENT["$exp"]+set}" ]]; then printf '  · --item %s.%s：本趟记号 %s.%s\n' "$exp" "${ROW_ORDINAL["$exp|$bin|$args"]}" "$exp" "$row_sequence" >&2; fi
   admission_key_of_row "$exp" "$bin" "$args"   # 按表里的原样查（$REPLAY_DEV 这类还没展开）
   row_identity="$exp|$bin|$args"
   ROW_TEXTS+=("$exp|$bin|$args|$stored|$kind")
   REPLAY_ORDER+=("$exp.$row_sequence")
   [[ -n "${ROW_REFUSAL["$row_identity"]+set}" ]] && refused_rows=$((refused_rows + 1))
-  decide_row "$exp" "$exp.$row_sequence" "$bin" "$stored" "$ROW_ADMISSION_KEY" "${ROW_REUSE_KEY["$row_identity"]-}"
+  decide_row "$exp" "$exp.$row_sequence" "$bin" "$stored" "$ROW_ADMISSION_KEY" "${ROW_REUSE_KEY["$row_identity"]-}" "$row_identity"
   if [[ "$(cat -- "$OUT_DIR/$exp.$row_sequence.decision" 2>/dev/null)" == run ]]; then
     to_run=$((to_run + 1))
+    printf '%s\t%s\n' "$exp.$row_sequence" "$row_identity" >>"$OUT_DIR/row-costs.request"
     if [[ "$bin" == @* ]]; then to_run_drivers=$((to_run_drivers + 1)); else TO_RUN_BINARIES+=("$bin"); fi
-    if [[ "${ROW_USES_GPU["$row_identity"]:-0}" == 1 || "$REPLAY_BROKEN" == gpu-for-every-run ]]; then to_run_gpu=$((to_run_gpu + 1)); fi
+    if [[ "${ROW_USES_GPU["$row_identity"]:-0}" == 1 || "$REPLAY_BROKEN" == gpu-for-every-run ]]; then
+      to_run_gpu=$((to_run_gpu + 1))
+    fi
     if [[ -n "${ROW_CHANGE_NOTE["$row_identity"]:-}" ]]; then printf '  · %s 要现跑：%s\n' "$exp" "${ROW_CHANGE_NOTE["$row_identity"]}" >&2; fi
     if [[ -n "${ROW_REFUSAL["$row_identity"]+set}" ]]; then printf '  · %s 要现跑：行键%s\n' "$exp" "${ROW_REFUSAL["$row_identity"]}" >&2; fi
   fi
 done <<<"$TABLE"
+
+# 派行要的读数（文件头「派行」）：编译之前读，一行比上限还大就不编、不跑。读不来的各行照没量过办、不比内存
+REPLAY_ROW_COSTS_SCRIPT=scripts/experiment-apparatus/replay_row_costs.py
+REPLAY_MEMORY_CAP=""; REPLAY_ROW_PEAK_RECORDS=""
+declare -A ROW_PEAK_OF_TAG=() ROW_THREADS_OF_TAG=()   # 量到的线程数只给弄坏开关 threads-bound-kept 用
+if (( to_run )); then
+  if [[ ! -f "$REPLAY_ROW_COSTS_SCRIPT" ]]; then
+    echo "  · 派行：这棵树里没有 $REPLAY_ROW_COSTS_SCRIPT，各行照没量过办" >&2
+  elif replay_costs_output="$(python3 "$REPLAY_ROW_COSTS_SCRIPT" read "$OUT_DIR/row-costs.request")"; then
+    while IFS=$'\t' read -r replay_costs_kind replay_costs_first replay_costs_second replay_costs_third; do
+      case "$replay_costs_kind" in
+        cap) [[ "$replay_costs_first" == - ]] || REPLAY_MEMORY_CAP="$replay_costs_first"; echo "  · 派行：内存上限 ${REPLAY_MEMORY_CAP:-取不到、不比内存}（$replay_costs_second）" >&2 ;;
+        records) [[ "$replay_costs_first" == - ]] || REPLAY_ROW_PEAK_RECORDS="$replay_costs_first"; echo "  · 派行：峰值记录 ${REPLAY_ROW_PEAK_RECORDS:-不读不写}（$replay_costs_second）" >&2 ;;
+        row) ROW_PEAK_OF_TAG["$replay_costs_first"]="$replay_costs_second"; ROW_THREADS_OF_TAG["$replay_costs_first"]="$replay_costs_third" ;;
+      esac
+    done <<<"$replay_costs_output"
+  else
+    echo "  ! 派行：python3 $REPLAY_ROW_COSTS_SCRIPT read 退 $?（原因在上面），这一趟各行照没量过办" >&2
+  fi
+  # 一行比上限还大（文件头「派行」）：不编、不白跑前面的行。弄坏开关 oversized-row-not-refused 下照起
+  replay_oversized_rows=()
+  if [[ -n "$REPLAY_MEMORY_CAP" ]]; then
+    for tag in "${!ROW_PEAK_OF_TAG[@]}"; do
+      (( $(replay_row_reservation "${ROW_PEAK_OF_TAG[$tag]}") + REPLAY_ROW_BASE_BYTES > REPLAY_MEMORY_CAP )) && replay_oversized_rows+=("$tag（量过 ${ROW_PEAK_OF_TAG[$tag]} 字节）")
+    done
+  fi
+  if (( ${#replay_oversized_rows[@]} )) && [[ "$REPLAY_BROKEN" != oversized-row-not-refused ]]; then
+    echo "  ✗ 撞内存上限（memory-cap-hit）：内存上限 $REPLAY_MEMORY_CAP 字节装不下 ${replay_oversized_rows[*]}，一行都没跑" >&2
+    echo "     → 怎么办：经统一任务服务跑的不用管，退 250 由服务放大上限重排（task-server/task_server_lib.py 文件头「错误类型」memory-cap-hit）；到了那台总上限的由服务打回 memory-cap-at-maximum，查这一行为什么要这么多" >&2
+    exit 250
+  fi
+fi
+
 if (( to_run == 0 )); then
   echo "  · 开跑前判完：${#REPLAY_ORDER[@]} 行里要现跑的 0 行，不试编 gpu 特性、不编" >&2
 else
   if (( to_run_gpu )); then
     prepare_checker_tier_features "$OUT_DIR/gpu-build.log" || exit 78
   elif [[ "$REPLAY_GPU_SWITCH" == 1 ]]; then
-    echo "  · 开跑前判完：要现跑的 $to_run 行都不点 CHECKER_TIER_FEATURES，不试编 gpu 特性、不要服务交的卡" >&2
+    echo "  · 开跑前判完：要现跑的 $to_run 行都不点 CHECKER_TIER_FEATURES，不试编 gpu 特性" >&2
   fi
   if (( to_run_drivers )) || [[ "$REPLAY_BROKEN" == build-everything ]]; then
     build_research_binaries "$OUT_DIR/build.log" || exit 2
@@ -4209,15 +5296,16 @@ fi
 
 if (( to_run )); then replay_restore_referenced_products; fi
 
-# 并发度：这些实验多是跑 release 二进制的 CPU 活，缺省取登记的重活默认并行度（default_replay_jobs，不看忙闲）。
-# REPLAY_JOBS 压过它。各条实验的产物、镜像（e9/e45/e58/e140.img）与结果文件各用各的，没有共用的可写状态。
+# 同时至多几行：缺省取登记的重活默认并行度（default_replay_jobs，不看忙闲），REPLAY_JOBS 压过它。各条实验的产物、镜像（e9/e45/e58/e140.img）与结果文件各用各的，没有共用的可写状态。
+# 哪几行一起起照文件头「派行」。
 REPLAY_JOBS="${REPLAY_JOBS:-$(default_replay_jobs)}"
 [[ "$REPLAY_JOBS" -lt 1 ]] && REPLAY_JOBS=1
-declare -a REPLAY_PIDS=()
-running=0
-row_sequence=0
-for row_text in ${ROW_TEXTS[@]+"${ROW_TEXTS[@]}"}; do
-  IFS='|' read -r exp bin args stored kind <<<"$row_text"
+declare -a REPLAY_PIDS=() REPLAY_EXCLUSIVE_ROWS=() REPLAY_GPU_ROWS=() REPLAY_DRIVER_LEASED_ROWS=()
+declare -A REPLAY_RUNNING_BYTES=()   # 在跑的行，按进程号
+running=0; running_bytes=0
+replay_row_start() { # <复跑表那一行> <序号> <留的内存字节>
+  local exp bin args stored kind row_identity row_header_writer row_reuse_key_of_this_row
+  IFS='|' read -r exp bin args stored kind <<<"$1"
   admission_key_of_row "$exp" "$bin" "$args"
   row_identity="$exp|$bin|$args"
   row_header_writer="${ADMISSION_ROW_HEADER_WRITER["$row_identity"]-device}"
@@ -4226,14 +5314,116 @@ for row_text in ${ROW_TEXTS[@]+"${ROW_TEXTS[@]}"}; do
   args="${args//\$REPLAY_DEV58/$REPLAY_DEV58}"
   args="${args//\$REPLAY_DEV45/$REPLAY_DEV45}"
   args="${args//\$REPLAY_DEV/$REPLAY_DEV}"   # 表里写字面量 $REPLAY_DEV，这里才展开
-  row_sequence=$((row_sequence+1))
-  replay_one "$exp" "$row_sequence" "$bin" "$args" "$stored" "$kind" "$ROW_ADMISSION_KEY" "$row_header_writer" "$row_reuse_key_of_this_row" "$row_identity" &
+  replay_one "$exp" "$2" "$bin" "$args" "$stored" "$kind" "$ROW_ADMISSION_KEY" "$row_header_writer" "$row_reuse_key_of_this_row" "$row_identity" &
   REPLAY_PIDS+=($!)
-  running=$((running+1))
-  if (( running >= REPLAY_JOBS )); then wait -n 2>/dev/null || true; running=$((running-1)); fi
+  REPLAY_RUNNING_BYTES[$!]="$3"
+  running=$((running + 1)); running_bytes=$((running_bytes + $3))
+}
+# 等到至少一行收尾、把它的留量还回去。按 /proc 里的状态认（不在、或已是僵尸）：不用 wait -n，监看进程也是这个 shell 的子进程，它会把 wait -n 等住
+replay_row_reap_finished() {
+  local pid stat_line reaped=0
+  while :; do
+    for pid in "${!REPLAY_RUNNING_BYTES[@]}"; do
+      if IFS= read -r stat_line 2>/dev/null <"/proc/$pid/stat" && [[ "${stat_line##*) }" != Z* ]]; then continue; fi
+      running=$((running - 1)); running_bytes=$((running_bytes - REPLAY_RUNNING_BYTES[$pid]))
+      unset "REPLAY_RUNNING_BYTES[$pid]"
+      reaped=1
+    done
+    (( reaped )) && return 0
+    sleep 0.1
+  done
+}
+# 可并行的跑完、独占的起之前等 1 分钟负载落下来（文件头「派行」）：不等的话前面可并行的行留下的负载让计时行记本次不判
+replay_wait_for_load_to_settle() {
+  local waited=0 limit="${REPLAY_TIMING_SETTLE_SECONDS:-90}" load cpus
+  cpus="$(heavy_thread_default)"
+  while (( waited < limit )); do
+    read -r load _ </proc/loadavg
+    awk -v load_average="$load" -v cpus="$cpus" -v ratio="$TIMING_LOAD_RATIO" 'BEGIN { exit !(load_average / cpus <= ratio) }' && return 0
+    sleep 5
+    waited=$((waited + 5))
+  done
+}
+# 监看进程（replay_row_costs.py sample）：量每一行的峰值、报在跑的进度；等它读完上限的取法再派行（至多 10 秒），不然头几行量不到
+REPLAY_ROW_SAMPLER_PID=""; REPLAY_ROW_WATCH=""
+if (( to_run )) && [[ -f "$REPLAY_ROW_COSTS_SCRIPT" ]]; then
+  REPLAY_ROW_WATCH="$OUT_DIR/row-watch"
+  rm -rf -- "${REPLAY_ROW_WATCH:?}"
+  mkdir -p -- "$REPLAY_ROW_WATCH"
+  replay_sampler_options=(--progress-seconds "${REPLAY_PROGRESS_SECONDS:-300}")
+  [[ "$REPLAY_BROKEN" != row-progress-silent ]] || replay_sampler_options=(--progress-seconds 0)
+  [[ "$REPLAY_BROKEN" != row-peak-unrecorded ]] || replay_sampler_options+=(--no-records)
+  [[ "$REPLAY_BROKEN" != failed-row-peak-recorded ]] || replay_sampler_options+=(--record-failed)
+  python3 "$REPLAY_ROW_COSTS_SCRIPT" sample "$REPLAY_ROW_WATCH" "${REPLAY_ROW_PEAK_RECORDS:--}" "${replay_sampler_options[@]}" >&2 &
+  REPLAY_ROW_SAMPLER_PID=$!
+  for _ in {1..100}; do
+    [[ -e "$REPLAY_ROW_WATCH/ready" ]] && break
+    sleep 0.1
+  done
+fi
+REPLAY_DISPATCH_STARTED=1
+# 本脚本不领卡（文件头「GPU」）：环境里原有的 GPU_CARDS_BY_PRIORITY 先收起，不要卡的行看不到卡；要卡那一段原样交回去（没有的不设）
+REPLAY_CALLER_CARDS="${GPU_CARDS_BY_PRIORITY-}"; replay_caller_cards_given="${GPU_CARDS_BY_PRIORITY+given}"
+unset GPU_CARDS_BY_PRIORITY
+# 要卡的行（开了 GPU、admission.py replay-row-inputs 第 4 列为 1）先挑出来，挪到最后一段（文件头「派行」）
+row_sequence=0
+for row_text in ${ROW_TEXTS[@]+"${ROW_TEXTS[@]}"}; do
+  row_sequence=$((row_sequence + 1))
+  IFS='|' read -r exp bin args stored kind <<<"$row_text"
+  [[ "$(cat -- "$OUT_DIR/$exp.$row_sequence.decision" 2>/dev/null)" == run ]] || continue
+  [[ "$REPLAY_GPU_SWITCH" == 1 && "${ROW_USES_GPU["$exp|$bin|$args"]:-0}" == 1 ]] || continue
+  # 本脚本不交卡的行（文件头「GPU」）另放一批
+  if replay_row_driver_leases_its_own_card "$bin"; then REPLAY_DRIVER_LEASED_ROWS+=("$row_sequence"); else REPLAY_GPU_ROWS+=("$row_sequence"); fi
+done
+# 弄坏开关 cards-shown-to-every-row（文件头「派行」）：派行之前就交出卡串，不要卡的行也看得到卡
+if (( ${#REPLAY_GPU_ROWS[@]} )) && [[ -n "$replay_caller_cards_given" && "$REPLAY_BROKEN" == cards-shown-to-every-row ]]; then
+  export GPU_CARDS_BY_PRIORITY="$REPLAY_CALLER_CARDS"
+fi
+replay_shared_rows=0
+row_sequence=0
+for row_text in ${ROW_TEXTS[@]+"${ROW_TEXTS[@]}"}; do
+  row_sequence=$((row_sequence + 1))
+  IFS='|' read -r exp bin args stored kind <<<"$row_text"
+  tag="$exp.$row_sequence"
+  [[ "$(cat -- "$OUT_DIR/$tag.decision" 2>/dev/null)" == run ]] || continue   # 复用、输入没变、跑不了：开跑前那一判已经写好了这一行
+  [[ " ${REPLAY_GPU_ROWS[*]-} ${REPLAY_DRIVER_LEASED_ROWS[*]-} " == *" $row_sequence "* ]] && continue   # 要卡的行在最后一段
+  if replay_row_is_exclusive "$exp" "$kind" "${ROW_PEAK_OF_TAG[$tag]-}" "${ROW_THREADS_OF_TAG[$tag]-$(heavy_thread_default)}"; then
+    REPLAY_EXCLUSIVE_ROWS+=("$row_sequence")
+    continue
+  fi
+  row_reservation="$(replay_row_reservation "${ROW_PEAK_OF_TAG[$tag]:-0}")"
+  until replay_row_memory_bound_fits "$row_reservation"; do replay_row_reap_finished; done
+  replay_row_start "$row_text" "$row_sequence" "$row_reservation"
+  replay_shared_rows=$((replay_shared_rows + 1))
+done
+while (( running )); do replay_row_reap_finished; done
+if (( to_run )); then
+  echo "  · 派行：要现跑的 $to_run 行里可并行的 $replay_shared_rows 行跑完了（同时至多 $REPLAY_JOBS 行），接着一行一行跑独占的 ${#REPLAY_EXCLUSIVE_ROWS[@]} 行，最后是要卡的 ${#REPLAY_GPU_ROWS[@]} 行（交环境里的卡串）与 ${#REPLAY_DRIVER_LEASED_ROWS[@]} 行（本脚本不交卡）" >&2
+fi
+if (( replay_shared_rows && ${#REPLAY_EXCLUSIVE_ROWS[@]} )); then replay_wait_for_load_to_settle; fi
+for row_sequence in ${REPLAY_EXCLUSIVE_ROWS[@]+"${REPLAY_EXCLUSIVE_ROWS[@]}"}; do
+  replay_row_start "${ROW_TEXTS[row_sequence - 1]}" "$row_sequence" 0
+  while (( running )); do replay_row_reap_finished; done
+done
+# 要卡的那一段（文件头「GPU」）：环境里原有的卡串交回去（没有的不设），按表序一行一行跑，跑完再收起。
+#   弄坏开关 gpu-rows-not-serial：这一段几行一起起
+if (( ${#REPLAY_GPU_ROWS[@]} )); then
+  [[ -z "$replay_caller_cards_given" ]] || export GPU_CARDS_BY_PRIORITY="$REPLAY_CALLER_CARDS"
+  for row_sequence in "${REPLAY_GPU_ROWS[@]}"; do
+    replay_row_start "${ROW_TEXTS[row_sequence - 1]}" "$row_sequence" 0
+    [[ "$REPLAY_BROKEN" == gpu-rows-not-serial ]] || while (( running )); do replay_row_reap_finished; done
+  done
+  while (( running )); do replay_row_reap_finished; done
+  unset GPU_CARDS_BY_PRIORITY
+fi
+# 本脚本不交卡的行（文件头「GPU」「派行」）：GPU_CARDS_BY_PRIORITY 不设，按表序一行一行跑
+for row_sequence in ${REPLAY_DRIVER_LEASED_ROWS[@]+"${REPLAY_DRIVER_LEASED_ROWS[@]}"}; do
+  replay_row_start "${ROW_TEXTS[row_sequence - 1]}" "$row_sequence" 0
+  while (( running )); do replay_row_reap_finished; done
 done
 # 逐个 wait 写死的 pid，不写不带参数的 wait（它的退出码恒为 0，红了几个一个字都不说）
 for pid in ${REPLAY_PIDS[@]+"${REPLAY_PIDS[@]}"}; do wait "$pid" 2>/dev/null || true; done
+replay_row_sampler_stop
 
 # 派出去多少条就要收回来多少条：对不上整道红，不许少跑一条还报绿
 collected=0
@@ -4257,6 +5447,7 @@ for tag in ${REPLAY_ORDER[@]+"${REPLAY_ORDER[@]}"}; do
       unchanged) unchanged=$((unchanged+1)); UNCHANGED_ROWS+=("${tag%.*}") ;;
       reused:*) reused=$((reused+1)); REUSED_ROWS+=("${tag%.*}") ;;
       load_skipped) load_skipped=$((load_skipped+1)); LOAD_SKIPPED_ROWS+=("$(cat "$OUT_DIR/$tag.skip")") ;;
+      not_run) not_run=$((not_run+1)); NOT_RUN_ROWS+=("${tag%.*}") ;;
     esac
   fi
   if [[ -f "$OUT_DIR/$tag.load" ]]; then   # 放行的计时行（judged 或 lagged）
@@ -4302,14 +5493,17 @@ done
 if [[ ! -f "$REPLAY_REUSE_CHECKS" ]]; then
   :   # 不带共用库的小树（上面复用哨兵那一段说过一句）
 elif (( ${#ONLY[@]} )); then
-  printf '%s\n' "${ONLY[@]}" >"$OUT_DIR/last-run.ran"
+  # --item 点到的实验号只判了其中几行：红了加进清单，绿了不从清单里划掉（清单里别的行的红还在）
+  for replay_ran_experiment in "${ONLY[@]}"; do
+    [[ -n "${ITEM_EXPERIMENT["$replay_ran_experiment"]+set}" ]] || printf '%s\n' "$replay_ran_experiment"
+  done >"$OUT_DIR/last-run.ran"
   python3 "$REPLAY_REUSE_CHECKS" last-run scripts/experiment-apparatus/replay.sh "$OUT_DIR/last-run.red" --ran "$OUT_DIR/last-run.ran" >&2 || echo "  ! 上次红的清单没写成" >&2
 else
   python3 "$REPLAY_REUSE_CHECKS" last-run scripts/experiment-apparatus/replay.sh "$OUT_DIR/last-run.red" >&2 || echo "  ! 上次红的清单没写成" >&2
 fi
 printf '%s\n' "-------------------------------------------------------------------------"
 echo "字节一致 $pass ／ 仅计时不同 $timing_only ／ 对不上 $drift ／ 跑不了 $broken ／ 结论断言不中 $claim_bad ／ 输入没变没跑 $unchanged ／ 负载高本次不判 $load_skipped ／ 按行复用 $reused"
-echo "REPLAY_TOTAL dispatched=${#REPLAY_ORDER[@]} collected=$collected judged=$((pass + timing_only + drift)) reused=$reused refused=$refused_rows pass=$pass timing_only=$timing_only drift=$drift broken=$broken claims_bad=$claim_bad unchanged=$unchanged load_skipped=$load_skipped"
+echo "REPLAY_TOTAL dispatched=${#REPLAY_ORDER[@]} collected=$collected judged=$((pass + timing_only + drift)) reused=$reused refused=$refused_rows pass=$pass timing_only=$timing_only drift=$drift broken=$broken claims_bad=$claim_bad unchanged=$unchanged load_skipped=$load_skipped not_run=$not_run"
 if (( reused )); then
   echo "  · 按行复用 $reused 行（行键相同，判定库在 prune-server 里、库名 ${REPLAY_ROW_LIBRARY:-没有}，结论区间断言照常对记录里留的那一份产物判）：${REUSED_ROWS[*]}"
 fi
@@ -4327,6 +5521,14 @@ if [[ $load_skipped -ne 0 ]]; then
   if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then
     for skipped_row in "${LOAD_SKIPPED_ROWS[@]}"; do
       printf 'replay.sh %s，负载过高本次不判（阈值 %s）\n' "$skipped_row" "$TIMING_LOAD_RATIO" >>"$GATE_NOT_RUN_FILE"
+    done
+  fi
+fi
+if (( not_run )); then
+  echo "  ! 「本次未跑」$not_run 行：${NOT_RUN_ROWS[*]}。输入缺（导出根不在 replay-frozen-roots 下，REPLAY_DEFERRED_ROW_ROOT），里程碑四收口做全量时重建再跑；这几行既不判绿也不判红"
+  if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then
+    for skipped_row in "${NOT_RUN_ROWS[@]}"; do
+      printf 'replay.sh %s，输入缺本次未跑（里程碑四收口做全量时再跑）\n' "$skipped_row" >>"$GATE_NOT_RUN_FILE"
     done
   fi
 fi
@@ -4348,8 +5550,8 @@ fi
 if [[ $drift -eq 0 && $broken -eq 0 && $claim_bad -eq 0 && $sentinel_bad -eq 0 ]]; then
   # 全绿且用的是自动分配的临时目录 ⇒ 收拾掉。有一条不绿就留着，上面的提示指着它。
   [[ -z "${REPLAY_OUT:-}" ]] && rm -rf "$OUT_DIR"
-  if (( load_skipped && pass + timing_only + unchanged + reused == 0 )); then
-    echo "  ! 判的全是本次不判（负载过高 $load_skipped 行），一行都没比：不算通过，退 77"
+  if (( (load_skipped || not_run) && pass + timing_only + unchanged + reused == 0 )); then
+    echo "  ! 判的全是本次不判或本次未跑（负载过高 $load_skipped 行、输入缺 $not_run 行），一行都没比：不算通过，退 77"
     exit 77
   fi
   echo "  ✓ 复跑现判 $((pass + timing_only)) 行都对得上（字节一致 $pass、仅计时不同 $timing_only）、复用 $reused 行、行键拒算照跑 $refused_rows 行、负载高本次不判 $load_skipped 行、输入没变没跑 $unchanged 行，结论断言全中；负载关：判了 $load_passed、滞后 $load_lagged 份"

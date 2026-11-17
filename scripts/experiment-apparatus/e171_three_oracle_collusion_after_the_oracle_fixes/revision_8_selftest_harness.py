@@ -6,6 +6,7 @@
   - 临时目录（也交给子进程当 TMPDIR）末尾删掉，记一格 temporary-directory-removed；
   - 不点名格时，末尾逐个打开弄坏开关（脚本自己的开关表：开关 → 该红的格），在子进程里只跑那一格，核它红在那一格；
   - 末行「自证 N 项，红 M」。
+各格的结论攒到这一轮末尾才打；要每格判完当场打一行进度的，把格表先经 cells_reporting_progress 包一层再交给 run_selftest。
 弄坏开关只在自证起的子进程里认：脚本的 break 变量在 selftest 变量不是 1 时设了，refuse_break_outside_selftest 交回一句拒因（调用方退 2）。
 本外壳自己的两个开关（每份脚本的开关表里都带上）：
   sweep-skipped            每一格之后与末尾不收进程                  no-leftover-processes
@@ -110,6 +111,23 @@ def start_straggler(marker: str) -> None:
     # 它的标准输入输出接 /dev/null：弄坏开关那一轮不收它时，它不能攥着上一层 capture_output 的管子让上一层等它 300 秒
     subprocess.Popen(["bash", "-c", f"sleep 300 </dev/null >/dev/null 2>&1 & echo $! > {marker}"], start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).wait()
+
+
+def cells_reporting_progress(cells: dict) -> dict:
+    """自证各格包一层：每格判完当场打一行「格 <名> 判完：过|红|抛了异常，用时 N 秒」并刷新（run_selftest 把一轮各格的结论攒到这一轮末尾才打，
+    任务服务按日志长不长判卡住：task-server/task_server_lib.py 文件头「错误类型」stalled 那一行）。这一行不以 ✓/✗ 起头：开关轮认的是「✗ 自证 <格>：」，
+    格的结论照旧由 run_selftest 打。"""
+    def reporting(name: str, function):
+        def run(scratch: str) -> tuple[bool, str]:
+            started, outcome = time.monotonic(), "抛了异常"
+            try:
+                ok, detail = function(scratch)
+                outcome = "过" if ok else "红"
+                return ok, detail
+            finally:
+                print(f"  格 {name} 判完：{outcome}，用时 {time.monotonic() - started:.0f} 秒", flush=True)
+        return run
+    return {name: reporting(name, function) for name, function in cells.items()}
 
 
 def run_selftest(script: str, argument_list: list[str], cells: dict, switches: dict[str, str], break_variable: str,

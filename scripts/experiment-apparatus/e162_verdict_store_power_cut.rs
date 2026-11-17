@@ -2931,11 +2931,10 @@ fn preflight() -> Option<String> {
     if role_of(&arguments).is_some_and(|role| GUEST_ROLES.contains(&role.as_str())) {
         return None;
     }
-    let manifest_directory = env!("CARGO_MANIFEST_DIR");
-    let source = format!("{manifest_directory}/e162_verdict_store_power_cut.rs");
-    let script = format!("{manifest_directory}/../../.claude/singlefs-ai-sop/scripts/preflight.py");
+    let source = concat!(env!("CARGO_MANIFEST_DIR"), "/e162_verdict_store_power_cut.rs");
+    let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../.claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = Command::new("python3");
-    command.arg(&script).arg("check").arg(&source);
+    command.arg(script).arg("check").arg(source);
     if arguments.iter().any(|argument| argument == "--force") {
         command.arg("--force");
     }
@@ -3748,12 +3747,8 @@ fn verify_boot_run(verify_root: &Path, kernel: &str) -> VirtualMachineRun {
     }
 }
 
-fn repository_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..")
-}
-
 fn vm_bench_path() -> PathBuf {
-    repository_root().join("scripts").join("vm-bench.sh")
+    PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/devices/vm-bench.sh"))
 }
 
 fn run_description(run: &VirtualMachineRun, launcher: &Path) -> String {

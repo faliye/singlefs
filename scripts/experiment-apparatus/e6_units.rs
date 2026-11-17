@@ -7,7 +7,7 @@
 //! 那张表今天不能继续当 D9 已定项 3 的依据，要重测一遍。
 //!
 //! ⚠️ **这不是复跑，所以不设「必须复现 3888.51」的闸。**
-//! 照着已有答案定判据正是 `.claude/singlefs-ai-sop/rules/test-discipline.md`
+//! 照着已有答案定判据正是 `.claude/rules/test-discipline.md`
 //! 「实验开跑之前答案不许已经存在」要禁的形态。本轮量到什么记什么，
 //! 与 08-27 那组不一致时**如实并列**，不回头改判据。
 //!
@@ -21,7 +21,7 @@
 //!    两档跑的必须是同一份计算，差别只许在快慢上。
 //! 4. **绝对值断言**：单测钉住「每个单元都被加密到」「计费字节恰等于 `TOTAL_MIB`」
 //!    这两条算术，不让「两条臂一起错」躲过互比
-//!    （`.claude/singlefs-ai-sop/rules/test-discipline.md`「只让多条臂互相比…」）。
+//!    （`.claude/rules/test-discipline.md`「只让多条臂互相比…」）。
 //!
 //! **反过来的结果我接不接受**（跑前写下）：若量出「有 AES-NI 时 ChaCha 反而更快」
 //! 或「屏蔽后两者持平」，那就是 D9 已定项 3「运行时按 CPU 特性选」的前提塌了，
@@ -125,7 +125,7 @@ fn run(alg: CipherAlgorithm, unit: usize, rounds: usize) -> (u64, usize, u64, u6
 /// **已知答案测试**：拿一个外部实现算出的期望值钉住「这台机器今天算的是不是 AES-256-GCM」。
 ///
 /// 期望值由 `python3 -c` 调 `cryptography` 49.0.0（OpenSSL 后端）在宿主上独立算出，
-/// **与本二进制不共享任何一行代码**——`.claude/singlefs-ai-sop/rules/evidence-discipline.md`
+/// **与本二进制不共享任何一行代码**——`.claude/rules/evidence-discipline.md`
 /// 要的「换一条独立路径复现同一个判断」就是这个形态。
 ///
 /// 为什么非要有它：`tagchk` 只能说「两档算出来的不一样」，**说不出哪一档是对的**。

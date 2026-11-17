@@ -992,14 +992,18 @@ def cell_unit_script_commands(scratch: str) -> tuple[bool, str]:
     return good, f"打不出命令或退非 0 的单元 {failed or '无'}；修订 8 改的那几处没打出预期的 {missing or '无'}；还接 S15 比对的 {s15 or '无'}"
 
 
-SELFTEST_CELLS = {
-    "unit-script-commands": cell_unit_script_commands,
-    "allocation-threads": cell_allocation_threads, "queue-order": cell_queue_order, "downstream": cell_downstream,
-    "e2e-two-rounds": cell_e2e_two_rounds, "e2e-order": cell_e2e_order, "e2e-unit-red": cell_e2e_unit_red, "e2e-resume": cell_e2e_resume,
-    "e2e-resume-manifest-changed": cell_e2e_resume_manifest_changed, "e2e-dry-run-refused": cell_e2e_dry_run_refused,
-    "e2e-threads-within-quota": cell_e2e_threads_within_quota,
-    "plan-prints-commands": cell_plan_prints_commands,
-}
+def selftest_cell_functions():
+    """自证的各格，格名到函数。表写在函数体里：写成模块级赋值，会在 import 这个模块时把全部自证格连同它们起的子进程拖进 import 一方的判法单元闭包。"""
+    return {
+        "unit-script-commands": cell_unit_script_commands,
+        "allocation-threads": cell_allocation_threads, "queue-order": cell_queue_order, "downstream": cell_downstream,
+        "e2e-two-rounds": cell_e2e_two_rounds, "e2e-order": cell_e2e_order, "e2e-unit-red": cell_e2e_unit_red, "e2e-resume": cell_e2e_resume,
+        "e2e-resume-manifest-changed": cell_e2e_resume_manifest_changed, "e2e-dry-run-refused": cell_e2e_dry_run_refused,
+        "e2e-threads-within-quota": cell_e2e_threads_within_quota,
+        "plan-prints-commands": cell_plan_prints_commands,
+    }
+
+
 SELFTEST_SWITCHES = {
     "resume-reruns-green": "e2e-resume", "resume-ignores-manifest": "e2e-resume-manifest-changed", "downstream-not-rerun": "e2e-resume-manifest-changed",
     "dependency-ignored": "e2e-order", "stop-ignored": "e2e-unit-red", "rows-before-units-done": "e2e-order", "threads-ignored": "allocation-threads",
@@ -1009,7 +1013,7 @@ SELFTEST_SWITCHES = {
 
 def selftest(argument_list: list[str]) -> int:
     os.environ[SELFTEST_VARIABLE] = "1"
-    return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
+    return harness.run_selftest(os.path.abspath(__file__), argument_list, selftest_cell_functions(), SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
 
 
 if __name__ == "__main__":

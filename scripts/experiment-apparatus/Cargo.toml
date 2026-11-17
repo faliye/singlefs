@@ -785,3 +785,33 @@ path = "e199_transaction_output_copy.rs"
 [[bin]]
 name = "e203-admission-scan-cost"
 path = "e203_admission_scan_cost.rs"
+
+# E206（发布固定点轮数的代价）：跑前登记 research/prompts/e206-preregistration.md。计数模型，纯算术，不与 crates/ 共用代码；读量的那一路（插了读数的副本）打出的产物。
+[[bin]]
+name = "e206-fixed-point-cost"
+path = "e206_fixed_point_cost.rs"
+
+# E207（B8严格判据下的步数）：跑前登记 research/prompts/e207-preregistration.md。推的那一路，纯算术，不与 crates/ 共用代码；读量的那一路（插了读数的副本）打出的产物与 E206 的 p2a 产物（回扫）。
+[[bin]]
+name = "e207-strict-scan-steps"
+path = "e207_strict_scan_steps.rs"
+
+# E207 历史用例里量窗的取法（声明行、冷文件池、探针前缀、扩展窗口、阴性对照）：同一份文件由入口拷进副本给历史用例 #[path] 引，这里只为单测与变异。
+[[bin]]
+name = "e207-strict-scan-steps-window-choices"
+path = "e207_strict_scan_steps_window_choices.rs"
+
+# E209（尖峰成因）的推的那一路：读产物、判问题单五行；脚本表与选择子在 e209_spike_cause_scripts.rs（经 #[path] 引，不单独编）
+[[bin]]
+name = "e209-spike-cause"
+path = "e209_spike_cause.rs"
+
+# E209 的脚本表与选择子：同一份文件由入口拷进副本给历史用例 #[path] 引、模型也引；这里另编成 bin，只为单测与变异（mutate.sh 要一个编得出这份源文件的 bin 名）。
+[[bin]]
+name = "e209-spike-cause-scripts"
+path = "e209_spike_cause_scripts.rs"
+
+# E210（盘变大改容量表的读者规则四臂）：跑前登记 research/prompts/e210-preregistration.md。计数模型，纯算术，不与 crates/ 共用代码；两段产物由命令行参数选。
+[[bin]]
+name = "e210-capacity-grow-reader-rules"
+path = "e210_capacity_grow_reader_rules.rs"

@@ -11,7 +11,7 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::time::Instant;
 
 /// 块层自己数的 I/O。**这是校验用的独立路径**——内核数的，与本程序的计数器
-/// 不共享任何代码、任何采样、任何工具（`singlefs-ai-sop/rules/evidence-discipline.md`）。
+/// 不共享任何代码、任何采样、任何工具（`rules/evidence-discipline.md`）。
 /// 两者对不上，说明本程序的模型是错的：O_DIRECT 没真的绕过缓存、
 /// 内核合并了请求、或者有预读。
 #[derive(Debug, Default, Clone, Copy)]

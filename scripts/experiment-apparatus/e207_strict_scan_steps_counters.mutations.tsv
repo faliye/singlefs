@@ -1,0 +1,9 @@
+# E207（B8严格判据下的步数）插计数脚本的变异表（跑前登记第九节 M14 在第一行，其余几行登记之外新增：读法 10、第三节第 1、2、4 组与停机条款第 1 条各一条）。
+# 一行三段：名、原文、替换文，都逐字取自 e207_strict_scan_steps_counters.py；经它的 --mutation-check 逐条改坏、跑自证，自证退非 0 算抓到。
+m14_age_table_updated_every_round	f"        {READINGS_MODULE}round_resolved(&resolved.rewritten_roles, rewritten_by_the_plan.len());\n"),	f"        {READINGS_MODULE}round_resolved(&resolved.rewritten_roles, rewritten_by_the_plan.len());\n        {READINGS_MODULE}note_settled_nodes(&rewritten_by_the_plan);\n"),
+implementation_merge_call_replaced	        Edit("merge_begin_after_the_release", TRANSACTION_SOURCE, HEAD_SETTLE, FN_END, RELEASE_MERGE_CALL, "before",	        Edit("merge_begin_after_the_release", TRANSACTION_SOURCE, HEAD_SETTLE, FN_END, RELEASE_MERGE_CALL, "replace",
+round_released_reading_renamed	f"        {READINGS_MODULE}round_released(release.len());	f"        {READINGS_MODULE}round_relesed(release.len());
+first_merge_overwritten_every_merge	                if open.first_merge_site.is_none() {	                if true {
+anchor_check_always_passes	    return 0 if bad == 0 else 3	    return 0
+seed_family_cut_leaves_a_nul_byte	    return text[:text.index(begin)]	    return text[:text.index(begin)] + "\x00"
+c4_the_anchor_check_skips_the_syntax_check	    if bad == 0 and syntax:	    if False and syntax:

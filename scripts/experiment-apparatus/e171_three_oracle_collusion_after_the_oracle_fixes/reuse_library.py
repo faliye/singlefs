@@ -1,105 +1,83 @@
 #!/usr/bin/env python3
-"""E171 第 1 次重跑·修订 11：按输入复用的那一层（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.1–11.9 节与其后「主 agent 认定：修订 11 交回」）。
-单元的键（第 11.2 节）、复用库（第 11.5 节：查、取、原子入库、隔离、读数相等）、复用账本（第 11.4 节）、RC1–RC5 与 S18（第 11.9 节）都在这里；
-三层编排（segment_one_units_revision_11.py、rows_orchestrator_revision_11.py、rows_orchestrator_segment_two_revision_11.py）与计数脚本
-count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_key.py（照着写进仓，不从仓里 import 草稿）。
+"""E171 第 1 次重跑·修订 11 那三层编排（segment_one_units_revision_11.py、rows_orchestrator_revision_11.py、rows_orchestrator_segment_two_revision_11.py）
+与计数脚本 count_reusable_units.py 共用的复用那一层：每个读数单元（装置、E170 导出装置、执行器、变异驱动的一次起法，逐行驱动的一行）一项，
+判定只存进 prune-server 那一份判定库（.claude/rules/verification.md「判定库只有一份」）；算键、读写、复用哨兵都经
+scripts/experiment-apparatus/long_run_item_verdicts.py（它文件头「请求文件」「判定库」「一趟的三步」「复用哨兵」），这里不另写键的算法、不另存条目。
+判法（装置怎么跑、O3 怎么判、比对器怎么比、读数相等怎么比）不在这一层；取来的单元判法照跑。
 
-键 = 键文本的 sha256。键文本第一行是 KEY_SCHEMA_LINE，之后十节，节名与次序写死：
-  [kind]      单元种类：device | e170 | driver-row | o3-executor | mutation-driver
-  [build]     cargo -V 与 rustc -vV 原样的 sha256；根与 crates/*/ 的 Cargo.toml、Cargo.lock、树里 .cargo/ 下每个文件的 sha256；
-              admission.build_environment_lines 给的构建环境各行（名字与内容的 sha256）
-  [closure]   树里编的 release 二进制的 dep-info 列的每个源文件，相对树根的路径与 sha256；驱动行用改坏之后的内容（bad_implementation_table.apply_mutation）；
-              树外的路径出现就停（S18 ②，ClosureOutsideTheTree）
-  [env]       闭包源码里按名字读的 SINGLEFS_、KS_、RAYON_ 字面量，去掉任务服务设的线程数变量里的那八个，逐个记 set / unset；有一个 set 的单元不查库、不进库
-  [mutation]  行号、行表那一行原文、变异表那一行原文；空变异记 empty-of <原名> 与那一行原文
-  [args]      装置或驱动的参数，去掉输出目录、--threads、--lanes、工作根、输出根
-  [limit]     逐行限时 L 的秒数；不限时的单元记 none
-  [upstream]  角色名与上游读数各文件的 sha256（按读数内容，不按上游的键）
-  [research]  研究一侧运行期闭包各文件的 sha256（装置单元 device_timing.py；驱动行是驱动与它 import 的四份；跑执行器的另加执行器目录、冻结行那份产物、
-              frozen_o3.py、o3_bad_image_judge.py、result_lines.py；变异驱动是研究一侧整个目录与它的变异表）
-  [python]    python3 -VV 原样
-库：prune-server 那一份判定库（.claude/rules/verification.md「判定库只有一份」），经 scripts/prune-server/prune_server_client.py 读写；
-  族 apparatus-items，种类是装置名 DEVICE_BINARY（客户端文件头「键空间」）。本地不建、不读、不写库目录，旧的本地库不导入（那一族「接完」的 ① ②）。
-  H30 的库根（reuse_library_root.py 取）只当名字与命名空间：不在临时服务底下不进键，两台、哪个库根读写同一份；临时服务底下按它给命名空间（自证各格各占一份）。
-  条目：entries/<键>.tar.gz 一条值，是整份条目打成的 tar（gzip）：key.txt、reading/<角色>…、meta.tsv、manifest.sha256。
-    入库先在这一趟自己的临时目录里拼好整份（manifest.sha256 最后写），再一次写进服务（写在服务确认之后才算数，大值由客户端分段、读时核 sha256）；
-    拼到一半被停，服务里什么都没有，临时目录随这一趟的 TMPDIR 走。查库、取用、比读数都先把那一条解进临时目录（中转，用完即删）再照原样核。
-  quarantine/<键>-<纳秒>.tar.gz：RC5 不符的条目原样挪进来（写一份、删掉 entries/ 那一条）；frozen-by-s18：S18 触发时写的一条（在就不取、不入）。
-  RP2（selfproof）一趟另占 selfproof/<日期>-<进程号>-<随机>/ 那一层相对路径，跑完删掉。
-  读数按角色存：product、timing（文件），directory（装置的导出目录），row（驱动行的行目录）；meta.tsv 记这一单元原来的名字（前缀后缀换成占位）。
-  服务连不上客户端退 75（PruneServerFailure，是 SystemExit）：不现判、不当「库里没有」。
-账本：<导出根>/reuse-markers/<层>/ 下每个单元一份标记（先写标记、再链接、最后链 row-result.tsv 或写绿行），events.tsv 收 RC1–RC5 的每一次；
-  每层收尾由标记现合成 E7RESULT name=reuse / name=reuse_check / name=reuse_insert 各行与末行 name=verdict（N + M 不等于这一层登记的单元数判红）。
-  末行另报 judged_now（现判：查过库没有、条目坏了、库冻住、RC3 与强制现判抽去现跑的）、reused（复用）、refused（拒算：永远现跑的几类、
-  环境变量设了的、闭包认不全的），三个数加起来等于 units；三层编排打「复用账本 …：<末行>」就是这一层的成功句「现判 N、复用 M、拒算 R」。
-复用哨兵（.claude/rules/verification.md「一个门禁：两种跑法」末条；判法借 scripts/gate/lib_reuse_checks.py 的种子与条数）：
-  一个进程一份（三层编排各是一个进程）。种子取 SINGLEFS_REUSE_SENTINEL_SEED（不设现取）、条数取 SINGLEFS_REUSE_SENTINEL_COUNT（不设 3），
-  第一次命中时打进标准错误、标记里每个被抽中的单元记 sentinel 与 sentinel_seed，事件里记一行 name=reuse_sentinel_plan。查库是逐个单元当场答的，
-  事先不知道一共命中几条：强制现判与哨兵都从这一趟头 SENTINEL_HIT_WINDOW 条命中里按种子抽（random.Random(种子) 抽 条数 + 1 个序号，头一个是强制现判）。
-  强制现判那一条 decide 交 fresh-check（reason=sentinel-forced），照现跑、入库时与库里那一条照 RC1 比（reuse_check kind=forced）。
-  三种情形记一行 E7RESULT name=reuse_sentinel problem=…，s18_problems 收进去，三层编排照 S18 冻库、记红（第 11.9 节 S18 另加的第 ③ 样）：
-    sentinel-rejudged  哨兵（键相同、库里有、决定是取来）却照现跑交了 record_finished；
-    forced-reused  强制现判那一条的标记仍是 reused；
-    forced-not-compared  强制现判跑完没与库里那一条比上（入库条件不过、或库里那一条已经不在）。
-  强制现判的读数与库里不同就是 identical=false，照 S18 第 ① 样红。RC3 抽去现跑的哨兵不算被现判；取用时条目坏了改现跑的哨兵不判。
-  RP2（selfproof，另占一层的库）不抽。临时 prune-server 底下（自证与单测）不抽：三层编排的端到端格与 test_revision_11 照数复用条数，
-  只有 reuse-sentinel 一格自己装一份哨兵；真跑没有关哨兵的开关。
+按项判定：
+  种类 KIND（装置名）；项名是单元名把 [A-Za-z0-9._-] 之外的字符换成「.」（item_name）。一项的请求（reading_unit_request、row_request）：
+    入口  装置、E170 导出装置、驱动的一行：被判那棵冻结树（要在仓根底下）里那个 bin 的 main（root:<树>、profile:release），树里 crates/*/src/bin/<bin>.rs
+          恰好一份才算得出；执行器（第 5、8 步与第 3 步 O3 阳性对照）：冻结执行器 executor_main.py；变异驱动：本目录 mutation_driver.py
+    judge: 判这一单元的那几个函数：装置 device_timing.py::run_and_time；驱动的一行 row_driver.py::run_row_on_the_lane，跑执行器的行另加冻结执行器；
+          执行器 frozen_o3.py::run_executor，O3 阳性对照 o3_bad_image_judge.py::run_control
+    line: kind、装置或驱动的参数（normalized_arguments：去掉落点、线程、线道与已在别处进键的几样）、限时 L（不限时写 none）、上游读数的摘要
+          （line:upstream:<角色>=<sha256>，reading_digest：文件按内容，目录按每个文件的相对路径与内容）；驱动的一行另有行号、行表那一行原文的 sha256
+          （空变异写 empty-of <名>）、变异表那一行原文的 sha256（改坏之后的源码不进闭包，由变异行原文进键）；line:compare=timing（读数里带耗时）
+    @input、@files  跑冻结执行器的项另把冻结行那份产物进键；变异驱动把研究一侧目录每个文件与它的变异表进键
+    键 = long_run_item_verdicts 照这些请求经 admission.py 算的那一把；路径、名字、在副本还是主树都不进键。值是读数按角色确定地打成的 tar（gzip，packed_reading）：
+    成员按名字排，修改时刻、属主与 gzip 头的时刻置 0，同一份读数两次打出逐字节相同。
+  这一层自己拒算（不进计划、照跑、不复用；账本记 fresh-always），缘由按这个次序取第一样：tree-outside-the-repository（冻结树不在仓根底下）、
+    entry-not-found（树里找不到那个 bin）、env-set（树里 crates 下源码按名字读的 SINGLEFS_、KS_、RAYON_ 字面量有一个此刻设着，任务服务设的线程数变量那八个除外）、
+    second-run（RC2 的第二趟：step-9、step-10-run-2、第一段 row-0 与跨机 X、第二段跨机那一行）、not-located（按名字取不到或不唯一）、anchor-not-once（锚点不是恰 1 次）、
+    touches-module-set（改坏那一处碰到模块集合：原文或替换文带 MODULE_SET_TOKENS）。admission 自己拒算的（闭包收不全）照 long_run_item_verdicts 记拒算。
+  ItemRun 是一层一次计划（一个单元的几个读数、一步的行）：plan（算键、查库、抽复用哨兵）→ 取来的照角色解进这一趟的名字（fetch）→ 照跑完的 record
+  （入库条件过判绿、不过判红：记红撤绿）→ finish（重算键、判复用哨兵）；状态目录是这一趟新建的，finish 之后删。
+  输出根与行目录只是这一趟的产物，不是复用来源：做没做完只认这一趟的计划（取来的）与这一趟跑完的。
+复用对不对的几条核对（读数照 reading_differences 比，不比字节；不同就是 S18：那一把键撤成红（long_run_item_verdicts.write_record 照同一把键写 red）、
+这一层记红停下，交主 agent）：
+  RC1  现判的一项入库时，库里这把键已有判绿的那一份（复用哨兵抽中的强制现判那一条，或计划之后别的趟先入了）：比（kind=forced、insert）
+  RC2  second-run 那几项跑完：库里这把键有判绿的就比（kind=second-run），没有就照判绿写进去
+  RC3  第二段整表取来的行里照 rows_sample 挑 k 行照跑、与库里那一份比（kind=sample），不入库
+  复用哨兵、键在跑的中途变了：long_run_item_verdicts 的 finish 判，它退 1 记一行 name=reuse_sentinel problem=finish-red；取来的单元照现跑交了 record 记一行
+  name=reuse_sentinel problem=reused-rejudged；两样同 S18。库里那一份读不回、sha256 对不上：long_run_item_verdicts 的 plan 当没有、现判。
+账本：<导出根>/reuse-markers/<层>/ 下每个单元一份标记、events.tsv 收 RC1–RC3、哨兵与入库的每一次；每层收尾由标记现合 E7RESULT name=reuse 各行、事件原样与末行
+  name=verdict（N + M 不等于这一层登记的单元数判红）；末行另报 judged_now（现判）、reused（复用）、refused（拒算），三个数加起来等于 units。
 
 用法：
-  reuse_library.py fetch --library L --entry E --map <角色>=<目标路径> [--map …]
-      单元脚本取用（E 是条目的键）：核 RC5（不符的挪进 quarantine/、退 1）、按角色把条目里的读数写到这一趟的名字（目标已在就拒、退 1）；标准输出一行条目 meta 里的退出码。
-  reuse_library.py selfproof --library L --binary B --scratch S --output O --threads N
-      RP2（修订 8 那一趟 step-0 绿之后的 reuse-selfproof 单元）：H7 那个装置二进制跑三次 stream-constants --streams 1,2,3。
+  reuse_library.py fetch --library <状态目录> --entry <项名> --map <角色>=<目标路径> [--map …]
+      单元脚本取用：编排给的这一趟状态目录里那一项取来的读数按角色解到这一趟的名字（目标已在、值里没有这个角色都拒、退 1）；标准输出一行它的退出码。
+  reuse_library.py selfproof --library <目录> --binary B --scratch S --output O --threads N [--repo R]
+      RP2：H7 那个装置二进制跑三次 stream-constants --streams 1,2,3，这一趟独占一把键（line:selfproof-run=<日期-进程号-随机>）：① 照现判入库
+      ② 同一把键取来、与①逐字节比 ③ 另一个目录现跑、照读数相等比；跑完删掉库里这一把键的两条。三趟的状态目录放 --library 底下。
+  reuse_library.py items --repo R --tree T --script S --units <单元>,<单元>
+      只在自证里认（临时 prune-server 底下、LONG_RUN_ITEMS_SELFTEST_FAKE_JUDGE=1，不是就退 2）：点名的单元照这一份的请求写法经 judge_items 走一趟，
+      给 long_run_item_verdicts.py reuse-cells 当起法（本文件与三层编排自证的 reuse-three-questions）。
   reuse_library.py --selftest [--cells 格,…] [--rounds N]
-      RP1、RP3–RP8（假树、假装置、假驱动、假判法；RP1 另起三层编排各自的端到端格），复用三问一格（reuse-three-questions：第二段三行四趟，
-      打规范输出「REUSE_SELFTEST script=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py …」），
-      复用哨兵一格（reuse-sentinel：一绿四红，见「复用哨兵」），键不随所在目录变一格（key-independent-of-location：同一份假仓与假树放在两处、
-      一处在另一处的副本目录底下，各类单元的键逐个相同），钉值认搬迁登记的两格（pin-moves：假前缀的红绿红样本；
-      pin-moves-real-files：本目录每一处钉值的被钉文件照一次假搬迁换过之后照样认、多改一处就不认）与冻结执行器核对认搬迁登记的单测（frozen-o3-moves：
-      子进程跑 test_frozen_o3），倒换只认正着换一遍不动的、逐次倒的两格（pin-moves-partial：钉值核对；frozen-o3-reverse-moves：本目录与 E171 第 1 次那两份
-      冻结执行器核对），末尾逐个打开弄坏开关核红在点名格。末行「自证 N 项，红 M」。
-      只在临时 prune-server 上跑（客户端文件头「命令行」--with-temporary-service；开跑前调 selftest_service_problem()，不是临时服务退 2、一格都不跑，不写真服务）。
-退出码：0 成；1 取用不成或 RP2 不过；2 用法错、自证没有临时服务；75 prune-server 不可用（客户端的码）。
+      假仓（研究一侧目录拷一份，判法闭包照真文件算；.claude 与 scripts 下别的目录指回真仓）、假树、假装置与假驱动行、假判法；装置入口经
+      LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成 long_run_item_verdicts 的假入口。只在临时 prune-server 上跑（客户端文件头「命令行」--with-temporary-service；
+      开跑前调 selftest_service_problem()，不是临时服务退 2、一格都不跑，不写真服务）。末尾逐个打开弄坏开关核红在点名格；末行「自证 N 项，红 M」。
+退出码：0 成；1 取用不成或 RP2 不过；2 用法错、自证没有临时服务、items 不在自证里；75 prune-server 不可用（客户端的码）。
 
 弄坏开关 REUSE_BREAK=<项>（逗号连几个；只在 --selftest 起的子进程里认，REUSE_SELFTEST=1；别处设了退 2）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ 自证 <格名>：…」）：
-  REUSE_BREAK=drop-kind  键文本里不写 [kind]
-      「✗ 自证 rp3-kind：」
-  REUSE_BREAK=drop-build  不写 [build]
-      「✗ 自证 rp3-build：」
-  REUSE_BREAK=drop-closure  不写 [closure]
-      「✗ 自证 rp3-closure：」
-  REUSE_BREAK=drop-env  不写 [env]
-      「✗ 自证 rp3-env：」
-  REUSE_BREAK=drop-mutation  不写 [mutation]
-      「✗ 自证 rp3-mutation：」
-  REUSE_BREAK=drop-args  不写 [args]
-      「✗ 自证 rp3-args：」
-  REUSE_BREAK=drop-limit  不写 [limit]
-      「✗ 自证 rp3-limit：」
-  REUSE_BREAK=drop-upstream  不写 [upstream]
-      「✗ 自证 rp3-upstream：」
-  REUSE_BREAK=drop-research  不写 [research]
-      「✗ 自证 rp3-research：」
-  REUSE_BREAK=drop-python  不写 [python]
-      「✗ 自证 rp3-python：」
-  REUSE_BREAK=check-skipped  RC1–RC3 不比读数（库里有同键条目就算相同）
-      「✗ 自证 rp7-check-mismatch：」
-  REUSE_BREAK=closure-check-skipped  RC4 不核 dep-info
-      「✗ 自证 rp6-closure-extra-file：」
-  REUSE_BREAK=manifest-unchecked  RC5 不核 manifest.sha256
-      「✗ 自证 rp8-corrupted-entry：」
-  REUSE_BREAK=insert-in-place  入库时没有 manifest 的半份先写进服务、再写整份（不是拼好整份才写的那一类）
-      「✗ 自证 rp5-atomic-insert：」
-  REUSE_BREAK=fresh-always-ignored  永远现跑的几类（step-9 等）也查库
-      「✗ 自证 rp1-two-passes：」
-  REUSE_BREAK=sentinel-skipped  查库命中时不抽强制现判、不抽哨兵
-      「✗ 自证 reuse-sentinel：」
-  REUSE_BREAK=forced-read-answered-found  抽中强制现判的那一条照取来交出去（标记仍记 forced）
-      「✗ 自证 reuse-sentinel：」
-  REUSE_BREAK=sentinel-problems-ignored  s18_problems 不收 name=reuse_sentinel 那几行（哨兵红了不冻库、不记红）
-      「✗ 自证 reuse-sentinel：」
-  REUSE_BREAK=location-in-key  [closure] 每行写文件的绝对路径（键随树所在的目录变）
+  REUSE_BREAK=kind-unkeyed  请求里不写 line:kind=
+      「✗ 自证 request-kind：」
+  REUSE_BREAK=arguments-unkeyed  请求里不写 line:arguments=
+      「✗ 自证 request-arguments：」
+  REUSE_BREAK=limit-unkeyed  请求里不写 line:limit-seconds=
+      「✗ 自证 request-limit：」
+  REUSE_BREAK=upstream-unkeyed  请求里不写 line:upstream:<角色>=
+      「✗ 自证 request-upstream：」
+  REUSE_BREAK=mutation-unkeyed  驱动的一行不写行表那一行与变异行的 sha256
+      「✗ 自证 request-mutation：」
+  REUSE_BREAK=judges-dropped  请求里不写 judge:
+      「✗ 自证 request-judge-closure：」
+  REUSE_BREAK=freeze-reference-unkeyed  跑执行器的项不写冻结行那份产物的 @input
+      「✗ 自证 request-freeze-reference：」
+  REUSE_BREAK=environment-set-ignored  树里源码读的变量此刻设着也不拒算
+      「✗ 自证 request-environment-set：」
+  REUSE_BREAK=module-set-keyed  改坏那一处碰到模块集合的行也进计划
+      「✗ 自证 request-module-set-refused：」
+  REUSE_BREAK=location-in-key  请求里另写冻结树的绝对路径（键随树所在的目录变）
       「✗ 自证 key-independent-of-location：」
+  REUSE_BREAK=packing-keeps-times  值照原文件的修改时刻与此刻打
+      「✗ 自证 packing-deterministic：」
+  REUSE_BREAK=second-run-planned  second-run 那几项也进计划（取得到就复用）
+      「✗ 自证 rp1-two-passes：」
+  REUSE_BREAK=forced-reading-unchecked  强制现判那一条跑完不与库里那一份比读数（RC1 forced）
+      「✗ 自证 forced-reading-check：」
+  REUSE_BREAK=second-run-unchecked  second-run 那几项跑完不比、不入（RC2）
+      「✗ 自证 second-run-check：」
   REUSE_BREAK=pin-moves-ignored  钉值核对不看搬迁登记（pinned_sha256_now 只认逐字节相同）
       「✗ 自证 pin-moves：」
   REUSE_BREAK=frozen-o3-moves-ignored  冻结执行器核对不看搬迁登记（子进程设 FROZEN_O3_BREAK=path-moves-ignored）
@@ -114,25 +92,24 @@ count_reusable_units.py 都从这里取。参照实现是设计员草稿 reuse_k
       「✗ 自证 no-leftover-processes：」
   REUSE_BREAK=temporary-kept  末尾不删临时目录（自证外壳 revision_8_selftest_harness.py 的开关）
       「✗ 自证 temporary-directory-removed：」
-自证只换假件的变量（只在 REUSE_SELFTEST=1 时认）：REUSE_SELFTEST_KILL_AT=before-manifest|before-store|before-row-result:<行目录名>
-  （入库或取用走到那一处时进程给自己发 SIGKILL，RP4、RP5 用）。
+另认 long_run_item_verdicts.py 的弄坏开关 LONG_RUN_ITEMS_BREAK（它文件头；reuse-three-questions 那一格起的 reuse-cells 照它坏）。
 """
 from __future__ import annotations
 
 import argparse
 import contextlib
 import dataclasses
+import glob
+import gzip
 import hashlib
 import importlib.machinery
 import importlib.util
 import io
 import math
 import os
-import random
 import re
 import secrets
 import shutil
-import signal
 import subprocess
 import sys
 import tarfile
@@ -143,59 +120,49 @@ import types
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.append(os.path.join(HERE, "..", "..", "prune-server"))
+sys.path.append(os.path.join(HERE, ".."))   # 实验装置目录：按项判定的那一份 long_run_item_verdicts.py
 import revision_8_selftest_harness as harness  # noqa: E402
 import frozen_o3  # noqa: E402（搬迁登记的读法：钉值核对与冻结执行器核对共用 frozen_o3 那一份）
-import prune_server_client  # noqa: E402（复用库只经它读写 prune-server 那一份：文件头「库」）
+import prune_server_client  # noqa: E402（自证开跑前问在不在临时 prune-server 底下）
+import long_run_item_verdicts as items_library  # noqa: E402（按项判定：键、库、复用哨兵都在它那里，文件头「按项判定」）
 
 BREAK_VARIABLE = "REUSE_BREAK"
 SELFTEST_VARIABLE = "REUSE_SELFTEST"
-KILL_POINT_VARIABLE = "REUSE_SELFTEST_KILL_AT"
 RESEARCH_RELATIVE = "scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes"
+SCRIPT_KEY = f"{RESEARCH_RELATIVE}/reuse_library.py"
 EXECUTOR_RELATIVE = "scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487"
 FREEZE_REFERENCE_RELATIVE = "research/results/e170-r2-o3-spec-executor-2026-11-05-refreeze-executor.out"
 MUTATIONS_TABLE_RELATIVE = "scripts/mutation/tables/e171_three_oracle_collusion_after_the_oracle_fixes.tsv"
-ADMISSION_SCRIPT_RELATIVE = "scripts/gate/admission.py"
 DEVICE_BINARY = "e171_three_oracle_collusion_after_the_oracle_fixes"
 E170_BINARY = "e170_o3_spec_executor_export"
-def shared_reuse_root():
-    """数据根下的 reuse（.claude/hooks/lib_work_root.py 的 shared_data_path，两台同一份）。"""
-    specification = importlib.util.spec_from_file_location("lib_work_root_for_e171_reuse_library",
-                                                           os.path.join(HERE, "..", "..", "..", ".claude", "hooks", "lib_work_root.py"))
-    module = importlib.util.module_from_spec(specification)
-    specification.loader.exec_module(module)
-    return module.shared_data_path("reuse")
-
-
-DEFAULT_LIBRARY_ROOT = os.path.join(shared_reuse_root(), "e171-r1")   # 库根缺省的名字：只当名字与命名空间（文件头「库」），这个目录不建、不读、不写
-LIBRARY_FAMILY = prune_server_client.FAMILY_APPARATUS_ITEMS
-ENTRY_PREFIX, QUARANTINE_PREFIX, ARCHIVE_SUFFIX = "entries/", "quarantine/", ".tar.gz"
-SELFPROOF_AREA = "selfproof"
-KEY_SCHEMA_LINE = "schema e171-r1-reuse-key 1"
-SECTION_ORDER = ("kind", "build", "closure", "env", "mutation", "args", "limit", "upstream", "research", "python")
+KIND = DEVICE_BINARY   # long_run_item_verdicts 的种类（装置名）
 UNIT_KINDS = ("device", "e170", "driver-row", "o3-executor", "mutation-driver")
-# 任务服务设的线程数变量里的八个（取这一张表时 scripts/hosts/ 下线程上限脚本第 22–31 行那一份）：不进 [env]（线程数在键外，第 11.2 节「键外的几样」）
+# 判这一单元的那几个函数与程序（文件头「按项判定」judge:）
+DEVICE_JUDGE = f"{RESEARCH_RELATIVE}/device_timing.py::run_and_time"
+ROW_JUDGE = f"{RESEARCH_RELATIVE}/row_driver.py::run_row_on_the_lane"
+EXECUTOR_JUDGE = f"{RESEARCH_RELATIVE}/frozen_o3.py::run_executor"
+CONTROL_JUDGE = f"{RESEARCH_RELATIVE}/o3_bad_image_judge.py::run_control"
+SELFPROOF_JUDGE = f"{RESEARCH_RELATIVE}/reuse_library.py::selfproof_run"
+EXECUTOR_PROGRAM = f"{EXECUTOR_RELATIVE}/executor_main.py"
+MUTATION_DRIVER_PROGRAM = f"{RESEARCH_RELATIVE}/mutation_driver.py"
+# 任务服务设的线程数变量里的八个（取这一张表时 scripts/hosts/ 下线程上限脚本第 22–31 行那一份）：不当「树里源码读的变量设着」（线程数在键外）
 THREAD_COUNT_VARIABLES = ("CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "SINGLEFS_LAYER0_THREADS", "SINGLEFS_CRASH_INJECTION_THREADS",
                           "SINGLEFS_FAULT_INJECTION_WORKER_THREADS", "SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS",
                           "SINGLEFS_RANDOM_HISTORY_THREADS", "SINGLEFS_THREAD_CAP")
 ENVIRONMENT_NAME_PATTERN = re.compile(r'"(SINGLEFS_[A-Z0-9_]+|KS_[A-Z0-9_]+|RAYON_[A-Z0-9_]+)"')
-# 驱动行运行期闭包（row_driver.py 与它 import 的四份）；两张行表不整份进键（一行只吃自己那一行，在 [mutation]）
-DRIVER_RESEARCH_FILES = ("row_driver.py", "device_timing.py", "frozen_o3.py", "run_directory.py", "bad_implementation_table.py")
-EXECUTOR_RESEARCH_FILES = ("frozen_o3.py", "o3_bad_image_judge.py", "result_lines.py")
-DEVICE_RESEARCH_FILES = ("device_timing.py",)
 SELECTED_ROW_TABLES = ("bad-implementations-step-8.tsv", "bad-implementations-step-4-only.tsv")
-# 改坏的那一处碰到模块集合的，dep-info 认不全（第 11.2 节 RC4 的静态拦）：永远现跑
+# 改坏的那一处碰到模块集合的：未改坏的闭包加变异行原文对不上改坏之后的闭包，拒算、永远现跑
 MODULE_SET_TOKENS = ("mod ", "#[path", "include_str!", "include_bytes!", "include!")
 TIMEOUT_EXIT_CODE = 253
 WRAPPER_OWN_EXIT_CODES = (250, 251, 252, 254)
-# 读数相等（第 11.5 节）：驱动行的 row-result.tsv 去掉这几个键再比
+# 读数相等：驱动行的 row-result.tsv 去掉这几个键再比
 ROW_RESULT_VOLATILE_KEYS = ("copy_ns", "compile_ns", "device_ns", "o3_ns", "lane", "compile_kind", "packages_checked_rebuilt")
 REBUILD_CHECK_FIELD = "packages_checked_rebuilt"
 STATE_FRESH, STATE_REUSED, STATE_FRESH_CHECK, STATE_FRESH_ALWAYS = "fresh", "reused", "fresh-check", "fresh-always"
-FROZEN_FILE = "frozen-by-s18"
-# 复用哨兵（文件头「复用哨兵」）：抽的范围、标记里 sentinel 一项的三种值、强制现判那一条的 reason
-SENTINEL_HIT_WINDOW = 8
-SENTINEL_NONE, SENTINEL_WATCHED, SENTINEL_FORCED = "-", "sentinel", "forced"
-FORCED_REASON = "sentinel-forced"
+SECOND_RUN, SAMPLE_REASON = "second-run", "sample"
+READING_ROLES = ("product", "timing", "directory", "row")   # 读数的几个角色：单元脚本记下的别的角色不是读数，不进值
+FORCED_PREFIX = "强制现判"   # long_run_item_verdicts 的 plan 给复用哨兵抽中的那一条写的缘由的开头
+UNIT_NAME_OUTSIDE_ITEM_NAMES = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def broken(item: str) -> bool:
@@ -205,12 +172,6 @@ def broken(item: str) -> bool:
 def selftest_only(name: str) -> str:
     """只在自证起的子进程里认的换假件变量；平常交回空串。"""
     return os.environ.get(name, "") if os.environ.get(SELFTEST_VARIABLE) == "1" else ""
-
-
-def stop_here_if_asked(point: str) -> None:
-    """自证 RP4、RP5：走到点名的那一处时进程给自己发 SIGKILL（平常不认）。"""
-    if selftest_only(KILL_POINT_VARIABLE) == point:
-        os.kill(os.getpid(), signal.SIGKILL)
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -234,104 +195,13 @@ def files_under(directory: str) -> list[str]:
     return sorted(found)
 
 
-# ── 键（第 11.2 节）──
-class ClosureOutsideTheTree(Exception):
-    """dep-info 里有树外的路径：闭包认不全（S18 ②）。"""
+def item_name(unit: str) -> str:
+    """单元名 → long_run_item_verdicts 的项名（只许字母、数字、. _ -）。"""
+    return UNIT_NAME_OUTSIDE_ITEM_NAMES.sub(".", unit)
 
 
-def dep_info_files(tree: str, dep_info: str) -> list[str]:
-    """dep-info（Makefile 形）第一条规则的依赖，换成相对树根的路径（按真实路径比，#[path] 绕出去又绕回来的也认）；树外的路径抛 ClosureOutsideTheTree。"""
-    with open(dep_info, encoding="utf-8") as handle:
-        text = handle.read().split("\n\n", 1)[0].replace("\\\n", " ")
-    _, dependencies = text.split(": ", 1)
-    root = os.path.realpath(tree) + os.sep
-    files = []
-    for token in re.split(r"(?<!\\) ", dependencies.strip()):
-        token = token.replace("\\ ", " ").strip()
-        if not token:
-            continue
-        real = os.path.realpath(token if os.path.isabs(token) else os.path.join(tree, token))
-        if not real.startswith(root):
-            raise ClosureOutsideTheTree(f"dep-info {dep_info} 里有树外的文件：{token}")
-        files.append(os.path.relpath(real, root.rstrip(os.sep)))
-    return sorted(set(files))
-
-
-def closure_lines(tree: str, files: list[str], overrides: dict[str, bytes]) -> list[str]:
-    """[closure]：每个文件「相对路径 sha256」；overrides 里的文件按给的内容算（驱动行改坏之后的那一份）。"""
-    lines = []
-    for relative in files:
-        digest = sha256_bytes(overrides[relative]) if relative in overrides else sha256_file(os.path.join(tree, relative))
-        lines.append(f"{os.path.join(tree, relative) if broken('location-in-key') else relative} {digest}")
-    return lines
-
-
-def toolchain_text(tree: str) -> str:
-    """cargo -V 与 rustc -vV 原样（在树里起，树里有 rust-toolchain 的照它选）。"""
-    outputs = []
-    for command in (["cargo", "-V"], ["rustc", "-vV"]):
-        completed = subprocess.run(command, cwd=tree, capture_output=True, text=True)
-        if completed.returncode != 0:
-            raise RuntimeError(f"{' '.join(command)} 退 {completed.returncode}：{completed.stderr.strip()}")
-        outputs.append(completed.stdout)
-    return "".join(outputs)
-
-
-_admission_module: dict[str, types.ModuleType] = {}
-
-
-def build_environment_lines(repo: str, tree: str) -> list[str]:
-    """scripts/gate/admission.py 的 build_environment_lines（按路径载入、不写 .pyc）给的构建环境各行：「名字 内容的 sha256」。"""
-    if "module" not in _admission_module:
-        specification = importlib.util.spec_from_file_location("admission_for_reuse_keys", os.path.join(repo, ADMISSION_SCRIPT_RELATIVE))
-        module = importlib.util.module_from_spec(specification)
-        sys.dont_write_bytecode = True
-        sys.modules[specification.name] = module
-        specification.loader.exec_module(module)
-        _admission_module["module"] = module
-    return [f"{name} {sha256_bytes(content)}" for name, content in _admission_module["module"].build_environment_lines(tree)]
-
-
-def build_lines(tree: str, toolchain: str, environment_lines: list[str]) -> list[str]:
-    """[build]：工具链、清单与锁、树里 .cargo/ 下每个文件、构建环境。"""
-    lines = [f"toolchain {sha256_bytes(toolchain.encode('utf-8'))}"]
-    manifests = ["Cargo.toml", "Cargo.lock"] + sorted(os.path.join("crates", name, "Cargo.toml") for name in os.listdir(os.path.join(tree, "crates"))
-                                                    if os.path.isfile(os.path.join(tree, "crates", name, "Cargo.toml")))
-    lines += [f"{relative} {sha256_file(os.path.join(tree, relative))}" for relative in manifests]
-    cargo_directory = os.path.join(tree, ".cargo")
-    if os.path.isdir(cargo_directory):
-        lines += [f".cargo/{relative} {sha256_file(os.path.join(cargo_directory, relative))}" for relative in files_under(cargo_directory)]
-    else:
-        lines.append(".cargo absent")
-    return lines + [f"environment {line}" for line in environment_lines]
-
-
-def environment_names_in(tree: str, files: list[str]) -> list[str]:
-    names: set[str] = set()
-    for relative in files:
-        with open(os.path.join(tree, relative), encoding="utf-8", errors="replace") as handle:
-            names |= set(ENVIRONMENT_NAME_PATTERN.findall(handle.read()))
-    return sorted(names - set(THREAD_COUNT_VARIABLES))
-
-
-def environment_lines(names: list[str], environment: dict[str, str]) -> list[str]:
-    """[env]：闭包里按名字读的每个变量此刻设没设。"""
-    return [f"{name} {'set' if name in environment else 'unset'}" for name in names]
-
-
-def research_lines(repo: str, relative_paths: list[str]) -> list[str]:
-    """[research]：每个文件（目录就是它底下每个文件）「相对仓根的路径 sha256」。"""
-    lines = []
-    for relative in sorted(set(relative_paths)):
-        path = os.path.join(repo, relative)
-        if os.path.isdir(path):
-            lines += [f"{os.path.join(relative, inner)} {sha256_file(os.path.join(path, inner))}" for inner in files_under(path)]
-        else:
-            lines.append(f"{relative} {sha256_file(path)}")
-    return lines
-
-
-# [args] 不进键的那几项（带一个值）：输出与工作的落点、线程、线道，与已经在别的节里的输入（树进 [closure]、基线计时进 [limit]、上游进 [upstream]）
+# ── 请求里的内容输入（文件头「按项判定」line:）──
+# 参数里不进键的那几项（带一个值）：输出与工作的落点、线程、线道，与已经在别的 line: 里的输入（树是入口闭包、基线计时是限时、上游是上游的摘要）
 VOLATILE_ARGUMENT_OPTIONS = ("--output-directory", "--dump-directory", "--output-root", "--work-root", "--threads", "--lanes",
                              "--timing-output", "--baseline-timing", "--snapshot-from", "--repo-root", "--o3-control-bad-states", "--other-selected-rows")
 
@@ -348,51 +218,42 @@ def normalized_arguments(words: list[str]) -> str:
     return " ".join(kept)
 
 
-def limit_lines(seconds: int | None) -> list[str]:
-    """[limit]：逐行限时 L 的秒数；不限时记 none。"""
-    if seconds is None:
-        return ["none"]
-    return [f"seconds {seconds}"]
+def reading_digest(location: str) -> str:
+    """一份读数（文件或目录）的摘要：文件按内容；目录按每个文件「相对路径 内容的 sha256」排好的那几行。不在写「不在」。"""
+    if os.path.isdir(location):
+        return sha256_bytes("".join(f"{relative} {sha256_file(os.path.join(location, relative))}\n" for relative in files_under(location)).encode("utf-8"))
+    return sha256_file(location) if os.path.isfile(location) else "不在"
 
 
-def upstream_lines(upstream: list[tuple[str, str, str]]) -> list[str]:
-    """[upstream]：(角色, 上游读数单元名, 上游读数的目录或文件) → 角色与上游读数每个文件的 sha256（按内容，不按上游的键）。"""
-    lines = []
-    for role, unit_name, location in upstream:
-        if os.path.isdir(location):
-            lines += [f"{role} {relative} {sha256_file(os.path.join(location, relative))}" for relative in files_under(location)]
-        else:
-            lines += [f"{role} {os.path.basename(location)} {sha256_file(location)}"]
-    return lines
+def upstream_tokens(upstream: list[tuple[str, str]]) -> list[str]:
+    """(角色, 上游读数的目录或文件) → line:upstream:<角色>=<摘要>（按读数的内容，不按上游的键）。"""
+    if broken("upstream-unkeyed"):
+        return []
+    return [f"line:upstream:{role}={reading_digest(location)}" for role, location in upstream]
 
 
-def key_text(sections: dict[str, list[str]]) -> str:
-    unknown = set(sections) - set(SECTION_ORDER)
-    if unknown:
-        raise ValueError(f"认不得的节：{sorted(unknown)}")
-    lines = [KEY_SCHEMA_LINE]
-    for name in SECTION_ORDER:
-        if broken(f"drop-{name}"):
-            continue
-        lines.append(f"[{name}]")
-        values = list(sections.get(name, []))
-        lines.extend(values if name == "args" else sorted(values))
-    return "\n".join(lines) + "\n"
+def limit_tokens(seconds: int | None) -> list[str]:
+    """逐行限时 L 的秒数；不限时的单元写 none。"""
+    if broken("limit-unkeyed"):
+        return []
+    return [f"line:limit-seconds={'none' if seconds is None else seconds}"]
 
 
-def key_of(sections: dict[str, list[str]]) -> str:
-    return sha256_bytes(key_text(sections).encode("utf-8"))
+def kind_tokens(kind: str) -> list[str]:
+    return [] if broken("kind-unkeyed") else [f"line:kind={kind}"]
 
 
-def first_differing_section(first: dict[str, list[str]], second: dict[str, list[str]]) -> str:
-    for name in SECTION_ORDER:
-        if sorted(first.get(name, [])) != sorted(second.get(name, [])):
-            return name
-    return "-"
+def arguments_tokens(text: str) -> list[str]:
+    return [] if broken("arguments-unkeyed") else [f"line:arguments={text}"]
 
 
-def python_text() -> str:
-    return subprocess.run([sys.executable, "-VV"], capture_output=True, text=True).stdout.strip()
+def judge_tokens(judges: list[str]) -> list[str]:
+    return [] if broken("judges-dropped") else [f"judge:{judge}" for judge in judges]
+
+
+def freeze_reference_lines(item: str) -> list[str]:
+    """跑冻结执行器的项：冻结行那份产物经 @input 进键（long_run_item_verdicts 文件头「请求文件」）。"""
+    return [] if broken("freeze-reference-unkeyed") else [f"@input\t{item}\tfreeze-reference\t{FREEZE_REFERENCE_RELATIVE}"]
 
 
 # ── 单元表（第 11.1 节读数单元表；名字照 segment_one_units_revision_8.py 的 unit_table 与两份逐行编排器）──
@@ -496,10 +357,10 @@ _pinned_modules: dict[str, types.ModuleType] = {}
 # 用全部登记行倒换（不只此刻生效的）：换回去之后逐字节等于钉住的那一版，此刻与它就只差登记过的前缀；还改了别处的换回去也对不上。登记表不在或没有内容行时与改前逐字节同判。
 # 关不住的一种：登记表里留着一行老行（旧前缀下已没有文件、新前缀是早就在的另一份实现），再加一行真搬迁，钉住的文件改指那一份早就在的实现，换回去照样等于钉值，这里认；
 # 门禁一侧这份文件照算改动，要人看（.claude/rules/path-moves.md「门禁管哪一半」）。换算只认仓根起的前缀（lib-lag-baseline.py 文件头「搬迁登记」）。
-ORCHESTRATOR_SHA256 = "2b8fbdcc321cde368524d3c86a6486cfa01b9be6db3253ba4d84a3ec2a1f608f"
-SEGMENT_TWO_ORCHESTRATOR_SHA256 = "50d59d280fac19e7a935b22d05b74b66f71d8ba0b4ffbd8a4765ece1efbb45ca"
+ORCHESTRATOR_SHA256 = "00ffd24c3a85361f0ff0355c4ac2cc2efded989c308842f1b2ac6a5ca85b076b"
+SEGMENT_TWO_ORCHESTRATOR_SHA256 = "ce9ef2766680cb2305221020d03419b5ff49e447293e61b4a3098a9be6274964"
 # 冻结的修订 8（rows_orchestrator_revision_8.py 的 CROSS_HOST_CHECK_SHA256）钉的跨机对照入口：载入修订 8 时同样按此刻认不认换
-CROSS_HOST_CHECK_SHA256 = "1f6e39b245a203c6869107dca70b03a52fdf5e457529e2b9ada7bbdb1d5a488b"
+CROSS_HOST_CHECK_SHA256 = "7d071b620fed9861b2cb1f2c5a791c8741fd3979aec0cbb88042bca463bd1b20"
 PIN_REPOSITORY_ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))   # 搬迁登记表从这一个仓根取
 # 钉住的编排器：模块名 → 路径、模块名 → sha256 两张表（路径表照字面拼，函数单元库认得出载的是哪几份）；PINNED_REPINS 是载入时正文里要换的钉值（现算）
 PINNED_PATHS = {"rows_orchestrator_1dcfb8d0": os.path.join(HERE, "rows_orchestrator.py"),
@@ -630,339 +491,265 @@ def selected_row_lines(repo: str) -> dict[int, str]:
     return lines
 
 
-# ── 一棵树上各单元的键 ──
+# ── 一棵冻结树上各单元的请求（文件头「按项判定」）──
 @dataclasses.dataclass
-class TreeInputs:
-    """一棵树上算键要的、与单元无关的几样（每趟现算一次）。closure_files：装置 bin（device）与 E170 导出 bin（e170）各自 dep-info 列的文件。
-    hypothetical_change 只给计数脚本：假想那一个文件（相对树根）改了，它在 [closure] 或 [build] 里那一行换成另一个值。"""
+class TreeFacts:
+    """一棵冻结树上与单元无关的几样（每趟现算一次）：入口相对树根的路径（找不到是 None）、此刻设着的、树里源码按名字读的变量、变异表。"""
     repo: str
     tree: str
-    closure_files: dict[str, list[str]]
-    build: list[str]
-    environment_names: dict[str, list[str]]
-    python: str
-    environment: dict[str, str]
-    mutation_rows: dict[str, object]
-    mutation_name_counts: dict[str, int]
-    hypothetical_change: str | None = None
-
-    def changed(self, line: str) -> str:
-        return f"{line.split(' ', 1)[0]} changed-{sha256_bytes(line.encode('utf-8'))[:16]}" if line.split(" ", 1)[0] == self.hypothetical_change else line
-
-    def closure(self, binary: str, overrides: dict[str, bytes] | None = None) -> list[str]:
-        return [self.changed(line) for line in closure_lines(self.tree, self.closure_files[binary], overrides or {})]
-
-    def build_section(self) -> list[str]:
-        return [self.changed(line) for line in self.build]
-
-    def environment_section(self, binary: str) -> list[str]:
-        return environment_lines(self.environment_names[binary], self.environment)
+    tree_relative: str
+    device_entry: str | None
+    e170_entry: str | None
+    environment_set: list[str]
+    mutation_rows: dict
+    mutation_name_counts: dict
 
 
-def tree_inputs(repo: str, tree: str, dep_infos: dict[str, str], toolchain: str, python: str, environment: dict[str, str],
-                build_environment: list[str], hypothetical_change: str | None = None) -> TreeInputs:
-    """dep_infos：device / e170 → 那个 bin 的 dep-info（树里 target/release/<bin>.d）。树外路径抛 ClosureOutsideTheTree（S18 ②）。"""
+def bin_entry(tree: str, binary: str) -> str | None:
+    """树里 crates/*/src/bin/<bin>.rs 恰好一份：交它相对树根的路径；没有或不止一份交 None（那几项照 entry-not-found 拒算）。"""
+    found = sorted(glob.glob(os.path.join(tree, "crates", "*", "src", "bin", binary + ".rs")))
+    return os.path.relpath(found[0], tree) if len(found) == 1 else None
+
+
+def environment_names_in(tree: str) -> list[str]:
+    """树里 crates 下每份 .rs 按名字读的 SINGLEFS_、KS_、RAYON_ 字面量，去掉任务服务设的线程数变量那八个。"""
+    names: set[str] = set()
+    for directory, subdirectories, files in os.walk(os.path.join(tree, "crates")):
+        subdirectories[:] = sorted(name for name in subdirectories if name != "target")
+        for name in files:
+            if name.endswith(".rs"):
+                with open(os.path.join(directory, name), encoding="utf-8", errors="replace") as handle:
+                    names |= set(ENVIRONMENT_NAME_PATTERN.findall(handle.read()))
+    return sorted(names - set(THREAD_COUNT_VARIABLES))
+
+
+def tree_facts(repo: str, tree: str, environment: dict[str, str]) -> TreeFacts:
+    """tree 是绝对路径或相对 repo 的路径；environment 是这一趟起单元的环境（判 env-set）。"""
     import bad_implementation_table  # noqa: E402（本目录）
-    files = {binary: dep_info_files(tree, path) for binary, path in dep_infos.items()}
-    rows = bad_implementation_table.read_mutation_rows(os.path.join(tree, "crates", "mutations.tsv"))
+    absolute_repo = os.path.abspath(repo)
+    absolute = tree if os.path.isabs(tree) else os.path.join(absolute_repo, tree)
+    rows = bad_implementation_table.read_mutation_rows(os.path.join(absolute, "crates", "mutations.tsv"))
     counts: dict[str, int] = {}
     for row in rows:
         counts[row.name] = counts.get(row.name, 0) + 1
-    return TreeInputs(repo, tree, files, build_lines(tree, toolchain, build_environment),
-                      {binary: environment_names_in(tree, listed) for binary, listed in files.items()}, python, environment,
-                      {row.name: row for row in rows}, counts, hypothetical_change)
+    names = [] if broken("environment-set-ignored") else environment_names_in(absolute)
+    return TreeFacts(absolute_repo, absolute, os.path.relpath(absolute, absolute_repo), bin_entry(absolute, DEVICE_BINARY), bin_entry(absolute, E170_BINARY),
+                     [name for name in names if name in environment], {row.name: row for row in rows}, counts)
 
 
-def reading_unit_sections(inputs: TreeInputs, unit: ReadingUnit, upstream: list[str]) -> dict[str, list[str]]:
-    """装置、E170 导出装置、执行器、变异驱动的一个读数单元的十节（upstream 是 upstream_lines 给的，或计数脚本给的上游键）。"""
+@dataclasses.dataclass
+class UnitRequest:
+    """一个单元的请求：lines 是 long_run_item_verdicts 请求文件里这一项的几行；reason 不空是这一层自己拒算（文件头「按项判定」），不进计划；
+    facts 是别的台那三样核对要的（驱动的一行：row、mutation_line_sha256、limit_seconds）。"""
+    unit: str
+    kind: str
+    item: str
+    lines: list[str]
+    reason: str = ""
+    facts: dict = dataclasses.field(default_factory=dict)
+
+
+def tree_refusal(facts: TreeFacts, entry: str | None) -> str:
+    """树那一侧拒算的缘由（文件头「按项判定」那一串的前三样），没有交空串。"""
+    if facts.tree_relative.startswith(".."):
+        return "tree-outside-the-repository"
+    if entry is None:
+        return "entry-not-found"
+    return "env-set" if facts.environment_set else ""
+
+
+def program_tokens(facts: TreeFacts, entry: str | None) -> list[str]:
+    """装置那一侧的入口：被判的冻结树里那个 bin 的 main。弄坏开关 location-in-key 下另写树的绝对路径。"""
+    location = [f"line:location={facts.tree}"] if broken("location-in-key") else []
+    return [f"{entry or '-'}::main", f"root:{facts.tree_relative}", "profile:release", *location]
+
+
+def research_files_lines(repo: str, item: str) -> list[str]:
+    """变异驱动：研究一侧目录每个文件（不含 __pycache__）各一条 @files（按内容进键）。"""
+    return [f"@files\t{item}\t{os.path.join(RESEARCH_RELATIVE, relative)}" for relative in files_under(os.path.join(repo, RESEARCH_RELATIVE))]
+
+
+def reading_unit_request(facts: TreeFacts, unit: ReadingUnit, upstream: list[tuple[str, str]]) -> UnitRequest:
+    """装置、E170 导出装置、执行器、变异驱动的一个读数单元。upstream 是 (角色, 上游读数的目录或文件)。"""
+    item = item_name(unit.name)
+    contents = (kind_tokens(unit.kind) + arguments_tokens(normalized_arguments(unit.arguments.split())) + limit_tokens(None) + upstream_tokens(upstream)
+                + ["line:compare=timing"])
     if unit.kind in ("device", "e170"):
-        binary = "e170" if unit.kind == "e170" else "device"
-        return {"kind": [unit.kind], "build": inputs.build_section(), "closure": inputs.closure(binary), "env": inputs.environment_section(binary),
-                "args": [normalized_arguments(unit.arguments.split())], "limit": limit_lines(None), "upstream": upstream,
-                "research": research_lines(inputs.repo, [os.path.join(RESEARCH_RELATIVE, name) for name in DEVICE_RESEARCH_FILES]),
-                "python": [inputs.python]}
-    if unit.kind == "o3-executor":
-        return {"kind": [unit.kind], "args": [normalized_arguments(unit.arguments.split())], "limit": limit_lines(None), "upstream": upstream,
-                "research": executor_research(inputs.repo), "python": [inputs.python]}
-    if unit.kind == "mutation-driver":
-        return {"kind": [unit.kind], "args": [unit.arguments], "limit": limit_lines(None),
-                "research": research_lines(inputs.repo, [RESEARCH_RELATIVE, unit.arguments]), "python": [inputs.python]}
-    raise ValueError(f"认不得的单元种类：{unit.kind}")
+        entry = facts.device_entry if unit.kind == "device" else facts.e170_entry
+        reason = tree_refusal(facts, entry) or (SECOND_RUN if unit.fresh_always else "")
+        lines = ["\t".join([item, *program_tokens(facts, entry), *judge_tokens([DEVICE_JUDGE]), *contents])]
+    elif unit.kind == "o3-executor":
+        judge = CONTROL_JUDGE if unit.arguments.split()[0] == "control" else EXECUTOR_JUDGE
+        reason = SECOND_RUN if unit.fresh_always else ""
+        lines = ["\t".join([item, EXECUTOR_PROGRAM, *judge_tokens([judge]), *contents])] + freeze_reference_lines(item)
+    elif unit.kind == "mutation-driver":
+        reason = SECOND_RUN if unit.fresh_always else ""
+        lines = ["\t".join([item, MUTATION_DRIVER_PROGRAM, *contents])] + research_files_lines(facts.repo, item) + [f"@files\t{item}\t{unit.arguments}"]
+    else:
+        raise ValueError(f"认不得的单元种类：{unit.kind}")
+    return UnitRequest(unit.name, unit.kind, item, lines, reason)
 
 
-def executor_research(repo: str) -> list[str]:
-    return research_lines(repo, [EXECUTOR_RELATIVE, FREEZE_REFERENCE_RELATIVE] + [os.path.join(RESEARCH_RELATIVE, name) for name in EXECUTOR_RESEARCH_FILES])
-
-
-def driver_research(repo: str, executor: bool) -> list[str]:
-    lines = research_lines(repo, [os.path.join(RESEARCH_RELATIVE, name) for name in DRIVER_RESEARCH_FILES])
-    return lines + executor_research(repo) if executor else lines
-
-
-def row_sections(inputs: TreeInputs, row: RowUnit, selected_lines: dict[int, str], limit: list[str], upstream: list[str]) -> tuple[dict[str, list[str]], str]:
-    """驱动的一行的十节（第 11.2、11.3 节），与永远现跑的缘由（不是就交回空串）：second-run（RC2）、not-located（按名字取不到或不唯一）、
-    anchor-not-once（锚点不是恰 1 次）、touches-module-set（改坏那一处碰到模块集合，dep-info 认不全）。后三样要补位，读别的行用过的补位名。"""
+def row_request(facts: TreeFacts, row: RowUnit, selected_lines: dict[int, str], limit_seconds: int | None, upstream: list[tuple[str, str]]) -> UnitRequest:
+    """驱动的一行。拒算的缘由按文件头「按项判定」那一串的次序取第一样。"""
     import bad_implementation_table  # noqa: E402（本目录）
+    item = item_name(row.name)
     selected = selected_lines.get(row.number)
     name = (selected_lines[1].split("\t")[4] if row.empty else selected.split("\t")[4]) if (row.empty or selected) else None
-    overrides: dict[str, bytes] = {}
-    reason = "second-run" if row.second_run else ""
-    mutation = inputs.mutation_rows.get(name) if name else None
-    if mutation is None or inputs.mutation_name_counts.get(name, 0) != 1:
-        mutation_lines = [f"row {row.number}", f"selected {selected or '-'}", "mutation not-located"]
+    reason = tree_refusal(facts, facts.device_entry) or (SECOND_RUN if row.second_run else "")
+    mutation = facts.mutation_rows.get(name) if name else None
+    row_facts: dict[str, object] = {"row": row.number, "limit_seconds": limit_seconds}
+    contents = kind_tokens("driver-row") + [f"line:row={row.number}"]
+    if not broken("mutation-unkeyed"):
+        contents.append(f"line:selected-row-sha256={sha256_bytes((f'empty-of {name}' if row.empty else (selected or '-')).encode('utf-8'))}")
+    if mutation is None or facts.mutation_name_counts.get(name, 0) != 1:
         reason = reason or "not-located"
     else:
-        text = open(os.path.join(inputs.tree, mutation.file), encoding="utf-8").read()
+        with open(os.path.join(facts.tree, mutation.file), encoding="utf-8") as handle:
+            text = handle.read()
         applied = bad_implementation_table.empty_mutation(mutation) if row.empty else mutation
         if bad_implementation_table.anchor_hit_count(text, applied) != 1:
             reason = reason or "anchor-not-once"
-        else:
-            overrides[mutation.file] = bad_implementation_table.apply_mutation(text, applied).encode("utf-8")
-        if any(token in mutation.original_text() + mutation.replacement_text() for token in MODULE_SET_TOKENS):
+        if not broken("module-set-keyed") and any(token in mutation.original_text() + mutation.replacement_text() for token in MODULE_SET_TOKENS):
             reason = reason or "touches-module-set"
-        mutation_lines = [f"row {row.number}", f"selected {'empty-of ' + name if row.empty else selected}", f"mutation {mutation.raw_line}"]
-    sections = {"kind": ["driver-row"], "build": inputs.build_section(), "closure": inputs.closure("device", overrides),
-                "env": inputs.environment_section("device"), "mutation": mutation_lines, "args": [normalized_arguments(list(row.flags))],
-                "limit": limit, "upstream": upstream, "research": driver_research(inputs.repo, row.executor), "python": [inputs.python]}
-    return sections, reason
+        row_facts["mutation_line_sha256"] = sha256_bytes(mutation.raw_line.encode("utf-8"))
+        if not broken("mutation-unkeyed"):
+            contents.append(f"line:mutation-sha256={row_facts['mutation_line_sha256']}")
+    contents += arguments_tokens(normalized_arguments(list(row.flags))) + limit_tokens(limit_seconds) + upstream_tokens(upstream) + ["line:compare=timing"]
+    judges = [ROW_JUDGE] + ([EXECUTOR_PROGRAM] if row.executor else [])
+    lines = ["\t".join([item, *program_tokens(facts, facts.device_entry), *judge_tokens(judges), *contents])]
+    if row.executor:
+        lines += freeze_reference_lines(item)
+    return UnitRequest(row.name, "driver-row", item, lines, reason, row_facts)
 
 
-def mutated_closure_paths(inputs: TreeInputs) -> tuple[str, ...]:
-    """RC4 比的路径集合：装置 bin 的 dep-info 列的那一组（改坏只改内容、不改文件集合）。"""
-    return tuple(inputs.closure_files["device"])
+def unit_request(facts: TreeFacts, unit, selected_lines: dict[int, str], limit_seconds: int | None = None,
+                 upstream: tuple[tuple[str, str], ...] = ()) -> UnitRequest:
+    """读数单元走 reading_unit_request，驱动的一行走 row_request（limit_seconds 只给行）。"""
+    if isinstance(unit, RowUnit):
+        return row_request(facts, unit, selected_lines, limit_seconds, list(upstream))
+    return reading_unit_request(facts, unit, list(upstream))
 
 
-# ── 复用库（第 11.5 节）──
+def requests_text(requests: list[UnitRequest]) -> str:
+    return "".join(line + "\n" for request in requests for line in request.lines)
+
+
+def keyed_items(repo: str, requests: list[UnitRequest]) -> dict[str, tuple[str | None, str]]:
+    """{单元: (键或 None, 拒算说明)}：照 long_run_item_verdicts 的 plan 那样解析请求、自证底下换假入口、算键，不查库（RC2 那几项、plan 子命令、计数脚本用）。"""
+    if not requests:
+        return {}
+    items_library.require_selftest_variables_allowed()
+    parsed = items_library.parse_requests(requests_text(requests), "请求")
+    if os.environ.get(items_library.SUBSTITUTION_VARIABLE):
+        items_library.substitute_entries(parsed, os.environ[items_library.SUBSTITUTION_VARIABLE])
+    keyed = items_library.item_keys(repo, parsed)
+    return {request.unit: (keyed[request.item][0], keyed[request.item][2]) for request in requests}
+
+
+# ── 判定库：只经 long_run_item_verdicts 读写（文件头「按项判定」）──
 class RunCondition(Exception):
-    """运行条件不满足（三层编排的 H30 库根、H31、干跑配置这一类）：调用方退 78。"""
+    """运行条件不满足（三层编排的 H31、干跑配置这一类）：调用方退 78。"""
 
 
-class CorruptedEntry(Exception):
-    """RC5：条目的读数与 manifest.sha256 对不上（已挪进 quarantine/），或条目不在库里。"""
+def library_store(repo: str):
+    """prune-server 里这个种类那一份（long_run_item_verdicts 的 library_of、library_directory：命名空间只在临时服务底下给）。"""
+    return items_library.library_of(KIND, items_library.library_directory(repo))
 
 
-def link_or_copy(source: str, destination: str) -> None:
-    try:
-        os.link(source, destination)
-    except OSError:
-        shutil.copy2(source, destination)
+def stored_value(repo: str, key: str) -> bytes | None:
+    """库里这把键判绿、产物读得回且 sha256 对得上的那一份值；别的交 None。"""
+    store = library_store(repo)
+    record = items_library.parsed_record(store.read(items_library.verdict_relative(key)), key)
+    if record is None or record.get("verdict") != "green":
+        return None
+    output = store.read(items_library.output_relative(key))
+    return output if output is not None and sha256_bytes(output) == record.get("output_sha256") else None
 
 
-def link_reading(source: str, destination: str, last_file: str | None = None) -> None:
-    """文件硬链接过去；目录逐个文件硬链接（last_file 那一个最后链：行目录的 row-result.tsv）。目标已在就拒。"""
-    if os.path.lexists(destination):
-        raise FileExistsError(f"已存在、不覆盖：{destination}")
-    if os.path.isfile(source):
-        os.makedirs(os.path.dirname(destination), exist_ok=True)
-        link_or_copy(source, destination)
-        return
-    inner = files_under(source)
-    for relative in sorted(inner, key=lambda path: path == last_file):
-        if relative == last_file:
-            stop_here_if_asked(f"before-row-result:{os.path.basename(destination)}")
-        os.makedirs(os.path.dirname(os.path.join(destination, relative)), exist_ok=True)
-        link_or_copy(os.path.join(source, relative), os.path.join(destination, relative))
-    os.makedirs(destination, exist_ok=True)
+def store_green(repo: str, key: str, item: str, exit_code: int, output: bytes) -> None:
+    """RC2：second-run 那一项库里还没有判绿的，照判绿写进去（long_run_item_verdicts.write_record）。"""
+    items_library.write_record(library_store(repo), key, item, "green", exit_code, items_library.COMPARE_TIMING, SCRIPT_KEY, output)
 
 
-def manifest_text(entry: str) -> str:
-    reading = os.path.join(entry, "reading")
-    return "".join(f"{sha256_file(os.path.join(reading, relative))}  reading/{relative}\n" for relative in files_under(reading))
+def withdraw(repo: str, key: str, item: str, reason: str) -> None:
+    """S18：这把键照同一条写 red（记红撤绿），下一趟现判。"""
+    items_library.write_record(library_store(repo), key, item, "red", -1, items_library.COMPARE_TIMING, SCRIPT_KEY, reason=reason)
 
 
-def manifest_problems(entry: str) -> list[str]:
-    """RC5：manifest.sha256 在、列的每个文件 sha256 对、reading/ 下不多不少。交回不符的那几样（空表是好的）。"""
-    path = os.path.join(entry, "manifest.sha256")
-    if not os.path.isfile(path):
-        return ["manifest-missing"]
-    listed, problems = {}, []
-    for line in open(path, encoding="utf-8"):
-        digest, relative = line.rstrip("\n").split("  ", 1)
-        listed[relative] = digest
-    present = {f"reading/{relative}" for relative in files_under(os.path.join(entry, "reading"))}
-    problems += [f"extra:{relative}" for relative in sorted(present - set(listed))]
-    for relative, digest in sorted(listed.items()):
-        full = os.path.join(entry, relative)
-        if not os.path.isfile(full):
-            problems.append(f"missing:{relative}")
-        elif sha256_file(full) != digest:
-            problems.append(f"sha256:{relative}")
-    return problems
+def check_service_reachable(repo: str) -> None:
+    """运行条件：prune-server 连得上。连不上客户端退 75（PruneServerFailure 是 SystemExit），不当「库里没有」现判。"""
+    library_store(repo).read(items_library.verdict_relative("service-reachable"))
 
 
-def entry_problems(entry: str) -> list[str]:
-    """取用之前与查库时都走这一处（RC5）。"""
-    if broken("manifest-unchecked"):
-        return []
-    problems = manifest_problems(entry)
-    return problems
+# ── 值：读数确定地打成的 tar（文件头「按项判定」）──
+def entries_under(directory: str) -> list[str]:
+    """目录下每个子目录与文件相对目录的路径，排好序（目录排在它底下的文件前面）。"""
+    found = []
+    for root, directories, names in os.walk(directory):
+        directories[:] = sorted(directories)
+        found += [os.path.relpath(os.path.join(root, name), directory) for name in directories + names]
+    return sorted(found)
 
 
-def read_meta(entry: str) -> dict[str, str]:
-    path = os.path.join(entry, "meta.tsv")
-    return dict(line.rstrip("\n").split("\t", 1) for line in open(path, encoding="utf-8") if "\t" in line) if os.path.exists(path) else {}
+def packed_reading(reading: dict[str, str]) -> bytes:
+    """读数（角色 → 文件或目录）打成一份 tar（gzip）：成员是「<角色>」与「<角色>/<相对路径>」，按名字排；修改时刻与属主置 0，文件权限只分有没有执行位，
+    gzip 头的时刻置 0。同一份读数两次打出逐字节相同。弄坏开关 packing-keeps-times 下照原文件的修改时刻与此刻打。"""
+    keep_times = broken("packing-keeps-times")
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w", format=tarfile.GNU_FORMAT) as archive:
+        for role in sorted(reading):
+            source = reading[role]
+            members = [(role, source)] + ([(f"{role}/{relative}", os.path.join(source, relative)) for relative in entries_under(source)] if os.path.isdir(source) else [])
+            for name, path in members:
+                info = tarfile.TarInfo(name)
+                info.mtime = int(os.stat(path).st_mtime) if keep_times else 0
+                info.uid = info.gid = 0
+                info.uname = info.gname = ""
+                if os.path.isdir(path):
+                    info.type, info.mode = tarfile.DIRTYPE, 0o755
+                    archive.addfile(info)
+                    continue
+                with open(path, "rb") as handle:
+                    data = handle.read()
+                info.size, info.mode = len(data), 0o755 if os.access(path, os.X_OK) else 0o644
+                archive.addfile(info, io.BytesIO(data))
+    return gzip.compress(raw.getvalue(), mtime=None if keep_times else 0)
 
 
-def entry_reading(entry: str) -> dict[str, str]:
-    reading = os.path.join(entry, "reading")
-    return {role: os.path.join(reading, role) for role in sorted(os.listdir(reading))} if os.path.isdir(reading) else {}
+def value_roles(value: bytes) -> list[str]:
+    """值里有哪几个角色（成员名第一段）。"""
+    with tarfile.open(fileobj=io.BytesIO(value), mode="r:gz") as archive:
+        return sorted({member.name.split("/", 1)[0] for member in archive.getmembers()})
 
 
-def packed_entry(directory: str) -> bytes:
-    """拼好的条目目录（key.txt、reading/、meta.tsv、manifest.sha256）打成一份 tar（gzip），就是服务里那一条的值（文件头「库」）。"""
-    buffer = io.BytesIO()
-    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
-        for name in sorted(os.listdir(directory)):
-            archive.add(os.path.join(directory, name), arcname=name)
-    return buffer.getvalue()
-
-
-class Library:
-    """H30 的复用库：prune-server 里 apparatus-items 族、种类 DEVICE_BINARY 那一份（文件头「库」）。root 只当名字与命名空间；
-    area 是这一份另占的那一层相对路径（RP2 一趟一份，空串是整个库）。frozen-by-s18 在时不取、不入（S18：库冻住，直到主 agent 查出漏的输入、键 schema 加一或另判）。"""
-
-    def __init__(self, root: str, area: str = "") -> None:
-        self.root = root
-        self.area = area
-        self.store = prune_server_client.LibraryStore(LIBRARY_FAMILY, DEVICE_BINARY, root)
-
-    def relative(self, name: str) -> str:
-        return self.area + name
-
-    def entry_name(self, key: str) -> str:
-        return self.relative(f"{ENTRY_PREFIX}{key}{ARCHIVE_SUFFIX}")
-
-    def location(self) -> str:
-        return self.store.location() + self.area
-
-    def frozen_reason(self) -> str | None:
-        data = self.store.read(self.relative(FROZEN_FILE))
-        return (data.decode("utf-8", "replace").strip() or "frozen") if data is not None else None
-
-    def freeze(self, reason: str) -> None:
-        earlier = self.store.read(self.relative(FROZEN_FILE)) or b""
-        self.store.write(self.relative(FROZEN_FILE), earlier + (reason.replace("\n", " ") + "\n").encode("utf-8"))
-
-    def check_service_reachable(self) -> None:
-        """运行条件（第 11.9 节）：prune-server 连得上。连不上客户端抛 PruneServerFailure（退 75），不当「库里没有」现判。"""
-        self.store.read(self.relative(FROZEN_FILE))
-
-    def archive(self, key: str) -> bytes | None:
-        return self.store.read(self.entry_name(key))
-
-    def present(self, key: str) -> bool:
-        return self.archive(key) is not None
-
-    @contextlib.contextmanager
-    def extracted(self, key: str, archive: bytes | None = None):
-        """库里这把键的条目解进一个临时目录（中转，出 with 就删）：交 (目录, 解不开的一句)；库里没有交 (None, "absent")，解不开交 (None, 那一句)。"""
-        archive = self.archive(key) if archive is None else archive
-        if archive is None:
-            yield None, "absent"
-            return
-        directory = tempfile.mkdtemp(prefix="e171-reuse-entry-")
+def unpack_reading(value: bytes, targets: dict[str, str]) -> None:
+    """值按角色解到这一趟的名字（targets：角色 → 目标路径）：每个角色先解进目标旁边的中转目录，再一次改名换上（行目录整份一起出现）；
+    目标已在（FileExistsError）、值里没有这个角色（ValueError）都拒，拒的时候一个目标都不写。"""
+    present = [target for target in targets.values() if os.path.lexists(target)]
+    if present:
+        raise FileExistsError(f"已存在、不覆盖：{', '.join(sorted(present))}")
+    missing = sorted(set(targets) - set(value_roles(value)))
+    if missing:
+        raise ValueError(f"值里没有角色 {','.join(missing)}")
+    for role, target in sorted(targets.items()):
+        parent = os.path.dirname(os.path.abspath(target))
+        os.makedirs(parent, exist_ok=True)
+        staging = tempfile.mkdtemp(prefix=".reuse-unpack-", dir=parent)
         try:
-            try:
-                with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as handle:
-                    handle.extractall(directory, filter="data")
-            except (tarfile.TarError, OSError, EOFError) as error:
-                yield None, f"archive-unreadable:{type(error).__name__}"
-                return
-            yield directory, ""
+            with tarfile.open(fileobj=io.BytesIO(value), mode="r:gz") as archive:
+                members = [member for member in archive.getmembers() if member.name == role or member.name.startswith(role + "/")]
+                archive.extractall(staging, members=members, filter="data")
+            os.rename(os.path.join(staging, role), target)
         finally:
-            shutil.rmtree(directory, ignore_errors=True)
-
-    def quarantine(self, key: str, archive: bytes) -> str:
-        """RC5 不符的条目原样挪进 quarantine/（写一份、删掉 entries/ 那一条）；交回它在 quarantine/ 下的相对路径。"""
-        destination = self.relative(f"{QUARANTINE_PREFIX}{key}-{time.time_ns()}{ARCHIVE_SUFFIX}")
-        self.store.write(destination, archive)
-        self.store.delete_prefix(self.entry_name(key))
-        return destination
-
-    def entry_keys(self) -> list[str]:
-        """库里每一条条目的键（自证数条数用）。"""
-        prefix = self.relative(ENTRY_PREFIX)
-        return [relative[len(prefix):-len(ARCHIVE_SUFFIX)] for relative, _data in self.store.scan(prefix) if relative.endswith(ARCHIVE_SUFFIX)]
-
-    def quarantined(self) -> list[str]:
-        return [relative for relative, _data in self.store.scan(self.relative(QUARANTINE_PREFIX))]
-
-    def lookup(self, key: str) -> tuple[str | None, str, list[str], dict[str, str]]:
-        """交回 (条目的键, hit|miss|corrupted|frozen, RC5 不符的那几样, 条目的 meta)。不符的条目挪进 quarantine/。"""
-        if self.frozen_reason():
-            return None, "frozen", [], {}
-        archive = self.archive(key)
-        if archive is None:
-            return None, "miss", [], {}
-        with self.extracted(key, archive) as (entry, unreadable):
-            problems = [unreadable] if unreadable else entry_problems(entry)
-            meta = read_meta(entry) if entry is not None else {}
-        if problems:
-            self.quarantine(key, archive)
-            return None, "corrupted", problems, {}
-        return key, "hit", [], meta
-
-    def insert(self, key: str, text: str, kind: str, reading: dict[str, str], meta: dict[str, str]) -> tuple[str, list[str]]:
-        """入库：先在这一趟自己的临时目录里拼好整份条目（key.txt、reading/<角色>、meta.tsv，manifest.sha256 最后写），再一次写进服务。
-        库里已有同键条目（别人先入了）就不覆盖、照 RC1 比读数。交回 (inserted|present-identical|present-differs|frozen, 不同的那几样)。"""
-        if self.frozen_reason():
-            return "frozen", []
-        archive = self.archive(key)
-        if archive is not None:
-            with self.extracted(key, archive) as (entry, unreadable):
-                if not unreadable and not entry_problems(entry):
-                    return self.compare_with(entry, kind, reading)
-            self.quarantine(key, archive)
-        building = tempfile.mkdtemp(prefix="e171-reuse-insert-")   # 中转：拼好整份再写进服务，出这一段就删
-        try:
-            os.makedirs(os.path.join(building, "reading"))
-            with open(os.path.join(building, "key.txt"), "w", encoding="utf-8") as handle:
-                handle.write(text)
-            for role, source in sorted(reading.items()):
-                link_reading(source, os.path.join(building, "reading", role), "row-result.tsv" if role == "row" else None)
-            with open(os.path.join(building, "meta.tsv"), "w", encoding="utf-8") as handle:
-                handle.writelines(f"{name}\t{value}\n" for name, value in sorted(meta.items()))
-            if broken("insert-in-place"):
-                self.store.write(self.entry_name(key), packed_entry(building))   # 弄坏开关：没有 manifest 的半份先进服务
-            stop_here_if_asked("before-manifest")
-            with open(os.path.join(building, "manifest.sha256"), "w", encoding="utf-8") as handle:
-                handle.write(manifest_text(building))
-            stop_here_if_asked("before-store")
-            self.store.write(self.entry_name(key), packed_entry(building))
-        finally:
-            shutil.rmtree(building, ignore_errors=True)
-        return "inserted", []
-
-    def compare_with(self, entry: str, kind: str, reading: dict[str, str]) -> tuple[str, list[str]]:
-        """RC1–RC3 的比法：条目里的读数与这一次的（entry 是解开的那个临时目录）。"""
-        if broken("check-skipped"):
-            return "present-identical", []
-        differing = reading_differences(kind, entry_reading(entry), reading)
-        return ("present-differs" if differing else "present-identical"), differing
-
-    def reading_roles(self, key: str) -> list[str]:
-        """这把键的条目里有哪几个角色（自证照它拼取用的目标）；不在、解不开交空表。"""
-        with self.extracted(key) as (entry, _unreadable):
-            return sorted(entry_reading(entry)) if entry is not None else []
+            shutil.rmtree(staging, ignore_errors=True)
 
 
-def fetch(library: Library, entry: str, targets: dict[str, str]) -> dict[str, str]:
-    """取用（entry 是条目的键）：解进临时目录、核 RC5（不符的挪进 quarantine/、抛 CorruptedEntry；不在库里也抛）→ 按角色写到这一趟的名字（目标已在就拒）。交回条目的 meta。"""
-    archive = library.archive(entry)
-    if archive is None:
-        raise CorruptedEntry(f"条目 {entry[:16]}… 不在库里（{library.location()}）")
-    with library.extracted(entry, archive) as (directory, unreadable):
-        problems = [unreadable] if unreadable else entry_problems(directory)
-        if problems:
-            library.quarantine(entry, archive)
-            raise CorruptedEntry(f"条目 {entry[:16]}… 与 manifest.sha256 对不上：{','.join(problems[:4])}")
-        stored = entry_reading(directory)
-        missing = sorted(set(targets) - set(stored))
-        if missing:
-            raise CorruptedEntry(f"条目 {entry[:16]}… 里没有角色 {','.join(missing)}")
-        for role, target in sorted(targets.items()):
-            link_reading(stored[role], target, "row-result.tsv" if role == "row" else None)
-        return read_meta(directory)
+def fetch_from_state(state: str, item: str, targets: dict[str, str]) -> int:
+    """计划放进状态目录的那一项取来的值（long_run_item_verdicts 的 reused_output）按角色解到 targets；交它的退出码。"""
+    exit_code, output = items_library.reused_output(state, item)
+    unpack_reading(output, targets)
+    return exit_code
 
 
 # ── 读数相等（第 11.5 节「读数相等」）──
@@ -1096,108 +883,24 @@ def row_insertable(row_directory: str) -> tuple[bool, str]:
     return device_exit_insertable(int(exit_text), (0, 3))
 
 
-# ── 决定、标记、事件（第 11.4、11.5 节）──
+# ── 决定、标记、事件、账本（文件头「账本」）──
 @dataclasses.dataclass
 class Decision:
-    """一个单元这一趟怎么做：state 是 fresh（现跑、查过库没有）、reused（从库里取）、fresh-check（RC3 抽到、现跑后与条目比）、fresh-always（永远现跑）。"""
+    """一个单元这一趟怎么做：state 是 fresh（现判）、reused（从库里取）、fresh-check（取得到而照跑、只比不入：RC3 抽中）、fresh-always（拒算：照跑、不复用）。
+    forced 是复用哨兵抽中的强制现判那一条（照现判，跑完与库里那一份比，RC1）。key 算不出写 -。"""
     unit: str
     kind: str
+    item: str
     key: str
-    text: str
     state: str
     reason: str
-    entry: str = "-"
-    meta: dict = dataclasses.field(default_factory=dict)
-    sentinel: str = SENTINEL_NONE   # 复用哨兵抽中的：sentinel（哨兵）、forced（强制现判）；没抽中写 -
-    sentinel_seed: str = "-"
+    forced: bool = False
+    facts: dict = dataclasses.field(default_factory=dict)
 
 
-# 这几种缘由的单元现跑完也不入库（读数依赖别的行与次序，或环境变量设了）
-NEVER_INSERTED_REASONS = ("env-set", "not-located", "anchor-not-once", "touches-module-set")
-# 拒算（账本末行 refused）：键认不全或照登记永远现跑、从不复用的几类
-REFUSED_REASONS = ("env-set", "closure-outside-the-tree")
-REUSE_CHECKS_PATH = os.path.join(HERE, "..", "..", "gate", "lib_reuse_checks.py")   # 复用三问的判法与规范输出、哨兵的种子与条数全仓一份
-_reuse_checks_module: dict[str, types.ModuleType] = {}
-
-
-def reuse_checks_library() -> types.ModuleType:
-    """scripts/gate/lib_reuse_checks.py（按路径载入一次、不写 .pyc）。"""
-    if "module" not in _reuse_checks_module:
-        specification = importlib.util.spec_from_file_location("lib_reuse_checks_for_e171_reuse_library", REUSE_CHECKS_PATH)
-        module = importlib.util.module_from_spec(specification)
-        sys.dont_write_bytecode = True
-        specification.loader.exec_module(module)
-        _reuse_checks_module["module"] = module
-    return _reuse_checks_module["module"]
-
-
-class RunSentinel:
-    """这一个进程的复用哨兵（文件头「复用哨兵」）：命中按到达次序数，第 forced_hit 条强制现判，sentinel_hits 那几条当哨兵。"""
-
-    def __init__(self, seed: int, count: int) -> None:
-        self.seed = seed
-        picks = random.Random(seed).sample(range(1, SENTINEL_HIT_WINDOW + 1), min(count + 1, SENTINEL_HIT_WINDOW))
-        self.forced_hit, self.sentinel_hits = picks[0], tuple(sorted(picks[1:]))
-        self.hits = 0
-
-    def announcement(self) -> str:
-        variable = reuse_checks_library().SENTINEL_SEED_VARIABLE
-        return (f"  · 复用哨兵（{RESEARCH_RELATIVE}/reuse_library.py）：种子 {self.seed}（{variable}={self.seed} 复现）；强制现判取这一趟第 "
-                f"{self.forced_hit} 条命中，哨兵取第 {'、'.join(str(hit) for hit in self.sentinel_hits) or '-'} 条命中（头 {SENTINEL_HIT_WINDOW} 条里抽；"
-                f"命中不够那几条的，那几条不抽、不因此判红）")
-
-    def plan_event(self) -> str:
-        return (f"E7RESULT name=reuse_sentinel_plan seed={self.seed} forced_hit={self.forced_hit} "
-                f"sentinel_hits={','.join(str(hit) for hit in self.sentinel_hits) or '-'} window={SENTINEL_HIT_WINDOW}")
-
-    def tagged(self, decision: Decision) -> Decision:
-        """一条命中（decision 是 reused）：照到达次序交回强制现判、哨兵或原样。"""
-        if broken("sentinel-skipped"):
-            return decision
-        self.hits += 1
-        seed = str(self.seed)
-        if self.hits == self.forced_hit:
-            if broken("forced-read-answered-found"):
-                return dataclasses.replace(decision, sentinel=SENTINEL_FORCED, sentinel_seed=seed)
-            return dataclasses.replace(decision, state=STATE_FRESH_CHECK, reason=FORCED_REASON, sentinel=SENTINEL_FORCED, sentinel_seed=seed)
-        if self.hits in self.sentinel_hits:
-            return dataclasses.replace(decision, sentinel=SENTINEL_WATCHED, sentinel_seed=seed)
-        return decision
-
-
-_run_sentinel: list[RunSentinel] = []
-
-
-def run_sentinel(library: Library) -> RunSentinel | None:
-    """这一个进程的哨兵：已装的（reuse-sentinel 那一格自己装）就用它；没装的，真跑现装一份、打种子，临时 prune-server 底下与 RP2 那一层不抽。"""
-    if library.area:
-        return None
-    if not _run_sentinel:
-        if not prune_server_client.selftest_service_problem():
-            return None
-        checks = reuse_checks_library()
-        _run_sentinel.append(RunSentinel(checks.sentinel_seed(), checks.sentinel_count()))
-        print(_run_sentinel[0].announcement(), file=sys.stderr, flush=True)
-    return _run_sentinel[0]
-
-
-def decide(library: Library | None, unit: str, kind: str, sections: dict[str, list[str]], always_reason: str, lookup_enabled: bool) -> tuple[Decision, list[str]]:
-    """查库（第 11.2、11.4 节）。交回 (决定, RC5 不符的那几样：条目坏了时非空，调用方记一行 reuse_corrupted)。"""
-    text = key_text(sections)
-    key = sha256_bytes(text.encode("utf-8"))
-    environment_set = any(line.endswith(" set") for line in sections.get("env", []))
-    if always_reason and not broken("fresh-always-ignored"):
-        return Decision(unit, kind, key, text, STATE_FRESH_ALWAYS, always_reason), []
-    if environment_set:
-        return Decision(unit, kind, key, text, STATE_FRESH, "env-set"), []
-    if library is None or not lookup_enabled:
-        return Decision(unit, kind, key, text, STATE_FRESH, "lookup-off"), []
-    entry, outcome, problems, meta = library.lookup(key)
-    if outcome == "hit":
-        decision = Decision(unit, kind, key, text, STATE_REUSED, "hit", entry, meta)
-        sentinel = run_sentinel(library)
-        return (sentinel.tagged(decision) if sentinel else decision), []
-    return Decision(unit, kind, key, text, STATE_FRESH, {"miss": "no-entry", "corrupted": "corrupted-entry", "frozen": "library-frozen"}[outcome]), problems
+def value(text: object) -> str:
+    """结果行里的一个值：空白换成下划线，空串写 -（同 result_lines.field）。"""
+    return "".join("_" if character.isspace() else character for character in str(text)) or "-"
 
 
 def marker_path(markers: str, unit: str) -> str:
@@ -1205,39 +908,16 @@ def marker_path(markers: str, unit: str) -> str:
 
 
 def write_marker(markers: str, decision: Decision, extra: dict[str, str] | None = None) -> None:
-    """单元的标记（先写标记、再链接）：原子写（同目录临时文件再 os.replace）。"""
+    """单元的标记：原子写（同目录临时文件再 os.replace）；extra 是单元编排层记下的角色路径（role_<角色>）。"""
     os.makedirs(markers, exist_ok=True)
-    fields = {"unit": decision.unit, "kind": decision.kind, "key": decision.key, "state": decision.state, "reason": decision.reason,
-              "entry": decision.entry, "origin_run": decision.meta.get("origin_run", "-"), "origin_product": decision.meta.get("origin_product", "-"),
-              "origin_host": decision.meta.get("origin_host", "-"), "sentinel": decision.sentinel, "sentinel_seed": decision.sentinel_seed}
+    fields = {"unit": decision.unit, "kind": decision.kind, "item": decision.item, "key": decision.key, "state": decision.state,
+              "reason": value(decision.reason), "forced": str(decision.forced).lower()}
     fields.update(extra or {})
     path = marker_path(markers, decision.unit)
     partial = f"{path}.{os.getpid()}.partial"
     with open(partial, "w", encoding="utf-8") as handle:
-        handle.writelines(f"{name}\t{value}\n" for name, value in fields.items())
+        handle.writelines(f"{name}\t{text}\n" for name, text in fields.items())
     os.replace(partial, path)
-    if decision.sentinel != SENTINEL_NONE:
-        note_sentinel(markers, decision)
-
-
-def append_event_once(markers: str, line: str) -> None:
-    """同一行事件只记一次（标记会重写几次，哨兵的事件跟着标记走）。"""
-    if line not in event_lines(markers):
-        append_event(markers, line)
-
-
-def note_sentinel_problem(markers: str, decision: Decision, problem: str, detail: str = "-") -> None:
-    append_event_once(markers, f"E7RESULT name=reuse_sentinel unit={value(decision.unit)} key={decision.key} seed={decision.sentinel_seed} "
-                               f"role={decision.sentinel} problem={problem} detail={value(detail)}")
-
-
-def note_sentinel(markers: str, decision: Decision) -> None:
-    """抽中的单元写标记时：这一趟哨兵的种子与抽法记一行（每个种子一行）；强制现判那一条的标记仍是 reused 就记 forced-reused。"""
-    sentinel = _run_sentinel[0] if _run_sentinel and str(_run_sentinel[0].seed) == decision.sentinel_seed else None
-    if sentinel is not None:
-        append_event_once(markers, sentinel.plan_event())
-    if decision.sentinel == SENTINEL_FORCED and decision.state == STATE_REUSED:
-        note_sentinel_problem(markers, decision, "forced-reused", "抽中强制现判的那一条照取来交出去")
 
 
 def read_markers(markers: str) -> dict[str, dict[str, str]]:
@@ -1250,11 +930,6 @@ def read_markers(markers: str) -> dict[str, dict[str, str]]:
     return found
 
 
-def value(text: object) -> str:
-    """结果行里的一个值：空白换成下划线，空串写 -（同 result_lines.field）。"""
-    return "".join("_" if character.isspace() else character for character in str(text)) or "-"
-
-
 def append_event(markers: str, line: str) -> None:
     os.makedirs(markers, exist_ok=True)
     with open(os.path.join(markers, "events.tsv"), "a", encoding="utf-8") as handle:
@@ -1263,81 +938,23 @@ def append_event(markers: str, line: str) -> None:
         os.fsync(handle.fileno())
 
 
-def note_decision(markers: str, decision: Decision, problems: list[str]) -> None:
-    """写标记；条目坏了（RC5）另记一行事件。"""
-    if problems:
-        append_event(markers, f"E7RESULT name=reuse_corrupted unit={value(decision.unit)} key={decision.key} problems={value(','.join(problems[:6]))}")
-    write_marker(markers, decision)
-
-
-def record_finished(library: Library | None, markers: str, decision: Decision, reading: dict[str, str], insertable: tuple[bool, str],
-                    meta: dict[str, str]) -> str:
-    """一个现跑完的单元（取来的不进这里）：照入库条件入库；库里已有同键条目时比读数——普通单元是 RC1（kind=insert），永远现跑的第二趟是 RC2
-    （kind=second-run），RC3 抽到的是 kind=sample，复用哨兵的强制现判是 kind=forced。交回入库的结局（not-inserted 也是一种）。
-    决定是取来的单元交到这里就是照现跑了：哨兵记 sentinel-rejudged；强制现判跑完没与库里那一条比上记 forced-not-compared（文件头「复用哨兵」）。"""
-    if decision.state == STATE_REUSED:
-        if decision.sentinel == SENTINEL_WATCHED:
-            note_sentinel_problem(markers, decision, "sentinel-rejudged", "键相同、库里有、决定是取来，却照现跑了")
-        return "not-applicable"
-    state = record_fresh_reading(library, markers, decision, reading, insertable, meta)
-    if decision.sentinel == SENTINEL_FORCED and state not in ("present-identical", "present-differs", "frozen"):
-        note_sentinel_problem(markers, decision, "forced-not-compared", f"入库的结局 {state}（{insertable[1] or '入库条件过'}）")
-    return state
-
-
-def record_fresh_reading(library: Library | None, markers: str, decision: Decision, reading: dict[str, str], insertable: tuple[bool, str],
-                         meta: dict[str, str]) -> str:
-    """record_finished 的现跑那一半：照入库条件入库或比读数，记 reuse_check 与 reuse_insert 两行事件。"""
-    ok, why = insertable
-    if decision.reason in NEVER_INSERTED_REASONS:
-        ok, why = False, decision.reason
-    if library is None or not ok:
-        state, differing = "not-inserted", []
-    else:
-        meta = dict(meta, unit=decision.unit, kind=decision.kind, inserted=time.strftime("%Y-%m-%d"))
-        state, differing = library.insert(decision.key, decision.text, decision.kind, reading, meta)
-    if state in ("present-identical", "present-differs"):
-        check_kind = "forced" if decision.reason == FORCED_REASON else {STATE_FRESH_ALWAYS: "second-run", STATE_FRESH_CHECK: "sample"}.get(decision.state, "insert")
-        append_event(markers, f"E7RESULT name=reuse_check kind={check_kind} unit={value(decision.unit)} key={decision.key} "
-                              f"identical={str(state == 'present-identical').lower()} differing={value(','.join(differing[:12]))}")
-    append_event(markers, f"E7RESULT name=reuse_insert unit={value(decision.unit)} key={decision.key} state={state} reason={value(why)}")
-    return state
-
-
-def closure_check(markers: str, decision: Decision, compiled_tree: str, dep_info: str, key_paths: tuple[str, ...]) -> bool:
-    """RC4：现跑编译的单元编完，读那一次的 dep-info（相对编译用的那棵树），路径集合必须等于键里 [closure] 的；树外的路径也算不符。记一行事件，交回相符否。"""
-    if broken("closure-check-skipped"):
-        return True
-    try:
-        compiled = set(dep_info_files(compiled_tree, dep_info))
-        detail = f"extra={value(','.join(sorted(compiled - set(key_paths))[:6]))} missing={value(','.join(sorted(set(key_paths) - compiled)[:6]))}"
-        matches = compiled == set(key_paths)
-    except ClosureOutsideTheTree as error:
-        matches, detail = False, f"outside-the-tree={value(str(error)[-120:])}"
-    except OSError as error:
-        matches, detail = False, f"unreadable={value(type(error).__name__)}"
-    append_event(markers, f"E7RESULT name=reuse_closure_check unit={value(decision.unit)} key={decision.key} matches={str(matches).lower()} {detail}")
-    return matches
-
-
 def event_lines(markers: str) -> list[str]:
     path = os.path.join(markers, "events.tsv")
     return open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
 
 
 def s18_problems(markers: str) -> list[str]:
-    """S18（第 11.9 节）：① RC1–RC3（与强制现判）任一次 identical=false；② RC4 不符；③ 复用哨兵红（文件头「复用哨兵」）。交回触发的那几行事件。"""
+    """S18（文件头「复用对不对的几条核对」）：RC1–RC3 任一次 identical=false，或一行 name=reuse_sentinel。交回触发的那几行事件。"""
     return [line for line in event_lines(markers) if (" name=reuse_check " in f" {line} " and " identical=false " in f" {line} ")
-            or (" name=reuse_closure_check " in f" {line} " and " matches=false " in f" {line} ")
-            or (" name=reuse_sentinel " in f" {line} " and not broken("sentinel-problems-ignored"))]
+            or " name=reuse_sentinel " in f" {line} "]
 
 
 def ledger_text(markers: str, registered: list[str]) -> tuple[str, bool]:
-    """复用账本（第 11.4 节）：登记的每个单元一行 name=reuse，事件原样，末行 name=verdict。交回 (全文, N + M 等于登记的单元数否)。"""
+    """复用账本：登记的每个单元一行 name=reuse，事件原样，末行 name=verdict。交回 (全文, N + M 等于登记的单元数否)。"""
     found = read_markers(markers)
     counts = {STATE_FRESH: 0, STATE_REUSED: 0, STATE_FRESH_CHECK: 0, STATE_FRESH_ALWAYS: 0}
     lines = [f"E7RESULT name=reuse_columns registered_units={len(registered)} states=fresh,reused,fresh-check,fresh-always"]
-    environment_set = refused = 0
+    environment_set = 0
     for unit in registered:
         marker = found.get(unit)
         if marker is None:
@@ -1345,10 +962,8 @@ def ledger_text(markers: str, registered: list[str]) -> tuple[str, bool]:
         state = marker["state"]
         counts[state] += 1
         environment_set += marker.get("reason") == "env-set"
-        refused += state == STATE_FRESH_ALWAYS or marker.get("reason") in REFUSED_REASONS
-        lines.append(f"E7RESULT name=reuse unit={value(unit)} key={marker['key']} state={state} reason={value(marker.get('reason'))} "
-                     f"entry={value(marker.get('entry'))} origin_run={value(marker.get('origin_run'))} origin_product={value(marker.get('origin_product'))} "
-                     f"origin_host={value(marker.get('origin_host'))}")
+        lines.append(f"E7RESULT name=reuse unit={value(unit)} item={value(marker.get('item'))} key={marker['key']} state={state} "
+                     f"reason={value(marker.get('reason'))} forced={value(marker.get('forced'))}")
     events = event_lines(markers)
     lines += events
     judged_fresh = counts[STATE_FRESH] + counts[STATE_FRESH_CHECK] + counts[STATE_FRESH_ALWAYS]
@@ -1356,29 +971,14 @@ def ledger_text(markers: str, registered: list[str]) -> tuple[str, bool]:
     unregistered = sorted(set(found) - set(registered))
     sample_sizes = [int(line.split(" k=", 1)[1].split()[0]) for line in events if " name=reuse_sample " in f" {line} "]
     covers = judged_fresh + counts[STATE_REUSED] == len(registered)
-    sentinel_outcome, sentinel_problems = sentinel_outcome_line({unit: found[unit] for unit in registered if unit in found}, events)
-    lines.append(sentinel_outcome)
     lines.append(f"E7RESULT name=verdict units={judged_fresh + counts[STATE_REUSED]} judged_fresh={judged_fresh} reused={counts[STATE_REUSED]} "
                  f"fresh_check={counts[STATE_FRESH_CHECK]} fresh_always={counts[STATE_FRESH_ALWAYS]} sample_size={sample_sizes[-1] if sample_sizes else 0} "
                  f"check_mismatches={sum(1 for line in events if ' name=reuse_check ' in f' {line} ' and ' identical=false ' in f' {line} ')} "
-                 f"closure_mismatches={sum(1 for line in events if ' name=reuse_closure_check ' in f' {line} ' and ' matches=false ' in f' {line} ')} "
-                 f"corrupted_entries={sum(1 for line in events if ' name=reuse_corrupted ' in f' {line} ')} env_set_units={environment_set} "
-                 f"registered_units={len(registered)} units_cover_registered={str(covers).lower()} missing={value(','.join(missing[:8]))} "
-                 f"unregistered={value(','.join(unregistered[:8]))} judged_now={judged_fresh - refused} refused={refused} "
-                 f"sentinel_problems={sentinel_problems}")
+                 f"env_set_units={environment_set} registered_units={len(registered)} units_cover_registered={str(covers).lower()} "
+                 f"missing={value(','.join(missing[:8]))} unregistered={value(','.join(unregistered[:8]))} "
+                 f"judged_now={counts[STATE_FRESH] + counts[STATE_FRESH_CHECK]} refused={counts[STATE_FRESH_ALWAYS]} "
+                 f"sentinel_problems={sum(1 for line in events if ' name=reuse_sentinel ' in f' {line} ')}")
     return "\n".join(lines) + "\n", covers
-
-
-def sentinel_outcome_line(markers: dict[str, dict[str, str]], events: list[str]) -> tuple[str, int]:
-    """账本里复用哨兵那一行（文件头「复用哨兵」）：种子、强制现判的单元与它比上没有、哨兵几条、几条照旧取来、红了几样。交回 (那一行, 红了几样)。"""
-    forced = [unit for unit, marker in markers.items() if marker.get("sentinel") == SENTINEL_FORCED]
-    watched = [unit for unit, marker in markers.items() if marker.get("sentinel") == SENTINEL_WATCHED]
-    seeds = sorted({marker.get("sentinel_seed", "-") for marker in markers.values() if marker.get("sentinel", SENTINEL_NONE) != SENTINEL_NONE})
-    compared = [unit for unit in forced if any(" name=reuse_check kind=forced " in f" {line} " and f" unit={value(unit)} " in f" {line} " for line in events)]
-    still_reused = sum(1 for unit in watched if markers[unit].get("state") == STATE_REUSED)
-    problems = sum(1 for line in events if " name=reuse_sentinel " in f" {line} ")
-    return (f"E7RESULT name=reuse_sentinel_outcome seeds={value(','.join(seeds))} forced={value(','.join(forced))} "
-            f"forced_compared={len(compared)} sentinels={value(','.join(watched))} sentinels_reused={still_reused} problems={problems}"), problems
 
 
 def install_ledger(path: str, text: str) -> str:
@@ -1392,38 +992,138 @@ def install_ledger(path: str, text: str) -> str:
     return path
 
 
-# ── 两份逐行编排共用：派发之前取来的行（第 11.5 节「取用」「与分片、续跑怎么叠」）──
-def fetch_rows(library: Library | None, markers: str, decisions: list[tuple[Decision, str]]) -> tuple[list[str], list[Decision]]:
-    """decisions：(这一行的决定, 它在行输出根下的行目录)。行目录已有 row-result.tsv 的是做完了的（这一趟或更早几趟，现跑的、取来的都算），
-    标记不动；别的写标记，reused 的再按角色 row 硬链接进去（row-result.tsv 最后链）。标记写着 reused 而行目录没有 row-result.tsv 的
-    （上一次断在取用中间），删掉已链的几份重取。取用时条目坏了（RC5）那一行改成现跑。交回 (取来的行名, 改成现跑的决定)。"""
-    fetched, demoted = [], []
-    known = read_markers(markers)
-    for decision, row_directory in decisions:
-        if os.path.exists(os.path.join(row_directory, "row-result.tsv")):
-            if decision.unit not in known:
-                write_marker(markers, dataclasses.replace(decision, state=STATE_FRESH, reason="finished-before-the-marker", entry="-", meta={}))
-            continue
-        if decision.state != STATE_REUSED:
-            write_marker(markers, decision)
-            continue
-        if os.path.isdir(row_directory):
-            shutil.rmtree(row_directory)
-        write_marker(markers, decision)
+def differences_from_value(kind: str, stored: bytes, reading: dict[str, str]) -> list[str]:
+    """库里那一份值解进临时目录（中转，用完即删）与这一次的读数照 reading_differences 比；解不开按不同算。"""
+    directory = tempfile.mkdtemp(prefix="e171-reuse-compare-")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(stored), mode="r:gz") as archive:
+            archive.extractall(directory, filter="data")
+        return reading_differences(kind, {role: os.path.join(directory, role) for role in sorted(os.listdir(directory))}, reading)
+    except (tarfile.TarError, OSError, EOFError) as error:
+        return [f"value-unreadable:{type(error).__name__}"]
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+
+# ── 一层一次计划（文件头「按项判定」ItemRun）──
+class ItemRun:
+    """requests 里 reason 不空的不进计划（拒算），其中 second-run 那几项另照 keyed_items 算键给 RC2。state_parent 下新建这一趟的状态目录，finish 之后删。"""
+
+    def __init__(self, repo: str, script: str, requests: list[UnitRequest], state_parent: str, markers: str, printer=print) -> None:
+        self.repo, self.script, self.markers, self.printer = os.path.abspath(repo), script, markers, printer
+        self.requests = {request.unit: request for request in requests}
+        os.makedirs(state_parent, exist_ok=True)
+        self.state = tempfile.mkdtemp(prefix="items-", dir=state_parent)
+        self.planned: list[UnitRequest] = []
+        self.decisions: dict[str, Decision] = {}
+
+    def plan(self) -> dict[str, Decision]:
+        """算键、查库、抽复用哨兵（long_run_item_verdicts 的 plan），写标记。交回 {单元: 决定}。"""
+        self.planned = [request for request in self.requests.values()
+                        if not request.reason or (request.reason == SECOND_RUN and broken("second-run-planned"))]
+        refused = [request for request in self.requests.values() if request not in self.planned]
+        second_runs = keyed_items(self.repo, [request for request in refused if request.reason == SECOND_RUN])
+        for request in refused:
+            key = second_runs.get(request.unit, (None, ""))[0]
+            self.decisions[request.unit] = Decision(request.unit, request.kind, request.item, key or "-", STATE_FRESH_ALWAYS, request.reason, facts=request.facts)
+        if self.planned:
+            _order, answers = items_library.plan(self.state, self.script, KIND, self.repo, requests_text(self.planned), printer=self.printer)
+            items = items_library.read_plan(self.state)["items"]
+            for request in self.planned:
+                answer, why = answers[request.item]
+                key = items[request.item]["key"] or "-"
+                if answer == items_library.REUSE:
+                    decision = Decision(request.unit, request.kind, request.item, key, STATE_REUSED, "hit", facts=request.facts)
+                elif answer == items_library.REFUSED:
+                    decision = Decision(request.unit, request.kind, request.item, key, STATE_FRESH_ALWAYS, "refused", facts=request.facts)
+                else:
+                    decision = Decision(request.unit, request.kind, request.item, key, STATE_FRESH, why, why.startswith(FORCED_PREFIX), request.facts)
+                self.decisions[request.unit] = decision
+        for decision in self.decisions.values():
+            write_marker(self.markers, decision)
+        return dict(self.decisions)
+
+    def mark_sample(self, unit: str) -> None:
+        """RC3：取得到的这一项照跑、只比不入（fresh-check）。"""
+        self.decisions[unit] = dataclasses.replace(self.decisions[unit], state=STATE_FRESH_CHECK, reason=SAMPLE_REASON)
+        write_marker(self.markers, self.decisions[unit])
+
+    def fetch(self, unit: str, targets: dict[str, str]) -> int:
+        """取来的那一项按角色解到 targets；交它的退出码。"""
+        return fetch_from_state(self.state, self.decisions[unit].item, targets)
+
+    def fetch_into(self, unit: str, directory: str) -> tuple[int, dict[str, str]]:
+        """取来的那一项每个角色解进 directory/<角色>；交 (退出码, 角色 → 路径)。"""
+        _exit, output = items_library.reused_output(self.state, self.decisions[unit].item)
+        targets = {role: os.path.join(directory, role) for role in value_roles(output)}
+        return self.fetch(unit, targets), targets
+
+    def stored(self, unit: str) -> bytes | None:
+        """库里这一项判绿的那一份：计划放进状态目录的（取来的、RC3 抽中的）取那一份，别的现读库。"""
+        decision = self.decisions[unit]
+        path = os.path.join(self.state, items_library.OUTPUTS_DIRECTORY, decision.item + ".out")
+        if os.path.exists(path):
+            with open(path, "rb") as handle:
+                return handle.read()
+        return stored_value(self.repo, decision.key) if decision.key != "-" else None
+
+    def compare(self, decision: Decision, stored: bytes, reading: dict[str, str], check_kind: str) -> bool:
+        """RC1–RC3：读数与库里那一份比，记一行 name=reuse_check；不同就把那一把键撤成红（S18）。交回相同否。"""
+        differing = differences_from_value(decision.kind, stored, reading)
+        append_event(self.markers, f"E7RESULT name=reuse_check kind={check_kind} unit={value(decision.unit)} key={decision.key} "
+                                   f"identical={str(not differing).lower()} differing={value(','.join(differing[:12]))}")
+        if differing:
+            withdraw(self.repo, decision.key, decision.item, f"读数与库里同一把键的那一份不同（{check_kind}）：撤成红，下一趟现判")
+        return not differing
+
+    def record(self, unit: str, reading: dict[str, str], exit_code: int, insertable: tuple[bool, str]) -> str:
+        """一个照跑完的单元：现判的照入库条件判绿或判红（long_run_item_verdicts 的 record），RC1–RC3 照文件头比；记一行 name=reuse_insert。
+        交回结局：green、red、inserted、present-identical、present-differs、sample-identical、sample-differs、not-inserted、not-applicable。"""
+        decision = self.decisions[unit]
+        ok, why = insertable
+        if decision.state == STATE_REUSED:
+            append_event(self.markers, f"E7RESULT name=reuse_sentinel unit={value(unit)} key={decision.key} problem=reused-rejudged detail=取来的单元照现跑交了入库")
+            return "not-applicable"
+        if decision.state == STATE_FRESH_CHECK:
+            stored = self.stored(unit)
+            outcome = "sample-identical" if stored is not None and self.compare(decision, stored, reading, "sample") else "sample-differs"
+        elif decision.state == STATE_FRESH_ALWAYS:
+            outcome = self.record_second_run(decision, reading, exit_code, ok)
+        else:
+            unchecked = decision.forced and broken("forced-reading-unchecked")
+            before = None if unchecked else self.stored(unit)
+            items_library.record(self.state, decision.item, exit_code, packed_reading(reading), ok, printer=self.printer)
+            outcome = "green" if ok else "red"
+            if before is not None:
+                self.compare(decision, before, reading, "forced" if decision.forced else "insert")
+        append_event(self.markers, f"E7RESULT name=reuse_insert unit={value(unit)} key={decision.key} state={outcome} reason={value(why or decision.reason)}")
+        return outcome
+
+    def record_second_run(self, decision: Decision, reading: dict[str, str], exit_code: int, ok: bool) -> str:
+        """RC2：second-run 那一项库里这把键有判绿的就比，没有就照判绿写进去；拒算的别几类、入库条件不过的、键算不出的不存。"""
+        if decision.reason != SECOND_RUN or decision.key == "-" or not ok or broken("second-run-unchecked"):
+            return "not-inserted"
+        stored = stored_value(self.repo, decision.key)
+        if stored is None:
+            store_green(self.repo, decision.key, decision.item, exit_code, packed_reading(reading))
+            return "inserted"
+        return "present-identical" if self.compare(decision, stored, reading, SECOND_RUN) else "present-differs"
+
+    def finish(self) -> int:
+        """long_run_item_verdicts 的 finish（重算键、判复用哨兵）；退 1 记一行 name=reuse_sentinel problem=finish-red（同 S18）。删状态目录。交它的退出码。"""
+        code = 0
         try:
-            fetch(library, decision.entry, {"row": row_directory})
-        except CorruptedEntry as error:
-            shutil.rmtree(row_directory, ignore_errors=True)
-            changed = dataclasses.replace(decision, state=STATE_FRESH, reason="corrupted-entry", entry="-", meta={})
-            note_decision(markers, changed, [str(error)[-200:]])
-            demoted.append(changed)
-            continue
-        fetched.append(decision.unit)
-    return fetched, demoted
+            if self.planned:
+                code = items_library.finish(self.state, printer=self.printer)
+                if code != 0:
+                    append_event(self.markers, f"E7RESULT name=reuse_sentinel unit=- key=- problem=finish-red detail=long_run_item_verdicts_finish_exit_{code}")
+        finally:
+            shutil.rmtree(self.state, ignore_errors=True)
+        return code
 
 
 def rows_sample(decisions: list[Decision], suffix: str) -> list[str]:
-    """RC3：取来的行数 M ≥ 1 时挑 k = max(3, ⌈0.02 × M⌉) 行现跑（不够 k 行就全挑），挑法按 sha256(后缀 ‖ 键) 从小到大取前 k 个。交回挑中的行名。"""
+    """RC3：取来的行数 M ≥ 1 时挑 k = max(3, ⌈0.02 × M⌉) 行照跑（不够 k 行就全挑），挑法按 sha256(后缀 ‖ 键) 从小到大取前 k 个。交回挑中的单元名。"""
     reused = [decision for decision in decisions if decision.state == STATE_REUSED]
     if not reused:
         return []
@@ -1432,39 +1132,16 @@ def rows_sample(decisions: list[Decision], suffix: str) -> list[str]:
     return [decision.unit for decision in ordered[:size]]
 
 
-def tree_inputs_for_run(repo: str, tree: str, environment: dict[str, str]) -> TreeInputs:
-    """三层编排起跑时现算一次：dep-info 取树里 target/release/<bin>.d（H7 那次编译），工具链在树里现跑，构建环境照 admission.py。
-    自证里工具链与构建环境换成 REUSE_SELFTEST_TOOLCHAIN、REUSE_SELFTEST_BUILD_ENVIRONMENT（假树不在真仓里，admission.py 也不在）。"""
-    absolute_tree = os.path.join(repo, tree) if not os.path.isabs(tree) else tree
-    dep_infos = {"device": os.path.join(absolute_tree, "target/release", DEVICE_BINARY + ".d"),
-                 "e170": os.path.join(absolute_tree, "target/release", E170_BINARY + ".d")}
-    toolchain = selftest_only("REUSE_SELFTEST_TOOLCHAIN") or toolchain_text(absolute_tree)
-    build_environment = [selftest_only("REUSE_SELFTEST_BUILD_ENVIRONMENT")] if selftest_only("REUSE_SELFTEST_BUILD_ENVIRONMENT") \
-        else build_environment_lines(repo, absolute_tree)
-    return tree_inputs(repo, absolute_tree, dep_infos, toolchain, python_text(), dict(environment), build_environment)
-
-
-def key_section_values(text: str, section: str) -> list[str]:
-    """键文本里一节的各行。"""
-    lines, inside = [], False
-    for line in text.splitlines():
-        if line.startswith("["):
-            inside = line == f"[{section}]"
-        elif inside:
-            lines.append(line)
-    return lines
-
-
-def peer_row_problems(row_directory: str, row_number: int, decision_text: str, shard_product_text: str, frozen_snapshot_digest: str) -> list[str]:
-    """别的台取回的行入库之前另核三样（第 11.5 节「两台」）：行结果里 row_number 与 mutation_line_sha256 对得上键里 [mutation]；那一分片的
-    row_time_limit 秒数等于键里的 L；那一分片的 snapshot_digest 等于发给别的台的冻结树快照的摘要（合并规则 ② 比的那一份）。交回不过的那几样。"""
+def peer_row_problems(row_directory: str, decision: Decision, shard_product_text: str, frozen_snapshot_digest: str) -> list[str]:
+    """别的台跑的行入库之前另核三样：行结果里 row_number 与 mutation_line_sha256 对得上这一行的请求（Decision.facts）；那一分片的
+    row_time_limit 秒数等于请求里的 L；那一分片的 snapshot_digest 等于发给别的台的冻结树快照的摘要（合并规则 ② 比的那一份）。交回不过的那几样。"""
     fields = row_result_fields(row_directory)
-    problems = [] if fields.get("row_number") == str(row_number) else ["row_number"]
-    raw_lines = [line[len("mutation "):] for line in key_section_values(decision_text, "mutation") if line.startswith("mutation ") and line != "mutation not-located"]
-    if raw_lines and fields.get("mutation_line_sha256") != sha256_bytes(raw_lines[0].encode("utf-8")):
+    problems = [] if fields.get("row_number") == str(decision.facts.get("row")) else ["row_number"]
+    expected = decision.facts.get("mutation_line_sha256")
+    if expected is not None and fields.get("mutation_line_sha256") != expected:
         problems.append("mutation_line_sha256")
     limit = re.search(r"^name=row_time_limit seconds=(\d+)", shard_product_text, re.MULTILINE)
-    if not limit or f"seconds {limit.group(1)}" not in key_section_values(decision_text, "limit"):
+    if not limit or limit.group(1) != str(decision.facts.get("limit_seconds")):
         problems.append("row_time_limit")
     snapshot = re.search(r"^snapshot_digest=(\S+)", shard_product_text, re.MULTILINE)
     if not snapshot or snapshot.group(1) != frozen_snapshot_digest:
@@ -1496,7 +1173,21 @@ def readings_file_lines(path: str) -> list[tuple[str, str, str, dict[str, str]]]
     return found
 
 
-# ── 命令行：单元脚本取用、RP2 ──
+def unit_by_name(name: str):
+    """单元表里的读数单元或逐行驱动的一行（seg1-<步>-row-<号>、seg2-row-<号>，参数取钉住的那两份编排器）。"""
+    for unit in list(SEGMENT_ONE_READING_UNITS) + step_4_row_units():
+        if unit.name == name:
+            return unit
+    found = re.fullmatch(r"seg1-(s11|s12|sx|r11|r12)-row-([0-9]+)", name)
+    if found:
+        return segment_one_row_units((found.group(1),), {found.group(1): (int(found.group(2)),)})[0]
+    found = re.fullmatch(r"seg2-row-([0-9]+)", name)
+    if found:
+        return segment_two_row_units((int(found.group(1)),), None)[0]
+    raise ValueError(f"认不得的单元名：{name}")
+
+
+# ── 命令行：单元脚本取用、RP2、自证的起法 ──
 def command_fetch(arguments: argparse.Namespace) -> int:
     targets = {}
     for mapping in arguments.map:
@@ -1506,13 +1197,27 @@ def command_fetch(arguments: argparse.Namespace) -> int:
             return 2
         targets[role] = os.path.abspath(path)
     try:
-        meta = fetch(Library(arguments.library), arguments.entry, targets)
-    except (CorruptedEntry, FileExistsError) as error:
+        exit_code = fetch_from_state(arguments.library, arguments.entry, targets)
+    except (OSError, ValueError, EOFError, tarfile.TarError) as error:
         print(f"✗ 取用不成：{error}", file=sys.stderr)
-        print('     → 怎么办：目标已在就先挪走再取；库里那一条坏了已挪进 quarantine/，下一趟照现跑重算', file=sys.stderr)
+        print('     → 怎么办：目标已在就先挪走再取；状态目录里没有这一项、或那一份解不开的，照现判重跑这个单元（编排下一趟现查库）', file=sys.stderr)
         return 1
-    print(meta.get("exit", "0"))
+    print(exit_code)
     return 0
+
+
+def command_items(arguments: argparse.Namespace) -> int:
+    """文件头「用法」items：只在自证里认。"""
+    problem = prune_server_client.selftest_service_problem()
+    if problem or os.environ.get(items_library.FAKE_JUDGE_VARIABLE) != "1":
+        print(f"✗ items 只在自证里认（临时 prune-server 底下、{items_library.FAKE_JUDGE_VARIABLE}=1）：{problem or '假判法没设'}", file=sys.stderr)
+        print("     → 怎么办：它只给 long_run_item_verdicts.py reuse-cells 当起法（--fake-judge），平常不起它", file=sys.stderr)
+        return 2
+    facts = tree_facts(arguments.repo, arguments.tree, dict(os.environ))
+    selected = selected_row_lines(arguments.repo)
+    requests = [unit_request(facts, unit_by_name(name), selected) for name in arguments.units.split(",") if name]
+    code, _results = items_library.judge_items(arguments.script, KIND, arguments.repo, requests_text(requests), lambda item: (0, b"", True))
+    return code
 
 
 def selfproof_run(repo: str, binary: str, threads: str, directory: str) -> tuple[int, str]:
@@ -1526,41 +1231,48 @@ def selfproof_run(repo: str, binary: str, threads: str, directory: str) -> tuple
     return completed.returncode, product
 
 
+def selfproof_request(binary: str, nonce: str) -> UnitRequest:
+    """RP2 那一把键：入口写 -（判的是这一份装置二进制与 selfproof_run），装置的内容、参数与这一趟的随机串经 line: 进键（这一趟独占）。"""
+    item = "reuse-selfproof"
+    line = "\t".join([item, "-", f"judge:{SELFPROOF_JUDGE}", f"line:binary-sha256={sha256_file(binary)}", "line:arguments=stream-constants --streams 1,2,3",
+                      f"line:selfproof-run={nonce}", "line:compare=exact"])
+    return UnitRequest(item, "device", item, [line])
+
+
 def command_selfproof(arguments: argparse.Namespace) -> int:
-    """RP2（第 11.8 节）：①复用关、入一个只给这一单元用的库；②复用开、取来，与①逐字节比；③另一个目录现跑、照 RC1 比。"""
+    """RP2（第 11.8 节；文件头「用法」selfproof）：① 照现判入库 ② 同一把键取来、与①逐字节比 ③ 另一个目录现跑、照读数相等比；跑完删掉库里这一把键的两条。"""
     repo = os.path.abspath(arguments.repo)
-    # 只给这一单元用的那一层（文件头「库」RP2 那一行）：这一趟独占，跑完删
-    library = Library(arguments.library, area=f"{SELFPROOF_AREA}/{time.strftime('%Y%m%d')}-{os.getpid()}-{secrets.token_hex(4)}/")
-    library.check_service_reachable()
-    try:
-        return selfproof_steps(repo, arguments, library)
-    finally:
-        library.store.delete_prefix(library.area)
-
-
-def selfproof_steps(repo: str, arguments: argparse.Namespace, library: Library) -> int:
-    """RP2 的三步（command_selfproof 的文件头）：库是这一趟独占的那一层。"""
+    check_service_reachable(repo)
+    request = selfproof_request(arguments.binary, f"{time.strftime('%Y%m%d')}-{os.getpid()}-{secrets.token_hex(4)}")
     markers = os.path.join(arguments.scratch, "markers")
-    sections = {"kind": ["device"], "build": [f"binary {sha256_file(arguments.binary)}"], "args": ["stream-constants --streams 1,2,3"],
-                "limit": limit_lines(None), "python": [python_text()]}
-    lines = [f"E7RESULT name=reuse_selfproof_config library={value(library.location())} binary_sha256={sha256_file(arguments.binary)} key={key_of(sections)}"]
-    first_exit, first_product = selfproof_run(repo, arguments.binary, arguments.threads, os.path.join(arguments.scratch, "run-1"))
-    first, _ = decide(library, "reuse-selfproof", "device", sections, "", False)
-    inserted = record_finished(library, markers, first, {"product": first_product}, device_exit_insertable(first_exit, (0,)),
-                               {"exit": str(first_exit), "origin_product": "reuse-selfproof-run-1"})
-    lines.append(f"E7RESULT name=reuse_selfproof step=1 lookup=off exit={first_exit} insert={inserted}")
-    second, _ = decide(library, "reuse-selfproof", "device", sections, "", True)
-    second_product = os.path.join(arguments.scratch, "run-2", "stream-constants.out")
-    fetched_identical = False
-    if second.state == STATE_REUSED:
-        fetch(library, second.entry, {"product": second_product})
-        fetched_identical = open(second_product, "rb").read() == open(first_product, "rb").read()
-    lines.append(f"E7RESULT name=reuse_selfproof step=2 lookup=on state={second.state} fetched_identical_to_step_1={str(fetched_identical).lower()}")
-    third_exit, third_product = selfproof_run(repo, arguments.binary, arguments.threads, os.path.join(arguments.scratch, "run-3"))
-    third, _ = decide(library, "reuse-selfproof", "device", sections, "", False)
-    compared = record_finished(library, markers, third, {"product": third_product}, device_exit_insertable(third_exit, (0,)), {"exit": str(third_exit)})
-    lines.append(f"E7RESULT name=reuse_selfproof step=3 lookup=off exit={third_exit} insert={compared} identical={str(compared == 'present-identical').lower()}")
-    holds = first_exit == 0 and inserted == "inserted" and fetched_identical and third_exit == 0 and compared == "present-identical"
+    key = "-"
+    try:
+        first_exit, first_product = selfproof_run(repo, arguments.binary, arguments.threads, os.path.join(arguments.scratch, "run-1"))
+        first_run = ItemRun(repo, SCRIPT_KEY, [request], arguments.library, markers)
+        first = first_run.plan()[request.unit]
+        key = first.key
+        inserted = first_run.record(request.unit, {"product": first_product}, first_exit, device_exit_insertable(first_exit, (0,))) \
+            if first.state == STATE_FRESH else first.state
+        first_run.finish()
+        lines = [f"E7RESULT name=reuse_selfproof_config library=apparatus-items/{KIND} binary_sha256={sha256_file(arguments.binary)} key={key}",
+                 f"E7RESULT name=reuse_selfproof step=1 state={first.state} exit={first_exit} insert={inserted}"]
+        second_run = ItemRun(repo, SCRIPT_KEY, [request], arguments.library, markers)
+        second = second_run.plan()[request.unit]
+        fetched_identical = False
+        if second.state == STATE_REUSED:
+            second_product = os.path.join(arguments.scratch, "run-2", "stream-constants.out")
+            second_run.fetch(request.unit, {"product": second_product})
+            fetched_identical = open(second_product, "rb").read() == open(first_product, "rb").read()
+        second_run.finish()
+        lines.append(f"E7RESULT name=reuse_selfproof step=2 state={second.state} fetched_identical_to_step_1={str(fetched_identical).lower()}")
+        third_exit, third_product = selfproof_run(repo, arguments.binary, arguments.threads, os.path.join(arguments.scratch, "run-3"))
+        stored = stored_value(repo, key) if key != "-" else None
+        identical = stored is not None and not differences_from_value("device", stored, {"product": third_product})
+        lines.append(f"E7RESULT name=reuse_selfproof step=3 exit={third_exit} identical={str(identical).lower()}")
+    finally:
+        if key != "-":
+            library_store(repo).delete_prefix(f"items/{key}.")   # 这一趟独占的那一把键的两条（.out、.verdict）
+    holds = first_exit == 0 and inserted == "green" and fetched_identical and third_exit == 0 and identical
     lines.append(f"E7RESULT name=verdict selfproof_holds={str(holds).lower()}")
     with open(arguments.output, "x", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n")
@@ -1574,21 +1286,30 @@ def main(argument_list: list[str]) -> int:
         return 2
     if argument_list[:1] == ["--selftest"]:
         return selftest(argument_list[1:])
-    parser = argparse.ArgumentParser(description="E171 修订 11：按输入复用（键、库、账本）")
+    parser = argparse.ArgumentParser(description="E171 修订 11：按项判定（请求、值、核对、账本）")
     commands = parser.add_subparsers(dest="command", required=True)
     fetch_parser = commands.add_parser("fetch")
-    fetch_parser.add_argument("--library", required=True)
-    fetch_parser.add_argument("--entry", required=True)
+    fetch_parser.add_argument("--library", required=True, help="编排给的这一趟状态目录")
+    fetch_parser.add_argument("--entry", required=True, help="项名")
     fetch_parser.add_argument("--map", action="append", required=True)
     proof = commands.add_parser("selfproof")
     for name in ("--library", "--binary", "--scratch", "--output", "--threads"):
         proof.add_argument(name, required=True)
     proof.add_argument("--repo", default=os.getcwd())
+    items = commands.add_parser("items")
+    for name in ("--repo", "--tree", "--script", "--units"):
+        items.add_argument(name, required=True)
     arguments = parser.parse_args(argument_list)
-    return command_fetch(arguments) if arguments.command == "fetch" else command_selfproof(arguments)
+    return {"fetch": command_fetch, "selfproof": command_selfproof, "items": command_items}[arguments.command](arguments)
 
 
-# ── 自证：假仓、假树、假装置、假驱动、假判法；键、库、账本都调上面的真函数 ──
+# ── 自证：假仓、假树、假装置与假驱动行、假判法；请求、键、库、账本都调上面的真函数（文件头「用法」--selftest）──
+REAL_REPOSITORY = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
+FAKE_TREE_RELATIVE = "scripts/experiment-apparatus/target/fake-tree"
+ALL_SENTINELS = "1000"   # 键相同的全当哨兵、不抽强制现判（只看复用与现判的那几格）
+REUSE_CELLS_SECONDS = 1500
+
+
 def write_text(path: str, text: str) -> str:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as handle:
@@ -1603,9 +1324,32 @@ FAKE_SELECTED_117 = ("1\t1\tcrates/core/src/mutated.rs\t0\tm-row-one\taaaaaaaaaa
                      "3\t1\tcrates/core/src/other.rs\t1\tm-module\tcccccccccccc\n4\t2\tcrates/core/src/other.rs\t0\tm-row-two\tdddddddddddd\n"
                      "5\t2\tcrates/core/src/other.rs\t0\tm-row-two\teeeeeeeeeeee\n")
 FAKE_SELECTED_164 = "118\t2\tcrates/core/src/other.rs\t2\tm-missing\tffffffffffff\n"
-# 假仓里研究一侧那几份（驱动闭包、执行器那三份）：自己列一份，不取上面的键用常量（那几个常量是被测的，改坏了不该连假世界一起变）
-FAKE_RESEARCH_FILES = ("row_driver.py", "device_timing.py", "frozen_o3.py", "run_directory.py", "bad_implementation_table.py", "o3_bad_image_judge.py",
-                       "result_lines.py")
+
+
+def plant_key_skeleton(repo: str) -> None:
+    """假仓里算键要的几样：研究一侧目录拷一份（判法闭包照真文件算，改得动），.claude、scripts 下别的目录、实验装置目录里的按项判定与冻结执行器
+    指回真仓（符号链接）；再写 long_run_item_verdicts 的假装置入口。已在的不动。"""
+    research = os.path.join(repo, RESEARCH_RELATIVE)
+    if not os.path.isdir(research):
+        shutil.copytree(HERE, research, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    links = [".claude"] + [os.path.join("scripts", name) for name in sorted(os.listdir(os.path.join(REAL_REPOSITORY, "scripts"))) if name != "experiment-apparatus"]
+    links += [os.path.join("scripts", "experiment-apparatus", "long_run_item_verdicts.py"), EXECUTOR_RELATIVE]
+    for relative in links:
+        path = os.path.join(repo, relative)
+        if not os.path.lexists(path):
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            os.symlink(os.path.join(REAL_REPOSITORY, relative), path)
+    items_library.plant_fake_module(repo)
+
+
+def furnish_tree(tree: str, mutated_text: str = "fn f() { yx }\n") -> None:
+    """假冻结树：假 core、两个 bin 的入口文件（装置入口找得到，自证里经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假入口）、变异表。"""
+    for relative, text in (("Cargo.toml", "[workspace]\n"), ("Cargo.lock", "# lock\n"), (".cargo/config.toml", "[build]\n"),
+                           ("crates/core/Cargo.toml", "[package]\nname='core'\n"), ("crates/core/src/mutated.rs", mutated_text),
+                           ("crates/core/src/lib.rs", 'fn read() { std::env::var("SINGLEFS_FAKE_SWITCH"); std::env::var("SINGLEFS_THREAD_CAP"); }\n'),
+                           ("crates/core/src/other.rs", "fn g() { alpha; gamma }\n"), ("crates/mutations.tsv", FAKE_MUTATIONS),
+                           (f"crates/core/src/bin/{DEVICE_BINARY}.rs", "fn main() {}\n"), (f"crates/core/src/bin/{E170_BINARY}.rs", "fn main() {}\n")):
+        write_text(os.path.join(tree, relative), text)
 
 
 @dataclasses.dataclass
@@ -1613,31 +1357,83 @@ class FakeWorld:
     root: str
     repo: str
     tree: str
+    entries: str   # LONG_RUN_ITEMS_SELFTEST_ENTRIES 那一份
 
-    def inputs(self, toolchain: str = "cargo 1\nrustc 1\n", python: str = "Python fake", environment: dict[str, str] | None = None) -> TreeInputs:
-        dep_infos = {"device": os.path.join(self.tree, "target/release", DEVICE_BINARY + ".d"), "e170": os.path.join(self.tree, "target/release", E170_BINARY + ".d")}
-        return tree_inputs(self.repo, self.tree, dep_infos, toolchain, python, environment or {}, ["<构建环境：假> 0"])
+    def facts(self, environment: dict[str, str] | None = None) -> TreeFacts:
+        return tree_facts(self.repo, self.tree, environment or {})
 
 
 def fake_world(root: str, mutated_text: str = "fn f() { yx }\n") -> FakeWorld:
-    repo, tree = os.path.join(root, "repo"), os.path.join(root, "repo", "scripts/experiment-apparatus/target/fake-tree")
-    for relative, text in (("Cargo.toml", "[workspace]\n"), ("Cargo.lock", "# lock\n"), (".cargo/config.toml", "[build]\n"),
-                           ("crates/core/Cargo.toml", "[package]\nname='core'\n"), ("crates/core/src/mutated.rs", mutated_text),
-                           ("crates/core/src/lib.rs", 'fn read() { std::env::var("SINGLEFS_FAKE_SWITCH"); std::env::var("SINGLEFS_THREAD_CAP"); }\n'),
-                           ("crates/core/src/other.rs", "fn g() { alpha; gamma }\n"), ("crates/mutations.tsv", FAKE_MUTATIONS)):
-        write_text(os.path.join(tree, relative), text)
-    listed = " ".join(os.path.join(tree, "crates/core/src", name) for name in ("lib.rs", "mutated.rs", "other.rs"))
-    for binary in (DEVICE_BINARY, E170_BINARY):
-        write_text(os.path.join(tree, "target/release", binary + ".d"), f"{tree}/target/release/{binary}: {listed}\n\n{listed}:\n")
-    research = os.path.join(repo, RESEARCH_RELATIVE)
-    for name in FAKE_RESEARCH_FILES:
-        write_text(os.path.join(research, name), f"# 假的 {name}\n")
-    write_text(os.path.join(research, SELECTED_ROW_TABLES[0]), FAKE_SELECTED_117)
-    write_text(os.path.join(research, SELECTED_ROW_TABLES[1]), FAKE_SELECTED_164)
-    write_text(os.path.join(repo, EXECUTOR_RELATIVE, "executor_main.py"), "# 假执行器\n")
+    repo = os.path.join(root, "repo")
+    tree = os.path.join(repo, FAKE_TREE_RELATIVE)
+    plant_key_skeleton(repo)
+    furnish_tree(tree, mutated_text)
+    write_text(os.path.join(repo, RESEARCH_RELATIVE, SELECTED_ROW_TABLES[0]), FAKE_SELECTED_117)
+    write_text(os.path.join(repo, RESEARCH_RELATIVE, SELECTED_ROW_TABLES[1]), FAKE_SELECTED_164)
     write_text(os.path.join(repo, FREEZE_REFERENCE_RELATIVE), "E7RESULT name=freeze fake=1\n")
-    write_text(os.path.join(repo, MUTATIONS_TABLE_RELATIVE), "# 假变异表\n")
-    return FakeWorld(root, repo, tree)
+    return FakeWorld(root, repo, tree, write_text(os.path.join(root, "entries.tsv"), ""))
+
+
+def furnish_rows_world(repo: str, tree: str, numbers: tuple[int, ...]) -> None:
+    """两份逐行编排自证用：往编排器自己的假仓与假树里补上算键要的几样（plant_key_skeleton、假树、行表）。行表里点名的行号都指 m-row-two
+    （other.rs 里 alpha → beta），第 1 行指 m-row-one（空变异取它）。先补再算 H3、H8。"""
+    plant_key_skeleton(repo)
+    furnish_tree(tree)
+    research = os.path.join(repo, RESEARCH_RELATIVE)
+    table = "1\t1\tcrates/core/src/mutated.rs\t0\tm-row-one\taaaaaaaaaaaa\n" + "".join(
+        f"{number}\t2\tcrates/core/src/other.rs\t0\tm-row-two\t{number:012d}\n" for number in sorted(set(numbers) - {0, 1}))
+    write_text(os.path.join(research, SELECTED_ROW_TABLES[0]), table)
+    write_text(os.path.join(research, SELECTED_ROW_TABLES[1]), "")
+    # 假仓里的参照可能是指向真仓 research/results/ 下产物的链接（编排器自证的假仓就是）：链在就不写，悬空时 open(..., "w") 会顺着链把假内容写进真仓
+    if not os.path.lexists(os.path.join(repo, FREEZE_REFERENCE_RELATIVE)):
+        write_text(os.path.join(repo, FREEZE_REFERENCE_RELATIVE), "E7RESULT name=freeze fake=1\n")
+
+
+def selftest_entries(path: str, units: list[str]) -> str:
+    """自证：这几项的装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成 long_run_item_verdicts 的假入口 measure_alpha（line:、judge:、@input、@files 照留）。
+    path 里已有的项不再写；交回 path。"""
+    known = {line.split("\t", 1)[0] for line in open(path, encoding="utf-8")} if os.path.exists(path) else set()
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.writelines(f"{item_name(unit)}\t{items_library.FAKE_MODULE}::measure_alpha\n" for unit in units if item_name(unit) not in known)
+    return path
+
+
+@contextlib.contextmanager
+def items_environment(world: FakeWorld, sentinels: str = ALL_SENTINELS, seed: str | None = None):
+    """这一格读写临时服务里它自己的那一份命名空间、换假入口、定哨兵条数与种子；出 with 还原。"""
+    checks = items_library.lib_reuse_checks
+    settings = {items_library.LIBRARY_DIRECTORY_VARIABLE: os.path.join(world.root, "library"), items_library.SUBSTITUTION_VARIABLE: world.entries,
+                checks.SENTINEL_COUNT_VARIABLE: sentinels, checks.SENTINEL_SEED_VARIABLE: seed}
+    saved = {name: os.environ.get(name) for name in settings}
+    for name, setting in settings.items():
+        if setting is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = setting
+    try:
+        yield
+    finally:
+        for name, setting in saved.items():
+            if setting is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = setting
+
+
+def quiet(_line: str) -> None:
+    """自证里不打 long_run_item_verdicts 的计划与收尾那几行。"""
+
+
+def keys_of(world: FakeWorld, requests: list[UnitRequest]) -> dict[str, str | None]:
+    selftest_entries(world.entries, [request.unit for request in requests])
+    with items_environment(world):
+        return {unit: key for unit, (key, _why) in keyed_items(world.repo, requests).items()}
+
+
+def keys_differ(world: FakeWorld, first: UnitRequest, second: UnitRequest) -> tuple[bool, str]:
+    keys = keys_of(world, [first, second])
+    a, b = keys[first.unit], keys[second.unit]
+    return a is not None and b is not None and a != b, f"{first.unit} 键 {str(a)[:12]}，{second.unit} 键 {str(b)[:12]}（两把都算得出且不同才过）"
 
 
 def fake_device_reading(directory: str, unit: str, exit_code: int = 0) -> dict[str, str]:
@@ -1666,48 +1462,6 @@ def fake_row_reading(directory: str, unit: str, device_exit: int = 0, executor: 
     return {"row": row}
 
 
-def furnish_rows_world(repo: str, tree: str, numbers: tuple[int, ...]) -> None:
-    """两份逐行编排自证用：往编排器自己的假仓与假树里补上算键要的几样（假 core、变异表、两份 dep-info、研究一侧驱动闭包与执行器、行表）。
-    行表里点名的行号都指 m-row-two（other.rs 里 alpha → beta），第 1 行指 m-row-one（空变异取它）。先补再算 H3、H8。"""
-    for relative, text in (("crates/core/Cargo.toml", "[package]\nname='core'\n"), ("crates/core/src/mutated.rs", "fn f() { yx }\n"),
-                           ("crates/core/src/lib.rs", 'fn read() { std::env::var("SINGLEFS_FAKE_SWITCH"); }\n'),
-                           ("crates/core/src/other.rs", "fn g() { alpha; gamma }\n"), ("crates/mutations.tsv", FAKE_MUTATIONS)):
-        write_text(os.path.join(tree, relative), text)
-    listed = " ".join(os.path.join(tree, "crates/core/src", name) for name in ("lib.rs", "mutated.rs", "other.rs"))
-    for binary in (DEVICE_BINARY, E170_BINARY):
-        write_text(os.path.join(tree, "target/release", binary + ".d"), f"{tree}/target/release/{binary}: {listed}\n")
-    research = os.path.join(repo, RESEARCH_RELATIVE)
-    for name in FAKE_RESEARCH_FILES:
-        write_text(os.path.join(research, name), f"# 假的 {name}\n")
-    table = "1\t1\tcrates/core/src/mutated.rs\t0\tm-row-one\taaaaaaaaaaaa\n" + "".join(
-        f"{number}\t2\tcrates/core/src/other.rs\t0\tm-row-two\t{number:012d}\n" for number in sorted(set(numbers) - {0, 1}))
-    write_text(os.path.join(research, SELECTED_ROW_TABLES[0]), table)
-    write_text(os.path.join(research, SELECTED_ROW_TABLES[1]), "")
-    write_text(os.path.join(repo, EXECUTOR_RELATIVE, "executor_main.py"), "# 假执行器\n")
-    # 假仓里的参照可能是指向真仓 research/results/ 下产物的链接（编排器自证的假仓就是）：链在就不写，悬空时 open(..., "w") 会顺着链把假内容写进真仓
-    if not os.path.lexists(os.path.join(repo, FREEZE_REFERENCE_RELATIVE)):
-        write_text(os.path.join(repo, FREEZE_REFERENCE_RELATIVE), "E7RESULT name=freeze fake=1\n")
-
-
-FAKE_DRIVER_WRAPPER = r'''#!/usr/bin/env python3
-"""自证用：先起编排器自证那个假逐行驱动，再在 <工作根>/lane0 下放一份「这一次编译」的 dep-info（路径换成线道那棵树），给 RC4 核。"""
-import os, shutil, subprocess, sys
-arguments = sys.argv[1:]
-code = subprocess.run([sys.executable, "-B", "FAKE_DRIVER_PATH"] + arguments).returncode
-value = lambda option: arguments[arguments.index(option) + 1]
-snapshot, lane = value("--snapshot-from"), os.path.join(value("--work-root"), "lane0")
-release = os.path.join(snapshot, "target", "release")  # 别的台那一份快照不带 target/：那边不做 RC4（H35），不放
-if os.path.isdir(release):
-    shutil.copytree(os.path.join(snapshot, "crates"), os.path.join(lane, "tree", "crates"), dirs_exist_ok=True)
-    os.makedirs(os.path.join(lane, "target", "release"), exist_ok=True)
-for name in os.listdir(release) if os.path.isdir(release) else []:
-    if name.endswith(".d"):
-        text = open(os.path.join(snapshot, "target", "release", name), encoding="utf-8").read().replace(snapshot, os.path.join(lane, "tree"))
-        open(os.path.join(lane, "target", "release", name), "w", encoding="utf-8").write(text)
-sys.exit(code)
-'''
-
-
 def fake_judge(reading: dict[str, str]) -> str:
     """假判法：读产物或 row-result.tsv（取来的与现跑的都读）。"""
     if "row" in reading:
@@ -1715,285 +1469,202 @@ def fake_judge(reading: dict[str, str]) -> str:
     return open(reading["product"], encoding="utf-8").read().strip()
 
 
-def library_in(scratch: str) -> Library:
-    """这一格自己的那一份库：库根取格的临时目录下的名字，临时服务底下各占一份命名空间（文件头「库」）。"""
-    return Library(os.path.join(scratch, "library"))
+def row_two(world: FakeWorld, name: str = "seg2-row-2", limit: int | None = 1800, selected: dict[int, str] | None = None,
+            facts: TreeFacts | None = None) -> UnitRequest:
+    row = RowUnit(name, 2, False, ("--streams", "1,2", "--no-executor"), False, False)
+    return row_request(facts or world.facts(), row, selected or selected_row_lines(world.repo), limit, [])
 
 
-def reuse_across(scratch: str, first_sections: dict, second_sections: dict, kind: str = "device") -> tuple[bool, str]:
-    """第一份键现跑、入库，再拿第二份查：交回 (第二份取到了没有, 细节)。"""
-    library, markers = library_in(scratch), os.path.join(scratch, "markers")
-    first, _ = decide(library, "unit", kind, first_sections, "", False)
-    record_finished(library, markers, first, fake_device_reading(os.path.join(scratch, "first"), "unit"), (True, ""), {"exit": "0"})
-    second, _ = decide(library, "unit", kind, second_sections, "", True)
-    return second.state == STATE_REUSED, f"键 {first.key[:12]} → {second.key[:12]}，第二份 {second.state}（{second.reason}）"
+def device_unit(name: str, arguments: str, kind: str = "device", fresh_always: bool = False) -> ReadingUnit:
+    return ReadingUnit(name, name, name, kind, arguments, fresh_always=fresh_always)
 
 
-def missed(outcome: tuple[bool, str]) -> tuple[bool, str]:
-    return not outcome[0], outcome[1]
-
-
-def row_two(world: FakeWorld, inputs: TreeInputs | None = None, selected: dict[int, str] | None = None, limit: int = 1800) -> dict:
-    row = RowUnit("seg2-row-2", 2, False, ("--streams", "1,2", "--no-executor"), False, False)
-    return row_sections(inputs or world.inputs(), row, selected or selected_row_lines(world.repo), limit_lines(limit), [])[0]
-
-
-def cell_rp3_kind(scratch: str) -> tuple[bool, str]:
+def cell_request_kind(scratch: str) -> tuple[bool, str]:
+    """参数相同、种类不同（装置与 E170 导出装置）的两个读数单元：键不同。"""
     world = fake_world(os.path.join(scratch, "world"))
-    inputs = world.inputs()
-    device = ReadingUnit("u", "u", "u", "device", "baseline --streams 1")
-    return missed(reuse_across(scratch, reading_unit_sections(inputs, device, []),
-                               reading_unit_sections(inputs, dataclasses.replace(device, kind="e170"), [])))
+    facts = world.facts()
+    return keys_differ(world, reading_unit_request(facts, device_unit("u-device", "baseline --streams 1"), []),
+                       reading_unit_request(facts, device_unit("u-e170", "baseline --streams 1", "e170"), []))
 
 
-def cell_rp3_build(scratch: str) -> tuple[bool, str]:
+def cell_request_arguments(scratch: str) -> tuple[bool, str]:
     world = fake_world(os.path.join(scratch, "world"))
-    device = ReadingUnit("u", "u", "u", "device", "baseline --streams 1")
-    return missed(reuse_across(scratch, reading_unit_sections(world.inputs(toolchain="cargo 1\n"), device, []),
-                               reading_unit_sections(world.inputs(toolchain="cargo 2\n"), device, [])))
+    facts = world.facts()
+    return keys_differ(world, reading_unit_request(facts, device_unit("u-first", "baseline --streams 2 --positive-control O1-对拍"), []),
+                       reading_unit_request(facts, device_unit("u-second", "baseline --streams 2 --positive-control O1-对拍-卸载"), []))
 
 
-def cell_rp3_closure(scratch: str) -> tuple[bool, str]:
+def cell_request_limit(scratch: str) -> tuple[bool, str]:
     world = fake_world(os.path.join(scratch, "world"))
-    first = row_two(world)
-    write_text(os.path.join(world.tree, "crates/core/src/lib.rs"), open(os.path.join(world.tree, "crates/core/src/lib.rs")).read() + "// 改了\n")
-    return missed(reuse_across(scratch, first, row_two(world), "driver-row"))
+    return keys_differ(world, row_two(world, "seg2-row-2", 1800), row_two(world, "seg2-rerun-row-2", 2400))
 
 
-def cell_rp3_closure_mutated_content(scratch: str) -> tuple[bool, str]:
-    """改坏之前那份文件不同、改坏之后逐字节相同（编进去的源码一样）：照第 11.2 节 [closure] 取改坏之后的内容，要取到。"""
-    first_world, second_world = fake_world(os.path.join(scratch, "a"), "fn f() { yx }\n"), fake_world(os.path.join(scratch, "b"), "fn f() { xy }\n")
-    row = RowUnit("seg2-row-1", 1, False, ("--streams", "1,2", "--no-executor"), False, False)
-    first = row_sections(first_world.inputs(), row, selected_row_lines(first_world.repo), limit_lines(1800), [])[0]
-    second = row_sections(second_world.inputs(), row, selected_row_lines(second_world.repo), limit_lines(1800), [])[0]
-    return reuse_across(scratch, first, second, "driver-row")
-
-
-def cell_rp3_env(scratch: str) -> tuple[bool, str]:
-    """设了一个闭包里读的变量：键不同，且那个单元不查库（即便库里有它那个键）。"""
+def cell_request_upstream(scratch: str) -> tuple[bool, str]:
+    """执行器的上游导出目录里一个文件多一个字：键不同（上游按读数的内容进键）。"""
     world = fake_world(os.path.join(scratch, "world"))
-    device = ReadingUnit("u", "u", "u", "device", "baseline --streams 1")
-    unset_sections = reading_unit_sections(world.inputs(environment={}), device, [])
-    set_sections = reading_unit_sections(world.inputs(environment={"SINGLEFS_FAKE_SWITCH": "1"}), device, [])
-    hit, detail = reuse_across(scratch, unset_sections, set_sections)
-    decision, _ = decide(library_in(scratch), "unit", "device", set_sections, "", True)
-    return not hit and key_of(unset_sections) != key_of(set_sections) and decision.reason == "env-set", f"{detail}；设了变量的那一份 {decision.reason}"
+    facts = world.facts()
+    export = fake_device_reading(os.path.join(scratch, "upstream"), "step-1")["directory"]
+    unit = [unit for unit in SEGMENT_ONE_READING_UNITS if unit.name == "step-5"][0]
+    first = reading_unit_request(facts, unit, [("device-baseline", export)])
+    with open(os.path.join(export, "new_pool_file_creation", "states.tsv"), "a", encoding="utf-8") as handle:
+        handle.write("x")
+    second = reading_unit_request(facts, dataclasses.replace(unit, name="step-5-again"), [("device-baseline", export)])
+    return keys_differ(world, first, second)
 
 
-def cell_rp3_mutation(scratch: str) -> tuple[bool, str]:
+def cell_request_mutation(scratch: str) -> tuple[bool, str]:
+    """只改行表里第 2 行那一行（行文 sha256 前缀那一列）：键不同；只改变异表里那一行的替换文（改坏之后的源码不进闭包，由变异行原文进键）：键不同。"""
     world = fake_world(os.path.join(scratch, "world"))
     selected = selected_row_lines(world.repo)
     changed = {**selected, 2: selected[2].replace("bbbbbbbbbbbb", "bbbbbbbbbbbc")}
-    return missed(reuse_across(scratch, row_two(world, selected=selected), row_two(world, selected=changed), "driver-row"))
+    table_line, table_detail = keys_differ(world, row_two(world, "seg2-row-2", selected=selected), row_two(world, "seg2-again-row-2", selected=changed))
+    before = row_two(world, "seg2-before-row-2")
+    mutations = os.path.join(world.tree, "crates", "mutations.tsv")
+    write_text(mutations, open(mutations, encoding="utf-8").read().replace("\talpha\tbeta\t", "\talpha\tbetb\t"))
+    mutation_line, mutation_detail = keys_differ(world, before, row_two(world, "seg2-after-row-2"))
+    return table_line and mutation_line, f"行表那一行：{table_detail}；变异表那一行：{mutation_detail}"
 
 
-def cell_rp3_args(scratch: str) -> tuple[bool, str]:
+def cell_request_judge_closure(scratch: str) -> tuple[bool, str]:
+    """判这一行的函数（假仓里拷的 row_driver.py 的 run_row_on_the_lane）改了一处代码：键不同。"""
     world = fake_world(os.path.join(scratch, "world"))
-    inputs = world.inputs()
-    first, second = (ReadingUnit("u", "u", "u", "device", f"baseline --streams 2 --positive-control {control}") for control in ("O1-对拍", "O1-对拍-卸载"))
-    return missed(reuse_across(scratch, reading_unit_sections(inputs, first, []), reading_unit_sections(inputs, second, [])))
+    first = keys_of(world, [row_two(world)])["seg2-row-2"]
+    driver = os.path.join(world.repo, RESEARCH_RELATIVE, "row_driver.py")
+    anchor = "timed_out_before = bool(" + "arguments.timed_out_before)"
+    text = open(driver, encoding="utf-8").read()
+    if text.count(anchor) != 1:
+        return False, f"假仓里的 row_driver.py 里「{anchor}」不是恰好一处（{text.count(anchor)} 处）"
+    write_text(driver, text.replace(anchor, anchor + " and True"))
+    second = keys_of(world, [row_two(world)])["seg2-row-2"]
+    return first is not None and second is not None and first != second, f"动它之前的键 {str(first)[:12]}，动了之后的键 {str(second)[:12]}"
 
 
-def cell_rp3_limit(scratch: str) -> tuple[bool, str]:
+def cell_request_freeze_reference(scratch: str) -> tuple[bool, str]:
+    """冻结行那份产物多一行：跑执行器的两样，键都变；不动它再算一遍，键都不变。
+    执行器那一个读数单元（step-5，判法 frozen_o3.py::run_executor）的判法闭包不读这份产物，只经 @input 进键：弄坏开关 freeze-reference-unkeyed 红在它；
+    跑执行器的一行（seg1-s12-row-1）的判法闭包另经起执行器与 O3 对照那一路读到这份产物，它的键不只靠 @input。"""
     world = fake_world(os.path.join(scratch, "world"))
-    return missed(reuse_across(scratch, row_two(world, limit=1800), row_two(world, limit=2400), "driver-row"))
-
-
-def cell_rp3_upstream(scratch: str) -> tuple[bool, str]:
-    world = fake_world(os.path.join(scratch, "world"))
-    inputs = world.inputs()
+    executor = [unit for unit in SEGMENT_ONE_READING_UNITS if unit.name == "step-5"][0]
     export = fake_device_reading(os.path.join(scratch, "upstream"), "step-1")["directory"]
-    unit = [unit for unit in SEGMENT_ONE_READING_UNITS if unit.name == "step-5"][0]
-    first = reading_unit_sections(inputs, unit, upstream_lines([("device-baseline", "step-1", export)]))
-    with open(os.path.join(export, "new_pool_file_creation", "states.tsv"), "a", encoding="utf-8") as handle:
-        handle.write("x")
-    second = reading_unit_sections(inputs, unit, upstream_lines([("device-baseline", "step-1", export)]))
-    return missed(reuse_across(scratch, first, second, "o3-executor"))
+    row = RowUnit("seg1-s12-row-1", 1, False, ("--keep-dumps", "--streams", "1,2,3"), True, False, owner="s12")
+
+    def executor_and_row_keys() -> tuple[str | None, str | None]:
+        found = keys_of(world, [reading_unit_request(world.facts(), executor, [("device-baseline", export)]),
+                                row_request(world.facts(), row, selected_row_lines(world.repo), 1800, [])])
+        return found[executor.name], found[row.name]
+
+    before, again = executor_and_row_keys(), executor_and_row_keys()
+    with open(os.path.join(world.repo, FREEZE_REFERENCE_RELATIVE), "a", encoding="utf-8") as handle:
+        handle.write("E7RESULT name=freeze fake=2\n")
+    after = executor_and_row_keys()
+    good = None not in before + after and before == again and before[0] != after[0] and before[1] != after[1]
+    return good, (f"执行器 step-5：多一行之前 {str(before[0])[:12]}、不动再算 {str(again[0])[:12]}、多一行之后 {str(after[0])[:12]}；"
+                  f"跑执行器的一行 seg1-s12-row-1：之前 {str(before[1])[:12]}、不动再算 {str(again[1])[:12]}、之后 {str(after[1])[:12]}")
 
 
-def cell_rp3_research(scratch: str) -> tuple[bool, str]:
-    """驱动 import 的一个模块（device_timing.py）改了：驱动行的键要变。"""
+def cell_request_environment_set(scratch: str) -> tuple[bool, str]:
+    """树里源码读的变量此刻设着：装置单元与驱动的一行都拒算 env-set；只设了线程数变量的不拒。"""
     world = fake_world(os.path.join(scratch, "world"))
-    first = row_two(world)
-    write_text(os.path.join(world.repo, RESEARCH_RELATIVE, "device_timing.py"), "# 改过的 device_timing.py\n")
-    return missed(reuse_across(scratch, first, row_two(world), "driver-row"))
+    unit = device_unit("u", "baseline --streams 1")
+    reasons = {label: (reading_unit_request(world.facts(environment), unit, []).reason, row_two(world, facts=world.facts(environment)).reason)
+               for label, environment in (("unset", {}), ("set", {"SINGLEFS_FAKE_SWITCH": "1"}), ("threads-only", {"SINGLEFS_THREAD_CAP": "4"}))}
+    return reasons == {"unset": ("", ""), "set": ("env-set", "env-set"), "threads-only": ("", "")}, f"各样的拒算缘由：{reasons}"
 
 
-def cell_rp3_python(scratch: str) -> tuple[bool, str]:
+def cell_request_module_set_refused(scratch: str) -> tuple[bool, str]:
+    """改坏那一处碰到模块集合的第 3 行（m-module：替换文带 mod）拒算 touches-module-set；第 2 行照常进计划。"""
     world = fake_world(os.path.join(scratch, "world"))
-    return missed(reuse_across(scratch, row_two(world, inputs=world.inputs(python="Python 3.12.3 甲")),
-                               row_two(world, inputs=world.inputs(python="Python 3.12.4 乙")), "driver-row"))
+    selected = selected_row_lines(world.repo)
+    reasons = {number: row_request(world.facts(), RowUnit(f"seg2-row-{number}", number, False, ("--streams", "1,2", "--no-executor"), False, False),
+                                   selected, 1800, []).reason for number in (2, 3)}
+    return reasons == {2: "", 3: "touches-module-set"}, f"各行的拒算缘由：{reasons}"
 
 
-def killed_in_child(point: str, action) -> int:
-    """在一个 fork 出的子进程里走 action，走到 point 那一处它给自己发 SIGKILL（只在这个子进程里设变量）。交回子进程的退出码（-9 是被杀）。"""
-    import multiprocessing  # noqa: E402
-
-    def child() -> None:
-        os.environ[SELFTEST_VARIABLE], os.environ[KILL_POINT_VARIABLE] = "1", point
-        action()
-
-    process = multiprocessing.get_context("fork").Process(target=child)
-    process.start()
-    process.join(60)
-    return process.exitcode
-
-
-def half_entries(library: Library) -> list[str]:
-    """服务里读数与 manifest 对不上（含没有 manifest、解不开）的条目。"""
-    found = []
-    for key in library.entry_keys():
-        with library.extracted(key) as (entry, unreadable):
-            if unreadable or manifest_problems(entry):
-                found.append(key[:12])
-    return found
+def location_keys(root: str) -> dict[str, str | None]:
+    """root 底下一份假仓与假树上各类单元的键：装置、带上游导出目录的 E170 导出装置与执行器、变异驱动、第二段一行、第一段一行（空变异）。"""
+    world = fake_world(root)
+    facts = world.facts()
+    upstream = [("e170-export", write_text(os.path.join(root, "upstream-export", "new_pool_file_creation", "states.tsv"), "上游导出\n").rsplit("/", 2)[0])]
+    units = {unit.name: unit for unit in SEGMENT_ONE_READING_UNITS}
+    requests = [reading_unit_request(facts, units["step-1"], []), reading_unit_request(facts, units["step-2b"], upstream),
+                reading_unit_request(facts, units["step-5"], upstream), reading_unit_request(facts, units["research-mutations"], []), row_two(world, facts=facts),
+                row_request(facts, RowUnit("seg1-s12-row-0", 0, True, ("--empty-mutation", "--keep-dumps", "--streams", "1,2,3"), True, True, owner="s12"),
+                            selected_row_lines(world.repo), 1800, upstream)]
+    return keys_of(world, requests)
 
 
-def cell_rp5_atomic_insert(scratch: str) -> tuple[bool, str]:
-    """在拼 manifest 之前、写进服务之前各杀一次：服务里没有这把键的条目、也没有半条；那一单元再入库照常 inserted、整份核得过。"""
-    library = library_in(scratch)
+def cell_key_independent_of_location(scratch: str) -> tuple[bool, str]:
+    """同一份假仓与假树（连上游导出）放在两处：一处在主树的位置，一处在另一处的副本目录底下、多套几层；各类单元的键逐个相同、都算得出。"""
+    here, there = location_keys(os.path.join(scratch, "main-tree")), location_keys(os.path.join(scratch, "copies", "nested", "copy-of-the-tree"))
+    differing = sorted(unit for unit in here if here[unit] is None or here[unit] != there.get(unit))
+    return not differing, (f"{len(here)} 个单元的键都相同" if not differing else f"键随所在目录变了或算不出：{', '.join(differing)}")
+
+
+def cell_packing_deterministic(scratch: str) -> tuple[bool, str]:
+    """同一份读数改了修改时刻再打一次，两份值逐字节相同；解回来文件、内容、空目录都与原来一样。"""
     reading = fake_device_reading(os.path.join(scratch, "reading"), "unit")
-    sections = {"kind": ["device"], "args": ["baseline --streams 1"]}
-    codes, half, present = [], [], []
-    for point in ("before-manifest", "before-store"):  # 每杀一次就数一遍：第二次入库会把第一次留下的坏条目挪走，攒到最后再数就看不见
-        codes.append(killed_in_child(point, lambda: library.insert(key_of(sections), key_text(sections), "device", reading, {"exit": "0"})))
-        half += [f"{point}:{key}" for key in half_entries(library)]
-        present.append(library.present(key_of(sections)))
-    state, _ = library.insert(key_of(sections), key_text(sections), "device", reading, {"exit": "0"})
-    good = codes == [-signal.SIGKILL, -signal.SIGKILL] and not half and present == [False, False] and state == "inserted" \
-        and not half_entries(library) and library.entry_keys() == [key_of(sections)]
-    return good, f"子进程退出码 {codes}；被杀之后服务里半条条目 {half or '无'}、这把键在不在 {present}；再入库 {state}；库里条目 {len(library.entry_keys())} 条"
+    os.makedirs(os.path.join(reading["directory"], "empty-stream"))
+    first = packed_reading(reading)
+    for path in [reading["product"], reading["timing"]] + [os.path.join(reading["directory"], relative) for relative in files_under(reading["directory"])]:
+        os.utime(path, (1_000_000_000, 1_000_000_000))
+    second = packed_reading(reading)
+    targets = {role: os.path.join(scratch, "unpacked", role) for role in reading}
+    unpack_reading(second, targets)
+    same = same_bytes(reading, targets) and os.path.isdir(os.path.join(targets["directory"], "empty-stream"))
+    return first == second and same, f"两份值逐字节相同 {first == second}；解回来与原来相同 {same}"
 
 
-def cell_rp6_closure(scratch: str, extra_file) -> tuple[bool, str]:
-    """extra_file(假树) 交回现跑那一次的 dep-info 比键多出来的那个文件。"""
-    world = fake_world(os.path.join(scratch, "world"))
-    extra_line = extra_file(world)
-    inputs = world.inputs()
-    markers = os.path.join(scratch, "markers")
-    sections = row_two(world, inputs=inputs)
-    decision, _ = decide(None, "seg2-row-2", "driver-row", sections, "", False)
-    write_marker(markers, decision)
-    listed = " ".join(os.path.join(world.tree, "crates/core/src", name) for name in ("lib.rs", "mutated.rs", "other.rs")) + " " + extra_line
-    dep_info = write_text(os.path.join(scratch, "compiled.d"), f"{world.tree}/target/release/x: {listed}\n")
-    matches = closure_check(markers, decision, world.tree, dep_info, mutated_closure_paths(inputs))
-    text, _ = ledger_text(markers, [decision.unit])
-    return not matches and " closure_mismatches=1 " in text and bool(s18_problems(markers)), \
-        f"相符 {str(matches).lower()}；账本末行 {text.strip().splitlines()[-1][:120]}；S18 {len(s18_problems(markers))} 行"
-
-
-def cell_rp6_closure_extra_file(scratch: str) -> tuple[bool, str]:
-    """现跑那一次的 dep-info 多一个树里有、键里没有的文件。"""
-    return cell_rp6_closure(scratch, lambda world: write_text(os.path.join(world.tree, "crates/core/src/extra.rs"), "fn extra() {}\n"))
-
-
-def cell_rp6_closure_outside_the_tree(scratch: str) -> tuple[bool, str]:
-    """现跑那一次的 dep-info 里有树外的路径。"""
-    return cell_rp6_closure(scratch, lambda world: write_text(os.path.join(scratch, "outside.rs"), "fn outside() {}\n"))
-
-
-def cell_rp7_check_mismatch(scratch: str) -> tuple[bool, str]:
-    """同键第二次跑时导出里一个文件多一字节（E7RESULT 产物不变）：present-differs、check_mismatches=1、S18。"""
-    library, markers = library_in(scratch), os.path.join(scratch, "markers")
-    sections = {"kind": ["device"], "args": ["baseline --streams 1,2,3 --writable-mount-probe"]}
-    first, _ = decide(library, "step-7", "device", sections, "", False)
-    record_finished(library, markers, first, fake_device_reading(os.path.join(scratch, "first"), "baseline"), (True, ""), {"exit": "0"})
-    second_reading = fake_device_reading(os.path.join(scratch, "second"), "baseline")
-    with open(os.path.join(second_reading["directory"], "new_pool_file_creation", "states.tsv"), "a", encoding="utf-8") as handle:
+def cell_reading_equality(scratch: str) -> tuple[bool, str]:
+    """读数相等：两趟假装置（计时、impl-verdicts.tsv 耗时列不同）相等，导出里一个文件多一字节不等；两趟假驱动行（易变键、o3 的耗时不同）相等，device.out 掺一个字不等。"""
+    first, second = fake_device_reading(os.path.join(scratch, "a"), "unit"), fake_device_reading(os.path.join(scratch, "b"), "unit")
+    equal_devices = reading_differences("device", first, second)
+    with open(os.path.join(second["directory"], "new_pool_file_creation", "states.tsv"), "a", encoding="utf-8") as handle:
         handle.write("x")
-    second, _ = decide(library, "step-9", "device", sections, "second-run", True)
-    write_marker(markers, first)
-    write_marker(markers, second)
-    state = record_finished(library, markers, second, second_reading, (True, ""), {"exit": "0"})
-    text, _ = ledger_text(markers, ["step-7", "step-9"])
-    with library.extracted(first.key) as (entry, _unreadable):
-        same_product = entry is not None and open(second_reading["product"], "rb").read() == open(entry_reading(entry)["product"], "rb").read()
-    good = state == "present-differs" and " check_mismatches=1 " in text and bool(s18_problems(markers)) and same_product
-    return good, f"第二次入库 {state}；产物相同 {same_product}；账本末行 {text.strip().splitlines()[-1][:110]}"
+    unequal_devices = reading_differences("device", first, second)
+    row_a, row_b = fake_row_reading(os.path.join(scratch, "c"), "row"), fake_row_reading(os.path.join(scratch, "d"), "row")
+    equal_rows = reading_differences("driver-row", row_a, row_b)
+    with open(os.path.join(row_b["row"], "device.out"), "a", encoding="utf-8") as handle:
+        handle.write("E7RESULT name=salt\n")
+    unequal_rows = reading_differences("driver-row", row_a, row_b)
+    good = (not equal_devices and unequal_devices == ["directory/new_pool_file_creation/states.tsv"] and not equal_rows and unequal_rows == ["row/device.out"])
+    return good, f"装置 {equal_devices} → {unequal_devices}；驱动行 {equal_rows} → {unequal_rows}"
 
 
-def cell_rp8_corrupted_entry(scratch: str) -> tuple[bool, str]:
-    """库里一条条目的读数改一字节（manifest 不动，重新打包写回服务）：不取它、挪进 quarantine/、现跑；账本 corrupted_entries=1；现跑完照常入库。"""
-    library, markers = library_in(scratch), os.path.join(scratch, "markers")
-    sections = {"kind": ["device"], "args": ["baseline --streams 1,2"]}
-    first, _ = decide(library, "step-1", "device", sections, "", False)
-    record_finished(library, markers, first, fake_device_reading(os.path.join(scratch, "first"), "s2"), (True, ""), {"exit": "0"})
-    with library.extracted(first.key) as (entry, unreadable):
-        if entry is None:
-            return False, f"头一次入库之后条目读不回（{unreadable}）"
-        entry_file = os.path.join(entry, "reading", "product")
-        damaged = open(entry_file, "rb").read() + b"x"
-        os.remove(entry_file)
-        with open(entry_file, "wb") as handle:
-            handle.write(damaged)
-        library.store.write(library.entry_name(first.key), packed_entry(entry))
-    second, problems = decide(library, "step-1", "device", sections, "", True)
-    note_decision(markers, second, problems)
-    quarantined = len(library.quarantined())
-    state = record_finished(library, markers, second, fake_device_reading(os.path.join(scratch, "second"), "s2"), (True, ""), {"exit": "0"})
-    text, _ = ledger_text(markers, ["step-1"])
-    good = second.state == STATE_FRESH and second.reason == "corrupted-entry" and quarantined == 1 and " corrupted_entries=1 " in text and state == "inserted"
-    return good, f"第二次 {second.state}（{second.reason}）；隔离目录 {quarantined} 条；现跑完 {state}；账本末行 {text.strip().splitlines()[-1][:100]}"
+def cell_insert_conditions(scratch: str) -> tuple[bool, str]:
+    """入库条件：装置退 0、预期退 3 入；超时 253、包装自己的 250–252、254、不在预期里的不入；驱动行做完、没补位、核过重编的入，超时、补位、编不过、没核重编的不入。"""
+    devices = {code: device_exit_insertable(code, expected)[0] for code, expected in ((0, (0,)), (3, (3,)), (TIMEOUT_EXIT_CODE, (0,)), (251, (0,)), (3, (0,)))}
+    rows = {}
+    for label, changes in (("ok", {}), ("timeout", {"device_exit": str(TIMEOUT_EXIT_CODE)}), ("substituted", {"substituted_from": "m-row-one"}),
+                           ("compile-failed", {"status": "compile_failed", "device_exit": "-"}), ("rebuild-not-checked", {REBUILD_CHECK_FIELD: None})):
+        row = fake_row_reading(os.path.join(scratch, label), label)["row"]
+        fields = row_result_fields(row)
+        for name, setting in changes.items():
+            if setting is None:
+                fields.pop(name, None)
+            else:
+                fields[name] = setting
+        write_text(os.path.join(row, "row-result.tsv"), "".join(f"{name}\t{text}\n" for name, text in fields.items()))
+        rows[label] = row_insertable(row)[0]
+    good = (devices == {0: True, 3: False, TIMEOUT_EXIT_CODE: False, 251: False} and device_exit_insertable(3, (3,))[0]
+            and rows == {"ok": True, "timeout": False, "substituted": False, "compile-failed": False, "rebuild-not-checked": False})
+    return good, f"装置 {devices}；驱动行 {rows}"
 
 
-def fake_row_into(row_directory: str, identity: str, device_exit: int = 0, executor: bool = True) -> dict[str, str]:
-    """假驱动把一行写进行输出根下的 row-<n>/（row-result.tsv 最后写，同真驱动）。"""
-    os.makedirs(os.path.dirname(row_directory), exist_ok=True)
-    staging = tempfile.mkdtemp(dir=os.path.dirname(row_directory))
-    produced = fake_row_reading(staging, identity, device_exit, executor)["row"]
-    os.makedirs(row_directory)
-    for relative in sorted(files_under(produced), key=lambda path: path == "row-result.tsv"):
-        os.makedirs(os.path.dirname(os.path.join(row_directory, relative)), exist_ok=True)
-        os.rename(os.path.join(produced, relative), os.path.join(row_directory, relative))
-    shutil.rmtree(staging)
-    return {"row": row_directory}
-
-
-def row_decisions(world: FakeWorld, library: Library, rows: list[RowUnit], lookup: bool) -> list[Decision]:
-    inputs, selected = world.inputs(), selected_row_lines(world.repo)
-    decisions = []
-    for row in rows:
-        sections, reason = row_sections(inputs, row, selected, limit_lines(1800), [])
-        decisions.append(decide(library, row.name, "driver-row", sections, reason, lookup)[0])
-    return decisions
-
-
-def cell_rp4_resume_fetch(scratch: str) -> tuple[bool, str]:
-    """第二遍在现跑两行、取来两行之后断在第三行的取用中间，同一套再起：已取来的、已现跑完的都不再做；断在中间的那一行重取；
-    库里条目数等于入得了库的不同键数；账本 N + M 不变。"""
-    world, library = fake_world(os.path.join(scratch, "world")), library_in(scratch)
-    rows = [RowUnit(f"seg2-row-{number}", number, False, ("--streams", "1,2", "--no-executor"), False, False) for number in (1, 2, 4, 5, 3)]
-    exits = {"seg2-row-5": TIMEOUT_EXIT_CODE}
-    first_markers, second_markers = os.path.join(scratch, "markers-1"), os.path.join(scratch, "markers-2")
-    for decision, row in zip(row_decisions(world, library, rows, False), rows):
-        note_decision(first_markers, decision, [])
-        reading = fake_row_into(os.path.join(scratch, "rows-1", f"row-{row.number}"), decision.key[:16], exits.get(row.name, 0), False)
-        record_finished(library, first_markers, decision, reading, row_insertable(reading["row"]), {"exit": "0"})
-    decisions = row_decisions(world, library, rows, True)
-    root = os.path.join(scratch, "rows-2")
-    pairs = [(decision, os.path.join(root, f"row-{row.number}")) for decision, row in zip(decisions, rows)]
-
-    def interrupted_pass() -> None:
-        os.makedirs(root, exist_ok=True)
-        for decision, row_directory in pairs:
-            if decision.state != STATE_REUSED:
-                write_marker(second_markers, decision)
-                fake_row_into(row_directory, decision.key[:16], exits.get(decision.unit, 0), False)
-        fetch_rows(library, second_markers, pairs)
-
-    code = killed_in_child("before-row-result:row-4", interrupted_pass)
-    inodes_before = {row: os.stat(os.path.join(root, f"row-{row}", "row-result.tsv")).st_ino for row in (1, 2, 5, 3)}
-    partial = os.path.isdir(os.path.join(root, "row-4")) and not os.path.exists(os.path.join(root, "row-4", "row-result.tsv"))
-    fetched, demoted = fetch_rows(library, second_markers, pairs)
-    inodes_after = {row: os.stat(os.path.join(root, f"row-{row}", "row-result.tsv")).st_ino for row in (1, 2, 5, 3)}
-    entries = len(library.entry_keys())
-    text_one, covers_one = ledger_text(first_markers, [row.name for row in rows])
-    text_two, covers_two = ledger_text(second_markers, [row.name for row in rows])
-    good = (code == -signal.SIGKILL and partial and fetched == ["seg2-row-4"] and not demoted and inodes_before == inodes_after and entries == 3
-            and covers_one and covers_two and " reused=3 " in text_two and not reading_differences("driver-row", {"row": os.path.join(scratch, "rows-1", "row-4")},
-                                                                                                   {"row": os.path.join(root, "row-4")}))
-    return good, (f"子进程 {code}；断在中间的 row-4 {'是半份' if partial else '不是半份'}；续跑重取 {fetched}；别的行没再动 {inodes_before == inodes_after}；"
-                  f"库里 {entries} 条；账本 {text_two.strip().splitlines()[-1][:90]}")
+def cell_fetch_refuses_existing_targets(scratch: str) -> tuple[bool, str]:
+    """取用：目标已在（哪怕只有一个）就拒、一个目标都不写；值里没有的角色拒；都不在的照解。"""
+    value = packed_reading(fake_device_reading(os.path.join(scratch, "reading"), "unit"))
+    targets = {"product": os.path.join(scratch, "out", "product"), "directory": os.path.join(scratch, "out", "directory")}
+    unpack_reading(value, targets)
+    outcomes = {}
+    for label, wanted in (("existing", {"product": os.path.join(scratch, "again", "product"), "directory": targets["directory"]}),
+                          ("missing-role", {"row": os.path.join(scratch, "again", "row")})):
+        try:
+            unpack_reading(value, wanted)
+            outcomes[label] = "解了"
+        except (FileExistsError, ValueError) as error:
+            outcomes[label] = type(error).__name__
+    untouched = not os.path.lexists(os.path.join(scratch, "again", "product"))
+    return outcomes == {"existing": "FileExistsError", "missing-role": "ValueError"} and untouched, f"{outcomes}；被拒的那一次一个目标都没写 {untouched}"
 
 
 RP1_ROWS = (
@@ -2010,37 +1681,40 @@ RP1_ROWS = (
     RowUnit("seg2-row-5", 5, False, ("--streams", "1,2", "--no-executor"), False, False, owner="rows"),
     RowUnit("seg2-row-118", 118, False, ("--streams", "1,2", "--no-executor"), False, False, owner="rows"),
 )
-# 第一遍里这几个单元的退出码（别的都是 0）：panic 对照预期退 3；step-6 撞包装（251，不入库）；第二段第 4 行超时（253，不入库）
+# 第一遍里这几个单元的退出码（别的都是 0）：panic 对照预期退 3；step-6 撞包装（251，判红）；第二段第 4 行超时（253，判红）
 RP1_EXITS = {"step-3-panic": 3, "step-6": 251, "seg2-row-4": TIMEOUT_EXIT_CODE}
 RP1_FRESH_IN_THE_SECOND_PASS = ("step-9", "step-10-run-2", "step-6", "seg1-s12-row-0", "seg1-s12-row-3", "seg2-row-2", "seg2-row-3", "seg2-row-4",
                                 "seg2-row-118")
 
 
-def rp1_pass(world: FakeWorld, library: Library, markers: str, lookup: bool, root: str) -> tuple[dict, dict, dict]:
-    """假编排的一遍：第 0–10 步的全部读数单元（单元表原样）与两段各 6 行，依次算键、查库、取来或假跑、入库，判法每个单元都现跑。"""
-    inputs, selected = world.inputs(), selected_row_lines(world.repo)
+def rp1_pass(world: FakeWorld, markers: str, root: str) -> tuple[dict, dict, dict]:
+    """假编排的一遍：第 0–10 步的全部读数单元（单元表原样）与两段各 6 行，上游都有了的那一批一份计划：算键、查库、取来或假跑、入库（照单元表的次序，
+    RC2 的第二趟在它第一趟之后），判法每个单元都现跑。"""
+    facts, selected = world.facts(), selected_row_lines(world.repo)
     readings, judges, decisions = {}, {}, {}
-    for unit in list(SEGMENT_ONE_READING_UNITS) + step_4_row_units() + list(RP1_ROWS):
-        upstream = upstream_lines([(role, name, readings[name].get("directory") or readings[name]["row"]) for role, name in unit.upstream])
-        if isinstance(unit, RowUnit):
-            sections, reason = row_sections(inputs, unit, selected, limit_lines(1800), upstream)
-            kind = "driver-row"
-        else:
-            sections, reason, kind = reading_unit_sections(inputs, unit, upstream), "second-run" if unit.fresh_always else "", unit.kind
-        decision, problems = decide(library, unit.name, kind, sections, reason, lookup)
-        note_decision(markers, decision, problems)
-        directory = os.path.join(root, unit.name.replace("/", "-"))
-        exit_code = RP1_EXITS.get(unit.name, 0)
-        if decision.state == STATE_REUSED:
-            reading = {role: os.path.join(directory, role) for role in library.reading_roles(decision.entry)}
-            fetch(library, decision.entry, reading)
-        elif isinstance(unit, RowUnit):
-            reading = fake_row_reading(directory, decision.key[:16], exit_code, unit.executor)
-            record_finished(library, markers, decision, reading, row_insertable(reading["row"]), {"exit": str(exit_code)})
-        else:
-            reading = fake_device_reading(directory, decision.key[:16], exit_code)
-            record_finished(library, markers, decision, reading, device_exit_insertable(exit_code, unit.expected_exits), {"exit": str(exit_code)})
-        readings[unit.name], judges[unit.name], decisions[unit.name] = reading, fake_judge(reading), decision
+    pending = list(SEGMENT_ONE_READING_UNITS) + step_4_row_units() + list(RP1_ROWS)
+    selftest_entries(world.entries, [unit.name for unit in pending])
+    while pending:
+        ready = [unit for unit in pending if all(name in readings for _, name in unit.upstream)]
+        requests = [unit_request(facts, unit, selected, 1800 if isinstance(unit, RowUnit) else None,
+                                 tuple((role, readings[name].get("directory") or readings[name]["row"]) for role, name in unit.upstream)) for unit in ready]
+        run = ItemRun(world.repo, SCRIPT_KEY, requests, os.path.join(root, "states"), markers, quiet)
+        planned = run.plan()
+        for unit in ready:
+            decision = planned[unit.name]
+            directory = os.path.join(root, unit.name.replace("/", "-"))
+            exit_code = RP1_EXITS.get(unit.name, 0)
+            if decision.state == STATE_REUSED:
+                _exit, reading = run.fetch_into(unit.name, directory)
+            elif isinstance(unit, RowUnit):
+                reading = fake_row_reading(directory, decision.key[:16], exit_code, unit.executor)
+                run.record(unit.name, reading, exit_code, row_insertable(reading["row"]))
+            else:
+                reading = fake_device_reading(directory, decision.key[:16], exit_code)
+                run.record(unit.name, reading, exit_code, device_exit_insertable(exit_code, unit.expected_exits))
+            readings[unit.name], judges[unit.name], decisions[unit.name] = reading, fake_judge(reading), decision
+        run.finish()
+        pending = [unit for unit in pending if unit.name not in readings]
     return readings, judges, decisions
 
 
@@ -2061,11 +1735,12 @@ def same_bytes(first: dict[str, str], second: dict[str, str]) -> bool:
 
 
 def cell_rp1_two_passes(scratch: str) -> tuple[bool, str]:
-    """复用关跑一遍（入库）、复用开再跑一遍：第二遍除永远现跑与没入库的几个外全部取来；取来的读数与第一遍逐字节相同，现跑的照读数相等的比法相同；
-    每个单元的判法两遍逐字相同；账本 N + M 等于单元数。"""
-    world, library = fake_world(os.path.join(scratch, "world")), library_in(scratch)
-    first_readings, first_judges, _ = rp1_pass(world, library, os.path.join(scratch, "markers-1"), False, os.path.join(scratch, "pass-1"))
-    second_readings, second_judges, decisions = rp1_pass(world, library, os.path.join(scratch, "markers-2"), True, os.path.join(scratch, "pass-2"))
+    """库空跑一遍（入库）、再跑一遍：第二遍除拒算（second-run、补位那几类）与第一遍判红的几个外全部取来；取来的读数与第一遍逐字节相同，照跑的照读数相等
+    的比法相同（RC2 比上）；每个单元的判法两遍逐字相同；账本 N + M 等于单元数、复用数对、没有 S18。"""
+    world = fake_world(os.path.join(scratch, "world"))
+    with items_environment(world):
+        first_readings, first_judges, _ = rp1_pass(world, os.path.join(scratch, "markers-1"), os.path.join(scratch, "pass-1"))
+        second_readings, second_judges, decisions = rp1_pass(world, os.path.join(scratch, "markers-2"), os.path.join(scratch, "pass-2"))
     names = list(decisions)
     fresh = sorted(name for name, decision in decisions.items() if decision.state != STATE_REUSED)
     expected_fresh = sorted(RP1_FRESH_IN_THE_SECOND_PASS)
@@ -2074,153 +1749,111 @@ def cell_rp1_two_passes(scratch: str) -> tuple[bool, str]:
     judge_differences = [name for name in names if first_judges[name] != second_judges[name]]
     text, covers = ledger_text(os.path.join(scratch, "markers-2"), names)
     verdict = text.strip().splitlines()[-1]
+    problems = s18_problems(os.path.join(scratch, "markers-1")) + s18_problems(os.path.join(scratch, "markers-2"))
     good = (fresh == expected_fresh and not differing and not judge_differences and covers and f" reused={len(names) - len(expected_fresh)} " in verdict
-            and " check_mismatches=0 " in verdict and not s18_problems(os.path.join(scratch, "markers-1")))
-    return good, (f"{len(names)} 个单元；第二遍现跑的 {fresh if fresh != expected_fresh else len(fresh)}（要 {len(expected_fresh)} 个）；读数不同的 {differing or '无'}；"
-                  f"判法不同的 {judge_differences or '无'}；账本 {verdict[:120]}")
+            and " check_mismatches=0 " in verdict and not problems)
+    return good, (f"{len(names)} 个单元；第二遍照跑的 {fresh if fresh != expected_fresh else len(fresh)}（要 {len(expected_fresh)} 个）；读数不同的 {differing or '无'}；"
+                  f"判法不同的 {judge_differences or '无'}；S18 {problems[:2] or '无'}；账本 {verdict[:140]}")
+
+
+def forcing_seed(items: list[str], wanted: str, count: int) -> str:
+    """头一个让复用哨兵（lib_reuse_checks.ReuseSentinel，条数 count）把 wanted 抽成强制现判的种子（照 long_run_item_verdicts 的 plan 那样抽）。"""
+    for seed in range(100000):
+        sentinel = items_library.lib_reuse_checks.ReuseSentinel(SCRIPT_KEY, KIND, count=count, seed=seed)
+        sentinel.plan({item: "-" for item in items}, printer=quiet)
+        if sentinel.forced_item == wanted:
+            return str(seed)
+    raise RuntimeError(f"十万个种子里没有一个把 {wanted} 抽成强制现判")
+
+
+def cell_forced_reading_check(scratch: str) -> tuple[bool, str]:
+    """RC1：四个装置单元判绿入库；第二遍哨兵 1 条、种子让 step-0-a 成强制现判，它照跑出来的导出多一字节（产物、退出码不变：long_run_item_verdicts 的
+    timing 比法比不出）：记一行 kind=forced identical=false（S18）、那一把键撤成红；别的三项照旧复用。"""
+    world = fake_world(os.path.join(scratch, "world"))
+    units = [device_unit(f"step-0-{label}", f"baseline --streams {streams}") for label, streams in (("a", "1"), ("b", "2"), ("c", "1,2"), ("d", "1,2,3"))]
+    requests = [reading_unit_request(world.facts(), unit, []) for unit in units]
+    selftest_entries(world.entries, [unit.name for unit in units])
+    markers = os.path.join(scratch, "markers")
+    with items_environment(world):
+        first = ItemRun(world.repo, SCRIPT_KEY, requests, os.path.join(scratch, "states"), markers, quiet)
+        for unit, decision in first.plan().items():
+            first.record(unit, fake_device_reading(os.path.join(scratch, "first", unit), decision.key[:16]), 0, (True, ""))
+        first.finish()
+    with items_environment(world, sentinels="1", seed=forcing_seed(sorted(request.item for request in requests), "step-0-a", 1)):
+        second = ItemRun(world.repo, SCRIPT_KEY, requests, os.path.join(scratch, "states"), markers, quiet)
+        decisions = second.plan()
+        forced = decisions["step-0-a"]
+        reading = fake_device_reading(os.path.join(scratch, "second", "step-0-a"), forced.key[:16])
+        with open(os.path.join(reading["directory"], "new_pool_file_creation", "states.tsv"), "a", encoding="utf-8") as handle:
+            handle.write("x")
+        if forced.state == STATE_FRESH:
+            second.record("step-0-a", reading, 0, (True, ""))
+        finish = second.finish()
+        withdrawn = stored_value(world.repo, forced.key) is None
+    problems = [line for line in s18_problems(markers) if " kind=forced " in f" {line} "]
+    others = sorted(decision.state for unit, decision in decisions.items() if unit != "step-0-a")
+    good = forced.forced and bool(problems) and withdrawn and others == [STATE_REUSED] * 3 and finish == 0
+    return good, f"强制现判 {forced.unit}（forced={forced.forced}，{forced.state}）；S18 {problems[:1] or '无'}；撤成红 {withdrawn}；别的三项 {others}；finish 退 {finish}"
+
+
+def cell_second_run_check(scratch: str) -> tuple[bool, str]:
+    """RC2：step-7 判绿入库，step-9（同一把键、second-run）照跑的导出多一字节：kind=second-run identical=false（S18）、那一把键撤成红；
+    step-10-run-1 与 run-2 读数相同：present-identical、不记 S18。"""
+    world = fake_world(os.path.join(scratch, "world"))
+    units = {unit.name: unit for unit in SEGMENT_ONE_READING_UNITS}
+    names = ("step-7", "step-9", "step-10-run-1", "step-10-run-2")
+    requests = [reading_unit_request(world.facts(), units[name], []) for name in names]
+    selftest_entries(world.entries, list(names))
+    markers = os.path.join(scratch, "markers")
+    outcomes = {}
+    with items_environment(world):
+        run = ItemRun(world.repo, SCRIPT_KEY, requests, os.path.join(scratch, "states"), markers, quiet)
+        decisions = run.plan()
+        for name in names:
+            reading = fake_device_reading(os.path.join(scratch, name), decisions[name].key[:16])
+            if name == "step-9":
+                with open(os.path.join(reading["directory"], "new_pool_file_creation", "states.tsv"), "a", encoding="utf-8") as handle:
+                    handle.write("x")
+            outcomes[name] = run.record(name, reading, 0, (True, ""))
+        run.finish()
+        withdrawn = stored_value(world.repo, decisions["step-7"].key) is None
+    problems = s18_problems(markers)
+    good = (decisions["step-9"].key == decisions["step-7"].key != "-" and outcomes["step-9"] == "present-differs" and outcomes["step-10-run-2"] == "present-identical"
+            and len(problems) == 1 and " kind=second-run " in f" {problems[0]} " and withdrawn)
+    return good, f"结局 {outcomes}；S18 {problems[:2] or '无'}；step-7 那一把键撤成红 {withdrawn}"
+
+
+def run_reuse_cells(scratch: str, script: str, units: tuple[str, str]) -> tuple[bool, str]:
+    """复用三问与复用哨兵的六格（long_run_item_verdicts.py reuse-cells，文件头「复用格」）：样板树是一份假仓，起法是本文件的 items（假判法），
+    项甲、项乙是点名的两个单元；那一份的输出原样转出（规范输出 REUSE_SELFTEST script=<script> 那一行，门禁 code-tooling 的 reuse-selftests 格认标准输出里它）。"""
+    world = fake_world(os.path.join(scratch, "template"))
+    command = [sys.executable, "-B", "{tree}/" + SCRIPT_KEY, "items", "--repo", "{tree}", "--tree", "{tree}/" + FAKE_TREE_RELATIVE, "--script", script,
+               "--units", ",".join(units)]
+    completed = subprocess.run([sys.executable, "-B", os.path.join(os.path.dirname(HERE), "long_run_item_verdicts.py"), "reuse-cells", "--script", script,
+                                "--template", world.repo, "--items", ",".join(item_name(unit) for unit in units), "--work", os.path.join(scratch, "cells"),
+                                "--fake-judge", "--", *command], capture_output=True, text=True, timeout=REUSE_CELLS_SECONDS)
+    print(completed.stdout, end="", flush=True)
+    last = (completed.stdout.strip().splitlines() or ["没有输出"])[-1]
+    return completed.returncode == 0 and last.endswith("6 格，红 0 格"), f"reuse-cells 退 {completed.returncode}：{last}；标准错误末尾 {completed.stderr.strip()[-200:]}"
 
 
 def cell_reuse_three_questions(scratch: str) -> tuple[bool, str]:
-    """复用三问（scripts/gate/lib_reuse_checks.py 文件头「一」）：第二段三行（1、2、4）各一项，四趟查库、现跑的照入库条件入库——库是空的、同一份输入、
-    仓里另加一份没有哪一项的键读的文件（闭包外）、只改第 4 行行表那一行（只在它的键里，[mutation]）；打规范输出 REUSE_SELFTEST script=<本文件>。
-    键按文件内容取（第 11.2 节），注释也进键，闭包外的改动取不在任何一项键里的文件。"""
-    checks = reuse_checks_library()
-    world, library = fake_world(os.path.join(scratch, "world")), library_in(scratch)
-    rows = [RowUnit(f"seg2-row-{number}", number, False, ("--streams", "1,2", "--no-executor"), False, False) for number in (1, 2, 4)]
-    selected = selected_row_lines(world.repo)
-    runs = []
-    for edit in (None, None, "unrelated", "unit"):
-        if edit == "unrelated":
-            write_text(os.path.join(world.repo, "docs", "not-read-by-any-key.md"), "没有哪一项的键读这一份\n")
-        elif edit == "unit":
-            selected = {**selected, 4: selected[4].replace("dddddddddddd", "dddddddddddf")}
-        states = {}
-        for row in rows:
-            sections, reason = row_sections(world.inputs(), row, selected, limit_lines(1800), [])
-            decision, _problems = decide(library, row.name, "driver-row", sections, reason, True)
-            if decision.state == STATE_REUSED:
-                states[row.name] = checks.REUSED
-                continue
-            reading = fake_row_reading(os.path.join(scratch, f"pass-{len(runs) + 1}", row.name), decision.key[:16], 0, False)
-            record_finished(library, os.path.join(scratch, f"markers-{len(runs) + 1}"), decision, reading, row_insertable(reading["row"]), {"exit": "0"})
-            states[row.name] = checks.JUDGED
-        runs.append(states)
-    output = io.StringIO()
-    with contextlib.redirect_stdout(output):
-        passed, problems = checks.report_three_questions(f"{RESEARCH_RELATIVE}/reuse_library.py", *runs, ["seg2-row-4"])
-    print(output.getvalue(), end="", flush=True)   # 规范输出那一行（门禁 code-tooling 的 reuse-selftests 格认标准输出里这一行）
-    return passed, "；".join(problems) or f"四趟：{runs}"
-
-
-SENTINEL_CELL_ROWS = (1, 2, 4, 5)   # 第二段四行：都入得了库，第二遍四条都命中
-SENTINEL_CELL_COUNT = 2
-
-
-def sentinel_seed_within(hits: int, count: int) -> int:
-    """头一个让强制现判与 count 条哨兵都落在头 hits 条命中里的种子（这一格的四行全用上）。"""
-    for seed in range(100000):
-        sentinel = RunSentinel(seed, count)
-        if max((sentinel.forced_hit,) + sentinel.sentinel_hits) <= hits:
-            return seed
-    raise RuntimeError(f"十万个种子里没有一个把强制现判与 {count} 条哨兵都抽在头 {hits} 条命中里")
-
-
-def sentinel_case(scratch: str, name: str, seed: int) -> tuple[list[Decision], list[str], str]:
-    """一种情形：第一遍查库关、四行现跑入库；第二遍装一份哨兵（种子 seed）查库，照情形 name 做，再照真编排的样子取来、现跑、入库。
-    交回 (第二遍的决定, s18_problems, 账本里哨兵那一行)。情形：as-registered 照规矩；sentinel-rejudged 一条哨兵照现跑；
-    forced-differs 强制现判那一行的读数换一份；forced-reused 强制现判那一条的标记写成取来；forced-not-compared 强制现判那一行超时、入库条件不过。"""
-    world, library = fake_world(os.path.join(scratch, name, "world")), library_in(os.path.join(scratch, name))
-    rows = [RowUnit(f"seg2-row-{number}", number, False, ("--streams", "1,2", "--no-executor"), False, False) for number in SENTINEL_CELL_ROWS]
-    first_markers, markers = os.path.join(scratch, name, "markers-1"), os.path.join(scratch, name, "markers-2")
-    identities = {}
-    for decision, row in zip(row_decisions(world, library, rows, False), rows):
-        identities[row.name] = decision.key[:16]
-        reading = fake_row_into(os.path.join(scratch, name, "rows-1", f"row-{row.number}"), identities[row.name], 0, False)
-        record_finished(library, first_markers, decision, reading, row_insertable(reading["row"]), {"exit": "0"})
-    _run_sentinel[:] = [RunSentinel(seed, SENTINEL_CELL_COUNT)]
-    try:
-        decisions = row_decisions(world, library, rows, True)
-        root = os.path.join(scratch, name, "rows-2")
-        pairs = [(decision, os.path.join(root, f"row-{row.number}")) for decision, row in zip(decisions, rows)]
-        fetch_rows(library, markers, pairs)
-        for decision, row_directory in pairs:
-            if decision.sentinel == SENTINEL_FORCED and name == "forced-reused":
-                write_marker(markers, dataclasses.replace(decision, state=STATE_REUSED))
-            if decision.state == STATE_REUSED and not (decision.sentinel == SENTINEL_WATCHED and name == "sentinel-rejudged"):
-                continue
-            identity = identities[decision.unit] + ("-changed" if decision.sentinel == SENTINEL_FORCED and name == "forced-differs" else "")
-            device_exit = TIMEOUT_EXIT_CODE if decision.sentinel == SENTINEL_FORCED and name == "forced-not-compared" else 0
-            if os.path.isdir(row_directory):
-                shutil.rmtree(row_directory)
-            reading = fake_row_into(row_directory, identity, device_exit, False)
-            record_finished(library, markers, decision, reading, row_insertable(reading["row"]), {"exit": str(device_exit)})
-    finally:
-        _run_sentinel.clear()
-    text, _covers = ledger_text(markers, [row.name for row in rows])
-    outcome = [line for line in text.splitlines() if line.startswith("E7RESULT name=reuse_sentinel_outcome ")]
-    return decisions, s18_problems(markers), (outcome or ["没有哨兵那一行"])[0]
-
-
-# 四种红各自该出的那一样（s18_problems 里认的字样）
-SENTINEL_RED_CASES = (("sentinel-rejudged", " problem=sentinel-rejudged "), ("forced-differs", " kind=forced "),
-                      ("forced-reused", " problem=forced-reused "), ("forced-not-compared", " problem=forced-not-compared "))
-
-
-def cell_reuse_sentinel(scratch: str) -> tuple[bool, str]:
-    """复用哨兵（文件头「复用哨兵」）一绿四红：照规矩那一种——强制现判恰一条、交 fresh-check 现跑、与库里那一条比上且相同，哨兵 2 条照旧取来，
-    s18_problems 空、账本哨兵那一行 problems=0；四种红各在 s18_problems 里出自己那一样。种子取头一个让四行全用上的。"""
-    seed = sentinel_seed_within(len(SENTINEL_CELL_ROWS), SENTINEL_CELL_COUNT)
-    decisions, problems, outcome = sentinel_case(scratch, "as-registered", seed)
-    forced = [decision for decision in decisions if decision.sentinel == SENTINEL_FORCED]
-    watched = [decision for decision in decisions if decision.sentinel == SENTINEL_WATCHED]
-    wrong = []
-    if len(forced) != 1 or forced[0].state != STATE_FRESH_CHECK or len(watched) != SENTINEL_CELL_COUNT:
-        wrong.append(f"照规矩：强制现判 {[(decision.unit, decision.state) for decision in forced]}、哨兵 {len(watched)} 条（要 1 条 fresh-check、{SENTINEL_CELL_COUNT} 条）")
-    if problems or " problems=0 " not in f"{outcome} " or " forced_compared=1 " not in f" {outcome} " or f" seeds={seed} " not in f" {outcome} ":
-        wrong.append(f"照规矩：s18 {problems[:2] or '空'}；账本 {outcome}")
-    for name, expected in SENTINEL_RED_CASES:
-        _decisions, red_problems, red_outcome = sentinel_case(scratch, name, seed)
-        if not any(expected in f" {line} " for line in red_problems):
-            wrong.append(f"{name}：s18 里没有「{expected.strip()}」（{red_problems[:2] or '空'}；账本 {red_outcome}）")
-    return not wrong, "；".join(wrong) or f"种子 {seed}：照规矩那一种 {outcome}；四种红各出自己那一样"
-
-
-def location_keys(root: str) -> dict[str, str]:
-    """root 底下一份假仓与假树上各类单元的键：装置（带上游导出目录）、E170、执行器、变异驱动、第二段一行、第一段一行（空变异）。"""
-    world = fake_world(root)
-    inputs = world.inputs()
-    upstream_directory = os.path.join(root, "upstream-export")
-    write_text(os.path.join(upstream_directory, "new_pool_file_creation", "states.tsv"), "上游导出\n")
-    upstream = upstream_lines([("e170-export", "step-2", upstream_directory)])
-    units = {"device": ReadingUnit("step-1", "step-1", "s", "device", "baseline --streams 1,2 --output-directory " + os.path.join(root, "dumps")),
-             "e170": ReadingUnit("step-2b", "step-2b", "s", "e170", "bad-states-second-run --seed-hex 85441ae491419411"),
-             "o3-executor": ReadingUnit("step-5", "step-5", "s", "o3-executor", f"executor --streams {STREAMS_ONE_TWO}"),
-             "mutation-driver": ReadingUnit("research-mutations", "research-mutations", "s", "mutation-driver", MUTATIONS_TABLE_RELATIVE)}
-    keys = {kind: key_of(reading_unit_sections(inputs, unit, upstream)) for kind, unit in units.items()}
-    keys["segment-two-row"] = key_of(row_two(world, inputs))
-    empty = RowUnit("seg1-s12-row-0", 0, True, ("--empty-mutation", "--keep-dumps", "--streams", "1,2,3"), True, True, owner="s12")
-    keys["segment-one-empty-row"] = key_of(row_sections(inputs, empty, selected_row_lines(world.repo), limit_lines(1800), upstream)[0])
-    return keys
-
-
-def cell_key_independent_of_location(scratch: str) -> tuple[bool, str]:
-    """同一份假仓与假树（连上游导出）放在两处：一处在主树的位置，一处在另一处的副本目录底下、多套几层；各类单元的键逐个相同（路径、副本还是主树都不进键）。"""
-    here, there = location_keys(os.path.join(scratch, "main-tree")), location_keys(os.path.join(scratch, "copies", "nested", "copy-of-the-tree"))
-    differing = sorted(kind for kind in here if here[kind] != there[kind])
-    return not differing, (f"{len(here)} 类单元的键都相同" if not differing else f"键随所在目录变了：{', '.join(differing)}")
+    """复用三问（scripts/gate/lib_reuse_checks.py 文件头「一」）与复用哨兵的六格：项甲、项乙是 step-1 与 step-7 两个装置单元。"""
+    return run_reuse_cells(scratch, SCRIPT_KEY, ("step-1", "step-7"))
 
 
 LAYER_FILES = ("segment_one_units_revision_11.py", "rows_orchestrator_revision_11.py", "rows_orchestrator_segment_two_revision_11.py")
 
 
 def cell_rp1_layers_end_to_end(scratch: str) -> tuple[bool, str]:
-    """三层编排各自的端到端格（reuse-e2e：假单元脚本或假驱动，复用关、复用开各跑一遍，取来的单元判法照跑）。"""
+    """三层编排各自的端到端格（reuse-e2e：假单元脚本或假驱动，库空、库里有各跑一遍，取来的单元判法照跑）。"""
     outcomes = []
     for name in LAYER_FILES:
         completed = subprocess.run([sys.executable, "-B", os.path.join(HERE, name), "--selftest", "--cells", "reuse-e2e"], capture_output=True, text=True,
                                    timeout=900, env=dict(os.environ, TMPDIR=scratch))
         last = (completed.stdout.strip().splitlines() or ["没有输出"])[-1]
         outcomes.append((name, completed.returncode == 0 and last.endswith("红 0"), last))
+        print(f"  格 rp1-layers-e2e：{name} 那一层 reuse-e2e 退 {completed.returncode}，{last}", flush=True)   # 一层判完就打（同 revision_8_selftest_harness.cells_reporting_progress 那一行）
     return all(ok for _, ok, _ in outcomes), "；".join(f"{name} {last}" for name, _, last in outcomes)
 
 
@@ -2462,35 +2095,41 @@ def cell_frozen_o3_reverse_moves(scratch: str) -> tuple[bool, str]:
     return not problems, f"判了 {judged} 种局面" + (f"，不对的：{'；'.join(problems)}" if problems else "，都对")
 
 
-SELFTEST_CELLS = {
-    "rp1-two-passes": cell_rp1_two_passes, "rp1-layers-e2e": cell_rp1_layers_end_to_end, "reuse-three-questions": cell_reuse_three_questions,
-    "reuse-sentinel": cell_reuse_sentinel, "key-independent-of-location": cell_key_independent_of_location,
-    "rp3-kind": cell_rp3_kind, "rp3-build": cell_rp3_build, "rp3-closure": cell_rp3_closure, "rp3-closure-mutated-content": cell_rp3_closure_mutated_content,
-    "rp3-env": cell_rp3_env, "rp3-mutation": cell_rp3_mutation, "rp3-args": cell_rp3_args, "rp3-limit": cell_rp3_limit, "rp3-upstream": cell_rp3_upstream,
-    "rp3-research": cell_rp3_research, "rp3-python": cell_rp3_python,
-    "rp4-resume-fetch": cell_rp4_resume_fetch, "rp5-atomic-insert": cell_rp5_atomic_insert,
-    "rp6-closure-extra-file": cell_rp6_closure_extra_file, "rp6-closure-outside-the-tree": cell_rp6_closure_outside_the_tree,
-    "rp7-check-mismatch": cell_rp7_check_mismatch, "rp8-corrupted-entry": cell_rp8_corrupted_entry,
-    "pin-moves": cell_pin_moves, "pin-moves-real-files": cell_pin_moves_real_files, "frozen-o3-moves": cell_frozen_o3_moves,
-    "pin-moves-partial": cell_pin_moves_partial, "frozen-o3-reverse-moves": cell_frozen_o3_reverse_moves,
-}
-SELFTEST_SWITCHES = {**{f"drop-{name}": f"rp3-{name}" for name in SECTION_ORDER}, "check-skipped": "rp7-check-mismatch",
-                     "closure-check-skipped": "rp6-closure-extra-file", "manifest-unchecked": "rp8-corrupted-entry", "insert-in-place": "rp5-atomic-insert",
-                     "fresh-always-ignored": "rp1-two-passes", "pin-moves-ignored": "pin-moves", "frozen-o3-moves-ignored": "frozen-o3-moves",
+def selftest_cell_functions():
+    """自证的各格，格名到函数。表写在函数体里：写成模块级赋值，会在 import 这个模块时把全部自证格连同它们起的子进程拖进 import 一方的判法单元闭包。"""
+    return {
+        "reuse-three-questions": cell_reuse_three_questions, "request-kind": cell_request_kind, "request-arguments": cell_request_arguments,
+        "request-limit": cell_request_limit, "request-upstream": cell_request_upstream, "request-mutation": cell_request_mutation,
+        "request-judge-closure": cell_request_judge_closure, "request-freeze-reference": cell_request_freeze_reference,
+        "request-environment-set": cell_request_environment_set, "request-module-set-refused": cell_request_module_set_refused,
+        "key-independent-of-location": cell_key_independent_of_location, "packing-deterministic": cell_packing_deterministic,
+        "reading-equality": cell_reading_equality, "insert-conditions": cell_insert_conditions, "fetch-refuses-existing-targets": cell_fetch_refuses_existing_targets,
+        "rp1-two-passes": cell_rp1_two_passes, "forced-reading-check": cell_forced_reading_check, "second-run-check": cell_second_run_check,
+        "rp1-layers-e2e": cell_rp1_layers_end_to_end,
+        "pin-moves": cell_pin_moves, "pin-moves-real-files": cell_pin_moves_real_files, "frozen-o3-moves": cell_frozen_o3_moves,
+        "pin-moves-partial": cell_pin_moves_partial, "frozen-o3-reverse-moves": cell_frozen_o3_reverse_moves,
+    }
+
+
+SELFTEST_SWITCHES = {"kind-unkeyed": "request-kind", "arguments-unkeyed": "request-arguments", "limit-unkeyed": "request-limit",
+                     "upstream-unkeyed": "request-upstream", "mutation-unkeyed": "request-mutation", "judges-dropped": "request-judge-closure",
+                     "freeze-reference-unkeyed": "request-freeze-reference", "environment-set-ignored": "request-environment-set",
+                     "module-set-keyed": "request-module-set-refused", "location-in-key": "key-independent-of-location",
+                     "packing-keeps-times": "packing-deterministic", "second-run-planned": "rp1-two-passes", "forced-reading-unchecked": "forced-reading-check",
+                     "second-run-unchecked": "second-run-check", "pin-moves-ignored": "pin-moves", "frozen-o3-moves-ignored": "frozen-o3-moves",
                      "pin-partial-accepted": "pin-moves-partial", "frozen-o3-partial-accepted": "frozen-o3-reverse-moves",
-                     "frozen-o3-whole-chain-only": "frozen-o3-reverse-moves", "sentinel-skipped": "reuse-sentinel",
-                     "forced-read-answered-found": "reuse-sentinel", "sentinel-problems-ignored": "reuse-sentinel",
-                     "location-in-key": "key-independent-of-location"}
+                     "frozen-o3-whole-chain-only": "frozen-o3-reverse-moves"}
 
 
 def selftest(argument_list: list[str]) -> int:
     problem = prune_server_client.selftest_service_problem()
-    if problem:   # 库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「用法」--selftest）
+    if problem:   # 判定库只在 prune-server 里：自证只在临时服务上跑，不写真服务（文件头「用法」--selftest）
         print(f"✗ reuse_library.py 自证没跑：{problem}", file=sys.stderr)
         print(f"     → 怎么办：{prune_server_client.SELFTEST_SERVICE_REMEDY}", file=sys.stderr)
         return 2
     os.environ[SELFTEST_VARIABLE] = "1"
-    return harness.run_selftest(os.path.abspath(__file__), argument_list, SELFTEST_CELLS, SELFTEST_SWITCHES, BREAK_VARIABLE, SELFTEST_VARIABLE)
+    return harness.run_selftest(os.path.abspath(__file__), argument_list, harness.cells_reporting_progress(selftest_cell_functions()), SELFTEST_SWITCHES,
+                                BREAK_VARIABLE, SELFTEST_VARIABLE)
 
 
 if __name__ == "__main__":

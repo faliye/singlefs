@@ -19,10 +19,12 @@ UNIT=${1:?要单元名}
 source "$(dirname "${BASH_SOURCE[0]}")/../../hosts/heavy-threads.sh" || exit 2
 THREADS="$(heavy_thread_default)" || exit 2  # 取每台默认重活线程数；单元编排起的单元里 SINGLEFS_THREAD_CAP 就是它分到的数
 cd "$REPO" || exit 2
+# 编排给的 RESEARCH 是这一份所在的研究目录；缺省写成那个字面路径
+RESEARCH="${RESEARCH:-scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes}"
 TIMING=$RESEARCH/device_timing.py
 CHECK=$RESEARCH/check_product.py
 JUDGE=$RESEARCH/frozen_tree_lines_revision_8.py
-S2_COMPARE=/home/fy5090/.local/share/singlefs/work/e171-r1-segment1-rev6/s2_compare.py
+S2_COMPARE=$RESEARCH/s2_compare.py
 E170_SEED=85441ae491419411
 PRINT_ONLY=${PRINT_ONLY:-0}
 EXPECTED_EXIT=0
@@ -45,7 +47,7 @@ refuse_existing() { if [ "$PRINT_ONLY" != 1 ] && [ -e "$1" ]; then stop "已存�
 snapshot_check() {  # 作废 Z5：冻结树快照摘要没变；修订 8 第 8.6 节另核树里 crates/mutations.tsv 等于 H8
   [ "$PRINT_ONLY" = 1 ] && return 0
   local digest mutations
-  digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest('$TREE')[0])")
+  digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest(sys.argv[1])[0])" "$TREE")
   [ "$digest" = "$SNAPSHOT_DIGEST" ] || stop "冻结树快照摘要变了（Z5）：$digest"
   mutations=$(sha256sum "$TREE/crates/mutations.tsv" | cut -d' ' -f1)
   [ "$mutations" = "$MUTATIONS_SHA256" ] || stop "树里 crates/mutations.tsv 变了（Z5，H8）：$mutations"
@@ -53,7 +55,7 @@ snapshot_check() {  # 作废 Z5：冻结树快照摘要没变；修订 8 第 8.6
 freeze_check() {  # 作废 Z2：O3 冻结行
   [ "$PRINT_ONLY" = 1 ] && return 0
   local differences
-  differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; print(len(frozen_o3.freeze_differences('$REPO')))")
+  differences=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; print(len(frozen_o3.freeze_differences(sys.argv[1])))" "$REPO")
   [ "$differences" = "0" ] || stop "O3 冻结行对不上（Z2）：$differences 处"
 }
 
@@ -259,11 +261,10 @@ unit_step_4() {
 
 # ───── 第 5 步：O3 基线（冻结的 v2-487 执行器判第 1 步导出的流一、流二） ─────
 run_executor() {  # run_executor <产物步名> <导出目录> <流,…>
-  local product streams_python
+  local product
   product=$(own "$1"); refuse_existing "$product"
-  streams_python=$(printf "'%s'," ${3//,/ })
   freeze_check
-  logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor('$REPO', '$REPO/$2', [$streams_python], $THREADS, '$REPO/$product', '$UNIT_LOG.$1.log'); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" \
+  logged python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import frozen_o3; code, wall = frozen_o3.run_executor(sys.argv[1], sys.argv[2], sys.argv[3].split(','), int(sys.argv[4]), sys.argv[5], sys.argv[6]); print('executor_exit', code, 'wall_ns', wall); sys.exit(code)" "$REPO" "$REPO/$2" "$3" "$THREADS" "$REPO/$product" "$UNIT_LOG.$1.log" \
     || stop "执行器没退 0（日志 $UNIT_LOG.$1.log）"
   note_product "$product"
   freeze_check

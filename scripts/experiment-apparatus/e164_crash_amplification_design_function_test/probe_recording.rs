@@ -187,7 +187,7 @@ fn sector_table_of(devices: &[(DeviceIdentity, RecordedSparse)]) -> Vec<(u32, Ve
 }
 
 #[test]
-fn records_h_short() {
+fn records_short_history() {
     let parameters = parameters();
     let stream = SharedStream::retaining_contents();
     let mut devices = recorded_devices(&stream);
@@ -218,7 +218,7 @@ fn records_h_short() {
 }
 
 #[test]
-fn records_h_long() {
+fn records_long_history() {
     let parameters = parameters();
     let stream = SharedStream::retaining_contents();
     let mut devices = recorded_devices(&stream);

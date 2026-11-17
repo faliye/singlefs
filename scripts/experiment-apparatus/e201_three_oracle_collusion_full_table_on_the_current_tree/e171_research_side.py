@@ -26,3 +26,20 @@ DEVICE_SOURCE = "crates/singlefs-verification/src/bin/e171_three_oracle_collusio
 
 if E171_DIRECTORY not in sys.path:
     sys.path.insert(1, E171_DIRECTORY)
+
+# 登记第十二节修订 8（E201 自己的第 8 条）：O3 一侧用 journal 记录头 496 字节的执行器目录与 E171 第 3 次重跑的冻结参照（不用 E171_DIRECTORY 里 frozen_o3.py 写的 487 目录与 r2 冻结参照）。
+# 只在 E201 自己这一头改：E171_DIRECTORY 里的 frozen_o3.py 一个字节不动，这里把它在本进程里的三个常量换成下面三个（别的模块按 `frozen_o3.<常量>` 在调用时取，不拷）。
+O3_EXECUTOR_DIRECTORY_RELATIVE = "scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496"
+O3_FREEZE_REFERENCE_RELATIVE = "research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out"
+O3_FILES_OUTSIDE_THE_FREEZE = ("comparator", "mutation_driver")
+
+
+def point_frozen_o3_at_the_496_directory(module) -> None:
+    module.FROZEN_DIRECTORY_RELATIVE = O3_EXECUTOR_DIRECTORY_RELATIVE
+    module.FREEZE_REFERENCE_RELATIVE = O3_FREEZE_REFERENCE_RELATIVE
+    module.FILES_OUTSIDE_THE_FREEZE = O3_FILES_OUTSIDE_THE_FREEZE
+
+
+import frozen_o3  # noqa: E402  （E171_DIRECTORY 进了 import 路径之后才取得到）
+
+point_frozen_o3_at_the_496_directory(frozen_o3)

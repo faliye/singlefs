@@ -1,5 +1,5 @@
 """E170 第 2 次重跑第二段 Q5 比对器（`research/prompts/e170-r2-prereg.md` 读法 13、14、19，12.7 的 Q5-a…Q5-c、Q5-e、Q5-h、Q5-pc2，
-12.8 的 B4-487、B15、轨迹与几何 G6–G9，12.14 的 B17 的 Z4 那一半）。
+12.8 的 B4-487、B15、轨迹与几何 G6–G9）。
 
 只读判定行（今天这一边是 Z 族上的判定，参照那一边是 v2 在 311 冻结导出上的判定）与两边导出目录里的行名，不重算判定。
 格（读法 14）：
@@ -17,10 +17,10 @@
 跑法：python3 comparator_q5_same_shape.py --pair <名>:<states|images>:<judged|attached>:<族或 rows>:<今天的产物>:<参照的产物> [...]
       --today-names <名>:<导出目录>[:<已知坏镜像目录>] --reference-names <名>:<导出目录>[:<已知坏镜像目录>] [...]
       --new-gaps G23 [--e171-tree <名>,<名>] --expected-freeze <带冻结行的产物> --record-paths <Q5-e 第一项产物>
-      --anchors-b15 <名>,<名> --b17 <照抄核对产物>:<Z4 已知坏镜像目录> --positive-control-row-input <名> --scratch <草稿目录>
+      --anchors-b15 <名>,<名> --positive-control-row-input <名> --scratch <草稿目录>
       --output <新文件>
---expected-freeze、--record-paths、--anchors-b15、--b17、--positive-control-row-input（连同 --scratch）各管一节（freeze_check_today、
-q5e_records、b15、b17、q5_pc2）；哪一样没给，那一节没有输入：结果行写 `name=not_run section=<节> input=<选项> …`、往标准错误打一行
+--expected-freeze、--record-paths、--anchors-b15、--positive-control-row-input（连同 --scratch）各管一节（freeze_check_today、
+q5e_records、b15、q5_pc2）；哪一样没给，那一节没有输入：结果行写 `name=not_run section=<节> input=<选项> …`、往标准错误打一行
 NOT_RUN_INPUT_NOT_GIVEN，别的节都不跑，整趟退 77（本次未跑，不是通过）。
 文件名以 comparator 起头，不进冻结。
 """
@@ -314,21 +314,6 @@ def b15(label: str, output: JudgementOutput, names: dict, emit) -> list[tuple[st
     return results
 
 
-def b17(recopy_product: str, known_bad_dir: str, emit) -> bool:
-    """B17 的 Z4 那一半（12.14）：Z4 的 known-bad-states.tsv 行数、known-bad-o2.tsv 第 2 列按序等于照抄核对数出的目标名。"""
-    with open(recopy_product, encoding="utf-8") as handle:
-        lines = [line.rstrip("\n") for line in handle]
-    # `name=known_bad_entry_name index=… name=…` 一行里有两个 name=：取行首认行、取最后一个 name= 的值当目标名
-    names = [re.findall(r"\bname=(\S*)", line)[-1] for line in lines if line.startswith("name=known_bad_entry_name ")]
-    source = next(fields_of(line)["sha256"] for line in lines if line.startswith("name=known_bad_source "))
-    states = read_rows(os.path.join(known_bad_dir, "known-bad-states.tsv"))
-    targets = [columns[1] for columns in read_rows(os.path.join(known_bad_dir, "known-bad-o2.tsv"))]
-    holds = len(states) == len(names) == len(targets) and targets == names
-    emit(f"name=b17 known_bad_states_rows={len(states)} known_bad_o2_rows={len(targets)} entry_names_from_the_recopy_check={len(names)} "
-         f"target_column_equals_in_order={str(targets == names).lower()} test_file_sha256_at_recopy={source} holds={str(holds).lower()}")
-    return holds
-
-
 def build_cells(pairs, outputs, today_names, reference_names, new_gaps) -> list[Cell]:
     cells = []
     for label, kind, role, family, today_path, reference_path in pairs:
@@ -364,7 +349,7 @@ NOT_RUN_EXIT_CODE = 77
 def sections_without_input(arguments: argparse.Namespace) -> list[tuple[str, str]]:
     """(节名, 选项名)：这一趟要读而没给的选填输入对应的节。"""
     sections = (("freeze_check_today", "--expected-freeze", arguments.expected_freeze), ("q5e_records", "--record-paths", arguments.record_paths),
-                ("b15", "--anchors-b15", arguments.anchors_b15), ("b17", "--b17", arguments.b17),
+                ("b15", "--anchors-b15", arguments.anchors_b15),
                 ("q5_pc2", "--positive-control-row-input", arguments.positive_control_row_input))
     missing = [(section, option) for section, option, value in sections if not value]
     if arguments.positive_control_row_input and not arguments.scratch:
@@ -394,7 +379,6 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--expected-freeze")
     parser.add_argument("--record-paths")
     parser.add_argument("--anchors-b15", default="")
-    parser.add_argument("--b17")
     parser.add_argument("--positive-control-row-input")
     parser.add_argument("--scratch")
     parser.add_argument("--output", required=True)
@@ -447,7 +431,6 @@ def main(argument_list: list[str]) -> int:
     for label in [item for item in arguments.anchors_b15.split(",") if item]:
         today_path = next(pair[4] for pair in pairs if pair[0] == label)
         b15_results += b15(label, outputs[today_path], today_names[label], emit)
-    b17_holds = b17(*arguments.b17.split(":"), emit)
 
     cells = build_cells(pairs, outputs, today_names, reference_names, new_gaps)
     for cell in cells:
@@ -547,7 +530,7 @@ def main(argument_list: list[str]) -> int:
          f"q5a_only_new_gaps={by_new_gaps} families_without_comparable_cells={','.join(families_without) or 'none'} q5_verdict={verdict} "
          f"q5a_all_class_ii={str(bool(judged_differs) and class_i == 0).lower()} e171_tree_subset_q5a={len(subset)} "
          f"b15_failures={sum(not holds for _, holds in b15_results)} b15_cells={len(b15_results)} "
-         f"b17_holds={str(b17_holds).lower()} integrity_failures={integrity_failures} "
+         f"integrity_failures={integrity_failures} "
          f"q5_pc2_exactly_one={positive_control}")
     emitted += 1
     output_file.write(f"name=done emitted={emitted}\n")

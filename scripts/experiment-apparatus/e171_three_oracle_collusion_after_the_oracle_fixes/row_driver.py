@@ -3,7 +3,7 @@
 默认就是扩表那一张）；透传 `--streams` 与 `--writable-mount-probe`；不给 `--keep-dumps` 时执行器判完删掉每条流导出里的三个大文件
 （`base-sectors.bin`、`ops-payload.bin`、`torn-payload.bin`，判定表与 manifest 留着；登记 5.3「第二段的行导出判完即删」）。
 冻结树照登记读法 10 用 `--snapshot-from scripts/experiment-apparatus/target/e171-r1-frozen-tree`。登记修订 2 第 2.5、2.6 节又改两处：每行装置那一步的限时由
-`--baseline-timing <基线那一趟的 -timing 产物>` 现算（max(1800, ⌈3 × T⌉) 秒；行目录里同键的上一次结果是超时的行，这一次再乘 3），驱动开头打一行 `name=row_time_limit`；
+`--baseline-timing <基线那一趟的 -timing 产物>` 现算（max(1800, ⌈3 × T⌉) 秒；调用方给 `--timed-out-before` 的那一趟再乘 3），驱动开头打一行 `name=row_time_limit`；
 装置套 `device_timing.py run`，每行 `device.out` 末尾多一行 `process_wall`，`--timing-output <新文件>` 收各行的 `E7TIMING` 行。以下是原驱动的说明，仍然适用
 （原说明里「限时 1800 秒」那一处照这一段读）。
 
@@ -13,7 +13,7 @@
   python3 row_driver.py --repo-root <仓根> --work-root <草稿目录> --output-root <输出根> [--rows 1,6 | --first-slice] [--empty-mutation]
       [--threads <每线道，缺省 = 登记的重活默认并行度 ÷ --lanes>] [--lanes 1] [--positive-control O1-对拍|O1-崩溃判官|O2|O3] [--disable-oracle O1|O2]
       [--no-executor] [--o3-control-bad-states <E170 bad-states 的导出目录>] [--snapshot-from <冻住的树>]
-      [--selected-rows <表>] [--other-selected-rows <别的表> …]
+      [--selected-rows <表>] [--other-selected-rows <别的表> …] [--timed-out-before] [--report-only]
 选行：不给 `--rows`、`--first-slice` 就是表里全部行；给了是指定范围，驱动往标准错误打一行 `row_scope scope=narrowed …`，
 缩过的那一趟不当正式产物。
 F4 扩表（登记 5.2「扩表」）：`--selected-rows bad-implementations-step-4-only.tsv --other-selected-rows bad-implementations-step-8.tsv`；
@@ -27,10 +27,12 @@ F4 扩表（登记 5.2「扩表」）：`--selected-rows bad-implementations-ste
 表里的行照名字取（登记 5.2：表若已变不重挑），
 行文与登记 5.9 的 sha256 不同照今天的行跑、另记。编不过、锚点不唯一、找不到的行按补位规则换同一文件组里的下一行（编之前的失败与编不过合起来至多三次；
 换上的行编不过再接着换），产物里带「补位自 <原名>」（`substituted_from`），试过而没用上的每个名字记成 `failed_attempt_<序>=<失败>:<名字>`。
-按键复用：输出根里已有的行目录，`row-result.tsv` 记的 `reuse_key`（快照摘要、行号、行名与会改变这一行结果的参数拼成）与这一趟相同、结局不是编不过、
-不是测量管子缺陷，就当作做完了、不重跑；键不同、没有 `row-result.tsv`（上一次中途停下的）或结局是编不过的行目录，驱动删掉重做（编不过的行重做时照上面的规则补位）。
-同键的上一次结果是超时（device_exit=253）的行，重做时限时再乘 3，重做时在行目录里先留标记文件 `timed-out-before`（写复用键），重做中途停下也不丢；
-做完的 `row-result.tsv` 另记 `time_limit_seconds`（这一次用的限时）与 `timed_out_before`（限时是不是乘过 3）。
+驱动不按键复用、不凭输出根判做完：输出根里已有的行目录一律删掉重做；可复用的结果只在判定库里，查库、取回、入库归三层编排
+（同目录 reuse_library.py 文件头「按项判定」）。两样由调用方显式给：
+  `--timed-out-before`  这一趟是上一次超时（device_exit=253）那几行的重跑：限时再乘 3。做完的 `row-result.tsv` 另记 `time_limit_seconds`（这一次用的限时）
+                        与 `timed_out_before`（限时是不是乘过 3）。
+  `--report-only`       调用方已把这几行的行目录（从判定库取回的）放进输出根：不编、不跑装置与执行器，照行目录里的 `row-result.tsv` 与 `device.out`
+                        重报产物与计时（冻结行前后照核、快照摘要照算）；点名的行目录有一个没有 `row-result.tsv` 就一行都不报、退 2。
 每行一个目录 `<输出根>/row-<序号>/`：`row-result.tsv`（key<TAB>value）、`device.out`、`device.err`、`compile.log`（最后一次编的诊断）、
 `compile-failed-<序>.log`（编不过的那几次的尾部）、`dump/`（装置导出目录）、
 `o3.out`（冻结的执行器对这一趟导出的批 1、批 2 的判定，登记 5.4）、`o3.log`、`o3-control.out`（`--positive-control O3` 时）。
@@ -96,11 +98,9 @@ LANE_BUILD_RECORD_FILE = "build-record.tsv"
 LANE_COMPILE_ARTIFACTS_FILE = "compile-artifacts.jsonl"
 SNAPSHOT_DIGEST_FILE = "snapshot-digest"
 STATUS_MEASUREMENT_PIPE_DEFECT = "measurement_pipe_defect"
-REUSE_KEY_FIELD = "reuse_key"  # row-result.tsv 里的键：这一行的复用键（reuse_key_of）
-# 行目录里的标记文件：同键的上一次结果是超时、这一次重做时先留下（里面写复用键）。重做中途停下、行目录没有 row-result.tsv 了，下一次凭它仍把限时乘 3
-TIMED_OUT_MARKER_FILE = "timed-out-before"
 REBUILD_CHECK_FIELD = "packages_checked_rebuilt"  # row-result.tsv 里的键：编完核过重编了的包；编过的行没有这个键，就是没核过（旧驱动跑的）
 EXIT_WORK_ROOT_REFUSED = 2
+EXIT_REPORTED_ROWS_MISSING = 2
 EXIT_MEASUREMENT_PIPE_DEFECT = 5
 
 
@@ -484,58 +484,28 @@ def read_result(directory: str) -> dict[str, object]:
         return dict(line.rstrip("\n").split("\t", 1) for line in handle if "\t" in line)
 
 
-def reuse_key_of(arguments: argparse.Namespace, number: int, row_name: str) -> str:
-    """一行的复用键：快照摘要、行号、行名与会改变这一行结果的参数拼起来取 sha256；键相同的行目录里的结果可以直接用。"""
-    parts = [arguments.snapshot_digest, str(number), row_name, arguments.streams, str(arguments.writable_mount_probe), str(arguments.positive_control),
-             str(arguments.disable_oracle), str(arguments.no_executor), str(arguments.keep_dumps), str(arguments.o3_control_bad_states)]
-    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
-
-
-def earlier_result_with_the_key(row_directory: str, key: str) -> dict[str, object] | None:
-    """行目录里同键的上一次结果；没有行目录、没有 `row-result.tsv` 或键不同交 None。"""
-    if not os.path.exists(os.path.join(row_directory, "row-result.tsv")):
-        return None
-    result = read_result(row_directory)
-    return result if result.get(REUSE_KEY_FIELD) == key else None
-
-
-def marked_as_timed_out_before(row_directory: str, key: str) -> bool:
-    """行目录里有标记文件、且里面写的就是这一趟的复用键：这一行上一次同键的结果是超时，重做中途停过。"""
-    path = os.path.join(row_directory, TIMED_OUT_MARKER_FILE)
-    if not os.path.exists(path):
-        return False
-    with open(path, encoding="utf-8") as handle:
-        return handle.read().strip() == key
-
-
-def result_is_reusable(result: dict[str, object]) -> bool:
-    """编不过、测量管子缺陷、超时的结果不复用：这几类重做（编不过的补位，超时的限时再乘 3）。"""
-    return (result.get("status") not in (STATUS_COMPILE_FAILED, STATUS_MEASUREMENT_PIPE_DEFECT)
-            and result.get("device_exit") != str(ROW_TIMEOUT_EXIT_CODE))
+def reported_rows(output_root: str, numbers: list[int]) -> tuple[list[dict[str, object]], list[int]]:
+    """`--report-only`：调用方放进输出根的那几行的 `row-result.tsv`（照 numbers 的次序）；交回 (各行的字段, 没有 `row-result.tsv` 的行号)。"""
+    missing = [number for number in numbers if not os.path.exists(os.path.join(output_root, f"row-{number}", "row-result.tsv"))]
+    if missing:
+        return [], missing
+    return [read_result(os.path.join(output_root, f"row-{number}")) for number in numbers], []
 
 
 def run_row_on_the_lane(number: int, selected: SelectedRow | None, empty_of: MutationRow | None, table: list[MutationRow],
                         rows_in_the_table: set[str], used_substitutes: set[str], arguments: argparse.Namespace,
                         lane: int) -> dict[str, object]:
-    """一条线道一次只跑一行（同一条线道共用一棵树与一个编译目录）。"""
+    """一条线道一次只跑一行（同一条线道共用一棵树与一个编译目录）。输出根里已有的行目录不当结果用，删掉重做；限时乘不乘 3 只看 `--timed-out-before`。"""
     row_directory = os.path.join(arguments.output_root, f"row-{number}")
     row_name = selected.name if selected else (empty_mutation(empty_of).name if empty_of else "-")
-    reuse_key = reuse_key_of(arguments, number, row_name)
-    earlier = earlier_result_with_the_key(row_directory, reuse_key)
-    if earlier is not None and result_is_reusable(earlier):
-        return earlier
-    timed_out_before = ((earlier is not None and earlier.get("device_exit") == str(ROW_TIMEOUT_EXIT_CODE))
-                        or marked_as_timed_out_before(row_directory, reuse_key))
+    timed_out_before = bool(arguments.timed_out_before)
     if os.path.isdir(row_directory):
-        shutil.rmtree(row_directory)  # 键不同、没做完、编不过或超时的行目录：驱动自己建的，删掉重做
+        shutil.rmtree(row_directory)
     os.makedirs(row_directory, exist_ok=False)
-    if timed_out_before:
-        with open(os.path.join(row_directory, TIMED_OUT_MARKER_FILE), "w", encoding="utf-8") as handle:
-            handle.write(reuse_key + "\n")
     lane_tree = os.path.join(arguments.work_root, f"lane{lane}", "tree")
     lane_target = os.path.join(arguments.work_root, f"lane{lane}", "target")
     snapshot_root = os.path.join(arguments.work_root, "snapshot")
-    fields: dict[str, object] = {"row_number": number, "row_name": row_name, "lane": lane, REUSE_KEY_FIELD: reuse_key}
+    fields: dict[str, object] = {"row_number": number, "row_name": row_name, "lane": lane}
     started = now_ns()
     compile_kind = "incremental" if os.path.isdir(lane_target) else "cold"
     sync_tree(snapshot_root, lane_tree)
@@ -689,6 +659,10 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--no-executor", action="store_true", help="不跑 O3 执行器（Q3-核「驱动不跑执行器」那一次）")
     parser.add_argument("--o3-control-bad-states", help="`--positive-control O3` 要的 E170 `bad-states` 导出目录（里面有每条流的 bad-states.tsv 与 bad-patches.bin）")
     parser.add_argument("--snapshot-from", help="快照从哪棵树同步（默认 --repo-root）：几趟要编同一棵树时，先把 Cargo.toml、Cargo.lock、.cargo、crates 拷一份冻住，各趟都指它")
+    parser.add_argument("--timed-out-before", action="store_true",
+                        help="这一趟是上一次超时那几行的重跑：限时再乘 3（调用方给；驱动不读输出根判）")
+    parser.add_argument("--report-only", action="store_true",
+                        help="调用方已把这几行的行目录（从判定库取回的）放进输出根：不编、不跑，照 row-result.tsv 与 device.out 重报")
     parser.add_argument("--keep-compile-failures-as-they-are", action="store_true",
                         help="编不过的行不补位、记编不过（只给 replay.sh 复跑 s4、F4 两份产物用：那两份是编不过之后不补位的那一版驱动跑的，登记第一节读法 5 要补位）")
     parser.add_argument("--baseline-timing", required=True,
@@ -751,18 +725,26 @@ def main(argument_list: list[str]) -> int:
         jobs.append((0, None, first_row))
     jobs.extend((row.number, row, None) for row in chosen)
     print(f"snapshot_digest={digest} files={file_count} snapshot_ns={now_ns() - started} rows={len(jobs)}")
-    work: "queue.Queue[tuple[int, int, SelectedRow | None, MutationRow | None]]" = queue.Queue()
-    for position, (number, selected, empty_of) in enumerate(jobs):
-        work.put((position, number, selected, empty_of))
     results: dict[int, dict[str, object]] = {}
     table_started = now_ns()
-    stop_taking_rows = threading.Event()
-    threads = [threading.Thread(target=lane_worker, args=(lane, work, results, table, rows_in_the_table, used_substitutes, arguments, stop_taking_rows))
-               for lane in range(arguments.lanes)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
+    if arguments.report_only:
+        reported, missing = reported_rows(arguments.output_root, [number for number, _, _ in jobs])
+        if missing:
+            print(f"report_only_refused missing_row_results={','.join(str(number) for number in missing)}")
+            print(f"--report-only 点名的行目录没有 row-result.tsv：第 {','.join(str(number) for number in missing)} 行（调用方先从判定库取回再起）", file=sys.stderr)
+            return EXIT_REPORTED_ROWS_MISSING
+        results = dict(enumerate(reported))
+    else:
+        work: "queue.Queue[tuple[int, int, SelectedRow | None, MutationRow | None]]" = queue.Queue()
+        for position, (number, selected, empty_of) in enumerate(jobs):
+            work.put((position, number, selected, empty_of))
+        stop_taking_rows = threading.Event()
+        threads = [threading.Thread(target=lane_worker, args=(lane, work, results, table, rows_in_the_table, used_substitutes, arguments, stop_taking_rows))
+                   for lane in range(arguments.lanes)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
     table_ns = now_ns() - table_started
     for position in sorted(results):
         print("row " + " ".join(f"{key}={str(value).replace(' ', '_')}" for key, value in results[position].items()))

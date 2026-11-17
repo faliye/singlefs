@@ -56,7 +56,7 @@ say() { echo "$(TZ=Asia/Tokyo date +%F) $*" | tee -a "$LOGS/sequence.log"; }
 stop() { say "✗ 停在前提：$*"; exit 1; }
 
 say "开跑：DATE=$DATE SUFFIX=$SUFFIX 导出 $DUMPS 日志 $LOGS 产物前缀 $PREFIX"
-digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest('$TREE')[0])")
+digest=$(python3 -B -c "import sys; sys.path.insert(0, '$RESEARCH'); import row_driver; print(row_driver.snapshot_digest(sys.argv[1])[0])" "$TREE")
 [ "$digest" = "$SNAPSHOT_DIGEST" ] || stop "冻结树快照摘要变了（Z5）：$digest"
 [ "$(sha256sum "$BASELINE_TIMING" | cut -d' ' -f1)" = "$BASELINE_TIMING_SHA256" ] || stop "基线计时不是修订 6 树 S2 那一份：$BASELINE_TIMING"
 [ "$(sha256sum "$TREE/crates/mutations.tsv" | cut -d' ' -f1)" = "$FROZEN_MUTATIONS_SHA256" ] || stop "冻结树里的变异表变了：$TREE/crates/mutations.tsv"

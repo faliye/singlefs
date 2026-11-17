@@ -97,31 +97,31 @@ impl AppendArm {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 enum RecoveryArm {
     Bing0Today,
-    Bing1TruncateBeforeA,
-    Bing2DropAKeepB,
+    Bing1TruncateBeforeTheIncompleteTransaction,
+    Bing2DropTheIncompleteKeepTheComplete,
     Bing3ForbidPattern,
 }
 
 impl RecoveryArm {
     const ALL: [RecoveryArm; 4] = [
         RecoveryArm::Bing0Today,
-        RecoveryArm::Bing1TruncateBeforeA,
-        RecoveryArm::Bing2DropAKeepB,
+        RecoveryArm::Bing1TruncateBeforeTheIncompleteTransaction,
+        RecoveryArm::Bing2DropTheIncompleteKeepTheComplete,
         RecoveryArm::Bing3ForbidPattern,
     ];
     fn label(self) -> &'static str {
         match self {
             RecoveryArm::Bing0Today => "bing0_today",
-            RecoveryArm::Bing1TruncateBeforeA => "bing1_truncate_before_a",
-            RecoveryArm::Bing2DropAKeepB => "bing2_drop_a_keep_b",
+            RecoveryArm::Bing1TruncateBeforeTheIncompleteTransaction => "bing1_truncate_before_a",
+            RecoveryArm::Bing2DropTheIncompleteKeepTheComplete => "bing2_drop_a_keep_b",
             RecoveryArm::Bing3ForbidPattern => "bing3_forbid",
         }
     }
     fn position(self) -> usize {
         match self {
             RecoveryArm::Bing0Today => 0,
-            RecoveryArm::Bing1TruncateBeforeA => 1,
-            RecoveryArm::Bing2DropAKeepB => 2,
+            RecoveryArm::Bing1TruncateBeforeTheIncompleteTransaction => 1,
+            RecoveryArm::Bing2DropTheIncompleteKeepTheComplete => 2,
             RecoveryArm::Bing3ForbidPattern => 3,
         }
     }
@@ -131,17 +131,17 @@ impl RecoveryArm {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 enum AppendedReading {
     /// R2：记录全部已发出，且其后已有一道屏障或 FUA 完成。
-    R2IssuedAndCovered,
+    IssuedAndCovered,
     /// R1：记录全部已发出。
-    R1Issued,
+    IssuedOnly,
 }
 
 impl AppendedReading {
-    const ALL: [AppendedReading; 2] = [AppendedReading::R2IssuedAndCovered, AppendedReading::R1Issued];
+    const ALL: [AppendedReading; 2] = [AppendedReading::IssuedAndCovered, AppendedReading::IssuedOnly];
     fn label(self) -> &'static str {
         match self {
-            AppendedReading::R2IssuedAndCovered => "r2_covered",
-            AppendedReading::R1Issued => "r1_issued",
+            AppendedReading::IssuedAndCovered => "r2_covered",
+            AppendedReading::IssuedOnly => "r1_issued",
         }
     }
 }
@@ -187,23 +187,23 @@ enum VoidTiming {
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Debug)]
 enum HistoryFamily {
-    H0,
-    H1,
-    H2,
+    WithoutVoid,
+    NarrowVoid,
+    WideVoid,
 }
 
 impl HistoryFamily {
     fn label(self) -> &'static str {
         match self {
-            HistoryFamily::H0 => "H0",
-            HistoryFamily::H1 => "H1",
-            HistoryFamily::H2 => "H2",
+            HistoryFamily::WithoutVoid => "H0",
+            HistoryFamily::NarrowVoid => "H1",
+            HistoryFamily::WideVoid => "H2",
         }
     }
     fn is_legal(self) -> bool {
         match self {
-            HistoryFamily::H0 | HistoryFamily::H1 => true,
-            HistoryFamily::H2 => false,
+            HistoryFamily::WithoutVoid | HistoryFamily::NarrowVoid => true,
+            HistoryFamily::WideVoid => false,
         }
     }
 }
@@ -218,9 +218,9 @@ struct History {
 impl History {
     fn family(&self) -> HistoryFamily {
         match self.voided {
-            None => HistoryFamily::H0,
-            Some((_, VoidTiming::NarrowBeforeAnyWrite)) => HistoryFamily::H1,
-            Some((_, VoidTiming::WideAfterFirstRecord)) => HistoryFamily::H2,
+            None => HistoryFamily::WithoutVoid,
+            Some((_, VoidTiming::NarrowBeforeAnyWrite)) => HistoryFamily::NarrowVoid,
+            Some((_, VoidTiming::WideAfterFirstRecord)) => HistoryFamily::WideVoid,
         }
     }
     fn transaction_count(&self) -> u32 {
@@ -887,8 +887,8 @@ fn is_appended(timeline: &TransactionTimeline, completed_through: Option<usize>,
         return false;
     }
     match reading {
-        AppendedReading::R1Issued => true,
-        AppendedReading::R2IssuedAndCovered => {
+        AppendedReading::IssuedOnly => true,
+        AppendedReading::IssuedAndCovered => {
             let last_record_index = timeline.issued_record_operation_indices.iter().copied().max().expect("r ≥ 1");
             // completed_through 是一个闭段点：它在最后一条记录之后，就有一道完成了的屏障或 FUA 罩住那些记录。
             completed_through.is_some_and(|completed| last_record_index < completed)
@@ -945,7 +945,7 @@ fn collect_crash_states(execution: &Execution, reading: AppendedReading, rule: R
             .filter(|(_, operation)| operation.closes_a_segment())
             .map(|(operation_index, _)| Some(operation_index)),
     );
-    let mut a7_violation_points = 0u64;
+    let mut returned_before_last_barrier_points = 0u64;
     for (boundary_position, completed_through) in boundaries.iter().copied().enumerate() {
         let segment_first = completed_through.map_or(0, |completed| completed + 1);
         let segment_end_exclusive = match boundaries.get(boundary_position + 1) {
@@ -976,7 +976,7 @@ fn collect_crash_states(execution: &Execution, reading: AppendedReading, rule: R
                     .final_barrier_operation_index
                     .is_some_and(|barrier| completed_through.is_some_and(|completed| barrier <= completed));
                 if !barrier_done {
-                    a7_violation_points += 1;
+                    returned_before_last_barrier_points += 1;
                 }
             }
             let segment_writes: Vec<(WriteContent, WriteDurabilityStates)> = (segment_first..segment_end_exclusive)
@@ -986,7 +986,7 @@ fn collect_crash_states(execution: &Execution, reading: AppendedReading, rule: R
             insert_every_durability_choice(&base, &segment_writes, &returned, states);
         }
     }
-    a7_violation_points
+    returned_before_last_barrier_points
 }
 
 fn insert_every_durability_choice(base: &[(WriteContent, DurableForm)], segment_writes: &[(WriteContent, WriteDurabilityStates)], returned: &[(u32, ReturnBranch)], states: &mut HashSet<CrashState>) {
@@ -1420,7 +1420,7 @@ struct ConfigurationSearch<'search> {
     return_rule: ReturnRule,
     states: HashSet<CrashState>,
     memo: HashMap<SearchConfiguration, SearchSummary>,
-    a7_violation_points: u64,
+    returned_before_last_barrier_points: u64,
     limit_exceeded: bool,
 }
 
@@ -1456,7 +1456,7 @@ impl<'search> ConfigurationSearch<'search> {
             return_rule,
             states: HashSet::new(),
             memo: HashMap::new(),
-            a7_violation_points: 0,
+            returned_before_last_barrier_points: 0,
             limit_exceeded: false,
         }
     }
@@ -1510,8 +1510,8 @@ impl<'search> ConfigurationSearch<'search> {
         let publish_position = placement.publish_position.expect("没作废的事务有自己的发布");
         let last_record = *placement.record_positions.last().expect("没作废的事务至少一条记录");
         match self.reading {
-            AppendedReading::R1Issued => usize::from(configuration.issued[publish_position]) > last_record,
-            AppendedReading::R2IssuedAndCovered => usize::from(configuration.completed[publish_position]) > last_record,
+            AppendedReading::IssuedOnly => usize::from(configuration.issued[publish_position]) > last_record,
+            AppendedReading::IssuedAndCovered => usize::from(configuration.completed[publish_position]) > last_record,
         }
     }
 
@@ -1584,7 +1584,7 @@ impl<'search> ConfigurationSearch<'search> {
             let placement = &self.placements[transaction_position(*number)];
             let publish_position = placement.publish_position.expect("返回的事务有自己的发布");
             if usize::from(configuration.completed[publish_position]) <= self.templates[publish_position].final_barrier_position {
-                self.a7_violation_points += 1;
+                self.returned_before_last_barrier_points += 1;
             }
         }
         insert_every_durability_choice(&base, &segment_writes, &returned, &mut self.states);
@@ -1671,7 +1671,7 @@ struct EnumeratedCrashStates {
     states: HashSet<CrashState>,
     executions: u64,
     configurations: Option<u64>,
-    a7_violation_points: u64,
+    returned_before_last_barrier_points: u64,
     pending: PendingTrajectory,
     configuration_limit_exceeded: bool,
 }
@@ -1706,17 +1706,17 @@ fn enumerate_multi_flight(request: &CellRequest, layout: &CellLayout, enumeratio
         MultiFlightEnumeration::DirectExecutions => {
             let executions = multi_flight_executions(layout, rules);
             let mut states = HashSet::new();
-            let mut a7_violation_points = 0u64;
+            let mut returned_before_last_barrier_points = 0u64;
             let mut pending = PendingTrajectory::default();
             for execution in &executions {
-                a7_violation_points += collect_crash_states(execution, request.reading, request.return_rule, &mut states);
+                returned_before_last_barrier_points += collect_crash_states(execution, request.reading, request.return_rule, &mut states);
                 pending.absorb(&pending_trajectory_of(execution, request.reading));
             }
             EnumeratedCrashStates {
                 states,
                 executions: u64::try_from(executions.len()).expect("执行数有限"),
                 configurations: None,
-                a7_violation_points,
+                returned_before_last_barrier_points,
                 pending,
                 configuration_limit_exceeded: false,
             }
@@ -1727,7 +1727,7 @@ fn enumerate_multi_flight(request: &CellRequest, layout: &CellLayout, enumeratio
                 states: HashSet::new(),
                 executions: 0,
                 configurations: Some(0),
-                a7_violation_points: 0,
+                returned_before_last_barrier_points: 0,
                 pending: PendingTrajectory::default(),
                 configuration_limit_exceeded: false,
             };
@@ -1755,7 +1755,7 @@ fn enumerate_multi_flight(request: &CellRequest, layout: &CellLayout, enumeratio
                 enumerated.states.extend(search.states.drain());
                 enumerated.executions += summary.paths_to_the_end;
                 enumerated.configurations = enumerated.configurations.map(|count| count + u64::try_from(search.memo.len()).expect("配置数有限"));
-                enumerated.a7_violation_points += search.a7_violation_points;
+                enumerated.returned_before_last_barrier_points += search.returned_before_last_barrier_points;
                 enumerated.pending.absorb(&trajectory);
                 enumerated.configuration_limit_exceeded |= search.limit_exceeded;
             }
@@ -2043,7 +2043,7 @@ fn two_or_more_incomplete_transactions_in(segment: &[RecordContent]) -> bool {
 }
 
 /// 模式 P：段里某个事务 X 的提交记录不在段里，而段里有另一个事务 Y 的提交记录、且 Y 有一条记录的 jsn 大于 X 在段里的第一条。
-fn incomplete_a_followed_by_complete_b_in(segment: &[RecordContent]) -> bool {
+fn incomplete_transaction_followed_by_complete_transaction_in(segment: &[RecordContent]) -> bool {
     let transactions = transactions_in(segment);
     for (incomplete_number, incomplete) in transactions.iter().filter(|(_, candidate)| !candidate.has_commit) {
         for (complete_number, complete) in transactions.iter().filter(|(_, candidate)| candidate.has_commit) {
@@ -2132,19 +2132,19 @@ fn recover(view: &StateView, arm: RecoveryArm, control: RecoveryControl) -> Reco
             RecoveryControl::NoControl => mounted_after(PrefixRules::TODAY),
             RecoveryControl::KeepLaterRecordsRemoved | RecoveryControl::CommitMarkerHandlingRemoved => mounted_after(RECORD_BY_RECORD_WITHOUT_COMMIT_CHECKS),
         },
-        RecoveryArm::Bing1TruncateBeforeA => match control {
+        RecoveryArm::Bing1TruncateBeforeTheIncompleteTransaction => match control {
             RecoveryControl::NoControl => {
-                let cut_before_a = first_incomplete_transaction_first_jsn(&strict_segment);
+                let cut_before_the_incomplete_transaction = first_incomplete_transaction_first_jsn(&strict_segment);
                 mounted_after(PrefixRules {
                     check_commit_before_transaction_change: false,
                     check_commit_on_last_record: false,
                     application: Application::WholePublish,
-                    stop_before_jsn: cut_before_a,
+                    stop_before_jsn: cut_before_the_incomplete_transaction,
                 })
             }
             RecoveryControl::KeepLaterRecordsRemoved | RecoveryControl::CommitMarkerHandlingRemoved => mounted_after(RECORD_BY_RECORD_WITHOUT_COMMIT_CHECKS),
         },
-        RecoveryArm::Bing2DropAKeepB => {
+        RecoveryArm::Bing2DropTheIncompleteKeepTheComplete => {
             let walk = walk_prefix(&view.records_by_jsn, root_txg, &verify, RECORD_BY_RECORD_WITHOUT_COMMIT_CHECKS);
             let applied = match control {
                 RecoveryControl::NoControl | RecoveryControl::KeepLaterRecordsRemoved => drop_transactions_without_commit_in(&walk.accepted),
@@ -2154,7 +2154,7 @@ fn recover(view: &StateView, arm: RecoveryArm, control: RecoveryControl) -> Reco
         }
         RecoveryArm::Bing3ForbidPattern => match control {
             RecoveryControl::NoControl => {
-                let judged_corrupt = incomplete_a_followed_by_complete_b_in(&strict_segment);
+                let judged_corrupt = incomplete_transaction_followed_by_complete_transaction_in(&strict_segment);
                 if judged_corrupt {
                     RecoveryOutcome::refused(view)
                 } else {
@@ -2177,16 +2177,16 @@ fn recover(view: &StateView, arm: RecoveryArm, control: RecoveryControl) -> Reco
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct RecoveryCounts {
     refused: u64,
-    v_fsync: u64,
-    v_fsync_mounted_lost: u64,
-    v_fsync_refused_with_returned: u64,
-    v_fsync_branch_every_earlier_appended: u64,
-    v_fsync_branch_earlier_passed_as_voided: u64,
-    v_dependency: u64,
-    v_dangling_returned_empty: u64,
-    v_dangling_returned_nonempty: u64,
+    fsync_violations: u64,
+    fsync_violations_mounted_lost: u64,
+    fsync_violations_refused_with_returned: u64,
+    fsync_violations_branch_every_earlier_appended: u64,
+    fsync_violations_branch_earlier_passed_as_voided: u64,
+    dependency_violations: u64,
+    dangling_violations_returned_empty: u64,
+    dangling_violations_returned_nonempty: u64,
     partial_publish: u64,
-    n_atom: u64,
+    atomicity_violations: u64,
     core_failures: u64,
     differs_from_bing0: u64,
 }
@@ -2194,21 +2194,21 @@ struct RecoveryCounts {
 impl RecoveryCounts {
     fn absorb(&mut self, other: &RecoveryCounts) {
         self.refused += other.refused;
-        self.v_fsync += other.v_fsync;
-        self.v_fsync_mounted_lost += other.v_fsync_mounted_lost;
-        self.v_fsync_refused_with_returned += other.v_fsync_refused_with_returned;
-        self.v_fsync_branch_every_earlier_appended += other.v_fsync_branch_every_earlier_appended;
-        self.v_fsync_branch_earlier_passed_as_voided += other.v_fsync_branch_earlier_passed_as_voided;
-        self.v_dependency += other.v_dependency;
-        self.v_dangling_returned_empty += other.v_dangling_returned_empty;
-        self.v_dangling_returned_nonempty += other.v_dangling_returned_nonempty;
+        self.fsync_violations += other.fsync_violations;
+        self.fsync_violations_mounted_lost += other.fsync_violations_mounted_lost;
+        self.fsync_violations_refused_with_returned += other.fsync_violations_refused_with_returned;
+        self.fsync_violations_branch_every_earlier_appended += other.fsync_violations_branch_every_earlier_appended;
+        self.fsync_violations_branch_earlier_passed_as_voided += other.fsync_violations_branch_earlier_passed_as_voided;
+        self.dependency_violations += other.dependency_violations;
+        self.dangling_violations_returned_empty += other.dangling_violations_returned_empty;
+        self.dangling_violations_returned_nonempty += other.dangling_violations_returned_nonempty;
         self.partial_publish += other.partial_publish;
-        self.n_atom += other.n_atom;
+        self.atomicity_violations += other.atomicity_violations;
         self.core_failures += other.core_failures;
         self.differs_from_bing0 += other.differs_from_bing0;
     }
-    fn v_dangling(&self) -> u64 {
-        self.v_dangling_returned_empty + self.v_dangling_returned_nonempty
+    fn dangling_violations(&self) -> u64 {
+        self.dangling_violations_returned_empty + self.dangling_violations_returned_nonempty
     }
 }
 
@@ -2235,10 +2235,10 @@ fn metrics_of(view: &StateView, layout: &CellLayout, outcome: &RecoveryOutcome) 
     if outcome.mounted {
         let lost: Vec<&(u32, ReturnBranch)> = view.returned.iter().filter(|(transaction, _)| !in_recovered_version(*transaction)).collect();
         if !lost.is_empty() {
-            counts.v_fsync = 1;
-            counts.v_fsync_mounted_lost = 1;
-            counts.v_fsync_branch_every_earlier_appended = u64::from(lost.iter().any(|(_, branch)| *branch == ReturnBranch::EveryEarlierAppended));
-            counts.v_fsync_branch_earlier_passed_as_voided = u64::from(lost.iter().any(|(_, branch)| *branch == ReturnBranch::SomeEarlierPassedAsVoided));
+            counts.fsync_violations = 1;
+            counts.fsync_violations_mounted_lost = 1;
+            counts.fsync_violations_branch_every_earlier_appended = u64::from(lost.iter().any(|(_, branch)| *branch == ReturnBranch::EveryEarlierAppended));
+            counts.fsync_violations_branch_earlier_passed_as_voided = u64::from(lost.iter().any(|(_, branch)| *branch == ReturnBranch::SomeEarlierPassedAsVoided));
         }
         // Q3-2：施加了某事务 Y 的记录，而某个没作废、号小于 Y、txg 大于所选根的事务 X 的记录没全部施加。
         let dependency_violated = applied_per_transaction.keys().any(|later| {
@@ -2249,7 +2249,7 @@ fn metrics_of(view: &StateView, layout: &CellLayout, outcome: &RecoveryOutcome) 
                     && applied_of(earlier.number) < earlier.planned_records
             })
         });
-        counts.v_dependency = u64::from(dependency_violated);
+        counts.dependency_violations = u64::from(dependency_violated);
         // Q3-3：装上的根引用的写里有不持久或撕裂的。
         let unit_missing = layout.transactions.iter().any(|transaction| {
             transaction.voided.is_none()
@@ -2261,9 +2261,9 @@ fn metrics_of(view: &StateView, layout: &CellLayout, outcome: &RecoveryOutcome) 
             .is_some_and(|publish| !view.durable_new.contains(&WriteContent::SharedUnit { publish }));
         if unit_missing || shared_missing {
             if view.returned.is_empty() {
-                counts.v_dangling_returned_empty = 1;
+                counts.dangling_violations_returned_empty = 1;
             } else {
-                counts.v_dangling_returned_nonempty = 1;
+                counts.dangling_violations_returned_nonempty = 1;
             }
         }
         // Q3-4：一次发布只施加了一部分记录。
@@ -2273,7 +2273,7 @@ fn metrics_of(view: &StateView, layout: &CellLayout, outcome: &RecoveryOutcome) 
                 .any(|(publish, applied_count)| *applied_count > 0 && *applied_count < layout.written_record_count_of(*publish)),
         );
         // 第七节 A3（C37（事务与记录的对应无定义） 层 0 那一半）：某个事务的记录被施加了一部分。
-        counts.n_atom = u64::from(
+        counts.atomicity_violations = u64::from(
             applied_per_transaction
                 .iter()
                 .any(|(transaction, applied_count)| *applied_count > 0 && *applied_count < transaction_layout(*transaction).planned_records),
@@ -2281,10 +2281,10 @@ fn metrics_of(view: &StateView, layout: &CellLayout, outcome: &RecoveryOutcome) 
     } else {
         counts.refused = u64::from(!outcome.core_failure);
         if !view.returned.is_empty() {
-            counts.v_fsync = 1;
-            counts.v_fsync_refused_with_returned = 1;
-            counts.v_fsync_branch_every_earlier_appended = u64::from(view.returned.iter().any(|(_, branch)| *branch == ReturnBranch::EveryEarlierAppended));
-            counts.v_fsync_branch_earlier_passed_as_voided = u64::from(view.returned.iter().any(|(_, branch)| *branch == ReturnBranch::SomeEarlierPassedAsVoided));
+            counts.fsync_violations = 1;
+            counts.fsync_violations_refused_with_returned = 1;
+            counts.fsync_violations_branch_every_earlier_appended = u64::from(view.returned.iter().any(|(_, branch)| *branch == ReturnBranch::EveryEarlierAppended));
+            counts.fsync_violations_branch_earlier_passed_as_voided = u64::from(view.returned.iter().any(|(_, branch)| *branch == ReturnBranch::SomeEarlierPassedAsVoided));
         }
     }
     counts
@@ -2383,12 +2383,12 @@ struct AppendCellResult {
     executions: u64,
     states: u64,
     incomplete_pair_states: u64,
-    pattern_p_states: u64,
+    out_of_order_commit_pattern_states: u64,
     strict_segment_length_peak: usize,
     in_flight_limit_states: u64,
-    a7_violation_points: u64,
+    returned_before_last_barrier_points: u64,
     pending: PendingTrajectory,
-    a5_differing_states: u64,
+    whole_arms_differing_states: u64,
     recovery: [RecoveryCounts; 4],
     /// 第二段：这一格怎么枚举的（第一段为 None）。
     multi_flight_enumeration: Option<MultiFlightEnumeration>,
@@ -2399,7 +2399,7 @@ struct AppendCellResult {
 
 /// 甲整段下一个事务的记录连着发出，中间不能作废：H2 对它不适用（登记 5.4）。
 fn cell_is_applicable(append_arm: AppendArm, history: &History) -> bool {
-    !(append_arm == AppendArm::JiaWhole && history.family() == HistoryFamily::H2)
+    !(append_arm == AppendArm::JiaWhole && history.family() == HistoryFamily::WideVoid)
 }
 
 fn evaluate_cell(request: &CellRequest) -> Option<AppendCellResult> {
@@ -2413,17 +2413,17 @@ fn evaluate_cell(request: &CellRequest) -> Option<AppendCellResult> {
     }
     let executions = build_executions(&layout, request.append_arm, request.discipline, request.barriers);
     let mut states: HashSet<CrashState> = HashSet::new();
-    let mut a7_violation_points = 0u64;
+    let mut returned_before_last_barrier_points = 0u64;
     let mut pending = PendingTrajectory::default();
     for execution in &executions {
-        a7_violation_points += collect_crash_states(execution, request.reading, request.return_rule, &mut states);
+        returned_before_last_barrier_points += collect_crash_states(execution, request.reading, request.return_rule, &mut states);
         pending.absorb(&pending_trajectory_of(execution, request.reading));
     }
     let enumerated = EnumeratedCrashStates {
         states,
         executions: u64::try_from(executions.len()).expect("执行数有限"),
         configurations: None,
-        a7_violation_points,
+        returned_before_last_barrier_points,
         pending,
         configuration_limit_exceeded: false,
     };
@@ -2445,12 +2445,12 @@ fn cell_result_from_states(layout: &CellLayout, enumerated: &EnumeratedCrashStat
         executions: enumerated.executions,
         states: u64::try_from(states.len()).expect("状态数有限"),
         incomplete_pair_states: 0,
-        pattern_p_states: 0,
+        out_of_order_commit_pattern_states: 0,
         strict_segment_length_peak: 0,
         in_flight_limit_states: 0,
-        a7_violation_points: enumerated.a7_violation_points,
+        returned_before_last_barrier_points: enumerated.returned_before_last_barrier_points,
         pending: enumerated.pending,
-        a5_differing_states: 0,
+        whole_arms_differing_states: 0,
         recovery: Default::default(),
         multi_flight_enumeration,
         configurations: enumerated.configurations,
@@ -2460,12 +2460,12 @@ fn cell_result_from_states(layout: &CellLayout, enumerated: &EnumeratedCrashStat
         let view = StateView::of(state);
         let strict_segment = strict_continuous_segment(&view.records_by_jsn, view.chosen_root_txg());
         result.incomplete_pair_states += u64::from(two_or_more_incomplete_transactions_in(&strict_segment));
-        result.pattern_p_states += u64::from(incomplete_a_followed_by_complete_b_in(&strict_segment));
+        result.out_of_order_commit_pattern_states += u64::from(incomplete_transaction_followed_by_complete_transaction_in(&strict_segment));
         result.strict_segment_length_peak = result.strict_segment_length_peak.max(strict_segment.len());
         let outcomes: [RecoveryOutcome; 4] = RecoveryArm::ALL.map(|arm| recover(&view, arm, recovery_control));
         result.in_flight_limit_states += u64::from(outcomes.iter().any(|outcome| outcome.in_flight_limit_reached));
         let bing0_version = outcomes[RecoveryArm::Bing0Today.position()].version_key();
-        result.a5_differing_states += u64::from(outcomes.iter().any(|outcome| outcome.version_key() != bing0_version));
+        result.whole_arms_differing_states += u64::from(outcomes.iter().any(|outcome| outcome.version_key() != bing0_version));
         for arm in RecoveryArm::ALL {
             let outcome = &outcomes[arm.position()];
             let mut counts = metrics_of(&view, layout, outcome);
@@ -2548,18 +2548,18 @@ fn two_to_the(exponent: u32) -> u64 {
 }
 
 /// B1：串落 H0 = 1 + Σ_i (6 + 2^{r_i})。
-fn anchor_b1_closed_form(record_counts: &[u32]) -> u64 {
+fn serial_publish_anchor_closed_form(record_counts: &[u32]) -> u64 {
     1 + record_counts.iter().map(|count| 6 + two_to_the(*count)).sum::<u64>()
 }
 
 /// B2：同发 H0 甲整段、乙整段 = 2^{k+1} + 2^{Σr} + 3。
-fn anchor_b2_closed_form(record_counts: &[u32]) -> u64 {
+fn shared_publish_anchor_closed_form(record_counts: &[u32]) -> u64 {
     let transaction_count = u32::try_from(record_counts.len()).expect("k 小");
     two_to_the(transaction_count + 1) + two_to_the(record_counts.iter().sum()) + 3
 }
 
 /// B4：作废·窄的闭式（登记第七节 B4 原样）。
-fn anchor_b4_closed_form(condition: PublishCondition, reserves: bool, record_counts: &[u32], voided: u32) -> u64 {
+fn narrow_void_anchor_closed_form(condition: PublishCondition, reserves: bool, record_counts: &[u32], voided: u32) -> u64 {
     let transaction_count = u32::try_from(record_counts.len()).expect("k 小");
     let count_of = |transaction: u32| record_counts[transaction_position(transaction)];
     let others: Vec<u32> = (1..=transaction_count).filter(|transaction| *transaction != voided).collect();
@@ -2583,7 +2583,7 @@ fn anchor_b4_closed_form(condition: PublishCondition, reserves: bool, record_cou
 }
 
 /// B5：`anchors_q1c.py` 原样输出（登记第十三节）：(r, 条件, 臂, 执行数, 去重状态数)，多飞 k = 2、H0、读法 R2。
-const ANCHOR_B5: [(&[u32], PublishCondition, AppendArm, u64, u64); 16] = [
+const MULTI_FLIGHT_ANCHOR: [(&[u32], PublishCondition, AppendArm, u64, u64); 16] = [
     (&[1, 1], PublishCondition::MultiFlightRootsOrdered, AppendArm::JiaWhole, 3747, 56),
     (&[1, 1], PublishCondition::MultiFlightRootsOrdered, AppendArm::JiaInterleaved, 3747, 56),
     (&[1, 1], PublishCondition::MultiFlightRootsOrdered, AppendArm::YiReservedWhole, 5049, 59),
@@ -2603,7 +2603,7 @@ const ANCHOR_B5: [(&[u32], PublishCondition, AppendArm, u64, u64); 16] = [
 ];
 
 /// B3：同发 H0 甲交错 / 对照丁的（执行数，去重状态数），`anchors_tongfa.py` 原样输出（登记第十三节）。
-const ANCHOR_B3: [(&[u32], (u64, u64), (u64, u64)); 6] = [
+const SHARED_INTERLEAVED_ANCHOR: [(&[u32], (u64, u64), (u64, u64)); 6] = [
     (&[2, 1], (2, 29), (3, 39)),
     (&[1, 2], (1, 19), (3, 39)),
     (&[2, 2], (3, 59), (6, 104)),
@@ -2613,7 +2613,7 @@ const ANCHOR_B3: [(&[u32], (u64, u64), (u64, u64)); 6] = [
 ];
 
 /// B4：`anchors_void.py` 原样输出（登记第十三节）：(r, v, 串落甲, 串落乙, 同发甲, 同发乙)。
-const ANCHOR_B4_SCRIPT: [(&[u32], u32, u64, u64, u64, u64); 10] = [
+const NARROW_VOID_ANCHOR_SCRIPT: [(&[u32], u32, u64, u64, u64, u64); 10] = [
     (&[1, 1], 1, 9, 11, 9, 11),
     (&[1, 1], 2, 9, 14, 9, 11),
     (&[2, 2], 1, 11, 23, 11, 23),
@@ -2627,14 +2627,14 @@ const ANCHOR_B4_SCRIPT: [(&[u32], u32, u64, u64, u64, u64); 10] = [
 ];
 
 /// B1、B2 登记里写出数的那五格。
-const ANCHOR_B1_LISTED: [(&[u32], u64); 5] = [(&[1, 1], 17), (&[2, 2], 21), (&[1, 2], 19), (&[1, 1, 1], 25), (&[2, 2, 2], 31)];
-const ANCHOR_B2_LISTED: [(&[u32], u64); 5] = [(&[1, 1], 15), (&[2, 2], 27), (&[1, 2], 19), (&[1, 1, 1], 27), (&[2, 2, 2], 83)];
+const SERIAL_PUBLISH_ANCHOR_LISTED: [(&[u32], u64); 5] = [(&[1, 1], 17), (&[2, 2], 21), (&[1, 2], 19), (&[1, 1, 1], 25), (&[2, 2, 2], 31)];
+const SHARED_PUBLISH_ANCHOR_LISTED: [(&[u32], u64); 5] = [(&[1, 1], 15), (&[2, 2], 27), (&[1, 2], 19), (&[1, 1, 1], 27), (&[2, 2, 2], 83)];
 
-fn h0(record_counts: &[u32]) -> History {
+fn history_without_void(record_counts: &[u32]) -> History {
     History { record_counts: record_counts.to_vec(), voided: None }
 }
 
-fn h1(record_counts: &[u32], voided: u32) -> History {
+fn history_with_narrow_void(record_counts: &[u32], voided: u32) -> History {
     History { record_counts: record_counts.to_vec(), voided: Some((voided, VoidTiming::NarrowBeforeAnyWrite)) }
 }
 
@@ -2689,55 +2689,55 @@ fn emit_anchors(emitter: &mut Emitter) -> u64 {
         }
         emit(emitter, &format!("name=anchor family={family} {detail} expected={expected} measured={measured} matches={}", yes_or_no(expected == measured)));
     };
-    let h0_record_counts: Vec<Vec<u32>> = all_histories().into_iter().filter(|history| history.voided.is_none()).map(|history| history.record_counts).collect();
-    for counts in &h0_record_counts {
-        let listed = ANCHOR_B1_LISTED.iter().find(|(listed_counts, _)| *listed_counts == counts.as_slice()).map(|(_, states)| *states);
+    let record_counts_without_void: Vec<Vec<u32>> = all_histories().into_iter().filter(|history| history.voided.is_none()).map(|history| history.record_counts).collect();
+    for counts in &record_counts_without_void {
+        let listed = SERIAL_PUBLISH_ANCHOR_LISTED.iter().find(|(listed_counts, _)| *listed_counts == counts.as_slice()).map(|(_, states)| *states);
         for arm in AppendArm::ALL {
-            let measured = grid_cell(PublishCondition::SerialPublishes, arm, h0(counts), AppendedReading::R2IssuedAndCovered).states;
-            report(emitter, "B1", format!("q2={} r={} source=closed_form", arm.label(), h0(counts).record_counts_label()), anchor_b1_closed_form(counts), measured);
+            let measured = grid_cell(PublishCondition::SerialPublishes, arm, history_without_void(counts), AppendedReading::IssuedAndCovered).states;
+            report(emitter, "B1", format!("q2={} r={} source=closed_form", arm.label(), history_without_void(counts).record_counts_label()), serial_publish_anchor_closed_form(counts), measured);
             if let Some(listed_states) = listed {
-                report(emitter, "B1", format!("q2={} r={} source=listed", arm.label(), h0(counts).record_counts_label()), listed_states, measured);
+                report(emitter, "B1", format!("q2={} r={} source=listed", arm.label(), history_without_void(counts).record_counts_label()), listed_states, measured);
             }
         }
     }
-    for counts in &h0_record_counts {
-        let listed = ANCHOR_B2_LISTED.iter().find(|(listed_counts, _)| *listed_counts == counts.as_slice()).map(|(_, states)| *states);
+    for counts in &record_counts_without_void {
+        let listed = SHARED_PUBLISH_ANCHOR_LISTED.iter().find(|(listed_counts, _)| *listed_counts == counts.as_slice()).map(|(_, states)| *states);
         for arm in [AppendArm::JiaWhole, AppendArm::YiReservedWhole] {
-            let measured = grid_cell(PublishCondition::SharedPublish, arm, h0(counts), AppendedReading::R2IssuedAndCovered).states;
-            report(emitter, "B2", format!("q2={} r={} source=closed_form", arm.label(), h0(counts).record_counts_label()), anchor_b2_closed_form(counts), measured);
+            let measured = grid_cell(PublishCondition::SharedPublish, arm, history_without_void(counts), AppendedReading::IssuedAndCovered).states;
+            report(emitter, "B2", format!("q2={} r={} source=closed_form", arm.label(), history_without_void(counts).record_counts_label()), shared_publish_anchor_closed_form(counts), measured);
             if let Some(listed_states) = listed {
-                report(emitter, "B2", format!("q2={} r={} source=listed", arm.label(), h0(counts).record_counts_label()), listed_states, measured);
+                report(emitter, "B2", format!("q2={} r={} source=listed", arm.label(), history_without_void(counts).record_counts_label()), listed_states, measured);
             }
         }
     }
-    for (counts, interleaved, control) in ANCHOR_B3 {
+    for (counts, interleaved, control) in SHARED_INTERLEAVED_ANCHOR {
         for (arm, (executions, states)) in [(AppendArm::JiaInterleaved, interleaved), (AppendArm::DingNoDiscipline, control)] {
-            let measured = grid_cell(PublishCondition::SharedPublish, arm, h0(counts), AppendedReading::R2IssuedAndCovered);
-            report(emitter, "B3", format!("q2={} r={} quantity=executions source=script", arm.label(), h0(counts).record_counts_label()), executions, measured.executions);
-            report(emitter, "B3", format!("q2={} r={} quantity=states source=script", arm.label(), h0(counts).record_counts_label()), states, measured.states);
+            let measured = grid_cell(PublishCondition::SharedPublish, arm, history_without_void(counts), AppendedReading::IssuedAndCovered);
+            report(emitter, "B3", format!("q2={} r={} quantity=executions source=script", arm.label(), history_without_void(counts).record_counts_label()), executions, measured.executions);
+            report(emitter, "B3", format!("q2={} r={} quantity=states source=script", arm.label(), history_without_void(counts).record_counts_label()), states, measured.states);
         }
     }
-    for (counts, voided, serial_jia, serial_yi, shared_jia, shared_yi) in ANCHOR_B4_SCRIPT {
+    for (counts, voided, serial_jia, serial_yi, shared_jia, shared_yi) in NARROW_VOID_ANCHOR_SCRIPT {
         for (condition, arm, expected) in [
             (PublishCondition::SerialPublishes, AppendArm::JiaWhole, serial_jia),
             (PublishCondition::SerialPublishes, AppendArm::YiReservedWhole, serial_yi),
             (PublishCondition::SharedPublish, AppendArm::JiaWhole, shared_jia),
             (PublishCondition::SharedPublish, AppendArm::YiReservedWhole, shared_yi),
         ] {
-            let measured = grid_cell(condition, arm, h1(counts, voided), AppendedReading::R2IssuedAndCovered).states;
-            report(emitter, "B4", format!("q1={} q2={} r={} voided=T{voided} source=script", condition.label(), arm.label(), h0(counts).record_counts_label()), expected, measured);
+            let measured = grid_cell(condition, arm, history_with_narrow_void(counts, voided), AppendedReading::IssuedAndCovered).states;
+            report(emitter, "B4", format!("q1={} q2={} r={} voided=T{voided} source=script", condition.label(), arm.label(), history_without_void(counts).record_counts_label()), expected, measured);
         }
     }
-    for history in all_histories().into_iter().filter(|candidate| candidate.family() == HistoryFamily::H1) {
+    for history in all_histories().into_iter().filter(|candidate| candidate.family() == HistoryFamily::NarrowVoid) {
         let (voided, _) = history.voided.expect("H1 有作废事务");
         for condition in PublishCondition::SEGMENT_ONE {
             for (arm, reserves) in [(AppendArm::JiaWhole, false), (AppendArm::YiReservedWhole, true)] {
-                let measured = grid_cell(condition, arm, history.clone(), AppendedReading::R2IssuedAndCovered).states;
+                let measured = grid_cell(condition, arm, history.clone(), AppendedReading::IssuedAndCovered).states;
                 report(
                     emitter,
                     "B4",
                     format!("q1={} q2={} r={} voided=T{voided} source=closed_form", condition.label(), arm.label(), history.record_counts_label()),
-                    anchor_b4_closed_form(condition, reserves, &history.record_counts, voided),
+                    narrow_void_anchor_closed_form(condition, reserves, &history.record_counts, voided),
                     measured,
                 );
             }
@@ -2755,16 +2755,16 @@ fn emit_cell(emitter: &mut Emitter, key_text: &str, result: &AppendCellResult) {
             result.executions,
             result.states,
             result.incomplete_pair_states,
-            result.pattern_p_states,
+            result.out_of_order_commit_pattern_states,
             result.strict_segment_length_peak,
             result.in_flight_limit_states,
-            result.a7_violation_points,
+            result.returned_before_last_barrier_points,
             result.pending.initial_peak,
             result.pending.peak_after_drain,
             result.pending.positive_closers_peak,
             result.pending.final_peak,
             result.pending.never_drained,
-            result.a5_differing_states
+            result.whole_arms_differing_states
         ),
     );
     for arm in RecoveryArm::ALL {
@@ -2776,16 +2776,16 @@ fn emit_cell(emitter: &mut Emitter, key_text: &str, result: &AppendCellResult) {
                 arm.label(),
                 result.states,
                 counts.refused,
-                counts.v_fsync,
-                counts.v_fsync_mounted_lost,
-                counts.v_fsync_refused_with_returned,
-                counts.v_fsync_branch_every_earlier_appended,
-                counts.v_fsync_branch_earlier_passed_as_voided,
-                counts.v_dependency,
-                counts.v_dangling_returned_empty,
-                counts.v_dangling_returned_nonempty,
+                counts.fsync_violations,
+                counts.fsync_violations_mounted_lost,
+                counts.fsync_violations_refused_with_returned,
+                counts.fsync_violations_branch_every_earlier_appended,
+                counts.fsync_violations_branch_earlier_passed_as_voided,
+                counts.dependency_violations,
+                counts.dangling_violations_returned_empty,
+                counts.dangling_violations_returned_nonempty,
                 counts.partial_publish,
-                counts.n_atom,
+                counts.atomicity_violations,
                 counts.core_failures,
                 counts.differs_from_bing0
             ),
@@ -2809,67 +2809,67 @@ fn emit_controls(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResul
             (AppendArm::YiReservedWhole, AppendDiscipline::RemovedForPositiveControl),
             (AppendArm::DingNoDiscipline, AppendDiscipline::Kept),
         ] {
-            let mut request = CellRequest::main_grid(PublishCondition::SharedPublish, arm, h0(&[2, 2]), reading);
+            let mut request = CellRequest::main_grid(PublishCondition::SharedPublish, arm, history_without_void(&[2, 2]), reading);
             request.discipline = discipline;
             let result = evaluate_cell(&request).expect("H0 适用");
             let sample = "q1=shared_publish family=H0 k=2 r=2,2";
             report(emitter, format!("quantity=Q2-1_n2a control=discipline_removed q2={} {sample} reading={}", arm.label(), reading.label()), result.incomplete_pair_states);
-            report(emitter, format!("quantity=Q2-2_n2b control=discipline_removed q2={} {sample} reading={}", arm.label(), reading.label()), result.pattern_p_states);
+            report(emitter, format!("quantity=Q2-2_n2b control=discipline_removed q2={} {sample} reading={}", arm.label(), reading.label()), result.out_of_order_commit_pattern_states);
         }
         // 5.3 V_fsync：早返回，四条 Q2 臂都套，每条 Q3 臂各报。
         for arm in AppendArm::ALL {
-            let mut request = CellRequest::main_grid(PublishCondition::SharedPublish, arm, h0(&[1, 1]), reading);
+            let mut request = CellRequest::main_grid(PublishCondition::SharedPublish, arm, history_without_void(&[1, 1]), reading);
             request.return_rule = ReturnRule::EarlyAfterOwnRecordsIssued;
             let result = evaluate_cell(&request).expect("H0 适用");
             for recovery_arm in RecoveryArm::ALL {
                 report(
                     emitter,
                     format!("quantity=Q3-1_v_fsync control=early_return q2={} q3={} q1=shared_publish family=H0 k=2 r=1,1 reading={}", arm.label(), recovery_arm.label(), reading.label()),
-                    result.recovery[recovery_arm.position()].v_fsync,
+                    result.recovery[recovery_arm.position()].fsync_violations,
                 );
             }
         }
         // 5.3 V_dep：每条臂关掉「不保后面」的那一处、按记录施加。
-        let mut dependency_request = CellRequest::main_grid(PublishCondition::SharedPublish, AppendArm::DingNoDiscipline, h0(&[2, 2]), reading);
+        let mut dependency_request = CellRequest::main_grid(PublishCondition::SharedPublish, AppendArm::DingNoDiscipline, history_without_void(&[2, 2]), reading);
         dependency_request.recovery_control = RecoveryControl::KeepLaterRecordsRemoved;
         let dependency_result = evaluate_cell(&dependency_request).expect("H0 适用");
         // 5.3 N_atom：每条臂去掉提交标记的处理并去掉整次发布施加。
-        let mut atomicity_request = CellRequest::main_grid(PublishCondition::SharedPublish, AppendArm::JiaWhole, h0(&[2, 2]), reading);
+        let mut atomicity_request = CellRequest::main_grid(PublishCondition::SharedPublish, AppendArm::JiaWhole, history_without_void(&[2, 2]), reading);
         atomicity_request.recovery_control = RecoveryControl::CommitMarkerHandlingRemoved;
         let atomicity_result = evaluate_cell(&atomicity_request).expect("H0 适用");
         // 5.3 V_dangling：拿掉 B1、B2。
-        let mut dangling_request = CellRequest::main_grid(PublishCondition::SerialPublishes, AppendArm::JiaWhole, h0(&[1, 1]), reading);
+        let mut dangling_request = CellRequest::main_grid(PublishCondition::SerialPublishes, AppendArm::JiaWhole, history_without_void(&[1, 1]), reading);
         dangling_request.barriers = PublishBarriers::WithoutBarriersAfterUnitsAndRecords;
         let dangling_result = evaluate_cell(&dangling_request).expect("H0 适用");
         for recovery_arm in RecoveryArm::ALL {
             report(
                 emitter,
                 format!("quantity=Q3-2_v_dep control=keep_later_records_removed q2=ding_control q3={} q1=shared_publish family=H0 k=2 r=2,2 reading={}", recovery_arm.label(), reading.label()),
-                dependency_result.recovery[recovery_arm.position()].v_dependency,
+                dependency_result.recovery[recovery_arm.position()].dependency_violations,
             );
             report(
                 emitter,
                 format!("quantity=A3_n_atom control=commit_marker_handling_removed q2=jia_whole q3={} q1=shared_publish family=H0 k=2 r=2,2 reading={}", recovery_arm.label(), reading.label()),
-                atomicity_result.recovery[recovery_arm.position()].n_atom,
+                atomicity_result.recovery[recovery_arm.position()].atomicity_violations,
             );
             report(
                 emitter,
                 format!("quantity=Q3-3_v_dangling control=barriers_after_units_and_records_removed q2=jia_whole q3={} q1=serial_publishes family=H0 k=2 r=1,1 reading={}", recovery_arm.label(), reading.label()),
-                dangling_result.recovery[recovery_arm.position()].v_dangling(),
+                dangling_result.recovery[recovery_arm.position()].dangling_violations(),
             );
         }
         // 5.3 判坏（只丙3）与部分施加（只丙2）：对照丁当 Q2 臂，主网格里那两格。
-        let judged_bad = &grid[&(PublishCondition::SharedPublish, AppendArm::DingNoDiscipline, h0(&[2, 1]), reading)];
+        let judged_bad = &grid[&(PublishCondition::SharedPublish, AppendArm::DingNoDiscipline, history_without_void(&[2, 1]), reading)];
         report(
             emitter,
             format!("quantity=bing3_refused control=ding_as_q2 q2=ding_control q3=bing3_forbid q1=shared_publish family=H0 k=2 r=2,1 reading={}", reading.label()),
             judged_bad.recovery[RecoveryArm::Bing3ForbidPattern.position()].refused,
         );
-        let partial = &grid[&(PublishCondition::SharedPublish, AppendArm::DingNoDiscipline, h0(&[2, 2]), reading)];
+        let partial = &grid[&(PublishCondition::SharedPublish, AppendArm::DingNoDiscipline, history_without_void(&[2, 2]), reading)];
         report(
             emitter,
             format!("quantity=Q3-4_partial_publish control=ding_as_q2 q2=ding_control q3=bing2_drop_a_keep_b q1=shared_publish family=H0 k=2 r=2,2 reading={}", reading.label()),
-            partial.recovery[RecoveryArm::Bing2DropAKeepB.position()].partial_publish,
+            partial.recovery[RecoveryArm::Bing2DropTheIncompleteKeepTheComplete.position()].partial_publish,
         );
     }
     emit(emitter, &format!("name=control_summary controls_not_positive={controls_not_positive}"));
@@ -2899,16 +2899,16 @@ fn emit_verdicts(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResul
                 let head = format!("q1={} q2={} reading={}", condition.label(), arm.label(), reading.label());
                 let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.incomplete_pair_states);
                 emit(emitter, &format!("name=verdict quantity=Q2-1 {head} legal_cells={cells} legal_cells_positive={positive_cells} legal_states={total} judgement={}", hit_or_not(total)));
-                let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.pattern_p_states);
+                let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.out_of_order_commit_pattern_states);
                 let pairing = if total > 0 { "bing3_pairing_out" } else { "bing3_pairing_stands" };
                 emit(emitter, &format!("name=verdict quantity=Q2-2 {head} legal_cells={cells} legal_cells_positive={positive_cells} legal_states={total} judgement={pairing}"));
                 for recovery_arm in RecoveryArm::ALL {
                     let position = recovery_arm.position();
-                    let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].v_fsync);
-                    let (_, _, mounted_lost) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].v_fsync_mounted_lost);
-                    let (_, _, refused_with_returned) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].v_fsync_refused_with_returned);
-                    let (_, _, branch_appended) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].v_fsync_branch_every_earlier_appended);
-                    let (_, _, branch_void) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].v_fsync_branch_earlier_passed_as_voided);
+                    let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].fsync_violations);
+                    let (_, _, mounted_lost) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].fsync_violations_mounted_lost);
+                    let (_, _, refused_with_returned) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].fsync_violations_refused_with_returned);
+                    let (_, _, branch_appended) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].fsync_violations_branch_every_earlier_appended);
+                    let (_, _, branch_void) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].fsync_violations_branch_earlier_passed_as_voided);
                     emit(
                         emitter,
                         &format!(
@@ -2917,17 +2917,17 @@ fn emit_verdicts(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResul
                             hit_or_not(total)
                         ),
                     );
-                    let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].v_dependency);
+                    let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[position].dependency_violations);
                     emit(emitter, &format!("name=verdict quantity=Q3-2 {head} q3={} legal_cells={cells} legal_cells_positive={positive_cells} legal_states={total} judgement={}", recovery_arm.label(), hit_or_not(total)));
                 }
                 // Q3-3：四条 Q3 臂同值 ⇒ 打中不分辨臂（F8）；不同值 ⇒ 值大的那几条臂。
                 let per_arm: Vec<u64> = RecoveryArm::ALL
                     .iter()
-                    .map(|recovery_arm| legal_sum(grid, condition, arm, reading, &|result| result.recovery[recovery_arm.position()].v_dangling()).2)
+                    .map(|recovery_arm| legal_sum(grid, condition, arm, reading, &|result| result.recovery[recovery_arm.position()].dangling_violations()).2)
                     .collect();
                 let (_, cells_where_arms_differ, _) = legal_sum(grid, condition, arm, reading, &|result| {
-                    let first = result.recovery[0].v_dangling();
-                    u64::from(result.recovery.iter().any(|counts| counts.v_dangling() != first))
+                    let first = result.recovery[0].dangling_violations();
+                    u64::from(result.recovery.iter().any(|counts| counts.dangling_violations() != first))
                 });
                 let largest = per_arm.iter().copied().max().unwrap_or(0);
                 let judgement = if largest == 0 {
@@ -2945,7 +2945,7 @@ fn emit_verdicts(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResul
                         per_arm[0], per_arm[1], per_arm[2], per_arm[3]
                     ),
                 );
-                let bing2 = RecoveryArm::Bing2DropAKeepB.position();
+                let bing2 = RecoveryArm::Bing2DropTheIncompleteKeepTheComplete.position();
                 let (cells, positive_cells, total) = legal_sum(grid, condition, arm, reading, &|result| result.recovery[bing2].partial_publish);
                 emit(emitter, &format!("name=verdict quantity=Q3-4 {head} q3=bing2_drop_a_keep_b legal_cells={cells} legal_cells_positive={positive_cells} legal_states={total} judgement={}", hit_or_not(total)));
             }
@@ -2960,12 +2960,12 @@ fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellRes
         let bing0 = RecoveryArm::Bing0Today.position();
         let quantities: [(&str, &dyn Fn(&AppendCellResult) -> u64); 7] = [
             ("n2a", &|result: &AppendCellResult| result.incomplete_pair_states),
-            ("n2b", &|result: &AppendCellResult| result.pattern_p_states),
-            ("v_fsync", &|result: &AppendCellResult| result.recovery[bing0].v_fsync),
-            ("v_dep", &|result: &AppendCellResult| result.recovery[bing0].v_dependency),
-            ("v_dangling", &|result: &AppendCellResult| result.recovery[bing0].v_dangling()),
+            ("n2b", &|result: &AppendCellResult| result.out_of_order_commit_pattern_states),
+            ("v_fsync", &|result: &AppendCellResult| result.recovery[bing0].fsync_violations),
+            ("v_dep", &|result: &AppendCellResult| result.recovery[bing0].dependency_violations),
+            ("v_dangling", &|result: &AppendCellResult| result.recovery[bing0].dangling_violations()),
             ("partial_publish", &|result: &AppendCellResult| result.recovery[bing0].partial_publish),
-            ("n_atom", &|result: &AppendCellResult| result.recovery[bing0].n_atom),
+            ("n_atom", &|result: &AppendCellResult| result.recovery[bing0].atomicity_violations),
         ];
         let mut fields = Vec::new();
         let mut nonzero_quantities = 0u64;
@@ -2986,7 +2986,7 @@ fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellRes
             if history.family().is_legal() == legal {
                 cells += 1;
                 for recovery_arm in RecoveryArm::ALL {
-                    per_arm[recovery_arm.position()] += result.recovery[recovery_arm.position()].n_atom;
+                    per_arm[recovery_arm.position()] += result.recovery[recovery_arm.position()].atomicity_violations;
                 }
             }
         }
@@ -3004,7 +3004,7 @@ fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellRes
         for arm in [AppendArm::JiaWhole, AppendArm::YiReservedWhole] {
             for reading in AppendedReading::ALL {
                 let (cells, _, n2a) = legal_sum(grid, condition, arm, reading, &|result| result.incomplete_pair_states);
-                let (_, _, n2b) = legal_sum(grid, condition, arm, reading, &|result| result.pattern_p_states);
+                let (_, _, n2b) = legal_sum(grid, condition, arm, reading, &|result| result.out_of_order_commit_pattern_states);
                 emit(emitter, &format!("name=assertion check=A4 q1={} q2={} reading={} legal_cells={cells} n2a={n2a} n2b={n2b}", condition.label(), arm.label(), reading.label()));
             }
         }
@@ -3013,7 +3013,7 @@ fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellRes
     for condition in conditions.iter().copied() {
         for arm in [AppendArm::JiaWhole, AppendArm::YiReservedWhole] {
             for reading in AppendedReading::ALL {
-                let (cells, positive_cells, differing) = legal_sum(grid, condition, arm, reading, &|result| result.a5_differing_states);
+                let (cells, positive_cells, differing) = legal_sum(grid, condition, arm, reading, &|result| result.whole_arms_differing_states);
                 let differing_by_arm: Vec<String> = RecoveryArm::ALL
                     .iter()
                     .map(|recovery_arm| format!("{}_differs={}", recovery_arm.label(), legal_sum(grid, condition, arm, reading, &|result| result.recovery[recovery_arm.position()].differs_from_bing0).2))
@@ -3034,10 +3034,10 @@ fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellRes
     for condition in conditions.iter().copied() {
         for reading in AppendedReading::ALL {
             let mut fields = Vec::new();
-            for recovery_arm in [RecoveryArm::Bing0Today, RecoveryArm::Bing1TruncateBeforeA, RecoveryArm::Bing3ForbidPattern] {
+            for recovery_arm in [RecoveryArm::Bing0Today, RecoveryArm::Bing1TruncateBeforeTheIncompleteTransaction, RecoveryArm::Bing3ForbidPattern] {
                 let total: u64 = AppendArm::ALL
                     .iter()
-                    .map(|arm| legal_sum(grid, condition, *arm, reading, &|result| result.recovery[recovery_arm.position()].v_dependency).2)
+                    .map(|arm| legal_sum(grid, condition, *arm, reading, &|result| result.recovery[recovery_arm.position()].dependency_violations).2)
                     .sum();
                 fields.push(format!("{}_v_dep={total}", recovery_arm.label()));
             }
@@ -3047,20 +3047,20 @@ fn emit_assertions(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellRes
     // A6、A7 与轨迹期末值：全部格。
     let mut longest = 0usize;
     let mut limit_states = 0u64;
-    let mut a7_points = 0u64;
+    let mut returned_before_last_barrier_point_total = 0u64;
     let mut final_peak = 0u64;
     let mut never_drained = 0u64;
     let mut core_failures = 0u64;
     for result in grid.values() {
         longest = longest.max(result.strict_segment_length_peak);
         limit_states += result.in_flight_limit_states;
-        a7_points += result.a7_violation_points;
+        returned_before_last_barrier_point_total += result.returned_before_last_barrier_points;
         final_peak = final_peak.max(result.pending.final_peak);
         never_drained += result.pending.never_drained;
         core_failures += result.recovery.iter().map(|counts| counts.core_failures).sum::<u64>();
     }
     emit(emitter, &format!("name=assertion check=A6 cells={} strict_segment_length_peak={longest} bound={STRICT_SEGMENT_LENGTH_BOUND} in_flight_limit={IN_FLIGHT_RECORD_LIMIT} in_flight_limit_states={limit_states}", grid.len()));
-    emit(emitter, &format!("name=assertion check=A7 cells={} a7_violation_points={a7_points}", grid.len()));
+    emit(emitter, &format!("name=assertion check=A7 cells={} a7_violation_points={returned_before_last_barrier_point_total}", grid.len()));
     emit(emitter, &format!("name=assertion check=pending_trajectory cells={} pending_final_peak={final_peak} pending_never_drained={never_drained}", grid.len()));
     emit(emitter, &format!("name=assertion check=core_failures cells={} core_failures={core_failures}", grid.len()));
 }
@@ -3079,21 +3079,21 @@ fn point_judgement(grid: &BTreeMap<GridKey, AppendCellResult>, condition: Publis
 fn geometry_quantities() -> Vec<(String, Box<dyn Fn(&AppendCellResult) -> u64>)> {
     let mut quantities: Vec<(String, Box<dyn Fn(&AppendCellResult) -> u64>)> = vec![
         ("Q2-1".to_string(), Box::new(|result: &AppendCellResult| result.incomplete_pair_states)),
-        ("Q2-2".to_string(), Box::new(|result: &AppendCellResult| result.pattern_p_states)),
+        ("Q2-2".to_string(), Box::new(|result: &AppendCellResult| result.out_of_order_commit_pattern_states)),
     ];
     for recovery_arm in RecoveryArm::ALL {
         let position = recovery_arm.position();
-        quantities.push((format!("Q3-1 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].v_fsync)));
-        quantities.push((format!("Q3-2 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].v_dependency)));
-        quantities.push((format!("Q3-3 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].v_dangling())));
+        quantities.push((format!("Q3-1 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].fsync_violations)));
+        quantities.push((format!("Q3-2 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].dependency_violations)));
+        quantities.push((format!("Q3-3 q3={}", recovery_arm.label()), Box::new(move |result: &AppendCellResult| result.recovery[position].dangling_violations())));
     }
-    let bing2 = RecoveryArm::Bing2DropAKeepB.position();
+    let bing2 = RecoveryArm::Bing2DropTheIncompleteKeepTheComplete.position();
     quantities.push(("Q3-4 q3=bing2_drop_a_keep_b".to_string(), Box::new(move |result: &AppendCellResult| result.recovery[bing2].partial_publish)));
     quantities
 }
 
 /// 登记 8.2：G1、G2 在给定的条件里判；`includes_g4` 时另报 G4（多飞·根序对多飞·根乱，两个子形态互为方向相反的点）。
-fn emit_geometry(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>, conditions: &[PublishCondition], includes_g4: bool) {
+fn emit_geometry(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>, conditions: &[PublishCondition], includes_multi_flight_root_order_geometry: bool) {
     let checks: [(&str, &[u32], Vec<(&str, &[u32])>); 2] = [
         ("G1", &[2, 2], vec![("r1,1", &[1, 1][..]), ("r1,1,1", &[1, 1, 1][..])]),
         ("G2", &[2, 1], vec![("r1,2", &[1, 2][..])]),
@@ -3132,7 +3132,7 @@ fn emit_geometry(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResul
             }
         }
     }
-    if includes_g4 {
+    if includes_multi_flight_root_order_geometry {
         for arm in AppendArm::ALL {
             for reading in AppendedReading::ALL {
                 for (quantity_name, quantity) in &geometry_quantities() {
@@ -3159,13 +3159,13 @@ fn emit_geometry(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResul
     emit(emitter, &format!("name=geometry_summary lines={lines} unstable_lines={unstable}"));
 }
 
-fn emit_h2_summaries(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>) {
+fn emit_wide_void_summaries(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>) {
     for condition in PublishCondition::SEGMENT_ONE {
         for arm in AppendArm::ALL {
             for reading in AppendedReading::ALL {
                 let cells: Vec<&AppendCellResult> = grid
                     .iter()
-                    .filter(|((cell_condition, cell_arm, history, cell_reading), _)| *cell_condition == condition && *cell_arm == arm && *cell_reading == reading && history.family() == HistoryFamily::H2)
+                    .filter(|((cell_condition, cell_arm, history, cell_reading), _)| *cell_condition == condition && *cell_arm == arm && *cell_reading == reading && history.family() == HistoryFamily::WideVoid)
                     .map(|(_, result)| result)
                     .collect();
                 if cells.is_empty() {
@@ -3173,7 +3173,7 @@ fn emit_h2_summaries(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellR
                     continue;
                 }
                 let n2a: u64 = cells.iter().map(|result| result.incomplete_pair_states).sum();
-                let n2b: u64 = cells.iter().map(|result| result.pattern_p_states).sum();
+                let n2b: u64 = cells.iter().map(|result| result.out_of_order_commit_pattern_states).sum();
                 let mut fields = vec![format!("cells={} n2a={n2a} n2b={n2b}", cells.len())];
                 for recovery_arm in RecoveryArm::ALL {
                     let mut totals = RecoveryCounts::default();
@@ -3183,11 +3183,11 @@ fn emit_h2_summaries(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellR
                     fields.push(format!(
                         "{}=v_fsync:{},v_dep:{},v_dangling:{},partial_publish:{},n_atom:{},refused:{}",
                         recovery_arm.label(),
-                        totals.v_fsync,
-                        totals.v_dependency,
-                        totals.v_dangling(),
+                        totals.fsync_violations,
+                        totals.dependency_violations,
+                        totals.dangling_violations(),
                         totals.partial_publish,
-                        totals.n_atom,
+                        totals.atomicity_violations,
                         totals.refused
                     ));
                 }
@@ -3676,11 +3676,11 @@ fn appended_events(plan: &WaitPlan, timeline: &WaitTimeline, reading: AppendedRe
     plan.transaction_record_writes
         .iter()
         .map(|writes| match reading {
-            AppendedReading::R1Issued => {
+            AppendedReading::IssuedOnly => {
                 let last_issued = *writes.iter().max_by_key(|write| (timeline.ready[**write], **write)).expect("r ≥ 1");
                 (timeline.ready[last_issued], WaitPathPoint::IssueOf(last_issued))
             }
-            AppendedReading::R2IssuedAndCovered => {
+            AppendedReading::IssuedAndCovered => {
                 let last_record = *writes.iter().max_by_key(|write| timeline.start[**write]).expect("r ≥ 1");
                 let cover = first_covering_operation_after(plan, timeline, last_record);
                 (timeline.complete[cover], WaitPathPoint::CompletionOf(cover))
@@ -3809,7 +3809,7 @@ fn trajectory_over(event_times: &[u64], end_time: u64, value_at: &dyn Fn(u64) ->
 #[derive(Clone, Debug)]
 struct WaitResult {
     return_times: Vec<u64>,
-    w_max: u64,
+    latest_return_time: u64,
     latest_transaction: u32,
     path: CriticalPath,
     pending: WaitTrajectory,
@@ -3819,7 +3819,7 @@ struct WaitResult {
 }
 
 impl WaitResult {
-    fn w_sum(&self) -> u64 {
+    fn return_time_sum(&self) -> u64 {
         self.return_times.iter().sum()
     }
 }
@@ -3832,16 +3832,16 @@ fn evaluate_wait(scenario: &WaitScenario, reading: AppendedReading) -> WaitResul
     let return_times: Vec<u64> = (1..=scenario.transaction_count)
         .map(|transaction| return_candidates(&plan, &timeline, transaction, &appended).iter().map(|(time, ..)| *time).max().expect("至少本发布的 B3"))
         .collect();
-    let w_max = *return_times.iter().max().expect("k ≥ 1");
+    let latest_return_time = *return_times.iter().max().expect("k ≥ 1");
     // 同时最晚返回的取事务号最大的那个（修订 4 第 2 条）。
-    let latest_transaction = (1..=scenario.transaction_count).rev().find(|transaction| return_times[transaction_position(*transaction)] == w_max).expect("有最晚的");
-    let path = critical_path_of(&plan, &timeline, latest_transaction, &appended, w_max);
-    assert_eq!(path.duration_sum + path.source_time, w_max, "关键路径上各步耗时之和加起点时刻等于返回时刻");
+    let latest_transaction = (1..=scenario.transaction_count).rev().find(|transaction| return_times[transaction_position(*transaction)] == latest_return_time).expect("有最晚的");
+    let path = critical_path_of(&plan, &timeline, latest_transaction, &appended, latest_return_time);
+    assert_eq!(path.duration_sum + path.source_time, latest_return_time, "关键路径上各步耗时之和加起点时刻等于返回时刻");
     let mut event_times: Vec<u64> = std::iter::once(0).chain(timeline.complete.iter().copied()).collect();
     event_times.sort_unstable();
     event_times.dedup();
     let appended_times: Vec<u64> = appended[..transaction_position(latest_transaction)].iter().map(|(time, _)| *time).collect();
-    let pending = trajectory_over(&event_times, w_max, &|time| u64::try_from(appended_times.iter().filter(|appended| **appended > time).count()).expect("至多 63"));
+    let pending = trajectory_over(&event_times, latest_return_time, &|time| u64::try_from(appended_times.iter().filter(|appended| **appended > time).count()).expect("至多 63"));
     let reserved_lag = match scenario.append_arm {
         AppendArm::YiReservedWhole => {
             let record_count = u64::from(scenario.record_count);
@@ -3866,11 +3866,11 @@ fn evaluate_wait(scenario: &WaitScenario, reading: AppendedReading) -> WaitResul
                     (Some(_), None) | (None, Some(_)) | (None, None) => 0,
                 }
             };
-            Some(trajectory_over(&event_times, w_max, &lag_at))
+            Some(trajectory_over(&event_times, latest_return_time, &lag_at))
         }
         AppendArm::JiaWhole | AppendArm::JiaInterleaved | AppendArm::DingNoDiscipline => None,
     };
-    WaitResult { return_times, w_max, latest_transaction, path, pending, reserved_lag, merged_barriers_on_device: timeline.merged_barriers }
+    WaitResult { return_times, latest_return_time, latest_transaction, path, pending, reserved_lag, merged_barriers_on_device: timeline.merged_barriers }
 }
 
 fn format_wait_units(units: u64) -> String {
@@ -3901,10 +3901,10 @@ impl GrowthJudgement {
 }
 
 /// ρ = large ÷ small 与两道门槛比：ρ ≥ grows ⇔ large·grows分母 ≥ grows分子·small。
-fn growth_judgement(small_k_w_max: u64, large_k_w_max: u64, grows_threshold: (u64, u64), bounded_threshold: (u64, u64)) -> GrowthJudgement {
-    if large_k_w_max * grows_threshold.1 >= grows_threshold.0 * small_k_w_max {
+fn growth_judgement(small_transaction_count_latest_return: u64, large_transaction_count_latest_return: u64, grows_threshold: (u64, u64), bounded_threshold: (u64, u64)) -> GrowthJudgement {
+    if large_transaction_count_latest_return * grows_threshold.1 >= grows_threshold.0 * small_transaction_count_latest_return {
         GrowthJudgement::Grows
-    } else if large_k_w_max * bounded_threshold.1 <= bounded_threshold.0 * small_k_w_max {
+    } else if large_transaction_count_latest_return * bounded_threshold.1 <= bounded_threshold.0 * small_transaction_count_latest_return {
         GrowthJudgement::Bounded
     } else {
         GrowthJudgement::Between
@@ -3943,7 +3943,7 @@ fn wait_grid() -> BTreeMap<WaitKey, WaitResult> {
 }
 
 /// 登记第七节 B6：k = 1、r = 1：甲两条臂 W = 4w + 4b + h，乙整段 W = 4w + 4b（g ≤ 2w + b），慢头各加 Δ。
-fn anchor_b6_single_transaction(arm: AppendArm, profile: PreparationProfile, point: CostPoint) -> u64 {
+fn wait_anchor_single_transaction(arm: AppendArm, profile: PreparationProfile, point: CostPoint) -> u64 {
     let costs = point.costs();
     let appender = match arm {
         AppendArm::JiaWhole | AppendArm::JiaInterleaved => costs.cpu_step,
@@ -3953,13 +3953,13 @@ fn anchor_b6_single_transaction(arm: AppendArm, profile: PreparationProfile, poi
 }
 
 /// 登记第七节 B6：k = 2、r = 1、串落、等速、P1：甲整段 8.41、乙整段 8.4（写成整数单位）。
-const ANCHOR_B6_SERIAL_TWO_TRANSACTIONS: [(AppendArm, u64); 2] = [(AppendArm::JiaWhole, 8410), (AppendArm::YiReservedWhole, 8400)];
+const WAIT_ANCHOR_SERIAL_TWO_TRANSACTIONS: [(AppendArm, u64); 2] = [(AppendArm::JiaWhole, 8410), (AppendArm::YiReservedWhole, 8400)];
 
 fn emit_wait_anchors(emitter: &mut Emitter, grid: &BTreeMap<WaitKey, WaitResult>) -> u64 {
     let mut checked = 0u64;
     let mut mismatches = 0u64;
     let mut check = |emitter: &mut Emitter, key: WaitKey, expected: u64| {
-        let measured = grid[&key].w_max;
+        let measured = grid[&key].latest_return_time;
         checked += 1;
         mismatches += u64::from(measured != expected);
         let (condition, arm, profile, point, record_count, reading, transaction_count) = key;
@@ -3983,13 +3983,13 @@ fn emit_wait_anchors(emitter: &mut Emitter, grid: &BTreeMap<WaitKey, WaitResult>
             for profile in PreparationProfile::ALL {
                 for point in CostPoint::ALL {
                     for reading in AppendedReading::ALL {
-                        check(emitter, (condition, arm, profile, point, 1, reading, 1), anchor_b6_single_transaction(arm, profile, point));
+                        check(emitter, (condition, arm, profile, point, 1, reading, 1), wait_anchor_single_transaction(arm, profile, point));
                     }
                 }
             }
         }
     }
-    for (arm, expected) in ANCHOR_B6_SERIAL_TWO_TRANSACTIONS {
+    for (arm, expected) in WAIT_ANCHOR_SERIAL_TWO_TRANSACTIONS {
         for reading in AppendedReading::ALL {
             check(emitter, (PublishCondition::SerialPublishes, arm, PreparationProfile::Uniform, CostPoint::DeviceDominated, 1, reading, 2), expected);
         }
@@ -4014,8 +4014,8 @@ fn emit_wait_cell(emitter: &mut Emitter, key: WaitKey, result: &WaitResult) {
         &format!(
             "name=wait_cell {} k={transaction_count} w_max={} w_mean={} latest_transaction={} n_bar={} n_dev={} n_cpu={} merged_barriers_on_path={} merged_barriers_on_device={} tie_steps={} path_source_time={} pending_initial={} pending_peak_after_drain={} pending_positive_steps={} pending_final={} {lag}",
             wait_verdict_key_text((condition, arm, profile, point, record_count, reading)),
-            format_wait_units(result.w_max),
-            format_ratio(result.w_sum(), u64::from(transaction_count) * WAIT_UNITS_PER_ABSTRACT_UNIT),
+            format_wait_units(result.latest_return_time),
+            format_ratio(result.return_time_sum(), u64::from(transaction_count) * WAIT_UNITS_PER_ABSTRACT_UNIT),
             result.latest_transaction,
             result.path.barriers_or_forced_unit_access,
             result.path.device_writes,
@@ -4064,7 +4064,7 @@ fn wait_pair_of_grid(grid: &BTreeMap<WaitKey, WaitResult>, key: WaitVerdictKey) 
 
 fn registered_growth_judgement(grid: &BTreeMap<WaitKey, WaitResult>, key: WaitVerdictKey) -> GrowthJudgement {
     let (small, large) = wait_pair_of_grid(grid, key);
-    growth_judgement(small.w_max, large.w_max, REGISTERED_GROWS_THRESHOLD, REGISTERED_BOUNDED_THRESHOLD)
+    growth_judgement(small.latest_return_time, large.latest_return_time, REGISTERED_GROWS_THRESHOLD, REGISTERED_BOUNDED_THRESHOLD)
 }
 
 fn every_wait_verdict_key() -> Vec<WaitVerdictKey> {
@@ -4094,9 +4094,9 @@ fn emit_wait_verdicts(emitter: &mut Emitter, grid: &BTreeMap<WaitKey, WaitResult
             &format!(
                 "name=wait_verdict quantity=Q2-3 {} w_max_k8={} w_max_k64={} rho={} judgement={}",
                 wait_verdict_key_text(key),
-                format_wait_units(small.w_max),
-                format_wait_units(large.w_max),
-                format_ratio(large.w_max, small.w_max),
+                format_wait_units(small.latest_return_time),
+                format_wait_units(large.latest_return_time),
+                format_ratio(large.latest_return_time, small.latest_return_time),
                 registered_growth_judgement(grid, key).label()
             ),
         );
@@ -4449,17 +4449,17 @@ fn run_segment_one() {
         &mut emitter,
         &format!(
             "name=config experiment=e169 segment=1 q1=serial_publishes,shared_publish q2=jia_whole,jia_interleaved,yi_reserved_whole,ding_control q3=bing0_today,bing1_truncate_before_a,bing2_drop_a_keep_b,bing3_forbid readings=r2_covered,r1_issued histories_h0={} histories_h1={} histories_h2={} in_flight_record_limit={IN_FLIGHT_RECORD_LIMIT}",
-            count_of(HistoryFamily::H0),
-            count_of(HistoryFamily::H1),
-            count_of(HistoryFamily::H2)
+            count_of(HistoryFamily::WithoutVoid),
+            count_of(HistoryFamily::NarrowVoid),
+            count_of(HistoryFamily::WideVoid)
         ),
     );
     // 停机条款 T1：十四条序列逐条核，有一条不同就停。
-    let mut t1_mismatches = 0u64;
+    let mut fixed_sequence_mismatches = 0u64;
     for sequence in fixed_sequences() {
         let (publishes, records) = bing0_on_fixed_sequence(&sequence);
         let matches = publishes == sequence.expected_publishes_applied && records == sequence.expected_records_applied;
-        t1_mismatches += u64::from(!matches);
+        fixed_sequence_mismatches += u64::from(!matches);
         emit(
             &mut emitter,
             &format!(
@@ -4472,8 +4472,8 @@ fn run_segment_one() {
             ),
         );
     }
-    emit(&mut emitter, &format!("name=t1_summary sequences=14 mismatches={t1_mismatches}"));
-    if t1_mismatches > 0 {
+    emit(&mut emitter, &format!("name=t1_summary sequences=14 mismatches={fixed_sequence_mismatches}"));
+    if fixed_sequence_mismatches > 0 {
         emit(&mut emitter, "name=stopped clause=T1 remaining_segment_one=not_run");
         println!("{}", emitter.finish());
         std::process::exit(3);
@@ -4500,7 +4500,7 @@ fn run_segment_one() {
     emit_verdicts(&mut emitter, &grid, &PublishCondition::SEGMENT_ONE);
     emit_assertions(&mut emitter, &grid, &PublishCondition::SEGMENT_ONE, true);
     emit_geometry(&mut emitter, &grid, &PublishCondition::SEGMENT_ONE, false);
-    emit_h2_summaries(&mut emitter, &grid);
+    emit_wide_void_summaries(&mut emitter, &grid);
     println!("{}", emitter.finish());
 }
 
@@ -4508,8 +4508,8 @@ fn run_segment_one() {
 fn emit_segment_two_anchors(emitter: &mut Emitter, grid: &BTreeMap<GridKey, AppendCellResult>) -> u64 {
     let mut checked = 0u64;
     let mut mismatches = 0u64;
-    for (counts, condition, arm, executions, states) in ANCHOR_B5 {
-        let measured = &grid[&(condition, arm, h0(counts), AppendedReading::R2IssuedAndCovered)];
+    for (counts, condition, arm, executions, states) in MULTI_FLIGHT_ANCHOR {
+        let measured = &grid[&(condition, arm, history_without_void(counts), AppendedReading::IssuedAndCovered)];
         for (quantity, expected, value) in [("executions", executions, measured.executions), ("states", states, measured.states)] {
             checked += 1;
             mismatches += u64::from(expected != value);
@@ -4519,7 +4519,7 @@ fn emit_segment_two_anchors(emitter: &mut Emitter, grid: &BTreeMap<GridKey, Appe
                     "name=anchor family=B5 q1={} q2={} r={} quantity={quantity} source=script expected={expected} measured={value} matches={}",
                     condition.label(),
                     arm.label(),
-                    h0(counts).record_counts_label(),
+                    history_without_void(counts).record_counts_label(),
                     yes_or_no(expected == value)
                 ),
             );
@@ -4537,7 +4537,7 @@ struct PathCheckTally {
     execution_mismatches: u64,
     trajectory_mismatches: u64,
     quantity_mismatches: u64,
-    a7_zero_mismatches: u64,
+    returned_before_last_barrier_zero_mismatches: u64,
     mismatch_lines: Vec<String>,
 }
 
@@ -4549,15 +4549,15 @@ impl PathCheckTally {
         let trajectories_differ = direct_result.pending != searched_result.pending;
         let quantities_differ = direct_result.recovery != searched_result.recovery
             || direct_result.incomplete_pair_states != searched_result.incomplete_pair_states
-            || direct_result.pattern_p_states != searched_result.pattern_p_states;
-        let a7_zero_differs = (direct_result.a7_violation_points == 0) != (searched_result.a7_violation_points == 0);
+            || direct_result.out_of_order_commit_pattern_states != searched_result.out_of_order_commit_pattern_states;
+        let returned_before_last_barrier_zero_differs = (direct_result.returned_before_last_barrier_points == 0) != (searched_result.returned_before_last_barrier_points == 0);
         self.cells += 1;
         self.state_set_mismatches += u64::from(state_sets_differ);
         self.execution_mismatches += u64::from(executions_differ);
         self.trajectory_mismatches += u64::from(trajectories_differ);
         self.quantity_mismatches += u64::from(quantities_differ);
-        self.a7_zero_mismatches += u64::from(a7_zero_differs);
-        if state_sets_differ || executions_differ || trajectories_differ || quantities_differ || a7_zero_differs {
+        self.returned_before_last_barrier_zero_mismatches += u64::from(returned_before_last_barrier_zero_differs);
+        if state_sets_differ || executions_differ || trajectories_differ || quantities_differ || returned_before_last_barrier_zero_differs {
             self.mismatch_lines.push(format!(
                 "name=path_check_mismatch {key_text} direct_states={} searched_states={} direct_executions={} searched_executions={}",
                 direct_result.states, searched_result.states, direct_result.executions, searched_result.executions
@@ -4572,7 +4572,7 @@ impl PathCheckTally {
             emitter,
             &format!(
                 "name=path_check paths=direct,by_configuration cells={} state_set_mismatches={} execution_mismatches={} trajectory_mismatches={} quantity_mismatches={} a7_zero_mismatches={}",
-                self.cells, self.state_set_mismatches, self.execution_mismatches, self.trajectory_mismatches, self.quantity_mismatches, self.a7_zero_mismatches
+                self.cells, self.state_set_mismatches, self.execution_mismatches, self.trajectory_mismatches, self.quantity_mismatches, self.returned_before_last_barrier_zero_mismatches
             ),
         );
     }
@@ -4586,8 +4586,8 @@ fn run_segment_two() {
         &mut emitter,
         &format!(
             "name=config experiment=e169 segment=2 q1=multi_flight_roots_ordered,multi_flight_roots_unordered q2=jia_whole,jia_interleaved,yi_reserved_whole,ding_control q3=bing0_today,bing1_truncate_before_a,bing2_drop_a_keep_b,bing3_forbid readings=r2_covered,r1_issued histories_h0={} histories_h1={} histories_h2=not_run_after_decidable k3_record_counts=1,1,1;2,1,1 enumeration_k2=direct enumeration_k3=by_configuration configuration_limit={CONFIGURATION_LIMIT} in_flight_record_limit={IN_FLIGHT_RECORD_LIMIT}",
-            count_of(HistoryFamily::H0),
-            count_of(HistoryFamily::H1)
+            count_of(HistoryFamily::WithoutVoid),
+            count_of(HistoryFamily::NarrowVoid)
         ),
     );
     let mut grid: BTreeMap<GridKey, AppendCellResult> = BTreeMap::new();
@@ -4644,7 +4644,7 @@ fn run_segment_two() {
     for condition in PublishCondition::SEGMENT_TWO {
         for arm in AppendArm::ALL {
             for reading in AppendedReading::ALL {
-                let applicable = all_histories().iter().filter(|history| history.family() == HistoryFamily::H2).any(|history| cell_is_applicable(arm, history));
+                let applicable = all_histories().iter().filter(|history| history.family() == HistoryFamily::WideVoid).any(|history| cell_is_applicable(arm, history));
                 let status = if applicable { "applicable=yes run=not_run_after_decidable" } else { "applicable=no" };
                 emit(&mut emitter, &format!("name=h2_summary q1={} q2={} reading={} {status}", condition.label(), arm.label(), reading.label()));
             }
@@ -4659,8 +4659,8 @@ mod tests {
 
     const SERIAL: PublishCondition = PublishCondition::SerialPublishes;
     const SHARED: PublishCondition = PublishCondition::SharedPublish;
-    const R2: AppendedReading = AppendedReading::R2IssuedAndCovered;
-    const R1: AppendedReading = AppendedReading::R1Issued;
+    const ISSUED_AND_COVERED: AppendedReading = AppendedReading::IssuedAndCovered;
+    const ISSUED_ONLY: AppendedReading = AppendedReading::IssuedOnly;
 
     fn legal_histories() -> Vec<History> {
         all_histories().into_iter().filter(|history| history.family().is_legal()).collect()
@@ -4678,67 +4678,67 @@ mod tests {
     #[test]
     fn history_families_have_twelve_thirty_two_and_sixteen_members() {
         let histories = all_histories();
-        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::H0).count(), 12);
-        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::H1).count(), 32);
-        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::H2).count(), 16);
+        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::WithoutVoid).count(), 12);
+        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::NarrowVoid).count(), 32);
+        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::WideVoid).count(), 16);
     }
 
     #[test]
-    fn serial_publishes_h0_state_counts_equal_anchor_b1_for_every_append_arm_and_both_readings() {
-        for (counts, states) in ANCHOR_B1_LISTED {
+    fn serial_publishes_without_void_state_counts_equal_the_serial_publish_anchor_for_every_append_arm_and_both_readings() {
+        for (counts, states) in SERIAL_PUBLISH_ANCHOR_LISTED {
             for arm in AppendArm::ALL {
                 for reading in AppendedReading::ALL {
-                    assert_eq!(grid_cell(SERIAL, arm, h0(counts), reading).states, states, "B1 {arm:?} r={counts:?} {reading:?}");
+                    assert_eq!(grid_cell(SERIAL, arm, history_without_void(counts), reading).states, states, "B1 {arm:?} r={counts:?} {reading:?}");
                 }
             }
         }
-        for history in all_histories().into_iter().filter(|history| history.family() == HistoryFamily::H0) {
-            assert_eq!(grid_cell(SERIAL, AppendArm::JiaWhole, history.clone(), R2).states, anchor_b1_closed_form(&history.record_counts));
+        for history in all_histories().into_iter().filter(|history| history.family() == HistoryFamily::WithoutVoid) {
+            assert_eq!(grid_cell(SERIAL, AppendArm::JiaWhole, history.clone(), ISSUED_AND_COVERED).states, serial_publish_anchor_closed_form(&history.record_counts));
         }
     }
 
     #[test]
-    fn shared_publish_h0_whole_arm_state_counts_equal_anchor_b2() {
-        for (counts, states) in ANCHOR_B2_LISTED {
+    fn shared_publish_without_void_whole_arm_state_counts_equal_the_shared_publish_anchor() {
+        for (counts, states) in SHARED_PUBLISH_ANCHOR_LISTED {
             for arm in [AppendArm::JiaWhole, AppendArm::YiReservedWhole] {
-                assert_eq!(grid_cell(SHARED, arm, h0(counts), R2).states, states, "B2 {arm:?} r={counts:?}");
-                assert_eq!(grid_cell(SHARED, arm, h0(counts), R1).states, states, "B2 R1 {arm:?} r={counts:?}");
+                assert_eq!(grid_cell(SHARED, arm, history_without_void(counts), ISSUED_AND_COVERED).states, states, "B2 {arm:?} r={counts:?}");
+                assert_eq!(grid_cell(SHARED, arm, history_without_void(counts), ISSUED_ONLY).states, states, "B2 R1 {arm:?} r={counts:?}");
             }
         }
-        for history in all_histories().into_iter().filter(|history| history.family() == HistoryFamily::H0) {
-            assert_eq!(grid_cell(SHARED, AppendArm::YiReservedWhole, history.clone(), R2).states, anchor_b2_closed_form(&history.record_counts));
+        for history in all_histories().into_iter().filter(|history| history.family() == HistoryFamily::WithoutVoid) {
+            assert_eq!(grid_cell(SHARED, AppendArm::YiReservedWhole, history.clone(), ISSUED_AND_COVERED).states, shared_publish_anchor_closed_form(&history.record_counts));
         }
     }
 
     #[test]
-    fn shared_publish_h0_interleaved_and_control_executions_and_states_equal_anchor_b3() {
-        for (counts, (interleaved_executions, interleaved_states), (control_executions, control_states)) in ANCHOR_B3 {
-            let interleaved = grid_cell(SHARED, AppendArm::JiaInterleaved, h0(counts), R2);
+    fn shared_publish_without_void_interleaved_and_control_executions_and_states_equal_the_shared_interleaved_anchor() {
+        for (counts, (interleaved_executions, interleaved_states), (control_executions, control_states)) in SHARED_INTERLEAVED_ANCHOR {
+            let interleaved = grid_cell(SHARED, AppendArm::JiaInterleaved, history_without_void(counts), ISSUED_AND_COVERED);
             assert_eq!(interleaved.executions, interleaved_executions, "甲交错执行数 r={counts:?}");
             assert_eq!(interleaved.states, interleaved_states, "甲交错状态数 r={counts:?}");
-            let control = grid_cell(SHARED, AppendArm::DingNoDiscipline, h0(counts), R2);
+            let control = grid_cell(SHARED, AppendArm::DingNoDiscipline, history_without_void(counts), ISSUED_AND_COVERED);
             assert_eq!(control.executions, control_executions, "对照丁执行数 r={counts:?}");
             assert_eq!(control.states, control_states, "对照丁状态数 r={counts:?}");
         }
     }
 
     #[test]
-    fn narrow_void_state_counts_equal_the_anchor_b4_script_output() {
-        for (counts, voided, serial_jia, serial_yi, shared_jia, shared_yi) in ANCHOR_B4_SCRIPT {
-            assert_eq!(grid_cell(SERIAL, AppendArm::JiaWhole, h1(counts, voided), R2).states, serial_jia, "串落甲 r={counts:?} v={voided}");
-            assert_eq!(grid_cell(SERIAL, AppendArm::YiReservedWhole, h1(counts, voided), R2).states, serial_yi, "串落乙 r={counts:?} v={voided}");
-            assert_eq!(grid_cell(SHARED, AppendArm::JiaWhole, h1(counts, voided), R2).states, shared_jia, "同发甲 r={counts:?} v={voided}");
-            assert_eq!(grid_cell(SHARED, AppendArm::YiReservedWhole, h1(counts, voided), R2).states, shared_yi, "同发乙 r={counts:?} v={voided}");
+    fn narrow_void_state_counts_equal_the_narrow_void_anchor_script_output() {
+        for (counts, voided, serial_jia, serial_yi, shared_jia, shared_yi) in NARROW_VOID_ANCHOR_SCRIPT {
+            assert_eq!(grid_cell(SERIAL, AppendArm::JiaWhole, history_with_narrow_void(counts, voided), ISSUED_AND_COVERED).states, serial_jia, "串落甲 r={counts:?} v={voided}");
+            assert_eq!(grid_cell(SERIAL, AppendArm::YiReservedWhole, history_with_narrow_void(counts, voided), ISSUED_AND_COVERED).states, serial_yi, "串落乙 r={counts:?} v={voided}");
+            assert_eq!(grid_cell(SHARED, AppendArm::JiaWhole, history_with_narrow_void(counts, voided), ISSUED_AND_COVERED).states, shared_jia, "同发甲 r={counts:?} v={voided}");
+            assert_eq!(grid_cell(SHARED, AppendArm::YiReservedWhole, history_with_narrow_void(counts, voided), ISSUED_AND_COVERED).states, shared_yi, "同发乙 r={counts:?} v={voided}");
         }
     }
 
     #[test]
-    fn narrow_void_state_counts_equal_the_b4_closed_forms_for_all_thirty_two_histories() {
-        for history in all_histories().into_iter().filter(|history| history.family() == HistoryFamily::H1) {
+    fn narrow_void_state_counts_equal_the_narrow_void_closed_forms_for_all_thirty_two_histories() {
+        for history in all_histories().into_iter().filter(|history| history.family() == HistoryFamily::NarrowVoid) {
             let (voided, _) = history.voided.expect("H1");
             for condition in PublishCondition::SEGMENT_ONE {
-                assert_eq!(grid_cell(condition, AppendArm::JiaWhole, history.clone(), R2).states, anchor_b4_closed_form(condition, false, &history.record_counts, voided), "{condition:?} 甲 {history:?}");
-                assert_eq!(grid_cell(condition, AppendArm::YiReservedWhole, history.clone(), R2).states, anchor_b4_closed_form(condition, true, &history.record_counts, voided), "{condition:?} 乙 {history:?}");
+                assert_eq!(grid_cell(condition, AppendArm::JiaWhole, history.clone(), ISSUED_AND_COVERED).states, narrow_void_anchor_closed_form(condition, false, &history.record_counts, voided), "{condition:?} 甲 {history:?}");
+                assert_eq!(grid_cell(condition, AppendArm::YiReservedWhole, history.clone(), ISSUED_AND_COVERED).states, narrow_void_anchor_closed_form(condition, true, &history.record_counts, voided), "{condition:?} 乙 {history:?}");
             }
         }
     }
@@ -4750,24 +4750,24 @@ mod tests {
                 let result = grid_cell(SERIAL, AppendArm::JiaWhole, history.clone(), reading);
                 let bing0 = &result.recovery[RecoveryArm::Bing0Today.position()];
                 assert_eq!(result.incomplete_pair_states, 0, "A1 n2a {history:?}");
-                assert_eq!(result.pattern_p_states, 0, "A1 n2b {history:?}");
-                assert_eq!(bing0.v_fsync, 0, "A1 v_fsync {history:?}");
-                assert_eq!(bing0.v_dependency, 0, "A1 v_dep {history:?}");
-                assert_eq!(bing0.v_dangling(), 0, "A1 v_dangling {history:?}");
+                assert_eq!(result.out_of_order_commit_pattern_states, 0, "A1 n2b {history:?}");
+                assert_eq!(bing0.fsync_violations, 0, "A1 v_fsync {history:?}");
+                assert_eq!(bing0.dependency_violations, 0, "A1 v_dep {history:?}");
+                assert_eq!(bing0.dangling_violations(), 0, "A1 v_dangling {history:?}");
                 assert_eq!(bing0.partial_publish, 0, "A1 部分施加 {history:?}");
-                assert_eq!(bing0.n_atom, 0, "A1 n_atom {history:?}");
+                assert_eq!(bing0.atomicity_violations, 0, "A1 n_atom {history:?}");
             }
         }
     }
 
     #[test]
-    fn whole_append_arms_leave_no_incomplete_pair_and_no_pattern_p_on_legal_histories() {
+    fn whole_append_arms_leave_no_incomplete_pair_and_no_out_of_order_commit_pattern_on_legal_histories() {
         for condition in PublishCondition::SEGMENT_ONE {
             for arm in [AppendArm::JiaWhole, AppendArm::YiReservedWhole] {
                 for history in legal_histories() {
-                    let result = grid_cell(condition, arm, history.clone(), R2);
+                    let result = grid_cell(condition, arm, history.clone(), ISSUED_AND_COVERED);
                     assert_eq!(result.incomplete_pair_states, 0, "A4 n2a {condition:?} {arm:?} {history:?}");
-                    assert_eq!(result.pattern_p_states, 0, "A4 n2b {condition:?} {arm:?} {history:?}");
+                    assert_eq!(result.out_of_order_commit_pattern_states, 0, "A4 n2b {condition:?} {arm:?} {history:?}");
                 }
             }
         }
@@ -4778,9 +4778,9 @@ mod tests {
         for condition in PublishCondition::SEGMENT_ONE {
             for arm in AppendArm::ALL {
                 for history in all_histories() {
-                    if let Some(result) = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), R2)) {
+                    if let Some(result) = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), ISSUED_AND_COVERED)) {
                         for recovery_arm in RecoveryArm::ALL {
-                            assert_eq!(result.recovery[recovery_arm.position()].n_atom, 0, "A3 {condition:?} {arm:?} {history:?} {recovery_arm:?}");
+                            assert_eq!(result.recovery[recovery_arm.position()].atomicity_violations, 0, "A3 {condition:?} {arm:?} {history:?} {recovery_arm:?}");
                         }
                     }
                 }
@@ -4793,31 +4793,31 @@ mod tests {
         for condition in PublishCondition::SEGMENT_ONE {
             for arm in AppendArm::ALL {
                 for history in all_histories() {
-                    if let Some(result) = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), R2)) {
+                    if let Some(result) = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), ISSUED_AND_COVERED)) {
                         assert!(result.strict_segment_length_peak <= STRICT_SEGMENT_LENGTH_BOUND, "A6 {condition:?} {arm:?} {history:?}");
                         assert_eq!(result.in_flight_limit_states, 0, "A6 {condition:?} {arm:?} {history:?}");
-                        assert_eq!(result.a7_violation_points, 0, "A7 {condition:?} {arm:?} {history:?}");
+                        assert_eq!(result.returned_before_last_barrier_points, 0, "A7 {condition:?} {arm:?} {history:?}");
                         assert_eq!(result.pending.final_peak, 0, "轨迹期末值 {condition:?} {arm:?} {history:?}");
                     }
                 }
             }
         }
-        let longest = grid_cell(SHARED, AppendArm::DingNoDiscipline, h0(&[2, 2, 2]), R2).strict_segment_length_peak;
+        let longest = grid_cell(SHARED, AppendArm::DingNoDiscipline, history_without_void(&[2, 2, 2]), ISSUED_AND_COVERED).strict_segment_length_peak;
         assert_eq!(longest, 6, "k = 3、r = 2 时严格连续段取得到 6 条");
     }
 
     /// 手推：执行 [T1.1, T2.1, T1.2] 里持久集合 {U1, U2, S, jsn1, jsn2} 是唯一满足模式 P 的状态，丙3 判坏它。
     #[test]
-    fn shared_interleaved_two_one_has_exactly_one_pattern_p_state_which_bing3_refuses() {
-        let result = grid_cell(SHARED, AppendArm::JiaInterleaved, h0(&[2, 1]), R2);
-        assert_eq!(result.pattern_p_states, 1, "N2b");
+    fn shared_interleaved_two_one_has_exactly_one_out_of_order_commit_pattern_state_which_bing3_refuses() {
+        let result = grid_cell(SHARED, AppendArm::JiaInterleaved, history_without_void(&[2, 1]), ISSUED_AND_COVERED);
+        assert_eq!(result.out_of_order_commit_pattern_states, 1, "N2b");
         assert_eq!(result.incomplete_pair_states, 0, "N2a");
         assert_eq!(result.recovery[RecoveryArm::Bing3ForbidPattern.position()].refused, 1, "丙3 判坏数");
-        let layout = plan_cell(SHARED, AppendArm::JiaInterleaved, &h0(&[2, 1]), AppendDiscipline::Kept);
+        let layout = plan_cell(SHARED, AppendArm::JiaInterleaved, &history_without_void(&[2, 1]), AppendDiscipline::Kept);
         let executions = build_executions(&layout, AppendArm::JiaInterleaved, AppendDiscipline::Kept, PublishBarriers::AllThree);
         let mut states = HashSet::new();
         for execution in &executions {
-            collect_crash_states(execution, R2, ReturnRule::AfterOwnPublishLastBarrier, &mut states);
+            collect_crash_states(execution, ISSUED_AND_COVERED, ReturnRule::AfterOwnPublishLastBarrier, &mut states);
         }
         let target = states
             .iter()
@@ -4839,39 +4839,39 @@ mod tests {
     /// {1, 2}（两个执行内容相同）或 {1, 2, 4}（jsn4 在 1212 里是 T2.2、在 1221 里是 T1.2，内容不同）⇒ 3 个；
     /// 满足模式 P 的是两个执行各自的 {jsn1, jsn2, jsn3}（jsn4 不持久），内容不同，共 2 个。
     #[test]
-    fn shared_interleaved_two_two_has_three_incomplete_pair_states_and_two_pattern_p_states() {
-        let result = grid_cell(SHARED, AppendArm::JiaInterleaved, h0(&[2, 2]), R2);
+    fn shared_interleaved_two_two_has_three_incomplete_pair_states_and_two_out_of_order_commit_pattern_states() {
+        let result = grid_cell(SHARED, AppendArm::JiaInterleaved, history_without_void(&[2, 2]), ISSUED_AND_COVERED);
         assert_eq!(result.incomplete_pair_states, 3);
-        assert_eq!(result.pattern_p_states, 2);
+        assert_eq!(result.out_of_order_commit_pattern_states, 2);
     }
 
     /// 手推：对照丁 r = (2, 2) 里两个半截事务同在段里，只能是段 = {jsn1, jsn2} 且两条属于不同事务（前两条是 12 或 21）；
     /// 每种前两条下持久集合 {1, 2} 一个、{1, 2, 4} 按 jsn4 是谁的第二条两个 ⇒ 2 × 3 = 6。
     #[test]
     fn shared_control_two_two_has_six_incomplete_pair_states() {
-        assert_eq!(grid_cell(SHARED, AppendArm::DingNoDiscipline, h0(&[2, 2]), R2).incomplete_pair_states, 6);
+        assert_eq!(grid_cell(SHARED, AppendArm::DingNoDiscipline, history_without_void(&[2, 2]), ISSUED_AND_COVERED).incomplete_pair_states, 6);
     }
 
     #[test]
-    fn q2_positive_controls_are_positive_for_every_append_arm() {
+    fn append_discipline_positive_controls_are_positive_for_every_append_arm() {
         for arm in [AppendArm::JiaWhole, AppendArm::JiaInterleaved, AppendArm::YiReservedWhole] {
-            let mut request = CellRequest::main_grid(SHARED, arm, h0(&[2, 2]), R2);
+            let mut request = CellRequest::main_grid(SHARED, arm, history_without_void(&[2, 2]), ISSUED_AND_COVERED);
             request.discipline = AppendDiscipline::RemovedForPositiveControl;
             let result = evaluate_cell(&request).expect("H0");
             assert!(result.incomplete_pair_states > 0, "{arm:?} 拿掉纪律后 N2a");
-            assert!(result.pattern_p_states > 0, "{arm:?} 拿掉纪律后 N2b");
+            assert!(result.out_of_order_commit_pattern_states > 0, "{arm:?} 拿掉纪律后 N2b");
         }
     }
 
     /// 手推（登记 5.3 V_fsync 早返回，同发甲整段 r = (1, 1)）：R2 下 T1 在 jsn1 发出后就返回、T2 要等 B2，
     /// 记录段里返回集合 {T1} 的 4 个持久子集里 3 个丢 T1；R1 下另有返回集合 {T1, T2} 的 3 个丢失状态与 {T1} 的 2 个，共 5。
     #[test]
-    fn early_return_control_loses_returned_transactions_in_three_states_under_r2_and_five_under_r1() {
-        for (reading, expected) in [(R2, 3u64), (R1, 5u64)] {
-            let mut request = CellRequest::main_grid(SHARED, AppendArm::JiaWhole, h0(&[1, 1]), reading);
+    fn early_return_control_loses_returned_transactions_in_three_states_under_the_issued_and_covered_reading_and_five_under_the_issued_reading() {
+        for (reading, expected) in [(ISSUED_AND_COVERED, 3u64), (ISSUED_ONLY, 5u64)] {
+            let mut request = CellRequest::main_grid(SHARED, AppendArm::JiaWhole, history_without_void(&[1, 1]), reading);
             request.return_rule = ReturnRule::EarlyAfterOwnRecordsIssued;
             let result = evaluate_cell(&request).expect("H0");
-            assert_eq!(result.recovery[RecoveryArm::Bing0Today.position()].v_fsync, expected, "{reading:?}");
+            assert_eq!(result.recovery[RecoveryArm::Bing0Today.position()].fsync_violations, expected, "{reading:?}");
         }
     }
 
@@ -4879,11 +4879,11 @@ mod tests {
     fn early_return_control_is_positive_for_every_append_arm_recovery_arm_and_reading() {
         for arm in AppendArm::ALL {
             for reading in AppendedReading::ALL {
-                let mut request = CellRequest::main_grid(SHARED, arm, h0(&[1, 1]), reading);
+                let mut request = CellRequest::main_grid(SHARED, arm, history_without_void(&[1, 1]), reading);
                 request.return_rule = ReturnRule::EarlyAfterOwnRecordsIssued;
                 let result = evaluate_cell(&request).expect("H0");
                 for recovery_arm in RecoveryArm::ALL {
-                    assert!(result.recovery[recovery_arm.position()].v_fsync > 0, "{arm:?} {reading:?} {recovery_arm:?}");
+                    assert!(result.recovery[recovery_arm.position()].fsync_violations > 0, "{arm:?} {reading:?} {recovery_arm:?}");
                 }
             }
         }
@@ -4893,28 +4893,28 @@ mod tests {
     /// 第二次发布那一段 F2 持久而 U2、S2 缺一的 6 个（返回集合 {T1}）。
     #[test]
     fn dropping_the_unit_and_record_barriers_dangles_six_plus_six_states_under_bing0() {
-        let mut request = CellRequest::main_grid(SERIAL, AppendArm::JiaWhole, h0(&[1, 1]), R2);
+        let mut request = CellRequest::main_grid(SERIAL, AppendArm::JiaWhole, history_without_void(&[1, 1]), ISSUED_AND_COVERED);
         request.barriers = PublishBarriers::WithoutBarriersAfterUnitsAndRecords;
         let result = evaluate_cell(&request).expect("H0");
         let bing0 = &result.recovery[RecoveryArm::Bing0Today.position()];
-        assert_eq!(bing0.v_dangling_returned_empty, 6);
-        assert_eq!(bing0.v_dangling_returned_nonempty, 6);
+        assert_eq!(bing0.dangling_violations_returned_empty, 6);
+        assert_eq!(bing0.dangling_violations_returned_nonempty, 6);
         for recovery_arm in RecoveryArm::ALL {
-            assert!(result.recovery[recovery_arm.position()].v_dangling() > 0, "{recovery_arm:?}");
+            assert!(result.recovery[recovery_arm.position()].dangling_violations() > 0, "{recovery_arm:?}");
         }
     }
 
     #[test]
     fn dependency_and_atomicity_controls_are_positive_for_every_recovery_arm() {
-        let mut dependency = CellRequest::main_grid(SHARED, AppendArm::DingNoDiscipline, h0(&[2, 2]), R2);
+        let mut dependency = CellRequest::main_grid(SHARED, AppendArm::DingNoDiscipline, history_without_void(&[2, 2]), ISSUED_AND_COVERED);
         dependency.recovery_control = RecoveryControl::KeepLaterRecordsRemoved;
         let dependency_result = evaluate_cell(&dependency).expect("H0");
-        let mut atomicity = CellRequest::main_grid(SHARED, AppendArm::JiaWhole, h0(&[2, 2]), R2);
+        let mut atomicity = CellRequest::main_grid(SHARED, AppendArm::JiaWhole, history_without_void(&[2, 2]), ISSUED_AND_COVERED);
         atomicity.recovery_control = RecoveryControl::CommitMarkerHandlingRemoved;
         let atomicity_result = evaluate_cell(&atomicity).expect("H0");
         for recovery_arm in RecoveryArm::ALL {
-            assert!(dependency_result.recovery[recovery_arm.position()].v_dependency > 0, "V_dep 对照 {recovery_arm:?}");
-            assert!(atomicity_result.recovery[recovery_arm.position()].n_atom > 0, "N_atom 对照 {recovery_arm:?}");
+            assert!(dependency_result.recovery[recovery_arm.position()].dependency_violations > 0, "V_dep 对照 {recovery_arm:?}");
+            assert!(atomicity_result.recovery[recovery_arm.position()].atomicity_violations > 0, "N_atom 对照 {recovery_arm:?}");
         }
     }
 
@@ -4922,12 +4922,12 @@ mod tests {
     /// 丙0 一条不施加 ⇒ 部分施加 3、与丙0 不同的状态 3；r = (1, 1) 时只有 {jsn1} 那 1 个。
     #[test]
     fn bing2_applies_part_of_a_shared_publish_in_three_states_at_two_two_and_one_at_one_one() {
-        let two_two = grid_cell(SHARED, AppendArm::JiaWhole, h0(&[2, 2]), R2);
-        assert_eq!(two_two.recovery[RecoveryArm::Bing2DropAKeepB.position()].partial_publish, 3);
-        assert_eq!(two_two.recovery[RecoveryArm::Bing2DropAKeepB.position()].differs_from_bing0, 3);
-        assert_eq!(two_two.a5_differing_states, 3);
-        let one_one = grid_cell(SHARED, AppendArm::JiaWhole, h0(&[1, 1]), R2);
-        assert_eq!(one_one.recovery[RecoveryArm::Bing2DropAKeepB.position()].partial_publish, 1);
+        let two_two = grid_cell(SHARED, AppendArm::JiaWhole, history_without_void(&[2, 2]), ISSUED_AND_COVERED);
+        assert_eq!(two_two.recovery[RecoveryArm::Bing2DropTheIncompleteKeepTheComplete.position()].partial_publish, 3);
+        assert_eq!(two_two.recovery[RecoveryArm::Bing2DropTheIncompleteKeepTheComplete.position()].differs_from_bing0, 3);
+        assert_eq!(two_two.whole_arms_differing_states, 3);
+        let one_one = grid_cell(SHARED, AppendArm::JiaWhole, history_without_void(&[1, 1]), ISSUED_AND_COVERED);
+        assert_eq!(one_one.recovery[RecoveryArm::Bing2DropTheIncompleteKeepTheComplete.position()].partial_publish, 1);
     }
 
     #[test]
@@ -4935,8 +4935,8 @@ mod tests {
         for condition in PublishCondition::SEGMENT_ONE {
             for arm in AppendArm::ALL {
                 for history in all_histories() {
-                    if let Some(result) = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), R2)) {
-                        for recovery_arm in [RecoveryArm::Bing0Today, RecoveryArm::Bing1TruncateBeforeA, RecoveryArm::Bing3ForbidPattern] {
+                    if let Some(result) = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), ISSUED_AND_COVERED)) {
+                        for recovery_arm in [RecoveryArm::Bing0Today, RecoveryArm::Bing1TruncateBeforeTheIncompleteTransaction, RecoveryArm::Bing3ForbidPattern] {
                             assert_eq!(result.recovery[recovery_arm.position()].partial_publish, 0, "{condition:?} {arm:?} {history:?} {recovery_arm:?}");
                         }
                     }
@@ -4947,8 +4947,8 @@ mod tests {
 
     /// 登记 8.2 判别力自证：把 Q2-1 的门槛从「> 0」挪到主取样点上的实测值，那一格由「打中」转「没打中」。
     #[test]
-    fn moving_the_q2_1_threshold_to_the_main_point_reading_flips_hit_to_not_hit() {
-        let measured = grid_cell(SHARED, AppendArm::JiaInterleaved, h0(&[2, 2]), R2).incomplete_pair_states;
+    fn moving_the_incomplete_pair_threshold_to_the_main_point_reading_flips_hit_to_not_hit() {
+        let measured = grid_cell(SHARED, AppendArm::JiaInterleaved, history_without_void(&[2, 2]), ISSUED_AND_COVERED).incomplete_pair_states;
         let judge = |value: u64, threshold: u64| value > threshold;
         assert!(judge(measured, 0), "门槛 > 0 时打中");
         assert!(!judge(measured, measured), "门槛挪到实测值时没打中");
@@ -4957,7 +4957,7 @@ mod tests {
     /// 等价变异留档（登记第九节末段）：单实例、没有残留记录，`lib.rs:452` 那一判在模型里恒不断，删它的变异在所有输入上同值。
     #[test]
     fn back_chain_is_never_broken_in_a_single_instance_without_residue() {
-        let layout = plan_cell(SHARED, AppendArm::DingNoDiscipline, &h0(&[2, 2, 2]), AppendDiscipline::Kept);
+        let layout = plan_cell(SHARED, AppendArm::DingNoDiscipline, &history_without_void(&[2, 2, 2]), AppendDiscipline::Kept);
         for execution in build_executions(&layout, AppendArm::DingNoDiscipline, AppendDiscipline::Kept, PublishBarriers::AllThree) {
             for operation in &execution.operations {
                 if let Some(WriteContent::JournalRecord(record)) = operation.written_content() {
@@ -4968,15 +4968,15 @@ mod tests {
     }
 
     #[test]
-    fn r1_and_r2_readings_give_the_same_counts_on_serial_and_shared_publishes() {
+    fn issued_and_issued_and_covered_readings_give_the_same_counts_on_serial_and_shared_publishes() {
         for condition in PublishCondition::SEGMENT_ONE {
             for arm in AppendArm::ALL {
                 for history in all_histories() {
-                    let under_r2 = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), R2));
-                    let under_r1 = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), R1));
-                    if let (Some(r2_result), Some(r1_result)) = (under_r2, under_r1) {
-                        assert_eq!(r2_result.states, r1_result.states, "{condition:?} {arm:?} {history:?}");
-                        assert_eq!(r2_result.recovery, r1_result.recovery, "{condition:?} {arm:?} {history:?}");
+                    let under_the_issued_and_covered_reading = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), ISSUED_AND_COVERED));
+                    let under_the_issued_reading = evaluate_cell(&CellRequest::main_grid(condition, arm, history.clone(), ISSUED_ONLY));
+                    if let (Some(issued_and_covered_result), Some(issued_result)) = (under_the_issued_and_covered_reading, under_the_issued_reading) {
+                        assert_eq!(issued_and_covered_result.states, issued_result.states, "{condition:?} {arm:?} {history:?}");
+                        assert_eq!(issued_and_covered_result.recovery, issued_result.recovery, "{condition:?} {arm:?} {history:?}");
                     }
                 }
             }
@@ -4995,20 +4995,20 @@ mod tests {
     }
 
     #[test]
-    fn segment_two_runs_six_h0_and_fourteen_h1_histories() {
+    fn segment_two_runs_six_histories_without_void_and_fourteen_with_narrow_void() {
         let histories = segment_two_histories();
-        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::H0).count(), 6);
-        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::H1).count(), 14);
+        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::WithoutVoid).count(), 6);
+        assert_eq!(histories.iter().filter(|history| history.family() == HistoryFamily::NarrowVoid).count(), 14);
         assert_eq!(histories.len(), 20);
     }
 
     /// B5（`anchors_q1c.py`）：16 格的执行数与去重状态数，直接枚举与按配置去重两条路径各对一遍。
     /// 取样点覆盖 M14（根序 甲整段 r = (1, 1)：3747 → 6435）与 M15（根乱 乙整段 r = (1, 1)：77 → 81）。
     #[test]
-    fn multi_flight_h0_executions_and_states_equal_anchor_b5_on_both_enumerations() {
-        for (counts, condition, arm, executions, states) in ANCHOR_B5 {
+    fn multi_flight_without_void_executions_and_states_equal_the_multi_flight_anchor_on_both_enumerations() {
+        for (counts, condition, arm, executions, states) in MULTI_FLIGHT_ANCHOR {
             for enumeration in [MultiFlightEnumeration::DirectExecutions, MultiFlightEnumeration::ByConfiguration] {
-                let (_, result) = multi_flight(condition, arm, h0(counts), R2, enumeration);
+                let (_, result) = multi_flight(condition, arm, history_without_void(counts), ISSUED_AND_COVERED, enumeration);
                 assert_eq!(result.executions, executions, "B5 执行数 {condition:?} {arm:?} r={counts:?} {enumeration:?}");
                 assert_eq!(result.states, states, "B5 状态数 {condition:?} {arm:?} r={counts:?} {enumeration:?}");
             }
@@ -5022,8 +5022,8 @@ mod tests {
         for condition in PublishCondition::SEGMENT_TWO {
             for arm in AppendArm::ALL {
                 for history in segment_two_histories().into_iter().filter(|history| history.transaction_count() == 2) {
-                    let readings: &[AppendedReading] = if history.family() == HistoryFamily::H1 || history.record_counts == [2, 1] { &AppendedReading::ALL } else { &[R2] };
-                    if history.family() == HistoryFamily::H0 && history.record_counts == [2, 2] {
+                    let readings: &[AppendedReading] = if history.family() == HistoryFamily::NarrowVoid || history.record_counts == [2, 1] { &AppendedReading::ALL } else { &[ISSUED_AND_COVERED] };
+                    if history.family() == HistoryFamily::WithoutVoid && history.record_counts == [2, 2] {
                         continue;
                     }
                     for reading in readings.iter().copied() {
@@ -5034,8 +5034,8 @@ mod tests {
                         assert_eq!(direct_result.executions, searched_result.executions, "执行数 {label}");
                         assert_eq!(direct_result.pending, searched_result.pending, "轨迹 {label}");
                         assert_eq!(direct_result.recovery, searched_result.recovery, "各量 {label}");
-                        assert_eq!(direct_result.a7_violation_points, 0, "A7 直接枚举 {label}");
-                        assert_eq!(searched_result.a7_violation_points, 0, "A7 按配置 {label}");
+                        assert_eq!(direct_result.returned_before_last_barrier_points, 0, "A7 直接枚举 {label}");
+                        assert_eq!(searched_result.returned_before_last_barrier_points, 0, "A7 按配置 {label}");
                         compared += 1;
                     }
                 }
@@ -5049,9 +5049,9 @@ mod tests {
     #[test]
     fn configuration_search_counts_every_merge_when_no_cross_publish_order_applies() {
         for arm in [AppendArm::YiReservedWhole, AppendArm::DingNoDiscipline] {
-            let (_, one_one_one) = multi_flight(ROOTS_UNORDERED, arm, h0(&[1, 1, 1]), R2, MultiFlightEnumeration::ByConfiguration);
+            let (_, one_one_one) = multi_flight(ROOTS_UNORDERED, arm, history_without_void(&[1, 1, 1]), ISSUED_AND_COVERED, MultiFlightEnumeration::ByConfiguration);
             assert_eq!(one_one_one.executions, 9_465_511_770, "{arm:?} r=(1,1,1)");
-            let (_, two_one_one) = multi_flight(ROOTS_UNORDERED, arm, h0(&[2, 1, 1]), R2, MultiFlightEnumeration::ByConfiguration);
+            let (_, two_one_one) = multi_flight(ROOTS_UNORDERED, arm, history_without_void(&[2, 1, 1]), ISSUED_AND_COVERED, MultiFlightEnumeration::ByConfiguration);
             assert_eq!(two_one_one.executions, 26_293_088_250, "{arm:?} r=(2,1,1)");
             assert!(two_one_one.configurations.expect("按配置去重报配置数") < CONFIGURATION_LIMIT);
         }
@@ -5061,11 +5061,11 @@ mod tests {
     #[test]
     fn early_return_control_is_positive_under_multi_flight_for_every_recovery_arm() {
         for condition in PublishCondition::SEGMENT_TWO {
-            let mut request = CellRequest::main_grid(condition, AppendArm::JiaWhole, h0(&[1, 1]), R2);
+            let mut request = CellRequest::main_grid(condition, AppendArm::JiaWhole, history_without_void(&[1, 1]), ISSUED_AND_COVERED);
             request.return_rule = ReturnRule::EarlyAfterOwnRecordsIssued;
             let result = evaluate_cell(&request).expect("H0 适用");
             for recovery_arm in RecoveryArm::ALL {
-                assert!(result.recovery[recovery_arm.position()].v_fsync > 0, "{condition:?} {recovery_arm:?}");
+                assert!(result.recovery[recovery_arm.position()].fsync_violations > 0, "{condition:?} {recovery_arm:?}");
             }
         }
     }
@@ -5075,8 +5075,8 @@ mod tests {
     fn roots_unordered_states_contain_every_roots_ordered_state() {
         for arm in AppendArm::ALL {
             for counts in [&[1u32, 1][..], &[2, 1][..]] {
-                let (ordered, ordered_result) = multi_flight(ROOTS_ORDERED, arm, h0(counts), R2, MultiFlightEnumeration::DirectExecutions);
-                let (unordered, unordered_result) = multi_flight(ROOTS_UNORDERED, arm, h0(counts), R2, MultiFlightEnumeration::DirectExecutions);
+                let (ordered, ordered_result) = multi_flight(ROOTS_ORDERED, arm, history_without_void(counts), ISSUED_AND_COVERED, MultiFlightEnumeration::DirectExecutions);
+                let (unordered, unordered_result) = multi_flight(ROOTS_UNORDERED, arm, history_without_void(counts), ISSUED_AND_COVERED, MultiFlightEnumeration::DirectExecutions);
                 assert!(ordered_result.executions < unordered_result.executions, "{arm:?} r={counts:?}");
                 assert!(ordered.states.is_subset(&unordered.states), "{arm:?} r={counts:?}");
             }
@@ -5089,50 +5089,50 @@ mod tests {
         evaluate_wait(&WaitScenario { condition, append_arm: arm, profile, point, record_count, transaction_count }, reading)
     }
 
-    const P1: CostPoint = CostPoint::DeviceDominated;
-    const P2: CostPoint = CostPoint::CpuDominated;
+    const DEVICE_DOMINATED_POINT: CostPoint = CostPoint::DeviceDominated;
+    const CPU_DOMINATED_POINT: CostPoint = CostPoint::CpuDominated;
     const UNIFORM: PreparationProfile = PreparationProfile::Uniform;
     const SLOW_HEAD: PreparationProfile = PreparationProfile::SlowHead;
 
     /// 登记第七节 B6 的原数：k = 1、r = 1：P1 下 4.205 / 4.2、P2 下 4.7 / 4.2（甲 / 乙），慢头各加 Δ = 5；四个条件、两读都一样。
     #[test]
-    fn wait_single_transaction_equals_the_registered_b6_values_under_every_condition_and_reading() {
+    fn wait_single_transaction_equals_the_registered_wait_anchor_values_under_every_condition_and_reading() {
         let expected: [(AppendArm, PreparationProfile, CostPoint, u64); 12] = [
-            (AppendArm::JiaWhole, UNIFORM, P1, 4205),
-            (AppendArm::JiaInterleaved, UNIFORM, P1, 4205),
-            (AppendArm::YiReservedWhole, UNIFORM, P1, 4200),
-            (AppendArm::JiaWhole, UNIFORM, P2, 4700),
-            (AppendArm::JiaInterleaved, UNIFORM, P2, 4700),
-            (AppendArm::YiReservedWhole, UNIFORM, P2, 4200),
-            (AppendArm::JiaWhole, SLOW_HEAD, P1, 9205),
-            (AppendArm::JiaInterleaved, SLOW_HEAD, P1, 9205),
-            (AppendArm::YiReservedWhole, SLOW_HEAD, P1, 9200),
-            (AppendArm::JiaWhole, SLOW_HEAD, P2, 9700),
-            (AppendArm::JiaInterleaved, SLOW_HEAD, P2, 9700),
-            (AppendArm::YiReservedWhole, SLOW_HEAD, P2, 9200),
+            (AppendArm::JiaWhole, UNIFORM, DEVICE_DOMINATED_POINT, 4205),
+            (AppendArm::JiaInterleaved, UNIFORM, DEVICE_DOMINATED_POINT, 4205),
+            (AppendArm::YiReservedWhole, UNIFORM, DEVICE_DOMINATED_POINT, 4200),
+            (AppendArm::JiaWhole, UNIFORM, CPU_DOMINATED_POINT, 4700),
+            (AppendArm::JiaInterleaved, UNIFORM, CPU_DOMINATED_POINT, 4700),
+            (AppendArm::YiReservedWhole, UNIFORM, CPU_DOMINATED_POINT, 4200),
+            (AppendArm::JiaWhole, SLOW_HEAD, DEVICE_DOMINATED_POINT, 9205),
+            (AppendArm::JiaInterleaved, SLOW_HEAD, DEVICE_DOMINATED_POINT, 9205),
+            (AppendArm::YiReservedWhole, SLOW_HEAD, DEVICE_DOMINATED_POINT, 9200),
+            (AppendArm::JiaWhole, SLOW_HEAD, CPU_DOMINATED_POINT, 9700),
+            (AppendArm::JiaInterleaved, SLOW_HEAD, CPU_DOMINATED_POINT, 9700),
+            (AppendArm::YiReservedWhole, SLOW_HEAD, CPU_DOMINATED_POINT, 9200),
         ];
         for condition in WAIT_CONDITIONS {
             for reading in AppendedReading::ALL {
-                for (arm, profile, point, w_max) in expected {
-                    assert_eq!(wait(condition, arm, profile, point, 1, 1, reading).w_max, w_max, "{condition:?} {arm:?} {profile:?} {point:?} {reading:?}");
-                    assert_eq!(anchor_b6_single_transaction(arm, profile, point), w_max, "闭式与原数相同");
+                for (arm, profile, point, latest_return_time) in expected {
+                    assert_eq!(wait(condition, arm, profile, point, 1, 1, reading).latest_return_time, latest_return_time, "{condition:?} {arm:?} {profile:?} {point:?} {reading:?}");
+                    assert_eq!(wait_anchor_single_transaction(arm, profile, point), latest_return_time, "闭式与原数相同");
                 }
             }
         }
     }
 
     #[test]
-    fn wait_serial_two_transactions_equal_the_registered_b6_values() {
+    fn wait_serial_two_transactions_equal_the_registered_wait_anchor_values() {
         for reading in AppendedReading::ALL {
-            assert_eq!(wait(SERIAL, AppendArm::JiaWhole, UNIFORM, P1, 1, 2, reading).w_max, 8410);
-            assert_eq!(wait(SERIAL, AppendArm::YiReservedWhole, UNIFORM, P1, 1, 2, reading).w_max, 8400);
+            assert_eq!(wait(SERIAL, AppendArm::JiaWhole, UNIFORM, DEVICE_DOMINATED_POINT, 1, 2, reading).latest_return_time, 8410);
+            assert_eq!(wait(SERIAL, AppendArm::YiReservedWhole, UNIFORM, DEVICE_DOMINATED_POINT, 1, 2, reading).latest_return_time, 8400);
         }
     }
 
     /// 手推：多飞·根乱、甲整段、k = 2、r = 1、P1、等速：B1、B2、B3 的第二道都并进前一道（读法 ⑤ 跨发布），两个 F 各占 b。
     #[test]
     fn wait_roots_unordered_two_transactions_merge_the_second_barriers_and_follow_the_hand_computed_path() {
-        let result = wait(ROOTS_UNORDERED, AppendArm::JiaWhole, UNIFORM, P1, 1, 2, R2);
+        let result = wait(ROOTS_UNORDERED, AppendArm::JiaWhole, UNIFORM, DEVICE_DOMINATED_POINT, 1, 2, ISSUED_AND_COVERED);
         assert_eq!(result.return_times, vec![5405, 5405]);
         assert_eq!(result.latest_transaction, 2);
         assert_eq!(result.merged_barriers_on_device, 3);
@@ -5143,18 +5143,18 @@ mod tests {
     /// 手推：同发、甲整段、r = 1、P2、等速：追加者每条 0.5，k = 8 时 8.55，k = 64 时 39.35；关键路径 64 步 CPU、4 道屏障或 FUA、67 次写。
     #[test]
     fn wait_shared_publish_jia_whole_under_cpu_dominated_costs_follows_the_appender() {
-        assert_eq!(wait(SHARED, AppendArm::JiaWhole, UNIFORM, P2, 1, 8, R2).w_max, 8550);
-        let result = wait(SHARED, AppendArm::JiaWhole, UNIFORM, P2, 1, 64, R2);
-        assert_eq!(result.w_max, 39350);
+        assert_eq!(wait(SHARED, AppendArm::JiaWhole, UNIFORM, CPU_DOMINATED_POINT, 1, 8, ISSUED_AND_COVERED).latest_return_time, 8550);
+        let result = wait(SHARED, AppendArm::JiaWhole, UNIFORM, CPU_DOMINATED_POINT, 1, 64, ISSUED_AND_COVERED);
+        assert_eq!(result.latest_return_time, 39350);
         assert_eq!((result.path.cpu_steps, result.path.barriers_or_forced_unit_access, result.path.device_writes, result.path.tie_steps), (64, 4, 67, 0));
     }
 
     /// 手推：同发、乙整段、r = 1、P2、等速：预留每个 0.5，T64 的预留在 32 才完成，k = 8 时 7.1，k = 64 时 35.1；关键路径 64 步预留、2 次写、3 道屏障或 FUA。
     #[test]
     fn wait_shared_publish_yi_under_cpu_dominated_costs_follows_the_reservations() {
-        assert_eq!(wait(SHARED, AppendArm::YiReservedWhole, UNIFORM, P2, 1, 8, R2).w_max, 7100);
-        let result = wait(SHARED, AppendArm::YiReservedWhole, UNIFORM, P2, 1, 64, R2);
-        assert_eq!(result.w_max, 35100);
+        assert_eq!(wait(SHARED, AppendArm::YiReservedWhole, UNIFORM, CPU_DOMINATED_POINT, 1, 8, ISSUED_AND_COVERED).latest_return_time, 7100);
+        let result = wait(SHARED, AppendArm::YiReservedWhole, UNIFORM, CPU_DOMINATED_POINT, 1, 64, ISSUED_AND_COVERED);
+        assert_eq!(result.latest_return_time, 35100);
         assert_eq!((result.path.cpu_steps, result.path.device_writes, result.path.barriers_or_forced_unit_access), (64, 2, 3));
     }
 
@@ -5162,21 +5162,21 @@ mod tests {
     /// 根序下 F2 要等 F1，T2 落到 11.25。
     #[test]
     fn wait_multi_flight_yi_with_a_slow_head_waits_for_the_head_by_each_reading() {
-        assert_eq!(wait(ROOTS_UNORDERED, AppendArm::YiReservedWhole, SLOW_HEAD, P1, 1, 2, R2).return_times, vec![9200, 7150]);
-        assert_eq!(wait(ROOTS_UNORDERED, AppendArm::YiReservedWhole, SLOW_HEAD, P1, 1, 2, R1).return_times, vec![9200, 6100]);
-        assert_eq!(wait(ROOTS_ORDERED, AppendArm::YiReservedWhole, SLOW_HEAD, P1, 1, 2, R2).return_times, vec![10200, 11250]);
+        assert_eq!(wait(ROOTS_UNORDERED, AppendArm::YiReservedWhole, SLOW_HEAD, DEVICE_DOMINATED_POINT, 1, 2, ISSUED_AND_COVERED).return_times, vec![9200, 7150]);
+        assert_eq!(wait(ROOTS_UNORDERED, AppendArm::YiReservedWhole, SLOW_HEAD, DEVICE_DOMINATED_POINT, 1, 2, ISSUED_ONLY).return_times, vec![9200, 6100]);
+        assert_eq!(wait(ROOTS_ORDERED, AppendArm::YiReservedWhole, SLOW_HEAD, DEVICE_DOMINATED_POINT, 1, 2, ISSUED_AND_COVERED).return_times, vec![10200, 11250]);
     }
 
     /// 登记 8.2 判别力自证：把 Q2-3 的门槛 2 挪到两个取样点实测 ρ 之间，那一格的判定必须翻。
     #[test]
-    fn moving_the_q2_3_threshold_between_the_two_cost_points_flips_one_judgement() {
-        let at = |point: CostPoint, transaction_count: u32| wait(SHARED, AppendArm::JiaWhole, UNIFORM, point, 1, transaction_count, R2).w_max;
-        let (p1_small, p1_large, p2_small, p2_large) = (at(P1, 8), at(P1, 64), at(P2, 8), at(P2, 64));
-        assert_ne!(p1_large * p2_small, p2_large * p1_small, "两个取样点的 ρ 不同");
+    fn moving_the_wait_growth_threshold_between_the_two_cost_points_flips_one_judgement() {
+        let at = |point: CostPoint, transaction_count: u32| wait(SHARED, AppendArm::JiaWhole, UNIFORM, point, 1, transaction_count, ISSUED_AND_COVERED).latest_return_time;
+        let (device_dominated_small, device_dominated_large, cpu_dominated_small, cpu_dominated_large) = (at(DEVICE_DOMINATED_POINT, 8), at(DEVICE_DOMINATED_POINT, 64), at(CPU_DOMINATED_POINT, 8), at(CPU_DOMINATED_POINT, 64));
+        assert_ne!(device_dominated_large * cpu_dominated_small, cpu_dominated_large * device_dominated_small, "两个取样点的 ρ 不同");
         // 门槛取两个 ρ 的中点：(ρ1 + ρ2) / 2 = (l1·s2 + l2·s1) / (2·s1·s2)。
-        let midpoint = (p1_large * p2_small + p2_large * p1_small, 2 * p1_small * p2_small);
-        let registered = (growth_judgement(p1_small, p1_large, REGISTERED_GROWS_THRESHOLD, REGISTERED_BOUNDED_THRESHOLD), growth_judgement(p2_small, p2_large, REGISTERED_GROWS_THRESHOLD, REGISTERED_BOUNDED_THRESHOLD));
-        let moved = (growth_judgement(p1_small, p1_large, midpoint, (0, 1)), growth_judgement(p2_small, p2_large, midpoint, (0, 1)));
+        let midpoint = (device_dominated_large * cpu_dominated_small + cpu_dominated_large * device_dominated_small, 2 * device_dominated_small * cpu_dominated_small);
+        let registered = (growth_judgement(device_dominated_small, device_dominated_large, REGISTERED_GROWS_THRESHOLD, REGISTERED_BOUNDED_THRESHOLD), growth_judgement(cpu_dominated_small, cpu_dominated_large, REGISTERED_GROWS_THRESHOLD, REGISTERED_BOUNDED_THRESHOLD));
+        let moved = (growth_judgement(device_dominated_small, device_dominated_large, midpoint, (0, 1)), growth_judgement(cpu_dominated_small, cpu_dominated_large, midpoint, (0, 1)));
         assert_eq!(registered.1, GrowthJudgement::Grows);
         assert_ne!(moved.0, moved.1, "门槛挪到两点之间，两点的判定一个是长、一个不是");
     }

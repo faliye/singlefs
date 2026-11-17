@@ -27,7 +27,7 @@ from bad_implementation_table import STATUS_LOCATED, MutationRow
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPOSITORY_ROOT = os.environ.get("E171_REPOSITORY_ROOT") or os.path.abspath(os.path.join(HERE, "../../.."))  # 变异驱动在副本里跑单测时给真的仓根
-REGISTERED_SEED = "e49ebb14471be759"
+REGISTERED_SEED = "9d7924b061b04f30"
 FROZEN_FILE_COUNT = 15
 
 EXECUTOR_OUTPUT = """name=config dumps=d streams=a batches=1,2 workers=1
@@ -172,7 +172,7 @@ class FreezeTests(unittest.TestCase):
             self.assertIn(f"{frozen_o3.NOT_RUN_MARKER} test=comparator.py reason=", stderr.getvalue())
             self.assertEqual(frozen_o3.NOT_RUN_EXIT_CODE, 77)
 
-    def test_the_real_frozen_directory_matches_the_first_rerun_freeze_lines_and_the_registered_seed(self) -> None:
+    def test_the_real_frozen_directory_matches_the_freeze_lines_and_the_registered_seed(self) -> None:
         try:
             reference = frozen_o3.freeze_reference_lines(REPOSITORY_ROOT)
         except frozen_o3.FreezeReferenceMissing as missing:   # 参照产物已归档：报本次未跑（直写标准输出，unittest 不截）后跳过
@@ -185,8 +185,11 @@ class FreezeTests(unittest.TestCase):
         # 之后整个目录又搬了家、登记在 .claude/gate.d/path-moves.tsv 的，现算的种子先把登记的搬迁倒着换回去（frozen_o3 文件头「搬迁登记」）
         frozen_seed_registered, seed_now_registered = frozen_o3.path_only_changes_of().get(frozen_o3.SEED_NAME, (REGISTERED_SEED, REGISTERED_SEED))
         self.assertEqual(frozen_seed_registered, REGISTERED_SEED)
-        self.assertEqual(frozen_o3.seed_from_directory(os.path.join(REPOSITORY_ROOT, frozen_o3.FROZEN_DIRECTORY_RELATIVE),
-                                                       frozen_o3.registered_moves(REPOSITORY_ROOT)), seed_now_registered)
+        # 冻结比登记的搬迁晚的目录，内容本来就是新路径，不倒换；冻结之后才搬的倒换回去才对得上：现算的与倒换后的几版有一个等于登记的就算对上
+        frozen_directory = os.path.join(REPOSITORY_ROOT, frozen_o3.FROZEN_DIRECTORY_RELATIVE)
+        self.assertIn(seed_now_registered,
+                      {frozen_o3.seed_from_directory(frozen_directory),
+                       *frozen_o3.seeds_before_moves(frozen_directory, frozen_o3.registered_moves(REPOSITORY_ROOT))})
 
 
 # 搬迁登记（frozen_o3 文件头「搬迁登记」）的样本：前缀用假的 fixtures/old-home、fixtures/new-home，不用仓里真的目录名
@@ -342,7 +345,8 @@ class DriverO3StepTests(unittest.TestCase):
             fields = row_driver.run_o3_step(self.arguments(), root)
         self.assertEqual((fields["o3_status"], fields["o3_ns"]), (row_driver.O3_STATUS_NO_EXPORTED_STREAM, "-"))
 
-    def test_a_finished_row_directory_with_the_same_key_is_read_back_and_any_other_one_is_cleared(self) -> None:
+    def test_a_leftover_row_directory_is_cleared_before_the_row_runs(self) -> None:
+        """输出根里留着的行目录（判完的、中途停下的）不当复用来源：要现判的行一律先清掉再跑（复用只经判定库，row_driver.py 文件头「判定库」）。"""
         class Stop(Exception):
             pass
 
@@ -350,14 +354,10 @@ class DriverO3StepTests(unittest.TestCase):
             raise Stop
 
         with tempfile.TemporaryDirectory() as root:
-            arguments = argparse.Namespace(snapshot_digest="digest", positive_control=None, disable_oracle=None, no_executor=False,
-                                           o3_control_bad_states=None, output_root=root, work_root=os.path.join(root, "work"))
-            key = row_driver.reuse_key_of(arguments, 3, "-")
-            write(os.path.join(root, "row-3", "row-result.tsv"), f"status\tok\ndevice_exit\t0\nreuse_key\t{key}\n")
-            write(os.path.join(root, "row-4", "row-result.tsv"), "status\tok\ndevice_exit\t0\nreuse_key\tsome-other-key\n")
+            arguments = argparse.Namespace(positive_control=None, disable_oracle=None, no_executor=False, o3_control_bad_states=None,
+                                           output_root=root, work_root=os.path.join(root, "work"))
+            write(os.path.join(root, "row-4", "row-result.tsv"), "status\tok\ndevice_exit\t0\n")
             write(os.path.join(root, "row-5", "partial.txt"), "left over from an interrupted run")
-            self.assertEqual(row_driver.run_row_on_the_lane(3, None, None, [], set(), set(), arguments, 0),
-                             {"status": "ok", "device_exit": "0", "reuse_key": key})
             original = row_driver.sync_tree
             row_driver.sync_tree = stop_after_clearing
             try:
@@ -366,21 +366,43 @@ class DriverO3StepTests(unittest.TestCase):
                         row_driver.run_row_on_the_lane(number, None, None, [], set(), set(), arguments, 0)
             finally:
                 row_driver.sync_tree = original
-            self.assertEqual(os.listdir(os.path.join(root, "row-4")), [], "键不同的行目录要先清掉")
+            self.assertEqual(os.listdir(os.path.join(root, "row-4")), [], "判完留着的行目录要先清掉")
             self.assertEqual(os.listdir(os.path.join(root, "row-5")), [], "中途停下的行目录要先清掉")
 
-    def test_a_row_directory_whose_result_is_a_compile_failure_or_a_timeout_is_not_reused(self) -> None:
-        for status, device_exit in (("compile_failed", "-"), ("ok", str(row_driver.ROW_TIMEOUT_EXIT_CODE))):
-            self.assertFalse(row_driver.result_is_reusable({"status": status, "device_exit": device_exit}), (status, device_exit))
-        self.assertTrue(row_driver.result_is_reusable({"status": "ok", "device_exit": "0"}))
+    def test_only_an_ok_row_that_kept_its_own_mutation_and_did_not_time_out_is_stored(self) -> None:
+        for fields in ({"status": "compile_failed", "device_exit": "-", "substituted_from": "-"},
+                       {"status": "ok", "device_exit": row_driver.ROW_TIMEOUT_EXIT_CODE, "substituted_from": "-"},
+                       {"status": "ok", "device_exit": 0, "substituted_from": "a1"},
+                       {"status": row_driver.STATUS_MEASUREMENT_PIPE_DEFECT, "stage": "card_lease"},
+                       {"status": "driver_error", "error": "RuntimeError:x"}):
+            self.assertFalse(row_driver.outcome_is_storable(fields), fields)
+        self.assertTrue(row_driver.outcome_is_storable({"status": "ok", "device_exit": 0, "substituted_from": "-"}))
+        self.assertTrue(row_driver.outcome_is_storable({"status": "ok", "device_exit": "101", "substituted_from": "-"}))
+
+    def test_a_packed_row_directory_is_the_same_bytes_for_the_same_content_and_unpacks_back(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            for base in ("one", "two"):
+                write(os.path.join(root, base, "row-result.tsv"), "status\tok\n")
+                write(os.path.join(root, base, "dump", "stream", "oracle-verdicts.tsv"), "state\tverdict\n")
+                os.makedirs(os.path.join(root, base, "dump", "empty"))
+            os.utime(os.path.join(root, "two", "row-result.tsv"), (1, 1))
+            packed = row_driver.pack_directory(os.path.join(root, "one"))
+            self.assertEqual(packed, row_driver.pack_directory(os.path.join(root, "two")))
+            row_driver.unpack_directory(packed, os.path.join(root, "back"))
+            self.assertTrue(os.path.isdir(os.path.join(root, "back", "dump", "empty")))
+            with open(os.path.join(root, "back", "dump", "stream", "oracle-verdicts.tsv"), encoding="utf-8") as handle:
+                self.assertEqual(handle.read(), "state\tverdict\n")
 
     def test_no_row_selection_is_every_row_and_a_given_one_is_a_narrowed_scope(self) -> None:
         rows = [row_driver.SelectedRow(number, 1 if number <= 2 else 2, "file", 0, f"name-{number}", "0" * 12) for number in (1, 2, 3)]
-        every = argparse.Namespace(rows=None, first_slice=False)
-        self.assertEqual([row.number for row in row_driver.choose_rows(every, rows)], [1, 2, 3])
-        self.assertEqual([row.number for row in row_driver.choose_rows(argparse.Namespace(rows="2,3", first_slice=False), rows)], [2, 3])
-        self.assertEqual([row.number for row in row_driver.choose_rows(argparse.Namespace(rows="", first_slice=False), rows)], [])
-        self.assertEqual([row.number for row in row_driver.choose_rows(argparse.Namespace(rows=None, first_slice=True), rows)], [1, 2])
+        def chosen(**given) -> list[int]:
+            # 照 row_driver.main 现行的选行参数拼全（解析器永远给全；choose_rows 不为缺属性设默认，缺了就是用例拼错）
+            namespace = argparse.Namespace(**{"rows": None, "first_slice": False, "row_range": None, "empty_mutation_only": False, **given})
+            return [row.number for row in row_driver.choose_rows(namespace, rows)]
+        self.assertEqual(chosen(), [1, 2, 3])
+        self.assertEqual(chosen(rows="2,3"), [2, 3])
+        self.assertEqual(chosen(rows=""), [])
+        self.assertEqual(chosen(first_slice=True), [1, 2])
 
     def test_the_retired_all_argument_is_a_usage_error(self) -> None:
         error = io.StringIO()

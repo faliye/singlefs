@@ -110,14 +110,14 @@ const TEST_LEAF_CAPACITY: u64 = 16;
 /// 历史族的常量（登记 5.2；F1、F3 的两个抄 E177 装置第 4611、4615 行）。
 const NEW_INODES_PER_STEP: u64 = 50;
 const MIXED_RANDOM_STEPS: u64 = 300;
-const F10_OVERWRITE_EVERY_UNLINKS: u64 = 10;
-const F10_SEQUENTIAL_WRITE_EVERY_UNLINKS: u64 = 25;
-const F10_SEQUENTIAL_WRITE_DATA_UNITS: u64 = 5;
-const F11_INODE_COUNT: u64 = 300;
-const F11_CHANGES_BEFORE_ROLLBACK: u64 = 10;
-const F11_CHANGES_AFTER_ROLLBACK: u64 = 20;
-const F12_INODE_COUNT: u64 = 300;
-const F12_NEW_INODES_AFTER_RECOVERY: u64 = 5;
+const MANY_OBJECTS_OVERWRITE_EVERY_UNLINKS: u64 = 10;
+const MANY_OBJECTS_SEQUENTIAL_WRITE_EVERY_UNLINKS: u64 = 25;
+const MANY_OBJECTS_SEQUENTIAL_WRITE_DATA_UNITS: u64 = 5;
+const ROLLBACK_OVER_A_GAP_INODE_COUNT: u64 = 300;
+const ROLLBACK_OVER_A_GAP_CHANGES_BEFORE_ROLLBACK: u64 = 10;
+const ROLLBACK_OVER_A_GAP_CHANGES_AFTER_ROLLBACK: u64 = 20;
+const INTENT_CRASH_INODE_COUNT: u64 = 300;
+const INTENT_CRASH_NEW_INODES_AFTER_RECOVERY: u64 = 5;
 
 fn length_as_u64(length: usize) -> u64 {
     u64::try_from(length).expect("长度装得进 u64")
@@ -2926,7 +2926,7 @@ impl History {
             History::ManyObjectsWithData { inode_count, order, batch } => {
                 format!("family=F10 n={inode_count} order={} batch={batch}", order.label())
             }
-            History::RollBackOverAGap { event } => format!("family=F11 n={F11_INODE_COUNT} gap_event={} batch={PRODUCT_UNLINK_BATCH_DATA_UNITS}", event.label()),
+            History::RollBackOverAGap { event } => format!("family=F11 n={ROLLBACK_OVER_A_GAP_INODE_COUNT} gap_event={} batch={PRODUCT_UNLINK_BATCH_DATA_UNITS}", event.label()),
         }
     }
 
@@ -2941,7 +2941,7 @@ impl History {
 }
 
 /// H51：F1 14 段、F8 32 段、F3 5 段（E177 装置 `segment_one_histories`，第 4670–4697 行）。
-fn histories_h51() -> Vec<History> {
+fn histories_replayed_from_the_e177_segment_one() -> Vec<History> {
     let mut histories = Vec::new();
     for inode_count in [300, 900] {
         for order in deletion_orders() {
@@ -2964,7 +2964,7 @@ fn histories_h51() -> Vec<History> {
 }
 
 /// F10：n ∈ {300, 900} × 删序 7 种 × 批 ∈ {1, 144}，28 段。
-fn histories_f10() -> Vec<History> {
+fn many_objects_with_data_histories() -> Vec<History> {
     let mut histories = Vec::new();
     for inode_count in [300, 900] {
         for order in deletion_orders() {
@@ -3013,11 +3013,11 @@ impl AscendingDeletionStream {
             if self.pending.is_empty() {
                 self.unlinks_started += 1;
                 let unlink_number = self.unlinks_started;
-                if unlink_number % F10_OVERWRITE_EVERY_UNLINKS == 0 {
+                if unlink_number % MANY_OBJECTS_OVERWRITE_EVERY_UNLINKS == 0 {
                     self.pending.push_back(PendingChange::RewriteTheSelectedObject { data_units: 1 });
                 }
-                if unlink_number % F10_SEQUENTIAL_WRITE_EVERY_UNLINKS == 0 {
-                    self.pending.push_back(PendingChange::RewriteTheSelectedObject { data_units: F10_SEQUENTIAL_WRITE_DATA_UNITS });
+                if unlink_number % MANY_OBJECTS_SEQUENTIAL_WRITE_EVERY_UNLINKS == 0 {
+                    self.pending.push_back(PendingChange::RewriteTheSelectedObject { data_units: MANY_OBJECTS_SEQUENTIAL_WRITE_DATA_UNITS });
                 }
                 self.pending.push_back(PendingChange::UnlinkTheSmallestLiveObject);
             }
@@ -3053,7 +3053,7 @@ struct RollbackOutcome {
 
 fn run_rollback_over_a_gap(simulation: &mut Simulation, event: GapEvent) -> RollbackOutcome {
     let mut outcome = RollbackOutcome::default();
-    build_and_write_many_objects(simulation, F11_INODE_COUNT);
+    build_and_write_many_objects(simulation, ROLLBACK_OVER_A_GAP_INODE_COUNT);
     simulation.gap_watch = Some(event);
     let mut stream = AscendingDeletionStream::default();
     while simulation.gap_start.is_none() && !simulation.has_stopped() {
@@ -3066,7 +3066,7 @@ fn run_rollback_over_a_gap(simulation: &mut Simulation, event: GapEvent) -> Roll
         return outcome;
     };
     outcome.event_found = true;
-    for _ in 0..F11_CHANGES_BEFORE_ROLLBACK {
+    for _ in 0..ROLLBACK_OVER_A_GAP_CHANGES_BEFORE_ROLLBACK {
         if let Some(change) = stream.next_change(simulation) {
             simulation.apply(change);
         }
@@ -3085,7 +3085,7 @@ fn run_rollback_over_a_gap(simulation: &mut Simulation, event: GapEvent) -> Roll
     outcome.retired_in_the_gap_and_present_in_the_old_version = length_as_u64(retired_in_the_gap.len());
     simulation.roll_back_to(gap_start.version_before);
     outcome.rollback_publish_sequence = simulation.publish_sequence;
-    for _ in 0..F11_CHANGES_AFTER_ROLLBACK {
+    for _ in 0..ROLLBACK_OVER_A_GAP_CHANGES_AFTER_ROLLBACK {
         if let Some(change) = stream.next_change(simulation) {
             simulation.apply(change);
         }
@@ -3170,14 +3170,14 @@ fn run_history(history: History, simulation: &mut Simulation) -> Option<Rollback
             build_and_write_many_objects(simulation, inode_count);
             for (position, victim) in deletion_order_of(inode_count, order).into_iter().enumerate() {
                 let unlink_number = length_as_u64(position) + 1;
-                if unlink_number % F10_OVERWRITE_EVERY_UNLINKS == 0 {
+                if unlink_number % MANY_OBJECTS_OVERWRITE_EVERY_UNLINKS == 0 {
                     if let Some(object) = simulation.rewrite_target() {
                         simulation.apply(UserChange::WriteFile { object, data_units: 1 });
                     }
                 }
-                if unlink_number % F10_SEQUENTIAL_WRITE_EVERY_UNLINKS == 0 {
+                if unlink_number % MANY_OBJECTS_SEQUENTIAL_WRITE_EVERY_UNLINKS == 0 {
                     if let Some(object) = simulation.rewrite_target() {
-                        simulation.apply(UserChange::WriteFile { object, data_units: F10_SEQUENTIAL_WRITE_DATA_UNITS });
+                        simulation.apply(UserChange::WriteFile { object, data_units: MANY_OBJECTS_SEQUENTIAL_WRITE_DATA_UNITS });
                     }
                 }
                 simulation.apply(UserChange::Unlink { object: victim });
@@ -3364,7 +3364,7 @@ struct SegmentOneResult {
 
 fn segment_one_items() -> Vec<SegmentOneItem> {
     let mut items = Vec::new();
-    for history in histories_h51().into_iter().chain(histories_f10()) {
+    for history in histories_replayed_from_the_e177_segment_one().into_iter().chain(many_objects_with_data_histories()) {
         for leaf_capacity in LEAF_CAPACITIES {
             for merge_threshold in merge_thresholds_of(leaf_capacity) {
                 items.push(SegmentOneItem { history, leaf_capacity, merge_threshold });
@@ -3914,13 +3914,13 @@ fn positive_control_shape_lines() -> Vec<String> {
     let verdict_of = |name: &str| {
         catalogue.iter().find(|named| named.name == name).map(|named| judge_the_shape(&named.shape)).expect("形态表里有它")
     };
-    let today_reddens_k1_to_k5 = ["K-1", "K-2", "K-3", "K-4", "K-5"].iter().all(|name| !verdict_of(name).today_container_numbers_hold);
-    let k0 = verdict_of("K-0");
-    let k0_green = k0.today_container_numbers_hold && k0.raised_separator_container_numbers_hold && k0.separators_hold;
+    let today_reddens_the_five_broken_shapes = ["K-1", "K-2", "K-3", "K-4", "K-5"].iter().all(|name| !verdict_of(name).today_container_numbers_hold);
+    let healthy_shape_verdict = verdict_of("K-0");
+    let healthy_shape_all_green = healthy_shape_verdict.today_container_numbers_hold && healthy_shape_verdict.raised_separator_container_numbers_hold && healthy_shape_verdict.separators_hold;
     let raised_reddens_unraised = !verdict_of("BN1-s20").raised_separator_container_numbers_hold;
     vec![format!(
-        "name=positive_control id=PC-K today_i94_reddens_k1_to_k5={today_reddens_k1_to_k5} k0_all_green={k0_green} n1_i94_reddens_bn1_s20={raised_reddens_unraised} holds={}",
-        today_reddens_k1_to_k5 && k0_green && raised_reddens_unraised
+        "name=positive_control id=PC-K today_i94_reddens_k1_to_k5={today_reddens_the_five_broken_shapes} k0_all_green={healthy_shape_all_green} n1_i94_reddens_bn1_s20={raised_reddens_unraised} holds={}",
+        today_reddens_the_five_broken_shapes && healthy_shape_all_green && raised_reddens_unraised
     )]
 }
 
@@ -3929,8 +3929,8 @@ fn run_segment_one(threads: usize) -> Vec<String> {
     let mut lines = vec![format!(
         "name=config experiment=E178 segment=one work_items={} histories_h51={} histories_f10={} capacities=233,16 thetas=0,quarter,half borrow_arms=N1,N2 inode_leaf_records={INODE_LEAF_RECORDS} tombstone_container_records={TOMBSTONE_CONTAINER_RECORDS} retirement_container_records={RETIREMENT_CONTAINER_RECORDS} root_node_leaf_containers={ROOT_NODE_LEAF_CONTAINERS} data_unit_payload_bytes={DATA_UNIT_PAYLOAD_BYTES} scanning=none",
         items.len(),
-        histories_h51().len(),
-        histories_f10().len(),
+        histories_replayed_from_the_e177_segment_one().len(),
+        many_objects_with_data_histories().len(),
     )];
     lines.extend(constant_anchor_lines());
     let stop_checks = [
@@ -3983,8 +3983,8 @@ fn run_segment_one(threads: usize) -> Vec<String> {
     lines.extend(positive_control_shape_lines());
     lines.extend(segment_one_cell_verdict_lines(&results));
     lines.extend(shape_verdict_lines(&shape_verdicts));
-    let a1_violations = tally.violations_of("A1_history_publishes") + tally.violations_of("A1_history_refused_steps");
-    let k_violations = tally.violations_of("K6_split_right_half_numbered_after_the_record_left_half_unchanged");
+    let history_assertion_violations = tally.violations_of("A1_history_publishes") + tally.violations_of("A1_history_refused_steps");
+    let split_numbering_violations = tally.violations_of("K6_split_right_half_numbered_after_the_record_left_half_unchanged");
     let constants_hold = INODE_LEAF_RECORDS == 233 && TOMBSTONE_CONTAINER_RECORDS == 815 && ROOT_NODE_LEAF_CONTAINERS == 135;
     let anchors_hold = RETIREMENT_CONTAINER_RECORDS == 959
         && zero_threshold_streams_identical
@@ -3993,8 +3993,8 @@ fn run_segment_one(threads: usize) -> Vec<String> {
     let stop_checks_hold = stop_checks.iter().all(|(_, (holds, _))| *holds);
     lines.push(format!(
         "name=verdict question=summary v1_history_replay_holds={} v4_two_runs_identical={every_run_identical} v4_user_changes_identical_between_n1_n2={user_changes_identical} v5_anchors_hold={anchors_hold} fl0_clause_constants_and_k6_hold={} stop_checks_hold={stop_checks_hold}",
-        a1_violations == 0,
-        constants_hold && k_violations == 0,
+        history_assertion_violations == 0,
+        constants_hold && split_numbering_violations == 0,
     ));
     lines
 }
@@ -4039,14 +4039,14 @@ const fn counts_as_array(counts: ReaderCounts) -> [u64; COUNT_FIELDS] {
 }
 
 /// 增量的下标：inode r、inode m、extent r、extent m、container r、container m、O1、O2。
-const DELTA_INODE_R: usize = 0;
-const DELTA_INODE_M: usize = 1;
-const DELTA_EXTENT_R: usize = 2;
-const DELTA_EXTENT_M: usize = 3;
-const DELTA_CONTAINER_R: usize = 4;
-const DELTA_CONTAINER_M: usize = 5;
-const DELTA_O1: usize = 6;
-const DELTA_O2: usize = 7;
+const DELTA_INODE_RESURRECTED: usize = 0;
+const DELTA_INODE_MISSED: usize = 1;
+const DELTA_EXTENT_RESURRECTED: usize = 2;
+const DELTA_EXTENT_MISSED: usize = 3;
+const DELTA_CONTAINER_RESURRECTED: usize = 4;
+const DELTA_CONTAINER_MISSED: usize = 5;
+const DELTA_LIVE_RECORDS_BEYOND_THE_TRUTH: usize = 6;
+const DELTA_RECORDS_WHOSE_INTENT_IS_PUBLISHED: usize = 7;
 
 fn signed(value: u64) -> i64 {
     i64::try_from(value).expect("计数装得进 i64")
@@ -4070,7 +4070,7 @@ fn deltas_of(before: &[ReaderCounts], after: &[ReaderCounts]) -> Vec<[i64; COUNT
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct PositiveControlOutcome {
-    id: &'static str,
+    control_identifier: &'static str,
     at_publish: u64,
     detail: String,
     /// 增量逐个对应的读者（第二、三段是 `every_reader` 的 20 个）。
@@ -4099,7 +4099,7 @@ impl PositiveControlOutcome {
             .collect();
         format!(
             "name=positive_control id={} {context} at_publish={} {} paths_agree={} closed_form_holds={} deltas_inode_r_m_extent_r_m_container_r_m_o1_o2={}",
-            self.id,
+            self.control_identifier,
             self.at_publish,
             self.detail,
             self.paths_agree,
@@ -4143,20 +4143,20 @@ impl Simulation {
     /// 一个对照：主路径（按组索引）与参照路径（整扫）各算改动前后，增量逐读者逐量相同才算两路对得上；`closed_form` 判登记写的期望。
     fn positive_control(
         &self,
-        id: &'static str,
+        control_identifier: &'static str,
         overlay: &Overlay,
         scan_publish: u64,
         detail: String,
         closed_form: &dyn Fn(&[Reader], &[[i64; COUNT_FIELDS]]) -> bool,
     ) -> PositiveControlOutcome {
-        self.positive_control_on(&self.readers.clone(), id, overlay, scan_publish, detail, closed_form)
+        self.positive_control_on(&self.readers.clone(), control_identifier, overlay, scan_publish, detail, closed_form)
     }
 
     /// 同 `positive_control`，读者表另给（PC-Bs2 在 B-stub 写路径上另读 B-stub-lin-off）。
     fn positive_control_on(
         &self,
         readers: &[Reader],
-        id: &'static str,
+        control_identifier: &'static str,
         overlay: &Overlay,
         scan_publish: u64,
         detail: String,
@@ -4170,7 +4170,7 @@ impl Simulation {
         let reference_deltas = deltas_of(&baseline_reference, &modified_reference);
         let paths_agree = baseline_main == baseline_reference && main_deltas == reference_deltas;
         let closed_form_holds = closed_form(readers, &main_deltas);
-        PositiveControlOutcome { id, at_publish: scan_publish, detail, readers: readers.to_vec(), main_deltas, paths_agree, closed_form_holds }
+        PositiveControlOutcome { control_identifier, at_publish: scan_publish, detail, readers: readers.to_vec(), main_deltas, paths_agree, closed_form_holds }
     }
 
     /// PC-Z 的手算：k ∈ [o 现在的单元数, 变短前单元数) 里，那一组有一个候选版本（读得出、已发布、在谱系上）的个数，逐单元数、不走择新。
@@ -4229,7 +4229,7 @@ impl Simulation {
                     },
                     ShrinkArm::RangeTombstone | ShrinkArm::ObjectGateOnly => 0,
                 };
-                delta[DELTA_CONTAINER_R] == 1 && delta[DELTA_EXTENT_R] == extent_expected
+                delta[DELTA_CONTAINER_RESURRECTED] == 1 && delta[DELTA_EXTENT_RESURRECTED] == extent_expected
             })
         };
         let mut outcomes = vec![self.positive_control(
@@ -4248,7 +4248,7 @@ impl Simulation {
         if let Some(removed) = range_tombstone {
             let overlay = Overlay::removing_a_tombstone(removed);
             let range_closed_form = |readers: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| {
-                readers.iter().zip(deltas).all(|(reader, delta)| reader.shrink == ShrinkArm::RangeTombstone || delta[DELTA_EXTENT_R] == 0)
+                readers.iter().zip(deltas).all(|(reader, delta)| reader.shrink == ShrinkArm::RangeTombstone || delta[DELTA_EXTENT_RESURRECTED] == 0)
             };
             outcomes.push(self.positive_control(
                 "PC-T",
@@ -4292,8 +4292,8 @@ impl Simulation {
         let overlay = Overlay::planting(planted);
         let closed_form = |readers: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| {
             readers.iter().zip(deltas).all(|(reader, delta)| match reader.effect {
-                UnlinkEffectArm::AtLastBatchWritten => delta[DELTA_INODE_M] == 1 && delta[DELTA_EXTENT_M] == remaining,
-                UnlinkEffectArm::AtIntent | UnlinkEffectArm::AtLastBatchRead => delta[DELTA_INODE_M] == 0 && delta[DELTA_EXTENT_M] == 0,
+                UnlinkEffectArm::AtLastBatchWritten => delta[DELTA_INODE_MISSED] == 1 && delta[DELTA_EXTENT_MISSED] == remaining,
+                UnlinkEffectArm::AtIntent | UnlinkEffectArm::AtLastBatchRead => delta[DELTA_INODE_MISSED] == 0 && delta[DELTA_EXTENT_MISSED] == 0,
             })
         };
         vec![self.positive_control("PC-EL", &overlay, scan_publish, format!("object={object} data_units_remaining={remaining}"), &closed_form)]
@@ -4323,8 +4323,8 @@ impl Simulation {
             readers.iter().zip(deltas).all(|(reader, delta)| {
                 reader.window == ReadableWindow::RingWindow
                     || match reader.effect {
-                        UnlinkEffectArm::AtLastBatchRead => delta[DELTA_INODE_R] == 1,
-                        UnlinkEffectArm::AtIntent | UnlinkEffectArm::AtLastBatchWritten => delta[DELTA_INODE_R] == 0,
+                        UnlinkEffectArm::AtLastBatchRead => delta[DELTA_INODE_RESURRECTED] == 1,
+                        UnlinkEffectArm::AtIntent | UnlinkEffectArm::AtLastBatchWritten => delta[DELTA_INODE_RESURRECTED] == 0,
                     }
             })
         };
@@ -4360,13 +4360,13 @@ impl Simulation {
         });
         if let Some(erased) = single_version.or_else(|| live_data_units.first().copied()) {
             let overlay = Overlay::erasing(erased);
-            let closed_form = |_: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| deltas.iter().all(|delta| delta[DELTA_EXTENT_M] <= 1);
+            let closed_form = |_: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| deltas.iter().all(|delta| delta[DELTA_EXTENT_MISSED] <= 1);
             outcomes.push(self.positive_control("PC-M-data", &overlay, scan_publish, format!("erased_unit={erased} single_version={}", single_version.is_some()), &closed_form));
         }
         if let Some(leaf) = self.version.leaves.first() {
             let overlay = Overlay::erasing(leaf.unit);
             let records = signed(length_as_u64(leaf.records.len()));
-            let closed_form = |_: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| deltas.iter().all(|delta| delta[DELTA_INODE_M] <= records);
+            let closed_form = |_: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| deltas.iter().all(|delta| delta[DELTA_INODE_MISSED] <= records);
             outcomes.push(self.positive_control("PC-M-leaf", &overlay, scan_publish, format!("erased_unit={} records={records}", leaf.unit), &closed_form));
         }
         outcomes
@@ -4389,13 +4389,13 @@ struct SegmentTwoItem {
     cell: WritePathCell,
 }
 
-fn histories_f11() -> Vec<History> {
+fn rollback_over_a_gap_histories() -> Vec<History> {
     GAP_EVENTS.iter().map(|event| History::RollBackOverAGap { event: *event }).collect()
 }
 
 fn segment_two_items() -> Vec<SegmentTwoItem> {
     let mut items = Vec::new();
-    for history in histories_h51().into_iter().chain(histories_f10()).chain(histories_f11()) {
+    for history in histories_replayed_from_the_e177_segment_one().into_iter().chain(many_objects_with_data_histories()).chain(rollback_over_a_gap_histories()) {
         for leaf_capacity in LEAF_CAPACITIES {
             for merge_threshold in merge_thresholds_of(leaf_capacity) {
                 for borrow_arm in BORROW_ARMS {
@@ -4482,8 +4482,8 @@ fn segment_two_checks(item: SegmentTwoItem, simulation: &Simulation, rollback: O
         .collect();
     let without_retirement_forever = reader_position(Reader { base: BaseArm::WithoutRetirement, shrink: ShrinkArm::RecordSize, effect: UnlinkEffectArm::AtIntent, window: ReadableWindow::Forever });
     let without_retirement_ring = reader_position(Reader { base: BaseArm::WithoutRetirement, shrink: ShrinkArm::RecordSize, effect: UnlinkEffectArm::AtIntent, window: ReadableWindow::RingWindow });
-    let final_container_r = last_counts.get(without_retirement_forever).map_or(0, |counts| counts.container_resurrected);
-    let disappearance_scans_without_r = simulation
+    let final_container_resurrected = last_counts.get(without_retirement_forever).map_or(0, |counts| counts.container_resurrected);
+    let disappearance_scans_without_resurrection = simulation
         .publish_records
         .iter()
         .zip(&simulation.scans)
@@ -4491,15 +4491,15 @@ fn segment_two_checks(item: SegmentTwoItem, simulation: &Simulation, rollback: O
         .filter(|(_, scan)| scan.counts[without_retirement_ring].container_resurrected == 0)
         .count();
     if !disappeared.is_empty() {
-        let holds = final_container_r == length_as_u64(disappeared.len()) && disappearance_scans_without_r == 0;
+        let holds = final_container_resurrected == length_as_u64(disappeared.len()) && disappearance_scans_without_resurrection == 0;
         assertions.judge("PC-B1_without_retirement_resurrects_every_disappeared_identity", holds);
         lines.push(format!(
-            "name=positive_control id=PC-B1 {label} disappeared_identities={} final_container_r_inf={final_container_r} disappearance_scans_without_r_23={disappearance_scans_without_r} holds={holds}",
+            "name=positive_control id=PC-B1 {label} disappeared_identities={} final_container_r_inf={final_container_resurrected} disappearance_scans_without_r_23={disappearance_scans_without_resurrection} holds={holds}",
             disappeared.len()
         ));
         if let (History::BuildAndDeleteEmptyInodes { inode_count, .. }, 0) = (item.history, item.cell.merge_threshold) {
             let expected = inode_count.div_ceil(item.cell.leaf_capacity) - 1;
-            assertions.judge("A9_without_retirement_final_container_r", final_container_r == expected);
+            assertions.judge("A9_without_retirement_final_container_r", final_container_resurrected == expected);
         }
     }
     // PC-G0（A3）：F8 删前覆盖写、n_u > 1 的段，覆盖写之后那次扫描 G0 的 extent r = n_u − 1。
@@ -4675,12 +4675,12 @@ const SCOPE_ALL: usize = 0;
 const SCOPE_INSIDE_UNLINK: usize = 1;
 const SCOPE_OUTSIDE_UNLINK: usize = 2;
 const SCOPE_AFTER_ROLLBACK_OUTSIDE_UNLINK: usize = 4;
-const QUANTITY_INODE_R: usize = 0;
-const QUANTITY_INODE_M: usize = 1;
-const QUANTITY_EXTENT_R: usize = 2;
-const QUANTITY_EXTENT_M: usize = 3;
-const QUANTITY_CONTAINER_R: usize = 4;
-const QUANTITY_CONTAINER_M: usize = 5;
+const QUANTITY_INODE_RESURRECTED: usize = 0;
+const QUANTITY_INODE_MISSED: usize = 1;
+const QUANTITY_EXTENT_RESURRECTED: usize = 2;
+const QUANTITY_EXTENT_MISSED: usize = 3;
+const QUANTITY_CONTAINER_RESURRECTED: usize = 4;
+const QUANTITY_CONTAINER_MISSED: usize = 5;
 
 fn theta_class_of(cell: WritePathCell) -> usize {
     merge_thresholds_of(cell.leaf_capacity).iter().position(|threshold| *threshold == cell.merge_threshold).expect("θ 取自三档之一")
@@ -4733,37 +4733,37 @@ fn segment_two_verdict_lines(results: &[SegmentTwoResult]) -> (Vec<String>, Vec<
                 });
             };
             let base_reader = reader_position(Reader { base: BaseArm::RetirementOnLineage, shrink: ShrinkArm::RecordSize, effect: UnlinkEffectArm::AtIntent, window });
-            let base_container_r = trajectories[base_reader].by_scope[SCOPE_ALL][QUANTITY_CONTAINER_R];
-            let q_b1 = status_by_threshold(base_container_r.peak, "resurrects");
-            judged("Q-B1".to_string(), q_b1);
+            let base_container_resurrected = trajectories[base_reader].by_scope[SCOPE_ALL][QUANTITY_CONTAINER_RESURRECTED];
+            let base_resurrection_status = status_by_threshold(base_container_resurrected.peak, "resurrects");
+            judged("Q-B1".to_string(), base_resurrection_status);
             let rollback_trajectories = rollback_only.get(key);
             let after_rollback = |quantity: usize| {
                 rollback_trajectories.map_or_else(QuantityTrajectory::default, |trajectories| trajectories[base_reader].by_scope[SCOPE_AFTER_ROLLBACK_OUTSIDE_UNLINK][quantity])
             };
-            let q_b2 = status_by_threshold(after_rollback(QUANTITY_CONTAINER_M).peak, "misjudges_death");
+            let base_misjudged_death_status = status_by_threshold(after_rollback(QUANTITY_CONTAINER_MISSED).peak, "misjudges_death");
             if rollback_trajectories.is_some() {
-                judged("Q-B2".to_string(), q_b2);
+                judged("Q-B2".to_string(), base_misjudged_death_status);
             }
-            let excluded_by_fl1 = q_b1 != "zero" || (rollback_trajectories.is_some() && q_b2 != "zero");
+            let excluded_by_fl1 = base_resurrection_status != "zero" || (rollback_trajectories.is_some() && base_misjudged_death_status != "zero");
             lines.push(format!(
-                "name=verdict question=Q-B1 {key_label} window={} {} status={q_b1}",
+                "name=verdict question=Q-B1 {key_label} window={} {} status={base_resurrection_status}",
                 window.label(),
-                base_container_r.fields("container_r")
+                base_container_resurrected.fields("container_r")
             ));
             lines.push(format!(
                 "name=verdict question=Q-B2 {key_label} window={} rollback_histories={} {} {} status={}",
                 window.label(),
                 rollback_trajectories.is_some(),
-                after_rollback(QUANTITY_CONTAINER_M).fields("container_m"),
-                after_rollback(QUANTITY_INODE_M).fields("inode_m"),
-                if rollback_trajectories.is_some() { q_b2 } else { "not_run" }
+                after_rollback(QUANTITY_CONTAINER_MISSED).fields("container_m"),
+                after_rollback(QUANTITY_INODE_MISSED).fields("inode_m"),
+                if rollback_trajectories.is_some() { base_misjudged_death_status } else { "not_run" }
             ));
             for effect in UNLINK_EFFECT_ARMS {
                 for shrink in [ShrinkArm::RecordSize, ShrinkArm::RangeTombstone] {
                     let reader = Reader { base: BaseArm::RetirementOnLineage, shrink, effect, window };
                     let trajectory = &trajectories[reader_position(reader)];
                     let arms = format!("shrink={} effect={}", shrink.label(), effect.label());
-                    let resurrection = trajectory.by_scope[SCOPE_ALL][QUANTITY_EXTENT_R];
+                    let resurrection = trajectory.by_scope[SCOPE_ALL][QUANTITY_EXTENT_RESURRECTED];
                     let resurrection_question = if shrink == ShrinkArm::RecordSize { "Q-X2-1" } else { "Q-X2-2" };
                     let resurrection_status = status_by_threshold(resurrection.peak, "resurrects");
                     judged(format!("{resurrection_question} {arms}"), resurrection_status);
@@ -4771,9 +4771,9 @@ fn segment_two_verdict_lines(results: &[SegmentTwoResult]) -> (Vec<String>, Vec<
                         "name=verdict question={resurrection_question} {key_label} {} {} {} status={resurrection_status} fl1_cell_excluded={excluded_by_fl1}",
                         reader.label(),
                         resurrection.fields("extent_r"),
-                        trajectory.by_scope[SCOPE_ALL][QUANTITY_INODE_R].fields("inode_r"),
+                        trajectory.by_scope[SCOPE_ALL][QUANTITY_INODE_RESURRECTED].fields("inode_r"),
                     ));
-                    let misjudged = trajectory.by_scope[SCOPE_OUTSIDE_UNLINK][QUANTITY_EXTENT_M];
+                    let misjudged = trajectory.by_scope[SCOPE_OUTSIDE_UNLINK][QUANTITY_EXTENT_MISSED];
                     let misjudged_question = if shrink == ShrinkArm::RecordSize { "Q-X2-3" } else { "Q-X2-4" };
                     let misjudged_status = status_by_threshold(misjudged.peak, "misjudges_death");
                     judged(format!("{misjudged_question} {arms}"), misjudged_status);
@@ -4781,20 +4781,20 @@ fn segment_two_verdict_lines(results: &[SegmentTwoResult]) -> (Vec<String>, Vec<
                         "name=verdict question={misjudged_question} {key_label} {} {} {} status={misjudged_status} fl1_cell_excluded={excluded_by_fl1}",
                         reader.label(),
                         misjudged.fields("extent_m_outside_unlink"),
-                        trajectory.by_scope[SCOPE_OUTSIDE_UNLINK][QUANTITY_INODE_M].fields("inode_m_outside_unlink"),
+                        trajectory.by_scope[SCOPE_OUTSIDE_UNLINK][QUANTITY_INODE_MISSED].fields("inode_m_outside_unlink"),
                     ));
-                    let inside_extent_m = trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_EXTENT_M];
-                    let inside_inode_m = trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_M];
+                    let inside_extent_missed = trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_EXTENT_MISSED];
+                    let inside_inode_missed = trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_MISSED];
                     if effect != UnlinkEffectArm::AtIntent {
-                        let batch_status = status_by_threshold(inside_extent_m.peak, "misjudges_in_batches");
+                        let batch_status = status_by_threshold(inside_extent_missed.peak, "misjudges_in_batches");
                         judged(format!("Q-X2-5 {arms}"), batch_status);
                         lines.push(format!(
                             "name=verdict question=Q-X2-5 {key_label} {} {} status={batch_status} fl1_cell_excluded={excluded_by_fl1}",
                             reader.label(),
-                            inside_extent_m.fields("extent_m_inside_unlink"),
+                            inside_extent_missed.fields("extent_m_inside_unlink"),
                         ));
                     }
-                    for (question, quantity) in [("Q-X3-1", inside_inode_m), ("Q-X3-2", inside_extent_m)] {
+                    for (question, quantity) in [("Q-X3-1", inside_inode_missed), ("Q-X3-2", inside_extent_missed)] {
                         let status = if effect == UnlinkEffectArm::AtIntent { "reported" } else { status_by_threshold(quantity.peak, "leaks") };
                         if effect != UnlinkEffectArm::AtIntent {
                             judged(format!("{question} {arms}"), status);
@@ -4808,8 +4808,8 @@ fn segment_two_verdict_lines(results: &[SegmentTwoResult]) -> (Vec<String>, Vec<
                     lines.push(format!(
                         "name=verdict question=Q-X3-3 {key_label} {} {} {} status=incidental",
                         reader.label(),
-                        trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_R].fields("inode_r_inside_unlink"),
-                        trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_EXTENT_R].fields("extent_r_inside_unlink"),
+                        trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_RESURRECTED].fields("inode_r_inside_unlink"),
+                        trajectory.by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_EXTENT_RESURRECTED].fields("extent_r_inside_unlink"),
                     ));
                 }
             }
@@ -4919,9 +4919,9 @@ fn run_segment_two(threads: usize) -> Vec<String> {
     let mut lines = vec![format!(
         "name=config experiment=E178 segment=two work_items={} histories_h51={} histories_f10={} histories_f11={} readers={} capacities=233,16 thetas=0,quarter,half borrow_arms=N1,N2 windows=inf,23 ring_window={READABLE_WINDOW_RING_PUBLISHES}",
         items.len(),
-        histories_h51().len(),
-        histories_f10().len(),
-        histories_f11().len(),
+        histories_replayed_from_the_e177_segment_one().len(),
+        many_objects_with_data_histories().len(),
+        rollback_over_a_gap_histories().len(),
         every_reader().len(),
     )];
     lines.extend(constant_anchor_lines());
@@ -4939,7 +4939,7 @@ fn run_segment_two(threads: usize) -> Vec<String> {
     let mut every_path_agrees = true;
     let mut positive_controls_agree = true;
     let mut positive_controls_closed_form = true;
-    let mut uncovered_f10_cells = 0;
+    let mut uncovered_many_objects_cells = 0;
     for result in &results {
         lines.extend(result.lines.iter().cloned());
         tally.merge(&result.assertions);
@@ -4948,7 +4948,7 @@ fn run_segment_two(threads: usize) -> Vec<String> {
         positive_controls_agree &= result.positive_controls.iter().all(|outcome| outcome.paths_agree);
         positive_controls_closed_form &= result.positive_controls.iter().all(|outcome| outcome.closed_form_holds);
         if result.item.history.family() == "F10" && result.item.cell.merge_threshold > 0 && !result.path_covered {
-            uncovered_f10_cells += 1;
+            uncovered_many_objects_cells += 1;
         }
     }
     positive_controls_closed_form &= direct_holds;
@@ -4965,7 +4965,7 @@ fn run_segment_two(threads: usize) -> Vec<String> {
     let rollbacks_too_far = results.iter().filter(|result| result.rollback.is_some_and(|outcome| outcome.too_far)).count();
     let rollback_events_missing = results.iter().filter(|result| result.rollback.is_some_and(|outcome| !outcome.event_found)).count();
     lines.push(format!(
-        "name=verdict question=summary v2_positive_controls_paths_agree={positive_controls_agree} positive_controls_closed_form_holds={positive_controls_closed_form} v3_last_scan_paths_agree={every_path_agrees} v4_two_runs_identical={every_run_identical} v5_anchors_hold={every_assertion_holds} v6_f10_cells_without_coverage={uncovered_f10_cells} f11_rollbacks_too_far={rollbacks_too_far} f11_events_missing={rollback_events_missing}"
+        "name=verdict question=summary v2_positive_controls_paths_agree={positive_controls_agree} positive_controls_closed_form_holds={positive_controls_closed_form} v3_last_scan_paths_agree={every_path_agrees} v4_two_runs_identical={every_run_identical} v5_anchors_hold={every_assertion_holds} v6_f10_cells_without_coverage={uncovered_many_objects_cells} f11_rollbacks_too_far={rollbacks_too_far} f11_events_missing={rollback_events_missing}"
     ));
     lines
 }
@@ -5101,7 +5101,7 @@ fn build_crash_prefix(prefix: CrashPrefix, cell: WritePathCell) -> Option<(Simul
     match prefix {
         CrashPrefix::FirstFileOnly => Some((simulation, FIRST_FILE_INODE)),
         CrashPrefix::MovedObject => {
-            build_and_write_many_objects(&mut simulation, F12_INODE_COUNT);
+            build_and_write_many_objects(&mut simulation, INTENT_CRASH_INODE_COUNT);
             loop {
                 let moved_and_live = simulation.moved_objects.iter().copied().find(|object| simulation.version.is_live(*object));
                 if let Some(object) = moved_and_live {
@@ -5138,8 +5138,8 @@ fn run_one_crash_branch(before_the_crash: &Simulation, object: u64) -> Option<Cr
     let plant = Overlay::planting(vec![Simulation::planted_leaf(planted, branch.newest_write_order(), crash_publish)]);
     let plant_closed_form = |readers: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| {
         readers.iter().zip(deltas).all(|(reader, delta)| match reader.effect {
-            UnlinkEffectArm::AtIntent => delta[DELTA_O1] == 0,
-            UnlinkEffectArm::AtLastBatchWritten | UnlinkEffectArm::AtLastBatchRead => delta[DELTA_O1] == 1,
+            UnlinkEffectArm::AtIntent => delta[DELTA_LIVE_RECORDS_BEYOND_THE_TRUTH] == 0,
+            UnlinkEffectArm::AtLastBatchWritten | UnlinkEffectArm::AtLastBatchRead => delta[DELTA_LIVE_RECORDS_BEYOND_THE_TRUTH] == 1,
         })
     };
     let removal = Overlay::removing_a_tombstone(TombstoneRecord {
@@ -5149,7 +5149,7 @@ fn run_one_crash_branch(before_the_crash: &Simulation, object: u64) -> Option<Cr
         death_txg: intent_txg,
     });
     let removal_closed_form = |readers: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| {
-        readers.iter().zip(deltas).all(|(reader, delta)| reader.effect != UnlinkEffectArm::AtIntent || delta[DELTA_O2] == 1)
+        readers.iter().zip(deltas).all(|(reader, delta)| reader.effect != UnlinkEffectArm::AtIntent || delta[DELTA_RECORDS_WHOSE_INTENT_IS_PUBLISHED] == 1)
     };
     let mut positive_controls = vec![
         branch.positive_control("PC-O-plant", &plant, crash_publish, format!("object={object}"), &plant_closed_form),
@@ -5159,7 +5159,7 @@ fn run_one_crash_branch(before_the_crash: &Simulation, object: u64) -> Option<Cr
     branch.scanning = true;
     branch.recover_after_the_crash();
     branch.walk_the_deletion_queue_empty();
-    branch.publish(&Operation::NewInodes { count: F12_NEW_INODES_AFTER_RECOVERY });
+    branch.publish(&Operation::NewInodes { count: INTENT_CRASH_NEW_INODES_AFTER_RECOVERY });
     let recovery_trajectories = trajectories_of(&branch.scans, every_reader().len());
     let recovery_paths_agree = branch.group_index_equals_the_full_scan(branch.publish_sequence);
     Some(CrashBranchOutcome { crash_counts, crash_paths_agree, positive_controls, recovery_trajectories, recovery_paths_agree })
@@ -5184,8 +5184,8 @@ fn run_crash_branches(prefix: &Simulation, object: u64, data_units: u64, batch: 
     outcomes
 }
 
-const F12_DATA_UNITS: [u64; 3] = [3, 145, 300];
-const F12_BATCHES: [u64; 2] = [1, PRODUCT_UNLINK_BATCH_DATA_UNITS];
+const INTENT_CRASH_DATA_UNITS: [u64; 3] = [3, 145, 300];
+const INTENT_CRASH_BATCHES: [u64; 2] = [1, PRODUCT_UNLINK_BATCH_DATA_UNITS];
 
 /// 一个 (前缀, 写路径格, u, b) 上，每个读者跨全部崩溃支的汇总。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -5233,8 +5233,8 @@ fn run_segment_three_item(item: SegmentThreeItem) -> SegmentThreeResult {
     let mut every_path_agrees = true;
     let mut positive_controls_agree = true;
     let mut positive_controls_closed_form = true;
-    for data_units in F12_DATA_UNITS {
-        for batch in F12_BATCHES {
+    for data_units in INTENT_CRASH_DATA_UNITS {
+        for batch in INTENT_CRASH_BATCHES {
             let outcomes = run_crash_branches(&prefix, object, data_units, batch);
             let mut per_reader = vec![CrashSummary::default(); readers.len()];
             for outcome in &outcomes {
@@ -5252,9 +5252,9 @@ fn run_segment_three_item(item: SegmentThreeItem) -> SegmentThreeResult {
                     summary.records_whose_intent_is_published.observe(counts.records_whose_intent_is_published);
                     summary.records_whose_intent_is_published_positive += u64::from(counts.records_whose_intent_is_published > 0);
                     let recovery = &outcome.recovery_trajectories[position].by_scope[SCOPE_ALL];
-                    summary.recovery_inode_resurrected_peak = summary.recovery_inode_resurrected_peak.max(recovery[QUANTITY_INODE_R].peak);
-                    summary.recovery_extent_resurrected_peak = summary.recovery_extent_resurrected_peak.max(recovery[QUANTITY_EXTENT_R].peak);
-                    summary.recovery_container_resurrected_peak = summary.recovery_container_resurrected_peak.max(recovery[QUANTITY_CONTAINER_R].peak);
+                    summary.recovery_inode_resurrected_peak = summary.recovery_inode_resurrected_peak.max(recovery[QUANTITY_INODE_RESURRECTED].peak);
+                    summary.recovery_extent_resurrected_peak = summary.recovery_extent_resurrected_peak.max(recovery[QUANTITY_EXTENT_RESURRECTED].peak);
+                    summary.recovery_container_resurrected_peak = summary.recovery_container_resurrected_peak.max(recovery[QUANTITY_CONTAINER_RESURRECTED].peak);
                 }
             }
             for (reader, summary) in readers.iter().zip(&per_reader) {
@@ -5275,13 +5275,13 @@ fn run_segment_three_item(item: SegmentThreeItem) -> SegmentThreeResult {
                 ));
             }
             let controls: Vec<&PositiveControlOutcome> = outcomes.iter().flat_map(|outcome| outcome.positive_controls.iter()).collect();
-            for id in ["PC-O-plant", "PC-O-remove", "PC-M-data", "PC-M-leaf"] {
-                let of_id: Vec<&&PositiveControlOutcome> = controls.iter().filter(|control| control.id == id).collect();
+            for control_identifier in ["PC-O-plant", "PC-O-remove", "PC-M-data", "PC-M-leaf"] {
+                let outcomes_of_the_control: Vec<&&PositiveControlOutcome> = controls.iter().filter(|control| control.control_identifier == control_identifier).collect();
                 lines.push(format!(
-                    "name=positive_control id={id} {label} u={data_units} batch={batch} crash_points={} paths_agree={} closed_form_holds={}",
-                    of_id.len(),
-                    of_id.iter().filter(|control| control.paths_agree).count(),
-                    of_id.iter().filter(|control| control.closed_form_holds).count(),
+                    "name=positive_control id={control_identifier} {label} u={data_units} batch={batch} crash_points={} paths_agree={} closed_form_holds={}",
+                    outcomes_of_the_control.len(),
+                    outcomes_of_the_control.iter().filter(|control| control.paths_agree).count(),
+                    outcomes_of_the_control.iter().filter(|control| control.closed_form_holds).count(),
                 ));
             }
             summaries.push(((data_units, batch), per_reader));
@@ -5330,7 +5330,7 @@ fn segment_three_verdict_lines(results: &[SegmentThreeResult]) -> Vec<String> {
 fn run_segment_three(threads: usize) -> Vec<String> {
     let items = segment_three_items();
     let mut lines = vec![format!(
-        "name=config experiment=E178 segment=three work_items={} data_units=3,145,300 batches=1,144 readers={} prefix_inode_count={F12_INODE_COUNT} new_inodes_after_recovery={F12_NEW_INODES_AFTER_RECOVERY}",
+        "name=config experiment=E178 segment=three work_items={} data_units=3,145,300 batches=1,144 readers={} prefix_inode_count={INTENT_CRASH_INODE_COUNT} new_inodes_after_recovery={INTENT_CRASH_NEW_INODES_AFTER_RECOVERY}",
         items.len(),
         every_reader().len(),
     )];
@@ -5479,7 +5479,7 @@ impl Simulation {
         let mut outcomes = Vec::new();
         if reversed_provenance_applies && plan.moved_then_shortened_scan == Some(publish_sequence) {
             let mut control = self.reversed_provenance_positive_control(publish_sequence);
-            control.id = "PC-Bt2-mid";
+            control.control_identifier = "PC-Bt2-mid";
             outcomes.push(control);
         }
         for window in READABLE_WINDOWS {
@@ -5560,7 +5560,7 @@ impl Simulation {
             .collect();
         let closed_form = |readers: &[Reader], deltas: &[[i64; COUNT_FIELDS]]| {
             readers.iter().zip(deltas).zip(&hand_counts).all(|((reader, delta), hand)| {
-                reader.window != window || (delta[DELTA_CONTAINER_R] == 1 && delta[DELTA_INODE_R] == signed(*hand))
+                reader.window != window || (delta[DELTA_CONTAINER_RESURRECTED] == 1 && delta[DELTA_INODE_RESURRECTED] == signed(*hand))
             })
         };
         vec![self.positive_control(
@@ -5596,10 +5596,10 @@ impl Simulation {
                     return true;
                 }
                 if reader.base == BaseArm::TombstonesOnly {
-                    return delta[DELTA_INODE_R] == 1;
+                    return delta[DELTA_INODE_RESURRECTED] == 1;
                 }
                 if reader.base == BaseArm::RetirementOnLineage && reader.effect == UnlinkEffectArm::AtIntent {
-                    return delta[DELTA_INODE_R] == 0 && delta[DELTA_EXTENT_R] == 0;
+                    return delta[DELTA_INODE_RESURRECTED] == 0 && delta[DELTA_EXTENT_RESURRECTED] == 0;
                 }
                 true
             })
@@ -5678,7 +5678,7 @@ impl Simulation {
                     ShrinkArm::RecordSize => hand,
                     ShrinkArm::RangeTombstone | ShrinkArm::ObjectGateOnly => 0,
                 };
-                delta[DELTA_EXTENT_R] == extent_expected && delta[DELTA_INODE_R] == 0
+                delta[DELTA_EXTENT_RESURRECTED] == extent_expected && delta[DELTA_INODE_RESURRECTED] == 0
             })
         };
         self.positive_control("PC-Bt2", &Overlay::reversing_the_provenance(), scan_publish, format!("hand_extent_r_z={hand}"), &closed_form)
@@ -5818,8 +5818,8 @@ fn trajectory_lines(label: &str, readers: &[Reader], trajectories: &[ReaderTraje
 
 /// 「差」的四条轨迹：同一次扫描、同一 (X2, X3, W) 下新臂减 B-on，两个方向各一条（修订 2 之七）。
 const DIFFERENCE_QUANTITIES: [&str; 4] = ["extent_r_more", "extent_r_less", "extent_m_more", "extent_m_less"];
-const DIFFERENCE_EXTENT_R_MORE: usize = 0;
-const DIFFERENCE_EXTENT_M_MORE: usize = 2;
+const DIFFERENCE_EXTENT_RESURRECTED_MORE: usize = 0;
+const DIFFERENCE_EXTENT_MISSED_MORE: usize = 2;
 
 fn difference_trajectories(new_scans: &[ScanRecord], new_position: usize, base_scans: &[ScanRecord], base_position: usize) -> [[QuantityTrajectory; 4]; 5] {
     let mut trajectories = [[QuantityTrajectory::default(); 4]; 5];
@@ -5863,11 +5863,11 @@ fn difference_lines(label: &str, reader: Reader, trajectories: &[[QuantityTrajec
 
 /// 第四段的阳性对照行：同第二段的形态，PC-M 另报登记字面（每个读者 extent m + 1；抹容器那一次 inode m + 记录数、容器 m + 1）成不成立。
 fn segment_four_positive_control_line(outcome: &PositiveControlOutcome, context: &str) -> String {
-    let literal = match outcome.id {
-        "PC-M-data" => Some(outcome.main_deltas.iter().all(|delta| delta[DELTA_EXTENT_M] == 1)),
+    let literal = match outcome.control_identifier {
+        "PC-M-data" => Some(outcome.main_deltas.iter().all(|delta| delta[DELTA_EXTENT_MISSED] == 1)),
         "PC-M-leaf" => {
             let records: Option<i64> = outcome.detail.split(' ').find_map(|field| field.strip_prefix("records=")).and_then(|value| value.parse().ok());
-            Some(records.is_some_and(|records| outcome.main_deltas.iter().all(|delta| delta[DELTA_INODE_M] == records && delta[DELTA_CONTAINER_M] == 1)))
+            Some(records.is_some_and(|records| outcome.main_deltas.iter().all(|delta| delta[DELTA_INODE_MISSED] == records && delta[DELTA_CONTAINER_MISSED] == 1)))
         }
         _ => None,
     };
@@ -6553,14 +6553,14 @@ const fn reader_with(base: BaseArm, shrink: ShrinkArm, effect: UnlinkEffectArm, 
     Reader { base, shrink, effect, window }
 }
 
-const fn x2_resurrection_question(shrink: ShrinkArm) -> &'static str {
+const fn shrink_axis_resurrection_question(shrink: ShrinkArm) -> &'static str {
     match shrink {
         ShrinkArm::RecordSize => "Q-X2-1",
         ShrinkArm::RangeTombstone | ShrinkArm::ObjectGateOnly => "Q-X2-2",
     }
 }
 
-const fn x2_misjudged_death_question(shrink: ShrinkArm) -> &'static str {
+const fn shrink_axis_misjudged_death_question(shrink: ShrinkArm) -> &'static str {
     match shrink {
         ShrinkArm::RecordSize => "Q-X2-3",
         ShrinkArm::RangeTombstone | ShrinkArm::ObjectGateOnly => "Q-X2-4",
@@ -6568,13 +6568,13 @@ const fn x2_misjudged_death_question(shrink: ShrinkArm) -> &'static str {
 }
 
 /// 一个读者在 Q-X2-1 至 Q-X2-5 口径下的判定（与第二段 `segment_two_verdict_lines` 同门槛同量）：(子问题, 状态)。
-fn x2_statuses(trajectories_all: &[QuantityTrajectory; 6], trajectories_outside: &[QuantityTrajectory; 6], trajectories_inside: &[QuantityTrajectory; 6], reader: Reader) -> Vec<(&'static str, &'static str)> {
+fn shrink_axis_statuses(trajectories_all: &[QuantityTrajectory; 6], trajectories_outside: &[QuantityTrajectory; 6], trajectories_inside: &[QuantityTrajectory; 6], reader: Reader) -> Vec<(&'static str, &'static str)> {
     let mut statuses = vec![
-        (x2_resurrection_question(reader.shrink), status_by_threshold(trajectories_all[QUANTITY_EXTENT_R].peak, "resurrects")),
-        (x2_misjudged_death_question(reader.shrink), status_by_threshold(trajectories_outside[QUANTITY_EXTENT_M].peak, "misjudges_death")),
+        (shrink_axis_resurrection_question(reader.shrink), status_by_threshold(trajectories_all[QUANTITY_EXTENT_RESURRECTED].peak, "resurrects")),
+        (shrink_axis_misjudged_death_question(reader.shrink), status_by_threshold(trajectories_outside[QUANTITY_EXTENT_MISSED].peak, "misjudges_death")),
     ];
     if reader.effect != UnlinkEffectArm::AtIntent {
-        statuses.push(("Q-X2-5", status_by_threshold(trajectories_inside[QUANTITY_EXTENT_M].peak, "misjudges_in_batches")));
+        statuses.push(("Q-X2-5", status_by_threshold(trajectories_inside[QUANTITY_EXTENT_MISSED].peak, "misjudges_in_batches")));
     }
     statuses
 }
@@ -6585,7 +6585,7 @@ fn new_base_verdict_lines(
     verdict_key: VerdictKey,
     reader: Reader,
     statuses: &mut Vec<JudgedStatus>,
-    differing_x2_cells: &mut Vec<String>,
+    differing_shrink_axis_cells: &mut Vec<String>,
 ) -> Vec<String> {
     let (prefix, base_label) = match reader.base {
         BaseArm::TombstonesOnly => ("Q-Bt", "B-tsz"),
@@ -6617,9 +6617,9 @@ fn new_base_verdict_lines(
     let difference_all = aggregate.difference(all_key, reader, SCOPE_ALL);
     // 复活：容器 r、inode r、extent r 差（新臂多出的方向）。B-tsz 的容器 r 是定义的推论，只报数（A12 钉）。
     let resurrection = [
-        ("container_r", new_all[QUANTITY_CONTAINER_R], base_all[QUANTITY_CONTAINER_R].peak, "resurrects_containers"),
-        ("inode_r", new_all[QUANTITY_INODE_R], base_all[QUANTITY_INODE_R].peak, "resurrects_records"),
-        ("extent_r_more_than_b_on", difference_all[DIFFERENCE_EXTENT_R_MORE], 0, "resurrects_more_units"),
+        ("container_r", new_all[QUANTITY_CONTAINER_RESURRECTED], base_all[QUANTITY_CONTAINER_RESURRECTED].peak, "resurrects_containers"),
+        ("inode_r", new_all[QUANTITY_INODE_RESURRECTED], base_all[QUANTITY_INODE_RESURRECTED].peak, "resurrects_records"),
+        ("extent_r_more_than_b_on", difference_all[DIFFERENCE_EXTENT_RESURRECTED_MORE], 0, "resurrects_more_units"),
     ];
     for (quantity, trajectory, base_peak, positive) in resurrection {
         let reported_only = reader.base == BaseArm::TombstonesOnly && quantity == "container_r";
@@ -6640,9 +6640,9 @@ fn new_base_verdict_lines(
         let base_tier = aggregate.trajectory(key, paired, scope);
         let difference_tier = aggregate.difference(key, reader, scope);
         let misjudged = [
-            ("container_m", new_tier[QUANTITY_CONTAINER_M], base_tier[QUANTITY_CONTAINER_M].peak, "misjudges_container_death"),
-            ("inode_m", new_tier[QUANTITY_INODE_M], base_tier[QUANTITY_INODE_M].peak, "misjudges_record_death"),
-            ("extent_m_more_than_b_on", difference_tier[DIFFERENCE_EXTENT_M_MORE], 0, "misjudges_more_units"),
+            ("container_m", new_tier[QUANTITY_CONTAINER_MISSED], base_tier[QUANTITY_CONTAINER_MISSED].peak, "misjudges_container_death"),
+            ("inode_m", new_tier[QUANTITY_INODE_MISSED], base_tier[QUANTITY_INODE_MISSED].peak, "misjudges_record_death"),
+            ("extent_m_more_than_b_on", difference_tier[DIFFERENCE_EXTENT_MISSED_MORE], 0, "misjudges_more_units"),
         ];
         for (quantity, trajectory, base_peak, positive) in misjudged {
             let status = if has_data { status_by_threshold(trajectory.peak, positive) } else { "not_run" };
@@ -6659,7 +6659,7 @@ fn new_base_verdict_lines(
     // unlink 途中漏活：E-I 只报数（A7），E-L 两臂峰值 > 0 判漏活；并排 B-on 同一格的判定。
     let new_inside = aggregate.trajectory(all_key, reader, SCOPE_INSIDE_UNLINK);
     let base_inside = aggregate.trajectory(all_key, paired, SCOPE_INSIDE_UNLINK);
-    for (quantity, position) in [("inode_m", QUANTITY_INODE_M), ("extent_m", QUANTITY_EXTENT_M)] {
+    for (quantity, position) in [("inode_m", QUANTITY_INODE_MISSED), ("extent_m", QUANTITY_EXTENT_MISSED)] {
         let (status, base_status) = if reader.effect == UnlinkEffectArm::AtIntent {
             ("reported", "reported")
         } else {
@@ -6675,13 +6675,13 @@ fn new_base_verdict_lines(
         ));
     }
     // X2 在新底座下的判定与 B-on 下并排（Q-Bs-4 / Q-Bt-4）。
-    let new_x2 = x2_statuses(&new_all, &aggregate.trajectory(all_key, reader, SCOPE_OUTSIDE_UNLINK), &new_inside, reader);
-    let base_x2 = x2_statuses(&base_all, &aggregate.trajectory(all_key, paired, SCOPE_OUTSIDE_UNLINK), &base_inside, paired);
-    for ((sub_question, new_status), (_, base_status)) in new_x2.iter().zip(&base_x2) {
+    let new_shrink_axis_statuses = shrink_axis_statuses(&new_all, &aggregate.trajectory(all_key, reader, SCOPE_OUTSIDE_UNLINK), &new_inside, reader);
+    let base_shrink_axis_statuses = shrink_axis_statuses(&base_all, &aggregate.trajectory(all_key, paired, SCOPE_OUTSIDE_UNLINK), &base_inside, paired);
+    for ((sub_question, new_status), (_, base_status)) in new_shrink_axis_statuses.iter().zip(&base_shrink_axis_statuses) {
         let differs = new_status != base_status;
         judged(format!("{prefix}-4 {arms} sub_question={sub_question}"), new_status);
         if differs {
-            differing_x2_cells.push(format!("{prefix}-4:{sub_question}:{}:{}:{}:{}:{}:{}", base_label, verdict_key.cell.label().replace(' ', ","), verdict_key.batch, reader.window.label(), reader.shrink.label(), reader.effect.label()));
+            differing_shrink_axis_cells.push(format!("{prefix}-4:{sub_question}:{}:{}:{}:{}:{}:{}", base_label, verdict_key.cell.label().replace(' ', ","), verdict_key.batch, reader.window.label(), reader.shrink.label(), reader.effect.label()));
         }
         lines.push(format!(
             "name=verdict question={prefix}-4 base={base_label} {key_label} window={} {arms} sub_question={sub_question} new_base_status={new_status} b_on_status={base_status} differs={differs}",
@@ -6706,12 +6706,12 @@ fn side_by_side_lines(aggregate: &SegmentFourAggregate, families: &[&'static str
         let outside = aggregate.trajectory(key, reader, SCOPE_OUTSIDE_UNLINK);
         format!(
             "{}/{}/{}:{}/{}/{}",
-            all[QUANTITY_CONTAINER_R].peak,
-            all[QUANTITY_INODE_R].peak,
-            all[QUANTITY_EXTENT_R].peak,
-            outside[QUANTITY_CONTAINER_M].peak,
-            outside[QUANTITY_INODE_M].peak,
-            outside[QUANTITY_EXTENT_M].peak
+            all[QUANTITY_CONTAINER_RESURRECTED].peak,
+            all[QUANTITY_INODE_RESURRECTED].peak,
+            all[QUANTITY_EXTENT_RESURRECTED].peak,
+            outside[QUANTITY_CONTAINER_MISSED].peak,
+            outside[QUANTITY_INODE_MISSED].peak,
+            outside[QUANTITY_EXTENT_MISSED].peak
         )
     };
     let mut lines = Vec::new();
@@ -6842,27 +6842,27 @@ fn assemble_segment_four(items: &[SegmentFourItem], item_lines: &[Vec<String>]) 
     }
     verdict_keys.sort();
     let mut statuses = Vec::new();
-    let mut differing_x2_cells = Vec::new();
+    let mut differing_shrink_axis_cells = Vec::new();
     for verdict_key in &verdict_keys {
         for window in READABLE_WINDOWS {
             if verdict_key.cell.borrow_arm == BorrowArm::RaiseSeparator {
                 for effect in UNLINK_EFFECT_ARMS {
                     for shrink in [ShrinkArm::RecordSize, ShrinkArm::RangeTombstone] {
                         let reader = reader_with(BaseArm::ZeroRecordStubs, shrink, effect, window);
-                        lines.extend(new_base_verdict_lines(&aggregate, *verdict_key, reader, &mut statuses, &mut differing_x2_cells));
+                        lines.extend(new_base_verdict_lines(&aggregate, *verdict_key, reader, &mut statuses, &mut differing_shrink_axis_cells));
                     }
                 }
             }
             for shrink in [ShrinkArm::RecordSize, ShrinkArm::RangeTombstone] {
                 let reader = reader_with(BaseArm::TombstonesOnly, shrink, UnlinkEffectArm::AtIntent, window);
-                lines.extend(new_base_verdict_lines(&aggregate, *verdict_key, reader, &mut statuses, &mut differing_x2_cells));
+                lines.extend(new_base_verdict_lines(&aggregate, *verdict_key, reader, &mut statuses, &mut differing_shrink_axis_cells));
             }
         }
     }
     lines.push(format!(
         "name=verdict question=FL-Bx x2_cells_whose_judgement_changes_with_the_base={} cells={}",
-        differing_x2_cells.len(),
-        if differing_x2_cells.is_empty() { "none".to_string() } else { differing_x2_cells.join(";") }
+        differing_shrink_axis_cells.len(),
+        if differing_shrink_axis_cells.is_empty() { "none".to_string() } else { differing_shrink_axis_cells.join(";") }
     ));
     lines.extend(side_by_side_lines(&aggregate, &families, &verdict_keys));
     lines.extend(stub_leaf_verdict_lines(items, item_lines));
@@ -6879,7 +6879,7 @@ fn segment_four_summary_lines(items: &[SegmentFourItem], item_lines: &[Vec<Strin
     let mut pairing_fails = 0_u64;
     let mut stub_read_mismatch_segments = 0_u64;
     let mut does_not_fit = 0_u64;
-    let mut uncovered_f10_cells = 0_u64;
+    let mut uncovered_many_objects_cells = 0_u64;
     let mut rollbacks_too_far = 0_u64;
     let mut rollback_events_missing = 0_u64;
     let mut controls: BTreeMap<String, (u64, u64, u64)> = BTreeMap::new();
@@ -6905,10 +6905,10 @@ fn segment_four_summary_lines(items: &[SegmentFourItem], item_lines: &[Vec<Strin
                     does_not_fit += u64::from(fields.get("does_not_fit_at").is_some_and(|value| *value != "none"));
                     rollbacks_too_far += u64::from(fields.get("rollback_too_far") == Some(&"true"));
                     rollback_events_missing += u64::from(fields.get("rollback_event_found") == Some(&"false"));
-                    let original_f10_with_merges = family == "F10" && fields.get("path") == Some(&"original") && fields.get("theta") != Some(&"0");
-                    if original_f10_with_merges {
+                    let original_many_objects_with_merges = family == "F10" && fields.get("path") == Some(&"original") && fields.get("theta") != Some(&"0");
+                    if original_many_objects_with_merges {
                         let covered = ["borrows", "moved_then_shortened", "moved_then_unlinked"].iter().all(|key| number_field(&fields, key) > 0);
-                        uncovered_f10_cells += u64::from(!covered);
+                        uncovered_many_objects_cells += u64::from(!covered);
                     }
                 }
                 Some("positive_control") => {
@@ -6967,7 +6967,7 @@ fn segment_four_summary_lines(items: &[SegmentFourItem], item_lines: &[Vec<Strin
         .map(|(_, count)| *count)
         .sum();
     lines.push(format!(
-        "name=verdict question=summary v2_paths_disagree={} v2_closed_form_fails={} v3_last_scan_paths_disagree={last_scan_paths_disagree} v4_runs_not_identical={runs_not_identical} v5_anchors_hold={every_assertion_holds} v6_f10_cells_without_coverage={uncovered_f10_cells} v8_new_base_trajectories_with_empty_reads={new_base_read_out_empty} v_bs1_pairing_fails={pairing_fails} v_bs3_segments_with_stub_read_mismatches={stub_read_mismatch_segments} does_not_fit_segments={does_not_fit} f11_rollbacks_too_far={rollbacks_too_far} f11_events_missing={rollback_events_missing} pc_bt2_segments_with_a_positive_hand_count={reversed_provenance_positive} pc_bt2_mid_segments_with_a_positive_hand_count={reversed_provenance_positive_mid} pc_bs1_taken={} pc_bt1_taken={} construction={}",
+        "name=verdict question=summary v2_paths_disagree={} v2_closed_form_fails={} v3_last_scan_paths_disagree={last_scan_paths_disagree} v4_runs_not_identical={runs_not_identical} v5_anchors_hold={every_assertion_holds} v6_f10_cells_without_coverage={uncovered_many_objects_cells} v8_new_base_trajectories_with_empty_reads={new_base_read_out_empty} v_bs1_pairing_fails={pairing_fails} v_bs3_segments_with_stub_read_mismatches={stub_read_mismatch_segments} does_not_fit_segments={does_not_fit} f11_rollbacks_too_far={rollbacks_too_far} f11_events_missing={rollback_events_missing} pc_bt2_segments_with_a_positive_hand_count={reversed_provenance_positive} pc_bt2_mid_segments_with_a_positive_hand_count={reversed_provenance_positive_mid} pc_bs1_taken={} pc_bt1_taken={} construction={}",
         controls.values().map(|(_, paths_disagree, _)| paths_disagree).sum::<u64>(),
         controls.values().map(|(_, _, closed_form_fails)| closed_form_fails).sum::<u64>(),
         if stub_erasure_families.is_empty() { "none".to_string() } else { stub_erasure_families.into_iter().collect::<Vec<String>>().join(",") },
@@ -7173,7 +7173,7 @@ mod tests {
 
     /// A6：一借小历史（第九节 M5、M6 在这里红：N2 不换身份则右号仍是 17，N1 不抬分隔 key 则右分隔 key 仍是 17）。
     #[test]
-    fn a_single_borrow_history_moves_five_records_and_costs_one_retirement() {
+    fn single_borrow_history_moves_five_records_and_costs_one_retirement() {
         let (holds, detail) = single_borrow_anchor_holds();
         assert!(holds, "{detail}");
     }
@@ -7275,7 +7275,7 @@ mod tests {
     }
 
     #[test]
-    fn a_trajectory_reports_peak_positive_scans_and_last() {
+    fn trajectory_reports_peak_positive_scans_and_last() {
         let mut trajectory = QuantityTrajectory::default();
         for (value, publish) in [(0, 1), (3, 2), (1, 3), (0, 4)] {
             trajectory.observe(value, publish);
@@ -7324,9 +7324,9 @@ mod tests {
         let deferred_read = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtLastBatchRead, ReadableWindow::Forever);
         let intent_effect = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever);
         let trajectories = trajectories_of(&simulation.scans, every_reader().len());
-        assert_eq!(trajectories[deferred_read].by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_M].peak, 0);
-        assert_eq!(trajectories[intent_effect].by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_M].peak, 1);
-        assert_eq!(trajectories[intent_effect].by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_M].positive_scans, 299);
+        assert_eq!(trajectories[deferred_read].by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_MISSED].peak, 0);
+        assert_eq!(trajectories[intent_effect].by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_MISSED].peak, 1);
+        assert_eq!(trajectories[intent_effect].by_scope[SCOPE_INSIDE_UNLINK][QUANTITY_INODE_MISSED].positive_scans, 299);
     }
 
     /// 第九节 M10 的取样点：F12 P-1、u = 145、b = 1，意图那一版之后崩溃（被抛弃的是第一批），恢复之后写行那一版的扫描：
@@ -7381,15 +7381,15 @@ mod tests {
         let trajectories = trajectories_of(&simulation.scans, every_reader().len());
         let on_lineage = position_of(BaseArm::RetirementOnLineage, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever);
         let after_rollback = &trajectories[on_lineage].by_scope[SCOPE_AFTER_ROLLBACK_OUTSIDE_UNLINK];
-        assert!(after_rollback[QUANTITY_CONTAINER_M].scans > 0);
-        assert_eq!(after_rollback[QUANTITY_CONTAINER_M].peak, 0);
-        assert_eq!(after_rollback[QUANTITY_INODE_M].peak, 0);
+        assert!(after_rollback[QUANTITY_CONTAINER_MISSED].scans > 0);
+        assert_eq!(after_rollback[QUANTITY_CONTAINER_MISSED].peak, 0);
+        assert_eq!(after_rollback[QUANTITY_INODE_MISSED].peak, 0);
     }
 
     /// 第九节 M3 的敏感取样点与 PC-B2 的方向（修订 1 的直接构造）：缺口里删空 L3（退役记录死亡 txg 在缺口里），回退之后 L3 回来、
     /// 版本还是缺口之前那一版；再删空最右的 L4（不左移）让退役容器在新父链上重写。B-on 的容器 m 是 0，B-off-lin 是 1。
     #[test]
-    fn a_retirement_from_the_abandoned_segment_applies_only_when_lineage_is_ignored() {
+    fn retirement_from_the_abandoned_segment_applies_only_when_lineage_is_ignored() {
         let (holds, detail) = direct_rollback_positive_control_holds();
         assert!(holds, "{detail}");
     }
@@ -7416,7 +7416,7 @@ mod tests {
         };
         let result = run_segment_two_item(item);
         assert!(result.two_runs_identical && result.last_scan_paths_agree);
-        let identifiers: BTreeSet<&str> = result.positive_controls.iter().map(|outcome| outcome.id).collect();
+        let identifiers: BTreeSet<&str> = result.positive_controls.iter().map(|outcome| outcome.control_identifier).collect();
         for expected in ["PC-Z", "PC-T", "PC-EL", "PC-ELr", "PC-M-data", "PC-M-leaf"] {
             assert!(identifiers.contains(expected), "{expected} 没做：{identifiers:?}");
         }
@@ -7453,8 +7453,8 @@ mod tests {
     fn the_shape_table_lists_the_shapes_the_raised_separator_reading_misses() {
         let (_, verdicts) = shape_table_lines();
         let lines = shape_verdict_lines(&verdicts);
-        let dense_k = lines.iter().find(|line| line.contains("question=Q-X4-4 layout=dense family=K ")).expect("有 K 族那一行");
-        assert!(dense_k.contains("K-2"), "{dense_k}");
+        let dense_split_family_line = lines.iter().find(|line| line.contains("question=Q-X4-4 layout=dense family=K ")).expect("有 K 族那一行");
+        assert!(dense_split_family_line.contains("K-2"), "{dense_split_family_line}");
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -7597,9 +7597,9 @@ mod tests {
         for order in deletion_orders() {
             let history = History::ManyObjectsWithData { inode_count: 300, order, batch: PRODUCT_UNLINK_BATCH_DATA_UNITS };
             let run = run_segment_four_path(history, write_path, ContainerDeathWritePath::RetirementRecords, &readers);
-            let at_the_end = run.positive_controls.iter().find(|control| control.id == "PC-Bt2").expect("期末那次做了 PC-Bt2");
+            let at_the_end = run.positive_controls.iter().find(|control| control.control_identifier == "PC-Bt2").expect("期末那次做了 PC-Bt2");
             assert!(at_the_end.paths_agree && at_the_end.closed_form_holds && hand_of(at_the_end) == 0, "{}", at_the_end.line(""));
-            let Some(mid) = run.positive_controls.iter().find(|control| control.id == "PC-Bt2-mid") else {
+            let Some(mid) = run.positive_controls.iter().find(|control| control.control_identifier == "PC-Bt2-mid") else {
                 continue;
             };
             assert!(mid.paths_agree && mid.closed_form_holds, "{}", mid.line(""));
@@ -7615,7 +7615,7 @@ mod tests {
 
     /// 第四段一个工作项（F10、N1、容量 16、θ = 4）：两条写路径配对、读到的桩数对得上、阳性对照两路一致且期望成立、A12 不红。
     #[test]
-    fn a_segment_four_item_holds_its_pairing_controls_and_anchors() {
+    fn segment_four_item_holds_its_pairing_controls_and_anchors() {
         let lines = segment_four_history_item_lines(
             History::ManyObjectsWithData { inode_count: 300, order: DeletionOrder::Ascending, batch: 144 },
             write_path_cell(BorrowArm::RaiseSeparator, TEST_LEAF_CAPACITY, 4),
@@ -7639,7 +7639,7 @@ mod tests {
     /// 盘上每一版的诞生 txg 都不在期末那一版的父链上（在缺口里生、又在缺口里消失）；登记 PC-B1 的期望数的是消失过的身份，没扣这一类。
     /// (消失过的身份数, 期末容器 r) 照第二段产物那三行钉：(4, 3)、(6, 4)、(5, 4)。
     #[test]
-    fn identities_born_and_retired_inside_the_abandoned_gap_are_what_pc_b1_overcounts() {
+    fn identities_born_and_retired_inside_the_abandoned_gap_are_what_the_gap_positive_control_overcounts() {
         let without_retirement_forever = position_of(BaseArm::WithoutRetirement, ShrinkArm::RecordSize, UnlinkEffectArm::AtIntent, ReadableWindow::Forever);
         for (event, threshold, expected) in [(GapEvent::Borrow, 4, (4, 3)), (GapEvent::Borrow, 8, (6, 4)), (GapEvent::MovedObjectShortened, 8, (5, 4))] {
             let (simulation, _) = simulate(History::RollBackOverAGap { event }, write_path_cell(BorrowArm::RenewIdentity, TEST_LEAF_CAPACITY, threshold), false);
@@ -7661,10 +7661,10 @@ mod tests {
                 })
                 .count();
             let counts = simulation.read_every_reader(&Overlay::default(), simulation.publish_sequence, SelectionPath::GroupIndex);
-            let final_container_r = counts[without_retirement_forever].container_resurrected;
-            assert_eq!((length_as_u64(disappeared.len()), final_container_r), expected, "{event:?} θ {threshold}");
+            let final_container_resurrected = counts[without_retirement_forever].container_resurrected;
+            assert_eq!((length_as_u64(disappeared.len()), final_container_resurrected), expected, "{event:?} θ {threshold}");
             assert!(born_off_the_chain_only > 0, "{event:?} θ {threshold}");
-            assert_eq!(final_container_r + length_as_u64(born_off_the_chain_only), length_as_u64(disappeared.len()), "{event:?} θ {threshold}");
+            assert_eq!(final_container_resurrected + length_as_u64(born_off_the_chain_only), length_as_u64(disappeared.len()), "{event:?} θ {threshold}");
         }
     }
 
@@ -7735,25 +7735,25 @@ mod tests {
     #[test]
     fn items_written_under_another_code_key_are_not_read_back() {
         let store = DeviceLibrary::in_memory();
-        let library_a = test_library(&store, "a1");
-        let library_b = test_library(&store, "b2");
+        let library_under_the_original_code_key = test_library(&store, "a1");
+        let library_under_another_code_key = test_library(&store, "b2");
         let items = [small_rewrite_item(3), small_rewrite_item(4)];
-        compute_or_reuse_the_items(&items, 2, &library_options(&library_a));
-        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b));
-        let files = item_files_in(&library_b);
+        compute_or_reuse_the_items(&items, 2, &library_options(&library_under_the_original_code_key));
+        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_under_another_code_key));
+        let files = item_files_in(&library_under_another_code_key);
         assert_eq!((second.computed, second.reused), (2, 0), "B 下不读 A 写的项");
         assert_eq!(files, 4, "A 写的两份留着，B 又写了两份");
     }
 
     /// 「键对不上的项数」（M26 抓）：代码键 A 跑完、B 再跑 → 成功句报键对不上 = 项数，那一句点名变了的单元。
     #[test]
-    fn a_second_code_key_reports_every_item_as_mismatched() {
+    fn another_code_key_reports_every_item_as_mismatched() {
         let store = DeviceLibrary::in_memory();
-        let library_a = test_library(&store, "a1");
-        let library_b = test_library(&store, "b2");
+        let library_under_the_original_code_key = test_library(&store, "a1");
+        let library_under_another_code_key = test_library(&store, "b2");
         let items = [small_rewrite_item(3), small_rewrite_item(4)];
-        let first = compute_or_reuse_the_items(&items, 2, &library_options(&library_a));
-        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_b));
+        let first = compute_or_reuse_the_items(&items, 2, &library_options(&library_under_the_original_code_key));
+        let second = compute_or_reuse_the_items(&items, 2, &library_options(&library_under_another_code_key));
         assert_eq!(first.mismatched, 0, "空库上第一趟没有上一趟可比");
         assert_eq!(second.mismatched, 2);
         let sentence = second.changed_units.expect("键对不上时有那一句");
@@ -7791,7 +7791,7 @@ mod tests {
 
     /// 「给了代码键就要转交的管道」：带 --code-key-file 却没经 device-code-key.py run 起（环境里没有管道） → 参数解析报错（main 照它退 2），不退回本地库。
     #[test]
-    fn a_code_key_without_the_relay_is_refused() {
+    fn code_key_without_the_relay_is_refused() {
         let composition_path = std::env::temp_dir().join(format!("e178-segment-four-relay-missing-{}.txt", std::process::id()));
         std::fs::write(&composition_path, format!("{COMPOSITION_FORM_LINE}\ncode_key\te7_index_bench::segment_four_item_lines\ta1\n")).expect("写得进测试的组成清单");
         let refused = parse_with(&["--code-key-file", &composition_path.to_string_lossy()], &test_environment_without_relay());

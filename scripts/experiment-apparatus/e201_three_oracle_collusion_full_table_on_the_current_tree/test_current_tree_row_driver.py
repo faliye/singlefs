@@ -1,5 +1,6 @@
 """current_tree_row_driver.py 的单测：编装置的命令带 gpu 特性、前面不套 nice 与任何包装（假 cargo、假 nice 记下真起的进程）；装置命令不带内存包装；
-超过限时杀整组、退出码记 253；不给 --lanes 时线道数照跑前登记第十四节按每台重活线程数算（LaneCountTests）。弄坏开关 E201_ROW_DRIVER_BREAK 见 current_tree_row_driver.py 文件头。
+超过限时杀整组、退出码记 253；不给 --lanes 时线道数照跑前登记第十四节按每台重活线程数算（LaneCountTests）；
+算键的库解得出驱动从 E171 修后版目录 import 的模块（JudgeImportTests）。弄坏开关 E201_ROW_DRIVER_BREAK 见 current_tree_row_driver.py 文件头。
 跑法：在本目录 `python3 -B -m unittest test_current_tree_row_driver`。"""
 
 from __future__ import annotations
@@ -7,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -211,6 +213,37 @@ class RowTimeLimitTests(unittest.TestCase):
 
     def test_a_row_inside_the_time_limit_returns_its_own_exit_code(self) -> None:
         self.assertEqual(driver.run_with_time_limit(["bash", "-c", "exit 7"], 30, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL), 7)
+
+
+class JudgeImportTests(unittest.TestCase):
+    """算键的库（scripts/gate/lib_function_units.py 的 PythonModule.resolve_module）照驱动的原文解得出它从 E171 修后版目录 import 的四份模块
+    （每行的判法 run_row_on_the_lane 的闭包收得到它们，不拒算 import-unresolved），e171_research_side.py 的 import frozen_o3 也解得出。
+    在临时目录里摆一棵小树问库：本目录的驱动与 e171_research_side.py 照此刻的原文拷进去（变异驱动把本目录拷到仓外跑时拷的是那份拷贝），
+    E171 修后版的那四份照仓里的拷进去。"""
+
+    OWN_RELATIVE = os.path.join("scripts", "experiment-apparatus", "e201_three_oracle_collusion_full_table_on_the_current_tree")
+    MODULES_FROM_E171 = ("device_timing", "frozen_o3", "run_directory", "bad_implementation_table")
+
+    @staticmethod
+    def copy_into(source: str, destination: str) -> None:
+        os.makedirs(os.path.dirname(destination), exist_ok=True)
+        shutil.copyfile(source, destination)
+
+    def test_the_key_library_resolves_the_e171_modules_the_driver_imports(self) -> None:
+        import attribution
+        units = attribution.function_units()
+        e171_relative = driver.e171_research_side.E171_RELATIVE
+        with tempfile.TemporaryDirectory() as root:
+            for name in ("current_tree_row_driver.py", "e171_research_side.py"):
+                self.copy_into(os.path.join(driver.HERE, name), os.path.join(root, self.OWN_RELATIVE, name))
+            for name in self.MODULES_FROM_E171:
+                self.copy_into(os.path.join(driver.E171_DIRECTORY, name + ".py"), os.path.join(root, e171_relative, name + ".py"))
+            index = units.PythonIndex(root)
+            row_driver_module = index.module(os.path.join(self.OWN_RELATIVE, "current_tree_row_driver.py"))
+            from_the_driver = {name: row_driver_module.resolve_module(name, 0) for name in self.MODULES_FROM_E171}
+            from_the_research_side = index.module(os.path.join(self.OWN_RELATIVE, "e171_research_side.py")).resolve_module("frozen_o3", 0)
+        self.assertEqual(from_the_driver, {name: ("repo", os.path.join(e171_relative, name + ".py")) for name in self.MODULES_FROM_E171})
+        self.assertEqual(from_the_research_side, ("repo", os.path.join(e171_relative, "frozen_o3.py")))
 
 
 if __name__ == "__main__":

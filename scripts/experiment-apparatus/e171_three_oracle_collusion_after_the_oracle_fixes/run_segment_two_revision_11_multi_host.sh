@@ -2,7 +2,7 @@
 # E171 第 1 次重跑·修订 11：修订 8 那一趟第二段整表带复用的跑法入口（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.10、11.11 节与
 # 「主 agent 认定：修订 11 交回」）。修订 10 那一份入口 run_segment_two_revision_10_multi_host.sh 一个字节不改；编排交 rows_orchestrator_segment_two_revision_11.py
 # （它按 sha256 载入修订 10 那一层，修订 10 的起跑闸、本机闸、让路、停派文件、输入清单、S17 联动原样）。
-# 起法（主 agent，在仓根；修订 8 那一趟第 0、1、2 步与研究一侧变异表（排了的话）绿、H30 认过、H31 填好认过之后）：
+# 起法（主 agent，在仓根；修订 8 那一趟第 0、1、2 步与研究一侧变异表（排了的话）绿、H31 填好认过之后）：
 #   task-server/task submit -- bash <这一份> [<修订 11 占位>]；内存、线程、哪台由服务定，这一份不套包装。经这一份起不分片：只用接到它的那一台，
 #   跨机对照报 not_run；要两台，交编排层 rows_orchestrator_segment_two_revision_11.py run（它文件头声明了分片）（E171（三oracle合谋测试） 第 2 次重跑登记修订 3）。
 #   不给配置取同目录 revision_11_placeholders.json（它点名修订 10 那一份占位，修订 10 那一份再点名修订 8 那一份）。同一条命令再起就是续跑。
@@ -12,7 +12,7 @@
 # long-run-resume: 同一条命令再起就是续跑：开跑先核输入清单与 H3、H8（修订 10 原样），只补行目录里还没有 row-result.tsv 的行；RC3 挑中的行照第一次挑的那份续用；取用断在中间的照标记删掉重取
 # 编排层另抽一份复用哨兵（种子打进标准错误与账本，红了照 S18 冻库、记红），账本末行报现判、复用、拒算（reuse_library.py 文件头「复用哨兵」「账本」）
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
-# 多机的说明：每台槽数 = ⌊每台线程 / 5⌋（起跑、续跑时算，每 600 秒给还没有槽的台重算加槽；内存不在这里算，整条命令交 task-server）；复用库在 prune-server 里（reuse_library.py 文件头「库」），两台读写同一份，别的台跑的行照 rows_orchestrator_segment_two_revision_11.py 文件头核三样再入库
+# 多机的说明：每台槽数 = ⌊每台线程 / 5⌋（起跑、续跑时算，每 600 秒给还没有槽的台重算加槽；内存不在这里算，整条命令交 task-server）；判定只在 prune-server 那一份判定库里（reuse_library.py 文件头「按项判定」），两台读写同一份，别的台跑的行照 rows_orchestrator_segment_two_revision_11.py 文件头核三样再入库
 set -u
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)" || exit 2   # 仓根取这一份所在的树（派到哪一台都对），不写死某一台上的路径
 cd "$REPO" || exit 2

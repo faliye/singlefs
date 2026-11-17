@@ -105,15 +105,15 @@ enum Arm {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum WholeRingArm {
     /// RGall：某块幸存盘整环里一条有效根都没有时，那块盘不进「每块幸存盘上最新的有效根」取小（读法 P，`crates/` 今天的上限形状）。被测。
-    ReadingP,
+    SkipsRootlessDisks,
     /// RGall_Q：那样的盘记 0、F 不抬（读法 Q）。被测。
-    ReadingQ,
+    CountsRootlessDisksAsZero,
     /// 阳性对照：RGall 只有回收门槛里的「最旧有效根」换成窗口缩短一行（txg + 3(S − 1) > N）的那一段里的最旧有效根。
-    ReadingPShort,
-    ReadingQShort,
+    SkipsRootlessDisksShortened,
+    CountsRootlessDisksAsZeroShortened,
     /// 只给单测 K15：RGall_Q 的候选下界取旧式（不并系统配置 F），用来对 Q 与原 G2S 逐处同式。不进任何一行产物。
     #[cfg_attr(not(test), allow(dead_code, reason = "只给单测 K15 用，产物里没有这条臂"))]
-    ReadingQWithTheOldCandidateFloor,
+    CountsRootlessDisksAsZeroWithTheOldCandidateFloor,
     /// 第 3 次重跑（`research/prompts/e139-r3-prereg.md` 第五节「臂」）：RGall 换上 `crates/singlefs-core/` 今天的回收门槛（CG 三处）。被测。
     CoreGateCeilingSkipsRootlessDisks,
     /// RGall_Q 换上 CG。被测（只报）。
@@ -132,11 +132,11 @@ enum WholeRingCeilingReading {
 impl WholeRingArm {
     fn name(self) -> &'static str {
         match self {
-            WholeRingArm::ReadingP => "RGall_ring_all",
-            WholeRingArm::ReadingQ => "RGall_Q_ring_all",
-            WholeRingArm::ReadingPShort => "RGall_short",
-            WholeRingArm::ReadingQShort => "RGall_Q_short",
-            WholeRingArm::ReadingQWithTheOldCandidateFloor => "RGall_Q_old_candidate_floor",
+            WholeRingArm::SkipsRootlessDisks => "RGall_ring_all",
+            WholeRingArm::CountsRootlessDisksAsZero => "RGall_Q_ring_all",
+            WholeRingArm::SkipsRootlessDisksShortened => "RGall_short",
+            WholeRingArm::CountsRootlessDisksAsZeroShortened => "RGall_Q_short",
+            WholeRingArm::CountsRootlessDisksAsZeroWithTheOldCandidateFloor => "RGall_Q_old_candidate_floor",
             WholeRingArm::CoreGateCeilingSkipsRootlessDisks => "RGall_core_gate",
             WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero => "RGall_Q_core_gate",
             WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened => "RGall_core_gate_short",
@@ -145,9 +145,9 @@ impl WholeRingArm {
     }
     fn ceiling_reading(self) -> WholeRingCeilingReading {
         match self {
-            WholeRingArm::ReadingP | WholeRingArm::ReadingPShort => WholeRingCeilingReading::DisksWithoutAValidRootAreSkipped,
+            WholeRingArm::SkipsRootlessDisks | WholeRingArm::SkipsRootlessDisksShortened => WholeRingCeilingReading::DisksWithoutAValidRootAreSkipped,
             WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened => WholeRingCeilingReading::DisksWithoutAValidRootAreSkipped,
-            WholeRingArm::ReadingQ | WholeRingArm::ReadingQShort | WholeRingArm::ReadingQWithTheOldCandidateFloor => {
+            WholeRingArm::CountsRootlessDisksAsZero | WholeRingArm::CountsRootlessDisksAsZeroShortened | WholeRingArm::CountsRootlessDisksAsZeroWithTheOldCandidateFloor => {
                 WholeRingCeilingReading::DisksWithoutAValidRootCountAsZero
             }
             WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => WholeRingCeilingReading::DisksWithoutAValidRootCountAsZero,
@@ -155,31 +155,31 @@ impl WholeRingArm {
     }
     fn is_reclaim_window_shortened(self) -> bool {
         match self {
-            WholeRingArm::ReadingPShort | WholeRingArm::ReadingQShort => true,
+            WholeRingArm::SkipsRootlessDisksShortened | WholeRingArm::CountsRootlessDisksAsZeroShortened => true,
             WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => true,
-            WholeRingArm::ReadingP | WholeRingArm::ReadingQ | WholeRingArm::ReadingQWithTheOldCandidateFloor => false,
+            WholeRingArm::SkipsRootlessDisks | WholeRingArm::CountsRootlessDisksAsZero | WholeRingArm::CountsRootlessDisksAsZeroWithTheOldCandidateFloor => false,
             WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero => false,
         }
     }
     fn uses_the_clause_candidate_floor(self) -> bool {
         match self {
-            WholeRingArm::ReadingP | WholeRingArm::ReadingQ | WholeRingArm::ReadingPShort | WholeRingArm::ReadingQShort => true,
+            WholeRingArm::SkipsRootlessDisks | WholeRingArm::CountsRootlessDisksAsZero | WholeRingArm::SkipsRootlessDisksShortened | WholeRingArm::CountsRootlessDisksAsZeroShortened => true,
             WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero | WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => true,
-            WholeRingArm::ReadingQWithTheOldCandidateFloor => false,
+            WholeRingArm::CountsRootlessDisksAsZeroWithTheOldCandidateFloor => false,
         }
     }
     /// 第 3 次重跑：回收门槛照 `crates/singlefs-core/` 今天的写法取（CG-F、CG-P、CG-R 三处）。
     fn uses_the_core_gate(self) -> bool {
         match self {
             WholeRingArm::CoreGateCeilingSkipsRootlessDisks | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero | WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened | WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened => true,
-            WholeRingArm::ReadingP | WholeRingArm::ReadingQ | WholeRingArm::ReadingPShort | WholeRingArm::ReadingQShort | WholeRingArm::ReadingQWithTheOldCandidateFloor => false,
+            WholeRingArm::SkipsRootlessDisks | WholeRingArm::CountsRootlessDisksAsZero | WholeRingArm::SkipsRootlessDisksShortened | WholeRingArm::CountsRootlessDisksAsZeroShortened | WholeRingArm::CountsRootlessDisksAsZeroWithTheOldCandidateFloor => false,
         }
     }
 }
 
 /// RGall 一族进全部格的两条被测臂，与它们的阳性对照（只进 steady、S ∈ {4, 16}）。
-const WHOLE_RING_ARMS: [WholeRingArm; 2] = [WholeRingArm::ReadingP, WholeRingArm::ReadingQ];
-const WHOLE_RING_SHORT_ARMS: [WholeRingArm; 2] = [WholeRingArm::ReadingPShort, WholeRingArm::ReadingQShort];
+const WHOLE_RING_ARMS: [WholeRingArm; 2] = [WholeRingArm::SkipsRootlessDisks, WholeRingArm::CountsRootlessDisksAsZero];
+const WHOLE_RING_SHORT_ARMS: [WholeRingArm; 2] = [WholeRingArm::SkipsRootlessDisksShortened, WholeRingArm::CountsRootlessDisksAsZeroShortened];
 /// 第 3 次重跑的两条 CG 被测臂，与它们的阳性对照（进 steady、torn_newest、activation_faults，S ∈ {4, 16}）。
 const CORE_GATE_ARMS: [WholeRingArm; 2] = [WholeRingArm::CoreGateCeilingSkipsRootlessDisks, WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero];
 const CORE_GATE_SHORT_ARMS: [WholeRingArm; 2] = [WholeRingArm::CoreGateCeilingSkipsRootlessDisksShortened, WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZeroShortened];
@@ -2691,7 +2691,7 @@ struct LineNames {
     verdict_window: &'static str,
     /// 只有第 2 次重跑有的行；第 1 次的 `w_` 一族不出这几类，留空。
     disk_stuck: &'static str,
-    disk_stuck_h3: &'static str,
+    disk_stuck_reversed: &'static str,
     stuck_growth: &'static str,
     broken_slot_growth: &'static str,
     broken_slot_reversed_growth: &'static str,
@@ -2718,7 +2718,7 @@ const FIRST_RERUN_LINES: LineNames = LineNames {
     readings_diff_row: "w_readings_diff_row",
     verdict_window: "verdict_window",
     disk_stuck: "",
-    disk_stuck_h3: "",
+    disk_stuck_reversed: "",
     stuck_growth: "",
     broken_slot_growth: "",
     broken_slot_reversed_growth: "",
@@ -2743,7 +2743,7 @@ const SECOND_RERUN_LINES: LineNames = LineNames {
     readings_diff_row: "f_readings_diff_row",
     verdict_window: "verdict_f_window",
     disk_stuck: "f_disk_stuck",
-    disk_stuck_h3: "f_disk_stuck_h3",
+    disk_stuck_reversed: "f_disk_stuck_h3",
     stuck_growth: "f_stuck_growth",
     broken_slot_growth: "f_broken_slot_growth",
     broken_slot_reversed_growth: "f_broken_slot_h1_growth",
@@ -2769,7 +2769,7 @@ const CORE_GATE_LINES: LineNames = LineNames {
     readings_diff_row: "core_gate_readings_diff_row",
     verdict_window: "verdict_core_gate_window",
     disk_stuck: "core_gate_disk_stuck",
-    disk_stuck_h3: "core_gate_disk_stuck_h3",
+    disk_stuck_reversed: "core_gate_disk_stuck_h3",
     stuck_growth: "core_gate_stuck_growth",
     broken_slot_growth: "core_gate_broken_slot_growth",
     broken_slot_reversed_growth: "core_gate_broken_slot_h1_growth",
@@ -2830,8 +2830,8 @@ fn second_rerun_family() -> RowFamily {
         ring_lag_arm: Arm::ClauseFloorWindowed(WindowArm::RingLag),
         is_second_rerun: true,
         disk_stuck_arms: vec![
-            Arm::WholeRing(WholeRingArm::ReadingP),
-            Arm::WholeRing(WholeRingArm::ReadingQ),
+            Arm::WholeRing(WholeRingArm::SkipsRootlessDisks),
+            Arm::WholeRing(WholeRingArm::CountsRootlessDisksAsZero),
             Arm::ClauseFloorWindowed(WindowArm::Window),
             Arm::ClauseFloorWindowed(WindowArm::RingGate),
         ],
@@ -3318,7 +3318,7 @@ fn emit_window_crit1_rows(emitter: &mut Emitter, family: &RowFamily) -> (u64, Ve
 }
 
 fn is_original_sampling_row(row: &WindowRow, family: &RowFamily) -> bool {
-    row.line_name != family.lines.activation_reversed && row.line_name != family.lines.broken_slot_reversed && row.line_name != family.lines.disk_stuck_h3
+    row.line_name != family.lines.activation_reversed && row.line_name != family.lines.broken_slot_reversed && row.line_name != family.lines.disk_stuck_reversed
 }
 
 fn count_rows(rows: &[&WindowRow], predicate: impl Fn(&WindowRow) -> bool) -> usize {
@@ -3439,7 +3439,7 @@ fn emit_window_reading_verdicts(emitter: &mut Emitter, rows: &[WindowRow], famil
 fn emit_window_geometry_verdicts(emitter: &mut Emitter, rows: &[WindowRow], family: &RowFamily) {
     let mut points = vec![("h1", family.lines.broken_slot_reversed, family.lines.broken_slot), ("h2", family.lines.activation_reversed, family.lines.activation)];
     if family.is_second_rerun {
-        points.push(("h3", family.lines.disk_stuck_h3, family.lines.disk_stuck));
+        points.push(("h3", family.lines.disk_stuck_reversed, family.lines.disk_stuck));
     }
     for arm in family.arms.iter().copied() {
         for (point_name, reversed_line, original_line) in points.iter().copied() {
@@ -3650,7 +3650,7 @@ fn stuck_outcome_fields(total: &Metrics) -> String {
 fn emit_disk_stuck_rows(emitter: &mut Emitter, rows: &mut Vec<WindowRow>, growth: &mut Vec<StuckGrowthSummary>, family: &RowFamily) {
     let stuck_arms = family.disk_stuck_arms.clone();
     for stuck_disk in STUCK_DISKS {
-        let (line_name, world_class) = if stuck_disk == 1 { (family.lines.disk_stuck, DISK_STUCK_CLASS) } else { (family.lines.disk_stuck_h3, DISK_STUCK_REVERSED_CLASS) };
+        let (line_name, world_class) = if stuck_disk == 1 { (family.lines.disk_stuck, DISK_STUCK_CLASS) } else { (family.lines.disk_stuck_reversed, DISK_STUCK_REVERSED_CLASS) };
         for slots_per_region in FAULT_SLOTS_SWEEP {
             for arm in stuck_arms.iter().copied() {
                 for fill in STUCK_FILLS {
@@ -3899,22 +3899,22 @@ fn emit_nonzero_rows(emitter: &mut Emitter, rows: &[WindowRow], family: &RowFami
 
 /// 第六节第 14 行：RGall（读法 P）与 RGall_Q 逐行的三位判定比，另报某块幸存盘整环里一条有效根都没有的次数。返回判定不同的行数。
 fn emit_rgall_reading_verdicts(emitter: &mut Emitter, rows: &[WindowRow]) -> u64 {
-    let reading_p = Arm::WholeRing(WholeRingArm::ReadingP);
-    let reading_q = Arm::WholeRing(WholeRingArm::ReadingQ);
-    let reading_p_judgement_by_key: HashMap<(&str, &str), RowJudgement> = rows.iter()
-        .filter(|row| row.arm == reading_p)
+    let rootless_skipping_arm = Arm::WholeRing(WholeRingArm::SkipsRootlessDisks);
+    let rootless_zero_counting_arm = Arm::WholeRing(WholeRingArm::CountsRootlessDisksAsZero);
+    let rootless_skipping_judgement_by_key: HashMap<(&str, &str), RowJudgement> = rows.iter()
+        .filter(|row| row.arm == rootless_skipping_arm)
         .map(|row| ((row.line_name, row.row_key.as_str()), row.judgement)).collect();
     let mut compared = 0u64;
     let mut differing = 0u64;
-    for row in rows.iter().filter(|row| row.arm == reading_q) {
-        let Some(reading_p_judgement) = reading_p_judgement_by_key.get(&(row.line_name, row.row_key.as_str())) else {
+    for row in rows.iter().filter(|row| row.arm == rootless_zero_counting_arm) {
+        let Some(rootless_skipping_judgement) = rootless_skipping_judgement_by_key.get(&(row.line_name, row.row_key.as_str())) else {
             continue;
         };
         compared += 1;
-        if *reading_p_judgement != row.judgement {
+        if *rootless_skipping_judgement != row.judgement {
             differing += 1;
             println!("{}", emitter.emit_raw(&format!(
-                "name=f_rgall_readings_diff_row line={} {} reading_p={} reading_q={}", row.line_name, row.row_key, judgement_text(reading_p_judgement), judgement_text(&row.judgement)
+                "name=f_rgall_readings_diff_row line={} {} reading_p={} reading_q={}", row.line_name, row.row_key, judgement_text(rootless_skipping_judgement), judgement_text(&row.judgement)
             )));
         }
     }
@@ -3922,7 +3922,7 @@ fn emit_rgall_reading_verdicts(emitter: &mut Emitter, rows: &[WindowRow]) -> u64
     println!("{}", emitter.emit_raw(&format!(
         "name=verdict_f_rgall_readings rows_compared={compared} rows_with_a_judgement_different_between_p_and_q={differing} \
          disk_without_valid_root_events_p={} disk_without_valid_root_events_q={}",
-        events_of(reading_p), events_of(reading_q)
+        events_of(rootless_skipping_arm), events_of(rootless_zero_counting_arm)
     )));
     differing
 }
@@ -4122,7 +4122,7 @@ fn emit_second_rerun_verdict_lines(
     let readings_differing = emit_rgall_reading_verdicts(emitter, &rows);
     emit_cost_verdicts(emitter, &rows, family);
     let (window_unbounded_in_disk_stuck, whole_ring_unbounded_in_broken_slot) = emit_growth_verdicts(emitter, &growth);
-    let h3_differing = emit_growth_pairing(emitter, "h3", &growth,
+    let stuck_disk_reversal_differing = emit_growth_pairing(emitter, "h3", &growth,
         |summary| summary.line_name == family.lines.stuck_growth && summary.row_key.contains("stuck_disk=1"),
         |summary| summary.line_name == family.lines.stuck_growth && summary.row_key.contains("stuck_disk=0"),
         |summary| row_key_without_the_field(&summary.row_key, "stuck_disk="));
@@ -4130,14 +4130,14 @@ fn emit_second_rerun_verdict_lines(
         |summary| summary.line_name == family.lines.stuck_growth && summary.row_key.contains("fill=0.30"),
         |summary| summary.line_name == family.lines.stuck_growth && summary.row_key.contains("fill=0.70"),
         |summary| row_key_without_the_field(&summary.row_key, "fill="));
-    let h1_differing = emit_growth_pairing(emitter, "h1", &growth,
+    let broken_slot_reversal_differing = emit_growth_pairing(emitter, "h1", &growth,
         |summary| summary.line_name == family.lines.broken_slot_growth,
         |summary| summary.line_name == family.lines.broken_slot_reversed_growth,
         |summary| summary.row_key.clone());
     let stuck_fill_judgement_differing = emit_stuck_fill_verdicts(emitter, &rows);
     let stale_rows_outside_the_stuck_worlds = emit_stale_verdicts(emitter, &rows, family);
     let window_arm_rows_with_a_nonzero_extra_pinned = count_window_arm_rows_with_a_nonzero_extra_pinned(&rows);
-    let is_rgall_short = |arm: Arm| matches!(arm, Arm::WholeRing(WholeRingArm::ReadingPShort | WholeRingArm::ReadingQShort));
+    let is_rgall_short = |arm: Arm| matches!(arm, Arm::WholeRing(WholeRingArm::SkipsRootlessDisksShortened | WholeRingArm::CountsRootlessDisksAsZeroShortened));
     let rgall_short_rows_with_zero_fakes = rows.iter().filter(|row| is_rgall_short(row.arm) && !row.judgement.has_fake_candidates).count();
     let rgall_rows: Vec<&WindowRow> = rows.iter().filter(|row| WHOLE_RING_ARMS.iter().any(|whole_ring_arm| row.arm == Arm::WholeRing(*whole_ring_arm))).collect();
     let rgall_false_enospc_outside_the_judged_range = rgall_rows.iter().filter(|row| {
@@ -4150,7 +4150,7 @@ fn emit_second_rerun_verdict_lines(
     println!("{}", emitter.emit_raw(&format!(
         "name=verdict_f_clauses f1_cf_never_reached={} f3_rgall_short_rows_where_the_detector_saw_zero_fake_candidates={rgall_short_rows_with_zero_fakes} \
          f4_window_arm_unbounded_disk_stuck_rows={window_unbounded_in_disk_stuck} f5_rgall_rows_with_different_readings={readings_differing} \
-         f7_growth_rows_with_a_different_bound_h3={h3_differing} f7_growth_rows_with_a_different_bound_fill={fill_differing} f7_growth_rows_with_a_different_bound_h1={h1_differing} \
+         f7_growth_rows_with_a_different_bound_h3={stuck_disk_reversal_differing} f7_growth_rows_with_a_different_bound_fill={fill_differing} f7_growth_rows_with_a_different_bound_h1={broken_slot_reversal_differing} \
          f7_stuck_rows_with_a_different_judgement_between_fills={stuck_fill_judgement_differing} \
          f8_rgall_false_enospc_rows_outside_the_judged_range={rgall_false_enospc_outside_the_judged_range} f9_rgall_rows_with_fakes_unrecoverable_or_judged_false_enospc={rgall_rows_not_zero} \
          f10_rows_outside_the_stuck_worlds_with_a_root_beyond_two_revolutions={stale_rows_outside_the_stuck_worlds} f11_rgall_broken_slot_unbounded_rows={whole_ring_unbounded_in_broken_slot} \
@@ -5327,7 +5327,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k1_window_is_txg_greater_than_anchor_minus_ring_length() {
+    fn window_is_txg_greater_than_anchor_minus_ring_length() {
         let lowest_inside = (0..=35u64).find(|txg| txg_is_inside_window(*txg, 35, REGION_COUNT * 8)).expect("窗口里有 txg");
         let highest_outside = (0..=35u64).filter(|txg| !txg_is_inside_window(*txg, 35, REGION_COUNT * 8)).max().expect("窗口外有 txg");
         assert_eq!((lowest_inside, highest_outside), (12, 11), "anchor1 window lowest in = 12 highest out = 11");
@@ -5338,7 +5338,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k2_window_arms_keep_the_tightened_states_bound_reserve_and_residue() {
+    fn window_arms_keep_the_tightened_states_bound_reserve_and_residue() {
         for window_arm in WINDOW_ARMS.iter().chain(WINDOW_SHORT_ARMS.iter()) {
             let arm = Arm::TightenedStatesWindowed(*window_arm);
             assert_eq!(arm.publication_bound(12), 4 + 4, "{} B = 4 + 2 × k_tol = 8", window_arm.name());
@@ -5348,7 +5348,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k3_ring_has_nine_outside_the_window_and_the_two_gates_differ_by_two() {
+    fn ring_has_nine_outside_the_window_and_the_two_gates_differ_by_two() {
         for (window_arm, expected_gate) in [(WindowArm::Window, 11u64), (WindowArm::DiskHold, 11), (WindowArm::RingLag, 11), (WindowArm::RingGate, 9)] {
             let mut simulation = anchor_two_state(window_arm, false);
             assert_eq!(sorted_ring_txgs(&simulation), vec![9, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22], "{} anchor2 ring", window_arm.name());
@@ -5366,7 +5366,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k4_root_nine_outside_the_window_is_not_a_fake_candidate_but_would_be_without_the_window() {
+    fn root_nine_outside_the_window_is_not_a_fake_candidate_but_would_be_without_the_window() {
         for window_arm in WINDOW_ARMS {
             let mut simulation = anchor_two_state(window_arm, false);
             simulation.damaged_txgs.clear();
@@ -5379,7 +5379,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k5_ceiling_readings_p_and_q_and_the_two_lag_bound_readings_differ_on_the_skipped_disk() {
+    fn ceiling_readings_skipping_and_zero_counting_and_the_two_lag_bound_readings_differ_on_the_skipped_disk() {
         let simulation = anchor_three_state(WindowArm::Window, false);
         let ring_by_slot: Vec<Option<u64>> = simulation.ring.iter().map(|root| root.map(|record| record.txg)).collect();
         assert_eq!(ring_by_slot, vec![Some(9), Some(4), Some(8)], "anchor3 ring = {{0: 9, 1: 4, 2: 8}}");
@@ -5391,7 +5391,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k6_window_arms_in_steady_use_three_or_four_publications_and_lag_three_windows() {
+    fn window_arms_in_steady_use_three_or_four_publications_and_lag_three_windows() {
         for window_arm in WINDOW_ARMS {
             for (slots_per_region, cost, publications, maximum, pinned, lag) in [
                 (1u64, 1u64, vec![3u64], 3u64, 6u64, 0u64),
@@ -5413,7 +5413,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k7_gate_difference_counter_reads_two_on_the_anchor_two_state_and_zero_in_steady() {
+    fn gate_difference_counter_reads_two_on_the_anchor_two_state_and_zero_in_steady() {
         for (window_arm, expected_difference) in [(WindowArm::Window, 2i64), (WindowArm::RingGate, 0)] {
             let mut simulation = anchor_two_state(window_arm, false);
             simulation.metrics = Metrics::fresh();
@@ -5432,7 +5432,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k8_window_boundary_is_strict_the_hole_left_by_a_failed_write_keeps_generation_zero_outside() {
+    fn window_boundary_is_strict_the_hole_left_by_a_failed_write_keeps_generation_zero_outside() {
         let mut simulation = window_simulation(WindowArm::Window, 4, false);
         publish_creating_windows_up_to(&mut simulation, 12, Some(5));
         assert_eq!(sorted_ring_txgs(&simulation), vec![0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12], "anchor8 ring");
@@ -5443,7 +5443,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k9_shortened_window_gate_is_fourteen_on_the_anchor_two_state() {
+    fn shortened_window_gate_is_fourteen_on_the_anchor_two_state() {
         let simulation = anchor_two_state(WindowArm::WindowShort, false);
         assert_eq!(simulation.oldest_valid_txg_in_the_reclaim_window(simulation.ring_depth - REGION_COUNT), Some(14), "anchor9 short-window oldest = 14");
         assert_eq!(simulation.reuse_bound(), 14, "缩短一行的窗口：回收门槛 14");
@@ -5489,7 +5489,7 @@ mod window_tests {
     }
 
     #[test]
-    fn k5_ceiling_difference_counter_reads_the_two_readings_against_the_whole_ring_ceiling() {
+    fn ceiling_difference_counter_reads_the_two_readings_against_the_whole_ring_ceiling() {
         for (window_arm, expected_difference) in [(WindowArm::Window, 4i64), (WindowArm::DiskHold, -4)] {
             let mut simulation = anchor_three_state(window_arm, false);
             simulation.metrics = Metrics::fresh();
@@ -5534,8 +5534,8 @@ mod second_rerun_tests {
 
     const CLAUSE_WINDOW_ARM: Arm = Arm::ClauseFloorWindowed(WindowArm::Window);
     const CLAUSE_RING_GATE_ARM: Arm = Arm::ClauseFloorWindowed(WindowArm::RingGate);
-    const WHOLE_RING_READING_P_ARM: Arm = Arm::WholeRing(WholeRingArm::ReadingP);
-    const WHOLE_RING_READING_Q_ARM: Arm = Arm::WholeRing(WholeRingArm::ReadingQ);
+    const WHOLE_RING_ROOTLESS_SKIPPING_ARM: Arm = Arm::WholeRing(WholeRingArm::SkipsRootlessDisks);
+    const WHOLE_RING_ROOTLESS_ZERO_COUNTING_ARM: Arm = Arm::WholeRing(WholeRingArm::CountsRootlessDisksAsZero);
 
     fn simulation_with(arm: Arm, slots_per_region: u64, fill: f64, keep_snapshots: bool) -> Simulation {
         let mut simulation = Simulation::new(arm, slots_per_region, 1, 5, 1, keep_snapshots, None);
@@ -5586,7 +5586,7 @@ mod second_rerun_tests {
     }
 
     /// 锚 K10：S = 4，占用 0.70，10 个删建窗口（txg 1..10，不盘紧）；直接抬 F 到 6（系统配置记 6）；第 11 个窗口的根撕裂、崩溃恢复；恢复之后 `damaged_txgs` 设成 {2, 3}。
-    fn k10_state(arm: Arm) -> Simulation {
+    fn state_with_the_system_configuration_floor_raised_to_six(arm: Arm) -> Simulation {
         let mut simulation = simulation_with(arm, 4, STEADY_FILL, true);
         run_delete_create_windows(&mut simulation, 10);
         simulation.raise_floor_to(6);
@@ -5608,9 +5608,9 @@ mod second_rerun_tests {
 
     /// 变异 MF1–MF5、MC3 的取样点：根上带的 F 都是 0、系统配置里是 6（`raise_floor_to` 记下的），撕裂的根在恢复之后不自证。
     #[test]
-    fn k10_system_configuration_floor_six_above_root_floors_zero_lifts_the_candidate_floor_and_the_rollback_target() {
-        for arm in [CLAUSE_WINDOW_ARM, WHOLE_RING_READING_P_ARM, WHOLE_RING_READING_Q_ARM] {
-            let simulation = k10_state(arm);
+    fn system_configuration_floor_six_above_root_floors_zero_lifts_the_candidate_floor_and_the_rollback_target() {
+        for arm in [CLAUSE_WINDOW_ARM, WHOLE_RING_ROOTLESS_SKIPPING_ARM, WHOLE_RING_ROOTLESS_ZERO_COUNTING_ARM] {
+            let simulation = state_with_the_system_configuration_floor_raised_to_six(arm);
             assert_eq!(simulation.slot_index(11), 11, "{} K10 torn_slot = 11", arm.name());
             assert_eq!(sorted_valid_txgs(&simulation), (0..=10).collect::<Vec<u64>>(), "{} K10 valid = [0..10]", arm.name());
             assert_eq!((simulation.floor_carried, simulation.floor_active), (0, 0), "{} 差异 ③ 不动：恢复之后 floor_carried、floor_active 取各根所带的 F，仍是 0", arm.name());
@@ -5637,8 +5637,8 @@ mod second_rerun_tests {
 
     /// 同一状态上旧候选下界的臂（开关关着）逐次相同：候选下界仍是 0。
     #[test]
-    fn k10_the_old_candidate_floor_arm_does_not_see_the_system_configuration_floor() {
-        let simulation = k10_state(Arm::TightenedStatesWindowed(WindowArm::Window));
+    fn old_candidate_floor_arm_does_not_see_the_system_configuration_floor() {
+        let simulation = state_with_the_system_configuration_floor_raised_to_six(Arm::TightenedStatesWindowed(WindowArm::Window));
         assert_eq!(simulation.system_configuration_floor, 6, "开关开不开都记系统配置 F");
         assert_eq!(simulation.candidate_floor(), 0, "开关关着：候选下界仍是旧的 0");
         let (fakes, candidates, _, _) = simulation.count_fake_candidates();
@@ -5648,8 +5648,8 @@ mod second_rerun_tests {
 
     /// 变异 MR1、MR2、MC1 的取样点：第 1 次 K3 的构造上 RGall 的门槛取整环（9）、候选集不滤窗口（12 个）、上限 18；窗口那一族是 11 / 11。
     #[test]
-    fn k11_rgall_gate_is_nine_and_candidates_twelve_where_the_window_arm_has_gate_eleven_and_candidates_eleven() {
-        let rgall = anchor_two_state(WHOLE_RING_READING_P_ARM, false);
+    fn rgall_gate_is_nine_and_candidates_twelve_where_the_window_arm_has_gate_eleven_and_candidates_eleven() {
+        let rgall = anchor_two_state(WHOLE_RING_ROOTLESS_SKIPPING_ARM, false);
         let window = anchor_two_state(CLAUSE_WINDOW_ARM, false);
         let mut expected_ring: Vec<u64> = vec![9];
         expected_ring.extend(11..=20);
@@ -5662,13 +5662,13 @@ mod second_rerun_tests {
         assert_eq!((rgall.count_fake_candidates().1, window.count_fake_candidates().1), (12, 11), "K11 rgall_candidates = 12 window_candidates = 11");
         assert_eq!(rgall.floor_upper_limit(), 18, "K11 rgall_ceiling = min(盘 0 最新 20, 盘 1 最新 22, 第 4 新的非空 18)");
         assert_eq!(rgall.slots_holding_a_valid_root_outside_the_window(), 1, "K11 holes (slots outside window) = 1");
-        for (arm, mut simulation) in [(WHOLE_RING_READING_P_ARM, rgall), (CLAUSE_WINDOW_ARM, window)] {
+        for (arm, mut simulation) in [(WHOLE_RING_ROOTLESS_SKIPPING_ARM, rgall), (CLAUSE_WINDOW_ARM, window)] {
             let extra_pinned_before = simulation.extra_pinned_blocks_against_the_window_gate();
             // 释放代 10、11 各放一块已释放块：落在 (9, 11] 里，整环门槛扣住、窗口门槛放得回
             simulation.pool.blocks[0] = BlockState::Freed { allocated_at: 1, freed_at: 10 };
             simulation.pool.blocks[1] = BlockState::Freed { allocated_at: 1, freed_at: 11 };
             let extra_pinned_after = simulation.extra_pinned_blocks_against_the_window_gate();
-            if arm == WHOLE_RING_READING_P_ARM {
+            if arm == WHOLE_RING_ROOTLESS_SKIPPING_ARM {
                 assert_eq!((extra_pinned_before, extra_pinned_after), (10, 10 + 2), "RGall：释放代 10、11 的元数据各 5 块加手放的 2 块，x = 12，h = 1");
             } else {
                 assert_eq!((extra_pinned_before, extra_pinned_after), (0, 0), "V8：窗口那一族的回收门槛就是窗口门槛，x 恒 0");
@@ -5679,7 +5679,7 @@ mod second_rerun_tests {
     /// 变异 MR3、MR4 的取样点：第 1 次 K5 的构造（S = 1，txg 1..9，7 写失败）上 RGall 的上限与滞后量下界取整环（4），窗口读法是 8。
     #[test]
     fn k5r_rgall_ceiling_and_lag_bound_read_the_whole_ring() {
-        for arm in [WHOLE_RING_READING_P_ARM, WHOLE_RING_READING_Q_ARM] {
+        for arm in [WHOLE_RING_ROOTLESS_SKIPPING_ARM, WHOLE_RING_ROOTLESS_ZERO_COUNTING_ARM] {
             let simulation = anchor_three_state(arm);
             assert_eq!(simulation.floor_upper_limit(), 4, "{} K5r rgall_ceiling = 4（窗口读法 P 是 8）", arm.name());
             assert_eq!(simulation.lag_bound_txg(), 4, "{} K5r rgall_lag_bound = 4（读法 a 是 8）", arm.name());
@@ -5690,8 +5690,8 @@ mod second_rerun_tests {
 
     /// 变异 MR5 的取样点：S = 1，txg 1..5 全部非空，管理员回退到候选集里最旧的根 3；盘 1 一条有效根都没有：读法 P 上限 3、读法 Q 上限 0。
     #[test]
-    fn k12_rgall_reading_p_skips_the_disk_without_a_valid_root_and_reading_q_counts_it_as_zero() {
-        for (arm, expected_ceiling) in [(WHOLE_RING_READING_P_ARM, 3u64), (WHOLE_RING_READING_Q_ARM, 0)] {
+    fn rgall_skipping_reading_skips_the_disk_without_a_valid_root_and_zero_counting_reading_counts_it_as_zero() {
+        for (arm, expected_ceiling) in [(WHOLE_RING_ROOTLESS_SKIPPING_ARM, 3u64), (WHOLE_RING_ROOTLESS_ZERO_COUNTING_ARM, 0)] {
             let mut simulation = simulation_with(arm, 1, STEADY_FILL, true);
             publish_creating_windows_up_to(&mut simulation, 5, None);
             let ring_by_slot: Vec<Option<u64>> = simulation.ring.iter().map(|root| root.map(|record| record.txg)).collect();
@@ -5713,7 +5713,7 @@ mod second_rerun_tests {
             let simulation = anchor_two_state(Arm::WholeRing(whole_ring_arm), false);
             assert_eq!(simulation.reuse_bound(), 14, "{} K9r rgall_short_gate = 14", whole_ring_arm.name());
         }
-        assert_eq!(anchor_two_state(WHOLE_RING_READING_P_ARM, false).reuse_bound(), 9, "对照：RGall 整环门槛 9");
+        assert_eq!(anchor_two_state(WHOLE_RING_ROOTLESS_SKIPPING_ARM, false).reuse_bound(), 9, "对照：RGall 整环门槛 9");
     }
 
     /// K6r：steady 里从稳态点触发一次完整处置，RGall 两条臂各 3 或 4 次发布、扣住最多 5 + 2c、滞后量正好 39；S = 1 时 3 次。
@@ -5748,9 +5748,9 @@ mod second_rerun_tests {
 
     /// 变异 MS1、MS2、MC1、MC2 的取样点：S = 4，占用 0.30，盘 1 从第一个窗口起卡住（区域 1 的槽写不进去），不盘紧；每个窗口放掉 13 块。
     #[test]
-    fn k13_disk_one_stuck_rgall_pins_thirteen_blocks_per_window_and_the_window_arm_stays_at_ninety_one() {
+    fn disk_one_stuck_rgall_pins_thirteen_blocks_per_window_and_the_window_arm_stays_at_ninety_one() {
         for (windows, newest_txg, window_gate, rgall_pinned, window_pinned) in [(8u64, 12u64, 2u64, 104u64, 91u64), (16, 24, 14, 208, 91), (32, 48, 38, 416, 91)] {
-            let mut rgall = stuck_from_the_first_window(WHOLE_RING_READING_P_ARM, 1, 0.30);
+            let mut rgall = stuck_from_the_first_window(WHOLE_RING_ROOTLESS_SKIPPING_ARM, 1, 0.30);
             let mut window = stuck_from_the_first_window(CLAUSE_WINDOW_ARM, 1, 0.30);
             let mut ring_gate = stuck_from_the_first_window(CLAUSE_RING_GATE_ARM, 1, 0.30);
             for simulation in [&mut rgall, &mut window, &mut ring_gate] {
@@ -5761,7 +5761,7 @@ mod second_rerun_tests {
             assert_eq!((rgall.reuse_bound(), window.reuse_bound(), ring_gate.reuse_bound()), (0, window_gate, 0), "K13 w = {windows}：RGall 门槛 0、窗口门槛 {window_gate}");
             assert_eq!((rgall.pinned_count(), window.pinned_count(), ring_gate.pinned_count()), (rgall_pinned, window_pinned, rgall_pinned), "K13 w = {windows}：扣住的块数");
         }
-        let mut rgall = stuck_from_the_first_window(WHOLE_RING_READING_P_ARM, 1, 0.30);
+        let mut rgall = stuck_from_the_first_window(WHOLE_RING_ROOTLESS_SKIPPING_ARM, 1, 0.30);
         let mut window = stuck_from_the_first_window(CLAUSE_WINDOW_ARM, 1, 0.30);
         let mut ring_gate = stuck_from_the_first_window(CLAUSE_RING_GATE_ARM, 1, 0.30);
         for simulation in [&mut rgall, &mut window, &mut ring_gate] {
@@ -5775,8 +5775,8 @@ mod second_rerun_tests {
 
     /// 刻度（T₀ = 1）k = 1、2、4 在第 9、17、33 个窗口；RGall 117 / 221 / 429，窗口臂 91 / 91 / 91；s(2→4) RGall = 208 / 208 = 1，窗口臂 = 0。
     #[test]
-    fn k13_marks_at_one_two_and_four_revolutions_give_slope_one_for_rgall_and_zero_for_the_window_arm() {
-        for (arm, expected_pinned, expected_increase_two_to_four) in [(WHOLE_RING_READING_P_ARM, [117u64, 221, 429], 208i64), (CLAUSE_WINDOW_ARM, [91, 91, 91], 0)] {
+    fn marks_at_one_two_and_four_revolutions_give_slope_one_for_rgall_and_zero_for_the_window_arm() {
+        for (arm, expected_pinned, expected_increase_two_to_four) in [(WHOLE_RING_ROOTLESS_SKIPPING_ARM, [117u64, 221, 429], 208i64), (CLAUSE_WINDOW_ARM, [91, 91, 91], 0)] {
             let mut simulation = stuck_from_the_first_window(arm, 1, 0.30);
             let mut windows_at_mark: [Option<u64>; 3] = [None; 3];
             for window in 1..=40u64 {
@@ -5798,7 +5798,7 @@ mod second_rerun_tests {
 
     /// 判别力自证：门槛 1/2 落在两个点（s = 1 与 s = 0）之间；挪到 0 与 1 之外任一侧，两个点由分开变成同判。
     #[test]
-    fn k13_bounded_threshold_one_half_separates_the_two_slopes_and_moving_it_outside_zero_to_one_makes_them_agree() {
+    fn bounded_threshold_one_half_separates_the_two_slopes_and_moving_it_outside_zero_to_one_makes_them_agree() {
         let rgall_slope = (208i64, 208i64);
         let window_slope = (0i64, 208i64);
         let is_below = |numerator: i64, denominator: i64, slope: (i64, i64)| slope.0 * denominator < slope.1 * numerator;
@@ -5812,9 +5812,9 @@ mod second_rerun_tests {
 
     /// 变异 MS2 的取样点：盘 0 卡住（H3，区域 0 与 2）。
     #[test]
-    fn k14_disk_zero_stuck_rgall_pins_thirteen_blocks_per_window_and_the_window_arm_stays_at_thirty_nine() {
+    fn disk_zero_stuck_rgall_pins_thirteen_blocks_per_window_and_the_window_arm_stays_at_thirty_nine() {
         for (windows, newest_txg, window_gate, rgall_pinned, window_pinned, hole_slots) in [(4u64, 10u64, 0u64, 52u64, 52u64, 0u64), (8, 22, 13, 104, 39, 8), (16, 46, 37, 208, 39, 8)] {
-            let mut rgall = stuck_from_the_first_window(WHOLE_RING_READING_P_ARM, 0, 0.30);
+            let mut rgall = stuck_from_the_first_window(WHOLE_RING_ROOTLESS_SKIPPING_ARM, 0, 0.30);
             let mut window = stuck_from_the_first_window(CLAUSE_WINDOW_ARM, 0, 0.30);
             for simulation in [&mut rgall, &mut window] {
                 run_delete_create_windows(simulation, windows);
@@ -5839,7 +5839,7 @@ mod second_rerun_tests {
 
     /// 检查本身分得出差别：两条确实不同的臂（臂 A 与 G2S）在 steady 里的签名不同。
     #[test]
-    fn k15_the_signature_tells_two_different_arms_apart() {
+    fn signature_tells_two_different_arms_apart() {
         let ring = core_metrics_signature(&run_world(Arm::RingPersisted, World::Steady, 4, 0, 0));
         let states = core_metrics_signature(&run_world(Arm::TightenedStates, World::Steady, 4, 0, 0));
         assert_ne!(ring, states, "臂 A 与 G2S 的 Metrics 字段不同，签名要看得出来");
@@ -5847,9 +5847,9 @@ mod second_rerun_tests {
 
     /// K15 等价留档：候选下界取旧式的 RGall_Q 与原 G2S 逐处同式（回收门槛、候选集、上限、处置目标、滞后量都取整环、读法 Q），`Metrics` 除轨迹之外每个字段逐个相等。
     #[test]
-    fn k15_rgall_reading_q_with_the_old_candidate_floor_agrees_with_the_original_states_arm_in_every_field_except_the_trajectory() {
+    fn rgall_zero_counting_reading_with_the_old_candidate_floor_agrees_with_the_original_states_arm_in_every_field_except_the_trajectory() {
         let original = Arm::TightenedStates;
-        let whole_ring = Arm::WholeRing(WholeRingArm::ReadingQWithTheOldCandidateFloor);
+        let whole_ring = Arm::WholeRing(WholeRingArm::CountsRootlessDisksAsZeroWithTheOldCandidateFloor);
         for world in WORLDS {
             for slots_per_region in SLOTS_PER_REGION_SWEEP {
                 let lost_disks: &[usize] = if world == World::DiskLoss { &[0, 1] } else { &[0] };
@@ -5886,10 +5886,10 @@ mod second_rerun_tests {
 
     /// K16：条款形下界的臂在各个世界里每次 `record_check`，系统配置 F ≥ 根上带的 F（「先写后抬」在装置里的不变量）；条款形候选集从不大于旧候选集的反面（V6）。
     #[test]
-    fn k16_the_system_configuration_floor_never_falls_below_the_root_floors_and_the_clause_candidate_set_is_never_larger() {
+    fn system_configuration_floor_never_falls_below_the_root_floors_and_the_clause_candidate_set_is_never_larger() {
         let clause_arms = [
             CLAUSE_WINDOW_ARM, Arm::ClauseFloorWindowed(WindowArm::DiskHold), Arm::ClauseFloorWindowed(WindowArm::RingLag), CLAUSE_RING_GATE_ARM,
-            WHOLE_RING_READING_P_ARM, WHOLE_RING_READING_Q_ARM,
+            WHOLE_RING_ROOTLESS_SKIPPING_ARM, WHOLE_RING_ROOTLESS_ZERO_COUNTING_ARM,
         ];
         let mut gap_samples_seen = 0u64;
         for arm in clause_arms {
@@ -5924,7 +5924,7 @@ mod second_rerun_tests {
     /// 路径跑到了（阴性结果要能与「代码没跑到」分开）：`disk_stuck` 的卡住段在低占用上三个刻度都走到、写失败真的注入过；三种收尾都做了一次恢复。
     #[test]
     fn disk_stuck_segment_reaches_the_three_marks_and_every_ending_runs_one_recovery() {
-        let stuck_end = disk_stuck_segment(WHOLE_RING_READING_P_ARM, 4, 1, 0.30, 0);
+        let stuck_end = disk_stuck_segment(WHOLE_RING_ROOTLESS_SKIPPING_ARM, 4, 1, 0.30, 0);
         assert!(stuck_end.metrics.second_rerun.marks.iter().all(|mark| mark.is_some()), "占用 0.30、S = 4：三个刻度都走到");
         assert!(stuck_end.metrics.root_write_failures_injected > 0, "卡住的盘上的槽真的被写过、写失败了");
         assert_eq!(stuck_end.stuck_disk, Some(1));
@@ -5970,8 +5970,8 @@ mod second_rerun_tests {
             }
         }
         assert_eq!((first_rows.len(), rows.len()), (8, 12), "第 1 次一族 4 条臂 × 2 个世界，第 2 次一族 6 条臂 × 2 个世界");
-        let seed_marks: Vec<[Option<StuckMark>; 3]> = (0..2u64).map(|seed| disk_stuck_segment(WHOLE_RING_READING_P_ARM, 4, 1, 0.30, seed).metrics.second_rerun.marks).collect();
-        let growth = vec![emit_stuck_growth_row(&mut emitter, second_family.lines.stuck_growth, WHOLE_RING_READING_P_ARM, "s=4 stuck_disk=1 fill=0.30", &seed_marks)];
+        let seed_marks: Vec<[Option<StuckMark>; 3]> = (0..2u64).map(|seed| disk_stuck_segment(WHOLE_RING_ROOTLESS_SKIPPING_ARM, 4, 1, 0.30, seed).metrics.second_rerun.marks).collect();
+        let growth = vec![emit_stuck_growth_row(&mut emitter, second_family.lines.stuck_growth, WHOLE_RING_ROOTLESS_SKIPPING_ARM, "s=4 stuck_disk=1 fill=0.30", &seed_marks)];
         assert_eq!(growth[0].bound, StuckBound::Unbounded, "RGall 在占用 0.30、盘 1 卡住时 s(2→4) = 1，判没有上界");
         emit_second_rerun_verdict_lines(&mut emitter, &second_family, &first_rows, &[], &rows, &growth, &[]);
     }
@@ -5980,7 +5980,7 @@ mod second_rerun_tests {
     /// 耗时，在默认那一趟里跑（慢的交统一任务服务，按单元键复用）。
     #[test]
     fn disk_stuck_world_runs_every_combination_without_panicking() {
-        for arm in [WHOLE_RING_READING_P_ARM, WHOLE_RING_READING_Q_ARM, CLAUSE_WINDOW_ARM, CLAUSE_RING_GATE_ARM] {
+        for arm in [WHOLE_RING_ROOTLESS_SKIPPING_ARM, WHOLE_RING_ROOTLESS_ZERO_COUNTING_ARM, CLAUSE_WINDOW_ARM, CLAUSE_RING_GATE_ARM] {
             for slots_per_region in FAULT_SLOTS_SWEEP {
                 for stuck_disk in STUCK_DISKS {
                     for fill in STUCK_FILLS {
@@ -6005,8 +6005,8 @@ mod core_gate_tests {
 
     const CORE_GATE_SKIPPING_ARM: Arm = Arm::WholeRing(WholeRingArm::CoreGateCeilingSkipsRootlessDisks);
     const CORE_GATE_ZERO_COUNTING_ARM: Arm = Arm::WholeRing(WholeRingArm::CoreGateCeilingCountsRootlessDisksAsZero);
-    const WHOLE_RING_SKIPPING_ARM: Arm = Arm::WholeRing(WholeRingArm::ReadingP);
-    const WHOLE_RING_ZERO_COUNTING_ARM: Arm = Arm::WholeRing(WholeRingArm::ReadingQ);
+    const WHOLE_RING_SKIPPING_ARM: Arm = Arm::WholeRing(WholeRingArm::SkipsRootlessDisks);
+    const WHOLE_RING_ZERO_COUNTING_ARM: Arm = Arm::WholeRing(WholeRingArm::CountsRootlessDisksAsZero);
     /// 两条 CG 被测臂各与同读法的 RGall 臂成对（锚对两条臂各做一遍）。
     const TESTED_PAIRS: [(Arm, Arm); 2] = [(CORE_GATE_SKIPPING_ARM, WHOLE_RING_SKIPPING_ARM), (CORE_GATE_ZERO_COUNTING_ARM, WHOLE_RING_ZERO_COUNTING_ARM)];
 

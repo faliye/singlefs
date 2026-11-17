@@ -523,7 +523,7 @@ mod tests {
 
     /// B7：头 487 时的余数（25，D23 已定项 4「4096 上余 3609」）——分得开同一档里
     /// 487 与 488 两个头宽的一条。写成加法，不写减法：减法在变异把常量改大时会编译期溢出
-    /// （`.claude/singlefs-ai-sop/rules/test-discipline.md`「常量断言写加法，别写减法」）。
+    /// （`.claude/rules/test-discipline.md`「常量断言写加法，别写减法」）。
     #[test]
     fn named_entries_per_record_remainder_matches_head_487() {
         assert_eq!(JOURNAL_HEADER_BYTES + JOURNAL_NAMED_ENTRIES_PER_RECORD * JOURNAL_NAMED_ENTRY_BYTES + 25, JOURNAL_RECORD_BYTES);

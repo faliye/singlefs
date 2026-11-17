@@ -229,19 +229,17 @@ pub fn read_archived_products_or_exit_not_run(device_name: &str, paths: &[&str])
     texts
 }
 
-/// E175 的装置源码：research 工作区不编它，`replay.sh` 的 `driver_e175` 把它拷进仓副本的 `crates/singlefs-verification/tests/` 编、按名字起一条用例。
-/// 这里钉住驱动依赖它的那几样（用例名、没有任何用例标 `#[ignore]`、驱动设的几个环境变量），源码改了名字驱动就起不来，这一条先红。
+/// E175 的装置是验证包的 bin（`crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs`），
+/// `replay.sh` 的 `driver_e175` 用环境变量把臂、族、结果文件和线程数交给它。
+/// 这里钉住驱动设的那几个变量名，bin 里改了名字驱动就起不来，这一条先红。
 #[cfg(test)]
-mod e175_device_source_tests {
-    const DEVICE_SOURCE: &str = include_str!("e175_product_path_inode_watermark_regression/device-source.rs");
+mod e175_bin_tests {
+    const BIN_SOURCE: &str = include_str!("../../crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs");
 
     #[test]
-    fn the_e175_device_source_has_no_ignored_case_and_carries_the_variables_the_replay_driver_uses() {
-        let case = "fn run_one_family_on_one_arm_into_the_result_file()";
-        assert!(DEVICE_SOURCE.contains(case), "装置源码里要有 driver_e175 按 --exact 起的那条用例");
-        assert!(!DEVICE_SOURCE.lines().any(|line| line.trim_start().starts_with("#[ignore")), "装置源码里的用例都在默认那一趟里跑，不标 #[ignore]");
-        for variable in ["E175_ARM", "E175_FAMILY", "E175_RESULT_FILE", "E175_WORKER_THREADS", "E175_TIME_BUDGET_SECONDS"] {
-            assert!(DEVICE_SOURCE.contains(&format!("\"{variable}\"")), "装置源码要读 driver_e175 设的 {variable}");
+    fn the_e175_bin_reads_the_variables_the_replay_driver_sets() {
+        for variable in ["E175_ARM", "E175_FAMILY", "E175_RESULT_FILE", "E175_WORKER_THREADS"] {
+            assert!(BIN_SOURCE.contains(&format!("\"{variable}\"")), "装置 bin 要读 driver_e175 设的 {variable}");
         }
     }
 }

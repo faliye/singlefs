@@ -1,7 +1,7 @@
 #!/bin/bash
 # E171 第 1 次重跑·修订 11：修订 8 那一趟第一段（第 0–13 步）带复用的跑法入口（登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.10、11.11 节
 # 与其后「主 agent 认定：修订 11 交回」）。修订 8 那一份入口 run_segment_one_on_the_revision_8_tree_multi_host.sh 一个字节不改。
-# 起法（主 agent，在仓根；H30 认过、H31 填好认过之后）：task-server/task submit -- bash <这一份> [<修订 11 占位>]；内存、线程、哪台由服务定，这一份不套包装。
+# 起法（主 agent，在仓根；H31 填好认过之后）：task-server/task submit -- bash <这一份> [<修订 11 占位>]；内存、线程、哪台由服务定，这一份不套包装。
 #   经这一份起不分片：只用接到它的那一台，跨机对照报 not_run（E171（三oracle合谋测试） 第 2 次重跑登记修订 3）。
 #   不给配置取同目录 revision_11_placeholders.json（它点名修订 8 那一份占位）。同一条命令再起就是续跑。
 #   PLAN_ONLY=1 bash <这一份> [<修订 11 占位>]：干跑——修订 8 的 plan 原样，另打每个读数单元的键与库里有没有；一个装置都不起、不编、不写产物、不建库、不写标记。
@@ -9,7 +9,7 @@
 # long-run-resume: 同一条命令再起就是续跑：第 0–10 步按单元（序列日志有绿行、产物在且行数同、清单 sha256 不变），第 11–13 步只补行目录里还没有 row-result.tsv 的行；取用断在中间的照标记删掉重取，入库是拼好整份条目再一次写进 prune-server
 # 每一层（单元编排、逐行编排）各抽一份复用哨兵（种子打进标准错误与账本，红了照 S18 冻库、记红），账本末行报现判、复用、拒算（reuse_library.py 文件头「复用哨兵」「账本」）
 # long-run-hosts: 台数从 crash-point-replay-shard-configuration-check.sh --emit-hosts 读，每台线程取 .claude/heavy-thread-default 的登记值，不现算、不写常量
-# 多机的说明：每台槽数 = ⌊每台线程 / 5⌋（逐行编排起跑、续跑时算；内存不在这里算，整条命令交 task-server）；第 0–10 步的本机线程额度也取登记值；复用库在 prune-server 里（reuse_library.py 文件头「库」），两台读写同一份
+# 多机的说明：每台槽数 = ⌊每台线程 / 5⌋（逐行编排起跑、续跑时算；内存不在这里算，整条命令交 task-server）；第 0–10 步的本机线程额度也取登记值；判定只在 prune-server 那一份判定库里（reuse_library.py 文件头「按项判定」），两台读写同一份
 # 这一份只把配置交给单元编排：H31 没填或对不上、修订 8 那一份占位没填齐，都由编排开跑先核、退 78 并点名；prune-server 连不上退 75。
 set -u
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)" || exit 2   # 仓根取这一份所在的树（派到哪一台都对），不写死某一台上的路径

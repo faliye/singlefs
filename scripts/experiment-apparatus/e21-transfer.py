@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 量的是此刻这台机器的显卡，上一次量到的数不替这一次作保
 # run-condition: check python3 -c 'import sys, torch; sys.exit(0 if torch.cuda.is_available() else 1)' :: 装好带 CUDA 的 torch，并确认显卡在、驱动起得来（nvidia-smi 能列出卡）
+# task-server-card-lease: on-demand
 """E21 的**传输段**：主机 → 显存 → 主机的带宽。不含任何核函数。
 
 为什么单独测这一段就有用：E21 判据 1 是
@@ -15,6 +16,10 @@
   * **阳性对照**：锁页内存必须明显快于可分页内存（可分页要多一次暂存拷贝）。
     测不出这个差别 ⇒ 计时没有判别力，整轮作废，不许把结果当结论。
   * N=5 取中位；先跑一轮丢弃（首次 CUDA 调用要建上下文）。
+
+按需领卡（文件头 `task-server-card-lease: on-demand`；领还卡的逻辑与退出码在同目录 e21_card_lease.py 文件头）：整条经 task-server/task submit 交，服务起跑不分卡；
+上卡这一段在子进程里跑，只看得到领到的那一张（torch 里序号 0），跑完、出错、被打断都还卡。没有领卡通道退 78，领卡没成退 1、不写产物。自证是
+e21-card-lease-selftest.py（假客户端、假 torch，不起真卡）。
 """
 import sys, time, statistics, torch
 import os as preflight_os, sys as preflight_sys  # noqa: E402
@@ -23,8 +28,9 @@ preflight_sys.dont_write_bytecode = True
 preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
 from project_preflight import preflight  # noqa: E402
 preflight(__file__)
+import e21_card_lease  # noqa: E402
 
-DEV = 0
+DEV = e21_card_lease.VISIBLE_DEVICE_INDEX
 SIZES_MIB = [1, 4, 16, 64, 256, 1024]
 ROUNDS = 5
 
@@ -47,7 +53,7 @@ def bench(mib, pinned):
     gb = n / 1e9
     return gb / statistics.median(h2d), gb / statistics.median(d2h)
 
-def main():
+def main(_card):
     if not torch.cuda.is_available():
         sys.stderr.write("e21: 没有 CUDA —— 这不是「带宽为 0」，是没测\n"); sys.exit(2)
     free, total = torch.cuda.mem_get_info(DEV)
@@ -78,4 +84,4 @@ def main():
             f"e21: 阳性对照失败——锁页只比可分页快 {ratio:.2f}×，计时没有判别力，整轮作废\n")
         sys.exit(4)
 
-main()
+sys.exit(e21_card_lease.run_on_leased_card(main))

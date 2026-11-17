@@ -8,7 +8,7 @@
 8	1	crates/singlefs-core/src/allocator.rs	0	空闲不随分配减（I-5.2 要红）	16ec71e44229
 9	2	crates/singlefs-core/src/allocator.rs	7	步 5：提交内生块的 bump 游标不绕开开段之后才隔离或扣住的槽	a836d4b989c8
 10	2	crates/singlefs-core/src/allocator.rs	14	增补 2：提交内生块段耗尽不回落（抬 F 的空发布在唯一全空段被扣住时又报 NoSpaceFor）	a1a9ffe21eb8
-11	2	crates/singlefs-core/src/allocator.rs	22	增补 3 第 1 件（代码三方第一轮第 3 条）：随机历史快档判出「复用改写已回收记录时不改分配代」（N2）	217469aeb5c7
+11	2	crates/singlefs-core/src/allocator.rs	22	增补 3 第 1 件（代码三方第一轮第 3 条）：随机历史默认批判出「复用改写已回收记录时不改分配代」（N2）	217469aeb5c7
 12	2	crates/singlefs-core/src/allocator.rs	29	步 0 开关一（复用窗口置 0）：回收下界退回 0（不再无视 F），释放的落点一个都不回收	a6433e2374f5
 13	2	crates/singlefs-core/src/allocator.rs	36	C518（一次挂载之内环转过一圈之后不回收）：挂载内不回收时，一次挂载里转过根环的历史又停在已知红第 0 条（C518 那一处）	c6eeb65822b3
 14	2	crates/singlefs-core/src/allocator.rs	44	增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2j）：分配器提交内生块那一处把「每块盘上都没有」报成「小盘写满」；抬 F 的空发布拿不到固定点那条写死用例判出（接替原第 166 行：单元区墙取样点换到 256 槽小盘之后只走得到用户数据那一处）	d3a4311edd30
@@ -103,7 +103,7 @@
 104	2	crates/singlefs-core/src/transaction.rs	124	实审 A2c 第 26 条：树表 0 条的一版上写行数记录条数只数一个角色	64ebb5e5a1c5
 105	2	crates/singlefs-core/src/transaction.rs	132	实审 B3c-3（树表 0 条的一版上写行那一版比实例表与分配代）：写行那次发布把这一版的分配记录报成零单元发布那一臂（不交回）	978d4529bfed
 106	2	crates/singlefs-core/src/transaction.rs	140	实审 A3c Q1：屏障之后取见证值那一遍读不出的盘不拒、照写取号写	ef6cef922c52
-108	1	crates/singlefs-core/src/unit.rs	0	增补 3 第 1 件（代码三方第一轮第 4 条）：随机历史快档判出「checker 判绿的镜像上冷启动读回报错」（B6：补齐字节从最后一个载荷字节算起）	b2f18ffee9f3
+108	1	crates/singlefs-core/src/unit.rs	0	增补 3 第 1 件（代码三方第一轮第 4 条）：随机历史默认批判出「checker 判绿的镜像上冷启动读回报错」（B6：补齐字节从最后一个载荷字节算起）	b2f18ffee9f3
 109	2	crates/singlefs-core/src/unit.rs	6	A3a 第 29 条：码 2 读者不判 29 字节预留位	abebad6cd099
 110	1	crates/singlefs-core/src/write_accounting.rs	0	增补 1：树表单元的写记到中央映射树名下（合计不变，按种类钉的字节表红）	19ffd5418e65
 111	1	crates/singlefs-core/src/write_request_split.rs	0	实审 A2a 第 21 条：没写过的 inode 长度 0 也按除法给一个单元	33bd7451555d

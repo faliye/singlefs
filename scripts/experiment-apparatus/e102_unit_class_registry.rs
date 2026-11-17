@@ -327,7 +327,7 @@ fn margins_inside(interval: (u64, u64), point: u64) -> Option<(u64, u64)> {
 }
 
 /// **Q4**：P8 在 40 下的改写——记录区起点 `records_origin` 下两个下游容量都等于 kb 登记值。
-fn p8_rewrite_holds_at(records_origin: u64) -> bool {
+fn downstream_capacities_equal_the_registered_values_at(records_origin: u64) -> bool {
     capacity(records_origin, TOMBSTONE_RECORD_BYTES) == TOMBSTONE_CONTAINER_RECORDS
         && capacity(records_origin, INODE_RECORD_BYTES) == INODE_LEAF_RECORDS
 }
@@ -502,15 +502,15 @@ fn main() {
     let inode_leaf_records = capacity(PACKED_RECORDS_AREA_ORIGIN, INODE_RECORD_BYTES);
     let tombstone_interval = header_interval_for(tombstone_container_records, TOMBSTONE_RECORD_BYTES);
     let inode_interval = header_interval_for(inode_leaf_records, INODE_RECORD_BYTES);
-    let joint_hdr_interval = joint_interval(tombstone_interval, inode_interval);
-    let joint_margins = joint_hdr_interval.and_then(|interval| margins_inside(interval, PACKED_RECORDS_AREA_ORIGIN));
+    let joint_header_interval = joint_interval(tombstone_interval, inode_interval);
+    let joint_margins = joint_header_interval.and_then(|interval| margins_inside(interval, PACKED_RECORDS_AREA_ORIGIN));
     let text_of = |value: Option<u64>| value.map_or_else(|| "NA".to_string(), |present| present.to_string());
     output_lines.push(emitter.emit_raw(&format!(
         "name=downstream_at_records_offset records_offset={PACKED_RECORDS_AREA_ORIGIN} tomb_rec={TOMBSTONE_RECORD_BYTES} cap_tomb={tombstone_container_records} \
          kb_tomb={TOMBSTONE_CONTAINER_RECORDS} inode_rec={INODE_RECORD_BYTES} cap_inode={inode_leaf_records} kb_inode={INODE_LEAF_RECORDS} \
          joint_hdr_lo={} joint_hdr_hi={} margin_to_lo={} margin_to_hi={}",
-        text_of(joint_hdr_interval.map(|interval| interval.0)),
-        text_of(joint_hdr_interval.map(|interval| interval.1)),
+        text_of(joint_header_interval.map(|interval| interval.0)),
+        text_of(joint_header_interval.map(|interval| interval.1)),
         text_of(joint_margins.map(|margins| margins.0)),
         text_of(joint_margins.map(|margins| margins.1))
     )));
@@ -605,9 +605,9 @@ fn main() {
     )));
     output_lines.push(emitter.emit_raw(&format!(
         "name=verdict quantity=P8_check_discriminates_h128_h136_h149 rejects_h128={} accepts_h136={} rejects_h149={}",
-        !p8_rewrite_holds_at(128),
-        p8_rewrite_holds_at(PACKED_RECORDS_AREA_ORIGIN),
-        !p8_rewrite_holds_at(149)
+        !downstream_capacities_equal_the_registered_values_at(128),
+        downstream_capacities_equal_the_registered_values_at(PACKED_RECORDS_AREA_ORIGIN),
+        !downstream_capacities_equal_the_registered_values_at(149)
     )));
 
     for line in &output_lines {
@@ -691,7 +691,7 @@ mod tests {
 
     /// **判据 3 原条（第一次几何的回归，字面 56 / 140，不读墓碑宽常量）**：107 字节头下 583 / 233 不动（105、103 时同值），区间两端各多 1 字节掉 1 格。
     #[test]
-    fn criterion3_first_run_geometry_rec_56_still_gives_583_and_233_under_hdr_107() {
+    fn criterion3_first_run_geometry_record_56_still_gives_583_and_233_under_header_107() {
         assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, 56), 583, "E83 / E84 的 583");
         assert_eq!(capacity(DATA_UNIT_HEADER_BYTES, 56), 583);
         assert_eq!(capacity(ORIGINAL_CLAUSE_HEADER_BYTES, 56), 583, "原反向接受条款字面 cap(103, 56)");
@@ -754,15 +754,15 @@ mod tests {
 
     /// **Q4 与反向接受条款**：读法乙下两个下游容量等于 kb 登记值；判别力自证——挪到区间外检查必须由绿转红。
     #[test]
-    fn criterion3_downstream_capacities_at_records_offset_equal_the_kb_values_and_the_check_discriminates() {
+    fn criterion3_downstream_capacities_at_records_offset_equal_the_knowledge_base_values_and_the_check_discriminates() {
         assert_eq!(capacity(PACKED_RECORDS_AREA_ORIGIN, TOMBSTONE_RECORD_BYTES), 815, "TOMBSTONE_CONTAINER_RECORDS");
         assert_eq!(capacity(PACKED_RECORDS_AREA_ORIGIN, INODE_RECORD_BYTES), 233, "INODE_LEAF_RECORDS");
         assert_eq!(capacity(PACKED_RECORDS_AREA_ORIGIN, FIRST_RUN_TOMBSTONE_RECORD_BYTES), 582, "按 56 与 136 的容量，已定项 11");
         assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES), 816, "只换宽不换头：h = 107 下 40 字节的容量");
-        assert!(!p8_rewrite_holds_at(128), "128 在 815 区间外：检查必须红");
-        assert!(p8_rewrite_holds_at(136));
-        assert!(!p8_rewrite_holds_at(149), "149 在 233 区间外：检查必须红");
-        assert!(!p8_rewrite_holds_at(PACKED_UNIT_HEADER_BYTES), "h = 107 下 816 ≠ 815");
+        assert!(!downstream_capacities_equal_the_registered_values_at(128), "128 在 815 区间外：检查必须红");
+        assert!(downstream_capacities_equal_the_registered_values_at(136));
+        assert!(!downstream_capacities_equal_the_registered_values_at(149), "149 在 233 区间外：检查必须红");
+        assert!(!downstream_capacities_equal_the_registered_values_at(PACKED_UNIT_HEADER_BYTES), "h = 107 下 816 ≠ 815");
     }
 
     /// **判据 4 的绝对值**：装满一个墓碑容器 815 条，五元组指认不到 814 条；打包类身份段 + 解析恰 0。

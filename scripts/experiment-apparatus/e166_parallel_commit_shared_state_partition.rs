@@ -71,9 +71,9 @@ const SAMPLE_DEVICE_COUNT: usize = 1;
 /// P设 一次提交内各盘不一致的重算上限（登记乙 7 口径：超过记「截断」）。
 const DEVICE_DISAGREEMENT_RETRY_CAP: u8 = 2;
 
-const MAX_TRANSACTIONS: usize = 4;
-const MAX_DEVICES: usize = 2;
-const MAX_REGIONS: usize = 4;
+const MAXIMUM_TRANSACTIONS: usize = 4;
+const MAXIMUM_DEVICES: usize = 2;
+const MAXIMUM_REGIONS: usize = 4;
 const NO_PAIR: u8 = u8::MAX;
 const NO_SLOT: u8 = u8::MAX;
 const FIRST_DEVICE_STEP_INDEX: u8 = 1;
@@ -255,7 +255,7 @@ enum RegionCountChoice {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct CellSpec {
+struct CellSpecification {
     arm: Arm,
     variant: ArmVariant,
     stage: ParallelStage,
@@ -269,7 +269,7 @@ struct CellSpec {
     journal_ring_slots: u32,
 }
 
-impl CellSpec {
+impl CellSpecification {
     fn default_geometry(
         arm: Arm,
         variant: ArmVariant,
@@ -278,8 +278,8 @@ impl CellSpec {
         initial_has_file: bool,
         transaction_count: usize,
         device_count: usize,
-    ) -> CellSpec {
-        CellSpec {
+    ) -> CellSpecification {
+        CellSpecification {
             arm,
             variant,
             stage,
@@ -382,29 +382,29 @@ struct Model {
 }
 
 impl Model {
-    fn new(spec: CellSpec) -> Model {
-        assert!(spec.transaction_count >= 1 && spec.transaction_count <= MAX_TRANSACTIONS);
-        assert!(spec.device_count >= 1 && spec.device_count <= MAX_DEVICES);
-        let region_count = match spec.region_count {
-            RegionCountChoice::EqualToTransactionCount => spec.transaction_count,
+    fn new(specification: CellSpecification) -> Model {
+        assert!(specification.transaction_count >= 1 && specification.transaction_count <= MAXIMUM_TRANSACTIONS);
+        assert!(specification.device_count >= 1 && specification.device_count <= MAXIMUM_DEVICES);
+        let region_count = match specification.region_count {
+            RegionCountChoice::EqualToTransactionCount => specification.transaction_count,
             RegionCountChoice::Fixed(count) => count,
         };
-        assert!(region_count >= 1 && region_count <= MAX_REGIONS);
+        assert!(region_count >= 1 && region_count <= MAXIMUM_REGIONS);
         Model {
-            arm: spec.arm,
-            variant: spec.variant,
-            stage: spec.stage,
-            shapes: shapes_of(spec.shape_kind, spec.transaction_count),
-            initial_has_file: spec.initial_has_file,
-            transaction_count: spec.transaction_count,
-            device_count: spec.device_count,
+            arm: specification.arm,
+            variant: specification.variant,
+            stage: specification.stage,
+            shapes: shapes_of(specification.shape_kind, specification.transaction_count),
+            initial_has_file: specification.initial_has_file,
+            transaction_count: specification.transaction_count,
+            device_count: specification.device_count,
             region_count,
-            inode_reservation: spec.inode_reservation,
-            root_slots_per_region: spec.root_slots_per_region,
-            journal_ring_slots: spec.journal_ring_slots,
-            steps: steps_of(spec.arm, spec.variant, spec.device_count),
-            transaction_groups: spec.stage.transaction_groups(),
-            pipeline_groups: spec.stage.pipeline_groups(),
+            inode_reservation: specification.inode_reservation,
+            root_slots_per_region: specification.root_slots_per_region,
+            journal_ring_slots: specification.journal_ring_slots,
+            steps: steps_of(specification.arm, specification.variant, specification.device_count),
+            transaction_groups: specification.stage.transaction_groups(),
+            pipeline_groups: specification.stage.pipeline_groups(),
         }
     }
 
@@ -439,10 +439,10 @@ struct SharedState {
     /// 同步臂的用户数据空闲表：第 p 位 = 第 p 个对已被占（各盘同步变化，只记一份）。
     user_taken: u16,
     /// P设 的逐盘空闲表。
-    device_taken: [u16; MAX_DEVICES],
+    device_taken: [u16; MAXIMUM_DEVICES],
     /// 提交内生块池的 bump 游标（非分区臂用；分区臂用 `region_cursor`）。
     commit_cursor: u8,
-    region_cursor: [u8; MAX_REGIONS],
+    region_cursor: [u8; MAXIMUM_REGIONS],
     /// 被在飞事务占着的区（按位）。
     region_busy: u8,
     inode_watermark: u8,
@@ -458,9 +458,9 @@ struct SharedState {
 
 const EMPTY_SHARED_STATE: SharedState = SharedState {
     user_taken: 0,
-    device_taken: [0; MAX_DEVICES],
+    device_taken: [0; MAXIMUM_DEVICES],
     commit_cursor: 0,
-    region_cursor: [0; MAX_REGIONS],
+    region_cursor: [0; MAXIMUM_REGIONS],
     region_busy: 0,
     inode_watermark: 0,
     tree_watermark: 0,
@@ -474,7 +474,7 @@ const EMPTY_SHARED_STATE: SharedState = SharedState {
 /// 一个事务拿到的号与槽。0（号）或 `NO_PAIR` / `NO_SLOT`（槽）表示没拿。
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct Holdings {
-    user_pairs: [u8; MAX_DEVICES],
+    user_pairs: [u8; MAXIMUM_DEVICES],
     commit_slot_start: u8,
     inode_start: u8,
     inode_count: u8,
@@ -487,7 +487,7 @@ struct Holdings {
 }
 
 const NOTHING_HELD: Holdings = Holdings {
-    user_pairs: [NO_PAIR; MAX_DEVICES],
+    user_pairs: [NO_PAIR; MAXIMUM_DEVICES],
     commit_slot_start: NO_SLOT,
     inode_start: 0,
     inode_count: 0,
@@ -533,17 +533,17 @@ const FRESH_TRANSACTION: TransactionState = TransactionState {
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct ModelState {
     shared: SharedState,
-    transactions: [TransactionState; MAX_TRANSACTIONS],
+    transactions: [TransactionState; MAXIMUM_TRANSACTIONS],
 }
 
 fn initial_state(model: &Model) -> ModelState {
-    let mut region_cursor = [0; MAX_REGIONS];
+    let mut region_cursor = [0; MAXIMUM_REGIONS];
     for region in 0..model.region_count {
         region_cursor[region] = model.region_slot_range(region).0;
     }
     let shared = SharedState {
         user_taken: 0,
-        device_taken: [0; MAX_DEVICES],
+        device_taken: [0; MAXIMUM_DEVICES],
         commit_cursor: 0,
         region_cursor,
         region_busy: 0,
@@ -559,7 +559,7 @@ fn initial_state(model: &Model) -> ModelState {
         txg: INITIAL_CHECKPOINT_TXG,
         version: 0,
     };
-    let mut transactions = [FRESH_TRANSACTION; MAX_TRANSACTIONS];
+    let mut transactions = [FRESH_TRANSACTION; MAXIMUM_TRANSACTIONS];
     for unused in transactions.iter_mut().skip(model.transaction_count) {
         unused.committed = true;
     }
@@ -581,7 +581,7 @@ fn take_resources(view: &mut SharedState, shape: TransactionShape, groups: u8, h
     if groups & GROUP_USER != 0 && shape.user_units > 0 {
         let pair = lowest_free_pair(view.user_taken, 0, USER_DATA_PAIR_COUNT).expect("16 个对够 n ≤ 4 个事务用");
         view.user_taken |= 1 << pair;
-        held.user_pairs = [pair; MAX_DEVICES];
+        held.user_pairs = [pair; MAXIMUM_DEVICES];
     }
     if groups & GROUP_COMMIT_SLOTS != 0 {
         // 提交内生块从开放段 bump，游标挪到落点之后。`crates/singlefs-core/src/allocator.rs:1494`、`:1522`。
@@ -747,7 +747,7 @@ fn take_from_region(
     if model.transaction_groups & GROUP_USER != 0 && shape.user_units > 0 && held.user_pairs[0] == NO_PAIR {
         if let Some(pair) = lowest_free_pair(view.user_taken, first_pair, end_pair) {
             view.user_taken |= 1 << pair;
-            held.user_pairs = [pair; MAX_DEVICES];
+            held.user_pairs = [pair; MAXIMUM_DEVICES];
         }
     }
     if model.transaction_groups & GROUP_COMMIT_SLOTS != 0 && held.commit_slot_start == NO_SLOT {
@@ -1030,7 +1030,7 @@ fn apply_step(model: &Model, state: &mut ModelState, transaction_index: usize) -
                         state.shared.device_taken[device] &= !(1 << pair);
                     }
                 }
-                transaction.items.user_pairs = [NO_PAIR; MAX_DEVICES];
+                transaction.items.user_pairs = [NO_PAIR; MAXIMUM_DEVICES];
                 transaction.retries += 1;
                 transaction.program_counter = FIRST_DEVICE_STEP_INDEX;
             }
@@ -1277,11 +1277,11 @@ struct Aggregate {
     schedules: u128,
     duplicate_total: [u128; RESOURCE_COUNT],
     duplicate_schedules: [u128; RESOURCE_COUNT],
-    duplicate_max_single_schedule: [u32; RESOURCE_COUNT],
+    duplicate_maximum_single_schedule: [u32; RESOURCE_COUNT],
     retries_total: u128,
     retries_schedules: u128,
-    retries_max_schedule: u32,
-    retries_max_transaction: u32,
+    retries_maximum_schedule: u32,
+    retries_maximum_transaction: u32,
     fallbacks_total: u128,
     truncated: u128,
     deadlocks: u128,
@@ -1304,11 +1304,11 @@ impl Aggregate {
             schedules: 0,
             duplicate_total: [0; RESOURCE_COUNT],
             duplicate_schedules: [0; RESOURCE_COUNT],
-            duplicate_max_single_schedule: [0; RESOURCE_COUNT],
+            duplicate_maximum_single_schedule: [0; RESOURCE_COUNT],
             retries_total: 0,
             retries_schedules: 0,
-            retries_max_schedule: 0,
-            retries_max_transaction: 0,
+            retries_maximum_schedule: 0,
+            retries_maximum_transaction: 0,
             fallbacks_total: 0,
             truncated: 0,
             deadlocks: 0,
@@ -1330,16 +1330,16 @@ impl Aggregate {
         self.schedules += other.schedules;
         self.retries_total += other.retries_total;
         self.retries_schedules += other.retries_schedules;
-        self.retries_max_schedule = self.retries_max_schedule.max(other.retries_max_schedule);
-        self.retries_max_transaction = self.retries_max_transaction.max(other.retries_max_transaction);
+        self.retries_maximum_schedule = self.retries_maximum_schedule.max(other.retries_maximum_schedule);
+        self.retries_maximum_transaction = self.retries_maximum_transaction.max(other.retries_maximum_transaction);
         self.fallbacks_total += other.fallbacks_total;
         self.truncated += other.truncated;
         self.deadlocks += other.deadlocks;
         for resource in 0..RESOURCE_COUNT {
             self.duplicate_total[resource] += other.duplicate_total[resource];
             self.duplicate_schedules[resource] += other.duplicate_schedules[resource];
-            self.duplicate_max_single_schedule[resource] =
-                self.duplicate_max_single_schedule[resource].max(other.duplicate_max_single_schedule[resource]);
+            self.duplicate_maximum_single_schedule[resource] =
+                self.duplicate_maximum_single_schedule[resource].max(other.duplicate_maximum_single_schedule[resource]);
             self.duplicate_peak[resource] = self.duplicate_peak[resource].max(other.duplicate_peak[resource]);
             self.duplicate_positive_steps[resource] += other.duplicate_positive_steps[resource];
         }
@@ -1363,17 +1363,17 @@ impl Aggregate {
             if duplicates > 0 {
                 self.duplicate_schedules[resource] += 1;
             }
-            self.duplicate_max_single_schedule[resource] = self.duplicate_max_single_schedule[resource].max(duplicates);
+            self.duplicate_maximum_single_schedule[resource] = self.duplicate_maximum_single_schedule[resource].max(duplicates);
         }
         let retries_of_schedule: u32 = retries_of_each_transaction.iter().map(|retries| u32::from(*retries)).sum();
         self.retries_total += u128::from(retries_of_schedule);
         if retries_of_schedule > 0 {
             self.retries_schedules += 1;
         }
-        self.retries_max_schedule = self.retries_max_schedule.max(retries_of_schedule);
+        self.retries_maximum_schedule = self.retries_maximum_schedule.max(retries_of_schedule);
         let most_retries_of_one_transaction =
             retries_of_each_transaction.iter().copied().max().map_or(0, u32::from);
-        self.retries_max_transaction = self.retries_max_transaction.max(most_retries_of_one_transaction);
+        self.retries_maximum_transaction = self.retries_maximum_transaction.max(most_retries_of_one_transaction);
         self.fallbacks_total += u128::from(fallbacks);
         self.inode_margin_final_minimum = self.inode_margin_final_minimum.min(metrics.inode_margin);
         self.busy_regions_final_maximum = self.busy_regions_final_maximum.max(metrics.busy_regions);
@@ -1590,7 +1590,7 @@ impl AnchorLine {
     }
 }
 
-fn spec_of(
+fn specification_of(
     arm: Arm,
     variant: ArmVariant,
     stage: ParallelStage,
@@ -1598,16 +1598,16 @@ fn spec_of(
     initial_has_file: bool,
     transaction_count: usize,
     device_count: usize,
-) -> CellSpec {
-    CellSpec::default_geometry(arm, variant, stage, shape_kind, initial_has_file, transaction_count, device_count)
+) -> CellSpecification {
+    CellSpecification::default_geometry(arm, variant, stage, shape_kind, initial_has_file, transaction_count, device_count)
 }
 
-fn should_memoize(spec: &CellSpec) -> bool {
-    spec.arm == Arm::DevicePartition
+fn should_memoize(specification: &CellSpecification) -> bool {
+    specification.arm == Arm::DevicePartition
 }
 
-fn enumerate_spec(spec: CellSpec) -> Enumeration {
-    enumerate_schedules(&Model::new(spec), should_memoize(&spec))
+fn enumerate_specification(specification: CellSpecification) -> Enumeration {
+    enumerate_schedules(&Model::new(specification), should_memoize(&specification))
 }
 
 fn duplicate_pair(aggregate: &Aggregate, resource: Resource) -> String {
@@ -1626,7 +1626,7 @@ fn join_numbers<Number: ToString>(numbers: &[Number]) -> String {
 fn anchors_from_the_clauses() -> Vec<AnchorLine> {
     let mut lines = Vec::new();
     let full_stage = ParallelStage::ManyPublishesInFlight;
-    let serial_model = Model::new(spec_of(
+    let serial_model = Model::new(specification_of(
         Arm::WholeLock,
         ArmVariant::Normal,
         full_stage,
@@ -1672,7 +1672,7 @@ fn anchors_from_the_clauses() -> Vec<AnchorLine> {
         .collect();
     lines.push(AnchorLine::new("甲7 提交内生块落点", commit_nodes.join(","), "{0,1},{2,3},{4,5}"));
 
-    let no_file_model = Model::new(spec_of(
+    let no_file_model = Model::new(specification_of(
         Arm::WholeLock,
         ArmVariant::Normal,
         full_stage,
@@ -1695,7 +1695,7 @@ fn anchors_from_the_clauses() -> Vec<AnchorLine> {
         "65536,65537,65538,65539,65540,65541,65542,65543,65544,65545,65546,65547",
     ));
 
-    let one_publish_model = Model::new(spec_of(
+    let one_publish_model = Model::new(specification_of(
         Arm::WholeLock,
         ArmVariant::Normal,
         ParallelStage::OnePublishCarriesManyTransactions,
@@ -1738,7 +1738,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
             (2, "schedules=6 U=4/4 G=8/4 I=4/4 X=4/4"),
             (3, "schedules=90 U=120/84 G=240/84 I=120/84 X=120/84"),
         ] {
-            let enumeration = enumerate_spec(spec_of(
+            let enumeration = enumerate_specification(specification_of(
                 arm,
                 variant,
                 ParallelStage::PrepareParallelCommitSerial,
@@ -1764,7 +1764,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
         // 乙 1 末句的结构延伸（登记 5.3 末句）：Q1丙 下单号资源各自等于「单件」那一行、G 等于「两件」那一行；
         // Q1乙 下 G、TXG、RS、T 归批发布者、不争用，所以是 0。
         for (transaction_count, single, double) in [(2usize, "4/4", "8/4"), (3, "120/84", "240/84")] {
-            let full_stage = enumerate_spec(spec_of(
+            let full_stage = enumerate_specification(specification_of(
                 arm,
                 variant,
                 ParallelStage::ManyPublishesInFlight,
@@ -1794,7 +1794,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
                 observed.join(" "),
                 &expected_text,
             ));
-            let one_publish = enumerate_spec(spec_of(
+            let one_publish = enumerate_specification(specification_of(
                 arm,
                 variant,
                 ParallelStage::OnePublishCarriesManyTransactions,
@@ -1837,7 +1837,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
     ];
     for (arm, variant) in tree_controls {
         for (transaction_count, expected) in [(2, "T=48/4"), (3, "T=1296/72")] {
-            let enumeration = enumerate_spec(spec_of(
+            let enumeration = enumerate_specification(specification_of(
                 arm,
                 variant,
                 ParallelStage::PrepareParallelCommitSerial,
@@ -1858,7 +1858,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
         (2, "schedules=6 U=4/4 G=8/4 I=6/6 X=6/6"),
         (3, "schedules=90 U=120/84 G=240/84 I=180/90 X=180/90"),
     ] {
-        let enumeration = enumerate_spec(spec_of(
+        let enumeration = enumerate_specification(specification_of(
             Arm::RegionPartition,
             ArmVariant::PositiveControl,
             ParallelStage::PrepareParallelCommitSerial,
@@ -1881,7 +1881,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
             expected,
         ));
         // J、JS、TXG、RS 在它们争用的 Q1 候选下等于 I 那一列。
-        let i_column = if transaction_count == 2 { "6/6" } else { "180/90" };
+        let inode_number_column = if transaction_count == 2 { "6/6" } else { "180/90" };
         for (stage, resources) in [
             (ParallelStage::OnePublishCarriesManyTransactions, vec![Resource::JsnCounter, Resource::JournalRingSlot]),
             (
@@ -1889,7 +1889,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
                 vec![Resource::JsnCounter, Resource::JournalRingSlot, Resource::CheckpointTxg, Resource::RootRingSlot],
             ),
         ] {
-            let contended = enumerate_spec(spec_of(
+            let contended = enumerate_specification(specification_of(
                 Arm::RegionPartition,
                 ArmVariant::PositiveControl,
                 stage,
@@ -1903,7 +1903,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
                 .map(|resource| format!("{}={}", resource.label(), duplicate_pair(&contended.aggregate, *resource)))
                 .collect();
             let expected_text: Vec<String> =
-                resources.iter().map(|resource| format!("{}={}", resource.label(), i_column)).collect();
+                resources.iter().map(|resource| format!("{}={}", resource.label(), inode_number_column)).collect();
             lines.push(AnchorLine::new(
                 &format!("乙3 P区同 {} n={transaction_count}", stage.label()),
                 observed.join(" "),
@@ -1919,7 +1919,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
         for stage in ALL_STAGES {
             for shape_kind in [ShapeKind::SameShape, ShapeKind::Disjoint] {
                 for initial_has_file in [true, false] {
-                    let enumeration = enumerate_spec(spec_of(
+                    let enumeration = enumerate_specification(specification_of(
                         Arm::OptimisticWholeVersion,
                         ArmVariant::Normal,
                         stage,
@@ -1934,7 +1934,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
                         aggregate.schedules,
                         aggregate.retries_total,
                         aggregate.retries_schedules,
-                        aggregate.retries_max_schedule
+                        aggregate.retries_maximum_schedule
                     );
                     if first_observed.is_empty() {
                         first_observed = observed.clone();
@@ -1955,7 +1955,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
     }
     // 乙 6：A字面去锁（四步），同形，Q1甲，U 一列。
     for (transaction_count, expected) in [(2, "schedules=70 U_total=36 U_schedules=36"), (3, "schedules=34650 U_total=37368 U_schedules=29268")] {
-        let enumeration = enumerate_spec(spec_of(
+        let enumeration = enumerate_specification(specification_of(
             Arm::LiteralLock,
             ArmVariant::PositiveControl,
             ParallelStage::PrepareParallelCommitSerial,
@@ -1993,7 +1993,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
         ),
     ];
     for (variant, device_count, transaction_count, expected) in device_partition_expectations {
-        let enumeration = enumerate_spec(spec_of(
+        let enumeration = enumerate_specification(specification_of(
             Arm::DevicePartition,
             variant,
             ParallelStage::PrepareParallelCommitSerial,
@@ -2015,7 +2015,7 @@ fn anchors_from_independent_calculations() -> Vec<AnchorLine> {
         (false, 2, "schedules=20 X=18/18 T=216/18"),
         (false, 3, "schedules=1680 X=2970/1674 T=34992/1620"),
     ] {
-        let enumeration = enumerate_spec(spec_of(
+        let enumeration = enumerate_specification(specification_of(
             Arm::LiteralLock,
             ArmVariant::Normal,
             ParallelStage::PrepareParallelCommitSerial,
@@ -2079,7 +2079,7 @@ fn anchors_from_structural_counts() -> Vec<AnchorLine> {
     ];
     for (arm, variant, device_count, steps_per_transaction) in cases {
         for transaction_count in [2usize, 3] {
-            let enumeration = enumerate_spec(spec_of(
+            let enumeration = enumerate_specification(specification_of(
                 arm,
                 variant,
                 stage,
@@ -2101,7 +2101,7 @@ fn anchors_from_structural_counts() -> Vec<AnchorLine> {
     }
     // 丙 2：串行基线 S 的调度数 1，重复数 0，重算 0。
     for transaction_count in [2usize, 3] {
-        let model = Model::new(spec_of(
+        let model = Model::new(specification_of(
             Arm::WholeLock,
             ArmVariant::Normal,
             ParallelStage::ManyPublishesInFlight,
@@ -2122,7 +2122,7 @@ fn anchors_from_structural_counts() -> Vec<AnchorLine> {
     // 丙 3：P设 的记忆化计数与逐叶枚举逐项相等（整份汇总，含轨迹，n = 2）。
     for variant in [ArmVariant::Normal, ArmVariant::PositiveControl] {
         for device_count in [1usize, 2] {
-            let model = Model::new(spec_of(
+            let model = Model::new(specification_of(
                 Arm::DevicePartition,
                 variant,
                 stage,
@@ -2164,20 +2164,20 @@ fn initial_label(initial_has_file: bool) -> &'static str {
     }
 }
 
-fn cell_prefix(name: &str, spec: &CellSpec) -> String {
+fn cell_prefix(name: &str, specification: &CellSpecification) -> String {
     format!(
         "name={name} arm={} stage={} shape={} initial={} transactions={} devices={}",
-        spec.arm.label(spec.variant),
-        spec.stage.label(),
-        spec.shape_kind.label(),
-        initial_label(spec.initial_has_file),
-        spec.transaction_count,
-        spec.device_count
+        specification.arm.label(specification.variant),
+        specification.stage.label(),
+        specification.shape_kind.label(),
+        initial_label(specification.initial_has_file),
+        specification.transaction_count,
+        specification.device_count
     )
 }
 
-fn cell_line(name: &str, spec: &CellSpec, aggregate: &Aggregate) -> String {
-    let mut line = cell_prefix(name, spec);
+fn cell_line(name: &str, specification: &CellSpecification, aggregate: &Aggregate) -> String {
+    let mut line = cell_prefix(name, specification);
     write!(line, " schedules={}", aggregate.schedules).expect("写进 String 不会失败");
     for resource in ALL_RESOURCES {
         let index = resource.index();
@@ -2186,7 +2186,7 @@ fn cell_line(name: &str, spec: &CellSpec, aggregate: &Aggregate) -> String {
             " {label}_total={} {label}_schedules={} {label}_max_single={}",
             aggregate.duplicate_total[index],
             aggregate.duplicate_schedules[index],
-            aggregate.duplicate_max_single_schedule[index],
+            aggregate.duplicate_maximum_single_schedule[index],
             label = resource.label()
         )
         .expect("写进 String 不会失败");
@@ -2197,9 +2197,9 @@ fn cell_line(name: &str, spec: &CellSpec, aggregate: &Aggregate) -> String {
          device_disagreements={} truncated={} fallbacks_total={} deadlocks={}",
         aggregate.retries_total,
         aggregate.retries_schedules,
-        aggregate.retries_max_schedule,
-        aggregate.retries_max_transaction,
-        if spec.arm == Arm::DevicePartition { aggregate.retries_total + aggregate.truncated } else { 0 },
+        aggregate.retries_maximum_schedule,
+        aggregate.retries_maximum_transaction,
+        if specification.arm == Arm::DevicePartition { aggregate.retries_total + aggregate.truncated } else { 0 },
         aggregate.truncated,
         aggregate.fallbacks_total,
         aggregate.deadlocks
@@ -2216,8 +2216,8 @@ fn margin_text(value: i32) -> String {
     }
 }
 
-fn trajectory_line(spec: &CellSpec, aggregate: &Aggregate) -> String {
-    let mut line = cell_prefix("trajectory", spec);
+fn trajectory_line(specification: &CellSpecification, aggregate: &Aggregate) -> String {
+    let mut line = cell_prefix("trajectory", specification);
     for resource in ALL_RESOURCES {
         let index = resource.index();
         write!(
@@ -2257,16 +2257,16 @@ fn counts_text(counts: &[u32]) -> String {
 }
 
 /// A 与 A字面 的锁里装了多少计划是 Q1 的测量，登记第六节 Q-9 不对它们报 R_n。
-fn reports_rounds(spec: &CellSpec) -> bool {
-    match spec.arm {
+fn reports_rounds(specification: &CellSpecification) -> bool {
+    match specification.arm {
         Arm::WholeLock | Arm::LiteralLock => false,
         Arm::RegionPartition | Arm::DevicePartition | Arm::OptimisticWholeVersion | Arm::OptimisticReadSet => true,
     }
 }
 
-fn rounds_line(spec: &CellSpec, outcome: &RoundsOutcome) -> String {
-    let mut line = cell_prefix("rounds", spec);
-    let serial_rounds = spec.transaction_count;
+fn rounds_line(specification: &CellSpecification, outcome: &RoundsOutcome) -> String {
+    let mut line = cell_prefix("rounds", specification);
+    let serial_rounds = specification.transaction_count;
     write!(
         line,
         " rounds={} serial_rounds={serial_rounds} commits_per_round={} peak_commits_in_a_round={} rounds_with_commits={} last_round_commits={} \
@@ -2285,26 +2285,26 @@ fn rounds_line(spec: &CellSpec, outcome: &RoundsOutcome) -> String {
 }
 
 struct PartitionCellResult {
-    spec: CellSpec,
+    specification: CellSpecification,
     aggregate: Aggregate,
     rounds: RoundsOutcome,
 }
 
-fn run_partition_cell(spec: CellSpec) -> PartitionCellResult {
-    let model = Model::new(spec);
-    let enumeration = enumerate_schedules(&model, should_memoize(&spec));
+fn run_partition_cell(specification: CellSpecification) -> PartitionCellResult {
+    let model = Model::new(specification);
+    let enumeration = enumerate_schedules(&model, should_memoize(&specification));
     let rounds = simulate_rounds(&model);
-    PartitionCellResult { spec, aggregate: enumeration.aggregate, rounds }
+    PartitionCellResult { specification, aggregate: enumeration.aggregate, rounds }
 }
 
-fn arm_cell_specs(device_count: usize) -> Vec<CellSpec> {
-    let mut specs = Vec::new();
+fn arm_cell_specifications(device_count: usize) -> Vec<CellSpecification> {
+    let mut specifications = Vec::new();
     for arm in ALL_ARMS {
         for stage in ALL_STAGES {
             for shape_kind in [ShapeKind::SameShape, ShapeKind::Disjoint] {
                 for initial_has_file in [true, false] {
                     for transaction_count in [2usize, 3] {
-                        specs.push(spec_of(
+                        specifications.push(specification_of(
                             arm,
                             ArmVariant::Normal,
                             stage,
@@ -2318,16 +2318,16 @@ fn arm_cell_specs(device_count: usize) -> Vec<CellSpec> {
             }
         }
     }
-    specs
+    specifications
 }
 
-fn control_cell_specs(device_count: usize) -> Vec<CellSpec> {
-    let mut specs = Vec::new();
+fn control_cell_specifications(device_count: usize) -> Vec<CellSpecification> {
+    let mut specifications = Vec::new();
     for arm in ALL_ARMS {
         for stage in ALL_STAGES {
             for initial_has_file in [true, false] {
                 for transaction_count in [2usize, 3] {
-                    specs.push(spec_of(
+                    specifications.push(specification_of(
                         arm,
                         ArmVariant::PositiveControl,
                         stage,
@@ -2340,7 +2340,7 @@ fn control_cell_specs(device_count: usize) -> Vec<CellSpec> {
             }
         }
     }
-    specs
+    specifications
 }
 
 // ── 判定行 ──────────────────────────────────────────────────────────────────
@@ -2490,7 +2490,7 @@ fn cells_of<'results>(
     arm: Arm,
     stage: ParallelStage,
 ) -> Vec<&'results PartitionCellResult> {
-    results.iter().filter(|result| result.spec.arm == arm && result.spec.stage == stage).collect()
+    results.iter().filter(|result| result.specification.arm == arm && result.specification.stage == stage).collect()
 }
 
 fn duplicates_of_question(result: &PartitionCellResult, question: Question) -> u128 {
@@ -2576,7 +2576,7 @@ fn emit_question_verdicts(emitter: &mut Emitter, default_cells: &[PartitionCellR
                     result
                         .rounds
                         .rounds
-                        .is_some_and(|rounds| usize::try_from(rounds).expect("轮数很小") < result.spec.transaction_count)
+                        .is_some_and(|rounds| usize::try_from(rounds).expect("轮数很小") < result.specification.transaction_count)
                 })
                 .count();
             let without_rounds = cells.iter().filter(|result| result.rounds.rounds.is_none()).count();
@@ -2600,15 +2600,15 @@ fn emit_question_verdicts(emitter: &mut Emitter, default_cells: &[PartitionCellR
 
 fn find_cell<'results>(
     results: &'results [PartitionCellResult],
-    spec: &CellSpec,
+    specification: &CellSpecification,
 ) -> Option<&'results PartitionCellResult> {
     results.iter().find(|result| {
-        result.spec.arm == spec.arm
-            && result.spec.variant == spec.variant
-            && result.spec.stage == spec.stage
-            && result.spec.shape_kind == spec.shape_kind
-            && result.spec.initial_has_file == spec.initial_has_file
-            && result.spec.transaction_count == spec.transaction_count
+        result.specification.arm == specification.arm
+            && result.specification.variant == specification.variant
+            && result.specification.stage == specification.stage
+            && result.specification.shape_kind == specification.shape_kind
+            && result.specification.initial_has_file == specification.initial_has_file
+            && result.specification.transaction_count == specification.transaction_count
     })
 }
 
@@ -2617,7 +2617,7 @@ fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[PartitionCellRes
     let nonzero_duplicates = |result: &PartitionCellResult| result.aggregate.duplicate_total.iter().any(|total| *total > 0);
     let whole_lock_default_duplicates = default_cells
         .iter()
-        .filter(|result| result.spec.arm == Arm::WholeLock)
+        .filter(|result| result.specification.arm == Arm::WholeLock)
         .filter(|result| nonzero_duplicates(result))
         .count();
     emit(
@@ -2627,10 +2627,10 @@ fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[PartitionCellRes
     let all_duplicates_zero = default_cells.iter().all(|result| !nonzero_duplicates(result));
     let read_set_equals_whole_everywhere = default_cells
         .iter()
-        .filter(|result| result.spec.arm == Arm::OptimisticReadSet)
+        .filter(|result| result.specification.arm == Arm::OptimisticReadSet)
         .all(|read_set_cell| {
-            let whole_spec = CellSpec { arm: Arm::OptimisticWholeVersion, ..read_set_cell.spec };
-            find_cell(default_cells, &whole_spec)
+            let whole_version_specification = CellSpecification { arm: Arm::OptimisticWholeVersion, ..read_set_cell.specification };
+            find_cell(default_cells, &whole_version_specification)
                 .is_some_and(|whole_cell| whole_cell.aggregate.retries_total == read_set_cell.aggregate.retries_total)
         });
     emit(
@@ -2642,15 +2642,15 @@ fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[PartitionCellRes
     );
     let mut read_set_differs_in_stage_one_or_three = 0;
     let mut read_set_below_whole_in_stage_two_same_shape = 0;
-    for read_set_cell in default_cells.iter().filter(|result| result.spec.arm == Arm::OptimisticReadSet) {
-        let whole_spec = CellSpec { arm: Arm::OptimisticWholeVersion, ..read_set_cell.spec };
-        let whole_cell = find_cell(default_cells, &whole_spec).expect("每个 O读 格都有同参数的 O整 格");
-        let stage_uses_base_version = read_set_cell.spec.stage.base_version_in_read_set();
+    for read_set_cell in default_cells.iter().filter(|result| result.specification.arm == Arm::OptimisticReadSet) {
+        let whole_version_specification = CellSpecification { arm: Arm::OptimisticWholeVersion, ..read_set_cell.specification };
+        let whole_cell = find_cell(default_cells, &whole_version_specification).expect("每个 O读 格都有同参数的 O整 格");
+        let stage_uses_base_version = read_set_cell.specification.stage.base_version_in_read_set();
         if stage_uses_base_version && whole_cell.aggregate.retries_total != read_set_cell.aggregate.retries_total {
             read_set_differs_in_stage_one_or_three += 1;
         }
-        if read_set_cell.spec.stage == ParallelStage::OnePublishCarriesManyTransactions
-            && read_set_cell.spec.shape_kind == ShapeKind::SameShape
+        if read_set_cell.specification.stage == ParallelStage::OnePublishCarriesManyTransactions
+            && read_set_cell.specification.shape_kind == ShapeKind::SameShape
             && read_set_cell.aggregate.retries_total < whole_cell.aggregate.retries_total
         {
             read_set_below_whole_in_stage_two_same_shape += 1;
@@ -2665,7 +2665,7 @@ fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[PartitionCellRes
     );
     let device_cells_with_truncation = default_cells
         .iter()
-        .filter(|result| result.spec.arm == Arm::DevicePartition)
+        .filter(|result| result.specification.arm == Arm::DevicePartition)
         .filter(|result| result.aggregate.truncated > 0)
         .count();
     emit(
@@ -2676,9 +2676,9 @@ fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[PartitionCellRes
             device_cells_with_truncation
         ),
     );
-    let literal_x_or_t = default_cells
+    let literal_lock_cells_with_tree_or_transaction_duplicates = default_cells
         .iter()
-        .filter(|result| result.spec.arm == Arm::LiteralLock)
+        .filter(|result| result.specification.arm == Arm::LiteralLock)
         .filter(|result| {
             result.aggregate.duplicate_total[Resource::TreeIdentifier.index()] > 0
                 || result.aggregate.duplicate_total[Resource::TransactionNumber.index()] > 0
@@ -2688,8 +2688,8 @@ fn emit_failure_clauses(emitter: &mut Emitter, default_cells: &[PartitionCellRes
         emitter,
         &format!(
             "name=verdict failure=7 clause=literal_lock_misses_shared_state triggered={} cells_with_x_or_t_duplicates={}",
-            literal_x_or_t > 0,
-            literal_x_or_t
+            literal_lock_cells_with_tree_or_transaction_duplicates > 0,
+            literal_lock_cells_with_tree_or_transaction_duplicates
         ),
     );
     let mut stage_flipping_columns: Vec<String> = Vec::new();
@@ -2732,20 +2732,20 @@ fn emit_geometry_sensitivity(emitter: &mut Emitter, default_cells: &[PartitionCe
         for stage in ALL_STAGES {
             let default_group = cells_of(default_cells, arm, stage);
             for question in DUPLICATE_QUESTIONS.into_iter().chain([Question::SynchronousRounds]) {
-                if question == Question::SynchronousRounds && !reports_rounds(&default_group[0].spec) {
+                if question == Question::SynchronousRounds && !reports_rounds(&default_group[0].specification) {
                     continue;
                 }
                 let mut differing = 0;
                 let mut strongest_default = 0u128;
                 let mut strongest_sample = 0u128;
                 for default_cell in &default_group {
-                    let sample_cell = find_cell(sample_cells, &default_cell.spec)
+                    let sample_cell = find_cell(sample_cells, &default_cell.specification)
                         .expect("每个默认格都有 D = 1 的同参数格");
                     let sample_aggregate = &sample_cell.aggregate;
                     let sample_rounds = &sample_cell.rounds;
                     let (default_judgement, sample_judgement, default_value, sample_value) =
                         if question == Question::SynchronousRounds {
-                            let serial = default_cell.spec.transaction_count;
+                            let serial = default_cell.specification.transaction_count;
                             let default_equal = default_cell.rounds.rounds.is_some_and(|rounds| usize::try_from(rounds).expect("轮数很小") == serial);
                             let sample_equal = sample_rounds.rounds.is_some_and(|rounds| usize::try_from(rounds).expect("轮数很小") == serial);
                             (
@@ -2849,20 +2849,20 @@ fn emit_segment_one(emitter: &mut Emitter) {
         std::process::exit(1);
     }
     for device_count in [DEFAULT_DEVICE_COUNT, SAMPLE_DEVICE_COUNT] {
-        for spec in control_cell_specs(device_count) {
-            let result = run_partition_cell(spec);
-            emit(emitter, &cell_line("control_cell", &result.spec, &result.aggregate));
+        for specification in control_cell_specifications(device_count) {
+            let result = run_partition_cell(specification);
+            emit(emitter, &cell_line("control_cell", &result.specification, &result.aggregate));
         }
     }
     let mut default_cells: Vec<PartitionCellResult> = Vec::new();
     let mut sample_cells: Vec<PartitionCellResult> = Vec::new();
     for device_count in [DEFAULT_DEVICE_COUNT, SAMPLE_DEVICE_COUNT] {
-        for spec in arm_cell_specs(device_count) {
-            let result = run_partition_cell(spec);
-            emit(emitter, &cell_line("cell", &result.spec, &result.aggregate));
-            emit(emitter, &trajectory_line(&result.spec, &result.aggregate));
-            if reports_rounds(&result.spec) {
-                emit(emitter, &rounds_line(&result.spec, &result.rounds));
+        for specification in arm_cell_specifications(device_count) {
+            let result = run_partition_cell(specification);
+            emit(emitter, &cell_line("cell", &result.specification, &result.aggregate));
+            emit(emitter, &trajectory_line(&result.specification, &result.aggregate));
+            if reports_rounds(&result.specification) {
+                emit(emitter, &rounds_line(&result.specification, &result.rounds));
             }
             if device_count == DEFAULT_DEVICE_COUNT {
                 default_cells.push(result);
@@ -2877,20 +2877,12 @@ fn emit_segment_one(emitter: &mut Emitter) {
     println!("{}", emitter.finish());
 }
 
-fn repository_root() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
-        .canonicalize()
-        .expect("仓根在 scripts/experiment-apparatus 往上两层")
-}
-
 fn preflight() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let root = repository_root();
-    let source = root.join("scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition.rs");
-    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    let source = concat!(env!("CARGO_MANIFEST_DIR"), "/e166_parallel_commit_shared_state_partition.rs");
+    let script = concat!(env!("CARGO_MANIFEST_DIR"), "/../../.claude/singlefs-ai-sop/scripts/preflight.py");
     let mut command = std::process::Command::new("python3");
-    command.arg(&script).arg("check").arg(&source);
+    command.arg(script).arg("check").arg(source);
     if arguments.iter().any(|argument| argument == "--force") {
         command.arg("--force");
     }
@@ -2941,7 +2933,7 @@ mod tests {
         transaction_count: usize,
         device_count: usize,
     ) -> Aggregate {
-        enumerate_spec(spec_of(arm, variant, stage, shape_kind, initial_has_file, transaction_count, device_count))
+        enumerate_specification(specification_of(arm, variant, stage, shape_kind, initial_has_file, transaction_count, device_count))
             .aggregate
     }
 
@@ -3193,7 +3185,7 @@ mod tests {
 
     #[test]
     fn one_region_for_two_transactions_makes_the_second_claim_wait_for_the_first_commit() {
-        let mut spec = spec_of(
+        let mut specification = specification_of(
             Arm::RegionPartition,
             ArmVariant::Normal,
             ParallelStage::PrepareParallelCommitSerial,
@@ -3202,8 +3194,8 @@ mod tests {
             2,
             DEFAULT_DEVICE_COUNT,
         );
-        spec.region_count = RegionCountChoice::Fixed(1);
-        let model = Model::new(spec);
+        specification.region_count = RegionCountChoice::Fixed(1);
+        let model = Model::new(specification);
         let enumeration = enumerate_schedules(&model, false);
         assert_eq!(enumeration.aggregate.schedules, 2, "先认领到区的那个事务先走完，只剩两种次序");
         assert_eq!(enumeration.aggregate.deadlocks, 0);
@@ -3215,7 +3207,7 @@ mod tests {
 
     #[test]
     fn inode_reservation_smaller_than_the_need_takes_a_fallback_interval_without_duplicates() {
-        let mut spec = spec_of(
+        let mut specification = specification_of(
             Arm::RegionPartition,
             ArmVariant::Normal,
             ParallelStage::OnePublishCarriesManyTransactions,
@@ -3224,8 +3216,8 @@ mod tests {
             2,
             DEFAULT_DEVICE_COUNT,
         );
-        spec.inode_reservation = InodeReservation::Fixed(1);
-        let model = Model::new(spec);
+        specification.inode_reservation = InodeReservation::Fixed(1);
+        let model = Model::new(specification);
         let aggregate = enumerate_schedules(&model, false).aggregate;
         assert_eq!(aggregate.fallbacks_total, aggregate.schedules * 2, "每个事务都要补一段区间");
         assert_eq!(aggregate.duplicate_total, [0; RESOURCE_COUNT]);
@@ -3236,7 +3228,7 @@ mod tests {
 
     #[test]
     fn inode_reservation_larger_than_the_need_leaves_numbers_unused() {
-        let mut spec = spec_of(
+        let mut specification = specification_of(
             Arm::RegionPartition,
             ArmVariant::Normal,
             ParallelStage::OnePublishCarriesManyTransactions,
@@ -3245,8 +3237,8 @@ mod tests {
             2,
             DEFAULT_DEVICE_COUNT,
         );
-        spec.inode_reservation = InodeReservation::Fixed(3);
-        let aggregate = enumerate_schedules(&Model::new(spec), false).aggregate;
+        specification.inode_reservation = InodeReservation::Fixed(3);
+        let aggregate = enumerate_schedules(&Model::new(specification), false).aggregate;
         assert_eq!(aggregate.unused_reserved_final_maximum, 4, "每个事务多预留 2 个，两个事务共 4 个号空洞");
         assert_eq!(aggregate.duplicate_total, [0; RESOURCE_COUNT]);
     }
@@ -3263,7 +3255,7 @@ mod tests {
             (Arm::DevicePartition, ArmVariant::PositiveControl, ParallelStage::PrepareParallelCommitSerial, 2),
         ] {
             let aggregate = partition_cell(arm, variant, stage, ShapeKind::SameShape, false, transaction_count, DEFAULT_DEVICE_COUNT);
-            assert_eq!(aggregate.duplicate_peak, aggregate.duplicate_max_single_schedule, "{}", arm.label(variant));
+            assert_eq!(aggregate.duplicate_peak, aggregate.duplicate_maximum_single_schedule, "{}", arm.label(variant));
             for resource in 0..RESOURCE_COUNT {
                 assert!(
                     aggregate.duplicate_positive_steps[resource] >= aggregate.duplicate_schedules[resource],
@@ -3305,7 +3297,7 @@ mod tests {
     // ── 同步轮次 ─────────────────────────────────────────────────────────────
 
     fn rounds_of(arm: Arm, stage: ParallelStage, shape_kind: ShapeKind, transaction_count: usize) -> RoundsOutcome {
-        simulate_rounds(&Model::new(spec_of(
+        simulate_rounds(&Model::new(specification_of(
             arm,
             ArmVariant::Normal,
             stage,
@@ -3349,7 +3341,7 @@ mod tests {
         // 默认的「不相交」形状（事务 0 只建 inode，其余只写用户数据单元）上，升序与倒序的每轮提交数一样（[2, 1]），
         // 变异 V19 在那里不敏感；这一组形状上升序是 [2, 1]、倒序是 [1, 2]：升序先让事务 0、1 同轮提交、事务 2 与两者都冲突；
         // 倒序先让事务 2 提交，事务 0 与 1 各与它冲突，下一轮才一起提交。总轮数在这两种次序下总是相同（n ≤ 7 的穷举见报告）。
-        let mut model = Model::new(spec_of(
+        let mut model = Model::new(specification_of(
             Arm::OptimisticReadSet,
             ArmVariant::Normal,
             ParallelStage::OnePublishCarriesManyTransactions,

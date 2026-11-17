@@ -32,17 +32,19 @@ use write_tables::{
     write_table_hash_of_final_sectors, write_table_hash_with_barriers, OperationKind, RecordedOperation,
 };
 
-const F12_WEAK_DESIGN: &str = include_str!("e164_crash_amplification_design_function_test/f12_design_weak.rs");
-const F12_STRICT_DESIGN: &str = include_str!("e164_crash_amplification_design_function_test/f12_design_strict.rs");
-const F12_WRITINGS: &str = include_str!("e164_crash_amplification_design_function_test/f12_writings.rs");
+const LABEL_COMPILATION_WEAK_DESIGN: &str = include_str!("e164_crash_amplification_design_function_test/label_compilation_design_weak.rs");
+const LABEL_COMPILATION_STRICT_DESIGN: &str = include_str!("e164_crash_amplification_design_function_test/label_compilation_design_strict.rs");
+const LABEL_COMPILATION_WRITINGS: &str = include_str!("e164_crash_amplification_design_function_test/label_compilation_writings.rs");
 
 /// 仓根：`E164_REPOSITORY_ROOT` 设了就用它（mutate.sh 只拷 research/，副本里没有 .git 与 crates/），否则取装置往上两层。
-/// `repository`、`variants` 两个子命令与单测 frozen_file_name_scan_covers_every_commit 读的就是真仓，单元键照旧把这里当运行期路径拒算（不改成取环境变量或当前目录）。
+/// 没设环境变量时从本源文件（清单目录里点名的一份文件，字节进单元键）往上取仓根：`repository`、`variants` 与单测读的是真仓，
+/// 但同一个二进制的 `models` 行要有单元键（目录直接拼出仓根会被当运行期路径拒算）。
 pub fn repository_root() -> PathBuf {
     if let Ok(root) = std::env::var("E164_REPOSITORY_ROOT") {
         return PathBuf::from(root);
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().expect("仓根在 scripts/experiments 往上两层")
+    let this_source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("e164_crash_amplification_design_function_test.rs");
+    this_source.ancestors().nth(3).expect("本源文件在 <根>/scripts/experiment-apparatus/ 下").canonicalize().expect("仓根在 scripts/experiment-apparatus 往上两层")
 }
 
 pub fn scratch_directory() -> PathBuf {
@@ -222,9 +224,9 @@ fn command_pipeline_models() {
 }
 
 /// F12 的五种写法，按「// writing N:」切开。
-fn f12_writings() -> Vec<(u32, String)> {
+fn label_compilation_writings() -> Vec<(u32, String)> {
     let mut writings: Vec<(u32, String)> = Vec::new();
-    for line in F12_WRITINGS.lines() {
+    for line in LABEL_COMPILATION_WRITINGS.lines() {
         if let Some(rest) = line.strip_prefix("// writing ") {
             let number: u32 = rest.split(':').next().and_then(|digits| digits.trim().parse().ok()).expect("写法编号");
             writings.push((number, String::new()));
@@ -242,8 +244,8 @@ fn command_label_compilation() {
     let mut weak_bypasses = 0usize;
     let mut strict_bypasses = 0usize;
     let mut strict_legal_compiles = false;
-    for (form, design) in [("weak", F12_WEAK_DESIGN), ("strict", F12_STRICT_DESIGN)] {
-        for (number, body) in f12_writings() {
+    for (form, design) in [("weak", LABEL_COMPILATION_WEAK_DESIGN), ("strict", LABEL_COMPILATION_STRICT_DESIGN)] {
+        for (number, body) in label_compilation_writings() {
             let source = format!("#![forbid(unsafe_code)]\n{design}\n{body}");
             let source_path = directory.join(format!("writing_{number}_{form}.rs"));
             std::fs::write(&source_path, &source).expect("写得了用例");
@@ -300,9 +302,19 @@ fn main() {
 
 fn preflight() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
-    let root = repository_root();
-    let source = root.join("scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs");
-    let script = root.join(".claude/singlefs-ai-sop/scripts/preflight.py");
+    // 准入脚本与本源文件：设了 E164_REPOSITORY_ROOT（mutate.sh 的副本）取那边，否则从本源文件（单元键里点名的一份已入库文件）往上取：
+    // 准入脚本在 .gitignore 的 .claude/singlefs-ai-sop 下，不直接拼进 env! 那一处（临时树里没有它，单元键会拒算）。
+    let own_source = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("e164_crash_amplification_design_function_test.rs");
+    let (source, script) = match std::env::var("E164_REPOSITORY_ROOT") {
+        Ok(root) => (
+            PathBuf::from(&root).join("scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs"),
+            PathBuf::from(&root).join(".claude/singlefs-ai-sop/scripts/preflight.py"),
+        ),
+        Err(_) => {
+            let script = own_source.parent().expect("源文件有父目录").join("../../.claude/singlefs-ai-sop/scripts/preflight.py");
+            (own_source, script)
+        }
+    };
     let mut command = std::process::Command::new("python3");
     command.arg(&script).arg("check").arg(&source);
     if arguments.iter().any(|argument| argument == "--force") {
@@ -393,18 +405,18 @@ mod tests {
         let root = repository_root();
         let output = common::run_allowed("git", &strings(&["rev-list", "--all", "--count"]), &root, &[]);
         let independent: usize = String::from_utf8_lossy(&output.stdout).trim().parse().expect("git 打出一个数");
-        assert_eq!(repository_scans_w3::all_commits(&root).len(), independent, "W3 扫到的提交数等于 git rev-list --all --count");
+        assert_eq!(repository_scans_frozen_file_names::all_commits(&root).len(), independent, "W3 扫到的提交数等于 git rev-list --all --count");
     }
 
     #[test]
-    fn a_node_reruns_when_its_own_target_file_changes() {
+    fn node_reruns_when_its_own_target_file_changes() {
         let closure = std::collections::BTreeSet::from(["singlefs-format".to_string()]);
         let untouched = std::collections::BTreeSet::new();
         let changed = vec!["crates/singlefs-verification/tests/a.rs".to_string()];
-        assert!(repository_scans_w5::node_reruns(&closure, &untouched, Some("crates/singlefs-verification/tests/a.rs"), &changed));
-        assert!(!repository_scans_w5::node_reruns(&closure, &untouched, Some("crates/singlefs-verification/tests/b.rs"), &changed));
+        assert!(repository_scans_crate_closure_reruns::node_reruns(&closure, &untouched, Some("crates/singlefs-verification/tests/a.rs"), &changed));
+        assert!(!repository_scans_crate_closure_reruns::node_reruns(&closure, &untouched, Some("crates/singlefs-verification/tests/b.rs"), &changed));
         let touched = std::collections::BTreeSet::from(["singlefs-format".to_string()]);
-        assert!(repository_scans_w5::node_reruns(&closure, &touched, None, &[]));
+        assert!(repository_scans_crate_closure_reruns::node_reruns(&closure, &touched, None, &[]));
     }
 
     #[test]
@@ -437,9 +449,9 @@ mod arms {
         write_table_hash_of_final_sectors, write_table_hash_with_barriers, RecordedOperation,
     };
 
-    const V5_TEST: (&str, &str, &str) = ("singlefs-verification", "crates/singlefs-verification/tests/new_pool_file_creation_publish.rs", "root_slots_system_configurations_and_journal_ring_hold_the_published_state");
-    const V11_TEST: &str = "pointer_record_and_entry_width_literals";
-    const F6_TEST: &str = "the_model_module_uses_only_the_standard_library_and_the_format_constants";
+    const PAYLOAD_CHECKSUM_OFFSET_VARIANT_TEST: (&str, &str, &str) = ("singlefs-verification", "crates/singlefs-verification/tests/new_pool_file_creation_publish.rs", "root_slots_system_configurations_and_journal_ring_hold_the_published_state");
+    const FORMAT_CONSTANT_LITERAL_VARIANT_TEST: &str = "pointer_record_and_entry_width_literals";
+    const MODEL_MODULE_STANDARD_LIBRARY_ONLY_TEST: &str = "the_model_module_uses_only_the_standard_library_and_the_format_constants";
 
     /// 输出比对（做）去掉的位置字段：`location=<文件>:<行>[:<列>]` 只留文件。只给变异 M12 改。
     fn strip_positions(output: &str) -> String {
@@ -461,13 +473,13 @@ mod arms {
         recording_code: String,
         judging_not_doing: String,
         judging_doing: String,
-        v5_node: [String; 3],
-        v11_node: [String; 3],
-        harness_lib_not_doing: String,
-        harness_lib_doing: String,
+        payload_checksum_offset_variant_node: [String; 3],
+        format_constant_literal_variant_node: [String; 3],
+        harness_library_not_doing: String,
+        harness_library_doing: String,
         probe_node: String,
         named_exit: BTreeMap<&'static str, i32>,
-        harness_lib_outcomes: BTreeMap<String, String>,
+        harness_library_outcomes: BTreeMap<String, String>,
     }
 
     fn three_digests(copy: &Path, files: &[String], rustc_text: &str) -> [String; 3] {
@@ -489,8 +501,8 @@ mod arms {
         let graph = dependency_graph(&copy, &[]).unwrap_or_else(|message| stop(&format!("副本上 cargo metadata --offline 起不来（S-offline）：{message}")));
         let rustc_text = rustc_version(&copy);
         let harness_files = closure_source_files(&copy, &graph, "singlefs-verification");
-        let mut v5_files = harness_files.clone();
-        v5_files.extend(target_files(&copy, V5_TEST.1));
+        let mut payload_checksum_offset_variant_files = harness_files.clone();
+        payload_checksum_offset_variant_files.extend(target_files(&copy, PAYLOAD_CHECKSUM_OFFSET_VARIANT_TEST.1));
         let format_files = closure_source_files(&copy, &graph, "singlefs-format");
         let own_source = own_source_files(&copy, &package_source_files(&copy, "crates/singlefs-verification"));
         let mut probe_files = harness_files.clone();
@@ -511,21 +523,21 @@ mod arms {
         }
         let mut named_exit = BTreeMap::new();
         if matches!(name, "V0" | "V5") {
-            named_exit.insert("v5_test", cargo_test(&copy, &["-p", V5_TEST.0, "--test", "new_pool_file_creation_publish", "--", V5_TEST.2]).exit_code);
+            named_exit.insert("v5_test", cargo_test(&copy, &["-p", PAYLOAD_CHECKSUM_OFFSET_VARIANT_TEST.0, "--test", "new_pool_file_creation_publish", "--", PAYLOAD_CHECKSUM_OFFSET_VARIANT_TEST.2]).exit_code);
         }
         if matches!(name, "V0" | "V11") {
-            named_exit.insert("v11_test", cargo_test(&copy, &["-p", "singlefs-format", "--lib", "--", V11_TEST]).exit_code);
+            named_exit.insert("v11_test", cargo_test(&copy, &["-p", "singlefs-format", "--lib", "--", FORMAT_CONSTANT_LITERAL_VARIANT_TEST]).exit_code);
         }
         let model_source = std::fs::read_to_string(copy.join("crates/singlefs-verification/src/model_comparison.rs")).unwrap_or_default();
-        if !model_source.contains(F6_TEST) {
-            stop(&format!("F6 那一条测试 {F6_TEST} 在副本里找不到（S-probe）"));
+        if !model_source.contains(MODEL_MODULE_STANDARD_LIBRARY_ONLY_TEST) {
+            stop(&format!("F6 那一条测试 {MODEL_MODULE_STANDARD_LIBRARY_ONLY_TEST} 在副本里找不到（S-probe）"));
         }
-        let mut harness_lib_outcomes = BTreeMap::new();
+        let mut harness_library_outcomes = BTreeMap::new();
         if matches!(name, "V0" | "V4" | "V8") {
             let run = cargo_test(&copy, &["-p", "singlefs-verification", "--lib"]);
-            harness_lib_outcomes = test_outcomes(&run.stdout);
+            harness_library_outcomes = test_outcomes(&run.stdout);
             named_exit.insert("harness_lib", run.exit_code);
-            named_exit.insert("f6_test", cargo_test(&copy, &["-p", "singlefs-verification", "--lib", "--", F6_TEST]).exit_code);
+            named_exit.insert("f6_test", cargo_test(&copy, &["-p", "singlefs-verification", "--lib", "--", MODEL_MODULE_STANDARD_LIBRARY_ONLY_TEST]).exit_code);
         }
         VariantObservation {
             histories,
@@ -534,13 +546,13 @@ mod arms {
             recording_code: digest_by_crate_closure(&copy, &closure_source_files(&copy, &graph, "singlefs-core"), &BTreeSet::new(), &rustc_text),
             judging_not_doing: packages_lexical_digest(&copy, &["crates/singlefs-checker", "crates/singlefs-format"]),
             judging_doing: packages_lexical_digest(&copy, &["crates/singlefs-checker", "crates/singlefs-format", "crates/singlefs-verification"]),
-            v5_node: three_digests(&copy, &v5_files, &rustc_text),
-            v11_node: three_digests(&copy, &format_files, &rustc_text),
-            harness_lib_not_doing: digest_by_crate_closure(&copy, &harness_files, &BTreeSet::new(), &rustc_text),
-            harness_lib_doing: digest_by_crate_closure(&copy, &harness_files, &own_source, &rustc_text),
+            payload_checksum_offset_variant_node: three_digests(&copy, &payload_checksum_offset_variant_files, &rustc_text),
+            format_constant_literal_variant_node: three_digests(&copy, &format_files, &rustc_text),
+            harness_library_not_doing: digest_by_crate_closure(&copy, &harness_files, &BTreeSet::new(), &rustc_text),
+            harness_library_doing: digest_by_crate_closure(&copy, &harness_files, &own_source, &rustc_text),
             probe_node: digest_by_crate_closure(&copy, &probe_files, &BTreeSet::new(), &rustc_text),
             named_exit,
-            harness_lib_outcomes,
+            harness_library_outcomes,
         }
     }
 
@@ -784,18 +796,18 @@ mod arms {
                 changed(&base.judging_doing, &observation.judging_doing)
             ));
         }
-        let v4 = &observations["V4"];
-        let differing_tests: Vec<&String> = base.harness_lib_outcomes.iter().filter(|(test, outcome)| v4.harness_lib_outcomes.get(*test) != Some(outcome)).map(|(test, _)| test).collect();
+        let harness_library_patch_observation = &observations["V4"];
+        let differing_tests: Vec<&String> = base.harness_library_outcomes.iter().filter(|(test, outcome)| harness_library_patch_observation.harness_library_outcomes.get(*test) != Some(outcome)).map(|(test, _)| test).collect();
         suffix.emit(&format!(
             "E7RESULT name=q3_lib tests_in_v0={} tests_in_v4={} differing_outcomes={} differing={}",
-            base.harness_lib_outcomes.len(), v4.harness_lib_outcomes.len(), differing_tests.len(),
+            base.harness_library_outcomes.len(), harness_library_patch_observation.harness_library_outcomes.len(), differing_tests.len(),
             if differing_tests.is_empty() { "none".to_string() } else { differing_tests.iter().map(|test| test.as_str()).collect::<Vec<&str>>().join(",") }
         ));
         let methods = ["by_function", "by_walked_files", "by_crate_closure"];
         let mut misses = [0usize; 3];
         for (name, key) in [("V5", "v5_test"), ("V11", "v11_test")] {
             let observation = &observations[name];
-            let (base_node, variant_node) = if name == "V5" { (&base.v5_node, &observation.v5_node) } else { (&base.v11_node, &observation.v11_node) };
+            let (base_node, variant_node) = if name == "V5" { (&base.payload_checksum_offset_variant_node, &observation.payload_checksum_offset_variant_node) } else { (&base.format_constant_literal_variant_node, &observation.format_constant_literal_variant_node) };
             let base_exit = base.named_exit.get(key).copied().unwrap_or(-1);
             let variant_exit = observation.named_exit.get(key).copied().unwrap_or(-1);
             let flipped = base_exit == 0 && variant_exit != 0;
@@ -819,15 +831,15 @@ mod arms {
             let doing_red = node_same && strip_positions(left) != strip_positions(right);
             suffix.emit(&format!("E7RESULT name=q5_red variant={name} node_code_same={node_same} not_doing_red={} doing_red={} left={} right={}", u8::from(not_doing_red), u8::from(doing_red), left.replace(' ', "|"), right.replace(' ', "|")));
         }
-        let v8 = &observations["V8"];
+        let comment_only_model_patch_observation = &observations["V8"];
         let base_exit = base.named_exit.get("f6_test").copied().unwrap_or(-1);
-        let v8_exit = v8.named_exit.get("f6_test").copied().unwrap_or(-1);
-        let exit_changed = base_exit != v8_exit;
-        let not_doing_changed = changed(&base.harness_lib_not_doing, &v8.harness_lib_not_doing);
-        let doing_changed = changed(&base.harness_lib_doing, &v8.harness_lib_doing);
+        let comment_only_model_patch_exit = comment_only_model_patch_observation.named_exit.get("f6_test").copied().unwrap_or(-1);
+        let exit_changed = base_exit != comment_only_model_patch_exit;
+        let not_doing_changed = changed(&base.harness_library_not_doing, &comment_only_model_patch_observation.harness_library_not_doing);
+        let doing_changed = changed(&base.harness_library_doing, &comment_only_model_patch_observation.harness_library_doing);
         suffix.emit(&format!(
-            "E7RESULT name=q6 base_exit={base_exit} v8_exit={v8_exit} exit_changed={exit_changed} not_doing_digest_changed={not_doing_changed} doing_digest_changed={doing_changed} not_doing_miss={} doing_miss={} doing_changed_on_v6={}",
-            u8::from(exit_changed && !not_doing_changed), u8::from(exit_changed && !doing_changed), changed(&base.harness_lib_doing, &observations["V6"].harness_lib_doing)
+            "E7RESULT name=q6 base_exit={base_exit} v8_exit={comment_only_model_patch_exit} exit_changed={exit_changed} not_doing_digest_changed={not_doing_changed} doing_digest_changed={doing_changed} not_doing_miss={} doing_miss={} doing_changed_on_v6={}",
+            u8::from(exit_changed && !not_doing_changed), u8::from(exit_changed && !doing_changed), changed(&base.harness_library_doing, &observations["V6"].harness_library_doing)
         ));
         let targets = own_source_targets(root);
         for (target, files) in &targets {
@@ -838,9 +850,9 @@ mod arms {
             suffix.emit(&format!(
                 "E7RESULT name=full_design_code variant={name} judging_changed={} v5_node_changed={} v11_node_changed={} harness_lib_node_changed={} probe_node_changed={} recording_code_changed={}",
                 changed(&base.judging_doing, &observation.judging_doing),
-                changed(&base.v5_node[2], &observation.v5_node[2]),
-                changed(&base.v11_node[2], &observation.v11_node[2]),
-                changed(&base.harness_lib_doing, &observation.harness_lib_doing),
+                changed(&base.payload_checksum_offset_variant_node[2], &observation.payload_checksum_offset_variant_node[2]),
+                changed(&base.format_constant_literal_variant_node[2], &observation.format_constant_literal_variant_node[2]),
+                changed(&base.harness_library_doing, &observation.harness_library_doing),
                 changed(&base.probe_node, &observation.probe_node),
                 changed(&base.recording_code, &observation.recording_code)
             ));
@@ -1698,7 +1710,7 @@ mod json {
     }
 }
 
-mod repository_scans_w3 {
+mod repository_scans_frozen_file_names {
     //! E164 W3：登记时冻结文件名在全部 git 历史上撞不撞（跑前登记 5.7「W3」）。只读 git。
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -1858,7 +1870,7 @@ mod repository_scans_w3 {
     }
 }
 
-mod repository_scans_w5 {
+mod repository_scans_crate_closure_reruns {
     //! E164 W5：节点代码按 crate 闭包取时，一次改动让多少节点重跑（跑前登记 5.7「W5」）。只读 git 与 `cargo metadata --offline`。
 
     use std::collections::{BTreeMap, BTreeSet};
@@ -3032,8 +3044,8 @@ mod repository_scans {
     pub fn command_repository() {
         let root = crate::repository_root();
         let suffix = ProductSuffix::current(&root);
-        crate::repository_scans_w3::scan_frozen_file_names(&root, &suffix);
-        crate::repository_scans_w5::scan_rerun_surface(&root, &suffix);
+        crate::repository_scans_frozen_file_names::scan_frozen_file_names(&root, &suffix);
+        crate::repository_scans_crate_closure_reruns::scan_rerun_surface(&root, &suffix);
         crate::fingerprints::scan_fingerprints(&root, &suffix);
     }
 }

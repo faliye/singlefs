@@ -1,0 +1,6 @@
+# 每行三段，制表符分隔：变异名、原文、替换文（原文与替换文里的 \n 表示换行）；e209_spike_cause_counters.py --mutation-check 逐条改坏、跑 --selftest，要退非 0。
+merge_end_after_the_release_loses_the_geometry	&rewritten, previous_tree, &geometry, {READINGS_MODULE}RoundExit::ReleaseNotCovered);	&rewritten, previous_tree, {READINGS_MODULE}RoundExit::ReleaseNotCovered);
+merge_end_after_the_placements_loses_the_geometry	&rewritten, previous_tree, &geometry, {READINGS_MODULE}RoundExit::PlacementNotCovered);	&rewritten, previous_tree, {READINGS_MODULE}RoundExit::PlacementNotCovered);
+the_settled_exit_forgets_the_final_nodes	open.final_list = rewritten_by_the_plan.iter().map(node_text).collect();	open.final_list = Vec::new();
+the_write_row_is_read_as_a_warm_up	if order == 0 { "write_row" } else { "warm_up" }	if order == 0 { "warm_up" } else { "write_row" }
+the_first_round_does_not_keep_the_pointer_graph	open.pointer_graph = pointer_graph_of(previous_tree);	open.pointer_graph = Vec::new();

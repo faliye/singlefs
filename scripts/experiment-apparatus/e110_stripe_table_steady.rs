@@ -246,7 +246,7 @@ mod tests {
     /// 「甲更省的轮数」那个计数用 `<` 还是 `<=`，在本模型里**等价**——
     /// 主负载下两条臂的字节从不相等（非溢出轮 627200 vs 659968，溢出轮 692736 vs 659968）。
     /// 等价变异不算盲区，但要把等价性写成测试留档
-    /// （`.claude/singlefs-ai-sop/rules/test-discipline.md`「等价变异不算盲区，但要分开记」）。
+    /// （`.claude/rules/test-discipline.md`「等价变异不算盲区，但要分开记」）。
     #[test]
     fn cheaper_count_comparison_is_equivalent_here_because_arms_never_tie() {
         for occupied_container_slots in 0..583u64 {

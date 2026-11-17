@@ -17,7 +17,7 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
   rows_orchestrator_segment_two.py --selftest [--cells 格,…]
       假驱动、假 task-server 分片（fake_task_server.py）、假机器清单走一遍各格（同目录的 fake_*），连同第一段编排器自己的 --selftest；自证进程是子进程的收养者
       （PR_SET_CHILD_SUBREAPER），每一格之后收掉它起的、还活着的每个进程，末尾数一遍自己的进程树，临时目录（自证给子进程的 TMPDIR）删掉；
-      末尾逐个打开弄坏开关核它红在点名的格。末行「自证 N 项，红 M」。
+      末尾逐个打开弄坏开关核它红在点名的格。每格（组）与每个开关判完当场打一行进度。末行「自证 N 项，红 M」。
 
 退出码：0 跑完（合并、判法、跨机对照、超时重跑都过）；1 停机或某一行没跑成（日志与 sequence.log 写停在哪、为什么）；2 用法错；
   3 第一段编排器不是钉的那一份（SEGMENT_ONE_ORCHESTRATOR_SHA256）；78 运行条件不满足（多机配置判不过、某台连不上（别的台的预检没过）、各台的线程都不够一条线道、
@@ -43,8 +43,8 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
   ③ 产物 <P>-rows-substitution-coordination<S>.out：每个用过补位的行一行、重做过的行、末行 name=verdict substitute_collisions=0。
 产物（照第一段「产物与合并」，按不跑执行器改了两处：分片里没有 freeze_check 行，有就拒；判法换成 check_product.py rows_without_executor，
   它照 rows 判，只把不跑执行器的那两处换掉、补位补不上的几类不算红；合成的先写进分片目录 merged/ 判，判过了才装进 research/results）：
-  <P>-rows-driver<S>.out 与 -timing.out：这一趟各行的分片 + 更早几趟已做完的行由本机一个驱动重报的分片（同键做完的行按键复用、直接读回；
-  上一次是超时、编不过或测量管子缺陷的行，驱动照自己的规则重做），按写死的规则合成：
+  <P>-rows-driver<S>.out 与 -timing.out：这一趟各行的分片 + 更早几趟已做完的行由本机一个驱动带 --report-only 重报的分片（不编、不跑装置，
+  行照 row-result.tsv 原样报，超时、编不过与测量管子缺陷的行也原样报；驱动不按键复用，做没做完由这一层照行目录判），按写死的规则合成：
   ① 各分片的 name=row_time_limit 行逐字相同；② snapshot_digest 与 files 等于冻结树快照；③ row 行按序号排，不许重复，行集等于这一趟的行集；
   ④ 没有 freeze_check 行；⑤ table 行：lanes、rows、sum_of_row_ns 相加，table_wall_ns 取最大，threads_per_lane 去重升序，加 shards=；
   ⑥ 每个分片一行 merged_shard，计时按 row_device 分块、块按序号排、行集与产物的相等；⑦ 认不得的行拒。
@@ -52,8 +52,8 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
   （同一张补位排除表），比三样：row 行去四个耗时列、device.out 的 E7RESULT 行、导出 z1 五个文件；o3 那一格不跑执行器就没有，报 identical=not_run。
   有一样不同就停机（退 1）；产物 <P>-rows-cross-host-check<S>.out 与 R 那次的 <P>-rows-cross-host-row-<R>-driver<S>.out。只有一台时报 not_run。
 超时重跑（主 agent 派发写定；登记修订 2 第 2.5 节原文「第二段照原登记读法 5 与补位规则，不重跑」，所以这一份只另出产物、不改合成的整表那一份）：
-  整表产物里 device_exit=253 的行，单线道，驱动参数与整表那一步完全一样、行输出根也是整表那个根：驱动按键复用，在这个根里看到同键的上一次结果是超时，
-  就自己把限时乘 3（重做中途停下，行目录里的标记文件 timed-out-before 还记着）；上一次超时的行目录在编排那一台的行输出根里，所以跑在编排那一台，
+  整表产物里 device_exit=253 的行，单线道，驱动参数是整表那一步的那一串末尾另带 --timed-out-before（RERUN_FLAGS：调用方显式给，驱动照它把限时乘 3、
+  row-result.tsv 记 timed_out_before=true），行输出根也是整表那个根（驱动把那一行上一次超时的行目录删掉重做）；行输出根在编排那一台，所以跑在编排那一台，
   用那一行原来那张补位排除表；产物 <P>-rows-timeout-rerun-driver<S>.out。
 别的台与经 task-server：同第一段文件头「机器」「经 task-server」（文件头第二行声明了 run 这一种分片，服务照计划、各片、合并三步起；
   编排在片号 0 那一片，别的台的行经 shard_relay.py 交给落在那一台的那一片代跑，同一个绝对路径读写共享根，不送、不取回；
@@ -84,11 +84,14 @@ driver_e171_r1_s1_revision_6_cross_host_check 跟着红）。这一层按路径�
       「✗ 自证 e2e-regrow：」
   ROWS_ORCHESTRATOR_TWO_BREAK=peer-command-gets-memory-cap  转交给别的台的命令又带上 --memory-cap 外层上限（shard_relay.py 不认、退 2）
       「✗ 自证 e2e-two-hosts：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=rerun-without-flag  超时重跑的驱动参数不带 --timed-out-before（RERUN_FLAGS 空着）
+      「✗ 自证 e2e-two-hosts：」
+  ROWS_ORCHESTRATOR_TWO_BREAK=carry-without-report-only  重报已做完的行那个驱动（run_carry_two）不带 --report-only
+      「✗ 自证 e2e-resume：」
 """
 from __future__ import annotations
 
 import argparse
-import concurrent.futures
 import ctypes
 import dataclasses
 import functools
@@ -111,8 +114,8 @@ import urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 SEGMENT_ONE_ORCHESTRATOR_PATH = os.path.join(HERE, "rows_orchestrator.py")
 # 钉的是第一段编排器此刻的内容：跑那一趟的 1dcfb8d0… 那一版与此刻差的不只是登记过的搬迁（每台线程改取登记值等），倒换不回去
-SEGMENT_ONE_ORCHESTRATOR_SHA256 = "2b8fbdcc321cde368524d3c86a6486cfa01b9be6db3253ba4d84a3ec2a1f608f"
-SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 35 项，红 0"
+SEGMENT_ONE_ORCHESTRATOR_SHA256 = "00ffd24c3a85361f0ff0355c4ac2cc2efded989c308842f1b2ac6a5ca85b076b"
+SEGMENT_ONE_SELFTEST_LAST_LINE = "自证 37 项，红 0"
 TABLE_FILES = ("bad-implementations-step-8.tsv", "bad-implementations-step-4-only.tsv")
 ROW_FLAGS = ("--streams", "1,2", "--no-executor")
 # s4 整表那一趟各行的计时（旧树、旧装置，流一流二）：只拿来排先后（文件头「派发」），不进任何判据
@@ -189,8 +192,10 @@ class StepTwo:
     rerun: bool = False   # 超时重跑：行输出根与参数同整表那一步，做完的标志是 row-result.tsv 里 timed_out_before=true
 
 
+# 超时重跑由调用方显式给驱动的参数：限时再乘 3（驱动不看行输出根里上一次的结果）。弄坏开关 rerun-without-flag 下不给
+RERUN_FLAGS = () if broken("rerun-without-flag") else ("--timed-out-before",)
 ROWS_STEP = StepTwo("rows", "rows-driver", "", ROW_FLAGS)
-RERUN_STEP = StepTwo("rerun", "rows-timeout-rerun-driver", "", ROW_FLAGS, rerun=True)
+RERUN_STEP = StepTwo("rerun", "rows-timeout-rerun-driver", "", ROW_FLAGS + RERUN_FLAGS, rerun=True)
 
 
 def cross_host_step(row: int) -> StepTwo:
@@ -225,7 +230,7 @@ def step_of(context: ContextTwo, key: str) -> StepTwo:
 
 def whole_table_rows(research_directory: str) -> tuple[int, ...]:
     """两张表的整表编号：第一列之并，升序（E171 第 2 次重跑登记读法 4：撤掉的行留空号，行集不写死）；一行都读不出或编号重了就停。"""
-    sys.path.insert(0, research_directory)
+    sys.path.insert(0, HERE)   # 读表的帮手 bad_implementation_table 住在本文件所在的目录；research_directory 只定读哪两张表
     import bad_implementation_table  # noqa: E402
     numbers = sorted(row.number for name in TABLE_FILES for row in bad_implementation_table.read_selected_rows(os.path.join(research_directory, name)))
     repeated = sorted({number for number in numbers if numbers.count(number) > 1})
@@ -728,10 +733,12 @@ def run_queue_two(context: ContextTwo, slots: list[tuple[int, int, int]], jobs: 
 
 
 def run_carry_two(context: ContextTwo, step: StepTwo, rows: tuple[int, ...], expected_hashes: dict[str, str]) -> dict:
-    """更早几趟（或这一趟里被重做顶掉的分片）已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置）。
-    线程取每台线程（登记值）：merge_step_two 在 run_queue_two 交回之后才调它，不与线道同时跑。"""
+    """更早几趟（或这一趟里被重做顶掉的分片）已做完的行：本机一个驱动带 --report-only 从行目录重报（不编、不跑装置）。
+    线程取每台线程（登记值）：merge_step_two 在 run_queue_two 交回之后才调它，不与线道同时跑。
+    弄坏开关 carry-without-report-only 下不带 --report-only（驱动把这几行删掉重跑）。"""
     work_root = os.path.join(context.attempt_dir, f"carry-work-{step.key}")
-    process, record = launch_local_two(context, expected_hashes, f"{step.key}-carry", step, rows, one.registered_host_threads(), work_root, "carry", set())
+    reporting = step if broken("carry-without-report-only") else dataclasses.replace(step, flags=step.flags + ("--report-only",))
+    process, record = launch_local_two(context, expected_hashes, f"{step.key}-carry", reporting, rows, one.registered_host_threads(), work_root, "carry", set())
     code = process.wait()
     if one.STOP.is_set():
         raise one.Interrupted()
@@ -998,7 +1005,7 @@ def run_two(context: ContextTwo, plan_only: bool) -> int:
 def context_from_arguments_two(arguments: argparse.Namespace) -> ContextTwo:
     arguments.resume_tag = "-s2"  # 只进别的台那一趟的标签（第一段编排器的 peer_label 用它），产物名与行输出根不接它
     base = one.context_from_arguments(arguments)
-    return ContextTwo(**{field.name: getattr(base, field.name) for field in dataclasses.fields(one.Context)})
+    return ContextTwo(**{field.name: vars(base)[field.name] for field in dataclasses.fields(one.Context)})
 
 
 def main(argument_list: list[str]) -> int:
@@ -1151,7 +1158,7 @@ def cells_planning() -> list[tuple[str, bool, str]]:
 
 def cells_substitution() -> list[tuple[str, bool, str]]:
     results = []
-    sys.path.insert(0, os.path.join(REAL_REPOSITORY, one.RESEARCH_RELATIVE))
+    sys.path.insert(0, HERE)
     import bad_implementation_table  # noqa: E402
     import row_driver  # noqa: E402
     names = {"实二五 准入：漏掉树表那一项, 第二处", "C375 实现 | 全池承诺量", "g1"}
@@ -1311,7 +1318,7 @@ def fake_world_two(root: str, rows: str = "1,2,3,4,5,6", hosts_code: int = 0, ex
     frozen_reference = "e170-r2-o3-spec-executor-2026-11-05-refreeze-executor.out"
     os.symlink(os.path.join(REAL_REPOSITORY, "research", "results", frozen_reference), os.path.join(results, frozen_reference))
     os.makedirs(os.path.join(repo, "scripts", "experiment-apparatus", "target", "fake-dumps"))
-    sys.path.insert(0, os.path.join(REAL_REPOSITORY, one.RESEARCH_RELATIVE))
+    sys.path.insert(0, HERE)
     import row_driver  # noqa: E402
     digest = row_driver.snapshot_digest(tree)[0]
     assignments = ("HOSTS='127.0.0.1 192.0.2.67'\nTHIS_HOST_ADDRESS=127.0.0.1\nPEER_HOST_ADDRESS=192.0.2.67\nCARGO_BIN_DIRECTORY_BY_HOST='127.0.0.1=/fake/cargo 192.0.2.67=/fake/cargo'\nBUILD_ROOT_BY_HOST='127.0.0.1=/fake/builds 192.0.2.67=/fake/peer'\nSLICE_MEMORY_CAP_BY_HOST='127.0.0.1=50G 192.0.2.67=50G'\n"
@@ -1585,9 +1592,16 @@ SWITCH_CELLS_TWO = {"sweep-skipped": "no-leftover-processes", "temporary-kept": 
                     "merge-allows-freeze-lines": "merge-refuse-freeze-line", "merge-allows-duplicates": "merge-refuse-duplicate",
                     "exclusions-not-given": "e2e-substitution-sequential", "collisions-ignored": "e2e-substitution-collision",
                     "cross-host-ignores-dumps": "cross-host-compare", "resume-reruns-finished": "e2e-resume", "harvest-skipped": "e2e-two-hosts",
-                    "regrow-skipped": "e2e-regrow", "peer-command-gets-memory-cap": "e2e-two-hosts"}
-END_TO_END_CELLS = {"e2e-two-hosts": two_hosts_cell, "e2e-substitution-sequential": substitution_sequential_cell,
-                    "e2e-substitution-collision": substitution_collision_cell, "e2e-resume": resume_cell_two, "e2e-regrow": regrow_cell}
+                    "regrow-skipped": "e2e-regrow", "peer-command-gets-memory-cap": "e2e-two-hosts",
+                    "rerun-without-flag": "e2e-two-hosts", "carry-without-report-only": "e2e-resume"}
+
+
+def end_to_end_cell_functions():
+    """端到端各格，格名到函数。表写在函数体里：写成模块级赋值，会在 import 这个模块时把全部端到端格连同它们起的子进程拖进 import 一方的判法单元闭包。"""
+    return {"e2e-two-hosts": two_hosts_cell, "e2e-substitution-sequential": substitution_sequential_cell,
+            "e2e-substitution-collision": substitution_collision_cell, "e2e-resume": resume_cell_two, "e2e-regrow": regrow_cell}
+
+
 REFUSAL_CELLS = ("e2e-config-refused", "e2e-switch-off", "e2e-preflight-refused")
 
 
@@ -1615,17 +1629,21 @@ def selftest(argument_list: list[str]) -> int:
     for signal_number in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(signal_number, interrupt)
     try:
-        results = (cells_planning() + cells_substitution() + cells_merge_two() + cells_judge(scratch) + cells_cross_host_two(scratch))
-        # 端到端各格、第一段自证互不相干（各自一个假世界、一个临时目录），并起来跑；收尾在这一批都退了之后做
-        batch = [(name, functools.partial(cell, scratch), False) for name, cell in END_TO_END_CELLS.items() if wanted is None or name in wanted]
+        results = []
+        for group_name, group in (("planning", cells_planning), ("substitution", cells_substitution), ("merge", cells_merge_two),
+                                  ("judge", functools.partial(cells_judge, scratch)), ("cross-host", functools.partial(cells_cross_host_two, scratch))):
+            started = time.monotonic()
+            found = group()
+            one.say_cell_progress(f"{group_name} 那一组", found, started)
+            results += found
+        # 端到端各格、第一段自证互不相干（各自一个假世界、一个临时目录），并起来跑、每格判完当场打一行进度（第一段编排器的 cells_in_parallel）；
+        # 收尾在这一批都退了之后做
+        batch = [(name, functools.partial(cell, scratch), False) for name, cell in end_to_end_cell_functions().items() if wanted is None or name in wanted]
         if wanted is None or wanted & set(REFUSAL_CELLS):
             batch.append(("e2e-refusals", functools.partial(refusal_cells_two, scratch), True))
         if wanted is None or "segment-one-selftest" in wanted:
             batch.append(("segment-one-selftest", segment_one_selftest_cell, False))
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(batch))) as pool:
-            futures = [(pool.submit(function), several) for _, function, several in batch]
-            for future, several in futures:
-                results += future.result() if several else [future.result()]
+        results += one.cells_in_parallel(batch)
         collect("端到端那一批")
         results.append(straggler_cell(scratch))
         switch_results = []
@@ -1633,6 +1651,7 @@ def selftest(argument_list: list[str]) -> int:
             switches = [(switch, cell, subprocess.Popen(["python3", "-B", os.path.abspath(__file__), "--selftest", "--cells", cell], stdout=subprocess.PIPE,
                                                          stderr=subprocess.STDOUT, text=True, env=dict(os.environ, **{BREAK_VARIABLE: switch, SELFTEST_VARIABLE: "1"})))
                         for switch, cell in SWITCH_CELLS_TWO.items()]
+            started = time.monotonic()
             for switch, cell, process in switches:
                 try:
                     output, _ = process.communicate(timeout=900)
@@ -1640,6 +1659,7 @@ def selftest(argument_list: list[str]) -> int:
                     process.kill()
                     output, _ = process.communicate()
                 switch_results.append((switch, cell, process.returncode == 1 and f"✗ 自证 {cell}：" in output, process.returncode))
+                print(f"  弄坏开关 {switch} 判完：{'红了' if switch_results[-1][2] else '没红'}，用时 {time.monotonic() - started:.0f} 秒", flush=True)
             sweep_own_processes()  # 弄坏开关那几趟有意留下的（例如 sweep-skipped 留下的那个）过继到这里，收掉，不算这一趟的遗留
         collect("末尾")
     except SelftestInterrupted as interrupted:

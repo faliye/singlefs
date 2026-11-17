@@ -40,6 +40,8 @@ def registered_threads_in_the_file() -> int:
 def environment_without_the_cap() -> dict:
     environment = dict(os.environ)
     environment.pop("SINGLEFS_THREAD_CAP", None)
+    for name in frozen_o3.CHILD_THREAD_VARIABLES:   # 服务给任务设了这一组：留着它们，「设了分到的线程」的断言在服务里跑时判不出
+        environment.pop(name, None)
     return environment
 
 
@@ -175,10 +177,10 @@ class SegmentOneSharesTests(TemporaryDirectoryCase):
         self.assertEqual(thread_variables_in(environment), every_thread_variable_set_to(31))
         self.assertEqual(environment.get("PYTHONDONTWRITEBYTECODE"), "1")
 
-    def test_the_thread_variables_are_the_twenty_the_service_sets(self) -> None:
-        self.assertEqual(len(frozen_o3.CHILD_THREAD_VARIABLES), 20)
-        self.assertEqual(len(set(frozen_o3.CHILD_THREAD_VARIABLES)), 20)
-        for name in ("CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "SINGLEFS_THREAD_CAP", "SINGLEFS_CRASH_JUDGE_CPU_THREADS"):
+    def test_the_thread_variables_are_the_nineteen_the_service_sets(self) -> None:
+        self.assertEqual(len(frozen_o3.CHILD_THREAD_VARIABLES), 19)
+        self.assertEqual(len(set(frozen_o3.CHILD_THREAD_VARIABLES)), 19)
+        for name in ("CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "SINGLEFS_THREAD_CAP"):
             self.assertIn(name, frozen_o3.CHILD_THREAD_VARIABLES)
         base = {"KEPT": "x", "SINGLEFS_THREAD_CAP": "31"}
         self.assertEqual(frozen_o3.thread_environment(7, base), dict(every_thread_variable_set_to(7), KEPT="x"))

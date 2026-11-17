@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# admission: always 每一次调都照此刻的仓、变异表与结果文件判还差哪几个变体，上一次跑完不替这一次作保
+# admission: always 每一趟照此刻的根、变异表与判定库现算每个变体的键、现查 prune-server 里的按项判定（long_run_item_verdicts.py）；上一趟的结论只经判定库按键复用，产物与草稿目录不替这一趟作保
 # run-condition: command cargo python3 nice git rsync
 # E165（恢复重放有界穷举与变异杀伤界）第二段：量变异表里动 replay_journal 那五个函数的每个变体在小界内红不红、首红的 N。
 # 登记：research/prompts/e165-preregistration.md 5.5 第二段、5.6 的界、第九节甲表、第十二节修订第 10、11、12 条；
@@ -78,10 +78,20 @@
 #       「副本应当照共用库的闭包拷：…」（实际只有 Cargo.toml、Cargo.lock 与 crates/ 底下的）
 #   E165_KILL_BOUNDS_BREAK=copyconfigurationunset  副本里编、跑装置不交多机配置（--root 给的根不在 git 里，照它的位置找不到配置）
 #       「副本里起命令的多机配置应当取脚本所在的仓那一份：…」（实际没设得 None）
-#   下面两项外面打开时自证的每一趟都带着它（drive() 照下面七项那一段的带法）：
+#   下面六项外面打开时自证的每一趟都带着它（drive() 照下面九项那一段的带法）：
+#   E165_KILL_BOUNDS_BREAK=outputoverwritten  三套整轮的 --output 指到已经存在的文件照收（开跑之后整份换掉那一份）
+#       「--output 指到已经存在的文件应当退 2、出路写换一个路径或先挪走那一份、一次不编、那一份一个字不动」（实际退 0、编 7 次）
+#   E165_KILL_BOUNDS_BREAK=ledgeroverwritten  不给 --profile 那一套的 --ledger 指到已经存在的文件照收（开跑之后整份换掉那一份）
+#       「--ledger 指到已经存在的文件应当退 2、出路写换一个路径或先挪走那一份、一次不编、那一份一个字不动」（实际退 0、编 7 次）
+#   E165_KILL_BOUNDS_BREAK=judgeoffthetree  自证起的那几趟 judge: 另带 judge-root:..（判法闭包换到假树的上一层去算：那里没有假判法，每一项都拒算）
+#       「改了假树里的判法应当每一项都现判、一项不拒算」（实际拒算 6）
+#       连带红的格：「✗ 自检：续跑应当只编 5 次」、「✗ 自检：续跑：库里复用的三项」、「✗ 自检：全部复用的一趟应当一次不编」、「✗ 自检：账写完而钉表没钉时驱动当场核钉全」、
+#       「✗ 自检：判过的一对重交同一条命令应当全部复用、照钉照核」、「✗ 自检：弄坏开关 reuseignored 开着时」、「✗ 自检：复用那六格」（复用格随 reuse-cells 带进去，六格都红）
+#   E165_KILL_BOUNDS_BREAK=judgewholedriver  真跑的按项判定请求里判法写整份驱动（judge:<本脚本>），不写判法模块里判一个变体的那几个函数
+#       「真跑的按项判定请求里判法应当是判法模块里判一个变体的函数与写基线那一行的函数（三套各两个）、judge-root 是脚本所在的仓，不是整份驱动」（实际三套都是 judge:scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh）
 #   E165_KILL_BOUNDS_BREAK=pincheckskipped  钉红例时不跑 --check（当场追加之后不核钉全）
-#       「账写完而钉表没钉时驱动当场核钉全应当判红、退 8、一次不编」（实际退 0）、「已收尾的一对重跑同一条命令应当只重做钉红例」（实际「核了 没核」）、
-#       「整轮写完账与产物要当场钉进钉表、再核钉全」「补跑补齐之后照样当场钉、当场核」（实际成功那句不报核了几行）
+#       「账写完而钉表没钉时驱动当场核钉全应当判红、退 8、一次不编」（实际退 0）、「判过的一对重交同一条命令应当全部复用、照钉照核」（实际「核了 没核」）、
+#       「整轮写完账与产物要当场钉进钉表、再核钉全」「续跑补齐之后照样当场钉、当场核」（实际成功那句不报核了几行）
 #   E165_KILL_BOUNDS_BREAK=retainedmissingred  留存产物不在时不报本次未跑：V7 读不到（退非 0）、TV7 报 TV8 退 6
 #       「r2：第一段产物不在时 V7 的比对应当逐项报本次未跑」「r3：第二段产物不在时 TV7 的比对应当逐项报本次未跑」「r4：第一段产物不在时 TV7 的比对应当逐项报本次未跑」
 #       连带红的格：「✗ 作废条款 TV8：第一段产物读不到：…」、「✗ 作废条款 TV8：第二段产物读不到：…」
@@ -94,17 +104,27 @@
 #       写 <产物>（已存在就不写、退 2），不编不跑。选不到（RQ4 / RQ6 有一行不满足）退 1，逐行比对结果照写；核对输入对不上（停机条款 RH1）退 4、不写。
 #       r2 登记 9.1 不判标签（附带照报）：Z5 不在标签表里，它那一行的标签几列写 not_judged_in_r2，只按原文命中 1 次判选没选到。
 #   e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --output <产物> --ledger <红例账> [--item <变体>]… [--jobs <并行度>] [--threads <每个变体的线程数>（只给自证）]
-#       跑还没落行的变体（给了 --item 就只看点名的）；每个变体跑完立刻记下，产物里照变体的次序落行；重跑同一条命令只补没跑的。
+#       点名的变体（不给 --item 是全部）每个一条判定：键相同、库里判绿的取库里的行、不编不跑，别的现判、判完当场入库（「按项判定」一段）；
+#       产物与红例账是这一趟的，从头写，照变体的次序落行；中途停下：挪走这一趟没收尾的产物与红例账，再重交同一条命令，只补没判的。
 #       27 个变体都有行、收尾的基线与开头逐字相同，才写收尾三行（name=restored、name=verdict、name=done）。
 #   e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --output <产物> --ledger <红例账> --recheck --item <变体>
-#       只复跑点名的那一条，拿新的行与产物里已有的行比，不写产物；不同就退 1。
+#       只复跑点名的那一条，拿新的行与产物里已有的行比，不写产物、不读不写判定库；不同就退 1。
 #   e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --measure <变体>
 #       量一次：从改 recovery.rs 到编完 bin 的挂钟与内存峰值（冷编译，经 run-with-memory-cap.sh），再量跑 --bounds segment2 的挂钟。不写产物。
 #   e165-replay-mutation-kill-bounds.sh --clean --scratch <草稿目录>
 #       删掉这条脚本在草稿目录里建的 kill-bounds/（副本、编译目录、每个变体的记录），删前报大小。
 #   e165-replay-mutation-kill-bounds.sh --selftest
-#       拿假的仓、假的 cargo 走一遍：锚点命中 0 次必须报「锚点腐化」退 3、一条都不跑；红、界内不红、无效各一条判得对；
-#       被打断的结果文件（只剩前一条、末行半截）重跑只补没跑的；弄坏开关开着时这两样必须判错。
+#       判定写进临时 prune-server：只在临时服务底下跑（long_run_item_verdicts.py selftest-service，即客户端 selftest_service_problem；不在就退 2、一格都不跑），起法：
+#         python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --selftest
+#       每一趟一份新的库命名空间；假仓里没有真装置的源码，装置入口不换的那几趟每一项都拒算、照跑（入口先算、算不出就停，判法的闭包不收）。
+#       自证起的每一趟算键都不碰脚本所在的仓：装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假树里的 Python 函数，judge: 换成假树里的
+#       SELFTEST_JUDGE_ENTRY（不带 judge-root:，判法闭包在假树上算；「按项判定」一段）。每判完一项打一行 E165_KILL_BOUNDS_SELFTEST_PROGRESS（立刻刷出）。
+#       拿假的仓、假的 cargo 走一遍：锚点命中 0 次必须报「锚点腐化」退 3、一条都不跑；红、界内不红、无效各一条判得对；--output、--ledger 已经存在退 2、一次不编；
+#       真跑的按项判定请求里判法写判法模块里判一个变体的函数与写基线那一行的函数（三套各两个），不写整份驱动；
+#       续跑：判完 tsv-3 就被停下的一趟重交只补没判的、库里复用的三项不编，再交一趟全部复用、一次不编（装置入口换成假树里的 Python 函数）；
+#       改了假树里的判法，同一条命令每一项都现判、一项不拒算；
+#       复用那六格（long_run_item_verdicts.py reuse-cells，打 REUSE_SELFTEST script=scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh …）；
+#       弄坏开关开着时这几样必须判错。
 #       r2 补的格（登记 r2 9.4 第 6 条）：假变体 J6 在 N = 2、J6Qn 在 N = 3 与基线不同 ⇒ 报 (2, 3)；只有 J6Qn 不同 ⇒ J6 报 none；
 #       基线里缺 J6Qn_ 行 ⇒ 报「装置没带 --profile r2」退 7、变体一个不编；自造表 Z 五行时 --list-items 列全五条。
 #       r3 补的格（登记 r3 9.3 第 6 条，在自己的假仓里走，不碰上面 r2 的假仓）：--list-items 列 7 行；假变体 KJ1 在 (1, 2)、KJ2 在 (1, 0) 与基线
@@ -112,8 +132,10 @@
 #       ⇒ 报「装置没带 --profile r3」退 7、变体一个不编；另有基线与第二段产物不同退 6、选行不满足记 not_compared、变体跑到装置自己退 1（TF9 的 halt 行）
 #       而照常落行三格。
 #   每种用法都可以加 --root <仓根>：被测的仓不是这条脚本所在的那一个时用（默认取脚本所在的仓）。
+#   三套整轮的 --output、不给 --profile 那一套的 --ledger 指到已经存在的文件：退 2、不编不跑、不写产物与账（出路：换一个路径，或先挪走那一份）；
+#   --recheck 读已有的产物与账，不受这一条管。
 #
-# 做法（每个变体一份副本、一个编译目录，仓里的 crates/ 一个字节不碰）：
+# 做法（每个变体一份副本、一个编译目录，仓里的 crates/ 一个字节不碰；第 3–5 步只做这一趟要现判的变体，库里复用的不编不跑，「按项判定」一段）：
 #   1. 开工核对：仓里 recovery.rs、lib.rs 与 crates/mutations.tsv 的 sha256 等于 REGISTERED 里的值（r2 登记 9.4 第 1 条：第一段收尾冻结的根上的值；
 #      crates/mutations.tsv 那一个在第一段收尾之前填不出，写的是占位串，开工核对一律停在 RH1）、9.2 那九个函数的行区间（从 fn 行到其后第一个只有 } 的行）
 #      等于 9.2 的表，不等是停机条款 RH1（退 4，一条都不跑）。自造表的 Z 行名字要等于 REGISTERED 的 custom_keys（Z1–Z5），不等同退 4。再按 23 个变异名从 crates/mutations.tsv 选行（r1 第九节 9.1，不按行号）：每个名字恰 1 行、
@@ -128,6 +150,7 @@
 #      改坏、`cargo build --release --offline -p singlefs-verification --bin e165_replay_bounded_enumeration`（编不过记「无效」）、
 #      跑 --bounds segment2、逐行与基线比；红了的域在首红的 N 上找一个反例状态（两边的 --list-states 逐行比出第一个判定不同的状态），
 #      再拿两边的二进制各 --replay-state 单条重放一遍，判定必须与逐态行相同；收尾把原件拷回副本、核 sha256，删掉这份副本与编译目录。
+#      建副本、改坏、编译在这份驱动里；起装置、逐行比、找红例、出产物行与红例账行在判法模块 e165_replay_mutation_kill_bounds_variant_judgement.py（「按项判定」一段）。
 #   5. 收尾再建一份不改的副本重编重跑基线，输出必须与开头逐字相同；仓里 recovery.rs 的 sha256 与 `git status --porcelain crates/`
 #      开头与结尾相同（作废条款 V6），不然退 5、不写收尾行。
 #   6. 红例账照落，写完收尾三行之后当场钉进 .claude/gate.d/e165-pinned-red-examples.tsv、当场核钉全（「钉红例」一段）。
@@ -135,7 +158,7 @@
 #   先跑 python3 scripts/experiment-apparatus/e165-pin-red-examples.py --root <脚本所在的仓> --kill-bounds <产物> <账>（追加：已钉的不重复，档取产物 config 行的
 #   device_arguments=，即 --profile r2），再跑同一份的 --check --kill-bounds <产物> <账>（显式给这一对）；钉表与变异表取脚本所在的仓，不取 --root。
 #   有一步退非 0，原样转出它的输出、整趟退 8（EXIT_PIN_INCOMPLETE）；都过，成功那句报「钉红例：钉进 N 行、核了 M 行」。
-#   产物已收尾的，重跑同一条命令不跑变体，只重做这一步（上一趟钉红例没过、改好之后走这里）。--recheck 不钉。
+#   上一趟钉红例没过、改好之后挪走那一趟的产物与账再重跑同一条命令：判过的变体全部从判定库复用、不编不跑，产物与账照样从头写，这一步照样做。--recheck 不钉。
 #   只供自证：E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND 设了（且是自证起的那一趟）就不追加，造「账写完了、钉表没钉」。
 # 留存产物：V7、TV7 比的对象（第一段、第二段的产物，五-甲的产物）在 research/results/ 下，那个目录可以整个删掉。比对的对象有不在的，
 #   那一项本次未跑：逐个点名不在的产物打一行「! 本次未跑：作废条款 <V7|TV7> 的比对：留存产物 <路径> 不在」（环境里有 GATE_NOT_RUN_FILE 的另往那份文件追加一行），
@@ -163,10 +186,12 @@
 #   变体的退出码一律是装置自己的退出码，照装置的退出码比，没有「包装的结局不算结果」那一支。
 #   唯一的例外是 --measure：它量的就是内存峰值，量编译那一步仍经 scripts/hosts/run-with-memory-cap.sh 8G 读它写的峰值表。
 #
-# 退出码：0 点名的都落了行（或本来就都有）；1 有变体没得出结果（装置没跑完）、--recheck 对不上、派出与收回的项数对不上（「每项一行与总计」一段）、或自证判红；
-#   2 用法不对（--item 写了不认识的变体名时列出可点名的全部变体）；
-#   3 锚点腐化；4 停机条款 H1（含自造表的 Z 行名字与登记不等）；5 作废条款 V6（收尾基线与开头不同，或仓里的 crates/ 在跑的时候变了）；6 作废条款 V7；
-#   7 基线里缺 J6Qn_ 行（装置没带 --profile r2，r2 9.4 第 6 条）；8 钉红例没过（当场追加或 --check 退非 0，「钉红例」一段）。
+# 退出码：0 点名的都落了行（现判的或从判定库复用的）；1 有变体没得出结果（装置没跑完）、--recheck 对不上、派出与收回的项数对不上（「每项一行与总计」一段）、
+#   按项判定收尾判红（复用哨兵红、键在跑的中途变了，「按项判定」一段）、或自证判红；
+#   2 用法不对（--item 写了不认识的变体名时列出可点名的全部变体）、三套整轮的 --output 或不给 --profile 那一套的 --ledger 已经存在、--selftest 不在临时 prune-server 底下；
+#   3 锚点腐化；4 停机条款 H1（含自造表的 Z 行名字与登记不等）；5 作废条款 V6（收尾基线与开头不同，或仓里的 crates/ 在跑的时候变了；
+#   或这一趟的基线与判定库里同一把键的基线不逐字相同）；6 作废条款 V7；
+#   7 基线里缺 J6Qn_ 行（装置没带 --profile r2，r2 9.4 第 6 条）；8 钉红例没过（当场追加或 --check 退非 0，「钉红例」一段）；75 prune-server 不可用（「按项判定」一段）。
 # 弄坏开关 E165_KILL_BOUNDS_BREAK=<项>（只给 --selftest 证明它会红用，逗号分隔可给几个；不认识的项当场退出）。
 # 逐项写开关名、弄坏哪一处、打开后自证哪几项红（自证的例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
 #   E165_KILL_BOUNDS_BREAK=progressnever  进度间隔的判断永不触发、一行进度都不打
@@ -174,10 +199,10 @@
 #       「整轮里一个变体跑过进度间隔应当打出点名它的进度行」（实际退 0、进度行 []）
 #   下面三项是入口脚本格式那几格（「每项一行与总计」一段），外面打开时自证的每一趟都带着它：
 #   E165_KILL_BOUNDS_BREAK=itemcountsdropped  每项一行不带 judged=、red=、reused=
-#       「整轮每项一行应当带判了、红了、复用了多少与秒，末行总计」、「补跑：已有行的两项应当各打一行 reused=1」
+#       「整轮每项一行应当带判了、红了、复用了多少与秒，末行总计」、「续跑：库里复用的三项应当各打一行 reused=1」
 #   E165_KILL_BOUNDS_BREAK=itemlinedropped  第一个做完的变体（基线除外）不打它那一行、不算收回（造一项收不回）
 #       「整轮每项一行应当带判了、红了、复用了多少与秒，末行总计」（实际派出 6 项、收回 5 项，退 1）
-#       连带红的格（这几趟都有变体做完，少收回一项就退 1）：「✗ 自检：整轮应当退 0」、「✗ 自检：补跑应当退 0」、「✗ 自检：补跑：已有行的两项」、「✗ 自检：r2：第一段产物不在时 V7 的比对」、
+#       连带红的格（这几趟都有变体做完，少收回一项就退 1）：「✗ 自检：整轮应当退 0」、「✗ 自检：续跑应当退 0」、「✗ 自检：续跑：库里复用的三项」、「✗ 自检：r2：第一段产物不在时 V7 的比对」、
 #       「✗ 自检：--recheck 同一条」、「✗ 自检：整轮里一个变体跑过进度间隔」、「✗ 自检：r2 整轮」、「✗ 自检：r3 整轮」、「✗ 自检：弄坏开关 r3kapinunchecked 开着时同一趟」、
 #       「✗ 自检：r4 整轮」、「✗ 自检：弄坏开关 r4kgpinunchecked 开着时同一趟」、「✗ 自检：r5：--gate r2 整轮」
 #   E165_KILL_BOUNDS_BREAK=unknownitemunlisted  --item 写错时不列可点名的变体（只说「--list-items 看」）
@@ -205,15 +230,23 @@
 #   E165_KILL_BOUNDS_BREAK=r3noprofile  调装置不带 --profile r3
 #       「r3 整轮应当退 0」（实际退 1：假装置不认没有 --profile r3 的 --family root_choice）、「r3 整轮里假装置每一次被调都应当带 --profile r3」
 #       连带红的格：「✗ 基线没跑完或退出码不是 0（2；日志 …）」、「✗ 自检：r3 整轮：收尾行」、「✗ 自检：r3：K 族不红而 KA 读数等于钉值的变体记 not_red_within_bounds、ka_pin=match；推的两个（1…」、「✗ 自检：r3：假变体 KJ1 在 (1, 2)、KJ2 在 (1, 0) 与基线不同」、「✗ 自检：r3：假变体的 KA 读数不等于钉值」、「✗ 自检：r3：变体跑到装置自己退 1（halt 行）而 K 域 KJ0 变红」、「✗ 自检：r3：变异名选不到的那一行」、「✗ 自检：r3：基线与第二段产物不逐行相同」、「✗ 自检：r3：基线缺 criteria=root_choice 判决行」、「✗ 自检：r3：第二段产物不在时 TV7 的比对」、「✗ 自检：弄坏开关 r3kapinunchecked 开着时同一趟」
-# 下面七项外面打开时，自证的每一趟都带着它（drive() 把外面给的并进那一趟自己点名的；r2 那四项照旧只由 r2 那几趟带），红在下面点名的项；
+# 下面九项外面打开时，自证的每一趟都带着它（drive() 把外面给的并进那一趟自己点名的；r2 那四项照旧只由 r2 那几趟带），红在下面点名的项；
 # 自证里对照那几例自己打开同一项（证明前一例的红来自那一处检查），外面打开时那几例本来就开着、不另红：
 #   E165_KILL_BOUNDS_BREAK=noanchorcheck  不核锚点、命中 0 次的那条照「改坏」（什么都没改）跑
 #       「锚点命中 0 次应当报「锚点腐化」退 3」（实际退 0）、「锚点腐化时一次都不许编、不许写产物」（实际编了 7 次）、
 #       「弄坏开关 recoveryonly 开着时文件列是 lib.rs 的那一条应当由红转「锚点腐化」退 3（证明整轮那一格的红来自按第二列改文件）」（实际退 0）
-#   E165_KILL_BOUNDS_BREAK=rerunall  不看结果文件里已有的行、每个变体都重跑
-#       「补跑应当只编 6 次（基线 2、没跑的变体 4）」（实际 7）、「补跑之后每个变体恰好一行完整的」（实际 baseline、tsv-2 各 2 行）、
-#       「补跑出来的变体行应当与整轮的逐字相同」、「--recheck 同一条应当逐字相同、退 0」（实际退 1）
-#       连带红的格：「✗ 自检：补跑」、「✗ 自检：补跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表」
+#   E165_KILL_BOUNDS_BREAK=reuseignored  plan 答 reuse 的项也照现判（不取库里的行，判完照 record：哨兵按「键相同却现判」判红）
+#       「续跑应当只编 5 次（基线 2、没判的变体 3）」（实际 7）、「续跑：库里复用的三项应当各打一行 reused=1」、「全部复用的一趟应当一次不编」（实际编 7 次、退 1）
+#       连带红的格：「✗ 自检：续跑应当退 0」、「✗ 自检：续跑补齐之后要写收尾行」、「✗ 自检：续跑补齐之后照样当场钉、当场核」、「✗ 自检：账写完而钉表没钉时驱动当场核钉全」、
+#       「✗ 自检：弄坏开关 pincheckskipped 开着时」、「✗ 自检：判过的一对重交同一条命令应当全部复用、照钉照核」、「✗ 自检：复用那六格」；
+#       复用那六格里红的：「reuse-three-questions」「key-independent-of-directory」「reuse-sentinel」「forced-still-reused-red」
+#   E165_KILL_BOUNDS_BREAK=finishignored  不认 long_run_item_verdicts.py finish 的红（复用哨兵红、键中途变了照写收尾行、照退 0）
+#       「弄坏开关 reuseignored 开着时应当每个变体都重编、复用哨兵判红退 1」（实际退 0）、「复用那六格应当全过」；
+#       复用那六格里红的：「sentinel-rejudged-red」「forced-verdict-differs-red」「forced-still-reused-red」
+#   E165_KILL_BOUNDS_BREAK=recorddeferred  现判的项判完不当场 record，等全部判完、finish 之前一并写
+#       「续跑应当只编 5 次（基线 2、没判的变体 3）」（实际 7：被停下的那一趟一项都没入库）、「续跑：库里复用的三项应当各打一行 reused=1」
+#   复用那几格与续跑那几格另认 long_run_item_verdicts.py 的弄坏开关 LONG_RUN_ITEMS_BREAK（它文件头；随环境带进每一趟，打开后复用那六格红在它点名的同名格，
+#       library-unread 另红续跑那几格）。
 #   E165_KILL_BOUNDS_BREAK=byrownumber  选行按登记时的行号、不按变异名（r1 9.5）
 #       「选行 ①：名字不在表里应当报 no_row_with_this_name、点名第 2 行、退 1、不编」（实际退 0、编 0 次）、
 #       「选行 ②：同名两行应当报 more_than_one_row_with_this_name、退 1、不编」（实际退 0、编 0 次）
@@ -227,16 +260,39 @@
 #   E165_KILL_BOUNDS_BREAK=recoveryonly  改坏时只写 recovery.rs、不看第二列
 #       「整轮应当退 0」（实际 3）、「文件列是 lib.rs 的那一条应当改 lib.rs、记 outcome=red」、「自造的那一条（文件列 lib.rs）应当记 red」、
 #       「收尾要打「已还原，基线与开头逐字相同」并写 name=restored 行」、「收尾行应当是 name=done emitted=10」（实际是一条 name=kill_bound 行）、
-#       「整轮应当编 7 次（基线 2、变体 5）」（实际 4）、「补跑应当退 0」（实际 3）、「补跑应当只编 6 次（基线 2、没跑的变体 4）」（实际 3）、
-#       「补跑之后每个变体恰好一行完整的」（实际 tsv-5、Z1 各 0 行）、「补齐之后要写收尾行」、
-#       「弄坏开关 rerunall 开着时应当每个变体都重编（证明上一例的 6 次来自只补没跑的）」（实际 4）、「r2 整轮应当退 0」（实际 3）
-#       连带红的格：「✗ 自检：r2：第一段产物不在时 V7 的比对」、「✗ 自检：r3 整轮：收尾行」、「✗ 自检：r3：K 族不红而 KA 读数等于钉值的变体记 not_red_within_bounds、ka_pin=match；推的两个（1…」、「✗ 自检：r3：假变体 KJ1 在 (1, 2)、KJ2 在 (1, 0) 与基线不同」、「✗ 自检：r3：假变体的 KA 读数不等于钉值」、「✗ 自检：r3：变体跑到装置自己退 1（halt 行）而 K 域 KJ0 变红」、「✗ 自检：r3：变异名选不到的那一行」、「✗ 自检：r3：第二段产物不在时 TV7 的比对」、「✗ 自检：r4 整轮：收尾行」、「✗ 自检：r4：KA 读数等于钉值、KG 读数等于那一列的变体记 ka_pin=match、kg_pin=match；推的 v1822、v1…」、「✗ 自检：r4：假变体 KJ1T 在 (1, 2, 无, 罩着)、KJ2 在 (1, 0, RN, 罩着) 与基线不同」、「✗ 自检：r4：假变体只在 KG 与基线不同（读数换成它自己那一列）」、「✗ 自检：r4：假变体的 KG 读数不等于它那一列」、「✗ 自检：r4：变体跑到装置自己退 1（halt 行）而 KF 域 KJ0 变红」、「✗ 自检：r4：变异名选不到的那一行」、「✗ 自检：r4：第一段产物不在时 TV7 的比对」、「✗ 自检：已收尾的一对重跑同一条命令」、「✗ 自检：弄坏开关 pincheckskipped 开着时」、「✗ 自检：弄坏开关 r3kapinunchecked 开着时同一趟」、「✗ 自检：弄坏开关 r4kgpinunchecked 开着时同一趟」、「✗ 自检：整轮写完账与产物要当场钉进钉表、再核钉全：红例账里有 1 行反例，钉表」、「✗ 自检：补跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表」、「✗ 自检：账写完而钉表没钉时驱动当场核钉全」、「✗ 锚点腐化：Z1 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」、「✗ 锚点腐化：tsv-2 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」、『✗ 锚点腐化：tsv-3 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次』、「✗ 锚点腐化：tsv-5 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」
+#       「整轮应当编 7 次（基线 2、变体 5）」（实际 4）、「续跑应当退 0」（实际 3）、「续跑应当只编 5 次（基线 2、没判的变体 3）」（实际 2）、
+#       「续跑之后每个变体恰好一行完整的」（实际 tsv-5、Z1 各 0 行）、「续跑补齐之后要写收尾行」、「全部复用的一趟应当一次不编」（实际退 3）、
+#       「弄坏开关 reuseignored 开着时应当每个变体都重编、复用哨兵判红退 1」（实际退 3）、
+#       「弄坏开关 recorddeferred 开着时被停下的那一趟一项都没入库，重交应当全部重编」（实际 4）、「r2 整轮应当退 0」（实际 3）
+#       连带红的格：「✗ 自检：r2：第一段产物不在时 V7 的比对」、「✗ 自检：r3 整轮：收尾行」、「✗ 自检：r3：K 族不红而 KA 读数等于钉值的变体记 not_red_within_bounds、ka_pin=match；推的两个（1…」、「✗ 自检：r3：假变体 KJ1 在 (1, 2)、KJ2 在 (1, 0) 与基线不同」、「✗ 自检：r3：假变体的 KA 读数不等于钉值」、「✗ 自检：r3：变体跑到装置自己退 1（halt 行）而 K 域 KJ0 变红」、「✗ 自检：r3：变异名选不到的那一行」、「✗ 自检：r3：第二段产物不在时 TV7 的比对」、「✗ 自检：r4 整轮：收尾行」、「✗ 自检：r4：KA 读数等于钉值、KG 读数等于那一列的变体记 ka_pin=match、kg_pin=match；推的 v1822、v1…」、「✗ 自检：r4：假变体 KJ1T 在 (1, 2, 无, 罩着)、KJ2 在 (1, 0, RN, 罩着) 与基线不同」、「✗ 自检：r4：假变体只在 KG 与基线不同（读数换成它自己那一列）」、「✗ 自检：r4：假变体的 KG 读数不等于它那一列」、「✗ 自检：r4：变体跑到装置自己退 1（halt 行）而 KF 域 KJ0 变红」、「✗ 自检：r4：变异名选不到的那一行」、「✗ 自检：r4：第一段产物不在时 TV7 的比对」、「✗ 自检：判过的一对重交同一条命令应当全部复用、照钉照核」、「✗ 自检：弄坏开关 pincheckskipped 开着时」、「✗ 自检：弄坏开关 r3kapinunchecked 开着时同一趟」、「✗ 自检：弄坏开关 r4kgpinunchecked 开着时同一趟」、「✗ 自检：整轮写完账与产物要当场钉进钉表、再核钉全：红例账里有 1 行反例，钉表」、「✗ 自检：续跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表」、「✗ 自检：账写完而钉表没钉时驱动当场核钉全」、「✗ 锚点腐化：Z1 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」、「✗ 锚点腐化：tsv-2 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」、『✗ 锚点腐化：tsv-3 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次』、「✗ 锚点腐化：tsv-5 的原文在副本里的 crates/singlefs-core/src/recovery.rs 命中 0 次」
 # 每项一行与总计（.claude/rules/test-script-discipline.md「入口脚本：不带参数就是剪枝跑全部项」）：三套整轮（不给 --profile、--profile r3、--profile r4）都往 stdout 打，
 #   每个点名的变体（含基线）一行 E165_KILL_BOUNDS_ITEM item=<变体> exit=<0 得出结果、1 没得出> judged=<这一趟现判 1，否则 0> red=<那一行的结局是 red 记 1，否则 0>
-#   reused=<产物里或草稿目录的记录里已有、这一趟没跑记 1，否则 0> seconds=<这一项的挂钟>；这一趟跑的做完时打，已有的开跑前打。
+#   reused=<判定库里键相同、判绿，这一趟取库里的行、没跑记 1，否则 0> seconds=<这一项的挂钟>；这一趟跑的做完时打，库里复用的开跑前打。
 #   整轮收尾（中途停机退出的也算）末行 E165_KILL_BOUNDS_TOTAL dispatched=<派出几项> collected=<收回几项> items=<打了几行> judged= red= reused= failed= seconds=；
 #   派出与收回对不上（.claude/singlefs-ai-sop/rules/command-safety.md「并行不许把失败吃掉」）先打 ✗ 再打总计，本来退 0 的改退 1。
-#   已收尾（name=done）的产物重跑、--list-items、--select-rows、--measure、--clean 不打。判定复用就是「产物里已有行的变体不重跑」：没有按键存的判定库，也没有 --full。
+#   --list-items、--select-rows、--measure、--clean 不打。判定复用经 prune-server 里的按项判定（「按项判定」一段），不设 --full。
+# 按项判定（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」）：三套整轮每个变体（含基线）一条判定，经
+#   scripts/experiment-apparatus/long_run_item_verdicts.py 的 plan / record / finish 存进 prune-server 的 apparatus-items 族，种类 e165_replay_bounded_enumeration
+#   （判定库只有那一份，本地不建库目录；产物与草稿目录都不是复用来源）。--recheck、--list-items、--select-rows、--measure、--clean 不读不写判定库。
+#   键（long_run_item_verdicts.py 文件头「键」，即 admission.py 的 compute_unit_key）：装置入口 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs::main
+#   在 --root 那棵树上的单元闭包（profile:release）、工具链、闭包真引到的依赖版本；judge: 判法模块 scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_variant_judgement.py
+#   里这一套判一个变体的函数与写基线那一行的函数（JUDGE_FUNCTIONS：judge_variant 与 baseline_item_line，--profile r3、r4 各是带 _r3、_r4 的那两个；判法闭包在
+#   脚本所在的仓上算，judge-root:）：闭包是起装置、读它的输出、按「红」的口径出产物行与红例账行的那几个函数、它们调到的单元与那份模块 import 时执行的语句；
+#   建副本、改坏、编译、选行、钉红例、产物收尾与读写判定库的代码在这份驱动里，不进判法闭包，它们读的表（变异表、自造表、钉表、按项判定的登记表）也就不进判法键
+#   （变异行原文经下面的 line:item= 进键）；自证起的那几趟换成假树里的 SELFTEST_JUDGE_ENTRY、不带 judge-root:，判法闭包在假树上算）；
+#   line: 这一趟的档（--profile、--pins、--gate 与界参数）、这一套登记值的 sha256、这一项写进产物行与红例账的字段（变异行原文、文件、表行号、名字、标题，ITEM_KEY_FIELDS）。
+#   改坏之后的源码不进闭包，变异行原文经 line: 进键；改坏那一处碰到模块集合（MODULE_SET_TOKENS：mod、#[path、include_str!、include_bytes!、include!）的变体拒算：
+#   不进请求，照跑、不复用、不入库，收尾逐个报。基线是一项，留存产物（V7 / TV7 的比对对象）经 @input 按内容进它的键（不在也是一种取值）；每个变体 @after 基线。
+#   值是这一项的产物行与红例账行（键排序的 JSON）；产物行里复跑命令那一段 rerun="…" 存成 rerun="<复跑命令>"，取回时照这一趟的 --output、--ledger 填回，
+#   与现跑的一个字不差。得出结果的判绿（被测变体被抓到、记 outcome=red 的也是得出了结果）；驱动没得出结果的（装置没跑完而没有一个域红）record --red，
+#   记红撤绿、下一趟现判。
+#   一趟：开工核对与选行 → plan（每项打 LONG_RUN_ITEM 行）→ 有项要现判才编、跑开头基线（库里复用的基线也照跑一遍给变体比，与库里那一行不逐字相同退 5，不入库；
+#   没点名的基线库里没有可复用的，照跑照记）→ 现判的项判完当场 record → 收尾基线 → finish（复用哨兵、键中途变了，红了退 1、产物不收尾）→
+#   产物从头写：config 行、点名的变体照变体的次序落行（库里复用的取库里的）、全都有行才写收尾三行。一项都不用现判时开头与收尾的基线都不编不跑，
+#   收尾行要的基线行数取库里基线那一行的 result_rows。中途停下：挪走没收尾的产物与红例账（--output、--ledger 已经存在退 2），重交同一条命令：判完的已在库里，只补没判的。
+#   成功那句报「按项判定 现判 N、复用 M、拒算 R」（R 含模块集合拒算的）。服务连不上退 75。状态目录在 <草稿目录>/kill-bounds/item-verdicts/，每一趟新建、跑完删。
+#   只供自证：E165_KILL_BOUNDS_SELFTEST_KILL_AFTER=<项>（自证起的那一趟才认）判完这一项、record 之后整个进程被 SIGKILL，造「中途停下」；
+#   E165_KILL_BOUNDS_SELFTEST_SET_OUTPUT_ASIDE=1（自证起的那一趟才认）已经存在的 --output 与 --ledger 先挪成 <名>.previous 再判（同一条命令重交几趟的那几格）。
 # 进度：跑着的时候每过 PROGRESS_INTERVAL_SECONDS 秒（300，.claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」定的进度间隔）往 stderr 打一行
 #   E165_KILL_BOUNDS_PROGRESS：挂钟、变体做完几个（共几个），在做的每一项在哪一步（建副本与编译、跑 --bounds segment2、在哪个 域:N 上找红例或单条重放）、
 #   这一步与这一项各跑了多久。开头与收尾的基线也算在做的项。
@@ -256,6 +312,7 @@ done
 E165_KILL_BOUNDS_SELF_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 export E165_KILL_BOUNDS_SELF_PATH
 exec python3 - "$@" <<'PYTHON'
+import atexit
 import concurrent.futures
 import hashlib
 import importlib.util
@@ -264,6 +321,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -276,8 +334,16 @@ SCRIPT_DIRECTORY = os.path.dirname(SELF_PATH)
 sys.path.insert(0, os.path.join(SCRIPT_DIRECTORY, "..", "hosts"))
 from heavy_threads import default_heavy_threads  # noqa: E402
 import lib_repository_copy as repository_copy  # noqa: E402   拷副本的范围与副本里起命令的环境（scripts/hosts/lib_repository_copy.py）
+sys.path.insert(0, SCRIPT_DIRECTORY)
+# 判一个变体的那几个函数在判法模块里（按项判定的 judge: 指它们，文件头「按项判定」）；BREAK 是两边共用的那一份，下面照环境填
+from e165_replay_mutation_kill_bounds_variant_judgement import (  # noqa: E402
+    BIN_NAME, BREAK, DEVICE_PROFILE_ARGUMENTS, J6_ROWS, J6QN_ROWS, R3_ALL_DOMAINS, R3_BOUNDS_ARGUMENTS, R3_DEVICE_PROFILE_ARGUMENTS,
+    R4_ALL_DOMAINS, R4_DEVICE_PROFILE_ARGUMENTS, R4_GATE_R2_ARGUMENTS,
+    CLAUSE_CRITERIA, J7_ROWS, R3_CRITERIA, R3_LEGAL_DOMAINS, R4_BOUNDS_ARGUMENTS, R4_CRITERIA, R4_LEGAL_DOMAINS,
+    baseline_item_line, baseline_item_line_r3, baseline_item_line_r4, device_bounds_arguments, judge_variant, judge_variant_r3, judge_variant_r4,
+    mark, parse_row, result_rows, retained_comparison_text, rerun_command, rerun_command_r3, rerun_command_r4, run_captured, run_segment_two,
+    violation_lines_by_place)
 DEFAULT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
-BIN_NAME = "e165_replay_bounded_enumeration"
 RECOVERY_PATH = "crates/singlefs-core/src/recovery.rs"
 LIB_PATH = "crates/singlefs-replay-prefix/src/lib.rs"
 SOURCE_FILES = (RECOVERY_PATH, LIB_PATH)     # 变异改的文件取变异行第二列，只认这两份（r1 9.1）
@@ -345,29 +411,19 @@ REGISTERED = {
 }
 # 原文与替换文逐字相同的两对（原登记第九节）：355 与 23、414 与 406，标签表里共用前一行的依据。
 SAME_AS = {355: 23, 414: 406}
-# 装置的档参数（r2 登记 5.1、9.4 第 2 条）：--bounds、--list-states、--replay-state 每一次都带。
-DEVICE_PROFILE_ARGUMENTS = ["--profile", "r2"]
-# r2 9.4 第 3 条：条款判据栏加 r2 档的新行，名字与装置的输出行同一组。
-J6_ROWS = ("J6_premise_holds", "J6_premise_fails")
-J6QN_ROWS = ("J6Qn_premise_holds", "J6Qn_premise_fails")
-J7_ROWS = ("J7a_instance_table", "J7a_allocation_record_tree_root", "J7a_filesystem_identifier", "J7b", "J7c")
-CLAUSE_CRITERIA = {"J0", "J1", "J2", "J3", "J4", *J6_ROWS, *J6QN_ROWS, *J7_ROWS, "A0", "AS_whole_table",
-                   "AS_consecutive_gap_continues", "AS_consecutive_gap_stops", "A_structure", "A_limit"}
-ANCHOR_CRITERIA = {"IA1", "IA2"}
-# 登记第七节甲类锚点：这几个域里原实现报错的态数是 0。
-DOMAINS_WHERE_FAILED_STATES_ARE_PINNED = {"L", "L6", "L9", "U_verify_on", "X", "E1"}
-ADVERSARIAL_DOMAINS = {"A", "A6", "AC"}
 EXIT_OK, EXIT_INCOMPLETE, EXIT_USAGE, EXIT_ANCHOR, EXIT_HALT_H1, EXIT_VOID_V6, EXIT_VOID_V7, EXIT_NOT_PROFILE_R2 = 0, 1, 2, 3, 4, 5, 6, 7
 EXIT_PIN_INCOMPLETE = 8   # 钉红例（文件头「钉红例」）：当场追加或 --check 没过
 # 钉红例用的那一份：追加与 --check 的写法在它文件头
 PIN_SCRIPT = os.path.join(SCRIPT_DIRECTORY, "e165-pin-red-examples.py")
-BREAK_MODES = ("noanchorcheck", "rerunall", "progressnever", "byrownumber", "nodupcheck", "nolocationcheck", "recoveryonly",
+BREAK_MODES = ("noanchorcheck", "reuseignored", "finishignored", "recorddeferred", "progressnever", "byrownumber", "nodupcheck", "nolocationcheck", "recoveryonly",
                "j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour",
                "r3itemsmissing", "r3firstredswap", "r3kapinunchecked", "r3noprofile",
                "r4itemsmissing", "r4firstredswap", "r4kgcountsasred", "r4kgpinunchecked", "r4noprofile",
                "r5pinsignored", "r4gateignored", "owntablesplit", "defaultone",
                "pincheckskipped", "retainedmissingred", "itemcountsdropped", "itemlinedropped", "unknownitemunlisted",
-               "fixedcopylist", "copyconfigurationunset")
+               "fixedcopylist", "copyconfigurationunset", "outputoverwritten", "judgeoffthetree", "ledgeroverwritten", "judgewholedriver")
+# 按项判定那一层的几项（文件头「弄坏开关」）：复用那六格只把外面开着的这几项带进去
+ITEM_VERDICT_BREAK_MODES = ("reuseignored", "finishignored", "recorddeferred", "judgeoffthetree")
 # 外面打开时自证的 r2 那几趟原样传进去的四项（文件头「弄坏开关」）
 R2_BREAK_MODES = ("j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour")
 # 外面打开时自证的 r3 那几趟原样传进去的四项（登记 r3 9.3 第 6 条的表）；别的趟不带
@@ -375,13 +431,6 @@ R3_BREAK_MODES = ("r3itemsmissing", "r3firstredswap", "r3kapinunchecked", "r3nop
 # 外面打开时自证的 r4 那几趟原样传进去的五项（登记 r4 9.3 第 6 条的表）；别的趟不带
 R4_BREAK_MODES = ("r4itemsmissing", "r4firstredswap", "r4kgcountsasred", "r4kgpinunchecked", "r4noprofile")
 # ── r3 档（登记 r3 9.3，第三段）。不给 --profile 是 r2 档，上面那一套一个字不动。
-R3_DEVICE_PROFILE_ARGUMENTS = ["--profile", "r3"]
-R3_BOUNDS_ARGUMENTS = ["--bounds", "segment1", "--family", "root_choice"]
-R3_LEGAL_DOMAINS = ("K", "K9", "KW")
-R3_ALL_DOMAINS = ("K", "K9", "KW", "KA")
-# 首红先报登记要的 KJ1、KJ2（TQ5），再附带 KJ0、KJ3
-R3_CRITERIA = ("KJ1", "KJ2", "KJ0", "KJ3")
-R3_ROW_CRITERIA = ("KJ0", "KJ1", "KJ2", "KJ3")
 # 取第二段冻结根上的值（第二段报告第九节）：recovery.rs、lib.rs 整份哈希与登记第三节相同；crates/mutations.tsv 是根里那一份（第二段盖上装置变异行之后）；
 # 两个函数的区间用 r1 9.2 的取法（fn 行到其后第一个只有 } 的行）在根上现算；names 的第三项是 KA 上 KJ2 的违例数：("pinned", n) 是登记 5.7、第七节钉的值
 # （1823 → 18、1824 → 52、1825 → 36、1826 → 18，TQ6），("inferred", n) 是登记 9.1 表里推的、没钉（1822 → 0、1827 → 18）。名字取根里 crates/mutations.tsv 第一列逐字。
@@ -418,20 +467,6 @@ R4_KG_RULE_READINGS = {
 }
 
 # ── r4 档（登记 r4 9.3，第二段）。不给 --profile 是 r2 档、--profile r3 是 r3 档，上面两套一个字不动。
-R4_DEVICE_PROFILE_ARGUMENTS = ["--profile", "r4"]
-R4_BOUNDS_ARGUMENTS = ["--bounds", "segment1", "--family", "root_choice_faults"]
-R4_LEGAL_DOMAINS = ("KF", "KF3", "KF9", "KFW")
-R4_ALL_DOMAINS = ("KF", "KF3", "KF9", "KFW", "KG", "KA")
-# 首红先报登记要的 KJ1、KJ1T、KJ2（TQ9），再附带 KJ0、KJ3
-R4_CRITERIA = ("KJ1", "KJ1T", "KJ2", "KJ0", "KJ3")
-R4_ROW_CRITERIA = ("KJ0", "KJ1", "KJ1T", "KJ2", "KJ3")
-R4_CLAUSE_CRITERIA = ("KJ1", "KJ1T", "KJ2")
-# 首红的次序：同一 (M, U) 格里先按被判时故障（无、RN、RI、D0、D1），再按历史标签（罩着、不罩）（登记 TQ9）
-R4_JUDGED_FAULTS = ("none", "RN", "RI", "D0", "D1")
-R4_HISTORY_LABELS = ("inside_the_promise", "outside_the_promise")
-R4_SUBCELLS = tuple((fault, label) for fault in R4_JUDGED_FAULTS for label in R4_HISTORY_LABELS)
-# 变体登记名（r3 的编号，今天主工作区里在第 1821–1826 行）对 KG 钉值取哪一列：v1827 对 v1823 那一列，别的对各自那一列（登记 5.6、第七节）
-R4_KG_COLUMN_OF = {"v1822": "v1822", "v1823": "v1823", "v1824": "v1824", "v1825": "v1825", "v1826": "v1826", "v1827": "v1823"}
 # 取第一段根上的值（登记 r4 修订 2）：recovery.rs、lib.rs 整份哈希与登记第三节相同；crates/mutations.tsv 是根里那一份（盖上装置变异行之后）；
 # 两个函数的区间用 r1 9.2 的取法（fn 行到其后第一个只有 } 的行）在根上现算；names 的第一项是今天主工作区里的表行号（只用来给变体起名与在产物里标出来），
 # 第三项是 KA 上 KJ2 的违例数：("pinned", n) 是登记第七节钉的值（v1823 → 18、v1824 → 52、v1825 → 36、v1826 → 18，TQ10），("inferred", n) 是登记 9.1 表里推的、没钉
@@ -498,8 +533,6 @@ R5_PINS = {
                # TV7 的比对对象：第一段重跑的 r4 带故障那一份（比对对象表第 16 行的重跑）
                segment1_product=R5_PRODUCT_PREFIX + "segment1-r4-root-choice-faults.out"),
 }
-# 第五段 5-乙（登记修订 1「修1.九」乙第 1–4 条）：--gate r2 只在 --profile r4 --pins r5 同给时认；调装置在 R4_BOUNDS_ARGUMENTS 之后加这两项。
-R4_GATE_R2_ARGUMENTS = ["--gate", "r2"]
 # 基线 family=root_choice_faults 的 name=config 行要带的 R2 闸字段与值：5-甲 的装置在 --gate r2 时实际写的（产物 R5_GATE_R2_PINS["segment1_product"] 第一行的 witness_gate=…）
 R4_GATE_R2_CONFIG_FIELD = ("witness_gate", "r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots")
 # 5-乙 跑在 5-甲 的根上（/tmp/claude-1000/e165-r5-segment3/root5：第一段根盖上 5-甲 改过的装置与 crates/mutations.tsv，登记修1.十一「根、清单、在哪编」）：
@@ -507,7 +540,7 @@ R4_GATE_R2_CONFIG_FIELD = ("witness_gate", "r2_some_slot_reports_a_read_error_an
 # 两份源文件与两个函数区间仍是第一段根上的（5-甲 不改它们；开工核对时对着根现判，对不上停在 RH1）。
 R5_GATE_R2_TABLE_SHA256 = "c9a03eb4af85a8e4c7206dfa3609593390516b80ca52be7090aced5696e84046"
 R5_GATE_R2_PINS = dict(R5_PINS["r4"], table_sha256=R5_GATE_R2_TABLE_SHA256, segment1_product=R5_PRODUCT_PREFIX + "segment5-r2-gate-root-choice-faults.out")
-BREAK = set(filter(None, os.environ.get("E165_KILL_BOUNDS_BREAK", "").split(",")))
+BREAK.update(filter(None, os.environ.get("E165_KILL_BOUNDS_BREAK", "").split(",")))   # 判法模块里的那一份（两边共用），照环境填
 for mode in BREAK:
     if mode not in BREAK_MODES:
         sys.exit(f"  ✗ 不认识的弄坏开关：{mode}\n  → 怎么办：E165_KILL_BOUNDS_BREAK 只认 {'、'.join(BREAK_MODES)}")
@@ -570,7 +603,7 @@ class ItemLines:
     def close(self, code):
         if self.collected != self.dispatched:
             print(f"  ✗ 派出 {self.dispatched} 项、收回 {self.collected} 项：有变体做完了没打出它那一行，这一趟的总计不算数")
-            print("  → 怎么办：看上面每项一行少了哪个变体、它的日志在草稿目录 kill-bounds/ 下；修好之后重跑同一条命令")
+            print("  → 怎么办：看上面每项一行少了哪个变体、它的日志在草稿目录 kill-bounds/ 下；修好之后挪走这一趟的产物（有红例账的连同它；--output、--ledger 已经存在的不收），再重跑同一条命令")
             code = code or EXIT_INCOMPLETE
         print(f"E165_KILL_BOUNDS_TOTAL dispatched={self.dispatched} collected={self.collected} items={self.lines} judged={self.judged} red={self.red} "
               f"reused={self.reused} failed={self.failed} seconds={time.monotonic() - self.started:.1f}", flush=True)
@@ -638,13 +671,6 @@ def progress_interval(setup):
     return float(given) if given and setup.selftest else PROGRESS_INTERVAL_SECONDS
 
 
-def mark(options, name, text):
-    """在做的这一项走到哪一步（进度行里报）；没有进度的用法（--measure）什么都不做。"""
-    progress = options.get("progress")
-    if progress is not None:
-        progress.phase(name, text)
-
-
 def sha256_of_file(path):
     with open(path, "rb") as handle:
         return hashlib.sha256(handle.read()).hexdigest()
@@ -686,28 +712,16 @@ class Setup:
         self.not_run = []
 
     def bounds_arguments(self):
-        """每次整份跑装置的界参数：r2 是 --bounds segment2；r3 是 --bounds segment1 --family root_choice（登记 r3 9.3 第 3 条）；
-        r4 是 --bounds segment1 --family root_choice_faults，给了 --gate r2 时再加 --gate r2（登记 r5 修1.九乙第 1 条；弄坏开关 r4gateignored 不加）。"""
-        if self.profile == "r2":
-            return ["--bounds", "segment2"]
-        if self.profile == "r3":
-            return list(R3_BOUNDS_ARGUMENTS)
-        gate = list(R4_GATE_R2_ARGUMENTS) if self.gate == "r2" and "r4gateignored" not in BREAK else []
-        return list(R4_BOUNDS_ARGUMENTS) + gate
+        """每次整份跑装置的界参数（判法模块的 device_bounds_arguments）。"""
+        return device_bounds_arguments(self)
 
     def pins_arguments(self):
         """复跑命令里要带的 --pins / --gate（照这一次给的原样写）。"""
         return (["--pins", self.pins] if self.pins else []) + (["--gate", self.gate] if self.gate else [])
 
-    def device_command(self, command):
-        """跑编译出来的二进制：直接起，不套内存包装。command 第一项是二进制，档参数接在它后面（r2 9.4 第 2 条；r3 同法带 --profile r3）。"""
-        if self.profile == "r2":
-            profile = [] if "noprofile" in BREAK else DEVICE_PROFILE_ARGUMENTS
-        elif self.profile == "r3":
-            profile = [] if "r3noprofile" in BREAK else R3_DEVICE_PROFILE_ARGUMENTS
-        else:
-            profile = [] if "r4noprofile" in BREAK else R4_DEVICE_PROFILE_ARGUMENTS
-        return command[:1] + profile + command[1:], environment_in_the_copy(self.script_root)
+    def command_environment(self):
+        """副本里跑编出来的装置的环境：多机配置取脚本所在的仓那一份（environment_in_the_copy）。判法模块起装置时经它取，拷副本那一层不进判法闭包。"""
+        return environment_in_the_copy(self.script_root)
 
 
 DEVICE_SOURCE_PATH = "crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs"
@@ -945,178 +959,6 @@ def check_the_anchors(items, texts):
         raise Stop(EXIT_ANCHOR, "\n".join(lines) + "\n  → 怎么办：把那一行的原文改到今天源码里逐字存在、只出现一次的那一段；这一次一条变异都没跑")
 
 
-# ── 装置输出的行
-
-def parse_row(line):
-    """`E7RESULT name=… k=v …`：值里带空格的字段（witness、rerun），不带「键=」开头的词并进前一个字段。"""
-    fields = {}
-    last_key = None
-    for token in line.split(" ")[1:]:
-        if re.match(r"^[a-z_0-9]+=", token):
-            key, value = token.split("=", 1)
-            fields[key] = value
-            last_key = key
-        elif last_key is not None:
-            fields[last_key] += " " + token
-    return fields
-
-
-def result_rows(text):
-    return [line for line in text.split("\n") if line.startswith("E7RESULT ")]
-
-
-def rows_by_place(rows):
-    """(域, N) → {行的键: 字段}；只收带 domain= 与 n= 的行（每个 (域, N) 的量），判决行与自检、对照行不在内。"""
-    places = {}
-    order = []
-    for line in rows:
-        fields = parse_row(line)
-        if "domain" not in fields or "n" not in fields or fields.get("name") == "state":
-            continue
-        place = (fields["domain"], int(fields["n"]))
-        if place not in places:
-            places[place] = {}
-            order.append(place)
-        key = (fields["name"], fields.get("criterion") or fields.get("reading") or fields.get("readings") or fields.get("set") or "")
-        places[place][key] = fields
-    return places, order
-
-
-def differences_at(domain, baseline_fields, mutant_fields):
-    """一个 (域, N) 上变体与基线不同的量，分三栏：条款判据、实现锚点、别的。"""
-    clause, anchors, other = [], [], []
-    for key, baseline in baseline_fields.items():
-        mutant = mutant_fields.get(key)
-        name, discriminator = key
-        if mutant is None:
-            other.append(f"{name}.{discriminator or 'row'}.missing")
-            continue
-        for field, baseline_value in baseline.items():
-            if mutant.get(field) == baseline_value:
-                continue
-            if name == "violations" and field == "violations":
-                if discriminator in CLAUSE_CRITERIA:
-                    clause.append(discriminator)
-                elif discriminator in ANCHOR_CRITERIA:
-                    anchors.append(discriminator)
-                else:
-                    other.append(f"violations.{discriminator}")
-            elif name == "pairs" and field in ("today_j5a", "today_j5b"):
-                clause.append(f"{'J5a' if field == 'today_j5a' else 'J5b'}[{discriminator}]")
-            elif name == "states" and field == "failed" and domain in DOMAINS_WHERE_FAILED_STATES_ARE_PINNED:
-                anchors.append("failed_states")
-            elif name == "states" and field == "panicked":
-                pass  # 与 J0 / A0 那一行是同一个数
-            else:
-                other.append(f"{name}.{discriminator + '.' if discriminator else ''}{field}")
-    for key in mutant_fields:
-        if key not in baseline_fields:
-            name, discriminator = key
-            if name == "violations" and discriminator in ANCHOR_CRITERIA:
-                anchors.append(discriminator)
-            else:
-                other.append(f"{name}.{discriminator or 'row'}.extra")
-    return clause, anchors, other
-
-
-def compare_with_baseline(baseline_rows, mutant_rows):
-    baseline_places, order = rows_by_place(baseline_rows)
-    mutant_places, _ = rows_by_place(mutant_rows)
-    domains = []
-    for domain, _size in order:
-        if domain not in domains:
-            domains.append(domain)
-    per_domain = {}
-    for domain in domains:
-        sizes = [size for (place_domain, size) in order if place_domain == domain]
-        entry = {"upper_bound": max(sizes), "clause": None, "anchor": None, "other": None, "missing": None}
-        for size in sizes:
-            if (domain, size) not in mutant_places:
-                entry["missing"] = size
-                break
-            clause, anchors, other = differences_at(domain, baseline_places[(domain, size)], mutant_places[(domain, size)])
-            if clause and entry["clause"] is None:
-                entry["clause"] = (size, clause)
-            if anchors and entry["anchor"] is None:
-                entry["anchor"] = (size, anchors)
-            if other and entry["other"] is None:
-                entry["other"] = (size, other)
-            if entry["clause"] is not None:
-                break  # 红了就不再往上看这个域
-        per_domain[domain] = entry
-    return domains, per_domain
-
-
-def violation_lines_by_place(rows):
-    """(域, N) → {判据名: 那一行的整行文字}，只收 name=violations 行；域与 N 的次序照行出现的先后。"""
-    places, order = {}, []
-    for line in rows:
-        fields = parse_row(line)
-        if fields.get("name") != "violations" or "domain" not in fields or "n" not in fields or "criterion" not in fields:
-            continue
-        place = (fields["domain"], int(fields["n"]))
-        if place not in places:
-            places[place] = {}
-            order.append(place)
-        places[place][fields["criterion"]] = line
-    return places, order
-
-
-def domains_in_order(order):
-    domains = []
-    for domain, _size in order:
-        if domain not in domains:
-            domains.append(domain)
-    return domains
-
-
-def first_red_by_criterion(baseline_rows, mutant_rows):
-    """r2 9.4 第 4 条（SQ2）：J6 两行合看、J6Qn 两行合看，每个域各求最小的 N——那条判据任一行与基线同一 (域, N) 的同一行文字不同
-    （变体缺那一行也算不同）；到上沿都相同记 None，基线在那个域上一行那条判据都没有记 "no_rows"（与「界内不红」分开）。整份比完，不早停。
-    返回 {"J6": [(域, N、None 或 "no_rows")…], "J6Qn": […]}，域的次序照基线。弄坏开关 j6qnfromj6：J6Qn 取了 J6 那两行。"""
-    baseline_places, order = violation_lines_by_place(baseline_rows)
-    mutant_places, _ = violation_lines_by_place(mutant_rows)
-    families = {"J6": J6_ROWS, "J6Qn": J6_ROWS if "j6qnfromj6" in BREAK else J6QN_ROWS}
-    result = {}
-    for family, criteria in families.items():
-        per_domain = []
-        for domain in domains_in_order(order):
-            sizes = sorted(size for (place_domain, size) in order if place_domain == domain)
-            first = None if any(criterion in baseline_places[(domain, size)] for size in sizes for criterion in criteria) else "no_rows"
-            for size in sizes if first is None else []:
-                baseline_lines = baseline_places[(domain, size)]
-                mutant_lines = mutant_places.get((domain, size), {})
-                if any(criterion in baseline_lines and mutant_lines.get(criterion) != baseline_lines[criterion] for criterion in criteria):
-                    first = size
-                    break
-            per_domain.append((domain, first))
-        result[family] = per_domain
-    return result
-
-
-def first_red_by_criterion_text(first_reds):
-    return ";".join(f"{family}:" + ",".join(f"{domain}={'none' if size is None else size}" for domain, size in per_domain)
-                    for family, per_domain in first_reds.items())
-
-
-def first_text_red_criteria(baseline_rows, mutant_rows):
-    """r2 9.4 第 4 条后半（SQ5）：每个域上任一条判据的 name=violations 行文字与基线不同的最小 N，与那个 N 上文字不同的全部判据名（基线的次序）。
-    交 [(域, N, [判据名…])]，到上沿都相同的域不列。"""
-    baseline_places, order = violation_lines_by_place(baseline_rows)
-    mutant_places, _ = violation_lines_by_place(mutant_rows)
-    found = []
-    for domain in domains_in_order(order):
-        for size in sorted(size for (place_domain, size) in order if place_domain == domain):
-            baseline_lines = baseline_places[(domain, size)]
-            mutant_lines = mutant_places.get((domain, size), {})
-            differing = [criterion for criterion, line in baseline_lines.items() if mutant_lines.get(criterion) != line]
-            differing += [criterion for criterion in mutant_lines if criterion not in baseline_lines]
-            if differing:
-                found.append((domain, size, differing))
-                break
-    return found
-
-
 def check_the_profile_rows(baseline):
     """r2 9.4 第 6 条：基线每个有 J6 行的 (域, N) 都要有 J6Qn 两行；一个有 J6 行的 (域, N) 都没有、或有一处缺 J6Qn 行，就是装置没带 --profile r2。
     弄坏开关 noprofilecheck：不核。"""
@@ -1164,16 +1006,6 @@ def environment_in_the_copy(script_root, environment=None):
     if "copyconfigurationunset" in BREAK:
         return dict(os.environ if environment is None else environment)
     return repository_copy.environment_for_commands_in_the_copy(script_root, environment)
-
-
-def run_captured(command, environment, cwd=None, log_path=None):
-    completed = subprocess.run(command, env=environment, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if log_path is not None:
-        with open(log_path, "w", encoding="utf-8") as handle:
-            handle.write(completed.stdout)
-            handle.write("\n--- stderr ---\n")
-            handle.write(completed.stderr)
-    return completed
 
 
 def prepare_and_build(setup, item, directory, threads, wrap_build_for_measure=False):
@@ -1236,169 +1068,27 @@ def restore_and_remove(setup, directory, keep, target=None):
     return restored
 
 
-def run_segment_two(setup, binary, threads, log_directory):
-    command, environment = setup.device_command([binary] + setup.bounds_arguments())
-    environment["E165_THREADS"] = str(threads)
-    started = time.monotonic()
-    completed = run_captured(["nice", "-n", "19"] + command, environment, log_path=os.path.join(log_directory, "run.log"))
-    return completed, time.monotonic() - started
-
-
-def state_lines(setup, binary, kind, place):
-    command, environment = setup.device_command([binary, "--list-states" if kind == "list-states" else "--replay-state", place])
-    return subprocess.Popen(["nice", "-n", "19"] + command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-
-
-def counters_of(line):
-    match = re.search(r" counters=(\S+)", line)
-    return match.group(1) if match else ""
-
-
-def first_differing_state(setup, baseline_binary, mutant_binary, domain, size):
-    """两边的逐态行照枚举次序逐行比：先找第一个「加了一的量」不同的状态；一个都没有时退到第一个整行不同的状态（只有结局不同）。"""
-    place = f"{domain}:{size}"
-    baseline_process = state_lines(setup, baseline_binary, "list-states", place)
-    mutant_process = state_lines(setup, mutant_binary, "list-states", place)
-    found = None
-    only_outcome = None
-    for baseline_line, mutant_line in zip(baseline_process.stdout, mutant_process.stdout):
-        if baseline_line == mutant_line or " name=state " not in baseline_line:
-            continue
-        ordinal = parse_row(baseline_line.rstrip("\n")).get("ordinal")
-        if counters_of(baseline_line) != counters_of(mutant_line):
-            found = ("counters", ordinal, baseline_line.rstrip("\n"), mutant_line.rstrip("\n"))
-            break
-        if only_outcome is None:
-            only_outcome = ("outcome_only", ordinal, baseline_line.rstrip("\n"), mutant_line.rstrip("\n"))
-    for process in (baseline_process, mutant_process):
-        process.stdout.close()  # 还在写的那一边收到管道关闭就退出
-        process.wait()
-    return found or only_outcome
-
-
-def replayed_state_line(setup, binary, domain, size, ordinal):
-    process = state_lines(setup, binary, "replay-state", f"{domain}:{size}:{ordinal}")
-    output = process.stdout.read()
-    process.stdout.close()
-    process.wait()
-    lines = [line for line in output.split("\n") if " name=state " in line]
-    return lines[0] if len(lines) == 1 else None
-
-
-def counter_difference(baseline_line, mutant_line):
-    baseline = set(counters_of(baseline_line).split(","))
-    mutant = set(counters_of(mutant_line).split(","))
-    parts = [f"+{name}" for name in sorted(mutant - baseline)] + [f"-{name}" for name in sorted(baseline - mutant)]
-    return ",".join(parts) if parts else "none"
-
-
-def rerun_command(item, options):
-    return (f"bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh{options.get('pins_text', '')} --scratch <草稿目录> --output {options['output_shown']} "
-            f"--ledger {options['ledger_shown']} --recheck --item {item['name']}")
+def judge_built_variant(setup, item, baseline, options, judge):
+    """做一个变体：在这里建副本、改坏、编（prepare_and_build），起装置、比、出产物行与红例账行交判法模块的 judge（judge_variant、judge_variant_r3、
+    judge_variant_r4；判完照交进去的 restore 还原并删掉副本）。r3、r4 选行没满足的（item["failure"]，登记 TH5）不建副本、不编，直接交 judge 记 not_compared。
+    返回 {lines: 产物行, ledger: 红例账行, problem: 没得出结果的原因或 None, timing: (编译秒, 跑秒, 这一项的秒)}。"""
+    if item.get("failure") is not None:
+        judged = judge(setup, item, baseline, options, None, None, None, None)
+        timing = (0.0, 0.0, 0.0)
+    else:
+        directory = os.path.join(options["work"], item["name"])
+        started = time.monotonic()
+        mark(options, item["name"], "建副本、改坏、编译")
+        binary, build_problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"])
+        judged = judge(setup, item, baseline, options, binary, build_problem, directory,
+                       lambda: restore_and_remove(setup, directory, keep=False, target=target_of(item)))
+        timing = (build_seconds, judged["run_seconds"], time.monotonic() - started)
+    return {"lines": judged["lines"], "ledger": judged["ledger"], "problem": judged["problem"], "timing": timing}
 
 
 def process_item(setup, item, baseline, options):
-    """做一个变体，返回 {lines: 产物行, ledger: 红例账行, problem: 没得出结果的原因或 None, timing: …}。"""
-    directory = os.path.join(options["work"], item["name"])
-    started = time.monotonic()
-    mark(options, item["name"], "建副本、改坏、编译")
-    binary, build_problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"])
-
-    def head(row):
-        return (f"E7RESULT name=kill_bound item={item['name']} table={item['table']} table_row={row} "
-                f"rows_sharing_this_replacement={'+'.join(str(shared) for shared in item['rows']) or 'none'}")
-
-    def tail(title):
-        return f"rerun=\"{rerun_command(item, options)}\" title={title.replace(' ', '_')} complete=yes"
-
-    if binary is None:
-        restored = restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        lines = [f"{head(row)} outcome=invalid build_error={build_problem.replace(' ', '_')} copy_restored={str(restored).lower()} {tail(title)}"
-                 for row, title in zip(item["rows"], item["titles"])]
-        return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
-    mark(options, item["name"], "跑 --bounds segment2")
-    completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    mutant_rows = result_rows(completed.stdout)
-    domains, per_domain = compare_with_baseline(baseline["rows"], mutant_rows)
-    finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
-    panic_lines = [line for line in completed.stderr.split("\n") if "panicked at" in line]
-    clause_parts, anchor_parts, other_parts, not_red, missing_parts = [], [], [], [], []
-    legal_minimum = adversarial_minimum = None
-    ledger = []
-    for domain in domains:
-        entry = per_domain[domain]
-        red_sizes = [found[0] for found in (entry["clause"], entry["anchor"]) if found is not None]
-        if entry["clause"] is not None:
-            clause_parts.append(f"{domain}:{entry['clause'][0]}:{'+'.join(entry['clause'][1])}")
-        if entry["anchor"] is not None:
-            anchor_parts.append(f"{domain}:{entry['anchor'][0]}:{'+'.join(entry['anchor'][1])}")
-        if entry["other"] is not None and (not red_sizes or entry["other"][0] < min(red_sizes)):
-            other_parts.append(f"{domain}:{entry['other'][0]}:{'+'.join(entry['other'][1])}")
-        if entry["missing"] is not None:
-            missing_parts.append(f"{domain}:{entry['missing']}")
-        if not red_sizes:
-            if entry["missing"] is None:
-                not_red.append(f"{domain}(≤{entry['upper_bound']})")
-            continue
-        first_red = min(red_sizes)
-        if domain in ADVERSARIAL_DOMAINS:
-            adversarial_minimum = first_red if adversarial_minimum is None else min(adversarial_minimum, first_red)
-        else:
-            legal_minimum = first_red if legal_minimum is None else min(legal_minimum, first_red)
-        # 红例：这个域首红的 N 上第一个判定不同的状态，两边各单条重放一遍。
-        rows_text = "+".join(str(row) for row in item["rows"])
-        mark(options, item["name"], f"在 {domain}:{first_red} 上找红例（两边 --list-states 逐行比）")
-        example = first_differing_state(setup, baseline["binary"], binary, domain, first_red)
-        if example is None:
-            ledger.append({"domain": domain, "size": first_red, "found": False, "fields": [
-                item["name"], rows_text, domain, str(first_red), "none", "no_single_state_differs", "none", "false", "false", "", "", ""]})
-            continue
-        kind, ordinal, baseline_line, mutant_line = example
-        mark(options, item["name"], f"在 {domain}:{first_red} 上单条重放第 {ordinal} 个状态")
-        on_original = replayed_state_line(setup, baseline["binary"], domain, first_red, ordinal)
-        on_mutant = replayed_state_line(setup, binary, domain, first_red, ordinal)
-        ledger.append({"domain": domain, "size": first_red, "found": True, "fields": [
-            item["name"], rows_text, domain, str(first_red), ordinal, kind,
-            counter_difference(baseline_line, mutant_line) if kind == "counters" else "outcome",
-            str(on_original == baseline_line).lower(), str(on_mutant == mutant_line).lower(),
-            f"target/release/{BIN_NAME} --replay-state {domain}:{first_red}:{ordinal}", baseline_line, mutant_line]})
-    if clause_parts:
-        outcome = "red"
-    elif anchor_parts:
-        outcome = "red_only_by_implementation_anchor"
-    elif missing_parts or not finished:
-        outcome = "run_did_not_finish"
-    else:
-        outcome = "not_red_within_bounds"
-    found_entries = [entry for entry in ledger if entry["found"]]
-    first_of_variant = min(found_entries, key=lambda entry: (entry["size"], domains.index(entry["domain"]))) if found_entries else None
-    for entry in ledger:
-        entry["fields"].insert(9, str(entry is first_of_variant).lower())
-    confirmed = sum(1 for entry in ledger if entry["fields"][7] == "true" and entry["fields"][8] == "true")
-    restored = restore_and_remove(setup, directory, keep=False, target=target_of(item))
-    abort = panic_lines[0].strip().replace(" ", "_")[:200] if panic_lines and not finished else "none"
-    text_reds = first_text_red_criteria(baseline["rows"], mutant_rows)
-    text_red_text = ";".join(f"{domain}:{size}:{'+'.join(criteria)}" for domain, size, criteria in text_reds) or "none"
-    body = (f"outcome={outcome} first_clause_red={';'.join(clause_parts) or 'none'} first_anchor_red={';'.join(anchor_parts) or 'none'} "
-            f"first_red_by_criterion={first_red_by_criterion_text(first_red_by_criterion(baseline['rows'], mutant_rows))} "
-            f"first_text_red_criteria={text_red_text} "
-            f"other_difference_before_any_red={';'.join(other_parts) or 'none'} not_red_domains={','.join(not_red) or 'none'} "
-            f"legal_family_minimum={legal_minimum if legal_minimum is not None else 'none'} "
-            f"adversarial_family_minimum={adversarial_minimum if adversarial_minimum is not None else 'none'} "
-            f"run_exit={completed.returncode} run_finished={str(finished).lower()} domains_without_rows={';'.join(missing_parts) or 'none'} "
-            f"abort={abort} red_examples={len(ledger)} red_examples_confirmed_by_single_state_replay={confirmed} copy_restored={str(restored).lower()}")
-    lines = [f"{head(row)} {body} {tail(title)}" for row, title in zip(item["rows"], item["titles"])]
-    problem = None if finished or outcome.startswith("red") else f"装置没跑完（退出码 {completed.returncode}）而没有一个域红"
-    return {"lines": lines, "ledger": ["\t".join(entry["fields"]) for entry in ledger], "problem": problem,
-            "timing": (build_seconds, run_seconds, time.monotonic() - started)}
-
-
-def baseline_item_line(item, baseline, options):
-    rows = baseline["rows"]
-    digest = hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
-    return (f"E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none outcome=baseline "
-            f"result_rows={len(rows)} result_rows_sha256={digest} run_exit={baseline['exit']} "
-            f"rows_found_verbatim_in_segment1_products={baseline['verbatim_rows']} rerun=\"{rerun_command(item, options)}\" title=基线（不改） complete=yes")
+    """不给 --profile 那一套做一个变体（判法模块的 judge_variant）。"""
+    return judge_built_variant(setup, item, baseline, options, judge_variant)
 
 
 def build_and_run_baseline(setup, options, name):
@@ -1417,7 +1107,7 @@ def build_and_run_baseline(setup, options, name):
     if completed.returncode != 0 or not rows or not rows[-1].startswith("E7RESULT name=done "):
         raise Stop(EXIT_INCOMPLETE, f"  ✗ 基线没跑完或退出码不是 0（{completed.returncode}；日志 {directory}/run.log）\n  → 怎么办：先单跑基线看（撞内存上限的由 task-server 放大重排整条命令，不在这里判）")
     print(f"  基线 {name}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，{len(rows)} 行", file=sys.stderr)
-    return {"binary": binary, "rows": rows, "exit": completed.returncode, "directory": directory}
+    return {"binary": binary, "rows": rows, "row_count": len(rows), "exit": completed.returncode, "directory": directory}
 
 
 def retained_product_not_run(setup, clause, paths):
@@ -1438,11 +1128,6 @@ def retained_product_not_run(setup, clause, paths):
     return True
 
 
-def retained_comparison_text(baseline, compared_text):
-    """基线那一行、收尾判决行里比对那一栏：留存产物不在、没比的写 not_run，比过的写 compared_text。"""
-    return "not_run" if baseline.get("verbatim_rows") == "not_run" else compared_text
-
-
 def check_against_segment_one(setup, baseline):
     """作废条款 V7：基线每个 (域, N) 的行必须逐字出现在第一段的产物里。第一段产物有不在的，这一项本次未跑（retained_product_not_run）。"""
     if retained_product_not_run(setup, "V7", [os.path.join(setup.research_root, product) for product in setup.registered["segment1_products"]]):
@@ -1460,337 +1145,11 @@ def check_against_segment_one(setup, baseline):
     baseline["verbatim_rows"] = len(place_rows)
 
 
-# ── r3 档（登记 r3 9.3，第三段）：整份装置输出的读法。判据是违例数，格是 (域, M, U)，KA 的 M、U 都写 0。
-
-def r3_parse(rows):
-    """装置 --family root_choice 的 E7RESULT 行 → (违例, 计数行, 格的先后次序)。
-    违例：{格: {判据: (违例数, 整行)}}（只收 name=violations）；计数行：{格: (字段, 整行)}（name=root_choice_states）；格 = (域, M, U)。"""
-    violations, states, order = {}, {}, []
-    for line in rows:
-        fields = parse_row(line)
-        if fields.get("name") not in ("violations", "root_choice_states") or not {"domain", "mounts", "user_publishes"} <= set(fields):
-            continue
-        cell = (fields["domain"], int(fields["mounts"]), int(fields["user_publishes"]))
-        if cell not in order:
-            order.append(cell)
-        if fields["name"] == "violations":
-            if "criterion" in fields:
-                violations.setdefault(cell, {})[fields["criterion"]] = (int(fields["violations"]), line)
-        else:
-            states[cell] = (fields, line)
-    return violations, states, order
-
-
-def r3_cells_of(order, domain):
-    """一个域的格，按 (M 升序, U 升序)。"""
-    return sorted((mounts, publishes) for cell_domain, mounts, publishes in order if cell_domain == domain)
-
-
-def r3_first_reds(baseline, mutant):
-    """登记 TQ5：每个变体、每个合法历史域、每条判据，按 (M 升序, U 升序) 第一个违例数与基线不同的格（变体缺那一格或缺那一行也算不同）；
-    到上沿都相同记 None；基线在那个域上一行那条判据都没有记 "no_rows"。整份比完，不早停。返回 {判据: [(域, (M, U) 或 None 或 "no_rows")…]}。
-    弄坏开关 r3firstredswap：KJ1 与 KJ2 两列对调。"""
-    baseline_violations, _states, baseline_order = baseline
-    mutant_violations = mutant[0]
-    result = {}
-    for criterion in R3_CRITERIA:
-        per_domain = []
-        for domain in R3_LEGAL_DOMAINS:
-            cells = r3_cells_of(baseline_order, domain)
-            if not any(criterion in baseline_violations[(domain, m, u)] for m, u in cells):
-                per_domain.append((domain, "no_rows"))
-                continue
-            first = None
-            for m, u in cells:
-                baseline_reading = baseline_violations[(domain, m, u)].get(criterion)
-                mutant_reading = mutant_violations.get((domain, m, u), {}).get(criterion)
-                if baseline_reading is not None and (mutant_reading is None or mutant_reading[0] != baseline_reading[0]):
-                    first = (m, u)
-                    break
-            per_domain.append((domain, first))
-        result[criterion] = per_domain
-    if "r3firstredswap" in BREAK:
-        result["KJ1"], result["KJ2"] = result["KJ2"], result["KJ1"]
-    return result
-
-
-def r3_first_red_text(first_reds):
-    def one(value):
-        return "none" if value is None else value if isinstance(value, str) else f"M{value[0]}U{value[1]}"
-    return ";".join(f"{criterion}:" + ",".join(f"{domain}={one(value)}" for domain, value in per_domain) for criterion, per_domain in first_reds.items())
-
-
-def r3_differing_cells_text(baseline, mutant):
-    """每条判据、每个合法历史域：违例数与基线不同的格数（格数总数写在 of 后面）。"""
-    baseline_violations, _states, baseline_order = baseline
-    parts = []
-    for criterion in R3_CRITERIA:
-        per_domain = []
-        for domain in R3_LEGAL_DOMAINS:
-            cells = r3_cells_of(baseline_order, domain)
-            differing = sum(1 for m, u in cells if criterion in baseline_violations[(domain, m, u)]
-                            and mutant[0].get((domain, m, u), {}).get(criterion, (None,))[0] != baseline_violations[(domain, m, u)][criterion][0])
-            per_domain.append(f"{domain}={differing}of{len(cells)}")
-        parts.append(f"{criterion}:" + ",".join(per_domain))
-    return ";".join(parts)
-
-
-def r3_cells_text(violations, order):
-    """每个格的 KJ0/KJ1/KJ2/KJ3 违例数（没有那一行写 -）：<域>.M<m>U<u>=a/b/c/d，格用逗号连（KA 的 M、U 是 0）。"""
-    parts = []
-    for domain in R3_ALL_DOMAINS:
-        for m, u in r3_cells_of(order, domain):
-            readings = violations.get((domain, m, u), {})
-            parts.append(f"{domain}.M{m}U{u}=" + "/".join(str(readings[criterion][0]) if criterion in readings else "-" for criterion in R3_ROW_CRITERIA))
-    return ",".join(parts) or "none"
-
-
-def r3_ka_kj2(violations):
-    """KA 上 KJ2 的违例数；KA 那一格或那一行不在交 None。"""
-    for (domain, _m, _u), readings in violations.items():
-        if domain == "KA" and "KJ2" in readings:
-            return readings["KJ2"][0]
-    return None
-
-
-def r3_states_row_differences(baseline, mutant):
-    """每个域：计数行与基线不同的第一个格，与那一格上不同的字段名；全相同的域不列。"""
-    _violations, baseline_states, baseline_order = baseline
-    mutant_states = mutant[1]
-    found = []
-    for domain in R3_ALL_DOMAINS:
-        for m, u in r3_cells_of(baseline_order, domain):
-            cell = (domain, m, u)
-            if cell not in mutant_states:
-                found.append(f"{domain}=M{m}U{u}:missing")
-                break
-            differing = sorted(key for key in baseline_states[cell][0] if mutant_states[cell][0].get(key) != baseline_states[cell][0][key])
-            if differing:
-                found.append(f"{domain}=M{m}U{u}:" + "+".join(differing))
-                break
-    return ";".join(found) or "none"
-
-
-def r3_state_totals(states, field, how):
-    """每个域上计数行某个字段的合计（how 是 sum 或 max）：K:a,K9:b,KW:c,KA:d。"""
-    parts = []
-    for domain in R3_ALL_DOMAINS:
-        values = [int(fields.get(field, "0")) for (cell_domain, _m, _u), (fields, _line) in states.items() if cell_domain == domain]
-        parts.append(f"{domain}:{(sum(values) if how == 'sum' else max(values, default=0))}")
-    return ",".join(parts)
-
-
-def r3_ka_pin(entry, ka_kj2):
-    """TQ6：变体在 KA 上 KJ2 的违例数对着登记。entry = ("pinned", n) 或 ("inferred", n)。返回 (ka_expected, ka_pin, ka_inferred)；
-    pinned 的等于钉值写 match、不等写 mismatch；inferred 的不钉（ka_pin=not_pinned），只在 ka_inferred 里报 match 或 mismatch。弄坏开关 r3kapinunchecked：不核。"""
-    kind, expected = entry
-    if "r3kapinunchecked" in BREAK:
-        return expected, "unchecked", "none"
-    if kind == "pinned":
-        return expected, "match" if ka_kj2 == expected else "mismatch", "none"
-    return expected, "not_pinned", "match" if ka_kj2 == expected else "mismatch"
-
+# ── r3 档（登记 r3 9.3，第三段）：整份装置输出的读法在判法模块里，这里只留 TV7 比对要的那一个。
 
 def r3_normalised(rows):
     """TV7 比对用：E7RESULT 行去掉耗时字段（登记第六节「elapsed_seconds、E7TIMING 行除外」；E7TIMING 行本来不是 E7RESULT 行）。"""
     return [re.sub(r" elapsed_seconds=\S+", "", row) for row in rows]
-
-
-def r4_parse(rows):
-    """装置 --family root_choice_faults 的 E7RESULT 行 → (违例, 计数行, 格的先后次序)。
-    违例：{格: {(被判时故障, 历史标签): {判据: (违例数, 整行)}}}（只收 name=violations；KA 的行是 r3 的写法、没有这两样，记成 ("none", "inside_the_promise")）；
-    计数行：{格: (字段, 整行)}（name=root_choice_fault_states，KA 取 name=root_choice_states）；格 = (域, M, U)。"""
-    violations, states, order = {}, {}, []
-    for line in rows:
-        fields = parse_row(line)
-        if fields.get("name") not in ("violations", "root_choice_fault_states", "root_choice_states") or not {"domain", "mounts", "user_publishes"} <= set(fields):
-            continue
-        cell = (fields["domain"], int(fields["mounts"]), int(fields["user_publishes"]))
-        if cell not in order:
-            order.append(cell)
-        if fields["name"] == "violations":
-            if "criterion" in fields:
-                subcell = (fields.get("judged_fault", "none"), fields.get("history", "inside_the_promise"))
-                violations.setdefault(cell, {}).setdefault(subcell, {})[fields["criterion"]] = (int(fields["violations"]), line)
-        else:
-            states[cell] = (fields, line)
-    return violations, states, order
-
-
-def r4_cells_of(order, domain):
-    """一个域的格，按 (M 升序, U 升序)。"""
-    return sorted((mounts, publishes) for cell_domain, mounts, publishes in order if cell_domain == domain)
-
-
-def r4_subcell_text(subcell):
-    fault, label = subcell
-    return f"{fault}/{'inside' if label == 'inside_the_promise' else 'outside'}"
-
-
-def r4_first_reds(baseline, mutant):
-    """登记 TQ9：每个变体、每个合法历史域、每条判据，按 (M 升序, U 升序, 被判时故障, 历史标签) 第一个违例数与基线不同的格（变体缺那一格或缺那一行也算不同）；
-    到上沿都相同记 None；基线在那个域上一行那条判据都没有记 "no_rows"。整份比完，不早停。返回 {判据: [(域, (M, U, 子格) 或 None 或 "no_rows")…]}。
-    弄坏开关 r4firstredswap：KJ1T 与 KJ2 两列对调。"""
-    baseline_violations, _states, baseline_order = baseline
-    mutant_violations = mutant[0]
-    result = {}
-    for criterion in R4_CRITERIA:
-        per_domain = []
-        for domain in R4_LEGAL_DOMAINS:
-            cells = r4_cells_of(baseline_order, domain)
-            if not any(criterion in readings for m, u in cells for readings in baseline_violations.get((domain, m, u), {}).values()):
-                per_domain.append((domain, "no_rows"))
-                continue
-            first = None
-            for m, u in cells:
-                for subcell in R4_SUBCELLS:
-                    baseline_reading = baseline_violations.get((domain, m, u), {}).get(subcell, {}).get(criterion)
-                    mutant_reading = mutant_violations.get((domain, m, u), {}).get(subcell, {}).get(criterion)
-                    if baseline_reading is not None and (mutant_reading is None or mutant_reading[0] != baseline_reading[0]):
-                        first = (m, u, subcell)
-                        break
-                if first is not None:
-                    break
-            per_domain.append((domain, first))
-        result[criterion] = per_domain
-    if "r4firstredswap" in BREAK:
-        result["KJ1T"], result["KJ2"] = result["KJ2"], result["KJ1T"]
-    return result
-
-
-def r4_first_red_text(first_reds):
-    def one(value):
-        if value is None:
-            return "none"
-        if isinstance(value, str):
-            return value
-        return f"M{value[0]}U{value[1]}/{r4_subcell_text(value[2])}"
-    return ";".join(f"{criterion}:" + ",".join(f"{domain}={one(value)}" for domain, value in per_domain) for criterion, per_domain in first_reds.items())
-
-
-def r4_differing_text(baseline, mutant, domains):
-    """每条判据、给定的每个域：违例数与基线不同的 (格, 被判时故障, 历史标签) 子格数（子格总数写在 of 后面）。"""
-    baseline_violations, _states, baseline_order = baseline
-    parts = []
-    for criterion in R4_CRITERIA:
-        per_domain = []
-        for domain in domains:
-            total = differing = 0
-            for m, u in r4_cells_of(baseline_order, domain):
-                for subcell, readings in baseline_violations.get((domain, m, u), {}).items():
-                    if criterion not in readings:
-                        continue
-                    total += 1
-                    mutant_reading = mutant[0].get((domain, m, u), {}).get(subcell, {}).get(criterion)
-                    differing += int(mutant_reading is None or mutant_reading[0] != readings[criterion][0])
-            per_domain.append(f"{domain}={differing}of{total}")
-        parts.append(f"{criterion}:" + ",".join(per_domain))
-    return ";".join(parts)
-
-
-def r4_cell_sums(violations, cell):
-    """一个格上五条判据的违例数合计（各子格相加）：{判据: 合计}，那一格没有的判据不列。"""
-    sums = {}
-    for readings in violations.get(cell, {}).values():
-        for criterion, (count, _line) in readings.items():
-            sums[criterion] = sums.get(criterion, 0) + count
-    return sums
-
-
-def r4_cells_text(violations, order):
-    """每个格的 KJ0/KJ1/KJ1T/KJ2/KJ3 违例数合计（没有那一行写 -）：<域>.M<m>U<u>=a/b/c/d/e，格用逗号连（KA 的 M、U 是 0）。"""
-    parts = []
-    for domain in R4_ALL_DOMAINS:
-        for m, u in r4_cells_of(order, domain):
-            sums = r4_cell_sums(violations, (domain, m, u))
-            parts.append(f"{domain}.M{m}U{u}=" + "/".join(str(sums[criterion]) if criterion in sums else "-" for criterion in R4_ROW_CRITERIA))
-    return ",".join(parts) or "none"
-
-
-def r4_ka_kj2(violations):
-    """KA 上 KJ2 的违例数；KA 那一格或那一行不在交 None。"""
-    for (domain, _m, _u), subcells in violations.items():
-        if domain == "KA":
-            for readings in subcells.values():
-                if "KJ2" in readings:
-                    return readings["KJ2"][0]
-    return None
-
-
-def r4_states_row_differences(baseline, mutant):
-    """每个域：计数行与基线不同的第一个格，与那一格上不同的字段名（见证文字不比）；全相同的域不列。"""
-    _violations, baseline_states, baseline_order = baseline
-    mutant_states = mutant[1]
-    found = []
-    for domain in R4_ALL_DOMAINS:
-        for m, u in r4_cells_of(baseline_order, domain):
-            cell = (domain, m, u)
-            if cell not in mutant_states:
-                found.append(f"{domain}=M{m}U{u}:missing")
-                break
-            differing = sorted(key for key in baseline_states[cell][0]
-                               if not key.endswith("witness") and mutant_states[cell][0].get(key) != baseline_states[cell][0][key])
-            if differing:
-                found.append(f"{domain}=M{m}U{u}:" + "+".join(differing))
-                break
-    return ";".join(found) or "none"
-
-
-def r4_state_totals(states, field, how):
-    """每个域上计数行某个字段的合计（how 是 sum 或 max）：KF:a,KF3:b,KF9:c,KFW:d,KG:e,KA:f。"""
-    parts = []
-    for domain in R4_ALL_DOMAINS:
-        values = [int(fields.get(field, "0")) for (cell_domain, _m, _u), (fields, _line) in states.items() if cell_domain == domain]
-        parts.append(f"{domain}:{(sum(values) if how == 'sum' else max(values, default=0))}")
-    return ",".join(parts)
-
-def r4_ka_pin(entry, ka_kj2):
-    """TQ10：变体在 KA 上 KJ2 的违例数对着登记。entry = ("pinned", n) 或 ("inferred", n)。返回 (ka_expected, ka_pin, ka_inferred)；
-    pinned 的等于钉值写 match、不等写 mismatch；inferred 的不钉（ka_pin=not_pinned），只在 ka_inferred 里报 match 或 mismatch。弄坏开关 r4kapinunchecked 不存在：
-    KA 钉值与 r3 同一组、r3 那一格已经证过它会红。"""
-    kind, expected = entry
-    if kind == "pinned":
-        return expected, "match" if ka_kj2 == expected else "mismatch", "none"
-    return expected, "not_pinned", "match" if ka_kj2 == expected else "mismatch"
-
-
-def r4_kg_pin(setup, label, violations):
-    """TQ10：变体在 KG 上每个 (M, U) 格的 KJ1、KJ1T、KJ2 违例数（各子格相加）对着登记第七节「本地择根序」表里它那一列（v1827 取 v1823 那一列）。
-    返回 (kg_pin, 不符的格)；kg_pin 是 match 或 mismatch；弄坏开关 r4kgpinunchecked：不核（unchecked）。"""
-    if "r4kgpinunchecked" in BREAK:
-        return "unchecked", "none"
-    column = setup.registered["kg_columns"][R4_KG_COLUMN_OF[label]]
-    mismatched = []
-    for key, expected in column.items():
-        m, u = (int(part) for part in key.split(","))
-        sums = r4_cell_sums(violations, ("KG", m, u))
-        got = [sums.get(criterion) for criterion in R4_CLAUSE_CRITERIA]
-        if got != list(expected):
-            mismatched.append(f"M{m}U{u}:" + "/".join("-" if value is None else str(value) for value in got) + "!=" + "/".join(str(value) for value in expected))
-    return ("mismatch" if mismatched else "match"), (";".join(mismatched) or "none")
-
-
-def r4_baseline_kg_today_pin(setup, violations):
-    """基线在 KG 上每格的读数对「今天的序」那一列（登记 5.6：本地理想恢复与今天的三步逐格同值）；只报，不停机。"""
-    column = setup.registered["kg_columns"]["today"]
-    for key, expected in column.items():
-        m, u = (int(part) for part in key.split(","))
-        sums = r4_cell_sums(violations, ("KG", m, u))
-        if [sums.get(criterion) for criterion in R4_CLAUSE_CRITERIA] != list(expected):
-            return "mismatch"
-    return "match"
-
-
-def r4_differs_on(baseline, mutant):
-    """变体在合法域不红时，KG 与 KA 上有没有与基线不同的量：KG（三条条款判据任一子格违例数不同）、KA（KJ2）。"""
-    baseline_violations = baseline[0]
-    on_kg = any(
-        (mutant[0].get(("KG", m, u), {}).get(subcell, {}).get(criterion) is None
-         or mutant[0][("KG", m, u)][subcell][criterion][0] != reading[0])
-        for (domain, m, u), subcells in baseline_violations.items() if domain == "KG"
-        for subcell, readings in subcells.items() for criterion, reading in readings.items() if criterion in R4_CLAUSE_CRITERIA)
-    on_ka = r4_ka_kj2(baseline_violations) != r4_ka_kj2(mutant[0])
-    return "+".join(name for name, differs in (("KG", on_kg), ("KA", on_ka)) if differs) or "none", on_kg
 
 
 def check_the_profile_rows_r4(baseline):
@@ -1856,119 +1215,320 @@ def load_items_r4(setup):
     return items, texts
 
 
-def baseline_item_line_r4(setup, item, baseline, options):
-    rows = baseline["rows"]
-    digest = hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
-    kg_pin = r4_baseline_kg_today_pin(setup, r4_parse(rows)[0]) if rows else "no_rows"
-    return (f"E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none{options.get('gate_field', '')} outcome=baseline "
-            f"result_rows={len(rows)} result_rows_sha256={digest} run_exit={baseline['exit']} "
-            f"rows_identical_to_segment1_product={retained_comparison_text(baseline, str(baseline.get('verbatim_rows', 0) == len(rows)).lower())} kg_today_pin={kg_pin} "
-            f"rerun=\"{rerun_command_r4(item, options)}\" title=基线（不改） complete=yes")
-
-
-def rerun_command_r4(item, options):
-    return (f"bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --profile r4{options.get('pins_text', '')} --root <第一段根> --scratch <草稿目录> "
-            f"--output {options['output_shown']} --item {item['name']}")
-
 def process_item_r4(setup, item, baseline, options):
-    """做一个变体，返回 {lines, ledger（恒空）, problem, timing}。整份 --bounds segment1 --family root_choice_faults 跑完，逐 (域, M, U, 被判时故障, 历史标签) 与基线比，不早停。
-    给了 --gate r2 时每一行在 rows_sharing_this_replacement 之后多一个 gate=r2（登记 r5 修1.九乙第 3 条）。"""
-    directory = os.path.join(options["work"], item["name"])
-    started = time.monotonic()
-
-    def head(row):
-        return (f"E7RESULT name=kill_bound item={item['name']} table={item['table']} table_row={row} "
-                f"rows_sharing_this_replacement={'+'.join(str(shared) for shared in item['rows']) or 'none'}{options.get('gate_field', '')}")
-
-    def tail(title):
-        return f"rerun=\"{rerun_command_r4(item, options)}\" title={title.replace(' ', '_')} complete=yes"
-
-    if item["failure"] is not None:     # 登记 TH5：四条里有一条不满足，记没比、别的行照做
-        lines = [f"{head(row)} outcome=not_compared failed_condition={item['failure']} registered_table_row={item['registered_row']} variant={item['label']} {tail(title)}"
-                 for row, title in zip(item["rows"], item["titles"])]
-        return {"lines": lines, "ledger": [], "problem": None, "timing": (0.0, 0.0, 0.0)}
-    mark(options, item["name"], "建副本、改坏、编译")
-    binary, build_problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"])
-    if binary is None:
-        restored = restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        lines = [f"{head(row)} outcome=invalid build_error={build_problem.replace(' ', '_')} copy_restored={str(restored).lower()} variant={item['label']} {tail(title)}"
-                 for row, title in zip(item["rows"], item["titles"])]
-        return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
-    mark(options, item["name"], "跑 " + " ".join(setup.bounds_arguments()))
-    completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    mutant_rows = result_rows(completed.stdout)
-    finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
-    panic_lines = [line for line in completed.stderr.split("\n") if "panicked at" in line]
-    baseline_parsed, mutant_parsed = r4_parse(baseline["rows"]), r4_parse(mutant_rows)
-    first_reds = r4_first_reds(baseline_parsed, mutant_parsed)
-    red_domains = [domain for domain in R4_LEGAL_DOMAINS
-                   if any(isinstance(value, tuple) for criterion in R4_CLAUSE_CRITERIA for found_domain, value in first_reds[criterion] if found_domain == domain)]
-    differs_on, kg_differs = r4_differs_on(baseline_parsed, mutant_parsed)
-    if "r4kgcountsasred" in BREAK and kg_differs:      # 弄坏开关：KG 当合法域
-        red_domains = red_domains + ["KG"]
-    other_red = any(isinstance(value, tuple) for criterion in ("KJ0", "KJ3") for _domain, value in first_reds[criterion])
-    cells_without_rows = sum(1 for cell in baseline_parsed[2] if cell not in mutant_parsed[2])
-    ka_kj2 = r4_ka_kj2(mutant_parsed[0])
-    ka_expected, ka_pin, ka_inferred = r4_ka_pin(item["pin"], ka_kj2)
-    kg_pin, kg_mismatched = r4_kg_pin(setup, item["label"], mutant_parsed[0])
-    if red_domains:
-        outcome = "red"
-    elif other_red:
-        outcome = "red_only_by_kj0_or_kj3"
-    elif cells_without_rows or not finished:
-        outcome = "run_did_not_finish"
-    else:
-        outcome = "not_red_within_bounds"
-    restored = restore_and_remove(setup, directory, keep=False, target=target_of(item))
-    abort = panic_lines[0].strip().replace(" ", "_")[:200] if panic_lines and not finished else "none"
-    halts = sum(1 for row in mutant_rows if row.startswith("E7RESULT name=halt "))
-    voids = sum(1 for row in mutant_rows if row.startswith("E7RESULT name=void "))
-    body = (f"outcome={outcome} variant={item['label']} red_legal_domains={','.join(red_domains) or 'none'} "
-            f"differs_on={differs_on if outcome == 'not_red_within_bounds' else 'not_applicable'} "
-            f"first_red_by_criterion={r4_first_red_text(first_reds)} "
-            f"differing_subcells={r4_differing_text(baseline_parsed, mutant_parsed, R4_LEGAL_DOMAINS)} "
-            f"differing_subcells_kg={r4_differing_text(baseline_parsed, mutant_parsed, ('KG',))} cells={r4_cells_text(mutant_parsed[0], mutant_parsed[2])} "
-            f"ka_kj2={'none' if ka_kj2 is None else ka_kj2} ka_expected={ka_expected} ka_pin={ka_pin} ka_inferred={ka_inferred} "
-            f"kg_pin={kg_pin} kg_mismatched_cells={kg_mismatched} "
-            f"states_row_differences={r4_states_row_differences(baseline_parsed, mutant_parsed)} "
-            f"choose_root_returned_none_with_a_readable_root={r4_state_totals(mutant_parsed[1], 'choose_root_returned_none_with_a_readable_root', 'sum')} "
-            f"replay_failed={r4_state_totals(mutant_parsed[1], 'replay_failed', 'sum')} panicked={r4_state_totals(mutant_parsed[1], 'panicked', 'sum')} "
-            f"kj1_and_kj1t_differing_states={r4_state_totals(mutant_parsed[1], 'kj1_and_kj1t_differing_states', 'sum')} "
-            f"halt_conditions={halts} void_conditions={voids} "
-            f"run_exit={completed.returncode} run_finished={str(finished).lower()} cells_without_rows={cells_without_rows} "
-            f"abort={abort} copy_restored={str(restored).lower()}")
-    lines = [f"{head(row)} {body} {tail(title)}" for row, title in zip(item["rows"], item["titles"])]
-    problem = None if finished or outcome == "red" else f"装置没跑完（退出码 {completed.returncode}）而没有一个域红"
-    return {"lines": lines, "ledger": [], "problem": problem, "timing": (build_seconds, run_seconds, time.monotonic() - started)}
+    """--profile r4 那一套做一个变体（判法模块的 judge_variant_r4）。"""
+    return judge_built_variant(setup, item, baseline, options, judge_variant_r4)
 
 
 # ── 结果文件
 
 def recorded_items(path):
-    """结果文件里已经有完整一行的变体 → 它的行；半截的行（没有 complete=yes 收尾）不算。"""
+    """产物里有完整一行（complete=yes 收尾）的变体 → 它的行：--recheck 拿来比的那一份产物，与整轮收尾读回这一趟自己写的产物。"""
     recorded = {}
-    closed = False
-    torn = False
     if not os.path.exists(path):
-        return recorded, closed, torn
-    content = open(path, encoding="utf-8").read()
-    torn = bool(content) and not content.endswith("\n")
+        return recorded
+    with open(path, encoding="utf-8") as handle:
+        content = handle.read()
     for line in content.split("\n"):
-        if line.startswith("E7RESULT name=done "):
-            closed = True
         if line.startswith("E7RESULT name=kill_bound ") and line.endswith(" complete=yes"):
             recorded.setdefault(parse_row(line)["item"], []).append(line)
-    return recorded, closed, torn
+    return recorded
 
 
-def append_lines(path, lines, torn):
-    with open(path, "a", encoding="utf-8") as handle:
-        if torn:
-            handle.write("\n")
+def start_file(path, lines):
+    """这一趟的产物（或红例账）从头写，先写开头那几行（config 行、账头）：--output 与 --ledger 已经存在的在开跑之前就拒了（refuse_existing_output；
+    弄坏开关 outputoverwritten、ledgeroverwritten 下照收，这里整份换掉那一份）；产物与账都不是复用来源（文件头「按项判定」）。"""
+    with open(path, "w", encoding="utf-8") as handle:
         for line in lines:
             handle.write(line + "\n")
         handle.flush()
         os.fsync(handle.fileno())
+
+
+def refuse_existing_output(setup, path, shown, ledger=None, ledger_shown=None):
+    """三套整轮的 --output、不给 --profile 那一套的 --ledger 指到已经存在的文件：退 2、不编不跑、不写产物与账，那一份一个字不动
+    （--recheck 读已有的产物与账，不走这里）。弄坏开关 outputoverwritten 下 --output 照收、ledgeroverwritten 下 --ledger 照收（start_file 整份换掉那一份）。
+    只供自证：SET_OUTPUT_ASIDE_VARIABLE 设成 1（且是自证起的那一趟）时，先把已经存在的产物与账挪成 <名>.previous，再判（同一条命令重交几趟的那几格）。"""
+    if setup.selftest and os.environ.get(SET_OUTPUT_ASIDE_VARIABLE) == "1":
+        for existing in (path, ledger):
+            if existing is not None and os.path.exists(existing):
+                os.replace(existing, existing + ".previous")
+    for option, existing, existing_shown, broken in (("--output", path, shown, "outputoverwritten"), ("--ledger", ledger, ledger_shown, "ledgeroverwritten")):
+        if existing is not None and os.path.exists(existing) and broken not in BREAK:
+            raise Stop(EXIT_USAGE, f"  ✗ {option} {existing_shown} 已经存在：这一趟不编不跑、不写产物，那一份没动\n  → 怎么办：换一个路径，或先挪走那一份")
+
+
+def append_lines(path, lines):
+    with open(path, "a", encoding="utf-8") as handle:
+        for line in lines:
+            handle.write(line + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+# ── 按项判定（文件头「按项判定」）：每个变体一项，经 long_run_item_verdicts.py 的 plan / record / finish 存进 prune-server 的 apparatus-items 族
+
+ITEM_VERDICTS_SCRIPT = os.path.join(SCRIPT_DIRECTORY, "long_run_item_verdicts.py")
+SCRIPT_KEY = "scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh"   # 按项判定 plan 与复用格认的脚本名（弄坏开关 judgewholedriver 下判法也写它）
+LIBRARY_KIND = BIN_NAME                                                            # 判定库的种类：装置的 bin 名，三套整轮共用，档写在 line: 里
+APPARATUS_ENTRY = DEVICE_SOURCE_PATH + "::main"
+ITEM_STATE_DIRECTORY_NAME = "item-verdicts"   # 这一趟的状态目录（计划、复用项取回的值、交给 record 的值），在 <草稿目录>/kill-bounds/ 下，跑完删
+RERUN_PLACEHOLDER = 'rerun="<复跑命令>"'      # 存进库的产物行里复跑命令那一段换成它，取回时照这一趟的 --output、--ledger 填回
+# 改坏那一处碰到模块集合的变体拒算：改坏之后的模块集合与没改坏的闭包不同，变异行原文进键罩不住
+MODULE_SET_TOKENS = ("mod ", "#[path", "include_str!", "include_bytes!", "include!")
+# 产物行与红例账行里写到的这一项的字段：都进这一项的键（line:item=）
+ITEM_KEY_FIELDS = ("name", "table", "rows", "titles", "file", "old", "new", "failure", "registered_row", "label", "pin", "function")
+EXIT_LIBRARY_UNAVAILABLE = 75
+KILL_AFTER_VARIABLE = "E165_KILL_BOUNDS_SELFTEST_KILL_AFTER"   # 只供自证：判完这一项、record 之后整个进程被 SIGKILL（文件头「按项判定」）
+SET_OUTPUT_ASIDE_VARIABLE = "E165_KILL_BOUNDS_SELFTEST_SET_OUTPUT_ASIDE"   # 只供自证：已经存在的 --output 与 --ledger 先挪走再判（refuse_existing_output）
+# 自证起的那几趟的判法（文件头「按项判定」）：自证把这份文件写进假树，judge: 指它、不带 judge-root:，判法闭包在假树上算
+SELFTEST_JUDGE_FILE = "scripts/experiment-apparatus/e165_kill_bounds_selftest_judge.py"
+SELFTEST_JUDGE_ENTRY = SELFTEST_JUDGE_FILE + "::judge_variant"
+SELFTEST_JUDGE_RESULT = '    return "red when a criterion differs from the baseline"\n'   # 自证「改了假树里的判法」那一格改的就是这一行
+SELFTEST_JUDGE_TEXT = ('"""E165 第二段驱动自证的假判法：自证起的那几趟，按项判定的 judge: 指这里（判法闭包在假树上算，不在脚本所在的仓上收整份驱动）。"""\n\n\n'
+                       "def judge_variant():\n" + SELFTEST_JUDGE_RESULT)
+
+
+# 真跑的按项判定请求里的判法（文件头「按项判定」）：判法模块里这一套判一个变体的函数与写基线那一行的函数，judge: 逐个指它们
+JUDGE_MODULE_KEY = "scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_variant_judgement.py"
+JUDGE_FUNCTIONS = {"r2": (judge_variant, baseline_item_line), "r3": (judge_variant_r3, baseline_item_line_r3), "r4": (judge_variant_r4, baseline_item_line_r4)}
+
+
+def judge_tokens(setup):
+    """按项判定请求里的判法：真跑是判法模块里这一套的 JUDGE_FUNCTIONS，判法闭包在脚本所在的仓上算（judge-root:）；
+    自证起的那几趟换成假树里的 SELFTEST_JUDGE_ENTRY、不带 judge-root:。
+    弄坏开关 judgewholedriver：真跑的判法写整份驱动（judge:<本脚本>）；judgeoffthetree：自证的判法另带 judge-root:..，
+    闭包换到假树的上一层去算（那里没有假判法，每一项拒算）。"""
+    if not setup.selftest:
+        if "judgewholedriver" in BREAK:
+            return [f"judge:{SCRIPT_KEY}", f"judge-root:{DEFAULT_ROOT}"]
+        return [f"judge:{JUDGE_MODULE_KEY}::{function.__name__}" for function in JUDGE_FUNCTIONS[setup.profile]] + [f"judge-root:{DEFAULT_ROOT}"]
+    return [f"judge:{SELFTEST_JUDGE_ENTRY}"] + (["judge-root:.."] if "judgeoffthetree" in BREAK else [])
+
+
+def touched_module_set_tokens(item):
+    text = (item.get("old") or "") + (item.get("new") or "")
+    return [token.strip() for token in MODULE_SET_TOKENS if token in text]
+
+
+def item_verdicts_command(arguments):
+    """起 long_run_item_verdicts.py 的一条子命令（plan、record、finish、自证用的几条）：交 (退出码, 合起来的输出)。"""
+    completed = subprocess.run([sys.executable, ITEM_VERDICTS_SCRIPT, *arguments], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    return completed.returncode, completed.stdout
+
+
+def item_verdicts_failure(step, code, output):
+    """按项判定那一步没成：75（prune-server 不可用）与 2（用法错）照交，别的按 1 交。"""
+    return Stop(code if code in (EXIT_LIBRARY_UNAVAILABLE, EXIT_USAGE) else EXIT_INCOMPLETE,
+                f"{output.rstrip()}\n  ✗ 按项判定的 {step} 没成（long_run_item_verdicts.py 退 {code}）\n"
+                "  → 怎么办：退 75 是 prune-server 不可用：python3 prune-server/control check 看服务，修好之后挪走这一趟写了一半的产物（有红例账的连同它；--output、--ledger 已经存在的不收）、重交同一条命令（报给主 agent）；别的照上面它打的出路改")
+
+
+def item_requests_text(setup, planned, retained_paths):
+    """请求正文（long_run_item_verdicts.py 文件头「请求文件」）：每项一行，基线之外的每项 @after 基线；留存产物经 @input 进基线的键。"""
+    registered = hashlib.sha256(json.dumps(setup.registered, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()
+    common = [APPARATUS_ENTRY, "profile:release", *judge_tokens(setup),
+              f"line:mode=profile {setup.profile} pins {setup.pins or 'none'} gate {setup.gate or 'none'} bounds {' '.join(setup.bounds_arguments())}",
+              f"line:registered={registered}"]
+    rows = []
+    for item in planned:
+        described = json.dumps({field: item.get(field) for field in ITEM_KEY_FIELDS}, ensure_ascii=False, sort_keys=True)
+        rows.append("\t".join([item["name"], *common, "line:item=" + described]))
+        if item["name"] == "baseline":
+            rows += [f"@input\tbaseline\t{os.path.basename(path)}\t{path}" for path in retained_paths]
+        else:
+            rows.append(f"@after\t{item['name']}\tbaseline")
+    return "".join(row + "\n" for row in rows)
+
+
+class ItemVerdicts:
+    """一趟整轮的按项判定（文件头「按项判定」）：构造时 plan（算键、查库），库里复用的项取回它的产物行与红例账行；现判的项判完 record，收尾 finish。
+    基线不管点没点名都在计划里（变体 @after 它）。改坏碰到模块集合的变体不进计划：照跑、不复用、不入库。"""
+
+    def __init__(self, setup, options, items, wanted, rerun_of, retained_paths):
+        self.setup, self.rerun_of = setup, rerun_of
+        self.by_name = {item["name"]: item for item in items}
+        self.wanted_names = [item["name"] for item in wanted]
+        self.directory = os.path.join(options["work"], ITEM_STATE_DIRECTORY_NAME)
+        shutil.rmtree(self.directory, ignore_errors=True)
+        os.makedirs(os.path.join(self.directory, "values"))
+        atexit.register(shutil.rmtree, self.directory, True)
+        self.state = os.path.join(self.directory, "plan")
+        self.module_set = {item["name"]: touched_module_set_tokens(item) for item in wanted if touched_module_set_tokens(item)}
+        planned = [item for item in items if item["name"] == "baseline" or (item["name"] in self.wanted_names and item["name"] not in self.module_set)]
+        requests = os.path.join(self.directory, "requests.tsv")
+        with open(requests, "w", encoding="utf-8") as handle:
+            handle.write(item_requests_text(setup, planned, retained_paths))
+        code, output = item_verdicts_command(["plan", self.state, "--script", SCRIPT_KEY, "--kind", LIBRARY_KIND, "--root", setup.root, "--requests", requests])
+        print(output, end="", flush=True)
+        if code != 0:
+            raise item_verdicts_failure("plan", code, output)
+        self.decisions = {}
+        with open(os.path.join(self.state, "decisions.tsv"), encoding="utf-8") as handle:
+            for line in handle:
+                name, _tab, decision = line.rstrip("\n").partition("\t")
+                self.decisions[name] = decision
+        self.reused = {}
+        if "reuseignored" not in BREAK:   # 弄坏开关：plan 答 reuse 的也照现判
+            self.reused = {name: self.reused_record(name) for name, decision in self.decisions.items() if decision == "reuse"}
+        self.to_run = [item for item in wanted if item["name"] not in self.reused]
+        # 没点名的基线库里没有可复用的（要现判、拒算）：照跑、照记，强制现判抽中它时也是这一支
+        self.baseline_pending = "baseline" not in self.reused and "baseline" not in self.wanted_names
+        self.deferred = []
+        self.summary = "取不出"
+
+    def rerun_text(self, name):
+        return f'rerun="{self.rerun_of(self.by_name[name])}"'
+
+    def reused_record(self, name):
+        """库里复用的一项：取回的值是 {"lines", "ledger"}，复跑命令那一段照这一趟填回。"""
+        try:
+            with open(os.path.join(self.state, "outputs", name + ".out"), encoding="utf-8") as handle:
+                value = json.load(handle)
+            lines, ledger = list(value["lines"]), list(value["ledger"])
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise Stop(EXIT_INCOMPLETE, f"  ✗ 判定库里 {name} 那一项的值读不出产物行与红例账行（{error}）\n"
+                                        "  → 怎么办：这把键的值不是这份驱动写的那一种；查是谁往 apparatus-items 族这个种类里写了别的东西，删掉那一条再起同一条命令") from error
+        return {"lines": [line.replace(RERUN_PLACEHOLDER, self.rerun_text(name)) for line in lines], "ledger": ledger, "problem": None, "timing": (0.0, 0.0, 0.0)}
+
+    def value_text(self, name, record):
+        """存进库的值：产物行（复跑命令那一段换成占位）与红例账行，键排序的 JSON，同一份结果写出来逐字节相同。"""
+        rerun = self.rerun_text(name)
+        lines = []
+        for line in record["lines"]:
+            if line.count(rerun) != 1:
+                raise Stop(EXIT_INCOMPLETE, f"  ✗ {name} 的产物行里复跑命令那一段不是恰好一处，存不进判定库：{line[:200]}\n  → 怎么办：看判法模块里这一套的 rerun_command 与 judge_variant 的 tail")
+            lines.append(line.replace(rerun, RERUN_PLACEHOLDER))
+        return json.dumps({"ledger": record["ledger"], "lines": lines}, ensure_ascii=False, sort_keys=True) + "\n"
+
+    def report_reused(self, item_lines):
+        """库里复用的点名项开跑前各打一行（文件头「每项一行与总计」）。"""
+        for name in self.wanted_names:
+            if name in self.reused:
+                item_lines.reused_item(name, self.reused[name]["lines"][0])
+
+    def record(self, name, record):
+        """现判或拒算的项判完当场写进库：得出结果的判绿，驱动没得出结果的（record 的 problem）记红。复用的项不调；模块集合拒算的不入库。"""
+        if name in self.module_set or name not in self.decisions:
+            return
+        if "recorddeferred" in BREAK:   # 弄坏开关：判完不当场写，finish 之前一并写
+            self.deferred.append((name, record))
+        else:
+            self.write(name, record)
+        if self.setup.selftest and os.environ.get(KILL_AFTER_VARIABLE) == name:
+            os.kill(os.getpid(), signal.SIGKILL)
+
+    def write(self, name, record):
+        red = record["problem"] is not None
+        value = os.path.join(self.directory, "values", name + ".json")
+        with open(value, "w", encoding="utf-8") as handle:
+            handle.write("" if red else self.value_text(name, record))
+        code, output = item_verdicts_command(["record", self.state, name, "1" if red else "0", value] + (["--red"] if red else []))
+        if code != 0:
+            raise item_verdicts_failure(f"record（项 {name}）", code, output)
+
+    def baseline_ran(self, baseline_line):
+        """开头基线跑完：库里复用的基线要与这一次的逐字相同（键相同而基线变了，退 5）；没点名、库里又没有可复用的基线，当场记。"""
+        stored = self.reused.get("baseline")
+        if stored is not None:
+            if stored["lines"][0] != baseline_line:
+                raise Stop(EXIT_VOID_V6, f"  ✗ 这一次的基线与判定库里同一把键的基线不同\n     库里的：{stored['lines'][0][:240]}\n     这次：{baseline_line[:240]}\n"
+                                         "  → 怎么办：键相同而基线变了，判法或装置读了键之外的输入；这一趟变体一个都没判，交主 agent 查")
+        elif self.baseline_pending:
+            self.record("baseline", {"lines": [baseline_line], "ledger": [], "problem": None})
+
+    def finish(self):
+        """收尾：写 recorddeferred 压下的那几项、起 finish、报模块集合拒算的项；交 True（没红）或 False（复用哨兵红、键中途变了：产物不收尾）。"""
+        for name, record in self.deferred:
+            self.write(name, record)
+        code, output = item_verdicts_command(["finish", self.state])
+        print(output, end="", flush=True)
+        if code > 1:
+            raise item_verdicts_failure("finish", code, output)
+        for name, tokens in self.module_set.items():
+            print(f"  · {name}：拒算（改坏那一处碰到模块集合：{'、'.join(tokens)}；照跑、不复用、不入库）")
+        found = re.findall(r"^LONG_RUN_ITEMS .* 现判 (\d+)、复用 (\d+)、拒算 (\d+)$", output, re.M)
+        if found:
+            judged, reused, refused = (int(value) for value in found[-1])
+            self.summary = f"现判 {judged}、复用 {reused}、拒算 {refused + len(self.module_set)}"
+        if code == 1 and "finishignored" not in BREAK:   # 弄坏开关：finish 的红不认
+            print(f"  ✗ 按项判定收尾判红（复用哨兵或键在这一趟中途变了，见上面 ✗ 那几行；{self.summary}）：这一趟的产物不收尾")
+            print("  → 怎么办：照上面那几行的出路办，挪走这一趟没收尾的产物（有红例账的连同它；--output、--ledger 已经存在的不收），再起同一条命令")
+            return False
+        return True
+
+
+def opening_baseline(setup, options, verdicts, to_run, run_checks, line_of, retained_absent):
+    """开头基线（文件头「做法」第 3 步）：这一趟有项要跑才编、才跑、才核（库里复用的项不要基线）；交 (基线, 基线那一行)。
+    一项都不跑时交一份替身、不编不跑：收尾行要的基线行数取库里基线那一行的 result_rows，留存产物在不在照现查（不在的照报本次未跑）。"""
+    if to_run or (verdicts is not None and verdicts.baseline_pending):
+        baseline = build_and_run_baseline(setup, options, "baseline")
+        run_checks(baseline)
+        baseline_line = line_of(baseline)
+        if verdicts is not None:
+            verdicts.baseline_ran(baseline_line)
+        return baseline, baseline_line
+    stored = verdicts.reused.get("baseline")
+    row_count = int(parse_row(stored["lines"][0]).get("result_rows", "0")) if stored is not None else None
+    return {"binary": None, "rows": None, "row_count": row_count, "verbatim_rows": "not_run" if retained_absent() else 0}, None
+
+
+def judge_items_in_parallel(setup, options, items, wanted, to_run, verdicts, baseline, baseline_line, process, item_lines, write_product):
+    """to_run 里的项按 --jobs 并行做（基线那一项就是开头基线那一行）：每项做完当场打它那一行、记进判定库；write_product 时照变体的次序落进这一趟的产物
+    （库里复用的项拿库里的行；没得出结果的那一项与它后面的不落，等下一趟）。交 (results, problems)；有项抛 Stop 的，别的项做完之后抛先抛的那一个。"""
+    results, problems = {}, []
+    lock = threading.Lock()
+    flushed = set()
+
+    def flush_in_order():
+        for item in items:
+            name = item["name"]
+            if name in flushed or item not in wanted:
+                continue
+            record = results.get(name) or (verdicts.reused.get(name) if verdicts is not None else None)
+            if record is None or record.get("problem"):
+                return
+            append_lines(options["output"], record["lines"])
+            if record["ledger"]:
+                append_lines(options["ledger"], record["ledger"])
+            flushed.add(name)
+
+    def work(item):
+        if item["name"] == "baseline":
+            record = {"lines": [baseline_line], "ledger": [], "problem": None, "timing": (0.0, 0.0, 0.0)}
+        else:
+            record = process(setup, item, baseline, options)
+        with lock:
+            results[item["name"]] = record
+            options["progress"].finished(item["name"])
+            item_lines.judged_item(item["name"], record)
+            build_seconds, run_seconds, total_seconds = record["timing"]
+            print(f"  {item['name']}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，合计 {total_seconds:.1f} 秒"
+                  + (f"；没得出结果：{record['problem']}" if record["problem"] else ""), file=sys.stderr)
+            with open(os.path.join(options["work"], "progress.log"), "a", encoding="utf-8") as handle:
+                handle.write(f"{item['name']}\tbuild={build_seconds:.1f}\trun={run_seconds:.1f}\ttotal={total_seconds:.1f}\tproblem={record['problem']}\n")
+            if record["problem"]:
+                problems.append(f"{item['name']}：{record['problem']}")
+            if verdicts is not None:
+                verdicts.record(item["name"], record)
+            if write_product and not record["problem"]:
+                flush_in_order()
+
+    halted = None
+    with concurrent.futures.ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
+        item_lines.dispatch(len(to_run))
+        futures = [pool.submit(work, item) for item in to_run]
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()
+            except Stop as stop:
+                halted = halted or stop
+    if halted is not None:
+        raise halted
+    if write_product:
+        with lock:
+            flush_in_order()
+    return results, problems
 
 
 LEDGER_HEADER = ("# E165 第二段红例账：每个红的变体在每个红了的域首红的 N 上一个反例状态。制表符分隔，十三列：变体、表行、域、N、状态在枚举次序里的序号、"
@@ -2025,80 +1585,9 @@ def load_items_r3(setup):
     return items, texts
 
 
-def baseline_item_line_r3(item, baseline, options):
-    rows = baseline["rows"]
-    digest = hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
-    return (f"E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none outcome=baseline "
-            f"result_rows={len(rows)} result_rows_sha256={digest} run_exit={baseline['exit']} "
-            f"rows_identical_to_segment2_product={retained_comparison_text(baseline, str(baseline.get('verbatim_rows', 0) == len(rows)).lower())} rerun=\"{rerun_command_r3(item, options)}\" title=基线（不改） complete=yes")
-
-
-def rerun_command_r3(item, options):
-    return (f"bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --profile r3{options.get('pins_text', '')} --root {'<r5 第一段根>' if options.get('pins_text') else '<第二段冻结根>'} --scratch <草稿目录> "
-            f"--output {options['output_shown']} --item {item['name']}")
-
-
 def process_item_r3(setup, item, baseline, options):
-    """做一个变体，返回 {lines, ledger（恒空）, problem, timing}。整份 --bounds segment1 --family root_choice 跑完，逐 (域, M, U) 与基线比，不早停。"""
-    directory = os.path.join(options["work"], item["name"])
-    started = time.monotonic()
-
-    def head(row):
-        return (f"E7RESULT name=kill_bound item={item['name']} table={item['table']} table_row={row} "
-                f"rows_sharing_this_replacement={'+'.join(str(shared) for shared in item['rows']) or 'none'}")
-
-    def tail(title):
-        return f"rerun=\"{rerun_command_r3(item, options)}\" title={title.replace(' ', '_')} complete=yes"
-
-    if item["failure"] is not None:     # 登记 TH5：四条里有一条不满足，记没比、别的行照做
-        lines = [f"{head(row)} outcome=not_compared failed_condition={item['failure']} registered_table_row={item['registered_row']} {tail(title)}"
-                 for row, title in zip(item["rows"], item["titles"])]
-        return {"lines": lines, "ledger": [], "problem": None, "timing": (0.0, 0.0, 0.0)}
-    mark(options, item["name"], "建副本、改坏、编译")
-    binary, build_problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"])
-    if binary is None:
-        restored = restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        lines = [f"{head(row)} outcome=invalid build_error={build_problem.replace(' ', '_')} copy_restored={str(restored).lower()} {tail(title)}"
-                 for row, title in zip(item["rows"], item["titles"])]
-        return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
-    mark(options, item["name"], "跑 " + " ".join(setup.bounds_arguments()))
-    completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    mutant_rows = result_rows(completed.stdout)
-    finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
-    panic_lines = [line for line in completed.stderr.split("\n") if "panicked at" in line]
-    baseline_parsed, mutant_parsed = r3_parse(baseline["rows"]), r3_parse(mutant_rows)
-    first_reds = r3_first_reds(baseline_parsed, mutant_parsed)
-    red_domains = [domain for domain in R3_LEGAL_DOMAINS
-                   if any(isinstance(value, tuple) for criterion in ("KJ1", "KJ2") for found_domain, value in first_reds[criterion] if found_domain == domain)]
-    other_red = any(isinstance(value, tuple) for criterion in ("KJ0", "KJ3") for _domain, value in first_reds[criterion])
-    cells_without_rows = sum(1 for cell in baseline_parsed[2] if cell not in mutant_parsed[2])
-    ka_kj2 = r3_ka_kj2(mutant_parsed[0])
-    ka_expected, ka_pin, ka_inferred = r3_ka_pin(item["pin"], ka_kj2)
-    if red_domains:
-        outcome = "red"
-    elif other_red:
-        outcome = "red_only_by_kj0_or_kj3"
-    elif cells_without_rows or not finished:
-        outcome = "run_did_not_finish"
-    else:
-        outcome = "not_red_within_bounds"
-    restored = restore_and_remove(setup, directory, keep=False, target=target_of(item))
-    abort = panic_lines[0].strip().replace(" ", "_")[:200] if panic_lines and not finished else "none"
-    halts = sum(1 for row in mutant_rows if row.startswith("E7RESULT name=halt "))
-    voids = sum(1 for row in mutant_rows if row.startswith("E7RESULT name=void "))
-    body = (f"outcome={outcome} red_legal_domains={','.join(red_domains) or 'none'} first_red_by_criterion={r3_first_red_text(first_reds)} "
-            f"differing_cells={r3_differing_cells_text(baseline_parsed, mutant_parsed)} cells={r3_cells_text(mutant_parsed[0], mutant_parsed[2])} "
-            f"ka_kj2={'none' if ka_kj2 is None else ka_kj2} ka_expected={ka_expected} ka_pin={ka_pin} ka_inferred={ka_inferred} "
-            f"states_row_differences={r3_states_row_differences(baseline_parsed, mutant_parsed)} "
-            f"above_chosen_root_max={r3_state_totals(mutant_parsed[1], 'above_chosen_root_max', 'max')} "
-            f"above_chosen_root_over_limit={r3_state_totals(mutant_parsed[1], 'above_chosen_root_over_limit', 'sum')} "
-            f"choose_root_returned_none={r3_state_totals(mutant_parsed[1], 'choose_root_returned_none', 'sum')} "
-            f"replay_failed={r3_state_totals(mutant_parsed[1], 'replay_failed', 'sum')} halt_conditions={halts} void_conditions={voids} "
-            f"run_exit={completed.returncode} run_finished={str(finished).lower()} cells_without_rows={cells_without_rows} "
-            f"abort={abort} copy_restored={str(restored).lower()}")
-    lines = [f"{head(row)} {body} {tail(title)}" for row, title in zip(item["rows"], item["titles"])]
-    problem = None if finished or outcome == "red" else f"装置没跑完（退出码 {completed.returncode}）而没有一个域红"
-    return {"lines": lines, "ledger": [], "problem": problem, "timing": (build_seconds, run_seconds, time.monotonic() - started)}
+    """--profile r3 那一套做一个变体（判法模块的 judge_variant_r3）。"""
+    return judge_built_variant(setup, item, baseline, options, judge_variant_r3)
 
 
 def not_run_suffix(setup):
@@ -2116,14 +1605,14 @@ def pin_red_examples(setup, options):
     只供自证：E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND 设了（且是自证起的那一趟）就不追加，造「账写完了、钉表没钉」。
     弄坏开关 pincheckskipped 下不跑 --check（当场不核钉全）。"""
     ledger, product = options["ledger"], options["output"]
-    base = [sys.executable, PIN_SCRIPT, "--root", setup.script_root]
     steps = []
     if not (setup.selftest and os.environ.get("E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND")):
-        steps.append(("追加", base + ["--kill-bounds", product, ledger]))
+        steps.append(("追加", ["--kill-bounds", product, ledger]))
     if "pincheckskipped" not in BREAK:
-        steps.append(("核钉全（--check）", base + ["--check", "--kill-bounds", product, ledger]))
+        steps.append(("核钉全（--check）", ["--check", "--kill-bounds", product, ledger]))
     said = {}
-    for label, command in steps:
+    for label, arguments in steps:
+        command = [sys.executable, PIN_SCRIPT, "--root", setup.script_root, *arguments]
         environment = dict(os.environ)
         environment.pop("E165_PIN_RED_EXAMPLES_BREAK", None)   # 那一份的弄坏开关只给它自己的自证用，不从这里带进去
         completed = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=environment)
@@ -2132,7 +1621,7 @@ def pin_red_examples(setup, options):
             shown = "\n".join("     " + line for line in lines[-PIN_LINE_LIMIT:])
             raise Stop(EXIT_PIN_INCOMPLETE, f"  ✗ 钉红例：{label}没过（{' '.join(command[1:])} 退 {completed.returncode}），这一趟的红例没钉全：\n{shown}\n"
                                             "  → 怎么办：照上面它打的出路办（同档冲突、按名字找不到变异、配对不上，写法在 scripts/experiment-apparatus/e165-pin-red-examples.py 文件头），"
-                                            "改好之后重跑同一条命令：产物已收尾的只重做钉红例这一步，不重跑变体")
+                                            "改好之后挪走这一趟的产物与账（--output、--ledger 已经存在的不收）、重跑同一条命令：判过的变体从判定库复用、不重跑，产物与账照样从头写、照样钉")
         said[label] = next((line for line in reversed(lines) if line.lstrip().startswith("✓")), lines[-1] if lines else "")
     appended = said.get("追加", "")
     pinned_match = re.search(r"钉进 (\d+) 行", appended)
@@ -2153,121 +1642,52 @@ def main_run(setup, options, item_names, recheck):
         if name not in by_name:
             raise unknown_item(name, list(by_name), "--list-items")
     wanted = [by_name[name] for name in item_names] if item_names else items
-    recorded, closed, torn = recorded_items(options["output"])
-    if "rerunall" in BREAK:
-        recorded = {}
-    records_directory = os.path.join(options["work"], "records")
-    os.makedirs(records_directory, exist_ok=True)
-
-    def stored_record(item):
-        path = os.path.join(records_directory, item["name"] + ".json")
-        if os.path.exists(path) and "rerunall" not in BREAK:
-            with open(path, encoding="utf-8") as handle:
-                return json.load(handle)
-        return None
-
-    if closed and not recheck:
-        # 已收尾的一对照样当场钉、当场核（上一趟钉红例没过、改好之后重跑同一条命令走这里；已钉的不重复）
-        pin_text = pin_red_examples(setup, options)
-        print(f"  {options['output']} 已经收尾（name=done），{len(recorded)} 个变体都有行，这一次不跑变体；{pin_text}")
-        return EXIT_OK
-    to_run = [item for item in wanted if recheck or (item["name"] not in recorded and stored_record(item) is None)]
+    retained = [os.path.join(setup.research_root, product) for product in setup.registered["segment1_products"]]
+    # --recheck 只拿新跑的行与给的那一份产物比，不读不写判定库、不写产物（文件头「用法」）
+    recorded = recorded_items(options["output"]) if recheck else {}
+    verdicts = None if recheck else ItemVerdicts(setup, options, items, wanted, lambda item: rerun_command(item, options), retained)
+    to_run = list(wanted) if recheck else verdicts.to_run
     status_at_start = subprocess.run(["git", "-C", setup.root, "status", "--porcelain", "crates/"], stdout=subprocess.PIPE, text=True).stdout
     sha_at_start = source_hashes(setup)
-    print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；已有行 {sum(1 for item in wanted if item['name'] in recorded)} 个；"
+    print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；判定库里复用 {len(wanted) - len(to_run)} 个；"
           f"这一次要跑 {len(to_run)} 个：{' '.join(item['name'] for item in to_run) or '无'}")
-    item_lines = ItemLines()   # 文件头「每项一行与总计」：已有的那几项开跑前各打一行
-    for item in wanted:
-        if item not in to_run:
-            item_lines.reused_item(item["name"], (recorded.get(item["name"]) or (stored_record(item) or {}).get("lines") or [""])[0])
+    item_lines = ItemLines()   # 文件头「每项一行与总计」：库里复用的那几项开跑前各打一行
+    if verdicts is not None:
+        verdicts.report_reused(item_lines)
 
     options["progress"] = Progress(len(to_run), progress_interval(setup))
     options["progress"].start()   # 守护线程：收尾基线跑完就停；中途 Stop 退出的，进程退出时随之结束
-    baseline = build_and_run_baseline(setup, options, "baseline")
-    check_the_profile_rows(baseline)
-    check_against_segment_one(setup, baseline)
-    baseline_line = baseline_item_line(by_name["baseline"], baseline, options)
-    if "baseline" in recorded and recorded["baseline"][0] != baseline_line:
-        raise Stop(EXIT_VOID_V6, f"  ✗ 这一次的基线与结果文件里记的基线不同\n     记的：{recorded['baseline'][0][:240]}\n     这次：{baseline_line[:240]}\n"
-                                 "  → 怎么办：bin 或 recovery.rs 变过；已有的行不能与新的行混在一份产物里，换一个 --output 重跑全部")
 
-    results = {}
-    problems = []
-    lock = threading.Lock()
-    flushed = set(recorded)
+    def run_checks(baseline):
+        check_the_profile_rows(baseline)
+        check_against_segment_one(setup, baseline)
+
+    baseline, baseline_line = opening_baseline(setup, options, verdicts, to_run, run_checks,
+                                               lambda baseline: baseline_item_line(by_name["baseline"], baseline, options),
+                                               lambda: retained_product_not_run(setup, "V7", retained))
     if not recheck:
-        if not os.path.exists(options["output"]):
-            append_lines(options["output"], [
-                f"E7RESULT name=config experiment=E165 segment=2 registration=research/prompts/e165-r2-prereg.md "
-                f"device_arguments={'+'.join([] if 'noprofile' in BREAK else DEVICE_PROFILE_ARGUMENTS) or 'none'} "
-                f"bounds=segment2 items={len(items)} table_rows={len(selected_rows)} "
-                f"custom_rows={sum(1 for item in items if item['table'] == CUSTOM_TABLE_PATH)} recovery_sha256={sha_at_start[RECOVERY_PATH]} "
-                f"lib_sha256={sha_at_start[LIB_PATH]} widening=none{pins_config_text(setup)}"], False)
-        if not os.path.exists(options["ledger"]):
-            append_lines(options["ledger"], [LEDGER_HEADER], False)
-
-    def flush_in_order():
-        """照变体的次序把已经有结果的落进产物：点名的里面前面还有没做完的就等它。"""
-        nonlocal torn
-        for item in items:
-            name = item["name"]
-            if name in flushed:
-                continue
-            record = results.get(name) or stored_record(item)
-            if record is None or record.get("problem"):
-                if item in wanted:
-                    return
-                continue
-            append_lines(options["output"], record["lines"], torn)
-            torn = False
-            if record["ledger"]:
-                append_lines(options["ledger"], record["ledger"], False)
-            flushed.add(name)
-
-    def work(item):
-        if item["name"] == "baseline":
-            record = {"lines": [baseline_line], "ledger": [], "problem": None, "timing": (0.0, 0.0, 0.0)}
-        else:
-            record = process_item(setup, item, baseline, options)
-        with lock:
-            results[item["name"]] = record
-            options["progress"].finished(item["name"])
-            item_lines.judged_item(item["name"], record)
-            build_seconds, run_seconds, total_seconds = record["timing"]
-            print(f"  {item['name']}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，合计 {total_seconds:.1f} 秒"
-                  + (f"；没得出结果：{record['problem']}" if record["problem"] else ""), file=sys.stderr)
-            with open(os.path.join(options["work"], "progress.log"), "a", encoding="utf-8") as handle:
-                handle.write(f"{item['name']}\tbuild={build_seconds:.1f}\trun={run_seconds:.1f}\ttotal={total_seconds:.1f}\tproblem={record['problem']}\n")
-            if record["problem"]:
-                problems.append(f"{item['name']}：{record['problem']}")
-            elif not recheck:
-                with open(os.path.join(records_directory, item["name"] + ".json"), "w", encoding="utf-8") as handle:
-                    json.dump(record, handle, ensure_ascii=False)
-                flush_in_order()
+        start_file(options["output"], [
+            f"E7RESULT name=config experiment=E165 segment=2 registration=research/prompts/e165-r2-prereg.md "
+            f"device_arguments={'+'.join([] if 'noprofile' in BREAK else DEVICE_PROFILE_ARGUMENTS) or 'none'} "
+            f"bounds=segment2 items={len(items)} table_rows={len(selected_rows)} "
+            f"custom_rows={sum(1 for item in items if item['table'] == CUSTOM_TABLE_PATH)} recovery_sha256={sha_at_start[RECOVERY_PATH]} "
+            f"lib_sha256={sha_at_start[LIB_PATH]} widening=none{pins_config_text(setup)}"])
+        start_file(options["ledger"], [LEDGER_HEADER])
 
     started = time.monotonic()
-    halted = None
-    with concurrent.futures.ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
-        item_lines.dispatch(len(to_run))
-        futures = [pool.submit(work, item) for item in to_run]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Stop as stop:
-                halted = halted or stop
-    if halted is not None:
-        raise halted
-    if not recheck:
-        with lock:
-            flush_in_order()
+    results, problems = judge_items_in_parallel(setup, options, items, wanted, to_run, verdicts, baseline, baseline_line, process_item, item_lines, not recheck)
     variants_seconds = time.monotonic() - started
 
-    # 收尾：重建一份不改的副本、重编重跑基线，必须与开头逐字相同；仓里的 crates/ 没变。
-    baseline_at_end = build_and_run_baseline(setup, options, "baseline-at-end")
-    options["progress"].stop()
-    same_baseline = baseline_at_end["rows"] == baseline["rows"]
-    restored_start = restore_and_remove(setup, baseline["directory"], keep=False)
-    restored_end = restore_and_remove(setup, baseline_at_end["directory"], keep=False)
+    # 收尾：重建一份不改的副本、重编重跑基线，必须与开头逐字相同；仓里的 crates/ 没变。开头基线没跑的（一项都不用现判）收尾基线也不跑，只核仓里的 crates/。
+    if baseline["binary"] is not None:
+        baseline_at_end = build_and_run_baseline(setup, options, "baseline-at-end")
+        options["progress"].stop()
+        same_baseline = baseline_at_end["rows"] == baseline["rows"]
+        restored_start = restore_and_remove(setup, baseline["directory"], keep=False)
+        restored_end = restore_and_remove(setup, baseline_at_end["directory"], keep=False)
+    else:
+        options["progress"].stop()
+        same_baseline = restored_start = restored_end = True
     status_at_end = subprocess.run(["git", "-C", setup.root, "status", "--porcelain", "crates/"], stdout=subprocess.PIPE, text=True).stdout
     sha_at_end = source_hashes(setup)
     print(f"  这一次 {len(to_run)} 个变体，挂钟 {variants_seconds:.1f} 秒（不含开头与收尾的基线）", file=sys.stderr)
@@ -2276,7 +1696,7 @@ def main_run(setup, options, item_names, recheck):
         raise Stop(EXIT_VOID_V6, f"  ✗ 作废条款 V6：收尾基线与开头逐字相同={same_baseline}；仓里 recovery.rs 与 lib.rs 的 sha256 开头 {sha_at_start[RECOVERY_PATH][:16]}…/{sha_at_start[LIB_PATH][:16]}… 结尾 {sha_at_end[RECOVERY_PATH][:16]}…/{sha_at_end[LIB_PATH][:16]}…；"
                                  f"`git status --porcelain crates/` 前后相同={status_at_start == status_at_end}；基线副本还原={restored_start and restored_end}\n"
                                  "  → 怎么办：这一次落的行不算数；查是谁在跑的时候改了 crates/，换一个 --output 重跑")
-    print("已还原，基线与开头逐字相同")
+    print("已还原，基线与开头逐字相同" if baseline["binary"] is not None else "  这一趟没有要现判的项，开头与收尾的基线都没编没跑；仓里 recovery.rs、lib.rs 与 crates/ 前后相同")
 
     if recheck:
         different = 0
@@ -2293,14 +1713,16 @@ def main_run(setup, options, item_names, recheck):
             print("  → 怎么办：bin、recovery.rs 或变异表变过；看上面新跑的行与产物里那一行差在哪")
         return EXIT_INCOMPLETE if different or problems else EXIT_OK
 
-    recorded, closed, _torn = recorded_items(options["output"])
+    if not verdicts.finish():
+        return EXIT_INCOMPLETE
+    recorded = recorded_items(options["output"])
     missing = [item["name"] for item in items if item["name"] not in recorded]
     for problem in problems:
         print(f"  ✗ {problem}")
     if problems:
-        print("  → 怎么办：没得出结果的那几个照上面各自的原因处理，再重跑同一条命令")
+        print("  → 怎么办：没得出结果的那几个照上面各自的原因处理，挪走这一趟的产物与红例账（--output、--ledger 已经存在的不收），再重跑同一条命令（判过的从判定库复用，只现判没判绿的）")
     if missing:
-        print(f"  还有 {len(missing)} 个变体没有行：{' '.join(missing)}；重跑同一条命令（不带 --item）只补这些")
+        print(f"  这一趟的产物里还有 {len(missing)} 个变体没有行：{' '.join(missing)}；挪走这一趟的产物与红例账（--output、--ledger 已经存在的不收）、不带 --item 重跑同一条命令补齐（判过的从判定库复用）；按项判定 {verdicts.summary}")
         return EXIT_INCOMPLETE if problems else EXIT_OK
     outcomes = {}
     for item in items:
@@ -2308,7 +1730,7 @@ def main_run(setup, options, item_names, recheck):
             outcome = parse_row(recorded[item["name"]][0])["outcome"]
             outcomes[outcome] = outcomes.get(outcome, 0) + 1
     closing = [
-        f"E7RESULT name=restored text=已还原，基线与开头逐字相同 baseline_result_rows={len(baseline['rows'])} "
+        f"E7RESULT name=restored text=已还原，基线与开头逐字相同 baseline_result_rows={baseline['row_count']} "
         f"repository_recovery_sha256_at_start={sha_at_start[RECOVERY_PATH]} repository_recovery_sha256_at_end={sha_at_end[RECOVERY_PATH]} "
         f"repository_lib_sha256_at_start={sha_at_start[LIB_PATH]} repository_lib_sha256_at_end={sha_at_end[LIB_PATH]} crates_git_status_unchanged=true copies_restored=true",
         f"E7RESULT name=verdict scope=segment2 variants={len(items)} variants_excluding_baseline={len(items) - 1} "
@@ -2317,9 +1739,9 @@ def main_run(setup, options, item_names, recheck):
         f"run_did_not_finish={outcomes.get('run_did_not_finish', 0)} ledger_sha256={sha256_of_file(options['ledger'])}",
     ]
     total = len(result_rows(open(options["output"], encoding="utf-8").read())) + len(closing) + 1
-    append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"], False)
+    append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"])
     pin_text = pin_red_examples(setup, options)
-    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}；{pin_text}{not_run_suffix(setup)}")
+    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}；{pin_text}；按项判定 {verdicts.summary}{not_run_suffix(setup)}")
     return EXIT_OK
 
 
@@ -2334,110 +1756,46 @@ def main_run_r3(setup, options, item_names):
         if name not in by_name:
             raise unknown_item(name, list(by_name), "--profile r3 --list-items")
     wanted = [by_name[name] for name in item_names] if item_names else items
-    recorded, closed, torn = recorded_items(options["output"])
-    if "rerunall" in BREAK:
-        recorded = {}
-    records_directory = os.path.join(options["work"], "records")
-    os.makedirs(records_directory, exist_ok=True)
-
-    def stored_record(item):
-        path = os.path.join(records_directory, item["name"] + ".json")
-        if os.path.exists(path) and "rerunall" not in BREAK:
-            with open(path, encoding="utf-8") as handle:
-                return json.load(handle)
-        return None
-
-    if closed:
-        print(f"  {options['output']} 已经收尾（name=done），{len(recorded)} 个变体都有行，这一次什么都不跑")
-        return EXIT_OK
-    to_run = [item for item in wanted if item["name"] not in recorded and stored_record(item) is None]
+    retained = os.path.join(setup.script_root, setup.registered["segment2_product"])
+    verdicts = ItemVerdicts(setup, options, items, wanted, lambda item: rerun_command_r3(item, options), [retained])
+    to_run = verdicts.to_run
     sha_at_start = source_hashes(setup)
-    print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；已有行 {sum(1 for item in wanted if item['name'] in recorded)} 个；"
+    print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；判定库里复用 {len(wanted) - len(to_run)} 个；"
           f"这一次要跑 {len(to_run)} 个：{' '.join(item['name'] for item in to_run) or '无'}")
-    item_lines = ItemLines()   # 文件头「每项一行与总计」：已有的那几项开跑前各打一行
-    for item in wanted:
-        if item not in to_run:
-            item_lines.reused_item(item["name"], (recorded.get(item["name"]) or (stored_record(item) or {}).get("lines") or [""])[0])
+    item_lines = ItemLines()   # 文件头「每项一行与总计」：库里复用的那几项开跑前各打一行
+    verdicts.report_reused(item_lines)
 
     options["progress"] = Progress(len(to_run), progress_interval(setup))
     options["progress"].start()
-    baseline = build_and_run_baseline(setup, options, "baseline")
-    check_the_profile_rows_r3(baseline)
-    check_against_segment_two_product(setup, baseline)
-    baseline_line = baseline_item_line_r3(by_name["baseline"], baseline, options)
-    if "baseline" in recorded and recorded["baseline"][0] != baseline_line:
-        raise Stop(EXIT_VOID_V6, f"  ✗ 这一次的基线与结果文件里记的基线不同\n     记的：{recorded['baseline'][0][:240]}\n     这次：{baseline_line[:240]}\n"
-                                 "  → 怎么办：bin 或根变过；已有的行不能与新的行混在一份产物里，换一个 --output 重跑全部")
 
-    results = {}
-    problems = []
-    lock = threading.Lock()
-    flushed = set(recorded)
-    if not os.path.exists(options["output"]):
-        append_lines(options["output"], [
-            f"E7RESULT name=config experiment=E165 segment=3 profile=r3 registration=research/prompts/e165-r3-prereg.md "
-            f"device_arguments={'+'.join(([] if 'r3noprofile' in BREAK else R3_DEVICE_PROFILE_ARGUMENTS) + R3_BOUNDS_ARGUMENTS) or 'none'} "
-            f"items={len(items)} table_rows={len(items) - 1} recovery_sha256={sha_at_start[RECOVERY_PATH]} lib_sha256={sha_at_start[LIB_PATH]} "
-            f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none{pins_config_text(setup)}"], False)
+    def run_checks(baseline):
+        check_the_profile_rows_r3(baseline)
+        check_against_segment_two_product(setup, baseline)
 
-    def flush_in_order():
-        nonlocal torn
-        for item in items:
-            name = item["name"]
-            if name in flushed:
-                continue
-            record = results.get(name) or stored_record(item)
-            if record is None or record.get("problem"):
-                if item in wanted:
-                    return
-                continue
-            append_lines(options["output"], record["lines"], torn)
-            torn = False
-            flushed.add(name)
-
-    def work(item):
-        if item["name"] == "baseline":
-            record = {"lines": [baseline_line], "ledger": [], "problem": None, "timing": (0.0, 0.0, 0.0)}
-        else:
-            record = process_item_r3(setup, item, baseline, options)
-        with lock:
-            results[item["name"]] = record
-            options["progress"].finished(item["name"])
-            item_lines.judged_item(item["name"], record)
-            build_seconds, run_seconds, total_seconds = record["timing"]
-            print(f"  {item['name']}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，合计 {total_seconds:.1f} 秒"
-                  + (f"；没得出结果：{record['problem']}" if record["problem"] else ""), file=sys.stderr)
-            with open(os.path.join(options["work"], "progress.log"), "a", encoding="utf-8") as handle:
-                handle.write(f"{item['name']}\tbuild={build_seconds:.1f}\trun={run_seconds:.1f}\ttotal={total_seconds:.1f}\tproblem={record['problem']}\n")
-            if record["problem"]:
-                problems.append(f"{item['name']}：{record['problem']}")
-            else:
-                with open(os.path.join(records_directory, item["name"] + ".json"), "w", encoding="utf-8") as handle:
-                    json.dump(record, handle, ensure_ascii=False)
-                flush_in_order()
+    baseline, baseline_line = opening_baseline(setup, options, verdicts, to_run, run_checks,
+                                               lambda baseline: baseline_item_line_r3(by_name["baseline"], baseline, options),
+                                               lambda: retained_product_not_run(setup, "TV7", [retained]))
+    start_file(options["output"], [
+        f"E7RESULT name=config experiment=E165 segment=3 profile=r3 registration=research/prompts/e165-r3-prereg.md "
+        f"device_arguments={'+'.join(([] if 'r3noprofile' in BREAK else R3_DEVICE_PROFILE_ARGUMENTS) + R3_BOUNDS_ARGUMENTS) or 'none'} "
+        f"items={len(items)} table_rows={len(items) - 1} recovery_sha256={sha_at_start[RECOVERY_PATH]} lib_sha256={sha_at_start[LIB_PATH]} "
+        f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none{pins_config_text(setup)}"])
 
     started = time.monotonic()
-    halted = None
-    with concurrent.futures.ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
-        item_lines.dispatch(len(to_run))
-        futures = [pool.submit(work, item) for item in to_run]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Stop as stop:
-                halted = halted or stop
-    if halted is not None:
-        raise halted
-    with lock:
-        flush_in_order()
+    _results, problems = judge_items_in_parallel(setup, options, items, wanted, to_run, verdicts, baseline, baseline_line, process_item_r3, item_lines, True)
     variants_seconds = time.monotonic() - started
 
     # 收尾：重建一份不改的副本、重编重跑基线，必须与开头逐字相同；两份源文件与变异表的 sha256 开头结尾相同（冻结根不是 git 仓，不看 git status）。
-    baseline_at_end = build_and_run_baseline(setup, options, "baseline-at-end")
-    options["progress"].stop()
-    same_baseline = baseline_at_end["rows"] == baseline["rows"]
-    restored_start = restore_and_remove(setup, baseline["directory"], keep=False)
-    restored_end = restore_and_remove(setup, baseline_at_end["directory"], keep=False)
+    # 开头基线没跑的（一项都不用现判）收尾基线也不跑，只核根里的两份源文件与变异表。
+    if baseline["binary"] is not None:
+        baseline_at_end = build_and_run_baseline(setup, options, "baseline-at-end")
+        options["progress"].stop()
+        same_baseline = baseline_at_end["rows"] == baseline["rows"]
+        restored_start = restore_and_remove(setup, baseline["directory"], keep=False)
+        restored_end = restore_and_remove(setup, baseline_at_end["directory"], keep=False)
+    else:
+        options["progress"].stop()
+        same_baseline = restored_start = restored_end = True
     sha_at_end = source_hashes(setup)
     table_unchanged = sha256_of_file(os.path.join(setup.root, TABLE_PATH)) == setup.registered["table_sha256"] if setup.registered.get("table_sha256") else True
     print(f"  这一次 {len(to_run)} 个变体，挂钟 {variants_seconds:.1f} 秒（不含开头与收尾的基线）", file=sys.stderr)
@@ -2445,16 +1803,18 @@ def main_run_r3(setup, options, item_names):
         raise Stop(EXIT_VOID_V6, f"  ✗ 作废条款 TV9：收尾基线与开头逐字相同={same_baseline}；根里 recovery.rs 与 lib.rs 的 sha256 开头 {sha_at_start[RECOVERY_PATH][:16]}…/{sha_at_start[LIB_PATH][:16]}… "
                                  f"结尾 {sha_at_end[RECOVERY_PATH][:16]}…/{sha_at_end[LIB_PATH][:16]}…；变异表没变={table_unchanged}；基线副本还原={restored_start and restored_end}\n"
                                  "  → 怎么办：这一次落的行不算数；查是谁在跑的时候改了根，换一个 --output 重跑")
-    print("已还原，基线与开头逐字相同")
+    print("已还原，基线与开头逐字相同" if baseline["binary"] is not None else "  这一趟没有要现判的项，开头与收尾的基线都没编没跑；根里 recovery.rs、lib.rs 与变异表前后相同")
 
-    recorded, closed, _torn = recorded_items(options["output"])
+    if not verdicts.finish():
+        return EXIT_INCOMPLETE
+    recorded = recorded_items(options["output"])
     missing = [item["name"] for item in items if item["name"] not in recorded]
     for problem in problems:
         print(f"  ✗ {problem}")
     if problems:
-        print("  → 怎么办：没得出结果的那几个照上面各自的原因处理，再重跑同一条命令")
+        print("  → 怎么办：没得出结果的那几个照上面各自的原因处理，挪走这一趟的产物（--output 已经存在的不收），再重跑同一条命令（判过的从判定库复用，只现判没判绿的）")
     if missing:
-        print(f"  还有 {len(missing)} 个变体没有行：{' '.join(missing)}；重跑同一条命令（不带 --item）只补这些")
+        print(f"  这一趟的产物里还有 {len(missing)} 个变体没有行：{' '.join(missing)}；挪走这一趟的产物（--output 已经存在的不收）、不带 --item 重跑同一条命令补齐（判过的从判定库复用）；按项判定 {verdicts.summary}")
         return EXIT_INCOMPLETE if problems else EXIT_OK
     outcomes, pin_mismatches = {}, []
     for item in items:
@@ -2464,7 +1824,7 @@ def main_run_r3(setup, options, item_names):
             if fields.get("ka_pin") == "mismatch":
                 pin_mismatches.append(item["name"])
     closing = [
-        f"E7RESULT name=restored text=已还原，基线与开头逐字相同 baseline_result_rows={len(baseline['rows'])} "
+        f"E7RESULT name=restored text=已还原，基线与开头逐字相同 baseline_result_rows={baseline['row_count']} "
         f"root_recovery_sha256_at_start={sha_at_start[RECOVERY_PATH]} root_recovery_sha256_at_end={sha_at_end[RECOVERY_PATH]} "
         f"root_lib_sha256_at_start={sha_at_start[LIB_PATH]} root_lib_sha256_at_end={sha_at_end[LIB_PATH]} copies_restored=true",
         f"E7RESULT name=verdict scope=segment3 variants={len(items)} variants_excluding_baseline={len(items) - 1} "
@@ -2474,8 +1834,8 @@ def main_run_r3(setup, options, item_names):
         f"ka_pin_mismatches={len(pin_mismatches)} baseline_equals_segment2_product={retained_comparison_text(baseline, 'true')}",
     ]
     total = len(result_rows(open(options["output"], encoding="utf-8").read())) + len(closing) + 1
-    append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"], False)
-    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}{not_run_suffix(setup)}")
+    append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"])
+    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}；按项判定 {verdicts.summary}{not_run_suffix(setup)}")
     if pin_mismatches:
         print(f"  ✗ KA 钉值对不上（TF8）：{' '.join(pin_mismatches)}；这几个变体的 K 族结果不能读成「没有取样点」，交主 agent；别的变体照判")
         print("     → 怎么办：把这几个变体的 KA 读数与跑前登记 TF8 钉的值并排交主 agent，由主 agent 判是登记钉错还是装置算错")
@@ -2495,111 +1855,47 @@ def main_run_r4(setup, options, item_names):
         if name not in by_name:
             raise unknown_item(name, list(by_name), "--profile r4 --list-items")
     wanted = [by_name[name] for name in item_names] if item_names else items
-    recorded, closed, torn = recorded_items(options["output"])
-    if "rerunall" in BREAK:
-        recorded = {}
-    records_directory = os.path.join(options["work"], "records")
-    os.makedirs(records_directory, exist_ok=True)
-
-    def stored_record(item):
-        path = os.path.join(records_directory, item["name"] + ".json")
-        if os.path.exists(path) and "rerunall" not in BREAK:
-            with open(path, encoding="utf-8") as handle:
-                return json.load(handle)
-        return None
-
-    if closed:
-        print(f"  {options['output']} 已经收尾（name=done），{len(recorded)} 个变体都有行，这一次什么都不跑")
-        return EXIT_OK
-    to_run = [item for item in wanted if item["name"] not in recorded and stored_record(item) is None]
+    retained = os.path.join(setup.script_root, setup.registered["segment1_product"])
+    verdicts = ItemVerdicts(setup, options, items, wanted, lambda item: rerun_command_r4(item, options), [retained])
+    to_run = verdicts.to_run
     sha_at_start = source_hashes(setup)
-    print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；已有行 {sum(1 for item in wanted if item['name'] in recorded)} 个；"
+    print(f"  变体 {len(items)} 个；点名 {len(wanted)} 个；判定库里复用 {len(wanted) - len(to_run)} 个；"
           f"这一次要跑 {len(to_run)} 个：{' '.join(item['name'] for item in to_run) or '无'}")
-    item_lines = ItemLines()   # 文件头「每项一行与总计」：已有的那几项开跑前各打一行
-    for item in wanted:
-        if item not in to_run:
-            item_lines.reused_item(item["name"], (recorded.get(item["name"]) or (stored_record(item) or {}).get("lines") or [""])[0])
+    item_lines = ItemLines()   # 文件头「每项一行与总计」：库里复用的那几项开跑前各打一行
+    verdicts.report_reused(item_lines)
 
     options["progress"] = Progress(len(to_run), progress_interval(setup))
     options["progress"].start()
-    baseline = build_and_run_baseline(setup, options, "baseline")
-    check_the_profile_rows_r4(baseline)
-    check_the_gate_rows_r4(setup, baseline)
-    check_against_segment_one_product(setup, baseline)
-    baseline_line = baseline_item_line_r4(setup, by_name["baseline"], baseline, options)
-    if "baseline" in recorded and recorded["baseline"][0] != baseline_line:
-        raise Stop(EXIT_VOID_V6, f"  ✗ 这一次的基线与结果文件里记的基线不同\n     记的：{recorded['baseline'][0][:240]}\n     这次：{baseline_line[:240]}\n"
-                                 "  → 怎么办：bin 或根变过；已有的行不能与新的行混在一份产物里，换一个 --output 重跑全部")
 
-    results = {}
-    problems = []
-    lock = threading.Lock()
-    flushed = set(recorded)
-    if not os.path.exists(options["output"]):
-        append_lines(options["output"], [
-            f"E7RESULT name=config experiment=E165 segment=2 profile=r4 registration=research/prompts/e165-r4-prereg.md "
-            f"device_arguments={'+'.join(([] if 'r4noprofile' in BREAK else R4_DEVICE_PROFILE_ARGUMENTS) + setup.bounds_arguments()) or 'none'} "
-            f"items={len(items)} table_rows={len(items) - 1} recovery_sha256={sha_at_start[RECOVERY_PATH]} lib_sha256={sha_at_start[LIB_PATH]} "
-            f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none{pins_config_text(setup)}"], False)
+    def run_checks(baseline):
+        check_the_profile_rows_r4(baseline)
+        check_the_gate_rows_r4(setup, baseline)
+        check_against_segment_one_product(setup, baseline)
 
-    def flush_in_order():
-        nonlocal torn
-        for item in items:
-            name = item["name"]
-            if name in flushed:
-                continue
-            record = results.get(name) or stored_record(item)
-            if record is None or record.get("problem"):
-                if item in wanted:
-                    return
-                continue
-            append_lines(options["output"], record["lines"], torn)
-            torn = False
-            flushed.add(name)
-
-    def work(item):
-        if item["name"] == "baseline":
-            record = {"lines": [baseline_line], "ledger": [], "problem": None, "timing": (0.0, 0.0, 0.0)}
-        else:
-            record = process_item_r4(setup, item, baseline, options)
-        with lock:
-            results[item["name"]] = record
-            options["progress"].finished(item["name"])
-            item_lines.judged_item(item["name"], record)
-            build_seconds, run_seconds, total_seconds = record["timing"]
-            print(f"  {item['name']}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，合计 {total_seconds:.1f} 秒"
-                  + (f"；没得出结果：{record['problem']}" if record["problem"] else ""), file=sys.stderr)
-            with open(os.path.join(options["work"], "progress.log"), "a", encoding="utf-8") as handle:
-                handle.write(f"{item['name']}\tbuild={build_seconds:.1f}\trun={run_seconds:.1f}\ttotal={total_seconds:.1f}\tproblem={record['problem']}\n")
-            if record["problem"]:
-                problems.append(f"{item['name']}：{record['problem']}")
-            else:
-                with open(os.path.join(records_directory, item["name"] + ".json"), "w", encoding="utf-8") as handle:
-                    json.dump(record, handle, ensure_ascii=False)
-                flush_in_order()
+    baseline, baseline_line = opening_baseline(setup, options, verdicts, to_run, run_checks,
+                                               lambda baseline: baseline_item_line_r4(setup, by_name["baseline"], baseline, options),
+                                               lambda: retained_product_not_run(setup, "TV7", [retained]))
+    start_file(options["output"], [
+        f"E7RESULT name=config experiment=E165 segment=2 profile=r4 registration=research/prompts/e165-r4-prereg.md "
+        f"device_arguments={'+'.join(([] if 'r4noprofile' in BREAK else R4_DEVICE_PROFILE_ARGUMENTS) + setup.bounds_arguments()) or 'none'} "
+        f"items={len(items)} table_rows={len(items) - 1} recovery_sha256={sha_at_start[RECOVERY_PATH]} lib_sha256={sha_at_start[LIB_PATH]} "
+        f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none{pins_config_text(setup)}"])
 
     started = time.monotonic()
-    halted = None
-    with concurrent.futures.ThreadPoolExecutor(max_workers=options["jobs"]) as pool:
-        item_lines.dispatch(len(to_run))
-        futures = [pool.submit(work, item) for item in to_run]
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                future.result()
-            except Stop as stop:
-                halted = halted or stop
-    if halted is not None:
-        raise halted
-    with lock:
-        flush_in_order()
+    _results, problems = judge_items_in_parallel(setup, options, items, wanted, to_run, verdicts, baseline, baseline_line, process_item_r4, item_lines, True)
     variants_seconds = time.monotonic() - started
 
     # 收尾：重建一份不改的副本、重编重跑基线，必须与开头逐字相同；两份源文件与变异表的 sha256 开头结尾相同（冻结根不是 git 仓，不看 git status）。
-    baseline_at_end = build_and_run_baseline(setup, options, "baseline-at-end")
-    options["progress"].stop()
-    same_baseline = baseline_at_end["rows"] == baseline["rows"]
-    restored_start = restore_and_remove(setup, baseline["directory"], keep=False)
-    restored_end = restore_and_remove(setup, baseline_at_end["directory"], keep=False)
+    # 开头基线没跑的（一项都不用现判）收尾基线也不跑，只核根里的两份源文件与变异表。
+    if baseline["binary"] is not None:
+        baseline_at_end = build_and_run_baseline(setup, options, "baseline-at-end")
+        options["progress"].stop()
+        same_baseline = baseline_at_end["rows"] == baseline["rows"]
+        restored_start = restore_and_remove(setup, baseline["directory"], keep=False)
+        restored_end = restore_and_remove(setup, baseline_at_end["directory"], keep=False)
+    else:
+        options["progress"].stop()
+        same_baseline = restored_start = restored_end = True
     sha_at_end = source_hashes(setup)
     table_unchanged = sha256_of_file(os.path.join(setup.root, TABLE_PATH)) == setup.registered["table_sha256"] if setup.registered.get("table_sha256") else True
     print(f"  这一次 {len(to_run)} 个变体，挂钟 {variants_seconds:.1f} 秒（不含开头与收尾的基线）", file=sys.stderr)
@@ -2607,16 +1903,18 @@ def main_run_r4(setup, options, item_names):
         raise Stop(EXIT_VOID_V6, f"  ✗ 作废条款 TV9：收尾基线与开头逐字相同={same_baseline}；根里 recovery.rs 与 lib.rs 的 sha256 开头 {sha_at_start[RECOVERY_PATH][:16]}…/{sha_at_start[LIB_PATH][:16]}… "
                                  f"结尾 {sha_at_end[RECOVERY_PATH][:16]}…/{sha_at_end[LIB_PATH][:16]}…；变异表没变={table_unchanged}；基线副本还原={restored_start and restored_end}\n"
                                  "  → 怎么办：这一次落的行不算数；查是谁在跑的时候改了根，换一个 --output 重跑")
-    print("已还原，基线与开头逐字相同")
+    print("已还原，基线与开头逐字相同" if baseline["binary"] is not None else "  这一趟没有要现判的项，开头与收尾的基线都没编没跑；根里 recovery.rs、lib.rs 与变异表前后相同")
 
-    recorded, closed, _torn = recorded_items(options["output"])
+    if not verdicts.finish():
+        return EXIT_INCOMPLETE
+    recorded = recorded_items(options["output"])
     missing = [item["name"] for item in items if item["name"] not in recorded]
     for problem in problems:
         print(f"  ✗ {problem}")
     if problems:
-        print("  → 怎么办：没得出结果的那几个照上面各自的原因处理，再重跑同一条命令")
+        print("  → 怎么办：没得出结果的那几个照上面各自的原因处理，挪走这一趟的产物（--output 已经存在的不收），再重跑同一条命令（判过的从判定库复用，只现判没判绿的）")
     if missing:
-        print(f"  还有 {len(missing)} 个变体没有行：{' '.join(missing)}；重跑同一条命令（不带 --item）只补这些")
+        print(f"  这一趟的产物里还有 {len(missing)} 个变体没有行：{' '.join(missing)}；挪走这一趟的产物（--output 已经存在的不收）、不带 --item 重跑同一条命令补齐（判过的从判定库复用）；按项判定 {verdicts.summary}")
         return EXIT_INCOMPLETE if problems else EXIT_OK
     outcomes, pin_mismatches, kg_mismatches = {}, [], []
     for item in items:
@@ -2628,7 +1926,7 @@ def main_run_r4(setup, options, item_names):
             if fields.get("kg_pin") == "mismatch":
                 kg_mismatches.append(item["name"])
     closing = [
-        f"E7RESULT name=restored text=已还原，基线与开头逐字相同 baseline_result_rows={len(baseline['rows'])} "
+        f"E7RESULT name=restored text=已还原，基线与开头逐字相同 baseline_result_rows={baseline['row_count']} "
         f"root_recovery_sha256_at_start={sha_at_start[RECOVERY_PATH]} root_recovery_sha256_at_end={sha_at_end[RECOVERY_PATH]} "
         f"root_lib_sha256_at_start={sha_at_start[LIB_PATH]} root_lib_sha256_at_end={sha_at_end[LIB_PATH]} copies_restored=true",
         f"E7RESULT name=verdict scope=segment2 variants={len(items)} variants_excluding_baseline={len(items) - 1} "
@@ -2638,8 +1936,8 @@ def main_run_r4(setup, options, item_names):
         f"ka_pin_mismatches={len(pin_mismatches)} kg_pin_mismatches={len(kg_mismatches)} baseline_equals_segment1_product={retained_comparison_text(baseline, 'true')}{options.get('gate_field', '')}",
     ]
     total = len(result_rows(open(options["output"], encoding="utf-8").read())) + len(closing) + 1
-    append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"], False)
-    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}{not_run_suffix(setup)}")
+    append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"])
+    print(f"  ✓ {len(items)} 个变体都有行，收尾三行已写：{options['output']}；按项判定 {verdicts.summary}{not_run_suffix(setup)}")
     if pin_mismatches:
         print(f"  ✗ KA 钉值对不上（TF7）：{' '.join(pin_mismatches)}；这几个变体的合法域结果不能读成「没有取样点」，交主 agent；别的变体照判")
         print("     → 怎么办：把这几个变体的 KA 读数与跑前登记 TF7 钉的值并排交主 agent，由主 agent 判是登记钉错还是装置算错")
@@ -3077,14 +2375,27 @@ os.chmod(binary, 0o755)
 
 
 def selftest():
+    # 判定写进临时 prune-server：只在临时服务底下跑（long_run_item_verdicts.py selftest-service，即客户端 selftest_service_problem），不在就退 2、一格都不跑
+    code, output = item_verdicts_command(["selftest-service"])
+    if code != 0:
+        print(output.rstrip())
+        print("  ✗ 自检没跑：判定写进临时 prune-server，自证只在临时服务底下跑")
+        print("  → 怎么办：照文件头「用法」--selftest 那一条的包装写法起（python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash <本脚本> --selftest）")
+        return EXIT_USAGE
     failures = []
     checked = 0
+    selftest_started = time.monotonic()
+
+    def say_progress(text):
+        # 自证要跑一阵：每判完一项（与每段长的开跑前）打一行、立刻刷出，看日志的人知道走到哪了（文件头「用法」--selftest）
+        print(f"E165_KILL_BOUNDS_SELFTEST_PROGRESS 挂钟 {time.monotonic() - selftest_started:.0f} 秒，判完 {checked} 项（不过 {len(failures)} 项）；{text}", flush=True)
 
     def expect(condition, what, fix):
         nonlocal checked
         checked += 1
         if not condition:
             failures.append((what, fix))
+        say_progress(f"刚判完的一项{'过了' if condition else '不过'}：{what[:120]}")
 
     def write(path, text):
         with open(path, "w", encoding="utf-8") as handle:
@@ -3104,6 +2415,26 @@ def selftest():
     expect(registered is not None and defaults == ((1, registered), (4, max(1, registered // 4)), (1, 7), (2, 3), (1, 5)),
            f"--jobs、--threads 的缺省：什么都不给要 1 × 登记的重活默认并行度（{registered}）、只给 --jobs 4 要 4 × 登记值 ÷ 4、上限 7 要 1 × 7、给了的原样（实际 {defaults}）",
            "看 default_jobs_and_threads 与 .claude/heavy-thread-default")
+
+    # 真跑的按项判定请求里判法那一段（item_requests_text 经 judge_tokens 写）：三套各写判法模块里判一个变体的函数与写基线那一行的函数、judge-root 是脚本所在的仓，
+    # 不写整份驱动（整份驱动的判法闭包连到选行、钉红例与自证读的整张表，表改一行每一项的键都变）；那几个函数要真在判法模块里。开关 judgewholedriver 下判法写回整份驱动
+    judge_module = "scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_variant_judgement.py"
+    wanted_judges = {"r2": ["judge_variant", "baseline_item_line"], "r3": ["judge_variant_r3", "baseline_item_line_r3"], "r4": ["judge_variant_r4", "baseline_item_line_r4"]}
+    written_judges = {}
+    for profile in wanted_judges:
+        request = item_requests_text(Setup(DEFAULT_ROOT, False, profile), [{"name": "baseline"}], [])
+        written_judges[profile] = [token for token in request.rstrip("\n").split("\t") if token.startswith(("judge:", "judge-root:"))]
+    in_module = sorted({os.path.realpath(function.__code__.co_filename) for functions in JUDGE_FUNCTIONS.values() for function in functions})
+    import e165_replay_mutation_kill_bounds_variant_judgement as judgement_module
+    names_of_the_driver = [function.__name__ for profile in ("r2", "r3", "r4") for function in JUDGE_FUNCTIONS[profile]]
+    expect(list(judgement_module.JUDGING_ENTRIES) == names_of_the_driver,
+           f"判法模块登记的判法入口 JUDGING_ENTRIES 应当与驱动的 JUDGE_FUNCTIONS 按 r2、r3、r4 的次序同名，实际模块 {list(judgement_module.JUDGING_ENTRIES)}、驱动 {names_of_the_driver}",
+           "看判法模块的 JUDGING_ENTRIES 与驱动的 JUDGE_FUNCTIONS：加、删、改名一个判法函数时两边一起改（算键库自证照模块那一行逐个收闭包）")
+    expect(all(written_judges[profile] == [f"judge:{judge_module}::{name}" for name in names] + [f"judge-root:{DEFAULT_ROOT}"] for profile, names in wanted_judges.items())
+           and in_module == [os.path.realpath(os.path.join(DEFAULT_ROOT, judge_module))],
+           f"真跑的按项判定请求里判法应当是判法模块里判一个变体的函数与写基线那一行的函数（三套各两个）、judge-root 是脚本所在的仓，不是整份驱动，"
+           f"实际 {written_judges}，函数所在的文件 {in_module}",
+           "看 judge_tokens 与 JUDGE_FUNCTIONS：判法写 judge:<判法模块>::<函数>，函数要在判法模块里")
 
     # 副本的范围取共用库在根上现算的闭包（copy_root_entries）：假仓里 crates/demo 经 path 依赖仓根下的 served/、编译期读 .claude/heavy-thread-default
     # ⇒ 两样连同共用清单拷进副本，research/ 不拷；副本里起命令的多机配置取脚本所在的仓那一份（environment_in_the_copy：假仓 git init 过，没设取它的 multi-host.env，设了的照原样）
@@ -3185,18 +2516,30 @@ def selftest():
         write(os.path.join(root, ".claude/gate.d/e165-pinned-red-examples.tsv"), "# 自检用的钉住的表\n")
         write(os.path.join(root, "fake-cargo"), FAKE_CARGO)
         os.chmod(os.path.join(root, "fake-cargo"), 0o755)
+        # 自证起的那几趟按项判定的判法（judge_tokens）：判法闭包在假树上算，复用那六格的样板树是这棵树的拷贝，同样带着它
+        os.makedirs(os.path.dirname(os.path.join(root, SELFTEST_JUDGE_FILE)), exist_ok=True)
+        write(os.path.join(root, SELFTEST_JUDGE_FILE), SELFTEST_JUDGE_TEXT)
         subprocess.run(["git", "init", "-q", root], check=True)
         cargo_log = os.path.join(temporary, "cargo.log")
         binary_log = os.path.join(temporary, "binary.log")
 
-        def drive(arguments, broken="", extra=None, fake_root=None):
+        library_count = [0]
+
+        def drive(arguments, broken="", extra=None, fake_root=None, library=None):
             # 弄坏开关：外面设了（BREAK，自证这个进程读到的）就每一趟都带上，再并上这一趟自己点名的（对照那几例）；外面没设只带这一趟自己的。
             # r2 那四项（R2_BREAK_MODES）与 r3 那四项（R3_BREAK_MODES）不在这里带：r2、r3 那几趟自己把外面给的原样传进去（r2_broken、r3_broken），别的几趟照常跑
+            # 判定库：临时 prune-server 里每一趟一份新的命名空间（LONG_RUN_ITEMS_LIBRARY_DIRECTORY），续跑那几格给 library 让几趟共用一份；
+            # 复用哨兵全当哨兵、不抽强制现判（编几次是定数）；假仓里没有真装置的源码，不给 LONG_RUN_ITEMS_SELFTEST_ENTRIES 的那几趟每一项都拒算、照跑
+            library_count[0] += 1
             environment = dict(os.environ)
             environment["E165_KILL_BOUNDS_SELFTEST_ROOT"] = fake_root or root
             environment["FAKE_CARGO_LOG"] = cargo_log
             environment["FAKE_BIN_LOG"] = binary_log
             environment["E165_KILL_BOUNDS_BREAK"] = ",".join(sorted((BREAK - set(R2_BREAK_MODES) - set(R3_BREAK_MODES) - set(R4_BREAK_MODES)) | set(filter(None, broken.split(",")))))
+            environment["LONG_RUN_ITEMS_LIBRARY_DIRECTORY"] = library or os.path.join(temporary, f"library-{library_count[0]}")
+            environment["SINGLEFS_REUSE_SENTINEL_COUNT"] = "1000"
+            for name in ("SINGLEFS_REUSE_SENTINEL_SEED", "LONG_RUN_ITEMS_SELFTEST_ENTRIES", "LONG_RUN_ITEMS_SELFTEST_FAULT", "LONG_RUN_ITEMS_SELFTEST_FAKE_JUDGE", KILL_AFTER_VARIABLE):
+                environment.pop(name, None)
             environment.pop("SINGLEFS_THREAD_CAP", None)
             environment.pop("E165_KILL_BOUNDS_PROGRESS_INTERVAL", None)
             environment.pop("FAKE_BIN_SLEEP", None)
@@ -3204,6 +2547,11 @@ def selftest():
             environment.pop("FAKE_BIN_NO_R3_ROWS", None)
             environment.pop("FAKE_BIN_NO_R4_ROWS", None)
             environment.update(extra or {})
+            # 几趟共用一份库的那几格（续跑、钉红例、改判法）重交同一条命令：已经存在的 --output 不收（文件头「用法」），
+            # 驱动先把上一趟的产物与账挪成 .previous（只供自证的 SET_OUTPUT_ASIDE_VARIABLE）；别的格不设，--output、--ledger 已经存在的照拒
+            environment.pop(SET_OUTPUT_ASIDE_VARIABLE, None)
+            if library is not None:
+                environment[SET_OUTPUT_ASIDE_VARIABLE] = "1"
             write(cargo_log, "")
             write(binary_log, "")
             completed = subprocess.run(["bash", SELF_PATH] + arguments, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -3221,7 +2569,7 @@ def selftest():
         last_line = output.rstrip("\n").split("\n")[-1]
         expect(completed.returncode == 0, f"整轮应当退 0，实际 {completed.returncode}：{completed.stdout[-400:]}{completed.stderr[-400:]}", "看 main_run 在假仓上卡在哪一步")
         expect(re.search(r"item=tsv-2 .* outcome=red first_clause_red=L:2:J4 .* legal_family_minimum=2 ", output) is not None, "红的那一条应当记 outcome=red、首红 L:2:J4", "看 compare_with_baseline 与 differences_at")
-        expect(re.search(r"item=tsv-3 .* outcome=not_red_within_bounds .* not_red_domains=L\(≤3\) ", output) is not None, "不红的那一条应当记 not_red_within_bounds、上沿 3", "看 process_item 的结局分类")
+        expect(re.search(r"item=tsv-3 .* outcome=not_red_within_bounds .* not_red_domains=L\(≤3\) ", output) is not None, "不红的那一条应当记 not_red_within_bounds、上沿 3", "看判法模块 judge_variant 的结局分类")
         expect(re.search(r"item=tsv-4 .* outcome=invalid ", output) is not None, "编不过的那一条应当记 invalid", "看 prepare_and_build 的返回")
         expect(re.search(r"item=tsv-5 .* outcome=red first_clause_red=L:2:J4 ", output) is not None, "文件列是 lib.rs 的那一条应当改 lib.rs、记 outcome=red", "看 prepare_and_build 的 target_of")
         expect(re.search(r"item=Z1 .* outcome=red ", output) is not None, "自造的那一条（文件列 lib.rs）应当记 red", "看 load_items 读自造表")
@@ -3244,6 +2592,31 @@ def selftest():
                and f"钉红例：钉进 {len(ledger_examples)} 行、核了 {len(ledger_examples)} 行" in completed.stdout,
                f"整轮写完账与产物要当场钉进钉表、再核钉全：红例账里有 {len(ledger_examples)} 行反例，钉表应当有同样多行、档都是 --profile r2，"
                f"成功那句报钉进与核了几行；实际表里 {len(pinned_rows)} 行：{completed.stdout[-300:]}", "看 main_run 收尾的 pin_red_examples")
+        # 一之二、--output 指到已经存在的文件（上面整轮写的那一份），--ledger 是新的：退 2、出路写全、一次不编，那一份一个字不动、账不写（开关 outputoverwritten 下照收、整份换掉）。
+        # 一之三、--ledger 指到已经存在的文件（整轮写的那一份），--output 是新的：同样退 2、同一句出路、一次不编，账一个字不动、产物不写（开关 ledgeroverwritten 下照收）。
+        # 开关开着时那一趟照新的一对钉、把整轮那一份换掉：两格判完把产物、账与钉表放回整轮写完时的样子，后面几格照整轮那一份比
+        pinned_text = read(pinned_table)
+        output_taken = paths("full")
+        output_taken[output_taken.index("--ledger") + 1] = os.path.join(temporary, "output-taken.ledger")
+        completed, builds = drive(output_taken)
+        output_untouched = read(os.path.join(temporary, "full.out")) == output
+        expect(completed.returncode == EXIT_USAGE and "--output full.out 已经存在" in completed.stdout and "换一个路径，或先挪走那一份" in completed.stdout
+               and len(builds) == 0 and output_untouched and not os.path.exists(os.path.join(temporary, "output-taken.ledger")),
+               f"--output 指到已经存在的文件应当退 2、出路写换一个路径或先挪走那一份、一次不编、那一份一个字不动，实际退 {completed.returncode}、编 {len(builds)} 次、"
+               f"那一份{'没动' if output_untouched else '变了'}：{completed.stdout[-300:]}",
+               "看 main 里三套整轮调 refuse_existing_output 的那几处")
+        ledger_taken = paths("ledger-taken")
+        ledger_taken[ledger_taken.index("--ledger") + 1] = os.path.join(temporary, "full.ledger")
+        completed, builds = drive(ledger_taken)
+        ledger_untouched = read(os.path.join(temporary, "full.ledger")) == ledger
+        expect(completed.returncode == EXIT_USAGE and "--ledger full.ledger 已经存在" in completed.stdout and "换一个路径，或先挪走那一份" in completed.stdout
+               and len(builds) == 0 and ledger_untouched and not os.path.exists(os.path.join(temporary, "ledger-taken.out")),
+               f"--ledger 指到已经存在的文件应当退 2、出路写换一个路径或先挪走那一份、一次不编、那一份一个字不动，实际退 {completed.returncode}、编 {len(builds)} 次、"
+               f"账{'没动' if ledger_untouched else '变了'}：{completed.stdout[-300:]}",
+               "看 main 里不给 --profile 那一套调 refuse_existing_output 时交进去的 --ledger")
+        write(os.path.join(temporary, "full.out"), output)
+        write(os.path.join(temporary, "full.ledger"), ledger)
+        write(pinned_table, pinned_text)
 
         # 二、锚点命中 0 次：自造表里的报「锚点腐化」退 3；crates 表里的让选出的行对不上登记（停机条款 H1）退 4；两样都一次不编、不写产物。
         write(os.path.join(root, CUSTOM_TABLE_PATH), "Z1 锚点坏的\t" + LIB_PATH + "\tlet omega = 4;\tlet omega = 8;\n")
@@ -3258,54 +2631,93 @@ def selftest():
         expect(completed.returncode == 4 and "RF2" in completed.stdout and "anchor_hits_0" in completed.stdout and len(builds) == 0, f"crates 表里锚点命中 0 次应当选不到（RF2）退 4、一次不编，实际退 {completed.returncode}、编 {len(builds)} 次", "看 select_by_name 与 load_items")
         write(os.path.join(root, TABLE_PATH), good_table)
 
-        # 三、被打断的结果文件：只剩基线与第一条、末行半截；重跑只补没跑的。
-        kept = [line for line in output.split("\n") if " name=config " in line or " item=baseline " in line or " item=tsv-2 " in line]
-        torn_line = ([line for line in output.split("\n") if " item=tsv-3 " in line] or [""])[0][:60]
-        interrupted = os.path.join(temporary, "resume.out")
-        kept_text = "\n".join(kept).replace("full.", "resume.") + "\n" + torn_line
-        write(interrupted, kept_text)
-        write(os.path.join(temporary, "resume.ledger"), "\n".join(line for line in ledger.split("\n") if line.startswith("#") or line.startswith("tsv-2\t")) + "\n")
-        completed, builds = drive(paths("resume"))
-        resumed = read(interrupted)
-        expect(completed.returncode == 0, f"补跑应当退 0，实际 {completed.returncode}：{completed.stdout[-300:]}{completed.stderr[-300:]}", "看 recorded_items 与 main_run")
-        expect(len(builds) == 6, f"补跑应当只编 6 次（基线 2、没跑的变体 4），实际 {len(builds)}", "已有完整一行的变体不许重跑；半截的那一行不算")
+        # 三、续跑（文件头「按项判定」）：判完 tsv-3 就被停下的一趟（只供自证的 E165_KILL_BOUNDS_SELFTEST_KILL_AFTER：record 之后整个进程被 SIGKILL），
+        # 重交同一条命令只补没判的三项，库里复用的三项不编、各打一行 reused=1，产物行与整轮的逐字相同；再交一趟全部复用、一次不编、产物逐字相同。
+        # 三趟共用一份判定库命名空间；假仓里的装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假树里的 Python 函数（不换就全部拒算、一项都不复用）。
+        planted_code, planted = item_verdicts_command(["plant-fake-entries", root])
+        resume_entries = os.path.join(temporary, "resume-entries.tsv")
+        write(resume_entries, "".join(f"{name}\tscripts/experiment-apparatus/long_run_reuse_fake_entries.py::{'measure_beta' if name == 'baseline' else 'measure_alpha'}\n"
+                                      for name in ("baseline", "tsv-2", "tsv-3", "tsv-4", "tsv-5", "Z1")))
+        resume_extra = {"LONG_RUN_ITEMS_SELFTEST_ENTRIES": resume_entries}
+        resume_library = os.path.join(temporary, "resume-library")
+        resume_arguments = paths("resume")[:-4] + ["--jobs", "1", "--threads", "1"]
+        resumed_path = os.path.join(temporary, "resume.out")
+        completed, builds = drive(resume_arguments, library=resume_library, extra=dict(resume_extra, **{KILL_AFTER_VARIABLE: "tsv-3"}))
+        expect(planted_code == 0 and completed.returncode == -signal.SIGKILL and len(builds) == 3,
+               f"续跑：判完 tsv-3 就被停下的那一趟应当被 SIGKILL、只编了 3 次（开头基线、tsv-2、tsv-3），实际种假入口退 {planted_code}（{planted.strip()[-200:]}）、"
+               f"退 {completed.returncode}、编 {len(builds)} 次：{completed.stdout[-300:]}{completed.stderr[-300:]}",
+               "看 ItemVerdicts.record 与只供自证的 E165_KILL_BOUNDS_SELFTEST_KILL_AFTER")
+        completed, builds = drive(resume_arguments, library=resume_library, extra=resume_extra)
+        resumed = read(resumed_path)
+        expect(completed.returncode == 0, f"续跑应当退 0，实际 {completed.returncode}：{completed.stdout[-300:]}{completed.stderr[-300:]}", "看 ItemVerdicts 与 main_run")
+        expect(len(builds) == 5, f"续跑应当只编 5 次（基线 2、没判的变体 3），实际 {len(builds)}", "判完的变体当场入库（ItemVerdicts.record），重交时 plan 答 reuse 的不编不跑")
         counts = {name: len(re.findall(rf"name=kill_bound item={name} .* complete=yes", resumed)) for name in ("baseline", "tsv-2", "tsv-3", "tsv-4", "tsv-5", "Z1")}
-        expect(all(count == 1 for count in counts.values()), f"补跑之后每个变体恰好一行完整的，实际 {counts}", "看 flush_in_order")
-        expect(resumed.rstrip("\n").split("\n")[-1].startswith("E7RESULT name=done "), "补齐之后要写收尾行", "看 main_run 的收尾")
+        expect(all(count == 1 for count in counts.values()), f"续跑之后每个变体恰好一行完整的，实际 {counts}", "看 judge_items_in_parallel 的 flush_in_order")
+        expect(resumed.rstrip("\n").split("\n")[-1].startswith("E7RESULT name=done "), "续跑补齐之后要写收尾行", "看 main_run 的收尾")
         complete_lines = lambda text: sorted(line for line in text.replace("resume.", "full.").split("\n") if line.endswith("complete=yes"))
-        expect(complete_lines(resumed) == complete_lines(output), "补跑出来的变体行应当与整轮的逐字相同", "变体行里不许有随跑法变的量")
+        expect(complete_lines(resumed) == complete_lines(output), "续跑出来的变体行（库里取回的与现判的）应当与整轮的逐字相同",
+               "看 ItemVerdicts 的 value_text 与 reused_record：复跑命令那一段存成占位、取回时照这一趟填回；变体行里不许有随跑法变的量")
         resumed_items = [line for line in completed.stdout.split("\n") if line.startswith("E165_KILL_BOUNDS_ITEM ")]
         resumed_last = completed.stdout.rstrip("\n").split("\n")[-1]
         expect(any(line.startswith("E165_KILL_BOUNDS_ITEM item=baseline exit=0 judged=0 red=0 reused=1 ") for line in resumed_items)
-               and any(line.startswith("E165_KILL_BOUNDS_ITEM item=tsv-2 exit=0 judged=0 red=1 reused=1 ") for line in resumed_items) and len(resumed_items) == 6
-               and re.match(r"E165_KILL_BOUNDS_TOTAL dispatched=4 collected=4 items=6 judged=4 red=3 reused=2 failed=0 ", resumed_last) is not None,
-               f"补跑：已有行的两项应当各打一行 reused=1（tsv-2 照产物里那一行记 red=1），末行总计派出 4 收回 4、复用 2，实际 {resumed_items}；末行 {resumed_last!r}",
-               "看 main_run 开跑前的 reused_item")
+               and any(line.startswith("E165_KILL_BOUNDS_ITEM item=tsv-2 exit=0 judged=0 red=1 reused=1 ") for line in resumed_items)
+               and any(line.startswith("E165_KILL_BOUNDS_ITEM item=tsv-3 exit=0 judged=0 red=0 reused=1 ") for line in resumed_items) and len(resumed_items) == 6
+               and re.match(r"E165_KILL_BOUNDS_TOTAL dispatched=3 collected=3 items=6 judged=3 red=3 reused=3 failed=0 ", resumed_last) is not None
+               and "按项判定 现判 3、复用 3、拒算 0" in completed.stdout,
+               f"续跑：库里复用的三项应当各打一行 reused=1（tsv-2 照库里那一行记 red=1），末行总计派出 3 收回 3、复用 3，成功句报现判 3、复用 3、拒算 0，"
+               f"实际 {resumed_items}；末行 {resumed_last!r}", "看 ItemVerdicts.report_reused 与 finish 的 summary")
         pinned_after_resume = [line for line in read(pinned_table).split("\n") if line and not line.startswith("#")]
         expect(pinned_after_resume == pinned_rows and f"钉红例：钉进 0 行、核了 {len(ledger_examples)} 行" in completed.stdout,
-               f"补跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表应当不变、报钉进 0 行，实际 {len(pinned_after_resume)} 行：{completed.stdout[-300:]}",
+               f"续跑补齐之后照样当场钉、当场核：同一批红例已钉，钉表应当不变、报钉进 0 行，实际 {len(pinned_after_resume)} 行：{completed.stdout[-300:]}",
                "看 main_run 收尾的 pin_red_examples：追加已钉的不重复")
-        write(interrupted, kept_text)
-        shutil.rmtree(os.path.join(temporary, "scratch-resume"), ignore_errors=True)
-        completed, builds = drive(paths("resume"), broken="rerunall")
-        expect(len(builds) == 7, f"弄坏开关 rerunall 开着时应当每个变体都重编（证明上一例的 6 次来自只补没跑的），实际 {len(builds)}", "看 BREAK 的 rerunall")
+        completed, builds = drive(resume_arguments, library=resume_library, extra=resume_extra)
+        expect(completed.returncode == 0 and len(builds) == 0 and read(resumed_path) == resumed and "按项判定 现判 0、复用 6、拒算 0" in completed.stdout
+               and "开头与收尾的基线都没编没跑" in completed.stdout,
+               f"全部复用的一趟应当一次不编、产物与上一趟逐字相同、报现判 0、复用 6，实际退 {completed.returncode}、编 {len(builds)} 次：{completed.stdout[-400:]}",
+               "看 opening_baseline 一项都不跑的那一支与收尾行的基线行数")
 
-        # 三之二、钉红例（文件头「钉红例」）：已收尾的一对重跑同一条命令也照钉照核，不编不跑变体。
+        # 三之二、钉红例（文件头「钉红例」）：全部从库里复用的一趟（不编不跑变体）照样从头写产物与账、照钉照核。
         # 钉表清空，再造「账写完了、钉表没钉」（只供自证的 E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND：不追加）：当场 --check 判红、整趟退 8（开关 pincheckskipped 下退 0）
         write(pinned_table, "# 自检用的钉住的表\n")
-        completed, builds = drive(paths("full"), extra={"E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND": "1"})
+        completed, builds = drive(resume_arguments, library=resume_library, extra=dict(resume_extra, E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND="1"))
         expect(completed.returncode == EXIT_PIN_INCOMPLETE and "钉红例：核钉全（--check）没过" in completed.stdout and "行没钉进" in completed.stdout and len(builds) == 0,
                f"账写完而钉表没钉时驱动当场核钉全应当判红、退 {EXIT_PIN_INCOMPLETE}、一次不编，实际退 {completed.returncode}、编 {len(builds)} 次：{completed.stdout[-300:]}",
-               "看 pin_red_examples 的 --check 那一步与它在 main_run 收尾（含已收尾那一支）的位置")
-        completed, builds = drive(paths("full"), broken="pincheckskipped", extra={"E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND": "1"})
+               "看 pin_red_examples 的 --check 那一步与它在 main_run 收尾的位置")
+        completed, builds = drive(resume_arguments, library=resume_library, broken="pincheckskipped", extra=dict(resume_extra, E165_KILL_BOUNDS_SELFTEST_SKIP_PIN_APPEND="1"))
         expect(completed.returncode == 0 and "核了 没核" in completed.stdout,
                f"弄坏开关 pincheckskipped 开着时应当照样退 0（证明上一例的红来自当场核钉全），实际退 {completed.returncode}：{completed.stdout[-300:]}", "看 BREAK 的 pincheckskipped")
-        completed, builds = drive(paths("full"))
+        completed, builds = drive(resume_arguments, library=resume_library, extra=resume_extra)
         repinned = [line for line in read(pinned_table).split("\n") if line and not line.startswith("#")]
-        expect(completed.returncode == 0 and repinned == pinned_rows and len(builds) == 0
+        # 钉表的出处 ⑤ 是「<红例账文件名>:<行号>」（e165-pin-red-examples.py 的 pinned_fields）：整轮钉的写 full.ledger，这一趟钉的写 resume.ledger；
+        # 别的 21 段要与整轮钉的逐字相同，⑤ 要指到这一趟的账
+        without_source = lambda rows: [row.split("\t")[:4] + row.split("\t")[5:] for row in rows]
+        expect(completed.returncode == 0 and without_source(repinned) == without_source(pinned_rows) and len(builds) == 0
+               and all(row.split("\t")[4].startswith("resume.ledger:") for row in repinned) and len(repinned) == len(pinned_rows)
                and f"钉进 {len(ledger_examples)} 行、核了 {len(ledger_examples)} 行" in completed.stdout,
-               f"已收尾的一对重跑同一条命令应当只重做钉红例：钉回同样的 {len(pinned_rows)} 行、一次不编，实际退 {completed.returncode}、{len(repinned)} 行、编 {len(builds)} 次：{completed.stdout[-300:]}",
-               "看 main_run 已收尾那一支")
+               f"判过的一对重交同一条命令应当全部复用、照钉照核：钉回同样的 {len(pinned_rows)} 行（出处 ⑤ 换成这一趟的 resume.ledger、别的段与整轮钉的逐字相同）、一次不编，"
+               f"实际退 {completed.returncode}、{len(repinned)} 行、编 {len(builds)} 次、出处 {[row.split(chr(9))[4] for row in repinned]}、"
+               f"除出处外与整轮钉的{'相同' if without_source(repinned) == without_source(pinned_rows) else '不同'}：{completed.stdout[-300:]}",
+               "看 main_run 收尾的 pin_red_examples 与 opening_baseline 一项都不跑的那一支")
+        # 对照：弄坏开关 reuseignored（plan 答 reuse 的也照现判）下同一条命令每个变体都重编、复用哨兵判红；
+        # recorddeferred（判完不当场入库）下被停下的那一趟一项都没入库，重交全部重编
+        completed, builds = drive(resume_arguments, library=resume_library, broken="reuseignored", extra=resume_extra)
+        expect(len(builds) == 7 and completed.returncode == EXIT_INCOMPLETE and "复用失灵" in completed.stdout,
+               f"弄坏开关 reuseignored 开着时应当每个变体都重编、复用哨兵判红退 1（证明「续跑应当只编 5 次」「全部复用的一趟应当一次不编」来自库里复用），"
+               f"实际退 {completed.returncode}、编 {len(builds)} 次", "看 BREAK 的 reuseignored")
+        deferred_library = os.path.join(temporary, "deferred-library")
+        drive(resume_arguments, library=deferred_library, broken="recorddeferred", extra=dict(resume_extra, **{KILL_AFTER_VARIABLE: "tsv-3"}))
+        completed, builds = drive(resume_arguments, library=deferred_library, extra=resume_extra)
+        expect(len(builds) == 7, f"弄坏开关 recorddeferred 开着时被停下的那一趟一项都没入库，重交应当全部重编（证明「续跑应当只编 5 次」来自判完当场入库），实际编 {len(builds)} 次",
+               "看 BREAK 的 recorddeferred")
+        # 改判法：假树里的判法（SELFTEST_JUDGE_FILE）改掉返回的那一行，库里六项都判过，同一条命令应当每一项都现判、一项不拒算；改回去，后面几格照旧。
+        # 证明自证的键里判法的闭包在假树上算（不在脚本所在的仓上收整份驱动），判法也进键（开关 judgeoffthetree 下闭包换到假树的上一层，每一项拒算）
+        judge_path = os.path.join(root, SELFTEST_JUDGE_FILE)
+        write(judge_path, SELFTEST_JUDGE_TEXT.replace(SELFTEST_JUDGE_RESULT, '    return "red when any criterion row differs"\n'))
+        completed, builds = drive(resume_arguments, library=resume_library, extra=resume_extra)
+        write(judge_path, SELFTEST_JUDGE_TEXT)
+        expect(completed.returncode == 0 and len(builds) == 7 and "按项判定 现判 6、复用 0、拒算 0" in completed.stdout,
+               f"改了假树里的判法应当每一项都现判、一项不拒算（报现判 6、复用 0、拒算 0，编 7 次），实际退 {completed.returncode}、编 {len(builds)} 次：{completed.stdout[-400:]}",
+               "看 judge_tokens：自证起的那几趟 judge: 要指假树里的 SELFTEST_JUDGE_ENTRY、不带 judge-root:")
 
         # 三之三、留存产物不在（research/ 可以整个删掉）：V7 的比对本次未跑——逐项点名、不当绿也不判红，基线那一行写 not_run（开关 retainedmissingred 下读不到、退非 0）
         os.rename(os.path.join(root, "seg1.out"), os.path.join(temporary, "seg1.out.aside"))
@@ -3316,6 +2728,24 @@ def selftest():
                and "本次未跑 1 项" in completed.stdout and " rows_found_verbatim_in_segment1_products=not_run " in no_seg1,
                f"r2：第一段产物不在时 V7 的比对应当逐项报本次未跑、照跑完退 0、基线那一行写 not_run，实际退 {completed.returncode}：{completed.stdout[-400:]}{completed.stderr[-200:]}",
                "看 retained_product_not_run 与 check_against_segment_one")
+
+        # 三之四、复用那六格（long_run_item_verdicts.py 文件头「复用格」）：样板树是这时的假仓（表、自造表、登记值同整轮），项甲 tsv-2、项乙 基线，
+        # 只点名 tsv-2（基线照 @after 进计划）；两项的装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假树里的两个 Python 函数。
+        # 外面开着的按项判定那几项弄坏开关（ITEM_VERDICT_BREAK_MODES）原样带进去，别的不带；LONG_RUN_ITEMS_BREAK 随环境带进去。
+        reuse_template = os.path.join(temporary, "reuse-template")
+        shutil.copytree(root, reuse_template, symlinks=True)
+        # 复用三问一格里同一条命令起四趟：已经存在的 --output 不收（文件头「用法」），驱动先把上一趟的产物与账挪走（只供自证的 SET_OUTPUT_ASIDE_VARIABLE）
+        reuse_command = ["env", "E165_KILL_BOUNDS_SELFTEST_ROOT={tree}", "FAKE_CARGO_LOG=/dev/null", "FAKE_BIN_LOG=/dev/null", SET_OUTPUT_ASIDE_VARIABLE + "=1",
+                         "E165_KILL_BOUNDS_BREAK=" + ",".join(sorted(BREAK & set(ITEM_VERDICT_BREAK_MODES))), "bash", SELF_PATH,
+                         "--scratch", "{tree}/../scratch", "--output", "{tree}/../reuse-cells-kill-bounds.out", "--ledger", "{tree}/../reuse-cells-red-examples.tsv",
+                         "--jobs", "1", "--threads", "1", "--item", "tsv-2"]
+        say_progress("开跑复用那六格（long_run_item_verdicts.py reuse-cells，十一趟，跑完一并打出）")
+        reuse_code, reuse_output = item_verdicts_command(["reuse-cells", "--script", SCRIPT_KEY, "--template", reuse_template, "--items", "tsv-2,baseline",
+                                                          "--work", os.path.join(temporary, "reuse-cells"), "--green-exit", "0", "--", *reuse_command])
+        print(reuse_output.rstrip())
+        expect(reuse_code == 0 and "：6 格，红 0 格" in reuse_output,
+               f"复用那六格（long_run_item_verdicts.py reuse-cells）应当全过，实际退 {reuse_code}：{reuse_output.strip()[-600:]}",
+               "看上面 ✗ 那一格点名的条件、ItemVerdicts 的 plan / record / finish 与 item_requests_text 进键的那几样")
 
         # 四、--recheck 单条复跑与产物里的行相同；--list-items 列全、不编。
         completed, builds = drive(["--scratch", os.path.join(temporary, "scratch-recheck"), "--output", os.path.join(temporary, "full.out"),
@@ -3353,7 +2783,7 @@ def selftest():
         progress_lines = [line for line in completed.stderr.split("\n") if line.startswith("E165_KILL_BOUNDS_PROGRESS ")]
         expect(completed.returncode == 0 and any("tsv-3（" in line for line in progress_lines),
                f"整轮里一个变体跑过进度间隔应当打出点名它的进度行，实际退 {completed.returncode}、进度行 {progress_lines[:3]!r}",
-               "看 main_run 里 Progress 的 start、process_item 里的 mark")
+               "看 main_run 里 Progress 的 start、judge_built_variant 与判法模块 judge_variant 里的 mark")
 
 
         # 七、r1 第二段的选行（登记 5.2 R2 三格、文件列一格、标签比对两格、RH1 一格）：都只跑 --select-rows 或停在选行，一次不编；每一格配一个弄坏开关证明它会红。
@@ -3529,12 +2959,12 @@ def selftest():
                "看 r3_first_reds：每条判据各取各的格，按 (M, U) 升序")
         expect(re.search(r"item=tsv-4 .* outcome=not_red_within_bounds .* ka_kj2=52 ka_expected=52 ka_pin=match ka_inferred=none ", output) is not None
                and re.search(r"item=tsv-2 .* outcome=not_red_within_bounds .* ka_kj2=0 ka_expected=0 ka_pin=not_pinned ka_inferred=match ", output) is not None,
-               "r3：K 族不红而 KA 读数等于钉值的变体记 not_red_within_bounds、ka_pin=match；推的两个（1822、1827）不钉，只报 ka_inferred", "看 r3_ka_pin 与 process_item_r3")
+               "r3：K 族不红而 KA 读数等于钉值的变体记 not_red_within_bounds、ka_pin=match；推的两个（1822、1827）不钉，只报 ka_inferred", "看 r3_ka_pin 与 judge_variant_r3")
         expect(re.search(r"item=tsv-6 .* outcome=red_only_by_kj0_or_kj3 red_legal_domains=none first_red_by_criterion=KJ1:K=none,K9=none,KW=none;KJ2:K=none,K9=none,KW=none;KJ0:K=M1U1,K9=none,KW=none;KJ3:.* "
                          r"states_row_differences=K=M1U1:choose_root_returned_none;K9=M1U0:above_chosen_root_over_limit .* above_chosen_root_over_limit=K:0,K9:4,KW:0,KA:0 "
                          r"choose_root_returned_none=K:1,K9:0,KW:0,KA:1 .* halt_conditions=1 .* run_exit=1 run_finished=true ", output) is not None,
                f"r3：变体跑到装置自己退 1（halt 行）而 K 域 KJ0 变红，应当照常落行、记 run_exit=1、run_finished=true、outcome=red_only_by_kj0_or_kj3，实际 {[line[:700] for line in output.split(chr(10)) if 'item=tsv-6 ' in line]}",
-               "看 process_item_r3：装置退 1 但最后一行是 name=done 就是跑完了")
+               "看 judge_variant_r3：装置退 1 但最后一行是 name=done 就是跑完了")
         expect(output.rstrip("\n").split("\n")[-1] == "E7RESULT name=done emitted=11" and "已还原，基线与开头逐字相同" in completed.stdout and len(builds) == 8,
                f"r3 整轮：收尾行应当是 name=done emitted=11、打「已还原，基线与开头逐字相同」、编 8 次（基线 2、变体 6），实际 {output.rstrip(chr(10)).split(chr(10))[-1]!r}、编 {len(builds)} 次", "看 main_run_r3 的收尾")
         expect(calls and all(line.startswith("--profile r3 --bounds segment1 --family root_choice") for line in calls),
@@ -3576,7 +3006,7 @@ def selftest():
         output = read(os.path.join(temporary, "r3-th5.out"))
         expect(completed.returncode == EXIT_INCOMPLETE and re.search(r"item=tsv-registered-1823 .* outcome=not_compared failed_condition=no_row_with_this_name ", output) is not None
                and "ka_pin=match" in output and len(builds) == 7 and "not_compared=1 " in output,
-               f"r3：变异名选不到的那一行应当记 not_compared、别的五行照做（编 7 次：基线 2、变体 5）、整轮退 1，实际退 {completed.returncode}、编 {len(builds)} 次", "看 load_items_r3 与 process_item_r3 的 TH5 一支")
+               f"r3：变异名选不到的那一行应当记 not_compared、别的五行照做（编 7 次：基线 2、变体 5）、整轮退 1，实际退 {completed.returncode}、编 {len(builds)} 次", "看 load_items_r3 与 judge_variant_r3 的 TH5 一支")
         write(os.path.join(root3, TABLE_PATH), table3())
         # ⑦ r3 模式不认 --select-rows、--recheck、--measure 与 --ledger（退 2）；--profile 只认 r2、r3
         completed, builds = drive(["--profile", "r3", "--select-rows", "--output", os.path.join(temporary, "r3-select.out")], broken=r3_broken, fake_root=root3)
@@ -3658,16 +3088,16 @@ def selftest():
                "看 r4_first_reds：每条判据各取各的子格，按 (M, U, 被判时故障, 历史标签) 升序")
         expect(re.search(r"item=tsv-2 .* outcome=not_red_within_bounds variant=v1822 red_legal_domains=none differs_on=KG .* kg_pin=match ", output) is not None,
                f"r4：假变体只在 KG 与基线不同（读数换成它自己那一列）应当记 not_red_within_bounds、differs_on=KG、kg_pin=match，实际 {[line[:600] for line in output.split(chr(10)) if 'item=tsv-2 ' in line]}",
-               "看 r4_differs_on 与 process_item_r4 的结局分类")
+               "看 r4_differs_on 与 judge_variant_r4 的结局分类")
         expect(re.search(r"item=tsv-4 .* outcome=not_red_within_bounds variant=v1824 .* differs_on=KG\+KA .* ka_kj2=52 ka_expected=52 ka_pin=match ka_inferred=none kg_pin=match ", output) is not None
                and re.search(r"item=tsv-5 .* outcome=not_red_within_bounds variant=v1825 .* differs_on=KA .* ka_kj2=36 ka_expected=36 ka_pin=match ka_inferred=none kg_pin=match ", output) is not None
                and re.search(r"item=tsv-7 .* ka_kj2=18 ka_expected=18 ka_pin=not_pinned ka_inferred=match kg_pin=match ", output) is not None,
-               "r4：KA 读数等于钉值、KG 读数等于那一列的变体记 ka_pin=match、kg_pin=match；推的 v1822、v1827 不钉，只报 ka_inferred（v1827 的 KG 取 v1823 那一列）", "看 r4_ka_pin、r4_kg_pin 与 process_item_r4")
+               "r4：KA 读数等于钉值、KG 读数等于那一列的变体记 ka_pin=match、kg_pin=match；推的 v1822、v1827 不钉，只报 ka_inferred（v1827 的 KG 取 v1823 那一列）", "看 r4_ka_pin、r4_kg_pin 与 judge_variant_r4")
         expect(re.search(r"item=tsv-6 .* outcome=red_only_by_kj0_or_kj3 variant=v1826 red_legal_domains=none .* first_red_by_criterion=KJ1:KF=none,KF3=none,KF9=none,KFW=none;"
                          r"KJ1T:KF=none,KF3=none,KF9=none,KFW=none;KJ2:KF=none,KF3=none,KF9=none,KFW=none;KJ0:KF=M1U1/none/inside,.* "
                          r"choose_root_returned_none_with_a_readable_root=KF:1,.* halt_conditions=1 .* run_exit=1 run_finished=true ", output) is not None,
                f"r4：变体跑到装置自己退 1（halt 行）而 KF 域 KJ0 变红，应当照常落行、记 run_exit=1、run_finished=true、outcome=red_only_by_kj0_or_kj3，实际 {[line[:700] for line in output.split(chr(10)) if 'item=tsv-6 ' in line]}",
-               "看 process_item_r4：装置退 1 但最后一行是 name=done 就是跑完了")
+               "看 judge_variant_r4：装置退 1 但最后一行是 name=done 就是跑完了")
         expect(output.rstrip("\n").split("\n")[-1] == "E7RESULT name=done emitted=11" and "已还原，基线与开头逐字相同" in completed.stdout and len(builds) == 8,
                f"r4 整轮：收尾行应当是 name=done emitted=11、打「已还原，基线与开头逐字相同」、编 8 次（基线 2、变体 6），实际 {output.rstrip(chr(10)).split(chr(10))[-1]!r}、编 {len(builds)} 次", "看 main_run_r4 的收尾")
         expect(calls and all(line.startswith("--profile r4 --bounds segment1 --family root_choice_faults") for line in calls),
@@ -3709,7 +3139,7 @@ def selftest():
         output = read(os.path.join(temporary, "r4-th5.out"))
         expect(completed.returncode == EXIT_INCOMPLETE and re.search(r"item=tsv-registered-1822 .* outcome=not_compared failed_condition=no_row_with_this_name ", output) is not None
                and "kg_pin=match" in output and len(builds) == 7 and "not_compared=1 " in output,
-               f"r4：变异名选不到的那一行应当记 not_compared、别的五行照做（编 7 次：基线 2、变体 5）、整轮退 1，实际退 {completed.returncode}、编 {len(builds)} 次", "看 load_items_r4 与 process_item_r4 的 TH5 一支")
+               f"r4：变异名选不到的那一行应当记 not_compared、别的五行照做（编 7 次：基线 2、变体 5）、整轮退 1，实际退 {completed.returncode}、编 {len(builds)} 次", "看 load_items_r4 与 judge_variant_r4 的 TH5 一支")
         write(os.path.join(root4, TABLE_PATH), table4())
         # ⑦ r4 模式不认 --select-rows、--recheck、--measure 与 --ledger（退 2）；--profile 只认 r2、r3、r4
         completed, builds = drive(["--profile", "r4", "--select-rows", "--output", os.path.join(temporary, "r4-select.out")], broken=r4_broken, fake_root=root4)
@@ -3796,7 +3226,7 @@ def selftest():
                and "device_arguments=--profile+r4+--bounds+segment1+--family+root_choice_faults+--gate+r2 " in config_lines[0],
                f"r5：--gate r2 整轮应当退 0、假装置每一次被调都带 --gate r2、产物带 gate=r2（kill_bound 7 行、判决行、config 行带装置 sha256），实际退 {completed.returncode}、编 {len(builds)} 次、"
                f"前几次调用 {calls[:2]!r}、kill_bound {len(kill_lines)} 行、{completed.stdout[-300:]}",
-               "看 Setup.bounds_arguments、check_the_gate_rows_r4、pins_config_text 与 process_item_r4 的 head")
+               "看 device_bounds_arguments、check_the_gate_rows_r4、pins_config_text 与 judge_variant_r4 的 head")
         completed, builds = drive(paths4("r5-gate-ignored") + ["--pins", "r5", "--gate", "r2"], broken="r4gateignored", fake_root=root4)
         expect(completed.returncode == EXIT_NOT_PROFILE_R2 and "装置没带 --gate r2" in completed.stdout and len(builds) == 1
                and not os.path.exists(os.path.join(temporary, "r5-gate-ignored.out")),
@@ -3935,12 +3365,14 @@ def main(arguments):
             raise Stop(EXIT_USAGE, "  ✗ 缺 --output\n  → 怎么办：产物进 research/results/，名字照登记 r3 5.8（前缀 e165-replay-bounded-enumeration-<日期>-r3-segment3-）")
         options["output"] = os.path.abspath(output)
         options["output_shown"] = os.path.relpath(options["output"], setup.root) if os.path.commonpath([options["output"], setup.root]) == setup.root else os.path.basename(options["output"])
+        refuse_existing_output(setup, options["output"], options["output_shown"])
         return main_run_r3(setup, options, item_names)
     if profile == "r4":
         if output is None:
             raise Stop(EXIT_USAGE, "  ✗ 缺 --output\n  → 怎么办：产物进 research/results/，名字照登记 r4 5.7（前缀 e165-replay-bounded-enumeration-<日期>-r4-segment2-）")
         options["output"] = os.path.abspath(output)
         options["output_shown"] = os.path.relpath(options["output"], setup.root) if os.path.commonpath([options["output"], setup.root]) == setup.root else os.path.basename(options["output"])
+        refuse_existing_output(setup, options["output"], options["output_shown"])
         return main_run_r4(setup, options, item_names)
     if output is None or ledger is None:
         raise Stop(EXIT_USAGE, "  ✗ 缺 --output 或 --ledger\n  → 怎么办：两个都给；产物进 research/results/，名字照登记 5.5")
@@ -3952,6 +3384,8 @@ def main(arguments):
         return os.path.relpath(path, setup.root) if os.path.commonpath([path, setup.root]) == setup.root else os.path.basename(path)
 
     options["output_shown"], options["ledger_shown"] = shown(options["output"]), shown(options["ledger"])
+    if not recheck:   # --recheck 拿新跑的行与已有的产物比，产物与账本来就该在
+        refuse_existing_output(setup, options["output"], options["output_shown"], options["ledger"], options["ledger_shown"])
     return main_run(setup, options, item_names, recheck)
 
 

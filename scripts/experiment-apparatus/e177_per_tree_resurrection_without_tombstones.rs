@@ -849,11 +849,11 @@ fn plan_code_two_tree(
 #[derive(Clone, Debug, Default)]
 struct CodeTwoTreeVersion {
     shape: CodeTwoShape,
-    units: Vec<UnitId>,
+    units: Vec<UnitIdentifier>,
 }
 
 impl CodeTwoTreeVersion {
-    fn unit_at(&self, position: CodeTwoNodePosition) -> UnitId {
+    fn unit_at(&self, position: CodeTwoNodePosition) -> UnitIdentifier {
         let found = self
             .shape
             .nodes
@@ -867,7 +867,7 @@ impl CodeTwoTreeVersion {
 // 分配器：W2–W6（G-环、G-宽）与 G-紧 的最低落点；根环表 W5
 // ---------------------------------------------------------------------------------------------
 
-type UnitId = usize;
+type UnitIdentifier = usize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum UnitFootprint {
@@ -913,7 +913,7 @@ struct AllocationRecord {
     /// 仍分配时是分配代，已释放时是释放代。
     generation: u64,
     is_released: bool,
-    unit: UnitId,
+    unit: UnitIdentifier,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1242,7 +1242,7 @@ impl Allocator {
         self.lowest_fitting_slot_without_segments(rule)
     }
 
-    fn allocate(&mut self, rule: PlacementRule, txg: u64, unit: UnitId) -> Result<u64, PlacementRefused> {
+    fn allocate(&mut self, rule: PlacementRule, txg: u64, unit: UnitIdentifier) -> Result<u64, PlacementRefused> {
         let slot = match self.geometry {
             Geometry::Tight => self.tight_slot(rule, txg),
             Geometry::Ring | Geometry::Wide => match rule {
@@ -1256,7 +1256,7 @@ impl Allocator {
     }
 
     /// 记下一次分配（W6）：起点就是这个槽的已回收记录改写成已分配，罩住的别的已回收记录删掉。
-    fn record(&mut self, slot: u64, span: u64, txg: u64, unit: UnitId) {
+    fn record(&mut self, slot: u64, span: u64, txg: u64, unit: UnitIdentifier) {
         let end = slot + span;
         self.grow_to_cover(end);
         let is_reuse = (slot..end).any(|each| self.ever_allocated[Self::offset_of(each)]);
@@ -1674,18 +1674,18 @@ impl Unit {
 #[derive(Clone, Debug, Default)]
 struct Disk {
     units: Vec<Unit>,
-    occupant_of_slot: HashMap<u64, UnitId>,
+    occupant_of_slot: HashMap<u64, UnitIdentifier>,
     units_written: u64,
     units_made_unreadable: u64,
 }
 
 impl Disk {
     /// 写一个单元：它占的每一槽上原来那个单元读不出了（整个或部分盖住一样，W8）。交回这次变得读不出的单元。
-    fn write(&mut self, unit: Unit) -> Vec<UnitId> {
-        let unit_id = self.units.len();
+    fn write(&mut self, unit: Unit) -> Vec<UnitIdentifier> {
+        let unit_identifier = self.units.len();
         let mut made_unreadable = Vec::new();
         for slot in unit.slot..unit.slot + unit.span_slots {
-            if let Some(previous) = self.occupant_of_slot.insert(slot, unit_id) {
+            if let Some(previous) = self.occupant_of_slot.insert(slot, unit_identifier) {
                 if self.units[previous].is_readable {
                     self.units[previous].is_readable = false;
                     self.units_made_unreadable += 1;
@@ -1712,7 +1712,7 @@ struct InodeContainerVersion {
     container_number: u64,
     container_birth: u64,
     records: Vec<InodeRecordSummary>,
-    unit: UnitId,
+    unit: UnitIdentifier,
 }
 
 #[derive(Clone, Debug)]
@@ -1720,7 +1720,7 @@ struct TombstoneContainerVersion {
     container_number: u64,
     container_birth: u64,
     records: Vec<TombstoneRecordSummary>,
-    unit: UnitId,
+    unit: UnitIdentifier,
 }
 
 #[derive(Clone, Debug)]
@@ -1730,20 +1730,20 @@ struct Version {
     highest_transaction: u64,
     next_inode: u64,
     /// inode 1 的数据单元，按单元序号。
-    file_units: Vec<UnitId>,
-    extent_root: Option<UnitId>,
-    extent_lower: BTreeMap<(u8, u64), UnitId>,
+    file_units: Vec<UnitIdentifier>,
+    extent_root: Option<UnitIdentifier>,
+    extent_lower: BTreeMap<(u8, u64), UnitIdentifier>,
     inode_containers: Vec<InodeContainerVersion>,
-    inode_root: Option<UnitId>,
+    inode_root: Option<UnitIdentifier>,
     deleted_queue: Vec<u64>,
-    deleted_root: Option<UnitId>,
+    deleted_root: Option<UnitIdentifier>,
     tombstone_containers: Vec<TombstoneContainerVersion>,
-    tombstone_root: Option<UnitId>,
-    allocation_nodes: BTreeMap<AllocationNode, UnitId>,
+    tombstone_root: Option<UnitIdentifier>,
+    allocation_nodes: BTreeMap<AllocationNode, UnitIdentifier>,
     accounting: CodeTwoTreeVersion,
     mapping: CodeTwoTreeVersion,
-    tree_table: UnitId,
-    instance_table: UnitId,
+    tree_table: UnitIdentifier,
+    instance_table: UnitIdentifier,
 }
 
 impl Version {
@@ -1782,7 +1782,7 @@ enum PublishOperation {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PlannedUnit {
     Rewritten,
-    Carried(UnitId),
+    Carried(UnitIdentifier),
 }
 
 #[derive(Clone, Debug)]
@@ -1823,7 +1823,7 @@ struct LogicalPlan {
     tombstone_root: Option<PlannedUnit>,
     tombstones_written: Vec<TombstoneRecordSummary>,
     accounting_keys: BTreeSet<KeyFields>,
-    released_units: Vec<UnitId>,
+    released_units: Vec<UnitIdentifier>,
 }
 
 /// extent 树下段层级 L 上一个节点罩几个单元：144 × 147^L（`extent_tree.rs:84-90`）。
@@ -1870,7 +1870,7 @@ fn accounting_keys_of(txg: u64) -> BTreeSet<KeyFields> {
     keys
 }
 
-fn release_if_carried(planned: PlannedUnit, released_units: &mut Vec<UnitId>) {
+fn release_if_carried(planned: PlannedUnit, released_units: &mut Vec<UnitIdentifier>) {
     match planned {
         PlannedUnit::Carried(unit) => released_units.push(unit),
         PlannedUnit::Rewritten => {}
@@ -2267,14 +2267,14 @@ struct AssembledPublish {
     accounting_plan: CodeTwoPlan,
     mapping_plan: CodeTwoPlan,
     mapping_keys_of_rewritten: HashMap<Role, KeyFields>,
-    releases: Vec<UnitId>,
+    releases: Vec<UnitIdentifier>,
 }
 
 fn node_mapping_key(plan: &LogicalPlan, unit_class: u64, tree: u64, birth_sequence: u64) -> KeyFields {
     [unit_class, tree, plan.txg, plan.instance, birth_sequence]
 }
 
-fn mapping_key_of_carried(disk: &Disk, unit: UnitId) -> KeyFields {
+fn mapping_key_of_carried(disk: &Disk, unit: UnitIdentifier) -> KeyFields {
     disk.units[unit]
         .mapping_key
         .expect("照抄进来的单元在上一版里进映射、有一把 key")
@@ -2582,8 +2582,8 @@ struct UnitScanReading {
     missed: [u64; NAMESPACE_COUNT],
     resurrected_in_window: [u64; NAMESPACE_COUNT],
     tombstones_by_object: HashMap<u64, Vec<TombstoneRecordSummary>>,
-    tagged_units_by_object: HashMap<u64, Vec<UnitId>>,
-    window_units: BTreeMap<UnitId, u64>,
+    tagged_units_by_object: HashMap<u64, Vec<UnitIdentifier>>,
+    window_units: BTreeMap<UnitIdentifier, u64>,
 }
 
 impl UnitScanReading {
@@ -2631,12 +2631,12 @@ impl UnitScanReading {
     }
 
     /// 一个单元写下、读得出了。
-    fn on_unit_readable(&mut self, unit_id: UnitId, unit: &Unit, death_time: &HashMap<NamespacedKey, u64>) {
+    fn on_unit_readable(&mut self, unit_identifier: UnitIdentifier, unit: &Unit, death_time: &HashMap<NamespacedKey, u64>) {
         for occurrence in occurrences_of(&unit.contents) {
             if let Some(object) = object_of_tag(occurrence.tag) {
                 let units = self.tagged_units_by_object.entry(object).or_default();
-                if units.last() != Some(&unit_id) {
-                    units.push(unit_id);
+                if units.last() != Some(&unit_identifier) {
+                    units.push(unit_identifier);
                 }
             }
             if self.counts(&occurrence, unit.birth_txg(), death_time) {
@@ -2646,8 +2646,8 @@ impl UnitScanReading {
     }
 
     /// 一个单元被之后的写盖过、读不出了。
-    fn on_unit_unreadable(&mut self, unit_id: UnitId, unit: &Unit, death_time: &HashMap<NamespacedKey, u64>) {
-        let was_in_window = self.window_units.remove(&unit_id).is_some();
+    fn on_unit_unreadable(&mut self, unit_identifier: UnitIdentifier, unit: &Unit, death_time: &HashMap<NamespacedKey, u64>) {
+        let was_in_window = self.window_units.remove(&unit_identifier).is_some();
         for occurrence in occurrences_of(&unit.contents) {
             if self.counts(&occurrence, unit.birth_txg(), death_time) {
                 self.change(occurrence.key, |counter| {
@@ -2661,11 +2661,11 @@ impl UnitScanReading {
     }
 
     /// 一个读得出的单元这次被释放：进环窗（只有 G-环 报 Q14）。
-    fn on_unit_released(&mut self, unit_id: UnitId, unit: &Unit, txg: u64, death_time: &HashMap<NamespacedKey, u64>) {
+    fn on_unit_released(&mut self, unit_identifier: UnitIdentifier, unit: &Unit, txg: u64, death_time: &HashMap<NamespacedKey, u64>) {
         if !self.tracks_the_ring_window || !unit.is_readable {
             return;
         }
-        self.window_units.insert(unit_id, txg);
+        self.window_units.insert(unit_identifier, txg);
         for occurrence in occurrences_of(&unit.contents) {
             if self.counts(&occurrence, unit.birth_txg(), death_time) {
                 self.change(occurrence.key, |counter| counter.in_window += 1);
@@ -2675,15 +2675,15 @@ impl UnitScanReading {
 
     /// 扫描时刻 t：释放代 s 满足 t − s > 23 的单元出环窗。
     fn expire_the_window(&mut self, txg: u64, disk: &Disk, death_time: &HashMap<NamespacedKey, u64>) {
-        let expired: Vec<UnitId> = self
+        let expired: Vec<UnitIdentifier> = self
             .window_units
             .iter()
             .filter(|(_, released_at)| txg - **released_at > RING_WINDOW_IN_PUBLISHES)
-            .map(|(unit_id, _)| *unit_id)
+            .map(|(unit_identifier, _)| *unit_identifier)
             .collect();
-        for unit_id in expired {
-            self.window_units.remove(&unit_id);
-            let unit = &disk.units[unit_id];
+        for unit_identifier in expired {
+            self.window_units.remove(&unit_identifier);
+            let unit = &disk.units[unit_identifier];
             for occurrence in occurrences_of(&unit.contents) {
                 if self.counts(&occurrence, unit.birth_txg(), death_time) {
                     self.change(occurrence.key, |counter| counter.in_window -= 1);
@@ -2708,12 +2708,12 @@ impl UnitScanReading {
             .cloned()
             .unwrap_or_default();
         let single = [tombstone];
-        for unit_id in units {
-            let unit = &disk.units[unit_id];
+        for unit_identifier in units {
+            let unit = &disk.units[unit_identifier];
             if !unit.is_readable {
                 continue;
             }
-            let in_window = self.window_units.contains_key(&unit_id);
+            let in_window = self.window_units.contains_key(&unit_identifier);
             for occurrence in occurrences_of(&unit.contents) {
                 if object_of_tag(occurrence.tag) != Some(tombstone.object) {
                     continue;
@@ -2773,23 +2773,23 @@ fn note_provider(keys: &mut KeysWithProviders, fields: KeyFields, unit: &Unit) {
 
 #[derive(Clone, Debug, Default)]
 struct UnitLists {
-    data_units: Vec<UnitId>,
-    inode_containers: Vec<UnitId>,
-    tombstone_containers: Vec<UnitId>,
-    accounting_leaves: Vec<UnitId>,
+    data_units: Vec<UnitIdentifier>,
+    inode_containers: Vec<UnitIdentifier>,
+    tombstone_containers: Vec<UnitIdentifier>,
+    accounting_leaves: Vec<UnitIdentifier>,
 }
 
-fn unit_by_id<'reading>(disk: &'reading Disk, planted: Option<&'reading Unit>, unit_id: UnitId) -> &'reading Unit {
-    if unit_id == PLANTED_UNIT {
+fn unit_by_identifier<'reading>(disk: &'reading Disk, planted: Option<&'reading Unit>, unit_identifier: UnitIdentifier) -> &'reading Unit {
+    if unit_identifier == PLANTED_UNIT {
         planted.expect("植入的单元")
     } else {
-        &disk.units[unit_id]
+        &disk.units[unit_identifier]
     }
 }
 
-fn consider_for_selection(newest: &mut BTreeMap<SelectionGroup, (WriteOrder, UnitId)>, unit_id: UnitId, unit: &Unit) {
+fn consider_for_selection(newest: &mut BTreeMap<SelectionGroup, (WriteOrder, UnitIdentifier)>, unit_identifier: UnitIdentifier, unit: &Unit) {
     if let Some(group) = unit.group {
-        let candidate = (unit.write_order, unit_id);
+        let candidate = (unit.write_order, unit_identifier);
         newest
             .entry(group)
             .and_modify(|current| {
@@ -2825,12 +2825,12 @@ struct ScanInputs<'scan> {
     unit_lists: &'scan UnitLists,
     death_time: &'scan HashMap<NamespacedKey, u64>,
     planted: Option<&'scan Unit>,
-    erased: Option<UnitId>,
+    erased: Option<UnitIdentifier>,
 }
 
 impl ScanInputs<'_> {
-    fn is_candidate(&self, unit_id: UnitId) -> bool {
-        unit_id != PLANTED_UNIT && self.disk.units[unit_id].is_readable && Some(unit_id) != self.erased
+    fn is_candidate(&self, unit_identifier: UnitIdentifier) -> bool {
+        unit_identifier != PLANTED_UNIT && self.disk.units[unit_identifier].is_readable && Some(unit_identifier) != self.erased
     }
 
     fn passes_death_records(&self, arm: Arm, namespace: Namespace, fields: KeyFields, provider_birth: u64) -> bool {
@@ -2842,16 +2842,16 @@ impl ScanInputs<'_> {
 /// R-S 与 R-G（登记 5.4、5.3 臂的效力、C3、C11）。
 fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> ReadingResult {
     let disk = inputs.disk;
-    let mut newest: BTreeMap<SelectionGroup, (WriteOrder, UnitId)> = BTreeMap::new();
+    let mut newest: BTreeMap<SelectionGroup, (WriteOrder, UnitIdentifier)> = BTreeMap::new();
     let lists = inputs.unit_lists;
-    for unit_id in lists
+    for unit_identifier in lists
         .data_units
         .iter()
         .chain(&lists.inode_containers)
         .chain(&lists.tombstone_containers)
     {
-        if inputs.is_candidate(*unit_id) {
-            consider_for_selection(&mut newest, *unit_id, &disk.units[*unit_id]);
+        if inputs.is_candidate(*unit_identifier) {
+            consider_for_selection(&mut newest, *unit_identifier, &disk.units[*unit_identifier]);
         }
     }
     if let Some(planted_unit) = inputs.planted {
@@ -2859,12 +2859,12 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
     }
     let mut reading = ReadingResult::empty();
     let mut tombstones_by_object: HashMap<u64, Vec<TombstoneRecordSummary>> = HashMap::new();
-    let mut accepted_containers: Vec<UnitId> = Vec::new();
-    for (group, (_, unit_id)) in &newest {
+    let mut accepted_containers: Vec<UnitIdentifier> = Vec::new();
+    for (group, (_, unit_identifier)) in &newest {
         if let SelectionGroup::PackedContainer { .. } = group {
-            accepted_containers.push(*unit_id);
+            accepted_containers.push(*unit_identifier);
         }
-        let unit = unit_by_id(disk, inputs.planted, *unit_id);
+        let unit = unit_by_identifier(disk, inputs.planted, *unit_identifier);
         if let UnitContents::TombstoneRecords(records) = &unit.contents {
             for record in records {
                 tombstones_by_object.entry(record.object).or_default().push(*record);
@@ -2882,8 +2882,8 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
                 .is_some_and(|tombstones| tombstone_suppresses(tombstones, tag))
     };
     let mut inode_tree_objects: BTreeSet<(u64, u64)> = BTreeSet::new();
-    for (_, unit_id) in newest.values() {
-        let unit = unit_by_id(disk, inputs.planted, *unit_id);
+    for (_, unit_identifier) in newest.values() {
+        let unit = unit_by_identifier(disk, inputs.planted, *unit_identifier);
         if let UnitContents::InodeRecords(records) = &unit.contents {
             for record in records {
                 let tag = OccurrenceTag::InodeRecord {
@@ -2904,8 +2904,8 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
             }
         }
     }
-    let mut accepted_data_units: Vec<UnitId> = Vec::new();
-    for (group, (_, unit_id)) in &newest {
+    let mut accepted_data_units: Vec<UnitIdentifier> = Vec::new();
+    for (group, (_, unit_identifier)) in &newest {
         if let SelectionGroup::DataUnit { object, object_birth, .. } = group {
             let tag = OccurrenceTag::InodeRecord {
                 inode: *object,
@@ -2917,11 +2917,11 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
             if reader == Reader::SelectCurrentGatedByObject && !inode_tree_objects.contains(&(*object, *object_birth)) {
                 continue;
             }
-            accepted_data_units.push(*unit_id);
+            accepted_data_units.push(*unit_identifier);
         }
     }
-    for unit_id in &accepted_data_units {
-        let unit = unit_by_id(disk, inputs.planted, *unit_id);
+    for unit_identifier in &accepted_data_units {
+        let unit = unit_by_identifier(disk, inputs.planted, *unit_identifier);
         if let UnitContents::DataUnit { object, anchor_unit, .. } = unit.contents {
             let fields = extent_key(object, anchor_unit);
             if inputs.passes_death_records(arm, Namespace::Extent, fields, unit.birth_txg()) {
@@ -2929,8 +2929,8 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
             }
         }
     }
-    for unit_id in accepted_data_units.iter().chain(&accepted_containers) {
-        let unit = unit_by_id(disk, inputs.planted, *unit_id);
+    for unit_identifier in accepted_data_units.iter().chain(&accepted_containers) {
+        let unit = unit_by_identifier(disk, inputs.planted, *unit_identifier);
         let slot_fields = single_field_key(unit.slot);
         if inputs.passes_death_records(arm, Namespace::AllocationUnitsOfTheVersion, slot_fields, unit.birth_txg()) {
             reading.note(Namespace::AllocationUnitsOfTheVersion, slot_fields, unit);
@@ -2941,8 +2941,8 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
             }
         }
     }
-    let mut rows: BTreeMap<[u64; 3], (u64, UnitId)> = BTreeMap::new();
-    let mut accounting_candidates: Vec<UnitId> = Vec::new();
+    let mut rows: BTreeMap<[u64; 3], (u64, UnitIdentifier)> = BTreeMap::new();
+    let mut accounting_candidates: Vec<UnitIdentifier> = Vec::new();
     if inputs.planted.is_some_and(|planted_unit| planted_unit.owner == UnitOwner::AccountingNode) {
         accounting_candidates.push(PLANTED_UNIT);
     }
@@ -2950,16 +2950,16 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
         .accounting_leaves
         .iter()
         .rev()
-        .find(|unit_id| inputs.is_candidate(**unit_id))
+        .find(|unit_identifier| inputs.is_candidate(**unit_identifier))
     {
         accounting_candidates.push(*newest_leaf);
     }
-    for unit_id in accounting_candidates {
-        let unit = unit_by_id(disk, inputs.planted, unit_id);
+    for unit_identifier in accounting_candidates {
+        let unit = unit_by_identifier(disk, inputs.planted, unit_identifier);
         if let UnitContents::AccountingKeys(keys) = &unit.contents {
             for key in keys {
                 let row = [key[0], key[1], key[2]];
-                let candidate = (key[3], unit_id);
+                let candidate = (key[3], unit_identifier);
                 rows.entry(row)
                     .and_modify(|current| {
                         if candidate.0 > current.0 {
@@ -2970,8 +2970,8 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
             }
         }
     }
-    for (row, (generation, unit_id)) in rows {
-        let unit = unit_by_id(disk, inputs.planted, unit_id);
+    for (row, (generation, unit_identifier)) in rows {
+        let unit = unit_by_identifier(disk, inputs.planted, unit_identifier);
         let fields = [row[0], row[1], row[2], generation, 0];
         if inputs.passes_death_records(arm, Namespace::Accounting, fields, unit.birth_txg()) {
             reading.note(Namespace::Accounting, fields, unit);
@@ -2983,16 +2983,16 @@ fn select_current_reading(reader: Reader, arm: Arm, inputs: &ScanInputs<'_>) -> 
 /// R-U 的整扫参照路径：逐个读得出的单元收它的每次出现，按臂滤。与增量计数不共用代码，最后一次扫描与阳性对照用它。
 fn unit_scan_reading_by_brute_force(arm: Arm, inputs: &ScanInputs<'_>) -> ReadingResult {
     let disk = inputs.disk;
-    let mut candidates: Vec<UnitId> = (0..disk.units.len())
-        .filter(|unit_id| inputs.is_candidate(*unit_id))
+    let mut candidates: Vec<UnitIdentifier> = (0..disk.units.len())
+        .filter(|unit_identifier| inputs.is_candidate(*unit_identifier))
         .collect();
     if inputs.planted.is_some() {
         candidates.push(PLANTED_UNIT);
     }
     let mut tombstones_by_object: HashMap<u64, Vec<TombstoneRecordSummary>> = HashMap::new();
     if arm == Arm::TodaysTombstones {
-        for unit_id in &candidates {
-            let unit = unit_by_id(disk, inputs.planted, *unit_id);
+        for unit_identifier in &candidates {
+            let unit = unit_by_identifier(disk, inputs.planted, *unit_identifier);
             if let UnitContents::TombstoneRecords(records) = &unit.contents {
                 for record in records {
                     tombstones_by_object.entry(record.object).or_default().push(*record);
@@ -3001,8 +3001,8 @@ fn unit_scan_reading_by_brute_force(arm: Arm, inputs: &ScanInputs<'_>) -> Readin
         }
     }
     let mut reading = ReadingResult::empty();
-    for unit_id in &candidates {
-        let unit = unit_by_id(disk, inputs.planted, *unit_id);
+    for unit_identifier in &candidates {
+        let unit = unit_by_identifier(disk, inputs.planted, *unit_identifier);
         for occurrence in occurrences_of(&unit.contents) {
             let counted = match arm {
                 Arm::WithoutTombstones => true,
@@ -3122,8 +3122,8 @@ fn truth_of_the_version(version: &Version, disk: &Disk, allocator: &Allocator) -
         .iter()
         .chain(version.inode_containers.iter().map(|container| &container.unit))
         .chain(version.tombstone_containers.iter().map(|container| &container.unit));
-    for unit_id in units_of_the_version {
-        let unit = &disk.units[*unit_id];
+    for unit_identifier in units_of_the_version {
+        let unit = &disk.units[*unit_identifier];
         assert!(
             unit.class == UNIT_CLASS_DATA || unit.class == UNIT_CLASS_PACKED,
             "这一版的码 1 / 码 3 单元：数据单元与打包容器"
@@ -3360,22 +3360,22 @@ impl Simulation {
         let plan = plan_logical(&self.version, operation, txg, self.write_path, NEW_POOL_FILE_CREATION_TXG);
         let assembled = settle_publish(&plan, &self.version, &self.disk, &self.allocator)?;
         let allocator_before = self.allocator.clone();
-        for unit_id in &assembled.releases {
-            let (slot, span_slots) = (self.disk.units[*unit_id].slot, self.disk.units[*unit_id].span_slots);
+        for unit_identifier in &assembled.releases {
+            let (slot, span_slots) = (self.disk.units[*unit_identifier].slot, self.disk.units[*unit_identifier].span_slots);
             self.allocator.release(slot, span_slots, txg);
-            self.disk.units[*unit_id].release_txg = Some(txg);
+            self.disk.units[*unit_identifier].release_txg = Some(txg);
         }
         let first_new_unit = self.disk.units.len();
         let mut placements = Vec::new();
-        let mut unit_of_role: HashMap<Role, UnitId> = HashMap::new();
+        let mut unit_of_role: HashMap<Role, UnitIdentifier> = HashMap::new();
         for (offset, role) in assembled.roles.iter().enumerate() {
-            let unit_id = first_new_unit + offset;
+            let unit_identifier = first_new_unit + offset;
             let slot = self
                 .allocator
-                .allocate(role.placement_rule(), txg, unit_id)
+                .allocate(role.placement_rule(), txg, unit_identifier)
                 .expect("固定点在拷贝上取得到的落点，真发时同一串分配照样取得到");
             placements.push((slot, role.placement_rule().span_slots()));
-            unit_of_role.insert(*role, unit_id);
+            unit_of_role.insert(*role, unit_identifier);
         }
         self.judge_cluster_segments_of_this_publish(&allocator_before, &assembled.roles, &placements);
         let new_units = self.build_units(&plan, &assembled, &placements);
@@ -3402,22 +3402,22 @@ impl Simulation {
         }
         self.placement_log.push(placements);
         self.publishes += 1;
-        let written: Vec<UnitId> = (first_new_unit..self.disk.units.len()).collect();
+        let written: Vec<UnitIdentifier> = (first_new_unit..self.disk.units.len()).collect();
         self.scan(txg, &assembled.releases, &written, &made_unreadable, &plan.tombstones_written);
         Ok(())
     }
 
-    fn note_unit_lists(&mut self, first_new_unit: UnitId) {
-        for unit_id in first_new_unit..self.disk.units.len() {
-            let unit = &self.disk.units[unit_id];
+    fn note_unit_lists(&mut self, first_new_unit: UnitIdentifier) {
+        for unit_identifier in first_new_unit..self.disk.units.len() {
+            let unit = &self.disk.units[unit_identifier];
             let is_an_accounting_leaf = matches!(unit.contents, UnitContents::AccountingKeys(_));
             match unit.owner {
-                UnitOwner::FileData => self.unit_lists.data_units.push(unit_id),
-                UnitOwner::InodeContainer => self.unit_lists.inode_containers.push(unit_id),
-                UnitOwner::TombstoneContainer => self.unit_lists.tombstone_containers.push(unit_id),
+                UnitOwner::FileData => self.unit_lists.data_units.push(unit_identifier),
+                UnitOwner::InodeContainer => self.unit_lists.inode_containers.push(unit_identifier),
+                UnitOwner::TombstoneContainer => self.unit_lists.tombstone_containers.push(unit_identifier),
                 UnitOwner::AccountingNode => {
                     if is_an_accounting_leaf {
-                        self.unit_lists.accounting_leaves.push(unit_id);
+                        self.unit_lists.accounting_leaves.push(unit_identifier);
                     }
                 }
                 UnitOwner::ExtentLowerNode
@@ -3633,7 +3633,7 @@ impl Simulation {
         units
     }
 
-    fn unit_of_planned(planned: PlannedUnit, role: Role, unit_of_role: &HashMap<Role, UnitId>) -> UnitId {
+    fn unit_of_planned(planned: PlannedUnit, role: Role, unit_of_role: &HashMap<Role, UnitIdentifier>) -> UnitIdentifier {
         match planned {
             PlannedUnit::Carried(unit) => unit,
             PlannedUnit::Rewritten => *unit_of_role.get(&role).expect("重写的角色这次取了落点"),
@@ -3644,7 +3644,7 @@ impl Simulation {
         plan: &CodeTwoPlan,
         previous: &CodeTwoTreeVersion,
         role_of: fn(CodeTwoNodePosition) -> Role,
-        unit_of_role: &HashMap<Role, UnitId>,
+        unit_of_role: &HashMap<Role, UnitIdentifier>,
     ) -> CodeTwoTreeVersion {
         let units = plan
             .shape
@@ -3662,7 +3662,7 @@ impl Simulation {
         }
     }
 
-    fn build_version(&self, plan: &LogicalPlan, assembled: &AssembledPublish, unit_of_role: &HashMap<Role, UnitId>) -> Version {
+    fn build_version(&self, plan: &LogicalPlan, assembled: &AssembledPublish, unit_of_role: &HashMap<Role, UnitIdentifier>) -> Version {
         let previous = &self.version;
         Version {
             txg: plan.txg,
@@ -3733,9 +3733,9 @@ impl Simulation {
     fn scan(
         &mut self,
         txg: u64,
-        released: &[UnitId],
-        written: &[UnitId],
-        made_unreadable: &[UnitId],
+        released: &[UnitIdentifier],
+        written: &[UnitIdentifier],
+        made_unreadable: &[UnitIdentifier],
         tombstones_written: &[TombstoneRecordSummary],
     ) {
         let new_truth = truth_of_the_version(&self.version, &self.disk, &self.allocator);
@@ -3756,14 +3756,14 @@ impl Simulation {
         }
         self.truth = new_truth;
         for reading in &mut self.unit_scan_readings {
-            for unit_id in made_unreadable {
-                reading.on_unit_unreadable(*unit_id, &self.disk.units[*unit_id], &self.death_time);
+            for unit_identifier in made_unreadable {
+                reading.on_unit_unreadable(*unit_identifier, &self.disk.units[*unit_identifier], &self.death_time);
             }
-            for unit_id in released {
-                reading.on_unit_released(*unit_id, &self.disk.units[*unit_id], txg, &self.death_time);
+            for unit_identifier in released {
+                reading.on_unit_released(*unit_identifier, &self.disk.units[*unit_identifier], txg, &self.death_time);
             }
-            for unit_id in written {
-                reading.on_unit_readable(*unit_id, &self.disk.units[*unit_id], &self.death_time);
+            for unit_identifier in written {
+                reading.on_unit_readable(*unit_identifier, &self.disk.units[*unit_identifier], &self.death_time);
             }
             for key in &born {
                 reading.set_truth(*key, true);
@@ -3784,7 +3784,7 @@ impl Simulation {
         self.scans += 1;
         self.occupancy_peak = self.occupancy_peak.max(self.allocator.allocated_slot_count);
         self.live_slot_peak = self.live_slot_peak.max(self.allocator.live_slot_count);
-        let released_slots: u64 = released.iter().map(|unit_id| self.disk.units[*unit_id].span_slots).sum();
+        let released_slots: u64 = released.iter().map(|unit_identifier| self.disk.units[*unit_identifier].span_slots).sum();
         self.slots_held_during_a_publish_peak = self
             .slots_held_during_a_publish_peak
             .max(self.allocator.live_slot_count + released_slots);
@@ -3962,8 +3962,8 @@ impl Simulation {
     /// 盘上见过的每个 inode 的对象出生代（号不复用，一个号一个出生代）。
     fn inode_births(&self) -> BTreeMap<u64, u64> {
         let mut births = BTreeMap::new();
-        for unit_id in &self.unit_lists.inode_containers {
-            if let UnitContents::InodeRecords(records) = &self.disk.units[*unit_id].contents {
+        for unit_identifier in &self.unit_lists.inode_containers {
+            if let UnitContents::InodeRecords(records) = &self.disk.units[*unit_identifier].contents {
                 for record in records {
                     births.insert(record.inode, record.object_birth);
                 }
@@ -4294,13 +4294,13 @@ impl Simulation {
         }
     }
 
-    fn fallback_in_the_group(&self, erased: UnitId, candidates: &[UnitId]) -> Option<UnitId> {
+    fn fallback_in_the_group(&self, erased: UnitIdentifier, candidates: &[UnitIdentifier]) -> Option<UnitIdentifier> {
         let group = self.disk.units[erased].group?;
         candidates
             .iter()
             .copied()
-            .filter(|unit_id| *unit_id != erased && self.disk.units[*unit_id].is_readable && self.disk.units[*unit_id].group == Some(group))
-            .max_by_key(|unit_id| self.disk.units[*unit_id].write_order)
+            .filter(|unit_identifier| *unit_identifier != erased && self.disk.units[*unit_identifier].is_readable && self.disk.units[*unit_identifier].group == Some(group))
+            .max_by_key(|unit_identifier| self.disk.units[*unit_identifier].write_order)
     }
 
     /// PC2 的手算期望（C14）：抹掉的单元、它同组退回去的旧版本与基线读数里每条 key 有几个供出者，逐条算，不调扫描函数。
@@ -4310,14 +4310,14 @@ impl Simulation {
         arm: Arm,
         namespace: Namespace,
         baseline: &ReadingResult,
-    ) -> Option<(UnitId, u64)> {
+    ) -> Option<(UnitIdentifier, u64)> {
         let truth = &self.truth[namespace.position()];
         let baseline_keys = &baseline.keys[namespace.position()];
         let only_provider = |fields: &KeyFields| baseline_keys.get(fields).is_some_and(|provider| provider.provider_count == 1);
         match reader {
             Reader::UnitScan => {
-                let mut best: Option<(UnitId, u64)> = None;
-                for (unit_id, unit) in self.disk.units.iter().enumerate() {
+                let mut best: Option<(UnitIdentifier, u64)> = None;
+                for (unit_identifier, unit) in self.disk.units.iter().enumerate() {
                     if !unit.is_readable || unit.release_txg.is_some() {
                         continue;
                     }
@@ -4328,18 +4328,18 @@ impl Simulation {
                             .count(),
                     );
                     if live_keys > 0 && best.is_none_or(|(_, best_live)| live_keys > best_live) {
-                        best = Some((unit_id, live_keys));
+                        best = Some((unit_identifier, live_keys));
                     }
                 }
-                let (unit_id, _) = best?;
-                let unit = &self.disk.units[unit_id];
+                let (unit_identifier, _) = best?;
+                let unit = &self.disk.units[unit_identifier];
                 let expected = occurrences_of(&unit.contents)
                     .into_iter()
                     .filter(|occurrence| occurrence.key.namespace == namespace && truth.contains(&occurrence.key.fields))
                     .filter(|occurrence| self.counts_for_the_hand_calculation(arm, &occurrence.key, unit.birth_txg(), occurrence.tag))
                     .filter(|occurrence| only_provider(&occurrence.key.fields))
                     .count();
-                Some((unit_id, length_as_u64(expected)))
+                Some((unit_identifier, length_as_u64(expected)))
             }
             Reader::SelectCurrent | Reader::SelectCurrentGatedByObject => {
                 self.select_current_erasure(arm, namespace, baseline, truth)
@@ -4353,7 +4353,7 @@ impl Simulation {
         namespace: Namespace,
         baseline: &ReadingResult,
         truth: &BTreeSet<KeyFields>,
-    ) -> Option<(UnitId, u64)> {
+    ) -> Option<(UnitIdentifier, u64)> {
         let baseline_keys = &baseline.keys[namespace.position()];
         let only_provider = |fields: &KeyFields| baseline_keys.get(fields).is_some_and(|provider| provider.provider_count == 1);
         let record_passes = |record: &InodeRecordSummary, provider_birth: u64| {
@@ -4377,8 +4377,8 @@ impl Simulation {
                     self.version.inode_containers.iter().max_by_key(|container| container.records.len())?.unit
                 };
                 let fallback = self.fallback_in_the_group(erased, &self.unit_lists.inode_containers);
-                let records_of = |unit_id: UnitId| {
-                    if let UnitContents::InodeRecords(records) = &self.disk.units[unit_id].contents {
+                let records_of = |unit_identifier: UnitIdentifier| {
+                    if let UnitContents::InodeRecords(records) = &self.disk.units[unit_identifier].contents {
                         records.clone()
                     } else {
                         Vec::new()
@@ -4386,7 +4386,7 @@ impl Simulation {
                 };
                 let erased_birth = self.disk.units[erased].birth_txg();
                 let fallback_records: Vec<(InodeRecordSummary, u64)> = fallback
-                    .map(|unit_id| records_of(unit_id).into_iter().map(|record| (record, self.disk.units[unit_id].birth_txg())).collect())
+                    .map(|unit_identifier| records_of(unit_identifier).into_iter().map(|record| (record, self.disk.units[unit_identifier].birth_txg())).collect())
                     .unwrap_or_default();
                 let expected = records_of(erased)
                     .iter()
@@ -4409,8 +4409,8 @@ impl Simulation {
                 let fields = extent_key(FIRST_FILE_INODE, 0);
                 let fallback = self.fallback_in_the_group(erased, &self.unit_lists.data_units);
                 let gate_holds = baseline.keys[Namespace::Inode.position()].contains_key(&single_field_key(FIRST_FILE_INODE));
-                let data_passes = |unit_id: UnitId| {
-                    let unit = &self.disk.units[unit_id];
+                let data_passes = |unit_identifier: UnitIdentifier| {
+                    let unit = &self.disk.units[unit_identifier];
                     let tag = OccurrenceTag::InodeRecord {
                         inode: FIRST_FILE_INODE,
                         object_birth: NEW_POOL_FILE_CREATION_TXG,
@@ -4423,7 +4423,7 @@ impl Simulation {
             }
             Namespace::AllocationUnitsOfTheVersion | Namespace::CentralMappingUnitsOfTheVersion => {
                 let erased = match self.version.file_units.first() {
-                    Some(unit_id) => *unit_id,
+                    Some(unit_identifier) => *unit_identifier,
                     None => self.version.inode_containers.first()?.unit,
                 };
                 let unit = &self.disk.units[erased];
@@ -4597,7 +4597,7 @@ enum DeletionOrder {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum HistorySpec {
+enum HistorySpecification {
     /// F1 建删空 inode：n 个 inode（含 inode 1），逐个 unlink inode 2..n。
     BuildAndDeleteEmptyInodes { inode_count: u64, order: DeletionOrder },
     /// F8 大文件改写删（12.4.2）。
@@ -4618,18 +4618,18 @@ const RING_ANCHOR_OVERWRITES: u64 = 22;
 /// F1 每次建 50 个空 inode（原文 5.2、12.4.3）。
 const NEW_INODES_PER_STEP: u64 = 50;
 
-impl HistorySpec {
+impl HistorySpecification {
     const fn family(self) -> &'static str {
         match self {
-            HistorySpec::BuildAndDeleteEmptyInodes { .. } => "F1",
-            HistorySpec::LargeFileRewriteAndDelete { .. } => "F8",
-            HistorySpec::MixedRandom { .. } => "F3",
+            HistorySpecification::BuildAndDeleteEmptyInodes { .. } => "F1",
+            HistorySpecification::LargeFileRewriteAndDelete { .. } => "F8",
+            HistorySpecification::MixedRandom { .. } => "F3",
         }
     }
 
     fn label(self) -> String {
         match self {
-            HistorySpec::BuildAndDeleteEmptyInodes { inode_count, order } => {
+            HistorySpecification::BuildAndDeleteEmptyInodes { inode_count, order } => {
                 let order_name = match order {
                     DeletionOrder::Ascending => "ascending".to_string(),
                     DeletionOrder::EvenThenOdd => "even_then_odd".to_string(),
@@ -4637,7 +4637,7 @@ impl HistorySpec {
                 };
                 format!("family=F1 n={inode_count} order={order_name}")
             }
-            HistorySpec::LargeFileRewriteAndDelete {
+            HistorySpecification::LargeFileRewriteAndDelete {
                 data_units,
                 rewrites,
                 overwrite_before_unlink,
@@ -4646,14 +4646,14 @@ impl HistorySpec {
                 "family=F8 n_u={data_units} k={rewrites} e={} batch={batch}",
                 if overwrite_before_unlink { "OU" } else { "U" }
             ),
-            HistorySpec::MixedRandom { seed } => format!("family=F3 seed={seed}"),
+            HistorySpecification::MixedRandom { seed } => format!("family=F3 seed={seed}"),
         }
     }
 
     const fn batch(self) -> u64 {
         match self {
-            HistorySpec::LargeFileRewriteAndDelete { batch, .. } => batch,
-            HistorySpec::BuildAndDeleteEmptyInodes { .. } | HistorySpec::MixedRandom { .. } => {
+            HistorySpecification::LargeFileRewriteAndDelete { batch, .. } => batch,
+            HistorySpecification::BuildAndDeleteEmptyInodes { .. } | HistorySpecification::MixedRandom { .. } => {
                 PRODUCT_UNLINK_BATCH_DATA_UNITS
             }
         }
@@ -4662,7 +4662,7 @@ impl HistorySpec {
     const fn is_overwrite_before_unlink(self) -> bool {
         matches!(
             self,
-            HistorySpec::LargeFileRewriteAndDelete {
+            HistorySpecification::LargeFileRewriteAndDelete {
                 overwrite_before_unlink: true,
                 ..
             }
@@ -4671,20 +4671,20 @@ impl HistorySpec {
 }
 
 /// 第一段的 51 段：F1 14 段、F8 32 段、F3 5 段（12.5）。
-fn segment_one_histories() -> Vec<HistorySpec> {
+fn segment_one_histories() -> Vec<HistorySpecification> {
     let mut histories = Vec::new();
     for inode_count in [300, 900] {
         let mut orders = vec![DeletionOrder::Ascending, DeletionOrder::EvenThenOdd];
         orders.extend((1..=5).map(DeletionOrder::Random));
         for order in orders {
-            histories.push(HistorySpec::BuildAndDeleteEmptyInodes { inode_count, order });
+            histories.push(HistorySpecification::BuildAndDeleteEmptyInodes { inode_count, order });
         }
     }
     for data_units in [1, 3, 145, 300] {
         for rewrites in [0, 5] {
             for overwrite_before_unlink in [false, true] {
                 for batch in [1, PRODUCT_UNLINK_BATCH_DATA_UNITS] {
-                    histories.push(HistorySpec::LargeFileRewriteAndDelete {
+                    histories.push(HistorySpecification::LargeFileRewriteAndDelete {
                         data_units,
                         rewrites,
                         overwrite_before_unlink,
@@ -4695,7 +4695,7 @@ fn segment_one_histories() -> Vec<HistorySpec> {
         }
     }
     for seed in 1..=5 {
-        histories.push(HistorySpec::MixedRandom { seed });
+        histories.push(HistorySpecification::MixedRandom { seed });
     }
     histories
 }
@@ -4733,9 +4733,9 @@ fn deletion_order_of(inode_count: u64, order: DeletionOrder) -> Vec<u64> {
 }
 
 /// 照历史驱动一段模拟；顺带判只在某个族上能判的断言（K4、A5、A10、A12）。
-fn run_history(spec: HistorySpec, simulation: &mut Simulation) {
-    match spec {
-        HistorySpec::BuildAndDeleteEmptyInodes { inode_count, order } => {
+fn run_history(specification: HistorySpecification, simulation: &mut Simulation) {
+    match specification {
+        HistorySpecification::BuildAndDeleteEmptyInodes { inode_count, order } => {
             let mut created = 1;
             while created < inode_count {
                 let count = NEW_INODES_PER_STEP.min(inode_count - created);
@@ -4769,7 +4769,7 @@ fn run_history(spec: HistorySpec, simulation: &mut Simulation) {
                 }
             }
         }
-        HistorySpec::LargeFileRewriteAndDelete {
+        HistorySpecification::LargeFileRewriteAndDelete {
             data_units,
             rewrites,
             overwrite_before_unlink,
@@ -4800,7 +4800,7 @@ fn run_history(spec: HistorySpec, simulation: &mut Simulation) {
             }
             simulation.apply(UserChange::Unlink { inode: FIRST_FILE_INODE });
         }
-        HistorySpec::MixedRandom { seed } => {
+        HistorySpecification::MixedRandom { seed } => {
             let mut random = SeededRandom::new(seed);
             for _ in 0..MIXED_RANDOM_STEPS {
                 let draw = random.below(10);
@@ -4872,17 +4872,17 @@ fn optional_txg(value: Option<u64>) -> String {
     value.map_or_else(|| "none".to_string(), |txg| txg.to_string())
 }
 
-fn simulate(spec: HistorySpec, geometry: Geometry, write_path: WritePath, tight_unit_area_slots: Option<u64>, cross_checks_every_scan: bool) -> Simulation {
-    let mut simulation = Simulation::start(geometry, write_path, spec.batch(), tight_unit_area_slots, cross_checks_every_scan);
-    run_history(spec, &mut simulation);
+fn simulate(specification: HistorySpecification, geometry: Geometry, write_path: WritePath, tight_unit_area_slots: Option<u64>, cross_checks_every_scan: bool) -> Simulation {
+    let mut simulation = Simulation::start(geometry, write_path, specification.batch(), tight_unit_area_slots, cross_checks_every_scan);
+    run_history(specification, &mut simulation);
     if !simulation.has_stopped() {
         simulation.cross_check_the_unit_scan();
     }
     simulation
 }
 
-fn summarize(spec: HistorySpec, simulation: &Simulation) -> SimulationSummary {
-    let label = spec.label();
+fn summarize(specification: HistorySpecification, simulation: &Simulation) -> SimulationSummary {
+    let label = specification.label();
     let geometry = simulation.geometry;
     let write_path_name = match simulation.write_path {
         WritePath::WithoutTombstones => "N_P",
@@ -4955,8 +4955,8 @@ fn summarize(spec: HistorySpec, simulation: &Simulation) -> SimulationSummary {
                     arm,
                     reader,
                     tree,
-                    family: spec.family(),
-                    is_overwrite_before_unlink: spec.is_overwrite_before_unlink(),
+                    family: specification.family(),
+                    is_overwrite_before_unlink: specification.is_overwrite_before_unlink(),
                     trajectory,
                     tree_has_units,
                     is_excluded,
@@ -5005,8 +5005,8 @@ fn summarize(spec: HistorySpec, simulation: &Simulation) -> SimulationSummary {
                     == (ACCOUNTING_POOL_WIDE_ROWS + ACCOUNTING_PER_DEVICE_ROWS * u64::from(DEVICE_COUNT)) * (accounting_versions - 1),
             );
             assertions.judge("tombstone_tree_never_loses_a_key", deaths_peak_of(arm, ReportedTree::Tombstone) == 0);
-            match spec {
-                HistorySpec::BuildAndDeleteEmptyInodes { inode_count, .. } => {
+            match specification {
+                HistorySpecification::BuildAndDeleteEmptyInodes { inode_count, .. } => {
                     assertions.judge("A7_inode_deaths_at_the_end", deaths_final_of(arm, ReportedTree::Inode) == inode_count - 1);
                     assertions.judge(
                         "A7_deleted_inodes_deaths_at_the_end",
@@ -5020,10 +5020,10 @@ fn summarize(spec: HistorySpec, simulation: &Simulation) -> SimulationSummary {
                         );
                     }
                 }
-                HistorySpec::LargeFileRewriteAndDelete { data_units, .. } => {
+                HistorySpecification::LargeFileRewriteAndDelete { data_units, .. } => {
                     assertions.judge("A11_extent_deaths_at_the_end", deaths_final_of(arm, ReportedTree::Extent) == data_units);
                 }
-                HistorySpec::MixedRandom { .. } => {}
+                HistorySpecification::MixedRandom { .. } => {}
             }
         }
     }
@@ -5086,29 +5086,29 @@ fn tight_unit_area_slots_from(live_slot_peak: u64) -> u64 {
 const WRITE_PATHS: [WritePath; 2] = [WritePath::WithoutTombstones, WritePath::WithTombstones];
 
 /// 一段历史：先 G-宽（G-紧 的盘按它定），再 G-环，再 G-紧；产物按 G-环、G-宽、G-紧 的次序（12.11 第 4 步）。
-fn run_segment(spec: HistorySpec) -> SegmentResult {
+fn run_segment(specification: HistorySpecification) -> SegmentResult {
     let wide: Vec<SimulationSummary> = WRITE_PATHS
         .iter()
-        .map(|write_path| summarize(spec, &simulate(spec, Geometry::Wide, *write_path, None, false)))
+        .map(|write_path| summarize(specification, &simulate(specification, Geometry::Wide, *write_path, None, false)))
         .collect();
     let ring: Vec<SimulationSummary> = WRITE_PATHS
         .iter()
-        .map(|write_path| summarize(spec, &simulate(spec, Geometry::Ring, *write_path, None, false)))
+        .map(|write_path| summarize(specification, &simulate(specification, Geometry::Ring, *write_path, None, false)))
         .collect();
     let tight: Vec<SimulationSummary> = wide
         .iter()
         .map(|wide_summary| {
             let slots = tight_unit_area_slots_from(wide_summary.slots_held_during_a_publish_peak);
-            summarize(spec, &simulate(spec, Geometry::Tight, wide_summary.write_path, Some(slots), false))
+            summarize(specification, &simulate(specification, Geometry::Tight, wide_summary.write_path, Some(slots), false))
         })
         .collect();
     let mut literal_tight_lines = Vec::new();
     for wide_summary in &wide {
         let literal_slots = tight_unit_area_slots_from(wide_summary.live_slot_peak);
-        let literal = simulate(spec, Geometry::Tight, wide_summary.write_path, Some(literal_slots), false);
+        let literal = simulate(specification, Geometry::Tight, wide_summary.write_path, Some(literal_slots), false);
         literal_tight_lines.push(format!(
             "name=tight_literal_reading {} write_path={} live_slot_peak={} unit_area_slots={literal_slots} does_not_fit_at={} publishes={}",
-            spec.label(),
+            specification.label(),
             match wide_summary.write_path {
                 WritePath::WithoutTombstones => "N_P",
                 WritePath::WithTombstones => "B",
@@ -5145,14 +5145,14 @@ fn run_segment(spec: HistorySpec) -> SegmentResult {
     result.lines.extend(literal_tight_lines);
     result.lines.push(format!(
         "name=segment_assertions {} A16_ring_equals_wide_before_the_first_reuse_violations={}",
-        spec.label(),
+        specification.label(),
         result.assertions.violations_of("A16_ring_equals_wide_before_the_first_reuse")
     ));
     result
 }
 
 /// 按段切片并行（`test-script-discipline.md`「编译与算法都要快」）：每段整段跑两遍、逐行比（C12）；按段的次序收回。
-fn run_segments_in_parallel(histories: &[HistorySpec], threads: usize) -> Vec<(SegmentResult, bool)> {
+fn run_segments_in_parallel(histories: &[HistorySpecification], threads: usize) -> Vec<(SegmentResult, bool)> {
     let next_segment = AtomicUsize::new(0);
     let collected: Mutex<Vec<Option<(SegmentResult, bool)>>> = Mutex::new(vec![None; histories.len()]);
     std::thread::scope(|scope| {
@@ -5629,9 +5629,9 @@ fn main() {
             let anchor = run_ring_anchor();
             emitted_lines.extend(anchor.lines.iter().cloned());
             let results = run_segments_in_parallel(&histories, threads);
-            for ((result, identical), spec) in results.iter().zip(&histories) {
+            for ((result, identical), specification) in results.iter().zip(&histories) {
                 emitted_lines.extend(result.lines.iter().cloned());
-                emitted_lines.push(format!("name=determinism {} two_runs_identical={identical}", spec.label()));
+                emitted_lines.push(format!("name=determinism {} two_runs_identical={identical}", specification.label()));
             }
             emitted_lines.extend(verdict_lines(&results));
             emitted_lines.extend(summary_lines(&results, &anchor));
@@ -5672,7 +5672,7 @@ mod tests {
             .expect("每一格都有轨迹")
     }
 
-    const SMALL_REWRITE: HistorySpec = HistorySpec::LargeFileRewriteAndDelete {
+    const SMALL_REWRITE: HistorySpecification = HistorySpecification::LargeFileRewriteAndDelete {
         data_units: 3,
         rewrites: 5,
         overwrite_before_unlink: true,
@@ -5752,13 +5752,13 @@ mod tests {
 
     #[test]
     fn accounting_rows_die_fifteen_per_version_and_unlink_takes_one_publish_per_batch() {
-        let spec = HistorySpec::LargeFileRewriteAndDelete {
+        let specification = HistorySpecification::LargeFileRewriteAndDelete {
             data_units: 3,
             rewrites: 0,
             overwrite_before_unlink: false,
             batch: 1,
         };
-        let simulation = simulate(spec, Geometry::Wide, WritePath::WithoutTombstones, None, false);
+        let simulation = simulate(specification, Geometry::Wide, WritePath::WithoutTombstones, None, false);
         // 起点 3 次（txg 3、4、5）+ 顺序写 1 次 + unlink 4 次（意图 + 两批 + 最后一批）。
         assert_eq!(simulation.publishes, 8);
         assert_eq!(simulation.scans, 8);
@@ -5770,12 +5770,12 @@ mod tests {
     }
 
     #[test]
-    fn f1_with_todays_tombstones_builds_and_drops_containers_as_the_clauses_say() {
-        let spec = HistorySpec::BuildAndDeleteEmptyInodes {
+    fn empty_inode_build_and_delete_family_with_todays_tombstones_builds_and_drops_containers_as_the_clauses_say() {
+        let specification = HistorySpecification::BuildAndDeleteEmptyInodes {
             inode_count: 300,
             order: DeletionOrder::Ascending,
         };
-        let simulation = simulate(spec, Geometry::Ring, WritePath::WithTombstones, None, false);
+        let simulation = simulate(specification, Geometry::Ring, WritePath::WithTombstones, None, false);
         assert_eq!(simulation.version.tombstone_containers.len(), 1);
         assert_eq!(simulation.version.tombstone_containers[0].records.len(), 299);
         assert!(judged(&simulation, "K4_emptied_container_not_written") >= 1);
@@ -5814,32 +5814,32 @@ mod tests {
 
     #[test]
     fn unit_scan_on_wide_reads_every_death_also_when_keys_are_reborn() {
-        for spec in [
-            HistorySpec::MixedRandom { seed: 1 },
-            HistorySpec::BuildAndDeleteEmptyInodes {
+        for specification in [
+            HistorySpecification::MixedRandom { seed: 1 },
+            HistorySpecification::BuildAndDeleteEmptyInodes {
                 inode_count: 300,
                 order: DeletionOrder::Random(2),
             },
         ] {
-            let simulation = simulate(spec, Geometry::Wide, WritePath::WithoutTombstones, None, false);
+            let simulation = simulate(specification, Geometry::Wide, WritePath::WithoutTombstones, None, false);
             assert!(judged(&simulation, "A3_unit_scan_on_wide_reads_every_death") > 0);
-            assert_eq!(violations(&simulation, "A3_unit_scan_on_wide_reads_every_death"), 0, "{}", spec.label());
+            assert_eq!(violations(&simulation, "A3_unit_scan_on_wide_reads_every_death"), 0, "{}", specification.label());
         }
     }
 
     #[test]
     fn death_records_read_zero_on_every_geometry() {
         for geometry in [Geometry::Ring, Geometry::Wide] {
-            for spec in [
+            for specification in [
                 SMALL_REWRITE,
-                HistorySpec::BuildAndDeleteEmptyInodes {
+                HistorySpecification::BuildAndDeleteEmptyInodes {
                     inode_count: 300,
                     order: DeletionOrder::EvenThenOdd,
                 },
             ] {
-                let simulation = simulate(spec, geometry, WritePath::WithoutTombstones, None, false);
-                assert_eq!(violations(&simulation, "A4_death_records_zero"), 0, "{} {}", geometry.name(), spec.label());
-                assert_eq!(violations(&simulation, "A13_death_records_zero_on_ring"), 0, "{} {}", geometry.name(), spec.label());
+                let simulation = simulate(specification, geometry, WritePath::WithoutTombstones, None, false);
+                assert_eq!(violations(&simulation, "A4_death_records_zero"), 0, "{} {}", geometry.name(), specification.label());
+                assert_eq!(violations(&simulation, "A13_death_records_zero_on_ring"), 0, "{} {}", geometry.name(), specification.label());
                 assert!(judged(&simulation, "A4_death_records_zero") + judged(&simulation, "A13_death_records_zero_on_ring") > 0);
             }
         }
@@ -5847,9 +5847,9 @@ mod tests {
 
     #[test]
     fn the_incremental_unit_scan_equals_the_brute_force_scan_at_every_scan() {
-        for (spec, write_path) in [
+        for (specification, write_path) in [
             (
-                HistorySpec::LargeFileRewriteAndDelete {
+                HistorySpecification::LargeFileRewriteAndDelete {
                     data_units: 145,
                     rewrites: 5,
                     overwrite_before_unlink: true,
@@ -5858,16 +5858,16 @@ mod tests {
                 WritePath::WithoutTombstones,
             ),
             (
-                HistorySpec::BuildAndDeleteEmptyInodes {
+                HistorySpecification::BuildAndDeleteEmptyInodes {
                     inode_count: 300,
                     order: DeletionOrder::Random(1),
                 },
                 WritePath::WithTombstones,
             ),
         ] {
-            let simulation = simulate(spec, Geometry::Ring, write_path, None, true);
+            let simulation = simulate(specification, Geometry::Ring, write_path, None, true);
             assert!(judged(&simulation, "unit_scan_incremental_equals_brute_force") > 10);
-            assert_eq!(violations(&simulation, "unit_scan_incremental_equals_brute_force"), 0, "{}", spec.label());
+            assert_eq!(violations(&simulation, "unit_scan_incremental_equals_brute_force"), 0, "{}", specification.label());
         }
     }
 
@@ -5881,8 +5881,8 @@ mod tests {
     }
 
     #[test]
-    fn positive_controls_match_on_f1() {
-        let result = run_segment(HistorySpec::BuildAndDeleteEmptyInodes {
+    fn positive_controls_match_on_the_empty_inode_build_and_delete_family() {
+        let result = run_segment(HistorySpecification::BuildAndDeleteEmptyInodes {
             inode_count: 300,
             order: DeletionOrder::Ascending,
         });
@@ -5903,13 +5903,13 @@ mod tests {
 
     #[test]
     fn user_data_never_lands_in_a_cluster_segment_of_this_mount() {
-        let spec = HistorySpec::LargeFileRewriteAndDelete {
+        let specification = HistorySpecification::LargeFileRewriteAndDelete {
             data_units: 300,
             rewrites: 0,
             overwrite_before_unlink: false,
             batch: PRODUCT_UNLINK_BATCH_DATA_UNITS,
         };
-        let simulation = simulate(spec, Geometry::Ring, WritePath::WithoutTombstones, None, false);
+        let simulation = simulate(specification, Geometry::Ring, WritePath::WithoutTombstones, None, false);
         assert!(judged(&simulation, "A18_user_data_outside_cluster_segments") >= 300);
         assert_eq!(violations(&simulation, "A18_user_data_outside_cluster_segments"), 0);
         assert_eq!(violations(&simulation, "A18_opened_segment_was_empty"), 0);
@@ -6019,7 +6019,7 @@ mod tests {
     }
 
     #[test]
-    fn a_tombstone_points_only_at_its_own_object_birth_and_its_pointer_range() {
+    fn tombstone_points_only_at_its_own_object_birth_and_its_pointer_range() {
         let tombstones = [TombstoneRecordSummary {
             object: 5,
             object_birth: 10,
@@ -6090,10 +6090,10 @@ mod tests {
         let mut disk = Disk::default();
         let mut lists = UnitLists::default();
         for unit in units {
-            let unit_id = disk.units.len();
+            let unit_identifier = disk.units.len();
             match unit.owner {
-                UnitOwner::FileData => lists.data_units.push(unit_id),
-                UnitOwner::InodeContainer => lists.inode_containers.push(unit_id),
+                UnitOwner::FileData => lists.data_units.push(unit_identifier),
+                UnitOwner::InodeContainer => lists.inode_containers.push(unit_identifier),
                 UnitOwner::ExtentLowerNode
                 | UnitOwner::ExtentRoot
                 | UnitOwner::InodeRoot

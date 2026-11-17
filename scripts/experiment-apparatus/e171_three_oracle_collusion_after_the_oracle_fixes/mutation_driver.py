@@ -94,12 +94,38 @@ def fresh_copy(scratch: str, label: str) -> str:
     return level_in_copy
 
 
+def unit_test_command(test_modules: tuple[str, ...]) -> list[str]:
+    """--unit-test-module 给的模块组合 → unittest 命令。每一种组合把模块名写成字面（单元键靠它认出要跑哪几份单测），
+    新加一种组合就在这里加一支，同时加到 UNIT_TEST_COMBINATIONS。"""
+    if test_modules == ("test_segment_one", "test_device_timing"):
+        return [sys.executable, "-m", "unittest", "test_segment_one", "test_device_timing"]
+    if test_modules == ("test_segment_two",):
+        return [sys.executable, "-m", "unittest", "test_segment_two"]
+    if test_modules == ("test_list_check", "test_removal_effect"):
+        return [sys.executable, "-m", "unittest", "test_list_check", "test_removal_effect"]
+    if test_modules == ("test_thread_shares", "test_revision_8"):
+        return [sys.executable, "-m", "unittest", "test_thread_shares", "test_revision_8"]
+    if test_modules == ("test_revision_8",):
+        return [sys.executable, "-m", "unittest", "test_revision_8"]
+    if test_modules == ("test_revision_10",):
+        return [sys.executable, "-m", "unittest", "test_revision_10"]
+    if test_modules == ("test_revision_11",):
+        return [sys.executable, "-m", "unittest", "test_revision_11"]
+    raise ValueError(f"单测模块组合 {test_modules} 没登记在 unit_test_command")
+
+
+# unit_test_command 认的组合（main 在开跑前核 --unit-test-module 给的组合在不在里面，不在退 2 点名出路）
+UNIT_TEST_COMBINATIONS = (("test_segment_one", "test_device_timing"), ("test_segment_two",), ("test_list_check", "test_removal_effect"),
+                          ("test_thread_shares", "test_revision_8"), ("test_revision_8",), ("test_revision_10",), ("test_revision_11",))
+
+
 def run_unit_tests(directory: str, test_modules: tuple[str, ...] = TEST_MODULES) -> tuple[str, int]:
     """本目录全部单测；交回 (结局 抓到 / 没红 / 超时, 退出码)。"""
     # 单测在草稿目录的仓形副本里跑，副本的根不带 .git（git 命令认不出它是仓）；冻结目录那一条单测读真的仓，所以把真的仓根交给它
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", E171_REPOSITORY_ROOT=REPOSITORY_ROOT)
+    command = unit_test_command(test_modules)
     try:
-        completed = subprocess.run([sys.executable, "-m", "unittest", *test_modules], cwd=directory, env=environment,
+        completed = subprocess.run(command, cwd=directory, env=environment,
                                    capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         return TIMED_OUT, -1
@@ -114,6 +140,10 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--unit-test-module", action="append", help="要跑的单测模块（可给几次）；不给跑 TEST_MODULES")
     arguments = parser.parse_args(argument_list)
     test_modules = tuple(arguments.unit_test_module) if arguments.unit_test_module else TEST_MODULES
+    if test_modules not in UNIT_TEST_COMBINATIONS:
+        print(f"  ✗ --unit-test-module 给的组合 {', '.join(test_modules)} 没登记在 unit_test_command", file=sys.stderr)
+        print("     → 怎么办：在 mutation_driver.py 的 unit_test_command 里加一支（模块名写字面），再加进 UNIT_TEST_COMBINATIONS", file=sys.stderr)
+        return 2
     rows = read_table(arguments.table)
     digest_before = directory_digest(DIRECTORY)
     lines = ResultLines(arguments.output)

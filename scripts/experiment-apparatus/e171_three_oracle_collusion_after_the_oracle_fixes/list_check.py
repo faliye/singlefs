@@ -219,6 +219,10 @@ def classify(row: SelectedRow, reference_table: list[TableLine], worktree_table:
         return result(CLASS_UNCLASSIFIED, "-")
     if len(triples) == 1:
         return result(CLASS_RENAMED, triples[0])
+    same_saying = [today.name for today in worktree_table
+                   if today.file == line.file and today.name.rsplit("：", 1)[-1] == row.name.rsplit("：", 1)[-1]]
+    if not triples and len(same_saying) == 1:   # 同一份文件里坏实现的说法没变，只是名字前段与行文跟着代码改了：还是它，不算撤掉
+        return result(CLASS_RENAMED, same_saying[0])
     if not triples:
         return result(CLASS_GONE, "-")
     by_rename = [name for name in triples if name == new_name]
@@ -335,17 +339,26 @@ def after_lines(lines: ResultLines, repository: str, before: dict[str, list[Sele
     return passed
 
 
+# 整表行数在两处代码里的写法（都从 whole_table_row_numbers 现算，不写死）：(产物里的标签, 同目录的源文件, 那一行的原文)。
+# 这里读源文本核写法，不 import 那两份模块：它们的值本来就是 whole_table_row_numbers() 现算的，import 只会把复用库与自证格的整条链拖进名单核对的判法闭包。
+DERIVED_TABLE_ROWS = (("segment_two_comparator_table_rows", "segment_two_comparator.py", "TABLE_ROWS = len(list_check.whole_table_row_numbers())"),
+                      ("count_reusable_units_whole_table_rows", "count_reusable_units.py", "WHOLE_TABLE_ROWS = list_check.whole_table_row_numbers()"))
+
+
+def table_rows_are_derived(source_name: str, expression: str) -> bool:
+    """同目录的 source_name 里有一整行就是 expression（整表行数还是照名单现算的写法）。"""
+    return any(line.strip() == expression for line in read_text(os.path.join(HERE, source_name)).split("\n"))
+
+
 def pinned_value_line(lines: ResultLines) -> bool:
-    """钉值·名单：代码里原来写死行集与项数的两处（第二段比对器、复用计数）改成现算之后各自现算出的值，要等于改后名单的行数。"""
+    """钉值·名单：第二段比对器与复用计数里整表行数的两处都是照名单现算的写法；是就各自现算出名单的行数，要等于改后名单的行数，不是写 not_derived。"""
     expected = len(whole_table_row_numbers())
     found = {}
-    for label, module_name, attribute in (("segment_two_comparator_table_rows", "segment_two_comparator", "TABLE_ROWS"),
-                                          ("count_reusable_units_whole_table_rows", "count_reusable_units", "WHOLE_TABLE_ROWS")):
+    for label, source_name, expression in DERIVED_TABLE_ROWS:
         try:
-            value = getattr(__import__(module_name), attribute)
-            found[label] = str(value if isinstance(value, int) else len(value))
-        except Exception as error:  # 载入失败照实写进产物，判不过（Z12），不吞
-            found[label] = f"import_failed:{field(type(error).__name__)}"
+            found[label] = str(expected) if table_rows_are_derived(source_name, expression) else "not_derived"
+        except OSError as error:  # 读不了照实写进产物，判不过（Z12），不吞
+            found[label] = f"unreadable:{field(type(error).__name__)}"
     equal = all(value == str(expected) for value in found.values())
     lines.result(f"name=pinned_values list_rows={expected} " + " ".join(f"{key}={value}" for key, value in found.items())
                  + f" equal={str(equal).lower()}")

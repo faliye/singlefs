@@ -23,9 +23,14 @@
 //! `codes/<代码键>.txt` 存组成清单，`index.tsv` 只当索引。轮库是 prune-server 里的那一份判定库（.claude/rules/verification.md「判定库只有一份」）：
 //! 装置不开本地库目录，读写经 `device-code-key.py run` 开的两根管道转给服务（`crates/singlefs-device-library/src/lib.rs` 文件头；族与种类在 device-code-key.py 文件头「判定库的转交」），
 //! 服务连不上照转回的退出码退（75），不退回本地文件。
+//! 卡（`child` 子进程）只开服务给的：环境里有 `GPU_CARDS_BY_PRIORITY` 照它，没有而有领卡通道（服务交的五个变量）时到开设备前一刻才经
+//! `task-server/task lease take` 领、子进程退出时还；从给这一台的卡里取头一张与这一格同型号的（`nvidia-smi` 报的 FB Total 对上登记第七节 B1 的数），
+//! 照它的总线开卡、读数；没给卡、领卡没成、给的卡里没有这一型都让子进程退非 0（父进程记 child_failed），不自己枚举、不按写死的总线号开。
+//! 父进程不开卡；轮键里「驱动与卡那一行」按型号取（`device_lines_by_card`）。
 
 // admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
 // run-condition: command python3
+// task-server-gpu-arguments: run child
 use std::collections::BTreeMap;
 
 // 判定库的口子（文件头「续跑」）：包 `singlefs-device-library`（crates/singlefs-device-library），scripts/experiment-apparatus/Cargo.toml 里按 path 依赖引
@@ -100,15 +105,7 @@ impl Card {
         Card::EVERY_CARD.into_iter().find(|card| card.label() == label)
     }
 
-    /// 登记第七节 B1：`nvidia-smi` 报的 PCI 总线号（去掉域）。
-    fn bus_without_domain(self) -> &'static str {
-        match self {
-            Card::Rtx5090 => "01:00.0",
-            Card::Rtx5060Ti => "10:00.0",
-        }
-    }
-
-    /// 登记第七节 B1：FB 那一小节报的 Total（MiB）。
+    /// 登记第七节 B1：FB 那一小节报的 Total（MiB）；服务给的卡照它认型号（`bus_for_the_cell_among`、`device_lines_by_card`）。
     fn total_mebibytes(self) -> u64 {
         match self {
             Card::Rtx5090 => 32607,
@@ -862,6 +859,8 @@ enum WorkKind {
 
 trait CardHost {
     fn card(&self) -> Card;
+    /// 开着的这张卡在 `nvidia-smi` 两种出口里的总线号（去掉域）：读数只认这一张的那一节、那几行。
+    fn bus_of_the_card(&self) -> String;
     fn process_identifier(&self) -> u32;
     /// 单调时钟，自进程起点算的微秒；全部分段计时都在被测进程里用它计。
     fn now_microseconds(&self) -> u64;
@@ -914,7 +913,7 @@ fn take_reading<Host: CardHost>(
         raw_log.entries.push((label.to_string(), text.clone()));
     }
     let card = host.card();
-    let reading = match parse_card_reading(&text, card.bus_without_domain(), host.process_identifier()) {
+    let reading = match parse_card_reading(&text, &host.bus_of_the_card(), host.process_identifier()) {
         Ok(reading) => reading,
         Err(_) => {
             push_reason_once(reasons, VoidReason::ReadFailure);
@@ -943,11 +942,11 @@ fn check_process_report_against_compute_applications<Host: CardHost>(
     used_mebibytes: u64,
     reasons: &mut Vec<VoidReason>,
 ) {
-    let card = host.card();
+    let bus = host.bus_of_the_card();
     let process_identifier = host.process_identifier();
     let compute_applications = host
         .read_compute_applications_text()
-        .and_then(|text| parse_compute_applications(&text, card.bus_without_domain(), process_identifier));
+        .and_then(|text| parse_compute_applications(&text, &bus, process_identifier));
     match compute_applications {
         Err(_) => push_reason_once(reasons, VoidReason::ReadFailure),
         Ok(Some(listed_mebibytes)) if listed_mebibytes == used_mebibytes => {}
@@ -1170,7 +1169,7 @@ fn record_window_samples<Host: CardHost>(
     lease_drop_instant: u64,
     raw_samples: Vec<(u64, u64, Result<String, String>)>,
 ) {
-    let card = host.card();
+    let bus = host.bus_of_the_card();
     let process_identifier = host.process_identifier();
     for (sample_index, (started_at, finished_at, text)) in raw_samples.into_iter().enumerate() {
         let mut used_mebibytes = None;
@@ -1178,7 +1177,7 @@ fn record_window_samples<Host: CardHost>(
             if sample_index == 0 {
                 raw_log.entries.push((format!("lease{}_after_first", record.lease_index), text.clone()));
             }
-            if let Ok(reading) = parse_card_reading(&text, card.bus_without_domain(), process_identifier) {
+            if let Ok(reading) = parse_card_reading(&text, &bus, process_identifier) {
                 if reading.listed_process_identifiers.iter().any(|listed| *listed != process_identifier) {
                     push_reason_once(&mut record.void_reasons, VoidReason::ForeignProcessListed);
                 }
@@ -1287,6 +1286,8 @@ fn run_child_procedure<Host: CardHost>(
 // 释放要等缓冲被丢掉、提交做完、之后有一次 poll）。它存在的理由是让登记第九节的变异在不起卡时也有东西可红。
 
 const SIMULATED_PROCESS_IDENTIFIER: u32 = 4242;
+/// 模型卡在它自己造的报告里用的总线号（去掉域）：只在模型里自洽，不拿它开真卡。
+const SIMULATED_CARD_BUS: &str = "01:00.0";
 const SIMULATED_RUNTIME_MEBIBYTES: u64 = 300;
 const SIMULATED_REPORT_COST_MICROSECONDS: u64 = 50_000;
 const SIMULATED_SMALL_KERNEL_MICROSECONDS: u64 = 2_000;
@@ -1384,7 +1385,7 @@ impl SimulatedCardHost {
              \x20   BAR1 Memory Usage\n        Total                                          : 32768 MiB\n\
              \x20       Used                                           : 1 MiB\n        Free                                           : 32767 MiB\n\
              \x20   Processes\n{}\n",
-            card.bus_without_domain(),
+            SIMULATED_CARD_BUS,
             card.total_mebibytes(),
             free,
             processes
@@ -1395,6 +1396,10 @@ impl SimulatedCardHost {
 impl CardHost for SimulatedCardHost {
     fn card(&self) -> Card {
         self.card
+    }
+
+    fn bus_of_the_card(&self) -> String {
+        SIMULATED_CARD_BUS.to_string()
     }
 
     fn process_identifier(&self) -> u32 {
@@ -1414,7 +1419,7 @@ impl CardHost for SimulatedCardHost {
         self.advance(SIMULATED_REPORT_COST_MICROSECONDS);
         Ok(format!(
             "00000000:{}, {}, {}\n",
-            self.card.bus_without_domain(),
+            SIMULATED_CARD_BUS,
             SIMULATED_PROCESS_IDENTIFIER,
             self.process_used_mebibytes() + self.compute_applications_extra_mebibytes
         ))
@@ -2369,6 +2374,8 @@ fn calibrate_spin_kernel(
 
 struct WgpuCardHost {
     card: Card,
+    /// 服务给的那一张的总线号（去掉域，`bus_of_the_handed_card_for` 取的）。
+    bus: String,
     started: std::time::Instant,
     /// 实例要活到进程结束，设备才不会在用着的时候被收走。
     _instance: wgpu::Instance,
@@ -2384,7 +2391,8 @@ struct WgpuCardHost {
 }
 
 /// 登记第五节：后端只用 Vulkan，`required_limits` 取 `adapter.limits()`，`memory_hints` 取 `Performance`。
-fn open_wgpu_card(card: Card) -> Result<WgpuCardHost, String> {
+/// 开的是服务给的那一张：`bus` 由 `bus_of_the_handed_card_for` 取，Vulkan 适配器里总线号对上它的那张 NVIDIA 独显。
+fn open_wgpu_card(card: Card, bus: &str) -> Result<WgpuCardHost, String> {
     let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
         backends: wgpu::Backends::VULKAN,
         ..wgpu::InstanceDescriptor::new_without_display_handle()
@@ -2395,9 +2403,9 @@ fn open_wgpu_card(card: Card) -> Result<WgpuCardHost, String> {
             let information = adapter.get_info();
             information.vendor == NVIDIA_VENDOR_IDENTIFIER
                 && information.device_type == wgpu::DeviceType::DiscreteGpu
-                && bus_without_domain(&information.device_pci_bus_id) == card.bus_without_domain()
+                && bus_without_domain(&information.device_pci_bus_id) == bus
         })
-        .ok_or_else(|| format!("Vulkan 适配器里没有总线 {} 那张 NVIDIA 独显", card.bus_without_domain()))?;
+        .ok_or_else(|| format!("Vulkan 适配器里没有总线 {bus} 那张 NVIDIA 独显（服务给的那一张）"))?;
     let information = adapter.get_info();
     let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         label: Some("e174-lease-drop-wait-memory-return"),
@@ -2416,6 +2424,7 @@ fn open_wgpu_card(card: Card) -> Result<WgpuCardHost, String> {
     let small_pipeline = build_work_pipeline(&device, &shader_module, "write_one_word", 1);
     Ok(WgpuCardHost {
         card,
+        bus: bus.to_string(),
         started: std::time::Instant::now(),
         _instance: instance,
         adapter_description: format!(
@@ -2447,6 +2456,10 @@ fn run_nvidia_smi(arguments: &[&str]) -> Result<String, String> {
 impl CardHost for WgpuCardHost {
     fn card(&self) -> Card {
         self.card
+    }
+
+    fn bus_of_the_card(&self) -> String {
+        self.bus.clone()
     }
 
     fn process_identifier(&self) -> u32 {
@@ -2555,11 +2568,259 @@ impl BackgroundLoad {
     }
 }
 
+// ============================== 服务给的卡 ==============================
+//
+// 卡由统一任务服务分（`task-server/task_server.py` 文件头 ②「GPU」「按需领卡」）：起跑就交卡的，卡串在环境变量 `GPU_CARDS_BY_PRIORITY`；
+// 按需领卡的，环境里只有领卡通道（`CARD_LEASE_CHANNEL_VARIABLES` 那五个），子进程到开设备前一刻经领卡客户端 `task-server/task lease take` 领一回、
+// 退出时还（写法照 `crates/singlefs-verification/src/gpu_card_configuration.rs` 的 `CardLeaseChannelOfTheCaller`；这份装置不依赖 `crates/` 下的包，这里另写一份）。
+// 卡串是空白隔开的若干项，每项 `<HOSTS 里的地址>:<nvidia-smi 序号>:<额度>`；这一台是 `HOSTS` 里哪一项只由多机配置判法
+// `scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-addresses` 打的 `THIS_HOST_ADDRESS` 认。
+
+/// 服务交卡的环境变量。
+const VARIABLE_OF_THE_CARDS_HANDED_OVER: &str = "GPU_CARDS_BY_PRIORITY";
+/// 服务交给按需领卡那一次尝试的领卡通道：通道目录、凭据、尝试标签、任务号、第几次尝试（`task-server/task_server_lib.py` 文件头「GPU」的领卡通道），五个都在、都不空才算有通道。
+const CARD_LEASE_CHANNEL_VARIABLES: [&str; 5] =
+    ["TASK_SERVER_CARD_LEASE_DIRECTORY", "TASK_SERVER_CARD_LEASE_TOKEN", "TASK_SERVER_ATTEMPT_LABEL", "TASK_SERVER_TASK", "TASK_SERVER_ATTEMPT"];
+/// 服务每次尝试交给命令的「提交方那一份仓的根」：领卡客户端取它下面的 `CARD_LEASE_CLIENT_IN_THE_REPOSITORY`。
+const SOURCE_REPOSITORY_VARIABLE: &str = "TASK_SERVER_SOURCE_REPOSITORY";
+/// 领卡客户端在仓里的路径（从仓根起）。
+const CARD_LEASE_CLIENT_IN_THE_REPOSITORY: &str = "task-server/task";
+/// 还卡子进程跑的 shell：标准输入读到收尾（领卡的进程退出，写端随之关掉）再起客户端 `lease return <卡串>`（`$0` 是客户端、`$1` 是卡串）。
+const RETURN_THE_CARDS_WHEN_THE_STANDARD_INPUT_ENDS: &str = r#"while read -r line_never_written; do :; done; exec "$0" lease return "$1""#;
+/// 认服务给的卡是哪一型、在哪条总线：`nvidia-smi` 报每张卡的序号、总线号与 FB Total（MiB）。
+const HANDED_CARD_QUERY_ARGUMENTS: [&str; 2] = ["--query-gpu=index,pci.bus_id,memory.total", "--format=csv,noheader,nounits"];
+
+/// 调用方给这个进程的领卡通道：五个变量的名字与值，原样交给领卡客户端。
+#[derive(Debug, PartialEq, Eq)]
+struct CardLeaseChannel {
+    variables: Vec<(&'static str, String)>,
+}
+
+/// 照 `value_of`（按名字取一个环境变量的值）认通道：五个都给了、都不空才是 `Some`。
+fn card_lease_channel_of(value_of: &dyn Fn(&str) -> Option<String>) -> Option<CardLeaseChannel> {
+    let mut variables = Vec::new();
+    for name in CARD_LEASE_CHANNEL_VARIABLES {
+        let value = value_of(name).filter(|value| !value.is_empty())?;
+        variables.push((name, value));
+    }
+    Some(CardLeaseChannel { variables })
+}
+
+/// 这个进程的卡串从哪来：交卡变量有值（不是空白）照它、不领；没有而有领卡通道，照 `lease` 领（真要卡的这一刻才调）；两样都没有是 `None`。
+fn cards_handed_over_or_leased(
+    handover_value: Option<&str>,
+    channel: Option<&CardLeaseChannel>,
+    lease: &dyn Fn(&CardLeaseChannel) -> Result<String, String>,
+) -> Result<Option<String>, String> {
+    match (handover_value.filter(|value| !value.trim().is_empty()), channel) {
+        (Some(handover_text), _) => Ok(Some(handover_text.to_string())),
+        (None, Some(channel)) => lease(channel).map(Some),
+        (None, None) => Ok(None),
+    }
+}
+
+/// 领卡客户端在哪：服务交的仓根（`SOURCE_REPOSITORY_VARIABLE` 的值）给了就是它下面那一份；没给的从 `start_directory` 往上逐层找。
+fn card_lease_client_from(source_repository: Option<std::path::PathBuf>, start_directory: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    if let Some(repository) = source_repository {
+        let client = repository.join(CARD_LEASE_CLIENT_IN_THE_REPOSITORY);
+        return if client.is_file() { Ok(client) } else { Err(format!("{SOURCE_REPOSITORY_VARIABLE} 点的仓根下没有领卡客户端：{} 不是文件", client.display())) };
+    }
+    start_directory
+        .ancestors()
+        .map(|directory| directory.join(CARD_LEASE_CLIENT_IN_THE_REPOSITORY))
+        .find(|client| client.is_file())
+        .ok_or_else(|| format!("从 {} 往上找不到领卡客户端 {CARD_LEASE_CLIENT_IN_THE_REPOSITORY}", start_directory.display()))
+}
+
+/// 领到的卡串，连同等着这个进程退出就还卡的那个子进程（它的标准输入写端只在这个进程手里，进程退出写端就关）。
+#[derive(Debug)]
+struct CardsLeasedUntilThisProcessExits {
+    cards: String,
+    /// 平常只为握着它标准输入的写端（进程退出才关），不读；单测经 `return_the_cards_now` 当场还。
+    _return_waiting_for_the_exit: std::process::Child,
+}
+
+impl CardsLeasedUntilThisProcessExits {
+    /// 不等进程退出，当场还：关掉还卡子进程的标准输入、等它起的客户端退出；交回客户端退没退 0（单测用）。
+    #[cfg(test)]
+    fn return_the_cards_now(mut self) -> bool {
+        drop(self._return_waiting_for_the_exit.stdin.take());
+        self._return_waiting_for_the_exit.wait().is_ok_and(|status| status.success())
+    }
+}
+
+/// 经 `client` 领一回卡：`lease take` 的标准输出是卡串（客户端在等卡时往标准错误打的行照进这个进程的标准错误）；领到之后起还卡的子进程。
+/// 客户端退非 0、退 0 而没交卡串、起不了还卡的子进程都交 `Err`（不重试；后两种领到的当场还）。
+fn lease_cards_through_the_client(client: &std::path::Path, channel: &CardLeaseChannel) -> Result<CardsLeasedUntilThisProcessExits, String> {
+    let variables = || channel.variables.iter().map(|(name, value)| (*name, value.as_str()));
+    let taken = std::process::Command::new(client)
+        .args(["lease", "take"])
+        .envs(variables())
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .map_err(|error| format!("起不了领卡客户端 {}：{error}", client.display()))?;
+    if !taken.status.success() {
+        return Err(format!("按需领卡没成：{} lease take 退 {:?}（原因在它往标准错误打的那一行）", client.display(), taken.status.code()));
+    }
+    let cards = String::from_utf8_lossy(&taken.stdout).trim().to_string();
+    let return_the_cards_at_once = || {
+        // 领到了而往下走不通：当场还，结局不改这一句错（尝试结束时服务照样收回）
+        let _returned = std::process::Command::new(client).args(["lease", "return"]).envs(variables()).stdin(std::process::Stdio::null()).status();
+    };
+    if cards.is_empty() {
+        return_the_cards_at_once();
+        return Err(format!("按需领卡没成：{} lease take 退 0 而没交卡串", client.display()));
+    }
+    match std::process::Command::new("sh")
+        .arg("-c")
+        .arg(RETURN_THE_CARDS_WHEN_THE_STANDARD_INPUT_ENDS)
+        .arg(client)
+        .arg(&cards)
+        .envs(variables())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::inherit())
+        .spawn()
+    {
+        Ok(return_waiting_for_the_exit) => Ok(CardsLeasedUntilThisProcessExits { cards, _return_waiting_for_the_exit: return_waiting_for_the_exit }),
+        Err(error) => {
+            return_the_cards_at_once();
+            Err(format!("按需领卡领到了 {cards}，起不了等这个进程退出就还卡的子进程（sh）：{error}；领到的已当场还掉"))
+        }
+    }
+}
+
+/// 这个进程按需领卡那一回的结局：进程里只领一回，之后每次交同一份；被拒的那一回也记下，不重试。
+static CARDS_LEASED_BY_THIS_PROCESS: std::sync::OnceLock<Result<CardsLeasedUntilThisProcessExits, String>> = std::sync::OnceLock::new();
+
+/// 这个进程按需领到的卡串：头一回问的时候才领（客户端在等卡时这里照等），进程退出时还。
+fn cards_leased_by_this_process(channel: &CardLeaseChannel) -> Result<&'static str, String> {
+    CARDS_LEASED_BY_THIS_PROCESS
+        .get_or_init(|| {
+            let current_directory = std::env::current_dir().map_err(|error| format!("取不到当前目录（领卡客户端从这里往上找）：{error}"))?;
+            let client = card_lease_client_from(std::env::var_os(SOURCE_REPOSITORY_VARIABLE).map(std::path::PathBuf::from), &current_directory)?;
+            let leased = lease_cards_through_the_client(&client, channel)?;
+            eprintln!("GPU_CARDS_LEASED_ON_DEMAND cards={}", leased.cards);
+            Ok(leased)
+        })
+        .as_ref()
+        .map(|leased| leased.cards.as_str())
+        .map_err(Clone::clone)
+}
+
+/// 卡串里给这一台的那几张的 `nvidia-smi` 序号（照卡串的次序）：每项从右边切两刀（地址可以是 IPv6、自带冒号），三段都不许空、序号是数；
+/// 只留地址与 `this_host` 逐字相同的；一张都没有、读不成交 `Err`。
+fn handed_indices_of_this_host(cards: &str, this_host: &str) -> Result<Vec<u32>, String> {
+    let mut indices = Vec::new();
+    for entry in cards.split_whitespace() {
+        let without_three_fields = || format!("卡串里的「{entry}」从右边切不出地址、序号、额度三段");
+        let (address_and_index, quota) = entry.rsplit_once(':').ok_or_else(without_three_fields)?;
+        let (host_address, index_text) = address_and_index.rsplit_once(':').ok_or_else(without_three_fields)?;
+        if host_address.is_empty() || index_text.is_empty() || quota.is_empty() {
+            return Err(without_three_fields());
+        }
+        let index: u32 = index_text.parse().map_err(|_| format!("卡串里的「{entry}」序号不是数"))?;
+        if host_address == this_host {
+            indices.push(index);
+        }
+    }
+    if indices.is_empty() {
+        return Err(format!("服务给的卡（{cards}）里没有这一台（HOSTS 里的 {this_host}）的"));
+    }
+    Ok(indices)
+}
+
+/// bash `printf %q` 打的一个地址还原成原样：只认反斜杠转义与空串的 `''`，别的引号写法认不出就报错。
+fn value_printed_by_printf_quoted(quoted: &str) -> Result<String, String> {
+    if quoted == "''" {
+        return Ok(String::new());
+    }
+    if quoted.starts_with('\'') || quoted.starts_with("$'") {
+        return Err(format!("「{quoted}」的引号写法不是判法给地址打的那一种"));
+    }
+    let mut value = String::with_capacity(quoted.len());
+    let mut characters = quoted.chars();
+    while let Some(character) = characters.next() {
+        if character == '\\' {
+            value.push(characters.next().ok_or_else(|| format!("「{quoted}」结尾多了一个反斜杠"))?);
+        } else {
+            value.push(character);
+        }
+    }
+    Ok(value)
+}
+
+/// 多机配置判法 `--emit-addresses` 打的那几行（`KEY=<printf %q 的值>`）里这一台的地址（`THIS_HOST_ADDRESS` 那一行）。
+fn this_host_address_emitted(printed: &str) -> Result<String, String> {
+    let quoted = printed.lines().find_map(|line| line.strip_prefix("THIS_HOST_ADDRESS=")).ok_or_else(|| format!("多机配置判法没打 THIS_HOST_ADDRESS 那一行（打的是「{printed}」）"))?;
+    let address = value_printed_by_printf_quoted(quoted)?;
+    if address.is_empty() {
+        return Err("多机配置判法打的 THIS_HOST_ADDRESS 是空的".to_string());
+    }
+    Ok(address)
+}
+
+/// 起多机配置判法 `bash <仓根>/scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-addresses`（仓根是清单目录往上两层），读这一台的地址。
+fn this_host_address_by_the_configuration_check() -> Result<String, String> {
+    let manifest_directory = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let root = manifest_directory.ancestors().nth(2).ok_or("清单目录在 <仓根>/scripts/experiment-apparatus 下")?;
+    let script = root.join("scripts/crash/crash-point-replay-shard-configuration-check.sh");
+    let output = std::process::Command::new("bash")
+        .arg(&script)
+        .arg("--emit-addresses")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .map_err(|error| format!("起不了多机配置判法 bash {} --emit-addresses：{error}（这一台是 HOSTS 里哪一项只由它认）", script.display()))?;
+    let printed = String::from_utf8_lossy(&output.stdout);
+    if !output.status.success() {
+        return Err(format!("多机配置判法认不出这一台（退 {:?}）：{}{}", output.status.code(), printed.trim(), String::from_utf8_lossy(&output.stderr).trim()));
+    }
+    this_host_address_emitted(&printed)
+}
+
+/// 给这一台的卡里（`handed_indices`，照卡串的次序）头一张与 `card` 同型号的那张的总线号（去掉域）：型号照 `report`
+/// （`HANDED_CARD_QUERY_ARGUMENTS` 那一种 `nvidia-smi` 输出，每行「序号, 总线号, FB Total」）的 FB Total 等于登记第七节 B1 的数认；
+/// 给的卡 `nvidia-smi` 没报、一张都不是这一型交 `Err`（不退回别的卡）。
+fn bus_for_the_cell_among(card: Card, handed_indices: &[u32], report: &str) -> Result<String, String> {
+    let mut reported: BTreeMap<u32, (String, String)> = BTreeMap::new();
+    for line in report.lines().filter(|line| !line.trim().is_empty()) {
+        let fields: Vec<&str> = line.split(',').map(str::trim).collect();
+        let [index_text, bus, total] = fields.as_slice() else {
+            return Err(format!("nvidia-smi 的一行「{line}」不是「序号, 总线号, FB Total」三段"));
+        };
+        let index: u32 = index_text.parse().map_err(|_| format!("nvidia-smi 的一行「{line}」序号不是数"))?;
+        reported.insert(index, (bus_without_domain(bus), (*total).to_string()));
+    }
+    let wanted_total = card.total_mebibytes().to_string();
+    let mut seen = Vec::new();
+    for index in handed_indices {
+        let (bus, total) = reported.get(index).ok_or_else(|| format!("服务给的卡 nvidia-smi 序号 {index}，nvidia-smi 没报这个序号"))?;
+        if *total == wanted_total {
+            return Ok(bus.clone());
+        }
+        seen.push(format!("序号 {index} 总线 {bus} FB Total {total} MiB"));
+    }
+    Err(format!("服务给这一台的卡（{}）里没有 {} 那一型（FB Total {wanted_total} MiB）", seen.join("；"), card.label()))
+}
+
+/// 子进程开哪一张卡：服务给这个进程的卡串（环境里有照它，没有而有领卡通道就在这一刻领）里这一台的那几张，取头一张与这一格同型号的（`bus_for_the_cell_among`）。
+/// 两样都没有、领卡没成、卡串里没有这一台的、没有这一型都交 `Err`（子进程退非 0），不自己枚举、不按写死的总线号开。
+fn bus_of_the_handed_card_for(card: Card) -> Result<String, String> {
+    let handover_value = std::env::var(VARIABLE_OF_THE_CARDS_HANDED_OVER).ok();
+    let channel = card_lease_channel_of(&|name| std::env::var(name).ok());
+    let cards = cards_handed_over_or_leased(handover_value.as_deref(), channel.as_ref(), &|channel| cards_leased_by_this_process(channel).map(str::to_string))?
+        .ok_or_else(|| format!("只开服务给的卡：环境里没有 {VARIABLE_OF_THE_CARDS_HANDED_OVER}，也没有领卡通道（{}）；整条经 task-server/task submit 交", CARD_LEASE_CHANNEL_VARIABLES.join("、")))?;
+    let handed_indices = handed_indices_of_this_host(&cards, &this_host_address_by_the_configuration_check()?)?;
+    bus_for_the_cell_among(card, &handed_indices, &run_nvidia_smi(&HANDED_CARD_QUERY_ARGUMENTS)?)
+}
+
 // ============================== 子进程入口 ==============================
 
-/// 真卡上的一个装置进程。
+/// 真卡上的一个装置进程：开设备前一刻才取卡（`bus_of_the_handed_card_for`），之后的步骤与次序照登记第五节。
 fn run_wgpu_child(job: &ChildJob, raw_output_path: Option<&str>) -> Result<(), String> {
-    let mut host = open_wgpu_card(job.cell.card)?;
+    let bus = bus_of_the_handed_card_for(job.cell.card)?;
+    let mut host = open_wgpu_card(job.cell.card, &bus)?;
     let calibration = calibrate_spin_kernel(&host.device, &host.queue, &host.shader_module, job.cell.liveness.work_target_microseconds());
     host.spin_pipeline = build_work_pipeline(&host.device, &host.shader_module, "spin", calibration.iteration_count);
     let mut background = if job.cell.has_background_load() {
@@ -2623,6 +2884,7 @@ fn run_child(arguments: &[String]) -> Result<(), String> {
 }
 
 /// 真卡上的子进程入口：解析参数，再 `run_wgpu_child`。
+// 不拆录判两段：这里量的是持卡期间的挂钟与显存归还，持卡期间的次序本身就是被测对象，没有 GPU 结果与 CPU 参照的比对可以挪出去。
 fn run_child_on_the_card(arguments: &[String]) -> Result<(), String> {
     let (job, raw_output_path) = parse_child_arguments(arguments)?;
     run_wgpu_child(&job, raw_output_path.as_deref())
@@ -3352,19 +3614,24 @@ fn parse_parent_options(arguments: &[String]) -> Result<ParentOptions, String> {
     })
 }
 
-/// 驱动与卡那一行（登记修订 2 之五「驱动与卡」）：`nvidia-smi --query-gpu=pci.bus_id,name,memory.total,driver_version --format=csv,noheader`
-/// 里总线号（去掉域）对得上的那一行，原样去掉首尾空白。
-fn device_lines_by_card(report: &str) -> BTreeMap<Card, String> {
-    let mut lines = BTreeMap::new();
-    for line in report.lines() {
-        let Some(bus) = line.split(',').next() else { continue };
+/// 父进程查驱动与卡那一行的 `nvidia-smi` 参数：每张卡的型号名、FB Total 与驱动版本，不带总线号（父进程不知道子进程会拿到哪一张）。
+const DEVICE_LINE_QUERY_ARGUMENTS: [&str; 2] = ["--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"];
+
+/// 驱动与卡那一行（登记修订 2 之五「驱动与卡」）：`DEVICE_LINE_QUERY_ARGUMENTS` 那一种输出里 FB Total 等于这一型登记第七节 B1 的数的那一行，
+/// 原样去掉首尾空白；同一型几张卡报的行相同算一行，不同（型号名或驱动不一）交 `Err`。
+fn device_lines_by_card(report: &str) -> Result<BTreeMap<Card, String>, String> {
+    let mut lines: BTreeMap<Card, String> = BTreeMap::new();
+    for line in report.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        let Some(total) = line.split(',').nth(1) else { continue };
         for card in Card::EVERY_CARD {
-            if bus_without_domain(bus.trim()) == card.bus_without_domain() {
-                lines.insert(card, line.trim().to_string());
+            if total.trim() == format!("{} MiB", card.total_mebibytes()) {
+                if let Some(earlier) = lines.insert(card, line.to_string()).filter(|earlier| earlier != line) {
+                    return Err(format!("{} 那一型的几张卡报的驱动与卡那一行不同：「{earlier}」与「{line}」", card.label()));
+                }
             }
         }
     }
-    lines
+    Ok(lines)
 }
 
 /// 登记第七节 B7、第十一节停机：驱动版本不是 595.84，停下，不作废也不当结果。
@@ -3500,12 +3767,14 @@ fn run_parent(arguments: &[String]) -> Result<i32, String> {
     let device_lines = if options.simulated {
         None
     } else {
-        Some(device_lines_by_card(&run_nvidia_smi(&["--query-gpu=pci.bus_id,name,memory.total,driver_version", "--format=csv,noheader"])?))
+        Some(device_lines_by_card(&run_nvidia_smi(&DEVICE_LINE_QUERY_ARGUMENTS)?)?)
     };
     let device_line_of = |card: Card| -> Result<String, String> {
         match &device_lines {
             None => Ok("simulated".to_string()),
-            Some(lines) => lines.get(&card).cloned().ok_or_else(|| format!("nvidia-smi 里没有总线 {} 那张卡（驱动与卡那一行进轮键）", card.bus_without_domain())),
+            Some(lines) => lines.get(&card).cloned().ok_or_else(|| {
+                format!("nvidia-smi 里没有 {} 那一型（FB Total {} MiB）的卡（驱动与卡那一行进轮键）", card.label(), card.total_mebibytes())
+            }),
         }
     };
     let cells = cells_of_segment(options.segment, options.skip_light);
@@ -3968,7 +4237,7 @@ mod tests {
     }
 
     #[test]
-    fn a_lease_that_is_already_void_does_not_sit_through_the_window() {
+    fn lease_that_is_already_void_does_not_sit_through_the_window() {
         let light_job = simulated_job(Group::MainGrid, 64, Liveness::InFlightLight, Method::OneBuild, Arm::WaitLatest, 1);
         let outcome = simulate_job(&light_job).0;
         assert_eq!(outcome.leases.len(), 1, "第 1 笔作废，这一轮不再起第 2、3 笔");
@@ -4254,12 +4523,12 @@ mod tests {
     #[test]
     fn rounds_written_under_another_child_code_key_are_not_read_back() {
         let store = DeviceLibrary::in_memory();
-        let library_a = test_round_library(&store, "a1", "b1");
-        let library_b = test_round_library(&store, "a2", "b1");
+        let library_under_the_original_child_code_key = test_round_library(&store, "a1", "b1");
+        let library_under_the_changed_child_code_key = test_round_library(&store, "a2", "b1");
         let directory = test_directory("other-child-key");
-        let first = run_on_the_model(&library_a, &directory.join("first.out"), None);
-        let second = run_on_the_model(&library_b, &directory.join("second.out"), None);
-        let files = round_files_in(&library_b);
+        let first = run_on_the_model(&library_under_the_original_child_code_key, &directory.join("first.out"), None);
+        let second = run_on_the_model(&library_under_the_changed_child_code_key, &directory.join("second.out"), None);
+        let files = round_files_in(&library_under_the_changed_child_code_key);
         std::fs::remove_dir_all(&directory).expect("删得掉测试自己建的产物目录");
         assert_eq!((second.computed, second.reused), (first.computed, 0), "B 下不读 A 写的轮");
         assert_eq!(second.mismatched, first.computed, "键对不上 = 上一趟的轮数");
@@ -4319,11 +4588,108 @@ mod tests {
     }
 
     #[test]
-    fn the_device_line_is_the_query_row_of_that_bus() {
-        let report = "00000000:01:00.0, NVIDIA GeForce RTX 5090, 32607 MiB, 595.84\n00000000:10:00.0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.84\n";
-        let lines = device_lines_by_card(report);
-        assert_eq!(lines.get(&Card::Rtx5090).map(String::as_str), Some("00000000:01:00.0, NVIDIA GeForce RTX 5090, 32607 MiB, 595.84"));
-        assert_eq!(lines.get(&Card::Rtx5060Ti).map(String::as_str), Some("00000000:10:00.0, NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.84"));
+    fn the_device_line_is_the_query_row_of_that_card_model() {
+        let report = "NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.84\nNVIDIA GeForce RTX 5090, 32607 MiB, 595.84\nNVIDIA GeForce RTX 5090, 32607 MiB, 595.84\n";
+        let lines = device_lines_by_card(report).expect("同一型两张卡报的行相同");
+        assert_eq!(lines.get(&Card::Rtx5090).map(String::as_str), Some("NVIDIA GeForce RTX 5090, 32607 MiB, 595.84"));
+        assert_eq!(lines.get(&Card::Rtx5060Ti).map(String::as_str), Some("NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.84"));
+        assert!(device_lines_by_card("NVIDIA GeForce RTX 5090, 32607 MiB, 595.84\nNVIDIA GeForce RTX 5090, 32607 MiB, 595.85\n").is_err(), "同一型驱动不一判错");
+        assert_eq!(device_lines_by_card("NVIDIA GeForce RTX 5060 Ti, 16311 MiB, 595.84\n").map(|lines| lines.contains_key(&Card::Rtx5090)), Ok(false), "没有这一型就没有它那一行");
+    }
+
+    // ---------- 取卡来路（不起真卡、不连服务） ----------
+
+    /// 单测的领卡通道：五个变量都给、值是名字本身。
+    fn card_lease_channel_for_the_unit_tests() -> CardLeaseChannel {
+        card_lease_channel_of(&|name| Some(format!("value-of-{name}"))).expect("五个变量都给了")
+    }
+
+    #[test]
+    fn handed_over_cards_are_used_without_leasing() {
+        let channel = card_lease_channel_for_the_unit_tests();
+        let leases = std::cell::Cell::new(0_u32);
+        let lease = |_channel: &CardLeaseChannel| -> Result<String, String> {
+            leases.set(leases.get() + 1);
+            Ok("10.0.0.1:1:8G".to_string())
+        };
+        assert_eq!(cards_handed_over_or_leased(Some("10.0.0.1:0:8G"), Some(&channel), &lease), Ok(Some("10.0.0.1:0:8G".to_string())));
+        assert_eq!(leases.get(), 0, "环境里已有卡串就不领");
+    }
+
+    #[test]
+    fn without_handed_over_cards_a_lease_channel_leases_at_that_moment() {
+        let channel = card_lease_channel_for_the_unit_tests();
+        let leases = std::cell::Cell::new(0_u32);
+        let lease = |_channel: &CardLeaseChannel| -> Result<String, String> {
+            leases.set(leases.get() + 1);
+            Ok("10.0.0.1:1:8G".to_string())
+        };
+        for handover_value in [None, Some(""), Some("  ")] {
+            assert_eq!(cards_handed_over_or_leased(handover_value, Some(&channel), &lease), Ok(Some("10.0.0.1:1:8G".to_string())), "{handover_value:?} 当没交卡串");
+        }
+        assert_eq!(leases.get(), 3);
+    }
+
+    #[test]
+    fn without_cards_or_a_lease_channel_nothing_is_taken() {
+        let lease = |_channel: &CardLeaseChannel| -> Result<String, String> { panic!("没有领卡通道就不该领") };
+        assert_eq!(cards_handed_over_or_leased(None, None, &lease), Ok(None));
+        let refused = |_channel: &CardLeaseChannel| -> Result<String, String> { Err("服务回 refused".to_string()) };
+        assert_eq!(cards_handed_over_or_leased(None, Some(&card_lease_channel_for_the_unit_tests()), &refused), Err("服务回 refused".to_string()), "领卡被拒是错，不退回别的卡");
+    }
+
+    #[test]
+    fn a_lease_channel_needs_all_five_variables_present_and_not_empty() {
+        for missing in CARD_LEASE_CHANNEL_VARIABLES {
+            assert_eq!(card_lease_channel_of(&|name| (name != missing).then(|| format!("value-of-{name}"))), None, "缺 {missing} 不算有通道");
+            assert_eq!(card_lease_channel_of(&|name| Some(if name == missing { String::new() } else { format!("value-of-{name}") })), None, "{missing} 是空的不算有通道");
+        }
+    }
+
+    #[test]
+    fn leasing_through_a_fake_client_takes_then_returns_the_cards() {
+        use std::os::unix::fs::PermissionsExt;
+        let directory = std::env::temp_dir().join(format!("e174-lease-through-a-fake-client-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).expect("建得了临时目录");
+        let calls = directory.join("calls.log");
+        let client = directory.join("fake-card-lease-client");
+        std::fs::write(
+            &client,
+            format!(
+                "#!/bin/sh\nprintf '%s|%s\\n' \"$*\" \"$TASK_SERVER_CARD_LEASE_TOKEN\" >> '{}'\n[ \"$1 $2\" = 'lease take' ] || exit 0\nprintf '10.0.0.1:0:8G\\n'\n",
+                calls.display()
+            ),
+        )
+        .expect("写得了假客户端");
+        std::fs::set_permissions(&client, std::fs::Permissions::from_mode(0o755)).expect("设得了执行位");
+        let leased = lease_cards_through_the_client(&client, &card_lease_channel_for_the_unit_tests()).expect("假客户端交了卡串");
+        assert_eq!(leased.cards, "10.0.0.1:0:8G");
+        assert!(leased.return_the_cards_now(), "还卡的客户端退 0");
+        let logged = std::fs::read_to_string(&calls).expect("假客户端记了调用");
+        assert_eq!(logged, "lease take|value-of-TASK_SERVER_CARD_LEASE_TOKEN\nlease return 10.0.0.1:0:8G|value-of-TASK_SERVER_CARD_LEASE_TOKEN\n");
+        std::fs::remove_dir_all(&directory).expect("删得了临时目录");
+    }
+
+    #[test]
+    fn only_the_cards_of_this_host_in_the_handed_order_are_taken() {
+        assert_eq!(handed_indices_of_this_host("10.0.0.1:2:8G 10.0.0.2:0:8G 10.0.0.1:0:8G", "10.0.0.1"), Ok(vec![2, 0]));
+        assert_eq!(handed_indices_of_this_host("fe80::1:3:8G", "fe80::1"), Ok(vec![3]), "IPv6 地址自带冒号，从右边切两刀");
+        assert!(handed_indices_of_this_host("10.0.0.2:0:8G", "10.0.0.1").is_err(), "没有这一台的");
+        for unreadable in ["sample-card", "10.0.0.1:x:8G", "10.0.0.1:0:"] {
+            assert!(handed_indices_of_this_host(unreadable, "10.0.0.1").is_err(), "「{unreadable}」读不成");
+        }
+        assert_eq!(this_host_address_emitted("HOSTS=(a)\nTHIS_HOST_ADDRESS=10.0.0.1\n"), Ok("10.0.0.1".to_string()));
+        assert!(this_host_address_emitted("THIS_HOST_ADDRESS=''\n").is_err(), "空地址判错");
+    }
+
+    #[test]
+    fn the_cell_opens_the_first_handed_card_of_its_model() {
+        let report = "0, 00000000:41:00.0, 16311\n1, 00000000:01:00.0, 32607\n2, 00000000:81:00.0, 32607\n";
+        assert_eq!(bus_for_the_cell_among(Card::Rtx5090, &[2, 1], report), Ok("81:00.0".to_string()), "照给的次序取头一张 5090，不是总线号写死的那张");
+        assert_eq!(bus_for_the_cell_among(Card::Rtx5060Ti, &[2, 0], report), Ok("41:00.0".to_string()));
+        assert!(bus_for_the_cell_among(Card::Rtx5060Ti, &[1, 2], report).is_err(), "给的卡里没有这一型：判错，不开别的卡");
+        assert!(bus_for_the_cell_among(Card::Rtx5090, &[3], report).is_err(), "nvidia-smi 没报的序号判错");
     }
 }
 

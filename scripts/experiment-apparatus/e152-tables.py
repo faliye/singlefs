@@ -6,7 +6,7 @@
   e152-tables.py <产物>        打印 markdown 表（每个维度一张，行是配置，格子是 5 轮中位）
   e152-tables.py --selftest    拿一份造出来的汇总行核渲染结果
 
-表里的数一律取产物的 name=summary 行，不手抄（.claude/singlefs-ai-sop/rules/evidence-discipline.md
+表里的数一律取产物的 name=summary 行，不手抄（.claude/rules/evidence-discipline.md
 「能被一条命令数出来的数，就该由一条命令来数」）。离散超过 15% 的格子带 ⚠ 与离散百分比，照报不删（跑前登记第七节）。
 六家那六张表的最后一行是 singlefs：同一个量才填，没有的格子写「—」（SINGLEFS_FROM_SUMMARY、SINGLEFS_FROM_BLOCK_LAYER）。
 自证会红：E152_TABLES_HIDE_UNSTABLE=1 强制走回「不稳定的格子不标」的错法，

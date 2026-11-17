@@ -2,7 +2,8 @@
 """E171 第 1 次重跑第一段·修订 6 树：第 11–13 步的多机编排（用户 2026-10-06 定案：「分片 双机62核 给80g」；「长时间重型任务。分片 断点重启 这都不用我说。
 自适应多机跑」）。由 run_segment_one_on_the_revision_6_tree_multi_host.sh 在前提与第 0–10 步的续跑核对都放行之后起，在仓根跑。
 判法（check_product.py rows）、阈值、限时规则（驱动照 --baseline-timing 现算）与每行驱动的参数照原跑法 run_segment_one_on_the_revision_6_tree.sh
-（sha256 869d2c0a…）第 11–13 步；改的只有 --lanes、--threads、--rows、输出根与工作根（驱动按键复用，同一输出根里同键做完的行不重做，不另给续跑开关）。
+（sha256 869d2c0a…）第 11–13 步；改的只有 --lanes、--threads、--rows、输出根与工作根，与调用方显式给驱动的两个参数：第 13 步带 --timed-out-before，
+重报已做完的行带 --report-only（驱动不按键复用：输出根里已有的行目录它删掉重做，做没做完由这一层照行目录判，文件头「第 13 步」「产物与合并」）。
 
 用法：
   rows_orchestrator.py run  --repo R --prefix P --suffix=S --resume-tag=T --dumps D --tree TREE --snapshot-digest H --baseline-timing B
@@ -11,7 +12,8 @@
   rows_orchestrator.py plan <同上>
       只现查机器与资源、算分配、按每行推的用时推各台挂钟，打出来；一行都不起，不写产物。
   rows_orchestrator.py --selftest [--cells 格,…]
-      假驱动、假 task-server 分片（fake_task_server.py 演计划、各片、合并三步）、假机器清单与资源走一遍各格（同目录的 fake_*），末尾逐个打开弄坏开关核它红在点名的格。
+      假驱动、假 task-server 分片（fake_task_server.py 演计划、各片、合并三步）、假机器清单与资源走一遍各格（同目录的 fake_*；端到端各格并起来跑），
+      末尾每个弄坏开关起一个子进程、并起来跑，核它红在点名的格；每格（组）与每个开关判完当场打一行。
 
 退出码：0 跑完（第 11–13 步都绿）；1 停机或某一行没跑成（日志与 sequence.log 写停在哪、为什么）；2 用法错；
   78 运行条件不满足（多机配置判不过、计划分的片没都起来或都落在同一台、别的台的预检没过（工具链、Python、离线编译、盘）、此刻一条线道都放不下、
@@ -38,12 +40,12 @@
   没量过的，带探针的取第 7 步 baseline-run1 的 process_wall（T），不带探针的取第 3 步两份带流三的阳性对照（O1-崩溃判官、RefFS）process_wall 的较大者；
   每行另加 120 秒（编译 36 秒、O3 33 秒取自第 269 行早先那一份 row-result.tsv，加拷树，推的）。
   本机每槽一个固定工作根（同一槽上后一行增量编译，驱动自己核）；第 12 步 row-0 与 X 各用新的工作根（两边都冷编译，跨机对照比得了编译那几列之外的一切）。
-第 13 步：第 11、12 步合成的产物里 device_exit=253 的行，照原规则单线道、限时再乘 3；带探针的先、不带的后，各一个驱动，驱动参数与第 11、12 步同一步的完全一样、
-  输出根也是同一个：驱动按键复用，在这个根里看到同键的上一次结果是超时，就自己把这一行的限时乘 3（重做中途停下，行目录里的标记文件 timed-out-before 还记着）。
-  行目录在编排那一台的行输出根里（别的台做完的行已收进来），所以跑在编排那一台（线程取每台线程，登记值），不挑别的台。
+第 13 步：第 11、12 步合成的产物里 device_exit=253 的行，照原规则单线道、限时再乘 3；带探针的先、不带的后，各一个驱动，驱动参数是第 11、12 步同一步的那一串
+  末尾另带 --timed-out-before（调用方显式给：驱动照它把限时乘 3，row-result.tsv 记 timed_out_before=true），输出根也是同一个（驱动把那一行上一次超时的行目录删掉重做）。
+  行输出根在编排那一台（别的台做完的行已收进来），所以跑在编排那一台（线程取每台线程，登记值），不挑别的台。
 产物与合并（写死的合并规则，merge_products）：每一步最后一份原名产物 <PREFIX>-<步名><RESUME_TAG><SUFFIX>.out 与 -timing.out，由「这一趟」的分片产物合成：
-  这一趟跑的每行一个分片；更早几趟已做完的行由本机一个驱动从行目录重报一份（同键做完的行按键复用、直接读回，行与 row-result.tsv 逐字相同；
-  上一次是超时、编不过或测量管子缺陷的行，驱动照自己的规则重做，不是原样重报）。
+  这一趟跑的每行一个分片；更早几趟已做完的行由本机一个驱动带 --report-only 从行目录重报一份（不编、不跑装置与执行器，行照 row-result.tsv 原样报，
+  超时、编不过与测量管子缺陷的行也原样报；超时的由第 13 步重跑）。
   ① 各分片的 name=row_time_limit 行逐字相同，原样留一行，不同就拒；② snapshot_digest 与 files 各分片相同、且等于冻结树快照（别的台读的那一份）的摘要，
   不同就拒；③ row 行按序号排，同一序号出现两次拒，与这一步登记的行集不等（缺、多）拒；④ freeze_check 前后各一行：differences 相加，detail 并起来；
   ⑤ table 行：lanes、rows、sum_of_row_ns 相加，table_wall_ns 取最大，threads_per_lane 写各分片取值去重升序，另加 shards=<分片数>；
@@ -89,13 +91,19 @@
       「✗ 自证 e2e-two-hosts：」
   ROWS_ORCHESTRATOR_BREAK=peer-command-gets-memory-cap  转交给别的台的命令又带上 --memory-cap 外层上限（shard_relay.py 不认、退 2）
       「✗ 自证 e2e-two-hosts：」
+  ROWS_ORCHESTRATOR_BREAK=rerun-without-flag  第 13 步的驱动参数不带 --timed-out-before（RERUN_FLAGS 空着）
+      「✗ 自证 e2e-two-hosts：」
+  ROWS_ORCHESTRATOR_BREAK=carry-without-report-only  重报已做完的行那个驱动（run_carry）不带 --report-only
+      「✗ 自证 e2e-resume：」
 """
 from __future__ import annotations
 
 import argparse
 import atexit
+import concurrent.futures
 import dataclasses
 import datetime
+import functools
 import hashlib
 import json
 import os
@@ -137,7 +145,7 @@ Z1_FILES = ("oracle-verdicts.tsv", "call-outcomes.tsv", "writable-mount-probe.ts
 HOST_NAMES = ("本机", "第二台", "第三台", "第四台", "第五台", "第六台", "第七台", "第八台", "第九台", "第十台")
 BREAK_SWITCHES = ("slots-split-by-five", "merge-allows-duplicates", "merge-ignores-time-limit", "cross-host-ignores-dumps",
                   "resume-reruns-finished", "harvest-skipped", "plan-writes-memory-limit", "driver-gets-memory-cap", "peer-command-gets-memory-cap",
-                  "plan-pins-local")
+                  "plan-pins-local", "rerun-without-flag", "carry-without-report-only")
 
 
 def broken(item: str) -> bool:
@@ -151,7 +159,8 @@ def host_name(number: int) -> str:
 @dataclasses.dataclass(frozen=True)
 class Step:
     """一步：key 在日志与账里用；number 是登记的步号；stem 是产物名里 <PREFIX>- 之后、RESUME_TAG 之前那一段；root_suffix 接在行输出根后面；
-    flags 是原跑法那一步每行驱动除 --rows / --empty-mutation / --lanes / --threads / --memory-cap / 输出根 / 工作根之外的参数，一字不改。"""
+    flags 是原跑法那一步每行驱动除 --rows / --empty-mutation / --lanes / --threads / --memory-cap / 输出根 / 工作根之外的参数，一字不改；
+    第 13 步的两步末尾另带 --timed-out-before（RERUN_FLAGS，文件头「第 13 步」）。"""
     key: str
     number: int
     stem: str
@@ -160,12 +169,14 @@ class Step:
     rerun: bool = False   # 第 13 步：行输出根与参数同第 11、12 步那一步，只挑上一次超时的行；做完的标志是 row-result.tsv 里 timed_out_before=true
 
 
+# 第 13 步由调用方显式给驱动的参数：限时再乘 3（驱动不看行输出根里上一次的结果）。弄坏开关 rerun-without-flag 下不给
+RERUN_FLAGS = () if broken("rerun-without-flag") else ("--timed-out-before",)
 STEPS = {
     "s11": Step("s11", 11, "rows-probe-driver", "", ("--keep-dumps", "--streams", "1,2,3", "--writable-mount-probe")),
     "s12": Step("s12", 12, "rows-driver", "", ("--keep-dumps", "--streams", "1,2,3")),
     "sx": Step("sx", 12, "rows-cross-host-row-0-driver", "-cross-host", ("--keep-dumps", "--streams", "1,2,3")),
-    "r11": Step("r11", 13, "rows-probe-timeout-rerun-driver", "", ("--keep-dumps", "--streams", "1,2,3", "--writable-mount-probe"), rerun=True),
-    "r12": Step("r12", 13, "rows-timeout-rerun-driver", "", ("--keep-dumps", "--streams", "1,2,3"), rerun=True),
+    "r11": Step("r11", 13, "rows-probe-timeout-rerun-driver", "", ("--keep-dumps", "--streams", "1,2,3", "--writable-mount-probe") + RERUN_FLAGS, rerun=True),
+    "r12": Step("r12", 13, "rows-timeout-rerun-driver", "", ("--keep-dumps", "--streams", "1,2,3") + RERUN_FLAGS, rerun=True),
 }
 # 原跑法第 11、12 步的 --rows（第 12 步另带 --empty-mutation，即 row-0）；X 是第 12 步 row-0 在另一台的那一次
 STEP_ROWS = {"s11": (242, 269), "s12": (0, 15, 271, 42, 23, 270, 125, 49, 110, 155, 161, 162, 174, 252), "sx": (0,)}
@@ -280,7 +291,7 @@ def allocate(hosts: list[Host], threads: int | None = None) -> list[HostAllocati
 
 
 def single_lane_host(allocations: list[HostAllocation], own_host: int) -> HostAllocation:
-    """第 13 步挑台：编排那一台（上一次超时的行目录在它的行输出根里，驱动在同一个根里按键复用才看得见；每台线程都是登记值）。"""
+    """第 13 步挑台：编排那一台（行输出根在它那里，重跑的行直接写回同一个根；每台线程都是登记值）。"""
     chosen = [allocation for allocation in allocations if allocation.number == own_host and allocation.slots > 0]
     if not chosen:
         raise RunCondition(f"第 13 步：编排那一台（{host_name(own_host)}）的线程不够一条线道（每台线程是 0）")
@@ -1057,10 +1068,12 @@ def install(context: Context, path: str, text: str) -> None:
 
 
 def run_carry(context: Context, step: Step, rows: tuple[int, ...], expected_hashes: dict[str, str]) -> dict:
-    """更早几趟已做完的行：本机一个驱动从行目录重报（同键做完的行按键复用，不编、不跑装置），这一趟才有一份覆盖全部行的分片。
-    线程取每台线程（登记值）：重报在那一步的队列收完之后才起（merge_step 在 run_queue 交回之后调），不与线道同时跑。"""
+    """更早几趟已做完的行：本机一个驱动带 --report-only 从行目录重报（不编、不跑装置与执行器），这一趟才有一份覆盖全部行的分片。
+    线程取每台线程（登记值）：重报在那一步的队列收完之后才起（merge_step 在 run_queue 交回之后调），不与线道同时跑。
+    弄坏开关 carry-without-report-only 下不带 --report-only（驱动把这几行删掉重跑）。"""
     work_root = os.path.join(context.attempt_dir, f"carry-work-{step.key}")
-    process, record = launch_local(context, expected_hashes, f"{step.key}-carry", step, rows, 1, registered_host_threads(), work_root, "carry")
+    reporting = step if broken("carry-without-report-only") else dataclasses.replace(step, flags=step.flags + ("--report-only",))
+    process, record = launch_local(context, expected_hashes, f"{step.key}-carry", reporting, rows, 1, registered_host_threads(), work_root, "carry")
     code = process.wait()
     if STOP.is_set():
         raise Interrupted()
@@ -1717,7 +1730,7 @@ def world_product(world: FakeWorld, stem: str) -> str:
 
 
 def ran_counts(world: FakeWorld) -> dict[tuple[int, str], int]:
-    """假驱动真跑过（按键复用读回的不算）的次数，按 (行, 限时是不是乘过 3) 数；第 12 步 row-0 与 X 都是 row-0，合起来该是 2。"""
+    """假驱动真跑过（带 --report-only 重报的不算）的次数，按 (行, 限时是不是乘过 3) 数；第 12 步 row-0 与 X 都是 row-0，合起来该是 2。"""
     counts: dict[tuple[int, str], int] = {}
     path = os.path.join(world.root, "driver.log")
     for line in open(path, encoding="utf-8") if os.path.exists(path) else []:
@@ -1742,22 +1755,41 @@ def verdict_of(path: str) -> str:
     return [line for line in open(path, encoding="utf-8") if " name=verdict " in line][-1].strip()
 
 
+def say_cell_progress(name: str, found: list[tuple[str, bool, str]] | None, started: float) -> None:
+    """一格（或一组格）判完当场打一行进度并刷新：任务服务按日志长不长判卡住（task-server/task_server_lib.py 文件头「错误类型」stalled 那一行）。
+    这一行不以 ✓/✗ 起头：格的结论照旧在末尾打「✓/✗ 自证 <格>：」。found 是 None 表示那一件抛了异常。"""
+    outcome = "抛了异常" if found is None else ("过" if all(ok for _, ok, _ in found) else "红")
+    print(f"  格 {name} 判完：{outcome}，用时 {time.monotonic() - started:.0f} 秒", flush=True)
+
+
+def cells_in_parallel(batch: list[tuple[str, object, bool]]) -> list[tuple[str, bool, str]]:
+    """batch 里每件（名字、无参函数、交回的是不是几格）并起来跑：各件各自一个假世界、一个目录，互不相干。每件判完当场打一行进度；
+    抛了异常的那一件记一格红（名字、炸了什么）。交回照 batch 的次序。"""
+    found: dict[str, list[tuple[str, bool, str]]] = {}
+    started = time.monotonic()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(batch))) as pool:
+        futures = {pool.submit(function): (name, several) for name, function, several in batch}
+        for future in concurrent.futures.as_completed(futures):
+            name, several = futures[future]
+            try:
+                found[name] = future.result() if several else [future.result()]
+                say_cell_progress(name, found[name], started)
+            except Exception as error:  # noqa: BLE001 —— 一件炸了记红、接着收别的件
+                found[name] = [(name, False, f"炸了：{type(error).__name__}: {error}")]
+                say_cell_progress(name, None, started)
+    return [cell for name, _, _ in batch for cell in found[name]]
+
+
 def cells_end_to_end(scratch: str, wanted: set[str] | None) -> list[tuple[str, bool, str]]:
-    """端到端各格；wanted 给了就只跑点名的那几格（弄坏开关那一轮只跑一格）。"""
+    """端到端各格；wanted 给了就只跑点名的那几格（弄坏开关那一轮只跑一格）。各格并起来跑（cells_in_parallel）。"""
     def want(name: str) -> bool:
         return wanted is None or name in wanted
-    results = []
-    if want("e2e-two-hosts"):
-        results.append(two_hosts_cell(scratch))
-    if want("e2e-resume"):
-        results.append(resume_cell(scratch))
-    if want("e2e-cross-host-mismatch"):
-        results.append(mismatch_cell(scratch))
-    if want("e2e-orchestrator-on-peer"):
-        results.append(orchestrator_on_peer_cell(scratch))
+    batch = [(name, functools.partial(cell, scratch), False) for name, cell in (("e2e-two-hosts", two_hosts_cell), ("e2e-resume", resume_cell),
+                                                                                  ("e2e-cross-host-mismatch", mismatch_cell),
+                                                                                  ("e2e-orchestrator-on-peer", orchestrator_on_peer_cell)) if want(name)]
     if want("e2e-config-refused") or want("e2e-switch-off") or want("e2e-preflight-refused") or want("e2e-product-collision"):
-        results += refusal_cells(scratch)
-    return results
+        batch.append(("e2e-refusals", functools.partial(refusal_cells, scratch), True))
+    return cells_in_parallel(batch)
 
 
 def two_hosts_cell(scratch: str) -> tuple[str, bool, str]:
@@ -1894,16 +1926,37 @@ SWITCH_CELLS = {"slots-split-by-five": "allocation-threads", "merge-allows-dupli
                 "merge-ignores-time-limit": "merge-refuse-time-limit", "cross-host-ignores-dumps": "cross-host-compare",
                 "resume-reruns-finished": "e2e-resume", "harvest-skipped": "e2e-two-hosts",
                 "plan-writes-memory-limit": "task-server-phases", "driver-gets-memory-cap": "e2e-two-hosts", "peer-command-gets-memory-cap": "e2e-two-hosts",
-                "plan-pins-local": "task-server-phases"}
+                "plan-pins-local": "task-server-phases", "rerun-without-flag": "e2e-two-hosts", "carry-without-report-only": "e2e-resume"}
 CELL_GROUPS = {"allocation": cells_allocation, "queue": cells_queue}
+SWITCH_ROUND_SECONDS = 600
+
+
+def switch_round(cell: str, process: subprocess.Popen) -> tuple[bool, int]:
+    """等一条弄坏开关的子进程（它自己一个进程组）退；SWITCH_ROUND_SECONDS 秒还没退就对整组发 KILL。交回 (红在点名的格没有, 退出码)。"""
+    try:
+        output, _ = process.communicate(timeout=SWITCH_ROUND_SECONDS)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        output, _ = process.communicate()
+    return process.returncode == 1 and f"✗ 自证 {cell}：" in output, process.returncode
 
 
 def selftest(argument_list: list[str]) -> int:
+    """各格组依次判、端到端各格并起来判（cells_in_parallel），弄坏开关各起一个子进程、也并起来跑；每格（组）与每个开关判完当场打一行进度。"""
     wanted = set(argument_list[argument_list.index("--cells") + 1].split(",")) if "--cells" in argument_list else None
     scratch = tempfile.mkdtemp(prefix="e171-rows-orchestrator-selftest-")
+    results: list[tuple[str, bool, str]] = []
     try:
-        results = (cells_allocation() + cells_queue() + cells_merge(scratch, os.path.join(HERE, "check_product.py"))
-                   + cells_cross_host(scratch) + cells_task_server(scratch))
+        for name, group in (("allocation", cells_allocation), ("queue", cells_queue),
+                            ("merge", functools.partial(cells_merge, scratch, os.path.join(HERE, "check_product.py"))),
+                            ("cross-host", functools.partial(cells_cross_host, scratch)), ("task-server", functools.partial(cells_task_server, scratch))):
+            started = time.monotonic()
+            found = group()
+            say_cell_progress(f"{name} 那一组", found, started)
+            results += found
         if wanted is None or any(name.startswith("e2e-") for name in wanted):
             results += cells_end_to_end(scratch, wanted)
     finally:
@@ -1914,14 +1967,17 @@ def selftest(argument_list: list[str]) -> int:
             continue
         red += 0 if ok else 1
         print(f"{'✓' if ok else '✗'} 自证 {name}：{detail}", flush=True)  # gate-lint:detail
-    if wanted is None and not os.environ.get("ROWS_ORCHESTRATOR_BREAK"):
-        for switch, cell in SWITCH_CELLS.items():
-            completed = subprocess.run(["python3", "-B", os.path.abspath(__file__), "--selftest", "--cells", cell], capture_output=True, text=True,
-                                       env=dict(os.environ, ROWS_ORCHESTRATOR_BREAK=switch, ROWS_ORCHESTRATOR_SELFTEST="1"), timeout=600)
-            caught = completed.returncode == 1 and f"✗ 自证 {cell}：" in completed.stdout
+    switching = wanted is None and not os.environ.get("ROWS_ORCHESTRATOR_BREAK")
+    if switching:
+        rounds = [(switch, cell, subprocess.Popen(["python3", "-B", os.path.abspath(__file__), "--selftest", "--cells", cell], stdout=subprocess.PIPE,
+                                                  stderr=subprocess.DEVNULL, text=True, start_new_session=True,
+                                                  env=dict(os.environ, ROWS_ORCHESTRATOR_BREAK=switch, ROWS_ORCHESTRATOR_SELFTEST="1")))
+                  for switch, cell in SWITCH_CELLS.items()]
+        for switch, cell, process in rounds:
+            caught, code = switch_round(cell, process)
             red += 0 if caught else 1
-            print(f"{'✓' if caught else '✗'} 弄坏开关 {switch} → 红在 {cell}：{'红了' if caught else '没红（退 ' + str(completed.returncode) + '）'}", flush=True)
-    counted = len([1 for name, _, _ in results if wanted is None or name in wanted]) + (len(SWITCH_CELLS) if wanted is None and not os.environ.get("ROWS_ORCHESTRATOR_BREAK") else 0)
+            print(f"{'✓' if caught else '✗'} 弄坏开关 {switch} → 红在 {cell}：{'红了' if caught else '没红（退 ' + str(code) + '）'}", flush=True)
+    counted = len([1 for name, _, _ in results if wanted is None or name in wanted]) + (len(SWITCH_CELLS) if switching else 0)
     print(f"自证 {counted} 项，红 {red}")
     return 1 if red else 0
 

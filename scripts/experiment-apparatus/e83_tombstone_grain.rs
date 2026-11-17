@@ -7,7 +7,7 @@
 //! 一个数都没有」（C84（墓碑单元的粒度没人定））。粒度差出来的是数量级，
 //! 不算清楚没法给 D18 补分项。
 //!
-//! ## 被引用条款逐字贴在这里（verify-before-claiming.md）
+//! ## 被引用条款逐字贴在这里（evidence-discipline.md）
 //!
 //! - D18 已定项 8：「删除不再是『盘上什么都不留』——它写一个单元，单元类型标签取『墓碑』」；
 //!   「字段集沿用已定项 3 的那五个」；射程注逐字「没有定它什么时候可以被回收」。
@@ -113,12 +113,12 @@ struct Load {
 }
 
 const UNLINK_ONE: Load = Load { name: "unlink_one", objects: 1, extents_per_object: 1 };
-const RM_RF_1K: Load = Load { name: "rm_rf_1k", objects: 1000, extents_per_object: 1 };
-const RM_RF_1M: Load = Load { name: "rm_rf_1m", objects: 1_000_000, extents_per_object: 1 };
+const RM_RF_ONE_THOUSAND_OBJECTS: Load = Load { name: "rm_rf_1k", objects: 1000, extents_per_object: 1 };
+const RM_RF_ONE_MILLION_OBJECTS: Load = Load { name: "rm_rf_1m", objects: 1_000_000, extents_per_object: 1 };
 const TRUNCATE_4096_EXTENTS: Load = Load { name: "truncate_4096ext", objects: 1, extents_per_object: 4096 };
-const LOADS: [Load; 4] = [UNLINK_ONE, RM_RF_1K, RM_RF_1M, TRUNCATE_4096_EXTENTS];
+const LOADS: [Load; 4] = [UNLINK_ONE, RM_RF_ONE_THOUSAND_OBJECTS, RM_RF_ONE_MILLION_OBJECTS, TRUNCATE_4096_EXTENTS];
 /// 有 ≥ 2 条记录的三个负载（敏感性行与 Q2 的对象）。
-const MULTI_RECORD_LOADS: [Load; 3] = [RM_RF_1K, RM_RF_1M, TRUNCATE_4096_EXTENTS];
+const MULTI_RECORD_LOADS: [Load; 3] = [RM_RF_ONE_THOUSAND_OBJECTS, RM_RF_ONE_MILLION_OBJECTS, TRUNCATE_4096_EXTENTS];
 
 /// 该组合下的墓碑单元数与物理字节。
 fn cost(load: &Load, grain: RecordGrain, carrier: Carrier, geometry: Geometry) -> (u64, u64) {
@@ -250,14 +250,14 @@ fn main() {
         }
     }
     // Q2：有 ≥ 2 条记录的五格，打包是否少写；Q3：这五格的差距倍数对第一次几何是变大、相等还是变小。
-    let q2_q3_cells = [
-        (RM_RF_1K, RecordGrain::PerExtent),
-        (RM_RF_1K, RecordGrain::PerObject),
-        (RM_RF_1M, RecordGrain::PerExtent),
-        (RM_RF_1M, RecordGrain::PerObject),
+    let cells_with_at_least_two_records = [
+        (RM_RF_ONE_THOUSAND_OBJECTS, RecordGrain::PerExtent),
+        (RM_RF_ONE_THOUSAND_OBJECTS, RecordGrain::PerObject),
+        (RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerExtent),
+        (RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerObject),
         (TRUNCATE_4096_EXTENTS, RecordGrain::PerExtent),
     ];
-    for (load, grain) in &q2_q3_cells {
+    for (load, grain) in &cells_with_at_least_two_records {
         let (packed_units, _) = cost(load, *grain, Carrier::PackedShared, MAIN_GEOMETRY);
         let (dedicated_units, _) = cost(load, *grain, Carrier::DedicatedUnit, MAIN_GEOMETRY);
         println!(
@@ -270,7 +270,7 @@ fn main() {
             ))
         );
     }
-    for (load, grain) in &q2_q3_cells {
+    for (load, grain) in &cells_with_at_least_two_records {
         let (packed_units, _) = cost(load, *grain, Carrier::PackedShared, MAIN_GEOMETRY);
         let (dedicated_units, _) = cost(load, *grain, Carrier::DedicatedUnit, MAIN_GEOMETRY);
         let (first_run_packed_units, _) = cost(load, *grain, Carrier::PackedShared, FIRST_RUN_GEOMETRY);
@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn first_run_geometry_still_gives_583() {
         assert_eq!(FIRST_RUN_GEOMETRY.packed_capacity(), 583);
-        assert_eq!(cost(&RM_RF_1M, RecordGrain::PerExtent, Carrier::PackedShared, FIRST_RUN_GEOMETRY).0, 1716);
+        assert_eq!(cost(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerExtent, Carrier::PackedShared, FIRST_RUN_GEOMETRY).0, 1716);
     }
 
     /// 常量的结构：墓碑记录 40 是五个 8 字节字段之和（D18 已定项 24 第 2 条）；
@@ -369,18 +369,18 @@ mod tests {
     #[test]
     fn absolute_rm_rf_1m() {
         let (dedicated_unit_count, dedicated_physical_bytes) =
-            cost(&RM_RF_1M, RecordGrain::PerExtent, Carrier::DedicatedUnit, MAIN_GEOMETRY);
+            cost(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerExtent, Carrier::DedicatedUnit, MAIN_GEOMETRY);
         assert_eq!(dedicated_unit_count, 1_000_000);
         assert_eq!(dedicated_physical_bytes, 65_536_000_000);
         let (packed_unit_count, packed_physical_bytes) =
-            cost(&RM_RF_1M, RecordGrain::PerExtent, Carrier::PackedShared, MAIN_GEOMETRY);
+            cost(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerExtent, Carrier::PackedShared, MAIN_GEOMETRY);
         assert_eq!(packed_unit_count, 1227);
         assert_eq!(packed_physical_bytes, 1227 * 65536);
         assert_eq!(packed_physical_bytes, 80_412_672);
         assert_eq!(physical_mebibytes_label(packed_physical_bytes), "76.7");
         // 单 extent 文件下 per_object 与 per_extent 逐格相同
         assert_eq!(
-            cost(&RM_RF_1M, RecordGrain::PerObject, Carrier::PackedShared, MAIN_GEOMETRY),
+            cost(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerObject, Carrier::PackedShared, MAIN_GEOMETRY),
             (packed_unit_count, packed_physical_bytes)
         );
     }
@@ -390,8 +390,8 @@ mod tests {
     #[test]
     fn absolute_rm_rf_1k() {
         for grain in [RecordGrain::PerExtent, RecordGrain::PerObject] {
-            assert_eq!(cost(&RM_RF_1K, grain, Carrier::DedicatedUnit, MAIN_GEOMETRY), (1000, 65_536_000));
-            assert_eq!(cost(&RM_RF_1K, grain, Carrier::PackedShared, MAIN_GEOMETRY), (2, 131_072));
+            assert_eq!(cost(&RM_RF_ONE_THOUSAND_OBJECTS, grain, Carrier::DedicatedUnit, MAIN_GEOMETRY), (1000, 65_536_000));
+            assert_eq!(cost(&RM_RF_ONE_THOUSAND_OBJECTS, grain, Carrier::PackedShared, MAIN_GEOMETRY), (2, 131_072));
         }
     }
 
@@ -442,7 +442,7 @@ mod tests {
     #[test]
     fn positive_control_per_object_dedicated_follows_object_count() {
         let one_object = cost(&UNLINK_ONE, RecordGrain::PerObject, Carrier::DedicatedUnit, MAIN_GEOMETRY).0;
-        let many_objects = cost(&RM_RF_1K, RecordGrain::PerObject, Carrier::DedicatedUnit, MAIN_GEOMETRY).0;
+        let many_objects = cost(&RM_RF_ONE_THOUSAND_OBJECTS, RecordGrain::PerObject, Carrier::DedicatedUnit, MAIN_GEOMETRY).0;
         assert_eq!((one_object, many_objects), (1, 1000));
     }
 
@@ -455,7 +455,7 @@ mod tests {
         let truncate_units = |geometry: Geometry| {
             cost(&TRUNCATE_4096_EXTENTS, RecordGrain::PerExtent, Carrier::PackedShared, geometry).0
         };
-        let rm_rf_units = |geometry: Geometry| cost(&RM_RF_1M, RecordGrain::PerObject, Carrier::PackedShared, geometry).0;
+        let rm_rf_units = |geometry: Geometry| cost(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerObject, Carrier::PackedShared, geometry).0;
         assert_eq!((truncate_units(MAIN_GEOMETRY), truncate_units(wide_record_geometry)), (6, 8));
         assert_eq!((rm_rf_units(MAIN_GEOMETRY), rm_rf_units(wide_record_geometry)), (1227, 1719));
     }
@@ -486,10 +486,10 @@ mod tests {
     /// Q2：主几何下有 ≥ 2 条记录的五格，打包都少写；Q5：只有 1 条记录的格并列。
     #[test]
     fn main_geometry_packed_writes_fewer_on_the_five_multi_record_cells_and_ties_on_single_record_cells() {
-        assert!(packed_writes_fewer_units(&RM_RF_1K, RecordGrain::PerExtent, MAIN_GEOMETRY));
-        assert!(packed_writes_fewer_units(&RM_RF_1K, RecordGrain::PerObject, MAIN_GEOMETRY));
-        assert!(packed_writes_fewer_units(&RM_RF_1M, RecordGrain::PerExtent, MAIN_GEOMETRY));
-        assert!(packed_writes_fewer_units(&RM_RF_1M, RecordGrain::PerObject, MAIN_GEOMETRY));
+        assert!(packed_writes_fewer_units(&RM_RF_ONE_THOUSAND_OBJECTS, RecordGrain::PerExtent, MAIN_GEOMETRY));
+        assert!(packed_writes_fewer_units(&RM_RF_ONE_THOUSAND_OBJECTS, RecordGrain::PerObject, MAIN_GEOMETRY));
+        assert!(packed_writes_fewer_units(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerExtent, MAIN_GEOMETRY));
+        assert!(packed_writes_fewer_units(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerObject, MAIN_GEOMETRY));
         assert!(packed_writes_fewer_units(&TRUNCATE_4096_EXTENTS, RecordGrain::PerExtent, MAIN_GEOMETRY));
         for grain in [RecordGrain::PerExtent, RecordGrain::PerObject] {
             assert!(!packed_writes_fewer_units(&UNLINK_ONE, grain, MAIN_GEOMETRY));
@@ -500,10 +500,10 @@ mod tests {
     /// Q3：主几何下五格的差距倍数对第一次几何（583）都不变小；两条 rm -rf 1M 的格变大（1716 → 1227 单元）。
     #[test]
     fn gap_against_first_run_grows_on_rm_rf_1m_and_never_shrinks() {
-        assert_eq!(gap_direction_against_first_run(&RM_RF_1M, RecordGrain::PerExtent, MAIN_GEOMETRY), GapDirection::Larger);
-        assert_eq!(gap_direction_against_first_run(&RM_RF_1M, RecordGrain::PerObject, MAIN_GEOMETRY), GapDirection::Larger);
-        assert_eq!(gap_direction_against_first_run(&RM_RF_1K, RecordGrain::PerExtent, MAIN_GEOMETRY), GapDirection::Equal);
-        assert_eq!(gap_direction_against_first_run(&RM_RF_1K, RecordGrain::PerObject, MAIN_GEOMETRY), GapDirection::Equal);
+        assert_eq!(gap_direction_against_first_run(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerExtent, MAIN_GEOMETRY), GapDirection::Larger);
+        assert_eq!(gap_direction_against_first_run(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerObject, MAIN_GEOMETRY), GapDirection::Larger);
+        assert_eq!(gap_direction_against_first_run(&RM_RF_ONE_THOUSAND_OBJECTS, RecordGrain::PerExtent, MAIN_GEOMETRY), GapDirection::Equal);
+        assert_eq!(gap_direction_against_first_run(&RM_RF_ONE_THOUSAND_OBJECTS, RecordGrain::PerObject, MAIN_GEOMETRY), GapDirection::Equal);
         assert_eq!(
             gap_direction_against_first_run(&TRUNCATE_4096_EXTENTS, RecordGrain::PerExtent, MAIN_GEOMETRY),
             GapDirection::Larger
@@ -516,7 +516,7 @@ mod tests {
         let wider_record_geometry =
             Geometry { records_offset_bytes: PACKED_UNIT_RECORDS_OFFSET, record_bytes: FIRST_RUN_TOMBSTONE_RECORD_BYTES * 2 };
         assert_eq!(
-            gap_direction_against_first_run(&RM_RF_1M, RecordGrain::PerObject, wider_record_geometry),
+            gap_direction_against_first_run(&RM_RF_ONE_MILLION_OBJECTS, RecordGrain::PerObject, wider_record_geometry),
             GapDirection::Smaller
         );
     }

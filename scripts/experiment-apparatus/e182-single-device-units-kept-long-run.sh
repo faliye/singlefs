@@ -112,6 +112,26 @@ usage_error() {
   exit 2
 }
 
+# 递归删目录前的守卫（目标是几段变量拼出来的，其中一段为空就删到别处，「${变量:?}」只挡整串为空）：
+# <根> 非空，且每个 <目标> 都严格落在 <根>/ 底下（比「<根>/」长），才删；不满足的什么都不删，退 1、stderr 点名。
+remove_directory_below() { # <根> <目标>…
+  local root_directory="${1:-}" directory_to_remove
+  if [[ -z "$root_directory" ]]; then
+    echo "  ✗ remove_directory_below：根是空的，不删（目标 ${2:-}）" >&2
+    echo "     → 怎么办：调用方先把根（\$LOG_DIRECTORY 这类）定下来再删" >&2
+    return 1
+  fi
+  shift
+  for directory_to_remove in "$@"; do
+    if [[ "$directory_to_remove" != "$root_directory"/?* ]]; then
+      echo "  ✗ remove_directory_below：「$directory_to_remove」不在「$root_directory」底下，不删" >&2
+      echo "     → 怎么办：目标由几段变量拼成，查哪一段是空的或指到了别处" >&2
+      return 1
+    fi
+    rm -rf -- "${directory_to_remove:?}"
+  done
+}
+
 # 弄坏开关与自证专用的变量只在自证起的那几趟里认（标记文件在、内容对得上）；弄坏开关别处设了就拒。
 break_is() {
   [[ ",${E182_UNITS_KEPT_BREAK:-}," == *",$1,"* ]]
@@ -354,7 +374,7 @@ FAKE
   invoke "$cell" --bogus; exit_code=$?
   expect "认不得的参数退 2" '((exit_code == 2)) && grep -qF "认不得的参数「--bogus」" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   cell="$work/without-git"; make_tree "$cell"
-  rm -rf -- "${cell:?}/tree/.git"
+  remove_directory_below "$work" "$cell/tree/.git" || return 1
   invoke "$cell"; exit_code=$?
   expect "不在 git 工作树里退 2、装置一次没起" '((exit_code == 2)) && grep -qF "不在 git 工作树里" "$cell/out" && [[ ! -e "$cell/calls" ]]'
   cell="$work/build-failure"; make_tree "$cell"
@@ -481,8 +501,8 @@ product_scratch="$LOG_DIRECTORY/$LIBRARY_KIND-$run_stamp.product.out"
 transit="$LOG_DIRECTORY/$LIBRARY_KIND-$run_stamp.transit-shards"
 merge_log="$LOG_DIRECTORY/$LIBRARY_KIND-$run_stamp.merge.log"
 # 中转目录这一趟用完就删（文件头「片结果库」）：正常结束、出错、被停都删；并回服务之前就被整组杀掉的，留下的这一份照「没并回」算，下一趟那几片照判
-trap 'rm -rf -- "$transit"' EXIT
-rm -rf -- "$transit"
+trap 'remove_directory_below "$LOG_DIRECTORY" "$transit"' EXIT
+remove_directory_below "$LOG_DIRECTORY" "$transit" || exit 1
 mkdir -p -- "$transit" || exit 1
 
 # merge_transit：中转目录里判完的片并回服务（逐字节相同的跳过）；交 library-files store 的退出码，输出进 $merge_log

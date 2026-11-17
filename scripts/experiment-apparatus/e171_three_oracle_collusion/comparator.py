@@ -258,7 +258,9 @@ def row_directories(rows_roots: list[str]) -> list[tuple[int, str]]:
 
 def rows_with_substitutes(merged: list[tuple[int, str]], substitution_roots: list[str]) -> tuple[list[tuple[int, str]], list[tuple[int, str, str]]]:
     """补位那一趟（登记第一节读法 5「替换之后编不过，按 5.2 的补位规则换行」）：补位输出根里的 `row-<序号>/` 换掉前面几个输出根里同一个序号的行。
-    拒（ValueError）：前面没有这一行；前面那一行的结局不是编不过；补位那一行的 `row_name` 不是前面那一行的；补位那一行编过了却没补位
+    不换也不拒：补位输出根里原行没编不过、这一趟也没补位（`substituted_from` 是 `-`）、表名与结局都与前面那一行相同的行——补位那一趟的逐行驱动把整张表的行都写进
+    它的输出根（没补位的行从判定库取回），这种行就是前面那一行自己。
+    拒（ValueError）：前面没有这一行；前面那一行的结局不是编不过（上面那种除外）；补位那一行的 `row_name` 不是前面那一行的；补位那一行编过了却没补位
     （`substituted_from` 是 `-`：原行这一次编过、上一次编不过，同一棵树上两次编的结局不同）或补位自的不是那一行的名字。交回 (换过的行表, [(序号, 原目录, 补位目录)])。"""
     by_number = dict(merged)
     replaced = []
@@ -267,6 +269,10 @@ def rows_with_substitutes(merged: list[tuple[int, str]], substitution_roots: lis
             raise ValueError(f"补位输出根里的第 {number} 行在前面的输出根里没有：{directory}")
         original_fields = dict(columns[:2] for columns in read_rows(os.path.join(by_number[number], "row-result.tsv")) if len(columns) >= 2)
         new_fields = dict(columns[:2] for columns in read_rows(os.path.join(directory, "row-result.tsv")) if len(columns) >= 2)
+        taken_again_unsubstituted = (original_fields.get("status") != "compile_failed" and new_fields.get("substituted_from", "-") == "-"
+                                     and (new_fields.get("row_name"), new_fields.get("status")) == (original_fields.get("row_name"), original_fields.get("status")))
+        if taken_again_unsubstituted:
+            continue
         if original_fields.get("status") != "compile_failed":
             raise ValueError(f"第 {number} 行原来的结局不是编不过（{original_fields.get('status')}），不补位：{by_number[number]}")
         if new_fields.get("row_name") != original_fields.get("row_name"):

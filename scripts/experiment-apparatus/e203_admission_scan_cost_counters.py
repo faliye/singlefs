@@ -5,7 +5,7 @@
 
 用法：
   python3 e203_admission_scan_cost_counters.py --build counts|timing --source <仓根> --into <工作目录> [--diff-out <文件>]
-  python3 e203_admission_scan_cost_counters.py --check-anchors <树>      只核锚点、打每个锚点的行号，不写
+  python3 e203_admission_scan_cost_counters.py --check-anchors <树>      只核锚点、打每个锚点的行号，不写；锚点全对之后再不起编译地判一遍：插完的每行读数语句要落在语句层（前一个字符是 ; { }、最内层括号是 {，不在表达式、实参表、链式调用中间），改过的 .rs 括号要配平，不过退 3、打 name=insertion_problem / name=balance_problem 行
   python3 e203_admission_scan_cost_counters.py --selftest [--histories <历史用例>]   用一棵小的假树证每个分支（不编实现）；
                                                                          另核历史用例里意图那次规模读数的取法（不给取本目录那一份）
   python3 e203_admission_scan_cost_counters.py --mutation-check <变异表>   逐条改坏、跑自证，没红的报 missed
@@ -30,6 +30,7 @@ import difflib
 import hashlib
 import os
 import pathlib
+import re
 import shutil
 import sys
 
@@ -73,6 +74,7 @@ ROWS = [
     ("InstanceTableChain", "instance_table_chain", "scan"),
     ("UnitsOfAPublishToLand", "units_of_a_publish_to_land", "none"),
     ("MappedUnitsWholeTable", "mapped_units_whole_table", "scan"),
+    ("PooledFallbackByTheLeaf", "pooled_fallback_by_the_leaf", "scan"),
     ("UnlistedIndexOrPlanWork", "unlisted_index_or_plan_work", "other"),
 ]
 
@@ -721,14 +723,16 @@ def edits():
              f"        {P}delta(\"placements_released\", release.len());\n"
              f"        {P}delta(\"roles_rewritten\", resolved.rewritten_roles.len());\n", None))
     # ---- 分配器里的扫类：s14、s25–s29
+    # 分配器的 newtype 补丁之后这个方法体只剩一个表达式：求和下到自由函数 `pairs_inside_the_cluster_segments`（别的读法也调它，不插在那里），
+    # 所以调用与步数记在方法体里、表达式之前（每个聚簇段 1 步，量没变）；计时守卫开在方法体第一句（体里没有别的步）。
+    # 锚点取这一整个表达式的起头 `SlotPairCount(`（语句边界上）：取过里面的 `self.unblocked_slot_pairs.0` 那一行，
+    # 补丁把它包进 `SlotPairCount(` 的实参里之后，插进去的两句落在实参表中间、编不过（不起编译的判法 insertion_problems 认这一类）。
     add(Edit("s14_cluster_segment_sum", A, "    pub fn unblocked_slot_pairs_outside_the_cluster_segments(\n", METHOD_END,
-             "        let pairs_inside_the_cluster_segments: u64 = cluster_segments\n", "before",
+             "        SlotPairCount(\n", "before",
              counted_call("ClusterSegmentSum")
              + f"        {P}steps({row('ClusterSegmentSum')}, cluster_segments.len());\n",
-             None))
-    e.extend(span("s14_timing", A, "    pub fn unblocked_slot_pairs_outside_the_cluster_segments(\n", METHOD_END,
-                  "        let pairs_inside_the_cluster_segments: u64 = cluster_segments\n",
-                  "        self.unblocked_slot_pairs - pairs_inside_the_cluster_segments\n", "ClusterSegmentSum", "        "))
+             guard("ClusterSegmentSum")))
+    GUARD_SCOPE["s14_cluster_segment_sum"] = "body"
     find_a = "        self.records\n            .iter()\n            .find(|record| record.device == device && record.slot == slot)\n"
     add(Edit("s25_record_for", A, "    pub fn record_for(\n", METHOD_END, find_a, "replace",
              counted_call("AllocatorReleaseLinearFind")
@@ -755,23 +759,24 @@ def edits():
     e.extend(span("s25_release_timing", A, "    pub fn release_leaving_the_record_allocated_on(\n", METHOD_END,
                   "            let record = self\n                .records\n                .iter_mut()\n",
                   "            assert!(\n                !record.is_released,\n", "AllocatorReleaseLinearFind", "            "))
-    add(Edit("s26_user_slot_scan", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END,
-             "        while candidate + 1 < end {\n", "before",
+    # s26：产品路径按「还有没挡偶数槽对的 64 槽段」集合升序走（`lowest_user_data_slot_outside_the_region`），走到一段问一次聚簇段集合与 R（1 步，
+    # 对应旧口径的「比一个聚簇段」）；落进的那一段里按 2 槽步进逐对看（`lowest_unblocked_slot_pair_in_the_segment`，每对 1 步，对应旧口径的
+    # 「看一个候选对」，至多 32 对）。逐槽走的旧实现只在 #[cfg(test)] 下，不插。
+    # 上界（调用那一刻读）：集合里的段数（每段至多 1 步）+ 一段里的对数 32（集合里的段至少有一对没挡，第一个没被跳过的段就是答案所在，只有它看对）。
+    HEAD_USER_SLOT = "    pub fn lowest_user_data_slot_outside_the_region(\n"
+    FIND_SEGMENT = "            .find_map(|segment_index| {\n"
+    add(Edit("s26_user_slot_scan", A, HEAD_USER_SLOT, METHOD_END,
+             "        self.segments_with_an_unblocked_slot_pair\n            .iter()\n" + FIND_SEGMENT, "before",
              counted_call("UserDataSlotLinearScan")
-             # 修订 4 的上界：这一刻单元区里的候选对数（每对一步）× (1 + 这一刻的聚簇段数，每个候选里 any 至多走完它们)
-             + f"        {P}scale_to_the_hit({row('UserDataSlotLinearScan')}, usize::try_from(end.saturating_sub(candidate) / 2).expect(\"候选数装得进 usize\") * (1 + cluster_segments.len()));\n",
-             None))
-    e.extend(span("s26_timing", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END,
-                  "        while candidate + 1 < end {\n", "            candidate += 2;\n        }\n",
-                  "UserDataSlotLinearScan", "        ", end_mode="after"))
-    inside = ("            let inside_cluster_segment = cluster_segments.iter().any(|segment| {\n"
-              "                candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS\n            });\n")
-    add(Edit("s26_candidate_steps", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END, inside, "replace",
-             f"            {P}step_to_the_hit({row('UserDataSlotLinearScan')});\n"
-             "            let inside_cluster_segment = cluster_segments.iter().any(|segment| {\n"
-             f"                {P}step_to_the_hit({row('UserDataSlotLinearScan')});\n"
-             "                candidate >= segment.0 && candidate < segment.0 + CLUSTER_SEGMENT_SLOTS\n            });\n",
-             None))
+             + f"        {P}scale_to_the_hit({row('UserDataSlotLinearScan')}, self.segments_with_an_unblocked_slot_pair.len()"
+             + " + usize::try_from(CLUSTER_SEGMENT_SLOTS / 2).expect(\"32\"));\n",
+             guard("UserDataSlotLinearScan")))
+    GUARD_SCOPE["s26_user_slot_scan"] = "body"
+    add(Edit("s26_segment_steps", A, HEAD_USER_SLOT, METHOD_END, FIND_SEGMENT, "replace",
+             FIND_SEGMENT + f"                {P}step_to_the_hit({row('UserDataSlotLinearScan')});\n", None))
+    add(Edit("s26_pair_steps", A, "    fn lowest_unblocked_slot_pair_in_the_segment(\n", METHOD_END,
+             "            .find(|first_index_of_the_pair| {\n", "replace",
+             "            .find(|first_index_of_the_pair| {\n" + f"                {P}step_to_the_hit({row('UserDataSlotLinearScan')});\n", None))
     add(Edit("s28_empty_segment_scan", A, "    pub fn lowest_empty_segment_outside_the_region(\n", METHOD_END,
              "        let per_segment = usize::try_from(CLUSTER_SEGMENT_SLOTS).expect(\"64\");\n", "before",
              counted_call("EmptySegmentLinearScan"), None))
@@ -801,6 +806,38 @@ def edits():
              f"            {P}step_to_the_hit({row('FallbackSlotLinearScan')});\n"
              "            let is_whole_span_unblocked = (candidate..candidate + footprint.slots()).all(|slot| {\n"
              f"                {P}step_to_the_hit({row('FallbackSlotLinearScan')});\n", None))
+    # s37：池级回落按叶取落点（每块盘都答回落之后，`commit_generated_fallback_slot_open_on_every_device`；每块盘各自先走的 s29 仍照旧记在 s29）。
+    # 一步 = 一片叶、一个候选、一个槽、或一次「某块盘在某个候选 / 槽 / 叶上的判」：
+    #   重写集里走到的每片叶 1 步；叶里每个候选 1 步、候选上每块盘的判各 1 步；
+    #   每块盘都空的单槽数逐槽数一遍：每槽 1 步、槽上每块盘的判各 1 步；
+    #   单槽最多的那片叶：单元区罩到的每片叶 1 步（没有提前出口）、叶上每块盘读一次没挡槽数各 1 步（走到的叶里再逐槽数、逐候选找的步记在上面两条）。
+    # 每次调用记 1 次调用；整个函数体一个计时守卫（体就是这一整步）。每块盘各取一次最低 / 最高叶序号的那一遍（盘数步）不记。
+    HEAD_POOLED_FALLBACK = "    fn commit_generated_fallback_slot_open_on_every_device(\n"
+    pooled_step = f"{P}step({row('PooledFallbackByTheLeaf')});\n"
+    add(Edit("s37_pooled_fallback_call", A, HEAD_POOLED_FALLBACK, METHOD_END,
+             "        rewrite_set_leaves\n            .leaf_indices\n            .iter()\n            .find_map(|leaf_index| {\n", "before",
+             counted_call("PooledFallbackByTheLeaf"), guard("PooledFallbackByTheLeaf")))
+    GUARD_SCOPE["s37_pooled_fallback_call"] = "body"
+    add(Edit("s37_rewrite_set_leaf_steps", A, HEAD_POOLED_FALLBACK, METHOD_END,
+             "            .find_map(|leaf_index| {\n", "replace", "            .find_map(|leaf_index| {\n" + f"                {pooled_step}", None))
+    add(Edit("s37_candidate_steps", A, "    fn lowest_slot_open_on_every_device_in_the_leaf(\n", METHOD_END,
+             "        while candidate.0 + footprint.slots() <= past_the_last_slot_of_the_leaf.0 {\n", "replace",
+             "        while candidate.0 + footprint.slots() <= past_the_last_slot_of_the_leaf.0 {\n" + f"            {pooled_step}", None))
+    add(Edit("s37_candidate_device_steps", A, "    fn lowest_slot_open_on_every_device_in_the_leaf(\n", METHOD_END,
+             "            if self.devices.iter().all(|device| {\n", "replace",
+             "            if self.devices.iter().all(|device| {\n" + f"                {pooled_step}", None))
+    add(Edit("s37_open_slot_steps", A, "    fn slots_open_on_every_device_in_the_leaf(\n", METHOD_END,
+             "            .filter(|slot| {\n                self.devices.iter().all(|device| {\n", "replace",
+             "            .filter(|slot| {\n" + f"                {pooled_step}" + "                self.devices.iter().all(|device| {\n"
+             + f"                    {pooled_step}", None))
+    HEAD_MOST_OPEN_LEAF = "    fn lowest_slot_in_the_leaf_with_the_most_slots_open_on_every_device(\n"
+    add(Edit("s37_leaf_loop_steps", A, HEAD_MOST_OPEN_LEAF, METHOD_END,
+             "        for leaf_number in first_leaf_index.0..=last_leaf_index.0 {\n", "replace",
+             "        for leaf_number in first_leaf_index.0..=last_leaf_index.0 {\n" + f"            {pooled_step}", None))
+    add(Edit("s37_leaf_device_steps", A, HEAD_MOST_OPEN_LEAF, METHOD_END,
+             "                .map(|device| device.unblocked_slots_in_allocation_record_tree_leaf(leaf_index))\n", "replace",
+             "                .map(|device| {\n" + f"                    {pooled_step}"
+             + "                    device.unblocked_slots_in_allocation_record_tree_leaf(leaf_index)\n                })\n", None))
     add(Edit("s27_record_intersection", A, "\nfn make_room_for_record_on_device(\n", FN_END,
              "    let intersecting_record_slots: Vec<SlotNumber> = records\n        .iter()\n        .filter(|record| {\n",
              "replace",
@@ -1066,7 +1103,7 @@ def add_the_rest(e):
                   counts_begin=f"        {P}scale({row('AllocationRecordTreePlan')}, rewritten.len() + nodes_after.len());\n"))
     e.extend(span("s15_timing", T, HEAD_SETTLE, FN_END,
                   "    let (previous_nodes, previous_records): (\n",
-                  "    for _round in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {\n",
+                  "    for round_index in 0..ALLOCATION_RECORD_TREE_SETTLING_ROUNDS_LIMIT {\n",
                   "AllocationRecordTreeNodeSet", "    "))
     # ---- s30 每比一片叶，与 B8 的 dirty、λ_ar
     ART = CORE + "allocation_record_tree.rs"
@@ -1180,7 +1217,14 @@ impl PoolAllocator {
             + self.records.len()
             + self.cluster_segments.len()
             + self.reclaimed.len()
+            + self.compaction.clone().take_the_quarantines_noted_by_the_publishes().len()
             + self.root_ring.as_ref().map_or(0, RootRingOccupancy::e203_elements)
+            + self
+                .allocation_record_tree_of_the_version_without_file
+                .as_ref()
+                .map_or(0, |version_without_file| {
+                    version_without_file.records.len() + version_without_file.version.nodes.len()
+                })
     }
 
     #[must_use]
@@ -1200,12 +1244,17 @@ impl DeviceFreeMap {
             + self.held_per_segment.len()
             + self.unblocked_slot_pairs_per_segment.len()
             + self.segments_reclaimed_not_yet_discarded.len()
+            + self.segments_with_an_unblocked_slot_pair.len()
+            + self.is_under_an_unreleased_record.len()
+            + self.slot_pairs_without_an_unreleased_record_per_segment.len()
+            + self.unblocked_slots_per_allocation_record_tree_leaf.len()
     }
 }
 
 impl RootRingOccupancy {
     fn e203_elements(&self) -> usize {
         self.occupants.len()
+            + self.instance_table_judging_the_rereads.rows.len()
             + self
                 .placements_named_by_unapplied_journal_records
                 .values()
@@ -1214,6 +1263,65 @@ impl RootRingOccupancy {
     }
 }
 '''
+# 整份拷分配器（s1、s24）数的集合：三个结构体的每个字段要么在上面的助手里点了名，要么在这里写明不数的理由。
+# `--check-anchors` 拿它对今天 allocator.rs 里三个结构体的字段清单逐个核（字段多了或少了都退 3），自证拿助手文字核点名的那几个。
+WHOLE_COPY_STRUCTS = (("DeviceFreeMap", "pub struct DeviceFreeMap {\n", "impl DeviceFreeMap {\n"),
+                      ("PoolAllocator", "pub struct PoolAllocator {\n", "impl PoolAllocator {\n"),
+                      ("RootRingOccupancy", "pub struct RootRingOccupancy {\n", "impl RootRingOccupancy {\n"))
+WHOLE_COPY_COUNTED = {
+    "DeviceFreeMap": ("allocated", "isolated", "held_until_floor_takes_effect", "used_per_segment", "unreleased_per_segment",
+                      "isolated_per_segment", "held_per_segment", "unblocked_slot_pairs_per_segment", "segments_reclaimed_not_yet_discarded",
+                      "segments_with_an_unblocked_slot_pair", "is_under_an_unreleased_record",
+                      "slot_pairs_without_an_unreleased_record_per_segment", "unblocked_slots_per_allocation_record_tree_leaf"),
+    "PoolAllocator": ("devices", "records", "cluster_segments", "reclaimed", "compaction", "root_ring",
+                      "allocation_record_tree_of_the_version_without_file"),
+    "RootRingOccupancy": ("occupants", "placements_named_by_unapplied_journal_records", "instance_table_judging_the_rereads"),
+}
+WHOLE_COPY_SCALAR = "单个数或单个小值，不是集合"
+WHOLE_COPY_NOT_COUNTED = {
+    "DeviceFreeMap": {name: WHOLE_COPY_SCALAR for name in (
+        "device", "device_size_in_bytes", "unit_area_start", "unit_area_slots", "full_segments_without_an_unreleased_record", "free_runs",
+        "allocated_slots", "free_slots", "isolated_slots", "deferred_slots", "unblocked_slots", "unblocked_slot_pairs",
+        "slot_pairs_without_an_unreleased_record")},
+    "PoolAllocator": {
+        **{name: WHOLE_COPY_SCALAR for name in (
+            "open_segment", "bump_cursor", "format_time_tree_table", "reuse_window",
+            "placements_reclaimed_on_release_by_the_forced_zero_reuse_window", "commit_generated_placements_that_fell_back",
+            "instance_rows_after_this_mounts_row_publish", "space_admission", "deletion_switches",
+            "reclaim_floor_when_the_latest_root_was_recorded")},
+        "frozen_publish": "只在一次发布落盘失败、冻结着等重发时是 Some，里面的字段在 transaction.rs 里私有、不数长度；改成每个被量的发布读一次它是不是空"
+                          "（状态行的 `frozen_publish_set`，用产品里已有的 `allocator.frozen_publish().is_some()`），不空的那一点整点作废",
+        "other_unit_reads_with_one_copy_failing": "Arc：各份拷贝共用同一份，拷贝不拷内容",
+    },
+    "RootRingOccupancy": {name: WHOLE_COPY_SCALAR for name in ("slots_per_region", "effective_floor", "latest_recorded_txg")},
+}
+
+
+def fields_of_the_struct(text, head):
+    import re
+    start = text.index(head) + len(head)
+    return re.findall(r"^    (?:pub )?([a-z][a-z0-9_]*):", text[start:text.index("\n}\n", start)], re.M)
+
+
+def whole_copy_gaps(allocator_text):
+    """今天 allocator.rs 里三个结构体的字段，对「数了的」「写明不数的」两份清单：交回 {结构体: (没归到任何一份的字段, 清单里有而结构体里没有的字段)}。"""
+    gaps = {}
+    for struct_name, struct_head, _ in WHOLE_COPY_STRUCTS:
+        fields = fields_of_the_struct(allocator_text, struct_head)
+        listed = set(WHOLE_COPY_COUNTED[struct_name]) | set(WHOLE_COPY_NOT_COUNTED[struct_name])
+        gaps[struct_name] = ([name for name in fields if name not in listed], sorted(listed - set(fields)))
+    return gaps
+
+
+def whole_copy_fields_named_by_the_helpers(helpers_text, struct_name):
+    """助手文字里 `impl <结构体> {` 那一块点了名的 `self.<字段>`。"""
+    import re
+    impl_head = {name: impl for name, _, impl in WHOLE_COPY_STRUCTS}[struct_name]
+    start = helpers_text.index(impl_head) + len(impl_head)
+    stop = helpers_text.find("\nimpl ", start)
+    return set(re.findall(r"self\s*\.\s*([a-z][a-z0-9_]*)", helpers_text[start:stop if stop >= 0 else len(helpers_text)]))
+
+
 HARNESS_FEATURES_FROM = 'features = ["lookup-work-counters", "test-only-publish-thresholds"]'
 HARNESS_FEATURES_TO = 'features = ["test-only-publish-thresholds"]'
 
@@ -1265,6 +1373,130 @@ def apply_one(text, edit, build):
     if edit.mode == "after":
         return text[:end] + inserted + text[end:]
     return text[:position] + inserted + text[end:]
+
+
+def scan_rust(text, positions=()):
+    """不编译，从头读一遍 Rust 文字（跳过 // 与 /* */ 注释、字符串、原始字符串、字符字面量；生命周期不当字符），
+    交回 (快照, 终栈, 第一处配平错误)。快照 {位置: (栈顶括号, 该位置前最后一个代码字符)}，栈顶 "" 表示不在任何括号里；
+    配平错误是 None 或 (偏移, 说明)。只认 ( [ { 三种括号。判不出的写法（宏里的括号、泛型的尖括号）不管。"""
+    wanted = sorted(set(positions))
+    snapshots, stack, last, error = {}, [], "", None
+    pairs = {")": "(", "]": "[", "}": "{"}
+    index, length, which = 0, len(text), 0
+    while True:
+        while which < len(wanted) and wanted[which] <= index:
+            snapshots[wanted[which]] = (stack[-1][0] if stack else "", last)
+            which += 1
+        if index >= length:
+            break
+        char = text[index]
+        if text.startswith("//", index):
+            newline = text.find("\n", index)
+            index = length if newline < 0 else newline
+        elif text.startswith("/*", index):
+            depth, index = 1, index + 2
+            while index < length and depth:
+                if text.startswith("/*", index):
+                    depth, index = depth + 1, index + 2
+                elif text.startswith("*/", index):
+                    depth, index = depth - 1, index + 2
+                else:
+                    index += 1
+        elif char in "rb" and (index == 0 or not (text[index - 1].isalnum() or text[index - 1] == "_")) and re.match(r'b?r#*"', text[index:index + 12]):
+            hashes = re.match(r'b?r(#*)"', text[index:index + 12]).group(1)
+            opening = text.index('"', index) + 1
+            closing = text.find('"' + hashes, opening)
+            index = length if closing < 0 else closing + 1 + len(hashes)
+            last = '"'
+        elif char == '"':
+            index += 1
+            while index < length and text[index] != '"':
+                index += 2 if text[index] == "\\" else 1
+            index += 1
+            last = '"'
+        elif char == "'":
+            if index + 1 < length and text[index + 1] == "\\":
+                closing = text.find("'", index + 3)
+                index = length if closing < 0 else closing + 1
+            elif index + 2 < length and text[index + 2] == "'":
+                index += 3
+            else:
+                index += 1
+            last = "'"
+        elif char in "([{":
+            stack.append((char, index))
+            last = char
+            index += 1
+        elif char in ")]}":
+            if stack and stack[-1][0] == pairs[char]:
+                stack.pop()
+            elif error is None:
+                error = (index, f"多出来的 {char}" if not stack else f"{char} 对不上栈顶的 {stack[-1][0]}")
+            last = char
+            index += 1
+        else:
+            if not char.isspace():
+                last = char
+            index += 1
+    return snapshots, stack, error
+
+
+OUR_STATEMENT = re.compile(r"^[ \t]*(?:crate::transaction::e20\d_\w+::|let _?e20\d_\w*|drop\(_e20\d_)")
+
+
+def insertion_problems(after_files):
+    """不起编译的判法之一：插完之后的每份 .rs 文件里，每一行我们插的语句（行首是 crate::transaction::e20N_…:: 的读数调用、`let e20N_…` 或 `let _e20N_…`、`drop(_e20N_…`）
+    要落在语句层：它前一个代码字符是语句边界（; { }），且最内层括号是 {（不在 ( [ 里面，即不在表达式、实参表、链式调用中间）。
+    只看插完之后的文字，不依赖每条改动的锚点怎么取、什么模式，所以锚文命中恰好一次但插进去落在表达式中间（锚文被别处的补丁包进了实参）也认得出。
+    交回 (判了几行, 问题清单)；问题一行一条：文件、行号、原因、那一行。判法的限度：`Name {` 之后插（结构体字面量、match）前一个字符也是 {，判不出，靠编译兜；
+    我们插的语句不是上面这几种开头的（例如接在别的语句同一行里）也不在这里判。"""
+    checked, problems = 0, []
+    for path in sorted(after_files):
+        text = after_files[path]
+        if not path.endswith(".rs"):
+            continue
+        starts, offset = [], 0
+        for line in text.splitlines(keepends=True):
+            if OUR_STATEMENT.match(line):
+                starts.append(offset)
+            offset += len(line)
+        snapshots, _, _ = scan_rust(text, starts)
+        for start in starts:
+            checked += 1
+            top, last = snapshots[start]
+            reasons = []
+            if top != "{":
+                reasons.append(f"在 {top or '括号之外'} 里面（表达式、实参表或链式调用中间）")
+            if last not in (";", "{", "}", ""):
+                reasons.append(f"前一个代码字符是 {last!r}，不是语句边界")
+            if reasons:
+                line_number = text.count("\n", 0, start) + 1
+                problems.append(f"name=insertion_problem file={path} line={line_number} reason={'；'.join(reasons)} text={text[start:text.index(chr(10), start)].strip()[:100]}")
+    return checked, problems
+
+
+def balance_problems(before_files, after_files):
+    """不起编译的判法之二：插完之后每份改过的 .rs 文件括号配平：终栈空、没有多出来或对不上的右括号；插之前那份本来就配不平的（读法没读准）也报，不当绿。"""
+    problems = []
+    for path in sorted(after_files):
+        if not path.endswith(".rs") or after_files[path] == before_files.get(path):
+            continue
+        for label, text in (("插之前", before_files.get(path, "")), ("插之后", after_files[path])):
+            _, stack, error = scan_rust(text)
+            if error or stack:
+                where = error[1] if error else f"文件结束时还有没关的 {stack[-1][0]}（第 {text.count(chr(10), 0, stack[-1][1]) + 1} 行起）"
+                problems.append(f"name=balance_problem file={path} stage={label} reason={where}")
+    return problems
+
+
+def syntax_report(label, edit_count, before_files, after_files):
+    """两道不起编译的判法一起过（改动条数只用来打摘要行）；问题行与摘要行都打出来，交回问题条数。"""
+    checked, lines = insertion_problems(after_files)
+    lines = lines + balance_problems(before_files, after_files)
+    for line in lines:
+        print(line)
+    print(f"name=insertion_check scope={label} edits={edit_count} inserted_statement_lines_checked={checked} problems={len(lines)}")
+    return len(lines)
 
 
 def transform(files, build, edit_list):
@@ -1476,6 +1708,13 @@ def check_anchors(tree):
         except AnchorError as error:
             bad += 1
             print(f"name=anchor id={edit.ident} file={edit.file} error={error}")
+    for struct_name, (unlisted, absent) in whole_copy_gaps(files[A]).items():
+        print(f"name=whole_copy_fields struct={struct_name} fields={len(fields_of_the_struct(files[A], dict((n, h) for n, h, _ in WHOLE_COPY_STRUCTS)[struct_name]))}"
+              f" counted={len(WHOLE_COPY_COUNTED[struct_name])} not_counted_with_reason={len(WHOLE_COPY_NOT_COUNTED[struct_name])}"
+              f" unlisted={unlisted} listed_but_absent={absent}")
+        bad += 1 if unlisted or absent else 0
+    if not bad:
+        bad += syntax_gate(files)
     return 3 if bad else 0
 
 
@@ -1577,6 +1816,65 @@ def the_intent_scale_is_read_between_the_write_and_the_unlink(histories_text):
         return False
     positions = [body.index(step) for step in steps]
     return positions == sorted(positions) and '"unlink_intent", round, pool)' not in measure_body
+
+
+SLOT_PAIR_METHOD_TODAY = (
+    "impl DeviceFreeMap {\n"
+    "    pub fn unblocked_slot_pairs_outside_the_cluster_segments(\n"
+    "        &self,\n"
+    "        cluster_segments: &BTreeSet<SlotNumber>,\n"
+    "    ) -> SlotPairCount {\n"
+    "        SlotPairCount(\n"
+    "            self.unblocked_slot_pairs.0\n"
+    "                - pairs_inside_the_cluster_segments(\n"
+    "                    self.unit_area_start,\n"
+    "                    &self.unblocked_slot_pairs_per_segment,\n"
+    "                    cluster_segments,\n"
+    "                )\n"
+    "        )\n"
+    "    }\n"
+    "}\n"
+)
+
+
+def selftest_insertions(expect):
+    """格：不起编译的判法（insertion_problems、balance_problems）。每格喂一小段 Rust，要报或不报；
+    其中两格喂今天聚簇段求和那个方法体的原样（`SlotPairCount(` 把求和包进实参里），用本表里真的那条改动落上去，锚点落在实参里要红。"""
+    ours = "crate::transaction::e203_scan::call(X);\n"
+
+    def problems(body):
+        return insertion_problems({"f.rs": "fn f() {\n" + body + "}\n"})[1]
+
+    expect(not problems("    let a = 1;\n    " + ours + "    let b = 2;\n"), "an_inserted_statement_between_two_statements_is_fine")
+    expect(not problems('    let s = ")";\n    let c = \'(\';\n    // ]\n    let r = r#"}"#;\n    ' + ours), "brackets_inside_strings_chars_and_comments_are_not_counted")
+    # 不配平的括号放进各种「不是代码」的位置，紧跟着一条我们插的语句：把它当代码，栈里就多一个 ( ，插入语句会被误报在括号里
+    expect(not problems("    // (\n    " + ours), "an_unbalanced_bracket_in_a_line_comment_right_before_the_insertion_is_not_counted")
+    expect(balance_problems({"a.rs": "fn f() {\n}\n"}, {"a.rs": "fn f() {\n    // (\n    g();\n}\n"}) == [], "an_unbalanced_bracket_in_a_line_comment_does_not_break_the_balance")
+    expect(not problems("    /* ( */\n    " + ours), "an_unbalanced_bracket_in_a_block_comment_right_before_the_insertion_is_not_counted")
+    expect(not problems('    let s = "(";\n    ' + ours), "an_unbalanced_bracket_in_a_string_right_before_the_insertion_is_not_counted")
+    expect(balance_problems({"a.rs": "fn f() {\n}\n"}, {"a.rs": "fn f<'a, 'b>(x: &'a(u8), y: &'b u8) {\n    g();\n}\n"}) == [], "a_lifetime_mark_is_not_taken_for_a_char_literal")
+    expect(bool(problems("    call(\n        a;\n        " + ours + "    )\n")), "an_inserted_statement_inside_an_argument_list_is_reported")
+    expect(bool(problems("    let s = Foo {\n        a: 1,\n        " + ours + "    };\n")), "an_inserted_statement_after_a_comma_is_reported")
+    expect(bool(problems("    self.records\n        .iter()\n        let e207_x = g();\n")), "an_inserted_let_in_the_middle_of_a_method_chain_is_reported")
+    today = next(edit for edit in edits() if edit.ident == "s14_cluster_segment_sum")
+    old = Edit("old_anchor", A, today.head, today.end, "        self.unblocked_slot_pairs.0\n", "before", today.counts, today.timing)
+    for kind, case_name in (("counts", "the_cluster_segment_sum_anchor_lands_on_a_statement_boundary_in_todays_method_body_counts"),
+                            ("timing", "the_cluster_segment_sum_anchor_lands_on_a_statement_boundary_in_todays_method_body_timing")):
+        landed = {A: apply_one(SLOT_PAIR_METHOD_TODAY, today, kind)}
+        expect(insertion_problems(landed)[1] == [] and landed[A] != SLOT_PAIR_METHOD_TODAY, case_name)
+    landed_old = {A: apply_one(SLOT_PAIR_METHOD_TODAY, old, "counts")}
+    expect(len(insertion_problems(landed_old)[1]) == 2 and balance_problems({A: SLOT_PAIR_METHOD_TODAY}, landed_old) == [],
+           "the_old_cluster_segment_sum_anchor_inside_the_slot_pair_argument_is_reported_though_the_brackets_balance")
+    expect(balance_problems({"a.rs": "fn f() {\n}\n"}, {"a.rs": "fn f() {\n    g();\n}\n"}) == [], "a_balanced_file_after_the_insertion_is_fine")
+    expect(len(balance_problems({"a.rs": "fn f() {\n}\n"}, {"a.rs": "fn f() {\n    g(;\n}\n"})) == 1, "an_unclosed_bracket_after_the_insertion_is_reported")
+    expect(len(balance_problems({"a.rs": "fn f() {\n}\n"}, {"a.rs": "fn f() {\n    g();)\n}\n"})) == 1, "an_extra_closing_bracket_after_the_insertion_is_reported")
+    expect(len(balance_problems({"a.rs": "fn f() {\n"}, {"a.rs": "fn f() {\n    g();\n"})) == 2, "a_file_that_was_not_balanced_before_is_reported_too")
+    expect(syntax_gate(fake_tree()) > 0, "the_syntax_gate_of_the_anchor_check_reports_on_a_tree_that_is_not_rust")
+
+
+def syntax_gate(files):
+    """--check-anchors 里的一段：两种构建各插一遍，再过不起编译的判法，交回有问题的构建数。"""
+    return sum(1 for kind in ("counts", "timing") if syntax_report(f"e203_{kind}", len(edits()), files, transform(files, kind, edits())))
 
 
 def selftest(histories_path=HISTORIES):
@@ -1777,10 +2075,10 @@ def selftest(histories_path=HISTORIES):
          f"{P}scale_to_the_hit({P}Row::AllocatorReleaseLinearFind, self.records.len());"),
         ("s25_release", A, "    pub fn release_leaving_the_record_allocated_on(\n", METHOD_END, None, "let record = self",
          f"{P}scale_to_the_hit({P}Row::AllocatorReleaseLinearFind, self.records.len());"),
-        ("s26_candidates", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END, f"{P}call({P}Row::UserDataSlotLinearScan);",
-         "while candidate + 1 < end {",
-         f"{P}scale_to_the_hit({P}Row::UserDataSlotLinearScan, usize::try_from(end.saturating_sub(candidate) / 2)"
-         '.expect("候选数装得进 usize") * (1 + cluster_segments.len()));'),
+        ("s26_segments", A, "    pub fn lowest_user_data_slot_outside_the_region(\n", METHOD_END, f"{P}call({P}Row::UserDataSlotLinearScan);",
+         ".find_map(|segment_index| {",
+         f"{P}scale_to_the_hit({P}Row::UserDataSlotLinearScan, self.segments_with_an_unblocked_slot_pair.len()"
+         ' + usize::try_from(CLUSTER_SEGMENT_SLOTS / 2).expect("32"));'),
         ("s27_filter", A, make_room, FN_END, None, "let intersecting_record_slots",
          f"{P}scale({P}Row::RecordIntersectionFilter, records.len());\n    let intersecting_record_slots"),
         ("s27_find", A, make_room, FN_END, None, "let existing = records",
@@ -1815,6 +2113,59 @@ def selftest(histories_path=HISTORIES):
     for camel, (to_the_hit, plain) in walks_to_the_hit.items():
         found = (every_counts_file.count(f"{P}step_to_the_hit({P}Row::{camel});"), every_counts_file.count(f"{P}step({P}Row::{camel});"))
         expect(found == (to_the_hit, plain), f"row_{camel}_counts_the_walk_to_the_hit_apart")
+    # s26：产品路径的两个循环（按段走、段内按对找）各记一步，且 `#[cfg(test)]` 下逐槽走的参照实现里一个计数点也没有
+    user_slot_step = f"{P}step_to_the_hit({P}Row::UserDataSlotLinearScan);"
+    user_slot_loops = (("    pub fn lowest_user_data_slot_outside_the_region(\n", "            .find_map(|segment_index| {\n"),
+                       ("    fn lowest_unblocked_slot_pair_in_the_segment(\n", "            .find(|first_index_of_the_pair| {\n"))
+    allocator_text = counts[A]
+    loops_step = all(allocator_text.count(head) == 1 and (lambda body: body.count(opener + "                " + user_slot_step + "\n") == 1)(
+        allocator_text[allocator_text.index(head):allocator_text.index(METHOD_END, allocator_text.index(head) + len(head)) + 1]) for head, opener in user_slot_loops)
+    reference_head = "    fn lowest_user_data_slot_outside_the_region_by_stepping_through_every_candidate(\n"
+    reference_has_no_counting_site = (reference_head not in allocator_text
+                                      or P not in allocator_text[allocator_text.index(reference_head):allocator_text.index(METHOD_END, allocator_text.index(reference_head))])
+    expect(loops_step and reference_has_no_counting_site, "the_user_data_slot_scan_counts_one_step_per_segment_and_one_per_pair_on_the_product_path")
+    # s37：池级回落按叶取落点的七处步各在自己那个函数体里恰好一处（叶、候选、候选上每块盘的判、逐槽数的槽、槽上每块盘的判、
+    # 单元区的叶、叶上每块盘读的没挡槽数），一次调用记在入口、计时守卫只在计时构建里、整个函数体一个
+    pooled_step_line = f"{P}step({P}Row::PooledFallbackByTheLeaf);\n"
+    pooled_sites = (
+        ("    fn commit_generated_fallback_slot_open_on_every_device(\n", "            .find_map(|leaf_index| {\n", 16),
+        ("    fn lowest_slot_open_on_every_device_in_the_leaf(\n", "        while candidate.0 + footprint.slots() <= past_the_last_slot_of_the_leaf.0 {\n", 12),
+        ("    fn lowest_slot_open_on_every_device_in_the_leaf(\n", "            if self.devices.iter().all(|device| {\n", 16),
+        ("    fn slots_open_on_every_device_in_the_leaf(\n", "            .filter(|slot| {\n", 16),
+        ("    fn slots_open_on_every_device_in_the_leaf(\n", "                self.devices.iter().all(|device| {\n", 20),
+        ("    fn lowest_slot_in_the_leaf_with_the_most_slots_open_on_every_device(\n", "        for leaf_number in first_leaf_index.0..=last_leaf_index.0 {\n", 12),
+        ("    fn lowest_slot_in_the_leaf_with_the_most_slots_open_on_every_device(\n", "                .map(|device| {\n", 20),
+    )
+
+    def body_of(text, head):
+        return text[text.index(head):text.index(METHOD_END, text.index(head) + len(head)) + 1]
+
+    pooled_entry_head = pooled_sites[0][0]
+    pooled_call = f"{P}call({P}Row::PooledFallbackByTheLeaf);\n"
+    pooled_timer = f"let _e203_timer = {P}timer({P}Row::PooledFallbackByTheLeaf);\n"
+    expect(all(counts[A].count(head) == 1 and body_of(counts[A], head).count(opener + " " * indent + pooled_step_line) == 1
+               for head, opener, indent in pooled_sites)
+           and body_of(counts[A], pooled_entry_head).count(pooled_call) == 1
+           and counts[A].count(pooled_step_line) == len(pooled_sites) and counts[A].count(pooled_call) == 1,
+           "the_pooled_fallback_counts_one_step_per_leaf_candidate_slot_and_device_check_and_one_call")
+    expect(body_of(timing[A], pooled_entry_head).count(pooled_timer) == 1 and pooled_timer not in counts[A]
+           and pooled_step_line not in timing[A] and pooled_call not in timing[A],
+           "the_pooled_fallback_is_timed_once_over_the_whole_body_in_the_timing_build_only")
+    # 整份拷分配器数的集合（s1、s24）：助手文字把「数了的」清单里每个字段都点了名，没点名的字段都写着不数的理由；
+    # 字段清单对今天结构体的核对在 `--check-anchors`（今天的树上才有结构体），这里用一份小结构体证核对本身会报多出来的字段与清单里多余的字段
+    expect(all(set(WHOLE_COPY_COUNTED[name]) <= whole_copy_fields_named_by_the_helpers(ALLOCATOR_HELPERS, name) for name, _, _ in WHOLE_COPY_STRUCTS)
+           and all(not (set(WHOLE_COPY_NOT_COUNTED[name]) & whole_copy_fields_named_by_the_helpers(ALLOCATOR_HELPERS, name))
+                   for name, _, _ in WHOLE_COPY_STRUCTS),
+           "the_whole_copy_helpers_name_every_collection_that_is_counted_and_none_that_is_not")
+    fake_structs = "".join(f"{head}" + "".join(f"    {field}: u64,\n" for field in (*WHOLE_COPY_COUNTED[name], *WHOLE_COPY_NOT_COUNTED[name])) + "}\n"
+                           for name, head, _ in WHOLE_COPY_STRUCTS)
+    fake_gaps = whole_copy_gaps(fake_structs)
+    extra_field = fake_structs.replace("pub struct DeviceFreeMap {\n", "pub struct DeviceFreeMap {\n    a_new_collection: Vec<bool>,\n")
+    short_struct = fake_structs.replace("    allocated: u64,\n", "", 1)
+    expect(all(unlisted == [] and absent == [] for unlisted, absent in fake_gaps.values())
+           and whole_copy_gaps(extra_field)["DeviceFreeMap"] == (["a_new_collection"], [])
+           and whole_copy_gaps(short_struct)["DeviceFreeMap"] == ([], ["allocated"]),
+           "the_whole_copy_field_check_reports_a_new_field_and_a_field_that_is_gone")
     # s25 两处查找（`record_for` 与 `release_leaving_the_record_allocated_on` 每块盘一次）各记一次调用、各有一个计时守卫：
     # 调用数是 B8 那一行 c25 × lg(R_a) 的 c25，只记一处时少一半（变异 c71、c72）
     counted_call_of_the_release_find = f"{P}call({P}Row::AllocatorReleaseLinearFind);"
@@ -1852,6 +2203,12 @@ def selftest(histories_path=HISTORIES):
     histories_text = pathlib.Path(histories_path).read_text(encoding="utf-8")
     expect(the_intent_scale_is_read_between_the_write_and_the_unlink(histories_text),
            "the_unlink_intent_scale_is_read_after_the_file_to_unlink_is_written")
+    # 每个被量的发布读一次冻结着的发布是不是空：状态行带 `frozen_publish_set`，值取产品里已有的 `allocator.frozen_publish().is_some()`
+    # （不空的那一点模型整点作废；变异 c85、c86）
+    state_text_start = histories_text.index("fn state_text(")
+    state_text_body = histories_text[state_text_start:histories_text.index("\n}\n", state_text_start)]
+    expect(state_text_body.count("frozen_publish_set={}") == 1 and state_text_body.count("allocator.frozen_publish().is_some()") == 1,
+           "the_state_line_reads_whether_a_publish_is_frozen")
     # 副本要编得起来：缺哪一份就拒，拷出来的清单不许指到副本外（变异 c4）
     import tempfile
     with tempfile.TemporaryDirectory() as directory:
@@ -1963,6 +2320,7 @@ def selftest(histories_path=HISTORIES):
         (foreign / "mine.txt").write_text("not ours", encoding="utf-8")
         expect(trying(lambda: prepare_copy(resume, foreign, changed_key)) == "refused" and (foreign / "mine.txt").exists(),
                "a_directory_that_is_not_our_copy_is_refused_and_left_alone")
+    selftest_insertions(expect)
     # 同一个锚点在函数体里出现两次：退 3 那一格（变异 c1）
     doubled = dict(files)
     first = edits()[0]

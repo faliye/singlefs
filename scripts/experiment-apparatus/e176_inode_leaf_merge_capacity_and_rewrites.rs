@@ -782,10 +782,10 @@ pub struct ArmVariant {
     pub policy: MergePolicy,
 }
 
-pub const ARM_M1: ArmVariant = ArmVariant { name: "M1", policy: MergePolicy::DropEmptyOnly };
-pub const ARM_M2_MAIN: ArmVariant =
+pub const ARM_DROP_EMPTY_ONLY: ArmVariant = ArmVariant { name: "M1", policy: MergePolicy::DropEmptyOnly };
+pub const ARM_ABSORB_RIGHT_MAIN: ArmVariant =
     ArmVariant { name: "M2", policy: MergePolicy::AbsorbRightWhenTheyFit { order: NeighbourCheckOrder::RightPairFirst } };
-pub const ARM_M3_MAIN: ArmVariant = ArmVariant {
+pub const ARM_ABSORB_AND_BORROW_MAIN: ArmVariant = ArmVariant {
     name: "M3",
     policy: MergePolicy::AbsorbRightAndBorrowFromRight {
         order: NeighbourCheckOrder::RightPairFirst,
@@ -793,7 +793,7 @@ pub const ARM_M3_MAIN: ArmVariant = ArmVariant {
         amount: BorrowAmount::HalfTheDifference,
     },
 };
-pub const ARM_M3_FLOOR_59: ArmVariant = ArmVariant {
+pub const ARM_ABSORB_AND_BORROW_FLOOR_59: ArmVariant = ArmVariant {
     name: "M3_floor59",
     policy: MergePolicy::AbsorbRightAndBorrowFromRight {
         order: NeighbourCheckOrder::RightPairFirst,
@@ -801,7 +801,7 @@ pub const ARM_M3_FLOOR_59: ArmVariant = ArmVariant {
         amount: BorrowAmount::HalfTheDifference,
     },
 };
-pub const ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR: ArmVariant = ArmVariant {
+pub const ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR: ArmVariant = ArmVariant {
     name: "M3_just_enough",
     policy: MergePolicy::AbsorbRightAndBorrowFromRight {
         order: NeighbourCheckOrder::RightPairFirst,
@@ -809,10 +809,10 @@ pub const ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR: ArmVariant = ArmVariant {
         amount: BorrowAmount::JustEnoughForTheFloor,
     },
 };
-pub const ARM_M2_LEFT_PAIR_FIRST: ArmVariant =
+pub const ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST: ArmVariant =
     ArmVariant { name: "M2_left_first", policy: MergePolicy::AbsorbRightWhenTheyFit { order: NeighbourCheckOrder::LeftPairFirst } };
 /// 第二段「先查哪一对」那个旋钮在 M3 上的取值：下限与借多少取主旋钮，只把先查的那一对换成左边（跑前登记第五节、第八节）。
-pub const ARM_M3_LEFT_PAIR_FIRST: ArmVariant = ArmVariant {
+pub const ARM_ABSORB_AND_BORROW_LEFT_PAIR_FIRST: ArmVariant = ArmVariant {
     name: "M3_left_first",
     policy: MergePolicy::AbsorbRightAndBorrowFromRight {
         order: NeighbourCheckOrder::LeftPairFirst,
@@ -822,10 +822,10 @@ pub const ARM_M3_LEFT_PAIR_FIRST: ArmVariant = ArmVariant {
 };
 
 /// 第一段的四个臂变体，次序就是产物里的次序；下标 0 是 M1。
-pub const SEGMENT_ONE_ARMS: [ArmVariant; 4] = [ARM_M1, ARM_M2_MAIN, ARM_M3_MAIN, ARM_M3_FLOOR_59];
+pub const SEGMENT_ONE_ARMS: [ArmVariant; 4] = [ARM_DROP_EMPTY_ONLY, ARM_ABSORB_RIGHT_MAIN, ARM_ABSORB_AND_BORROW_MAIN, ARM_ABSORB_AND_BORROW_FLOOR_59];
 /// 第二段的六个臂变体：主窗口那三条（M1、M2 主、M3 主）当参照，加登记第五节第二段那三个变体；次序就是产物里的次序，下标 0 是 M1、1 是 M2 主、2 是 M3 主。
 pub const SEGMENT_TWO_ARMS: [ArmVariant; 6] =
-    [ARM_M1, ARM_M2_MAIN, ARM_M3_MAIN, ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR, ARM_M2_LEFT_PAIR_FIRST, ARM_M3_LEFT_PAIR_FIRST];
+    [ARM_DROP_EMPTY_ONLY, ARM_ABSORB_RIGHT_MAIN, ARM_ABSORB_AND_BORROW_MAIN, ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR, ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST, ARM_ABSORB_AND_BORROW_LEFT_PAIR_FIRST];
 
 /// 一条臂在一条序列上为什么停下。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1054,7 +1054,7 @@ fn record_step_in_window(window: &mut ComparisonWindow, runs: &[ArmRun], outcome
     if operations[0] != operations[1] || operations[0] != operations[2] {
         window.operations_identical = false;
     }
-    let StepOutcome::Unlinked(_, m1_content, m1_position) = triple_outcomes[0] else { return };
+    let StepOutcome::Unlinked(_, drop_empty_only_content, drop_empty_only_position) = triple_outcomes[0] else { return };
     window.unlinks += 1;
     for (slot_index, outcome) in triple_outcomes.iter().enumerate() {
         let StepOutcome::Unlinked(_, content, position) = outcome else {
@@ -1069,8 +1069,8 @@ fn record_step_in_window(window: &mut ComparisonWindow, runs: &[ArmRun], outcome
         rewrites.content_histogram[histogram_bucket(*content)] += 1;
         rewrites.position_histogram[histogram_bucket(*position)] += 1;
         if slot_index > 0 {
-            let position_difference = i64::try_from(*position).expect("片数") - i64::try_from(*m1_position).expect("片数");
-            let content_difference = i64::try_from(*content).expect("片数") - i64::try_from(*m1_content).expect("片数");
+            let position_difference = i64::try_from(*position).expect("片数") - i64::try_from(*drop_empty_only_position).expect("片数");
+            let content_difference = i64::try_from(*content).expect("片数") - i64::try_from(*drop_empty_only_content).expect("片数");
             window.cumulative[(slot_index - 1) * 2].add(position_difference);
             window.cumulative[(slot_index - 1) * 2 + 1].add(content_difference);
         }
@@ -1209,7 +1209,7 @@ fn insert_until_refused(tree: &mut InodeLeafTree, first_inode: u64) -> u64 {
 
 /// A1：插入 1, 2, … 直到被拒。
 #[must_use]
-pub fn anchor_a1(arm: ArmVariant) -> String {
+pub fn anchor_insert_until_refused(arm: ArmVariant) -> String {
     let mut tree = InodeLeafTree::empty(arm.policy, LeafContainerLimit::OneRootNode);
     let refused_inode = insert_until_refused(&mut tree, 1);
     format!("refused_insert={refused_inode} live={} containers={}", live_inodes_at_refusal(&tree), tree.containers.len())
@@ -1217,7 +1217,7 @@ pub fn anchor_a1(arm: ArmVariant) -> String {
 
 /// A2：插入 1 … 31 455；对 k = 0 … 134 按号升序删 233k + 2 … 233k + 233；再插入直到被拒。
 #[must_use]
-pub fn anchor_a2(arm: ArmVariant) -> String {
+pub fn anchor_one_record_per_leaf_then_insert_until_refused(arm: ArmVariant) -> String {
     let mut tree = InodeLeafTree::empty(arm.policy, LeafContainerLimit::OneRootNode);
     for inode in 1..=31_455_u64 {
         assert_eq!(tree.insert(inode), InsertOutcome::Accepted, "A2 建满 135 片之前不会被拒");
@@ -1332,53 +1332,53 @@ pub fn crates_unit_test_readings() -> Vec<AnchorReading> {
 #[must_use]
 pub fn anchor_readings() -> Vec<AnchorReading> {
     let mut readings = Vec::new();
-    for arm in [ARM_M1, ARM_M2_MAIN, ARM_M3_MAIN, ARM_M3_FLOOR_59] {
-        readings.push(AnchorReading { cell: "A1", arm: arm.name, observed: anchor_a1(arm), expected: Some("refused_insert=31456 live=31455 containers=135") });
+    for arm in [ARM_DROP_EMPTY_ONLY, ARM_ABSORB_RIGHT_MAIN, ARM_ABSORB_AND_BORROW_MAIN, ARM_ABSORB_AND_BORROW_FLOOR_59] {
+        readings.push(AnchorReading { cell: "A1", arm: arm.name, observed: anchor_insert_until_refused(arm), expected: Some("refused_insert=31456 live=31455 containers=135") });
     }
-    let a2_expected: [(ArmVariant, Option<&'static str>); 4] = [
-        (ARM_M1, Some("refused_insert=31688 live=367 containers=135 merges=0 borrows=0")),
-        (ARM_M2_MAIN, Some("refused_insert=62776 live=31455 containers=135 merges=134 borrows=0")),
-        (ARM_M3_MAIN, Some("refused_insert=62776 live=31455 containers=135 merges=134 borrows=918")),
-        (ARM_M3_FLOOR_59, None),
+    let one_record_per_leaf_expected: [(ArmVariant, Option<&'static str>); 4] = [
+        (ARM_DROP_EMPTY_ONLY, Some("refused_insert=31688 live=367 containers=135 merges=0 borrows=0")),
+        (ARM_ABSORB_RIGHT_MAIN, Some("refused_insert=62776 live=31455 containers=135 merges=134 borrows=0")),
+        (ARM_ABSORB_AND_BORROW_MAIN, Some("refused_insert=62776 live=31455 containers=135 merges=134 borrows=918")),
+        (ARM_ABSORB_AND_BORROW_FLOOR_59, None),
     ];
-    for (arm, expected) in a2_expected {
-        readings.push(AnchorReading { cell: "A2", arm: arm.name, observed: anchor_a2(arm), expected });
+    for (arm, expected) in one_record_per_leaf_expected {
+        readings.push(AnchorReading { cell: "A2", arm: arm.name, observed: anchor_one_record_per_leaf_then_insert_until_refused(arm), expected });
     }
-    let a3_deleted = ascending_run(1, 117);
-    let a4_deleted = ascending_run(1, 233);
-    let a5_deleted: Vec<u64> = ascending_run(234, 350).into_iter().chain(ascending_run(467, 583)).collect();
-    let a6_deleted: Vec<u64> = ascending_run(1, 117).into_iter().chain(ascending_run(234, 349)).collect();
+    let deleted_inodes_1_to_117 = ascending_run(1, 117);
+    let deleted_inodes_1_to_233 = ascending_run(1, 233);
+    let deleted_inodes_234_to_350_and_467_to_583: Vec<u64> = ascending_run(234, 350).into_iter().chain(ascending_run(467, 583)).collect();
+    let deleted_inodes_1_to_117_and_234_to_349: Vec<u64> = ascending_run(1, 117).into_iter().chain(ascending_run(234, 349)).collect();
     let scenarios: [(&'static str, u64, &[u64], [(ArmVariant, Option<&'static str>); 4]); 4] = [
-        ("A3", 467, &a3_deleted, [
-            (ARM_M1, Some("content=117 position=117 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=116/233/1")),
-            (ARM_M2_MAIN, Some("content=117 position=117 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=116/233/1")),
-            (ARM_M3_MAIN, Some("content=118 position=118 containers=2 merges=1 borrows=1 third_sentence_false=1 sizes=174/176")),
-            (ARM_M3_FLOOR_59, None),
+        ("A3", 467, &deleted_inodes_1_to_117, [
+            (ARM_DROP_EMPTY_ONLY, Some("content=117 position=117 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=116/233/1")),
+            (ARM_ABSORB_RIGHT_MAIN, Some("content=117 position=117 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=116/233/1")),
+            (ARM_ABSORB_AND_BORROW_MAIN, Some("content=118 position=118 containers=2 merges=1 borrows=1 third_sentence_false=1 sizes=174/176")),
+            (ARM_ABSORB_AND_BORROW_FLOOR_59, None),
         ]),
-        ("A4", 700, &a4_deleted, [
-            (ARM_M1, Some("content=232 position=235 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=233/233/1")),
-            (ARM_M2_MAIN, Some("content=232 position=235 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=233/233/1")),
-            (ARM_M3_MAIN, Some("content=240 position=242 containers=3 merges=1 borrows=7 third_sentence_false=0 sizes=233/233/1")),
-            (ARM_M3_FLOOR_59, None),
+        ("A4", 700, &deleted_inodes_1_to_233, [
+            (ARM_DROP_EMPTY_ONLY, Some("content=232 position=235 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=233/233/1")),
+            (ARM_ABSORB_RIGHT_MAIN, Some("content=232 position=235 containers=3 merges=0 borrows=0 third_sentence_false=0 sizes=233/233/1")),
+            (ARM_ABSORB_AND_BORROW_MAIN, Some("content=240 position=242 containers=3 merges=1 borrows=7 third_sentence_false=0 sizes=233/233/1")),
+            (ARM_ABSORB_AND_BORROW_FLOOR_59, None),
         ]),
-        ("A5", 933, &a5_deleted, [
-            (ARM_M1, Some("content=234 position=234 containers=5 merges=0 borrows=0 third_sentence_false=0 sizes=233/116/116/233/1")),
-            (ARM_M2_MAIN, Some("content=234 position=236 containers=4 merges=1 borrows=0 third_sentence_false=0 sizes=233/232/233/1")),
-            (ARM_M3_MAIN, Some("content=241 position=243 containers=4 merges=1 borrows=7 third_sentence_false=0 sizes=233/232/233/1")),
-            (ARM_M3_FLOOR_59, None),
+        ("A5", 933, &deleted_inodes_234_to_350_and_467_to_583, [
+            (ARM_DROP_EMPTY_ONLY, Some("content=234 position=234 containers=5 merges=0 borrows=0 third_sentence_false=0 sizes=233/116/116/233/1")),
+            (ARM_ABSORB_RIGHT_MAIN, Some("content=234 position=236 containers=4 merges=1 borrows=0 third_sentence_false=0 sizes=233/232/233/1")),
+            (ARM_ABSORB_AND_BORROW_MAIN, Some("content=241 position=243 containers=4 merges=1 borrows=7 third_sentence_false=0 sizes=233/232/233/1")),
+            (ARM_ABSORB_AND_BORROW_FLOOR_59, None),
         ]),
-        ("A6", 466, &a6_deleted, [
-            (ARM_M1, Some("content=233 position=233 containers=2 merges=0 borrows=0 third_sentence_false=0 sizes=116/117")),
-            (ARM_M2_MAIN, Some("content=233 position=233 containers=1 merges=1 borrows=0 third_sentence_false=0 sizes=233")),
-            (ARM_M3_MAIN, Some("content=240 position=240 containers=1 merges=1 borrows=7 third_sentence_false=0 sizes=233")),
-            (ARM_M3_FLOOR_59, None),
+        ("A6", 466, &deleted_inodes_1_to_117_and_234_to_349, [
+            (ARM_DROP_EMPTY_ONLY, Some("content=233 position=233 containers=2 merges=0 borrows=0 third_sentence_false=0 sizes=116/117")),
+            (ARM_ABSORB_RIGHT_MAIN, Some("content=233 position=233 containers=1 merges=1 borrows=0 third_sentence_false=0 sizes=233")),
+            (ARM_ABSORB_AND_BORROW_MAIN, Some("content=240 position=240 containers=1 merges=1 borrows=7 third_sentence_false=0 sizes=233")),
+            (ARM_ABSORB_AND_BORROW_FLOOR_59, None),
         ]),
     ];
     for (cell, inserted, deleted, arms) in scenarios {
         for (arm, expected) in arms {
             let (observed, tree) = anchor_scenario_tree(arm, inserted, deleted);
             readings.push(AnchorReading { cell, arm: arm.name, observed, expected });
-            if cell == "A3" && arm == ARM_M3_MAIN {
+            if cell == "A3" && arm == ARM_ABSORB_AND_BORROW_MAIN {
                 let boundary = format!(
                     "leaf0_largest={} leaf1_smallest={}",
                     tree.containers[0].largest_inode_number(),
@@ -1388,18 +1388,18 @@ pub fn anchor_readings() -> Vec<AnchorReading> {
             }
         }
     }
-    let (a3_just_enough, _) = anchor_scenario_tree(ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR, 467, &a3_deleted);
+    let (just_enough_borrow_observed, _) = anchor_scenario_tree(ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR, 467, &deleted_inodes_1_to_117);
     readings.push(AnchorReading {
         cell: "A3",
-        arm: ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR.name,
-        observed: a3_just_enough,
+        arm: ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR.name,
+        observed: just_enough_borrow_observed,
         expected: Some("content=118 position=118 containers=2 merges=1 borrows=1 third_sentence_false=1 sizes=117/233"),
     });
-    let (a5_left_first, _) = anchor_scenario_tree(ARM_M2_LEFT_PAIR_FIRST, 933, &a5_deleted);
+    let (left_pair_first_observed, _) = anchor_scenario_tree(ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST, 933, &deleted_inodes_234_to_350_and_467_to_583);
     readings.push(AnchorReading {
         cell: "A5",
-        arm: ARM_M2_LEFT_PAIR_FIRST.name,
-        observed: a5_left_first,
+        arm: ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST.name,
+        observed: left_pair_first_observed,
         expected: Some("content=234 position=236 containers=4 merges=1 borrows=0 third_sentence_false=0 sizes=233/232/233/1"),
     });
     readings.push(AnchorReading { cell: "C1", arm: "M1_unlimited", observed: anchor_c1(), expected: Some("leaves=4292 live=100000 ideal=430 ratio=9.98") });
@@ -1408,7 +1408,7 @@ pub fn anchor_readings() -> Vec<AnchorReading> {
 }
 
 /// 第二段的三个臂变体（登记第五节第二段那一行），次序就是锚点行里的次序。
-pub const SEGMENT_TWO_VARIANTS: [ArmVariant; 3] = [ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR, ARM_M2_LEFT_PAIR_FIRST, ARM_M3_LEFT_PAIR_FIRST];
+pub const SEGMENT_TWO_VARIANTS: [ArmVariant; 3] = [ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR, ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST, ARM_ABSORB_AND_BORROW_LEFT_PAIR_FIRST];
 
 /// 第二段的阳性对照（登记修订 3）：第一段的全部锚点格（M1、M2 主、M3 主在第二段照样进窗口），加第二段三个变体在 A1 … A6 上还没有读数的格。
 /// A1 只插入、臂不起作用，三个变体都按 A1 那一格的登记答案判；A3 借到刚好够下限、A5 M2 先查左边两格第一段里已有、带登记答案；其余只报不判。
@@ -1416,19 +1416,19 @@ pub const SEGMENT_TWO_VARIANTS: [ArmVariant; 3] = [ARM_M3_JUST_ENOUGH_FOR_THE_FL
 pub fn segment_two_anchor_readings() -> Vec<AnchorReading> {
     let mut readings = anchor_readings();
     for arm in SEGMENT_TWO_VARIANTS {
-        readings.push(AnchorReading { cell: "A1", arm: arm.name, observed: anchor_a1(arm), expected: Some("refused_insert=31456 live=31455 containers=135") });
+        readings.push(AnchorReading { cell: "A1", arm: arm.name, observed: anchor_insert_until_refused(arm), expected: Some("refused_insert=31456 live=31455 containers=135") });
     }
     for arm in SEGMENT_TWO_VARIANTS {
-        readings.push(AnchorReading { cell: "A2", arm: arm.name, observed: anchor_a2(arm), expected: None });
+        readings.push(AnchorReading { cell: "A2", arm: arm.name, observed: anchor_one_record_per_leaf_then_insert_until_refused(arm), expected: None });
     }
-    let a3_deleted = ascending_run(1, 117);
-    let a4_deleted = ascending_run(1, 233);
-    let a5_deleted: Vec<u64> = ascending_run(234, 350).into_iter().chain(ascending_run(467, 583)).collect();
-    let a6_deleted: Vec<u64> = ascending_run(1, 117).into_iter().chain(ascending_run(234, 349)).collect();
-    let scenarios: [(&'static str, u64, &[u64]); 4] = [("A3", 467, &a3_deleted), ("A4", 700, &a4_deleted), ("A5", 933, &a5_deleted), ("A6", 466, &a6_deleted)];
+    let deleted_inodes_1_to_117 = ascending_run(1, 117);
+    let deleted_inodes_1_to_233 = ascending_run(1, 233);
+    let deleted_inodes_234_to_350_and_467_to_583: Vec<u64> = ascending_run(234, 350).into_iter().chain(ascending_run(467, 583)).collect();
+    let deleted_inodes_1_to_117_and_234_to_349: Vec<u64> = ascending_run(1, 117).into_iter().chain(ascending_run(234, 349)).collect();
+    let scenarios: [(&'static str, u64, &[u64]); 4] = [("A3", 467, &deleted_inodes_1_to_117), ("A4", 700, &deleted_inodes_1_to_233), ("A5", 933, &deleted_inodes_234_to_350_and_467_to_583), ("A6", 466, &deleted_inodes_1_to_117_and_234_to_349)];
     for (cell, inserted, deleted) in scenarios {
         for arm in SEGMENT_TWO_VARIANTS {
-            let has_a_segment_one_reading = (cell == "A3" && arm == ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR) || (cell == "A5" && arm == ARM_M2_LEFT_PAIR_FIRST);
+            let has_a_segment_one_reading = (cell == "A3" && arm == ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR) || (cell == "A5" && arm == ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST);
             if has_a_segment_one_reading {
                 continue;
             }
@@ -1586,13 +1586,13 @@ impl PointValue {
 pub fn point_value(result: &SequenceResult, row: JudgedRow, window_index: usize) -> PointValue {
     match row {
         JudgedRow::CapacityRatio => {
-            let m1 = &result.trajectories[0];
-            let m2 = &result.trajectories[1];
-            if m1.stop == ArmStop::ReachedOperationCap {
+            let drop_empty_only_trajectory = &result.trajectories[0];
+            let absorb_right_trajectory = &result.trajectories[1];
+            if drop_empty_only_trajectory.stop == ArmStop::ReachedOperationCap {
                 return PointValue { value: None, note: "m1_not_reached" };
             }
-            let note = if m2.stop == ArmStop::ReachedOperationCap { "upper_bound" } else { "" };
-            PointValue { value: Some(Rational::new(i128::from(m1.live_inodes_at_stop), i128::from(m2.live_inodes_at_stop))), note }
+            let note = if absorb_right_trajectory.stop == ArmStop::ReachedOperationCap { "upper_bound" } else { "" };
+            PointValue { value: Some(Rational::new(i128::from(drop_empty_only_trajectory.live_inodes_at_stop), i128::from(absorb_right_trajectory.live_inodes_at_stop))), note }
         }
         JudgedRow::WriteCost { minuend_slot, subtrahend_slot, notation, .. } => {
             let window = &result.windows[window_index];
@@ -1660,14 +1660,14 @@ pub fn moved_threshold_verdicts(row: JudgedRow, main: PointValue, opposite: Poin
     let smaller = if main_value.compare(opposite_value).is_lt() { main_value } else { opposite_value };
     let moved = match row {
         JudgedRow::CapacityRatio => {
-            if smaller.compare(registered.lower).is_lt() && main_value.max_with(opposite_value).compare(registered.lower).is_lt() {
+            if smaller.compare(registered.lower).is_lt() && main_value.maximum_with(opposite_value).compare(registered.lower).is_lt() {
                 Thresholds { lower: between, upper: registered.upper }
             } else {
                 Thresholds { lower: registered.lower, upper: between }
             }
         }
         JudgedRow::WriteCost { significant_side_counts, .. } => {
-            let larger = main_value.max_with(opposite_value);
+            let larger = main_value.maximum_with(opposite_value);
             if significant_side_counts && smaller.compare(registered.upper).is_ge() && larger.compare(registered.upper).is_ge() {
                 Thresholds { lower: registered.lower, upper: between }
             } else {
@@ -1680,7 +1680,7 @@ pub fn moved_threshold_verdicts(row: JudgedRow, main: PointValue, opposite: Poin
 
 impl Rational {
     #[must_use]
-    pub fn max_with(self, other: Self) -> Self {
+    pub fn maximum_with(self, other: Self) -> Self {
         if self.compare(other).is_ge() {
             self
         } else {
@@ -1966,20 +1966,20 @@ pub fn run_sequences(
 }
 
 /// 窗口指纹那一行（第十一节作废条款的读数）与 F6 那一行，两段共用。
-fn window_prefix_and_f6_verdict_lines(results: &[SequenceResult]) -> Vec<String> {
+fn window_prefix_and_drop_empty_only_reached_verdict_lines(results: &[SequenceResult]) -> Vec<String> {
     let windows: Vec<&ComparisonWindow> = results.iter().flat_map(|result| result.windows.iter()).collect();
     let equal_windows = windows
         .iter()
         .filter(|window| window.operations_identical && window.prefix_sha256[0] == window.prefix_sha256[1] && window.prefix_sha256[0] == window.prefix_sha256[2])
         .count();
-    let m1_not_reached = results.iter().filter(|result| result.trajectories[0].stop == ArmStop::ReachedOperationCap).count();
+    let drop_empty_only_not_reached = results.iter().filter(|result| result.trajectories[0].stop == ArmStop::ReachedOperationCap).count();
     vec![
         format!(
             "name=verdict scope=window_prefixes windows={} windows_with_equal_prefixes={equal_windows} all_window_prefixes_equal={}",
             windows.len(),
             equal_windows == windows.len()
         ),
-        format!("name=verdict scope=f6_m1_reached points={} m1_not_reached_points={m1_not_reached} m1_reached_on_every_point={}", results.len(), m1_not_reached == 0),
+        format!("name=verdict scope=f6_m1_reached points={} m1_not_reached_points={drop_empty_only_not_reached} m1_reached_on_every_point={}", results.len(), drop_empty_only_not_reached == 0),
     ]
 }
 
@@ -2018,7 +2018,7 @@ fn sensitivity_self_proof_line(sensitivity: &[String]) -> String {
 /// 第二段序列跑完之后的总判定行（不带 `E7RESULT ` 前缀）：窗口指纹、F6、三个窗口每行总判定、两个旋钮的敏感性与它的挪门槛自证。
 #[must_use]
 pub fn segment_two_summary_lines(results: &[SequenceResult]) -> Vec<String> {
-    let mut lines = window_prefix_and_f6_verdict_lines(results);
+    let mut lines = window_prefix_and_drop_empty_only_reached_verdict_lines(results);
     let window_labels: Vec<&str> = SEGMENT_TWO_WINDOWS.iter().map(|(label, _)| *label).collect();
     lines.extend(row_verdict_lines(results, &window_labels));
     let sensitivity = segment_two_sensitivity_lines(results);
@@ -2031,7 +2031,7 @@ pub fn segment_two_summary_lines(results: &[SequenceResult]) -> Vec<String> {
 /// 序列跑完之后的总判定行（不带 `E7RESULT ` 前缀）：窗口指纹、F5、F6、每行总判定、敏感性与它的挪门槛自证。
 #[must_use]
 pub fn summary_lines(results: &[SequenceResult]) -> Vec<String> {
-    let mut lines = window_prefix_and_f6_verdict_lines(results);
+    let mut lines = window_prefix_and_drop_empty_only_reached_verdict_lines(results);
     let main_point_borrows: u64 = results.iter().filter(|result| result.sequence.is_main_sampling_point).map(|result| result.trajectories[2].borrows).sum();
     lines.push(format!("name=verdict scope=f5_m3_borrows_on_main_points main_point_m3_borrows={main_point_borrows} m3_borrowed_on_some_main_point={}", main_point_borrows > 0));
     let window_labels: Vec<&str> = SEGMENT_ONE_WINDOWS.iter().map(|(label, _)| *label).collect();
@@ -2167,14 +2167,14 @@ mod tests {
     }
 
     #[test]
-    fn a1_refuses_the_insert_that_would_open_the_136th_leaf() {
-        let observed = anchor_a1(ARM_M1);
+    fn insert_until_refused_anchor_refuses_the_insert_that_would_open_the_136th_leaf() {
+        let observed = anchor_insert_until_refused(ARM_DROP_EMPTY_ONLY);
         assert_eq!(observed, format!("refused_insert={} live={} containers={}", 31_455 + 1, 233 * 135, 135));
     }
 
     #[test]
-    fn a2_one_record_per_leaf_leaves_m1_only_134_plus_233_live_inodes() {
-        let observed = anchor_a2(ARM_M1);
+    fn one_record_per_leaf_anchor_leaves_drop_empty_only_with_134_plus_233_live_inodes() {
+        let observed = anchor_one_record_per_leaf_then_insert_until_refused(ARM_DROP_EMPTY_ONLY);
         assert_eq!(observed, format!("refused_insert={} live={} containers=135 merges=0 borrows=0", 31_455 + 233, 134 + 233));
     }
 
@@ -2262,9 +2262,9 @@ mod tests {
         assert!(check_structure_after_publish(&overlapping, &[]).is_err(), "左片最大号 5 ≥ 右片最小号 4 要红");
         let third_sentence = two_leaf_tree(MergePolicy::DropEmptyOnly, vec![1, 5], 3, vec![6, 7]);
         assert!(check_structure_after_publish(&third_sentence, &[]).is_err(), "M1 上左片最大号 5 ≥ 右片容器号 3 要红");
-        let borrowed = two_leaf_tree(ARM_M3_MAIN.policy, ascending_run(1, 120), 100, ascending_run(121, 240));
+        let borrowed = two_leaf_tree(ARM_ABSORB_AND_BORROW_MAIN.policy, ascending_run(1, 120), 100, ascending_run(121, 240));
         assert_eq!(check_structure_after_publish(&borrowed, &[]), Ok(1), "M3 上同一形态只计数：1 对");
-        let thin_pair = two_leaf_tree(ARM_M2_MAIN.policy, ascending_run(1, 100), 101, ascending_run(101, 233));
+        let thin_pair = two_leaf_tree(ARM_ABSORB_RIGHT_MAIN.policy, ascending_run(1, 100), 101, ascending_run(101, 233));
         assert!(check_structure_after_publish(&thin_pair, &[]).is_err(), "M2 上相邻两片之和 233 < 234 要红");
         let unsorted = two_leaf_tree(MergePolicy::DropEmptyOnly, vec![1, 3, 2], 10, vec![10]);
         assert!(check_structure_after_publish(&unsorted, &[0]).is_err(), "动过的那片片内不升序要红");
@@ -2322,7 +2322,7 @@ mod tests {
 
     #[test]
     fn merge_and_borrow_arms_keep_adjacent_pairs_above_one_leaf_through_a_random_run() {
-        for arm in [ARM_M2_MAIN, ARM_M3_MAIN, ARM_M3_FLOOR_59, ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR, ARM_M2_LEFT_PAIR_FIRST, ARM_M3_LEFT_PAIR_FIRST] {
+        for arm in [ARM_ABSORB_RIGHT_MAIN, ARM_ABSORB_AND_BORROW_MAIN, ARM_ABSORB_AND_BORROW_FLOOR_59, ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR, ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST, ARM_ABSORB_AND_BORROW_LEFT_PAIR_FIRST] {
             let mut tree = InodeLeafTree::empty(arm.policy, LeafContainerLimit::OneRootNode);
             let mut generator = WorkloadGenerator::new(Workload::RandomInsertDelete { insert_probability_percent: 60 }, 7);
             for _ in 0..50_000 {
@@ -2343,25 +2343,25 @@ mod tests {
     }
 
     #[test]
-    fn segment_two_windows_put_each_registered_variant_against_m1() {
+    fn segment_two_windows_put_each_registered_variant_against_drop_empty_only() {
         let names = |triple: [usize; 3]| triple.map(|arm_index| SEGMENT_TWO_ARMS[arm_index].name);
         assert_eq!(SEGMENT_TWO_WINDOWS.map(|(label, _)| label), ["main", "just_enough", "left_first"]);
         assert_eq!(names(SEGMENT_TWO_WINDOWS[0].1), ["M1", "M2", "M3"]);
         assert_eq!(names(SEGMENT_TWO_WINDOWS[1].1), ["M1", "M2", "M3_just_enough"]);
         assert_eq!(names(SEGMENT_TWO_WINDOWS[2].1), ["M1", "M2_left_first", "M3_left_first"]);
         assert_eq!(
-            ARM_M3_LEFT_PAIR_FIRST.policy,
+            ARM_ABSORB_AND_BORROW_LEFT_PAIR_FIRST.policy,
             MergePolicy::AbsorbRightAndBorrowFromRight { order: NeighbourCheckOrder::LeftPairFirst, floor: 117, amount: BorrowAmount::HalfTheDifference }
         );
         assert_eq!(
-            ARM_M3_JUST_ENOUGH_FOR_THE_FLOOR.policy,
+            ARM_ABSORB_AND_BORROW_JUST_ENOUGH_FOR_THE_FLOOR.policy,
             MergePolicy::AbsorbRightAndBorrowFromRight { order: NeighbourCheckOrder::RightPairFirst, floor: 117, amount: BorrowAmount::JustEnoughForTheFloor }
         );
-        assert_eq!(ARM_M2_LEFT_PAIR_FIRST.policy, MergePolicy::AbsorbRightWhenTheyFit { order: NeighbourCheckOrder::LeftPairFirst });
+        assert_eq!(ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST.policy, MergePolicy::AbsorbRightWhenTheyFit { order: NeighbourCheckOrder::LeftPairFirst });
     }
 
     #[test]
-    fn segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest() {
+    fn segment_two_anchors_judge_insert_until_refused_for_the_three_variants_and_only_report_the_rest() {
         let readings = segment_two_anchor_readings();
         let registered = readings.iter().filter(|reading| reading.expected.is_some()).count();
         assert_eq!(registered, 26 + 3, "第一段登记的 26 格，加三个变体的 A1");
@@ -2403,27 +2403,27 @@ mod tests {
     }
 
     #[test]
-    fn m2_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour() {
-        assert_the_middle_leaf_absorbs_its_right_neighbour(ARM_M2_MAIN);
+    fn absorb_right_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour() {
+        assert_the_middle_leaf_absorbs_its_right_neighbour(ARM_ABSORB_RIGHT_MAIN);
     }
 
     #[test]
-    fn m3_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour() {
-        assert_the_middle_leaf_absorbs_its_right_neighbour(ARM_M3_MAIN);
+    fn absorb_and_borrow_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour() {
+        assert_the_middle_leaf_absorbs_its_right_neighbour(ARM_ABSORB_AND_BORROW_MAIN);
     }
 
     #[test]
-    fn m2_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position() {
-        assert_the_left_neighbour_absorbs_the_middle_leaf(ARM_M2_LEFT_PAIR_FIRST);
+    fn absorb_right_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position() {
+        assert_the_left_neighbour_absorbs_the_middle_leaf(ARM_ABSORB_RIGHT_LEFT_PAIR_FIRST);
     }
 
     #[test]
-    fn m3_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position() {
-        assert_the_left_neighbour_absorbs_the_middle_leaf(ARM_M3_LEFT_PAIR_FIRST);
+    fn absorb_and_borrow_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position() {
+        assert_the_left_neighbour_absorbs_the_middle_leaf(ARM_ABSORB_AND_BORROW_LEFT_PAIR_FIRST);
     }
 
     #[test]
-    fn segment_two_sensitivity_pairs_four_m3_rows_for_the_borrow_amount_and_six_rows_for_the_check_order() {
+    fn segment_two_sensitivity_pairs_four_absorb_and_borrow_rows_for_the_borrow_amount_and_six_rows_for_the_check_order() {
         let sequence = registered_sequences().into_iter().find(|sequence| sequence.name == "wa_keep1of2_a1000").expect("登记里有这一点");
         let result = run_sequence(sequence, &SEGMENT_TWO_ARMS, &SEGMENT_TWO_WINDOWS, 200_000);
         let lines = segment_two_sensitivity_lines(std::slice::from_ref(&result));

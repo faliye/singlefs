@@ -5,7 +5,9 @@
 #   装置是入库装置 crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs；装置按「段」（命令行参数）一段一段跑，
 #   本脚本把它们切成八个互不依赖的片，每片一个进程、一份输出，全部判完再按固定次序拼成产物
 #   research/results/e181-landing-check-fixed-point-and-mount-lower-bound-landing.out（多段产物，每段有自己的 name=done 收尾行），
-#   第一片（常量回比、锚点、自证、小几何的阳性对照）另存一份给复跑登记用的产物 …-checks.out（逐字节可比，不含计时与线程数）。
+#   第一片（常量回比、锚点、自证、小几何的阳性对照）另存一份 …-checks.out（逐字节可比，不含计时与线程数）。
+#   复跑表 E181 那一行（scripts/experiment-apparatus/replay.sh 的 driver_e181）起本脚本、比 …-landing.out：全部 11 段都判，判完的片复用。
+#   并发按下面的内存预算开；任务服务给的上限照它自己库里按命令键的记录定，.claude/memory-bounded-parallelism.tsv 只登记这份脚本准许按内存定并发。
 #
 # long-run-shards: 一片 = 装置的一段输出：checks、f11、f9、measure、controls、narrow、unequal、small 八片；每片一个进程，--only 点名哪几片，两台机器可以各判一部分片
 # long-run-resume: 每片一条判定，在 prune-server 的 apparatus-items 族、种类 e181_landing_check_fixed_point_and_mount_lower_bound（读写经 scripts/experiment-apparatus/long_run_item_verdicts.py，
@@ -226,6 +228,7 @@ run_segment() { # <片名>
     *) ;;
   esac
   binary_identity_assert_unchanged || return 1
+  echo "片 $segment：开跑（段 $sections）"
   # shellcheck disable=SC2086  # 段名按空格拆成装置的几个参数
   env ${environment[@]+"${environment[@]}"} \
     "$LAUNCH_BINARY" $sections \
@@ -270,9 +273,9 @@ assemble_the_products() {
   is_complete_output "$assembled" || { echo "  ✗ 拼出来的产物不齐：$assembled" >&2; echo "     → 怎么办：看这份文件末尾缺哪一段的收尾行，交主 agent 查那一片的判定（库里那一条判绿而产物不齐，是装置或收尾判法的缺陷）" >&2; return 1; }
   mkdir -p -- "$PRODUCT_DIRECTORY" || return 1
   mv -n -- "$assembled" "$landing" || return 1
-  [[ ! -e "$checks_product" ]] || { echo "  ✗ 复跑登记用的产物名被占了：$checks_product" >&2; echo "     → 怎么办：落地产物已经落在 $landing；照文件头「产物名」另起一个没被占的 …-checks 名字" >&2; return 1; }
+  [[ ! -e "$checks_product" ]] || { echo "  ✗ 第一片那一份产物的名字被占了：$checks_product" >&2; echo "     → 怎么办：落地产物已经落在 $landing；照文件头「产物名」另起一个没被占的 …-checks 名字" >&2; return 1; }
   cp -- "$SEGMENT_DIRECTORY/seg-checks.out" "$checks_product" || return 1
-  echo "产物：$landing（$(wc -l < "$landing") 行）；复跑登记用：$checks_product（$(wc -l < "$checks_product") 行）；按片判定 $counts"
+  echo "产物：$landing（$(wc -l < "$landing") 行）；第一片那一份：$checks_product（$(wc -l < "$checks_product") 行）；按片判定 $counts"
 }
 
 # 自证：假装置在每一格自己的临时树里走一遍（本脚本与共用库拷进树里，树里 .claude 与 long_run_item_verdicts.py 是指回真仓的符号链接）；不起 cargo、不碰真装置。
@@ -368,7 +371,7 @@ FAKE
   cell="$work/fresh"; make_tree "$cell"
   original_sha=$(sha256sum -- "$cell/tree/fake-bin/device" | cut -d' ' -f1)
   invoke "$cell"; exit_code=$?
-  expect "全新：八片现判、拼出落地产物与复跑登记用的产物、成功句报现判 8、复用 0、拒算 0" '((exit_code == 0)) && grep -qF "现判 8、复用 0、拒算 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem_landing.out") == 23)) && (($(wc -l < "$cell/tree/$stem_checks.out") == 8)) && (($(calls_of "$cell") == 8)) && grep -qF "装置 sha256 $original_sha（私有副本" "$cell/out"'
+  expect "全新：八片现判、拼出落地产物与第一片那一份产物、成功句报现判 8、复用 0、拒算 0" '((exit_code == 0)) && grep -qF "现判 8、复用 0、拒算 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem_landing.out") == 23)) && (($(wc -l < "$cell/tree/$stem_checks.out") == 8)) && (($(calls_of "$cell") == 8)) && grep -qF "装置 sha256 $original_sha（私有副本" "$cell/out"'
   invoke "$cell"; exit_code=$?
   expect "原样重起：八片全复用、装置一次没起、产物另存带日期的" '((exit_code == 0)) && grep -qF "现判 0、复用 8、拒算 0" "$cell/out" && (($(calls_of "$cell") == 8)) && [[ -f "$cell/tree/$stem_landing-$today.out" ]]'
   cell="$work/swap"; make_tree "$cell"

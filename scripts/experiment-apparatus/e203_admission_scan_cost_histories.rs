@@ -250,6 +250,9 @@ struct RefusedChange {
 fn floor_raises_inside_the_refusal(refusal: &UserChangeRefused) -> usize {
     match refusal {
         UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space) => no_space.floor_raises.len(),
+        UserChangeRefused::NoSpaceEvenWithEverythingAFloorRaiseCouldRelease(no_space) => {
+            no_space.floor_raises.len()
+        }
         UserChangeRefused::FloorRaiseFailedWhilePushingForSpace(failed) => {
             failed.floor_raises.len()
         }
@@ -393,7 +396,7 @@ fn state_text(
     format!(
         "E203RESULT name=state build={build} point={point} state={state} kind={kind} round={round} units={} mapped_units={} allocation_records={} cluster_segments={} \
          other_files={} tombstone_containers={} inode_leaf_containers={} accounting_rows={} devices={} whole_copy_elements={} deadlist_entries={} extent_upper_nodes={} \
-         extent_upper_levels={} accounting_tree_levels={} deadlist_tree_levels={} allocation_tree_levels={} central_mapping_levels={}",
+         extent_upper_levels={} accounting_tree_levels={} deadlist_tree_levels={} allocation_tree_levels={} central_mapping_levels={} frozen_publish_set={}",
         version.units.len(),
         version.mapped_units.len(),
         allocator.records().len(),
@@ -416,6 +419,8 @@ fn state_text(
         },
         heights.allocation_record_tree,
         version.height_read_from_the_root_node_header(MultiLevelCodeTwoTree::CentralMapping),
+        // 发布落盘失败冻结着等重发时是 1：那一点整点作废（模型的作废条款）
+        u8::from(allocator.frozen_publish().is_some()),
     )
 }
 
@@ -514,7 +519,7 @@ fn occupancy_text(pool: &Pool) -> String {
         version.deadlist_entries.len(),
         version.inode_number_watermark(),
         allocator.records().len(),
-        allocator.commit_generated_placements_that_fell_back_to_the_lowest_free_slot()
+        allocator.commit_generated_placements_that_fell_back()
     )
 }
 
@@ -1018,6 +1023,7 @@ fn number_from_the_environment(name: &str, by_default: u64) -> u64 {
 /// 对不上的取样数与外推口径（`probe_extrapolation_text`，推的）。逐步的读数整趟停着（不量），`E203_PROBE_KEEP_READINGS=1` 时不停（对照停读数省了多少挂钟）。
 /// 不进产物：入口只点名 `point_<点>`，这一条不在里面；打的行以 `E203PROBE` 起头，入口写产物时不收。
 #[test]
+// wallclock-assert-load-safe: 断言只核对被拒原因是不是建 inode 与合取 7（EmptyClusterSegmentsBelowTheFloor），与耗时无关
 fn probe_of_the_empty_segments_refusal_on_many_unlinks() {
     let unlinks = number_from_the_environment("E203_PROBE_UNLINKS", PROBE_UNLINKS_BY_DEFAULT);
     let exponent = u32::try_from(number_from_the_environment(

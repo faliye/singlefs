@@ -40,6 +40,8 @@ const SETTLING_ROUNDS_AT_MOST: u64 = 64;
 const OVERWRITE_BYTES: u64 = 2999;
 /// 每盘 16 TiB 的盘字节数 2⁴⁴ 对应的单元区槽数 2³⁰ − 1408（登记读法第 5 条）。
 const USER_SCALE_DEVICE_SLOTS: u64 = 1 << 30;
+/// 历史用例源文件（由 e203-admission-scan-cost-run.sh 拷进副本跑）。
+const _HISTORIES_PAYLOAD: &str = include_str!("e203_admission_scan_cost_histories.rs");
 
 // ---- 判档（登记第六节）----
 /// 增长阶三档：α ≥ 0.5 随这根轴涨，α ≤ 0.25 不随（至多对数级），之间不判。
@@ -770,7 +772,7 @@ enum RowKind {
     NegativeControl,
 }
 
-const ROW_TABLE: [(&str, RowKind); 35] = [
+const ROW_TABLE: [(&str, RowKind); 36] = [
     ("whole_allocator_copy_before_the_judgement", RowKind::Scan),
     ("inode_leaf_container_copy", RowKind::Copy),
     ("inode_leaf_writer_copy", RowKind::Copy),
@@ -806,7 +808,13 @@ const ROW_TABLE: [(&str, RowKind); 35] = [
     ("instance_table_chain", RowKind::Scan),
     ("units_of_a_publish_to_land", RowKind::NegativeControl),
     ("mapped_units_whole_table", RowKind::Scan),
+    // s37：主 agent 定的，量的一侧（B1）进扫类合计（准入之前三段）；推的一侧（B8、B4）没有这一行的式子，见 `ROW_WITHOUT_A_BY_DELTA_FORMULA`。
+    (ROW_WITHOUT_A_BY_DELTA_FORMULA, RowKind::Scan),
 ];
+
+/// 池级回落按叶取落点（s37）：B8 对这一步的做法没人定过，by_delta_rows 里没有它的式子，B8、B4 合计里它是 0；
+/// 一个点只要在准入之前三段里调到过它（pooled_fallback_calls > 0），那一点的 B8、B4 合计就标「缺 s37 一行，只对清单内的步」，不拿这一点判 B8 站不站得住。
+const ROW_WITHOUT_A_BY_DELTA_FORMULA: &str = "pooled_fallback_by_the_leaf";
 
 fn all_rows() -> Vec<(&'static str, RowKind)> {
     ROW_TABLE.to_vec()
@@ -950,6 +958,41 @@ fn cells_not_measurable(product: &Product) -> Vec<(String, String, u64, u64)> {
             (point.clone(), state.clone(), *taken, *attempts)
         })
         .collect()
+}
+
+/// 作废条款（冻结的发布）：被量的发布进判之前读一次分配器里冻结着等重发的那一次是不是空（规模读数行的 `frozen_publish_set`），
+/// 不空的那一格所在的点整点作废。交回 (作废的点, 这一份产物里没带这个字段的格数)。
+fn points_with_a_frozen_publish(product: &Product) -> (BTreeSet<String>, u64) {
+    let mut voided = BTreeSet::new();
+    let mut unread = 0;
+    for (key, fields) in &product.states {
+        match number(fields, "frozen_publish_set") {
+            Some(0) => {}
+            Some(_) => {
+                voided.insert(key.0.clone());
+            }
+            None => unread += 1,
+        }
+    }
+    (voided, unread)
+}
+
+/// 把整点拿掉：点轴值、各行读数、规模读数、发布行、差量、段挂钟与各点的附带读数一起拿。
+fn without_the_points(product: &Product, points: &BTreeSet<String>) -> Product {
+    let mut kept = product.clone();
+    kept.points.retain(|point, _| !points.contains(point));
+    kept.rows.retain(|key, _| !points.contains(&key.0));
+    kept.states.retain(|key, _| !points.contains(&key.0));
+    kept.publishes.retain(|key, _| !points.contains(&key.0));
+    kept.segment_nanos.retain(|key, _| !points.contains(&key.0));
+    kept.deltas.retain(|fields| {
+        !points.contains(fields.get("point").map_or("", String::as_str))
+    });
+    kept.unlink_publishes.retain(|key, _| !points.contains(&key.0));
+    kept.history_unlinks.retain(|point, _| !points.contains(point));
+    kept.rounds_taken.retain(|key, _| !points.contains(&key.0));
+    kept.items_done.retain(|point| !points.contains(point));
+    kept
 }
 
 /// 把量不到的那几格的覆盖写读数整格拿掉（它们不当 0 进任何一个量，别的格不动）：规模读数、各行读数、差量、段挂钟一起拿。
@@ -1296,6 +1339,8 @@ enum Relation {
     UpToTheHitAtTheCallSite,
     /// 修订 4，两部分都有：全表扫那一部分（步数减走到命中为止的步）逐格等于它的表长之和，走到命中为止那一部分不超过它的表长之和。
     WholeTableAndUpToTheHitAtTheCallSite,
+    /// 这一行没有表长可比（s37 只记步，没有 `scale`）：只核「调过就有步、没调过就没有步」，逐格对。
+    EveryCallTakesAStep,
 }
 
 impl Relation {
@@ -1323,11 +1368,11 @@ const EVERY_KIND: &[&str] = &["overwrite", "unlink_intent", "unlink_final"];
 const POOL_WIDE_ACCOUNTING_ROWS: u64 = 3;
 const PER_DEVICE_ACCOUNTING_ROWS: u64 = 6;
 
-/// 第三节清单里扫类的 26 行（两行整份拷走第七节 ③1，不在这里）全对账，三种发布、准入之前三段：
+/// 第三节清单里扫类的 27 行（两行整份拷走第七节 ③1，不在这里；第 27 行 s37 只核步）全对账，三种发布、准入之前三段：
 /// 16 行吃计数构建在这一次发布进判之前读上一版（`entry_` 起头的差量）、发完之后读这一次那一版（`exit_` 起头的差量）的表长，
 /// 与发布行的固定点轮数、这一行的调用次数，逐格相等（登记第十二节修订 3 ②；s5、s7、s14 是修订 4 换吃入口读数的）；
 /// 修订 4 那十行吃插计数脚本在每次调用那一刻读的表长，全表扫那一部分逐格相等、走到命中为止那一部分不超过上界（拆开记的，没有整行走上界的）。
-const RECONCILED_ROWS: [ReconciledRow; 26] = [
+const RECONCILED_ROWS: [ReconciledRow; 27] = [
     reconciled_on_every_kind("files_other_than_the_first_plan"),
     reconciled_on_every_kind("inodes_with_an_extent_entry_set"),
     reconciled_on_every_kind("cluster_segment_sum"),
@@ -1378,6 +1423,12 @@ const RECONCILED_ROWS: [ReconciledRow; 26] = [
     reconciled_on_every_kind("accounting_entries_of_this_publish"),
     reconciled_on_every_kind("instance_table_chain"),
     reconciled_on_every_kind("mapped_units_whole_table"),
+    ReconciledRow {
+        row: ROW_WITHOUT_A_BY_DELTA_FORMULA,
+        relation: Relation::EveryCallTakesAStep,
+        kinds: EVERY_KIND,
+        segments: &["caller", "before_landing", "between"],
+    },
 ];
 
 /// 逐格相等、三种发布、准入之前三段：吃入口、出口读数的 16 行一律这样对。
@@ -1445,7 +1496,9 @@ fn call_site_cell_agrees(relation: Relation, cell: &CallSiteCell) -> (bool, bool
     let absent_part_reads_nothing = match relation {
         Relation::WholeTableAtTheCallSite => cell.lengths_to_the_hit == 0,
         Relation::UpToTheHitAtTheCallSite => cell.whole_table_lengths == 0,
-        Relation::Equals | Relation::WholeTableAndUpToTheHitAtTheCallSite => true,
+        Relation::Equals
+        | Relation::WholeTableAndUpToTheHitAtTheCallSite
+        | Relation::EveryCallTakesAStep => true,
     };
     let agrees = whole_table_steps == cell.whole_table_lengths
         && !over_the_bound
@@ -1659,6 +1712,15 @@ fn reconcile_one_cell(
     state: &Fields,
     calls: u64,
 ) -> Option<(bool, bool, String)> {
+    if entry.relation == Relation::EveryCallTakesAStep {
+        // s37 每次调用至少走一片叶（重写集里的叶或单元区罩到的叶），所以调过 ⇔ 有步
+        let steps = product.steps_of(at, entry.segments, entry.row);
+        return Some((
+            (calls > 0) == (steps > 0),
+            false,
+            format!("steps={steps} calls={calls}"),
+        ));
+    }
     if entry.relation == Relation::Equals {
         let steps = product.steps_of(at, entry.segments, entry.row);
         let expected = expected_steps_of_the_rows_read_at_the_entry_and_the_exit(
@@ -1738,15 +1800,19 @@ fn reconciliation_report(product: &Product, out: &mut String) -> ReconciliationT
         .iter()
         .filter(|entry| entry.relation.has_a_bounded_part())
         .count();
+    let rows_steps_only = RECONCILED_ROWS
+        .iter()
+        .filter(|entry| entry.relation == Relation::EveryCallTakesAStep)
+        .count();
     let _ = writeln!(
         out,
-        "name=verdict quantity=three_two cells_checked={} disagreements={} cells_over_the_bound={} cells_with_the_scale_unread={} rows_reconciled={} rows_equal_only={} rows_with_a_bounded_part={rows_with_a_bounded_part} rows_not_reconciled={}",
+        "name=verdict quantity=three_two cells_checked={} disagreements={} cells_over_the_bound={} cells_with_the_scale_unread={} rows_reconciled={} rows_equal_only={} rows_with_a_bounded_part={rows_with_a_bounded_part} rows_steps_only={rows_steps_only} rows_not_reconciled={}",
         totals.cells,
         totals.disagreements,
         totals.over_the_bound,
         totals.unread,
         RECONCILED_ROWS.len(),
-        RECONCILED_ROWS.len() - rows_with_a_bounded_part,
+        RECONCILED_ROWS.len() - rows_with_a_bounded_part - rows_steps_only,
         not_reconciled.len()
     );
     totals
@@ -2304,7 +2370,7 @@ fn extrapolation_check_report(counts: &Product, timing: &Product, out: &mut Stri
 
 // ---- B8、B4 的输入：从计数产物里读（读不到的列进缺口，不当 0）----
 /// B8 式子里 `c_x` 那几行（登记第五节表里写调用次数的行）。
-const CALLED_ROWS: [&str; 17] = [
+const CALLED_ROWS: [&str; 18] = [
     "inode_record_linear_find",
     "files_other_than_the_first_plan",
     "file_other_than_the_first_linear_find",
@@ -2322,6 +2388,8 @@ const CALLED_ROWS: [&str; 17] = [
     "fallback_slot_linear_scan",
     "accounting_entries_of_this_publish",
     "instance_table_chain",
+    // s37 没有 B8 式子，只读调用次数 pooled_fallback_calls 好标「缺 s37 一行」
+    ROW_WITHOUT_A_BY_DELTA_FORMULA,
 ];
 
 /// 固定点每一轮的某个差量读数（一轮取读到的最大那个）；某一轮一条都没有记缺口。
@@ -2521,6 +2589,58 @@ fn by_delta_input_from_the_product(
 /// B1 照抄每个角色逐个查的次数（产物里这一行的 `query_levels`）是整表的量，不进 B8。
 fn mapped_units_queries_by_delta(changed_roles_over_all_rounds: u64, mapped_units: u64) -> u64 {
     changed_roles_over_all_rounds * lg(mapped_units)
+}
+
+// ---- s37（池级回落按叶取落点）：B8、B4 没有这一行的式子，按调用次数标点 ----
+/// 一个点某状态某发布：准入之前三段里 s37 的调用次数 pooled_fallback_calls、s37 的步数、s29 的步数（B1 一侧，读不到的行记 0）。
+fn pooled_fallback_reading(
+    counts: &Product,
+    point: &str,
+    state: &str,
+    kind: &str,
+) -> (u64, u64, u64) {
+    let at = round_key(point, state, kind, 1);
+    (
+        counts.calls_of(&at, &SEGMENTS_BEFORE_ADMISSION, ROW_WITHOUT_A_BY_DELTA_FORMULA),
+        counts.steps_of(&at, &SEGMENTS_BEFORE_ADMISSION, ROW_WITHOUT_A_BY_DELTA_FORMULA),
+        counts.steps_of(&at, &SEGMENTS_BEFORE_ADMISSION, "fallback_slot_linear_scan"),
+    )
+}
+
+/// 每个取样点、每种发布报 pooled_fallback_calls；pooled_fallback_calls = 0 的点 B8、B4 合计照常，pooled_fallback_calls > 0 的点标「缺 s37 一行，只对清单内的步」，逐点列出 s37 与 s29 的步数。
+/// 交回 (pooled_fallback_calls > 0 的格数, 核了几格)。
+fn pooled_fallback_report(counts: &Product, out: &mut String) -> (u64, u64) {
+    let (mut marked, mut checked) = (0, 0);
+    for point in counts.points.keys() {
+        for state in STATES {
+            for kind in KINDS {
+                if !counts.states.contains_key(&round_key(point, state, kind, 1)) {
+                    continue;
+                }
+                checked += 1;
+                let (calls, steps, per_disk_fallback_steps) = pooled_fallback_reading(counts, point, state, kind);
+                let by_delta_total = match by_delta_rows_by_segment(counts, point, state, kind) {
+                    Ok(rows) => total_of(&rows, &SEGMENTS_BEFORE_ADMISSION).to_string(),
+                    Err(_) => "unread".to_string(),
+                };
+                let mark = if calls > 0 {
+                    marked += 1;
+                    "missing_pooled_fallback_row_only_for_the_listed_steps"
+                } else {
+                    "complete"
+                };
+                let _ = writeln!(
+                    out,
+                    "name=by_delta_pooled_fallback point={point} state={state} kind={kind} pooled_fallback_calls={calls} pooled_fallback_steps={steps} per_disk_fallback_steps={per_disk_fallback_steps} by_delta_total={by_delta_total} by_delta_arms_total={mark}"
+                );
+            }
+        }
+    }
+    let _ = writeln!(
+        out,
+        "name=verdict quantity=by_delta_pooled_fallback cells_checked={checked} cells_with_pooled_fallback_calls={marked}"
+    );
+    (marked, checked)
 }
 
 // ---- Q6、Q7、Q8、Q9：B8、B4 的式子在量过的点上 ----
@@ -3402,6 +3522,23 @@ fn full_report(counts: &Product, timing: Option<&Product>, out: &mut String) {
     // 作废条款 8：量不到的格整格拿掉，不当 0 进任何一个量；每一格另点名。
     let cells_of_counts = cells_not_measurable(counts);
     let cells_of_timing = timing.map(cells_not_measurable).unwrap_or_default();
+    let (frozen_in_counts, frozen_unread_in_counts) = points_with_a_frozen_publish(counts);
+    let (frozen_in_timing, frozen_unread_in_timing) = timing.map_or((BTreeSet::new(), 0), points_with_a_frozen_publish);
+    for (build, points) in [("counts", &frozen_in_counts), ("timing", &frozen_in_timing)] {
+        for point in points {
+            let _ = writeln!(out, "name=void_frozen_publish build={build} point={point} result=point_voided");
+        }
+    }
+    let _ = writeln!(
+        out,
+        "name=verdict clause=void_frozen_publish points_voided_in_counts={} points_voided_in_timing={} cells_without_the_reading_in_counts={frozen_unread_in_counts} cells_without_the_reading_in_timing={frozen_unread_in_timing}",
+        frozen_in_counts.len(),
+        frozen_in_timing.len()
+    );
+    let voided_points: BTreeSet<String> = frozen_in_counts.union(&frozen_in_timing).cloned().collect();
+    let counts = &without_the_points(counts, &voided_points);
+    let timing = timing.map(|product| without_the_points(product, &voided_points));
+    let timing = timing.as_ref();
     let cleaned_counts = without_the_cells_not_measurable(counts, &cells_of_counts);
     let cleaned_timing =
         timing.map(|product| without_the_cells_not_measurable(product, &cells_of_timing));
@@ -3438,6 +3575,7 @@ fn full_report(counts: &Product, timing: Option<&Product>, out: &mut String) {
     );
     counts_report(counts, out);
     let (by_delta_summary, narrowed_summary) = arms_report(counts, out);
+    pooled_fallback_report(counts, out);
     memory_report(counts, out);
     between_segment_report(counts, timing, out);
     user_scale_steps_report(counts, timing, out);
@@ -4523,6 +4661,36 @@ mod tests {
     }
 
     #[test]
+    fn a_point_with_a_frozen_publish_is_voided_whole_and_named() {
+        let flat = synthetic_counts_text(&synthetic_unit_area_points(4, 8));
+        let clean = report_of_counts(&flat);
+        assert!(
+            clean.contains("name=verdict clause=void_frozen_publish points_voided_in_counts=0 points_voided_in_timing=0 cells_without_the_reading_in_counts=12 cells_without_the_reading_in_timing=0"),
+            "{clean}"
+        );
+        let frozen = flat.replace(
+            "name=state point=unit_area_2_pow_24 state=same_mount kind=overwrite round=1 ",
+            "name=state point=unit_area_2_pow_24 state=same_mount kind=overwrite round=1 frozen_publish_set=1 ",
+        );
+        assert_ne!(frozen, flat, "合成产物里要有这一格的状态行");
+        let voided = report_of_counts(&frozen);
+        assert!(
+            voided.contains("name=void_frozen_publish build=counts point=unit_area_2_pow_24 result=point_voided"),
+            "{voided}"
+        );
+        assert!(
+            voided.contains("name=verdict clause=void_frozen_publish points_voided_in_counts=1 points_voided_in_timing=0 cells_without_the_reading_in_counts=11"),
+            "{voided}"
+        );
+        // 整点作废：这个点的读数不进任何量（别的点照常）
+        assert!(!voided.contains("name=by_delta_pooled_fallback point=unit_area_2_pow_24 "), "{voided}");
+        assert!(voided.contains("name=by_delta_pooled_fallback point=unit_area_2_pow_14 "), "{voided}");
+        // 作废的点也不留在点轴里：点轴上的点数 2 变 1（变异：作废的点留在轴里时红）
+        assert!(clean.contains("name=verdict clause=void_6 points=2 points_with_the_done_marker="), "{clean}");
+        assert!(voided.contains("name=verdict clause=void_6 points=1 points_with_the_done_marker="), "{voided}");
+    }
+
+    #[test]
     fn failure_clauses_two_and_five_each_read_their_own_arm() {
         let flat = report_of_counts(&synthetic_counts_text(&synthetic_unit_area_points(4, 8)));
         assert!(
@@ -5170,7 +5338,7 @@ mod tests {
 
     #[test]
     fn the_reconciliation_covers_every_scan_row_and_counts_the_bounded_rows_apart() {
-        assert_eq!(scan_rows().len(), 28, "26 行扫类加两行整份拷");
+        assert_eq!(scan_rows().len(), 29, "27 行扫类加两行整份拷");
         let totals = |text: &str| {
             let mut out = String::new();
             (reconciliation_report(&read_product(text), &mut out), out)
@@ -5180,7 +5348,7 @@ mod tests {
         assert_eq!(
             empty,
             ReconciliationTotals {
-                cells: 11,
+                cells: 12,
                 disagreements: 0,
                 over_the_bound: 0,
                 unread: 15,
@@ -5188,7 +5356,7 @@ mod tests {
             "{out}"
         );
         assert!(
-            out.contains("name=verdict quantity=three_two cells_checked=11 disagreements=0 cells_over_the_bound=0 cells_with_the_scale_unread=15 rows_reconciled=26 rows_equal_only=18 rows_with_a_bounded_part=8 rows_not_reconciled=0"),
+            out.contains("name=verdict quantity=three_two cells_checked=12 disagreements=0 cells_over_the_bound=0 cells_with_the_scale_unread=15 rows_reconciled=27 rows_equal_only=18 rows_with_a_bounded_part=8 rows_steps_only=1 rows_not_reconciled=0"),
             "{out}"
         );
         assert!(
@@ -5200,7 +5368,7 @@ mod tests {
             "root_header_linear_find",
             "calls=3 steps=12",
         )]));
-        assert_eq!((old_product.cells, old_product.unread), (10, 16), "{out}");
+        assert_eq!((old_product.cells, old_product.unread), (11, 16), "{out}");
         // 走到命中为止那一部分超了上界：算不符，另记超上界；不符那一行带两边四个数
         let (over, out) = totals(&reconciliation_text(&[(
             "record_intersection_filter",
@@ -5804,9 +5972,9 @@ mod tests {
     }
 
     #[test]
-    fn the_user_data_slot_scan_walks_at_most_every_candidate_and_cluster_segment() {
-        // s26：两次调用，每次 8 个候选对 × (1 + 3 个聚簇段)：上界 64
-        assert_the_call_site_row_reconciles("overwrite", "user_data_slot_linear_scan", 0, 64);
+    fn the_user_data_slot_scan_walks_at_most_the_set_segments_and_one_segments_pairs() {
+        // s26：两次调用，每次调用那一刻集合里 10 个段、答案那一段里至多 32 对：上界 2 × (10 + 32) = 84
+        assert_the_call_site_row_reconciles("overwrite", "user_data_slot_linear_scan", 0, 84);
     }
 
     #[test]
@@ -5825,6 +5993,64 @@ mod tests {
     fn the_fallback_slot_scan_walks_at_most_every_candidate_and_slot_of_its_span() {
         // s29：一次调用，10 个候选 × (1 + 跨度 2 槽)：上界 30
         assert_the_call_site_row_reconciles("overwrite", "fallback_slot_linear_scan", 0, 30);
+    }
+
+    #[test]
+    fn the_pooled_fallback_row_reconciles_only_on_calls_with_steps() {
+        // s37：每次调用至少走一片叶：调过且有步、没调过且没有步核过；调过没有步、没调过却有步都不符
+        let cell = |readings: &str| {
+            cells_and_disagreements_of(
+                &reconciliation_text(&[("pooled_fallback_by_the_leaf", readings)]),
+                "pooled_fallback_by_the_leaf",
+            )
+        };
+        assert_eq!(cell("calls=2 steps=9"), (1, 0));
+        assert_eq!(cell("calls=0 steps=0"), (1, 0));
+        assert_eq!(cell("calls=2 steps=0"), (1, 1));
+        assert_eq!(cell("calls=0 steps=5"), (1, 1));
+    }
+
+    #[test]
+    fn the_pooled_fallback_steps_join_the_today_total_and_mark_the_by_delta_side_when_called() {
+        let flat = synthetic_counts_text(&synthetic_unit_area_points(4, 8));
+        let at = "point=unit_area_2_pow_24 state=same_mount kind=overwrite round=1";
+        let called = format!(
+            "{flat}E203RESULT name=row {at} segment=between row=pooled_fallback_by_the_leaf calls=2 steps=40\n\
+             E203RESULT name=row {at} segment=between row=fallback_slot_linear_scan calls=0 steps=7\n"
+        );
+        // s29 那一行合成输入里原本没有；调用次数记 0 让 B8 的输入不变，只给它 7 步好读出来
+        let (flat_counts, called_counts) = (read_product(&flat), read_product(&called));
+        let (mut flat_out, mut called_out) = (String::new(), String::new());
+        // pooled_fallback_calls = 0 的点：一格都不标
+        assert_eq!(pooled_fallback_report(&flat_counts, &mut flat_out), (0, 12), "{flat_out}");
+        assert!(
+            flat_out.contains("name=verdict quantity=by_delta_pooled_fallback cells_checked=12 cells_with_pooled_fallback_calls=0"),
+            "{flat_out}"
+        );
+        // pooled_fallback_calls > 0 的点：只标这一格，带 s37 与 s29 的步数；B8 合计不变（s37 没有式子），B1 合计多 40 步
+        assert_eq!(pooled_fallback_report(&called_counts, &mut called_out), (1, 12), "{called_out}");
+        let marked: Vec<&str> = called_out
+            .lines()
+            .filter(|line| line.contains("by_delta_arms_total=missing_pooled_fallback_row_only_for_the_listed_steps"))
+            .collect();
+        assert_eq!(marked.len(), 1, "{called_out}");
+        assert!(
+            marked[0].starts_with("name=by_delta_pooled_fallback point=unit_area_2_pow_24 state=same_mount kind=overwrite pooled_fallback_calls=2 pooled_fallback_steps=40 per_disk_fallback_steps=7 by_delta_total="),
+            "{}",
+            marked[0]
+        );
+        let unmarked_total = flat_out
+            .lines()
+            .find(|line| line.contains("point=unit_area_2_pow_24 state=same_mount kind=overwrite "))
+            .and_then(|line| line.split("by_delta_total=").nth(1))
+            .and_then(|rest| rest.split(' ').next())
+            .expect("读得到 B8 合计");
+        assert_ne!(unmarked_total, "unread", "{flat_out}");
+        assert!(marked[0].contains(&format!("by_delta_total={unmarked_total} ")), "{}", marked[0]);
+        let today = |counts: &Product| {
+            scan_steps(counts, "unit_area_2_pow_24", "same_mount", "overwrite", &SEGMENTS_BEFORE_ADMISSION)
+        };
+        assert_eq!(today(&called_counts), today(&flat_counts) + 40 + 7);
     }
 
     #[test]

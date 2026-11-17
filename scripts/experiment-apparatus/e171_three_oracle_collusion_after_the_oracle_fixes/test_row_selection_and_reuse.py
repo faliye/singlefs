@@ -1,7 +1,8 @@
-"""row_driver.py 的选行与按键复用的单测：不给 --rows、--first-slice 就是表里全部行（给了是指定范围，给空串是不跑表里的行）；
-行目录里同键、做完了的结果直接读回，键不同、没做完、编不过、超时的行目录先清掉重做；不认 --skip-finished、--rerun-compile-failed-from、
---rerun-of-timed-out-rows、--all（用法错退 2）；上一次超时的行重做时留标记文件，中途停下也认。每条用例自己建、自己删临时目录；不编、不跑装置。
-跑法：在本目录 `python3 -B -m unittest test_row_selection_and_reuse`。"""
+"""row_driver.py 的选行与「不按键复用」的单测：不给 --rows、--first-slice 就是表里全部行（给了是指定范围，给空串是不跑表里的行）；
+输出根里已有的行目录（做完的、没做完的、上一次超时的）一律清掉重做，驱动不凭它当做完；限时乘 3 只看调用方给的 --timed-out-before；
+--report-only 照调用方放进输出根的行目录重报，点名的行有一个没有 row-result.tsv 就一行都不报；不认 --skip-finished、--rerun-compile-failed-from、
+--rerun-of-timed-out-rows、--all（用法错退 2）。可复用的结果只在判定库里，入库条件与键由 reuse_library.py 的自证与 test_revision_11 钉。
+每条用例自己建、自己删临时目录；不编、不跑装置。跑法：在本目录 `python3 -B -m unittest test_row_selection_and_reuse`。"""
 from __future__ import annotations
 
 import argparse
@@ -11,8 +12,9 @@ import os
 import tempfile
 import unittest
 
+import device_timing
 import row_driver
-from bad_implementation_table import SelectedRow
+from bad_implementation_table import STATUS_LOCATED, MutationRow, SelectedRow
 
 
 def selected_rows() -> list[SelectedRow]:
@@ -25,10 +27,31 @@ def write(path: str, text: str) -> None:
         handle.write(text)
 
 
-def namespace(root: str) -> argparse.Namespace:
-    return argparse.Namespace(snapshot_digest="digest", streams="1,2,3", writable_mount_probe=False, positive_control=None, disable_oracle=None,
-                              no_executor=False, keep_dumps=False, o3_control_bad_states=None, output_root=root,
-                              work_root=os.path.join(root, "work"), baseline_process_wall_seconds=100.0)
+def namespace(root: str, timed_out_before: bool = False) -> argparse.Namespace:
+    return argparse.Namespace(streams="1,2,3", writable_mount_probe=False, positive_control=None, disable_oracle=None,
+                              no_executor=False, keep_dumps=False, o3_control_bad_states=None, output_root=root, repo_root=root, threads=1,
+                              work_root=os.path.join(root, "work"), baseline_process_wall_seconds=100.0, timed_out_before=timed_out_before)
+
+
+class Stop(Exception):
+    """桩：同步线道树那一步抛它，用例停在「行目录清过之后」。"""
+
+
+def stop_after_clearing(source_root: str, destination_root: str) -> None:
+    raise Stop
+
+
+@contextlib.contextmanager
+def replaced(**functions):
+    """把 row_driver 里点名的函数换成桩，出 with 换回原件。"""
+    originals = {name: getattr(row_driver, name) for name in functions}
+    for name, function in functions.items():
+        setattr(row_driver, name, function)
+    try:
+        yield
+    finally:
+        for name, function in originals.items():
+            setattr(row_driver, name, function)
 
 
 class RowSelection(unittest.TestCase):
@@ -56,81 +79,53 @@ class RowSelection(unittest.TestCase):
             self.assertIn("unrecognized arguments", error.getvalue(), argument)
 
 
-class ReuseByKey(unittest.TestCase):
-    def test_a_finished_row_directory_with_the_same_key_is_read_back(self) -> None:
+class NoReuseByKey(unittest.TestCase):
+    MUTATION = MutationRow("m-row", "crates/singlefs-core/src/a.rs", "x", "y", "-p singlefs-core", "t_row",
+                           raw_line="m-row\tcrates/singlefs-core/src/a.rs\tx\ty\t-p singlefs-core\tt_row")
+
+    def test_an_existing_row_directory_is_cleared_for_a_redo_whatever_it_holds(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             arguments = namespace(root)
-            key = row_driver.reuse_key_of(arguments, 3, "-")
-            write(os.path.join(root, "row-3", "row-result.tsv"), f"status\tok\ndevice_exit\t0\nreuse_key\t{key}\n")
-            self.assertEqual(row_driver.run_row_on_the_lane(3, None, None, [], set(), set(), arguments, 0),
-                             {"status": "ok", "device_exit": "0", "reuse_key": key})
-
-    def test_a_row_directory_with_another_key_or_no_result_is_cleared_for_a_redo(self) -> None:
-        class Stop(Exception):
-            pass
-
-        def stop_after_clearing(source_root, destination_root):
-            raise Stop
-
-        with tempfile.TemporaryDirectory() as root:
-            arguments = namespace(root)
-            write(os.path.join(root, "row-4", "row-result.tsv"), "status\tok\ndevice_exit\t0\nreuse_key\tsome-other-key\n")
+            write(os.path.join(root, "row-3", "row-result.tsv"), "status\tok\ndevice_exit\t0\n")
+            write(os.path.join(root, "row-4", "row-result.tsv"), f"status\tok\ndevice_exit\t{row_driver.ROW_TIMEOUT_EXIT_CODE}\n")
             write(os.path.join(root, "row-5", "partial.txt"), "left over from an interrupted run")
-            original = row_driver.sync_tree
-            row_driver.sync_tree = stop_after_clearing
-            try:
-                for number in (4, 5):
+            with replaced(sync_tree=stop_after_clearing):
+                for number in (3, 4, 5):
                     with self.assertRaises(Stop):
                         row_driver.run_row_on_the_lane(number, None, None, [], set(), set(), arguments, 0)
-            finally:
-                row_driver.sync_tree = original
-            self.assertEqual(os.listdir(os.path.join(root, "row-4")), [])
-            self.assertEqual(os.listdir(os.path.join(root, "row-5")), [])
+            for number in (3, 4, 5):
+                self.assertEqual(os.listdir(os.path.join(root, f"row-{number}")), [], number)
 
-    def test_the_key_changes_with_what_changes_the_result(self) -> None:
+    def run_one_row(self, root: str, number: int, timed_out_before: bool) -> tuple[list[int], dict[str, object]]:
+        """桩掉同步、挑行、编译与装置（装置照超时退 253），交回 (装置拿到的限时, row-result.tsv 的字段)。"""
+        limits: list[int] = []
+
+        def device_with_the_limit(repo_root, binary, row_directory, threads, extra, time_limit_seconds):
+            limits.append(time_limit_seconds)
+            return row_driver.ROW_TIMEOUT_EXIT_CODE, 1
+
+        with replaced(sync_tree=lambda source_root, destination_root: None,
+                      prepare_row=lambda *arguments, **keywords: row_driver.RowChoice(self.MUTATION, STATUS_LOCATED, "-", True, 0, ()),
+                      compile_one_mutation=lambda *arguments, **keywords: (0, 1, "crates/singlefs-core"), run_device=device_with_the_limit):
+            row_driver.run_row_on_the_lane(number, None, None, [], set(), set(), namespace(root, timed_out_before), 0)
+        return limits, row_driver.read_result(os.path.join(root, f"row-{number}"))
+
+    def test_the_time_limit_is_multiplied_only_when_the_caller_gives_timed_out_before(self) -> None:
+        plain = device_timing.row_time_limit_seconds(100.0, False)
         with tempfile.TemporaryDirectory() as root:
-            base = row_driver.reuse_key_of(namespace(root), 3, "name")
-            other_digest = namespace(root)
-            other_digest.snapshot_digest = "another"
-            other_streams = namespace(root)
-            other_streams.streams = "1,2"
-            self.assertEqual(base, row_driver.reuse_key_of(namespace(root), 3, "name"))
-            self.assertNotEqual(base, row_driver.reuse_key_of(other_digest, 3, "name"))
-            self.assertNotEqual(base, row_driver.reuse_key_of(other_streams, 3, "name"))
-            self.assertNotEqual(base, row_driver.reuse_key_of(namespace(root), 4, "name"))
-            self.assertNotEqual(base, row_driver.reuse_key_of(namespace(root), 3, "another-name"))
+            write(os.path.join(root, "row-6", "row-result.tsv"), f"status\tok\ndevice_exit\t{row_driver.ROW_TIMEOUT_EXIT_CODE}\n")
+            limits, fields = self.run_one_row(root, 6, False)
+            self.assertEqual((limits, fields["time_limit_seconds"], fields["timed_out_before"]), ([plain], str(plain), "false"))
+            limits, fields = self.run_one_row(root, 7, True)
+            self.assertEqual((limits, fields["time_limit_seconds"], fields["timed_out_before"]), ([3 * plain], str(3 * plain), "true"))
 
-    def test_a_timed_out_row_leaves_a_marker_that_survives_an_interrupted_redo(self) -> None:
-        class Stop(Exception):
-            pass
-
-        def stop_after_clearing(source_root, destination_root):
-            raise Stop
-
+    def test_report_only_reads_the_rows_the_caller_placed_and_refuses_a_missing_one(self) -> None:
         with tempfile.TemporaryDirectory() as root:
-            arguments = namespace(root)
-            key = row_driver.reuse_key_of(arguments, 6, "-")
-            write(os.path.join(root, "row-6", "row-result.tsv"), f"status\tok\ndevice_exit\t{row_driver.ROW_TIMEOUT_EXIT_CODE}\nreuse_key\t{key}\n")
-            write(os.path.join(root, "row-7", "partial.txt"), "left over from an interrupted run")
-            original = row_driver.sync_tree
-            row_driver.sync_tree = stop_after_clearing
-            try:
-                for number in (6, 7):
-                    with self.assertRaises(Stop):
-                        row_driver.run_row_on_the_lane(number, None, None, [], set(), set(), arguments, 0)
-            finally:
-                row_driver.sync_tree = original
-            self.assertEqual(os.listdir(os.path.join(root, "row-6")), [row_driver.TIMED_OUT_MARKER_FILE])
-            self.assertTrue(row_driver.marked_as_timed_out_before(os.path.join(root, "row-6"), key))
-            self.assertFalse(row_driver.marked_as_timed_out_before(os.path.join(root, "row-6"), "another-key"))
-            self.assertEqual(os.listdir(os.path.join(root, "row-7")), [])
-            self.assertFalse(row_driver.marked_as_timed_out_before(os.path.join(root, "row-7"), key))
-
-    def test_a_compile_failure_a_pipe_defect_and_a_timeout_are_not_reused(self) -> None:
-        self.assertFalse(row_driver.result_is_reusable({"status": row_driver.STATUS_COMPILE_FAILED, "device_exit": "-"}))
-        self.assertFalse(row_driver.result_is_reusable({"status": row_driver.STATUS_MEASUREMENT_PIPE_DEFECT}))
-        self.assertFalse(row_driver.result_is_reusable({"status": row_driver.STATUS_OK, "device_exit": str(row_driver.ROW_TIMEOUT_EXIT_CODE)}))
-        self.assertTrue(row_driver.result_is_reusable({"status": row_driver.STATUS_OK, "device_exit": "0"}))
+            write(os.path.join(root, "row-0", "row-result.tsv"), "row_number\t0\nstatus\tok\n")
+            write(os.path.join(root, "row-9", "row-result.tsv"), "row_number\t9\nstatus\tok\n")
+            write(os.path.join(root, "row-4", "device.out"), "E7RESULT name=half\n")
+            self.assertEqual(row_driver.reported_rows(root, [9, 0]), ([{"row_number": "9", "status": "ok"}, {"row_number": "0", "status": "ok"}], []))
+            self.assertEqual(row_driver.reported_rows(root, [0, 4, 5]), ([], [4, 5]))
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 """E171 O3 一侧：冻结的执行器版本核对、起执行器、读执行器的判定行（登记第一节读法 7、8，5.4，作废条款 Z2、Z4）。
 
-冻结的那一版是 E170 第 1 次重跑的执行器目录改过（执行器默认全跑）之后重冻结的：`research/results/e170-r1-o3-spec-executor-2026-11-05-refreeze-executor.out` 是用它现跑出来的冻结参照，目录
-`scripts/experiment-apparatus/e170_second_run_o3_spec_executor/`：产物里 `name=freeze file=… sha256=…` 每个文件一行（不含 `comparator*`
-与 `mutation_driver*`），最后一行 `name=freeze_seed sha256_prefix16=…` 是这一份目录内容的指纹（盲测族给导出装置的种子取登记的 `85441ae491419411`，写死在各驱动与复跑里，不随重冻结变）。本实验不改那一份，只读、只起它。
+冻结的那一版是 journal 记录头 496 字节的执行器目录：`research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out` 是用它在导出上现跑出来的冻结参照，目录
+`scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496/`：产物里 `name=freeze file=… sha256=…` 每个文件一行（不含 `comparator*`
+与 `mutation_driver*`），最后一行 `name=freeze_seed sha256_prefix16=…` 是这一份目录内容的指纹（盲测族给导出装置的种子取登记的 `85441ae491419411`，写死在各驱动与复跑里，不取自冻结行）。本实验不改那一份，只读、只起它。
 
 那份参照产物在 research/results/ 下、可以被归档删掉：读不到时
 `freeze_reference_lines` 抛 `FreezeReferenceMissing`；comparator.py、o3_bad_image_judge.py（judge）、row_driver.py 开跑前经
@@ -40,8 +40,8 @@ import time
 import types
 from dataclasses import dataclass, field
 
-FROZEN_DIRECTORY_RELATIVE = "scripts/experiment-apparatus/e170_second_run_o3_spec_executor"
-FREEZE_REFERENCE_RELATIVE = "research/results/e170-r1-o3-spec-executor-2026-11-05-refreeze-executor.out"
+FROZEN_DIRECTORY_RELATIVE = "scripts/experiment-apparatus/e170_second_run_o3_spec_executor_journal_header_496"
+FREEZE_REFERENCE_RELATIVE = "research/results/e170-o3-spec-executor-journal-header-496-2026-11-09-freeze-executor-e171-r3.out"
 FILES_OUTSIDE_THE_FREEZE = ("comparator", "mutation_driver")
 FREEZE_PREFIXES = ("name=freeze ", "name=freeze_seed ")
 FREEZE_FILE_PREFIX = "name=freeze file="
@@ -55,7 +55,7 @@ NOT_RUN_EXIT_CODE = 77
 # 任务里面不再套线程包装，驱动按一条线道分到的线程把它们设进子进程的环境（thread_environment）
 CHILD_THREAD_VARIABLES = ("CARGO_BUILD_JOBS", "RUST_TEST_THREADS", "SINGLEFS_CRASH_POINT_REPLAY_THREADS", "SINGLEFS_CRASH_INJECTION_THREADS",
                           "SINGLEFS_FAULT_INJECTION_WORKER_THREADS", "SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS", "SINGLEFS_RANDOM_HISTORY_THREADS",
-                          "E161_THREADS", "SINGLEFS_CRASH_JUDGE_CPU_THREADS", "SINGLEFS_CRASH_AMPLIFICATION_THREADS", "E165_THREADS", "E168_THREADS",
+                          "E161_THREADS", "SINGLEFS_CRASH_AMPLIFICATION_THREADS", "E165_THREADS", "E168_THREADS",
                           "E175_WORKER_THREADS", "E180_THREADS", "E182_THREADS", "E183_THREADS", "E184_THREADS", "E185_THREADS",
                           "GATE_MUTATION_KEY_WORKERS", "SINGLEFS_THREAD_CAP")
 PATH_ONLY_CHANGES_TABLE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "freeze-path-only-changes.tsv")
@@ -63,7 +63,7 @@ PATH_ONLY_CHANGES_COLUMNS = 5
 SEED_NAME = "freeze_seed"
 PATH_MOVES_TABLE_RELATIVE = os.path.join(".claude", "gate.d", "path-moves.tsv")
 PATH_MOVES_LIBRARY_RELATIVE = os.path.join(".claude", "gate.d", "lib-lag-baseline.py")
-OWN_REPOSITORY_ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
+OWN_REPOSITORY_ROOT = os.environ.get("E171_REPOSITORY_ROOT") or os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))   # 变异驱动把这份拷到草稿目录里跑，由它交仓根
 BREAK_VARIABLE = "FROZEN_O3_BREAK"
 _path_moves_libraries: dict[str, types.ModuleType] = {}
 

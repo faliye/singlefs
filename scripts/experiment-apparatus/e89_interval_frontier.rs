@@ -180,7 +180,7 @@ fn truly_free_set(world: &World) -> BTreeSet<u64> {
 }
 
 /// 基线臂（付查找）：E26 的 deadlist 臂同构。定义句原样贴
-/// （verify-before-claiming：引用决策去推导之前先贴定义）：
+/// （evidence-discipline：引用决策去推导之前先贴定义）：
 ///   「块 b 被快照 S 引用 ⟺ birth(b) ≤ S.txg < death(b)，左闭右开」
 ///   「death(b) = 最后一个活引用被摘掉且被发布的 checkpoint 号；仍在活树里则为 ∞」
 fn paylookup_arm(world: &World, victim: u64) -> (BTreeSet<u64>, u64) {

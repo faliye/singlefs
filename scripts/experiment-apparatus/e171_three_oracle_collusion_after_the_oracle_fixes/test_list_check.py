@@ -89,6 +89,12 @@ class Classification(unittest.TestCase):
         entry = self.classify(self.registration_row(33, old), table_line("步 4：用目标根自己带的 F", replacement="目标根的 F") + "\n", history=old)
         self.assertEqual((entry.klass, len(entry.triple_matches), len(entry.anchor_matches)), ("bing", 0, 1))
 
+    def test_a_changed_line_with_the_same_saying_in_the_same_file_is_retargeted_not_gone(self) -> None:
+        old = table_line("增补：甲批判出（B6：补齐字节从末尾算起）", replacement="旧替换")
+        new_name = "增补：乙批判出（B6：补齐字节从末尾算起）"
+        entry = self.classify(self.registration_row(108, old), table_line(new_name, replacement="新替换") + "\n", history=old)
+        self.assertEqual((entry.klass, entry.chosen_name, len(entry.triple_matches)), ("yi", new_name, 0))
+
     def test_two_identical_triples_with_no_renamed_name_among_them_stay_unclassified(self) -> None:
         old = table_line("某条：照样往下发")
         entry = self.classify(self.registration_row(9, old), table_line("甲说法") + "\n" + table_line("乙说法") + "\n", history=old)

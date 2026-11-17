@@ -24,7 +24,7 @@ from result_lines import ResultLines, field
 
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 THIS_FILE = os.path.basename(__file__)
-TEST_MODULES = ("test_collusion_matrix", "test_collusion_pipeline", "test_o3_columns", "test_o3_comparison")
+TEST_MODULES = ("test_collusion_matrix", "test_collusion_pipeline", "test_o3_columns", "test_o3_comparison", "test_row_shards")
 TIMEOUT_SECONDS = 300
 CAUGHT, INVALID, SURVIVED, TIMED_OUT = "✅", "⏭", "❌", "⏱"
 
@@ -73,15 +73,21 @@ def fresh_copy(scratch: str, label: str) -> str:
     return destination
 
 
-def run_unit_tests(directory: str) -> tuple[str, int]:
-    """本目录全部单测；交回 (结局 抓到 / 没红 / 超时, 退出码)。"""
+def run_unit_tests(directory: str, log_path: str | None = None) -> tuple[str, int]:
+    """本目录全部单测；交回 (结局 抓到 / 没红 / 超时, 退出码)。给了 `log_path`，单测的输出（标准输出加标准错误）写进去（基线红时查是哪几条、为什么；不进产物）。"""
     # 单测在草稿目录的副本里跑，仓根不能从副本的位置推出来；冻结目录那一条单测读真的仓，所以把真的仓根交给它
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", E171_REPOSITORY_ROOT=os.path.abspath(os.path.join(DIRECTORY, "../../..")))
     try:
         completed = subprocess.run([sys.executable, "-m", "unittest", *TEST_MODULES], cwd=directory, env=environment,
                                    capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
+        if log_path:
+            with open(log_path, "w", encoding="utf-8") as handle:
+                handle.write(f"timeout after {TIMEOUT_SECONDS} seconds\n")
         return TIMED_OUT, -1
+    if log_path:
+        with open(log_path, "w", encoding="utf-8") as handle:
+            handle.write(completed.stdout + completed.stderr)
     return (SURVIVED if completed.returncode == 0 else CAUGHT), completed.returncode
 
 
@@ -106,7 +112,7 @@ def main(argument_list: list[str]) -> int:
         lines.finish()
         return 3
     baseline_directory = fresh_copy(arguments.scratch, "baseline-before")
-    baseline_outcome, _ = run_unit_tests(baseline_directory)
+    baseline_outcome, _ = run_unit_tests(baseline_directory, os.path.join(arguments.scratch, "baseline-unit-tests.log"))
     lines.result(f"name=baseline unit_tests={'green' if baseline_outcome == SURVIVED else 'red'}")
     if baseline_outcome != SURVIVED:
         lines.finish()

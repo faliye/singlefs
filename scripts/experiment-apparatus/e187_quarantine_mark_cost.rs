@@ -908,7 +908,7 @@ impl<'state> PlacementWalk<'state> {
                 slot
             }
             None => {
-                // 没有全空段：回落到槽号最小的空槽，这会儿没有段可 bump（`allocator.rs` 的 `FallBackToLowestFreeSlot`）。
+                // 没有全空段：回落，这会儿没有段可 bump（`allocator.rs` 的 `CommitGeneratedDeviceAnswer::FallBack`；产品池级政策先取重写集的叶、不够取空槽最多的叶，D3（空间分配） 已定项 8 第 2 条）；本装置自己的落点仍取槽号最小的空槽，算术不动。
                 self.open_segment_start = None;
                 self.placements_that_fell_back += 1;
                 let mut candidate = self.state.first_unoccupied_slot_from(self.state.lowest_possibly_free_slot);
@@ -3872,7 +3872,7 @@ mod tests {
     }
 
     #[test]
-    fn a_complete_mark_exempts_an_intact_quarantine_under_both_variants() {
+    fn complete_mark_exempts_an_intact_quarantine_under_both_variants() {
         for arm in MARKING_ARMS {
             for checker in checkers_of(arm) {
                 let verdict = judge_record(*checker, &constructed_view(arm, RecordClass::QuarantineIntact, MarkState::WrittenCorrectly, JudgedVersion::AfterTheLastReferencingRootLeavesTheWindow));
@@ -3882,14 +3882,14 @@ mod tests {
     }
 
     #[test]
-    fn a_garbled_quarantine_with_its_mark_cleared_is_red_for_mark_only_and_green_for_mark_or_today() {
+    fn garbled_quarantine_with_its_mark_cleared_is_red_for_mark_only_and_green_for_mark_or_today() {
         let view = constructed_view(Arm::SpanBit, RecordClass::QuarantineGarbled, MarkState::WrongOnBothDevices, JudgedVersion::TheQuarantineVersion);
         assert_eq!(judge_record(CheckerUnderTest::MarkOnly, &view).label(), "I-3.11+I-3.15");
         assert_eq!(judge_record(CheckerUnderTest::MarkOrToday, &view).label(), "green");
     }
 
     #[test]
-    fn a_mark_on_a_referenced_record_reddens_mark_agreement() {
+    fn mark_on_a_referenced_record_reddens_mark_agreement() {
         let view = constructed_view(Arm::QuarantineTree, RecordClass::Normal, MarkState::WrongOnBothDevices, JudgedVersion::TheQuarantineVersion);
         assert_eq!(judge_record(CheckerUnderTest::MarkOnly, &view).label(), "mark_agrees_with_references");
         let one_device = constructed_view(Arm::SpanBit, RecordClass::Leak, MarkState::WrongOnOneDevice, JudgedVersion::TheQuarantineVersion);
@@ -3907,7 +3907,7 @@ mod tests {
     }
 
     #[test]
-    fn a_revival_ends_the_false_red_once_the_quarantine_versions_leave_the_window() {
+    fn revival_ends_the_false_red_once_the_quarantine_versions_leave_the_window() {
         let event = QuarantineEventRecord {
             txg: 100,
             copies: CopyCondition::Intact,
@@ -3994,7 +3994,7 @@ mod tests {
     }
 
     #[test]
-    fn a_code_two_leaf_splits_in_the_middle_and_a_root_with_one_child_collapses() {
+    fn code_two_leaf_splits_in_the_middle_and_a_root_with_one_child_collapses() {
         let capacity = CodeTwoCapacity { leaf_entries: 4, internal_entries: 4 };
         let mut fresh = FreshUnits::starting_at(0);
         let mut root: Option<CodeTwoNode<u64>> = None;
@@ -4038,7 +4038,7 @@ mod tests {
     }
 
     #[test]
-    fn a_history_with_rollbacks_revives_a_quarantined_unit_at_every_rollback() {
+    fn history_with_rollbacks_revives_a_quarantined_unit_at_every_rollback() {
         let summary = evaluate_cell(&small_cell(3, 1, 2));
         assert!(summary.schedule_realized, "30 次隔离、10 次回退，每次回退都让一个隔离单元重新被引用");
     }

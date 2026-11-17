@@ -2,8 +2,10 @@
 """rows_orchestrator.py --selftest 用的假逐行驱动：命令行与产物格式照 row_driver.py（标准输出那几种行、--timing-output 的分块、行目录里的
 row-result.tsv、device.out、dump/<流>/ 五个文件、o3.out），不编、不跑装置。限时与快照摘要用真的 device_timing.row_time_limit_seconds 与
 row_driver.snapshot_digest（FAKE_RESEARCH_DIRECTORY 指到真的驱动目录）。
-环境变量：FAKE_DRIVER_LOG（每行追加一行 ran / skipped / failed）、FAKE_DRIVER_HOST（台号，默认 1）、FAKE_DRIVER_ROW_SECONDS（每行睡几秒）、
-FAKE_DRIVER_TIMEOUT_ROWS（这几行 device_exit=253；同一输出根里同键的上一次结果是超时的行，这一趟限时乘 3、不超时）、FAKE_DRIVER_FAIL_ROWS（这几行驱动出错、不写 row-result.tsv、退 1）、
+同真驱动不按键复用：输出根里已有的行目录删掉重做；--timed-out-before（调用方给：限时乘 3、不超时）、--report-only（照输出根里调用方放好的行目录重报，
+点名的行有一个没有 row-result.tsv 就退 2）。
+环境变量：FAKE_DRIVER_LOG（每行追加一行 ran / reported / failed）、FAKE_DRIVER_HOST（台号，默认 1）、FAKE_DRIVER_ROW_SECONDS（每行睡几秒）、
+FAKE_DRIVER_TIMEOUT_ROWS（这几行 device_exit=253，给了 --timed-out-before 的那一趟不超时）、FAKE_DRIVER_FAIL_ROWS（这几行驱动出错、不写 row-result.tsv、退 1）、
 FAKE_DRIVER_SALT_HOST 与 FAKE_DRIVER_SALT_PART（在那一台上往 device / dump / o3 / row 那一样里掺一个不同）。
 第二段（rows_orchestrator_segment_two.py）另用：--no-executor（不写 o3.out、o3_status=skipped_by_request、不打 freeze_check 行，同真驱动）；
 --other-selected-rows（可给几次，名字用真的 bad_implementation_table.read_selected_rows 读，补位时跳过）；
@@ -71,27 +73,18 @@ def substitution_fields(arguments, number, name):
 def run_row(arguments, number, host):
     row_directory = os.path.join(arguments.output_root, f"row-{number}")
     name = f"假 第 {number} 行{' 掺' if salted('row') else ''}"
-    # 按键复用，照真驱动（row_driver.py）：同键、做完了、不是编不过 / 测量管子缺陷 / 超时的行目录直接读回；别的行目录先清再做；上一次同键是超时的，限时乘 3
-    key = row_driver.reuse_key_of(arguments, number, name)
-    earlier = row_driver.earlier_result_with_the_key(row_directory, key)
-    if earlier is not None and row_driver.result_is_reusable(earlier):
-        log(f"reused row={number} host={host} root={os.path.basename(arguments.output_root)}")
-        return earlier
-    timed_out_before = ((earlier is not None and earlier.get("device_exit") == str(row_driver.ROW_TIMEOUT_EXIT_CODE))
-                        or row_driver.marked_as_timed_out_before(row_directory, key))
+    # 照真驱动（row_driver.py）：输出根里已有的行目录删掉重做；限时乘不乘 3 只看调用方给没给 --timed-out-before
+    timed_out_before = arguments.timed_out_before
     if os.path.isdir(row_directory):
         shutil.rmtree(row_directory)
     os.makedirs(row_directory)
-    if timed_out_before:
-        with open(os.path.join(row_directory, row_driver.TIMED_OUT_MARKER_FILE), "w", encoding="utf-8") as handle:
-            handle.write(key + "\n")
     time.sleep(float(os.environ.get("FAKE_DRIVER_ROW_SECONDS", "0")))
     if number in numbers("FAKE_DRIVER_FAIL_ROWS"):
         log(f"failed row={number} host={host}")
         return {"row_number": number, "status": "driver_error", "error": "fake"}
     substitution, runnable = substitution_fields(arguments, number, name)
     if not runnable:
-        fields = {"row_number": number, "row_name": name, "lane": 0, row_driver.REUSE_KEY_FIELD: key, "line_matches_the_registration": "false", **substitution,
+        fields = {"row_number": number, "row_name": name, "lane": 0, "line_matches_the_registration": "false", **substitution,
                   "status": "compile_failed",
                   "device_exit": "-", "copy_ns": 1, "compile_ns": 1, "compile_kind": "cold", "device_ns": "-", "o3_ns": "-", "o3_status": "not_reached"}
         with open(os.path.join(row_directory, "row-result.tsv"), "w", encoding="utf-8") as handle:
@@ -118,7 +111,7 @@ def run_row(arguments, number, host):
             handle.write(f"name=load stream=new_pool_file_creation load_ns={random.randint(1, 10**9)} ops=3\n")
             handle.write(f"name=verdict_summary row={number} strict_not_in=0{' salt=1' if salted('o3') else ''}\n")
             handle.write(f"name=state_time batch=1 workers={arguments.threads}\n")
-    fields = {"row_number": number, "row_name": name, "lane": 0, row_driver.REUSE_KEY_FIELD: key, "packages_checked_rebuilt": "crates/singlefs-core",
+    fields = {"row_number": number, "row_name": name, "lane": 0, "packages_checked_rebuilt": "crates/singlefs-core",
               "substituted_from": substitution["substituted_from"], "line_matches_the_registration": "true" if substitution["substituted_from"] == "-" else "false",
               "mutated_row_name": substitution["mutated_row_name"], "failed_attempts": substitution["failed_attempts"],
               **{key: value for key, value in substitution.items() if key.startswith("failed_attempt_")},
@@ -146,10 +139,9 @@ def main():
     parser.add_argument("--streams", default="1,2,3")
     parser.add_argument("--threads", type=int, default=6)
     parser.add_argument("--lanes", type=int, default=1)
-    for flag in ("--empty-mutation", "--writable-mount-probe", "--keep-dumps", "--no-executor"):
+    for flag in ("--empty-mutation", "--writable-mount-probe", "--keep-dumps", "--no-executor", "--timed-out-before", "--report-only"):
         parser.add_argument(flag, action="store_true")
     parser.add_argument("--other-selected-rows", action="append", default=[])
-    parser.set_defaults(positive_control=None, disable_oracle=None, o3_control_bad_states=None)   # 复用键里的项，真驱动有这几个参数、这里固定为没给
     arguments = parser.parse_args()
     if os.path.exists(arguments.timing_output):
         parser.error("timing output exists")
@@ -167,7 +159,15 @@ def main():
     print(f"snapshot_digest={digest} files={count} snapshot_ns={random.randint(1, 10**6)} rows={len(jobs)}")
     os.makedirs(arguments.output_root, exist_ok=True)
     host = os.environ.get("FAKE_DRIVER_HOST", "1")
-    results = [run_row(arguments, number, host) for number in jobs]
+    if arguments.report_only:
+        results, missing = row_driver.reported_rows(arguments.output_root, jobs)
+        if missing:
+            print(f"report_only_refused missing_row_results={','.join(str(number) for number in missing)}")
+            return row_driver.EXIT_REPORTED_ROWS_MISSING
+        for number in jobs:
+            log(f"reported row={number} host={host} root={os.path.basename(arguments.output_root)}")
+    else:
+        results = [run_row(arguments, number, host) for number in jobs]
     for fields in results:
         print("row " + " ".join(f"{key}={str(value).replace(' ', '_')}" for key, value in fields.items()))
     print(f"table lanes={arguments.lanes} threads_per_lane={arguments.threads} rows={len(jobs)} table_wall_ns={random.randint(1, 10**9)} sum_of_row_ns=7")

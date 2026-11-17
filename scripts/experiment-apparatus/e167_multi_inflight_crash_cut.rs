@@ -92,14 +92,14 @@ impl StepKind {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Owner {
-    TransactionA,
-    TransactionB,
+    OlderTransaction,
+    NewerTransaction,
     /// 一次发布装多个事务时，根槽写与系统配置槽写不属于任何一个事务。
     Shared,
 }
 
 #[derive(Clone, Debug)]
-struct WriteSpec {
+struct WriteSpecification {
     name: String,
     disk: usize,
     kind: StepKind,
@@ -119,8 +119,8 @@ struct Geometry {
     label: &'static str,
     units_per_transaction: usize,
     disk_count: usize,
-    root_disk_of_transaction_a: usize,
-    root_disk_of_transaction_b: usize,
+    root_disk_of_the_older_transaction: usize,
+    root_disk_of_the_newer_transaction: usize,
     system_configuration_has_third_state: bool,
 }
 
@@ -136,29 +136,29 @@ fn geometry_one_disk(label: &'static str, units_per_transaction: usize, third_st
         label,
         units_per_transaction,
         disk_count: 1,
-        root_disk_of_transaction_a: 0,
-        root_disk_of_transaction_b: 0,
+        root_disk_of_the_older_transaction: 0,
+        root_disk_of_the_newer_transaction: 0,
         system_configuration_has_third_state: third_state,
     }
 }
 
 /// 两盘几何：A 的 txg 给定，B 的 txg 是它加一（登记第一节记号：A 是 N，B 是 N + 1）。
-fn geometry_two_disks(label: &'static str, units_per_transaction: usize, txg_of_a: usize) -> Geometry {
+fn geometry_two_disks(label: &'static str, units_per_transaction: usize, txg_of_the_older_transaction: usize) -> Geometry {
     Geometry {
         label,
         units_per_transaction,
         disk_count: 2,
-        root_disk_of_transaction_a: root_disk_of_txg(txg_of_a),
-        root_disk_of_transaction_b: root_disk_of_txg(txg_of_a + 1),
+        root_disk_of_the_older_transaction: root_disk_of_txg(txg_of_the_older_transaction),
+        root_disk_of_the_newer_transaction: root_disk_of_txg(txg_of_the_older_transaction + 1),
         system_configuration_has_third_state: true,
     }
 }
 
-fn geometry_g1() -> Geometry {
+fn geometry_one_disk_two_units() -> Geometry {
     geometry_one_disk("G1", 2, true)
 }
 
-fn geometry_g3() -> Geometry {
+fn geometry_one_disk_one_unit() -> Geometry {
     geometry_one_disk("G3", 1, true)
 }
 
@@ -170,7 +170,7 @@ fn geometry_g4b() -> Geometry {
     geometry_two_disks("G4b", 2, 2)
 }
 
-fn geometry_g5() -> Geometry {
+fn geometry_one_disk_two_units_without_torn_state() -> Geometry {
     geometry_one_disk("G5", 2, false)
 }
 
@@ -180,8 +180,8 @@ fn geometry_registered_publish_two_state() -> Geometry {
         label: "registered_publish",
         units_per_transaction: 12,
         disk_count: 2,
-        root_disk_of_transaction_a: 0,
-        root_disk_of_transaction_b: 0,
+        root_disk_of_the_older_transaction: 0,
+        root_disk_of_the_newer_transaction: 0,
         system_configuration_has_third_state: false,
     }
 }
@@ -192,8 +192,8 @@ fn geometry_real_publish_shape() -> Geometry {
         label: "real_publish_shape",
         units_per_transaction: 12,
         disk_count: 2,
-        root_disk_of_transaction_a: 0,
-        root_disk_of_transaction_b: 1,
+        root_disk_of_the_older_transaction: 0,
+        root_disk_of_the_newer_transaction: 1,
         system_configuration_has_third_state: true,
     }
 }
@@ -207,7 +207,7 @@ fn disk_suffix(disk_count: usize, disk: usize) -> String {
 }
 
 fn push_write(
-    table: &mut Vec<WriteSpec>,
+    table: &mut Vec<WriteSpecification>,
     geometry: &Geometry,
     name: &str,
     disk: usize,
@@ -215,7 +215,7 @@ fn push_write(
     owner: Owner,
 ) -> usize {
     let is_in_place = kind == StepKind::SystemConfigurationSlot && geometry.system_configuration_has_third_state;
-    table.push(WriteSpec {
+    table.push(WriteSpecification {
         name: format!("{name}{}", disk_suffix(geometry.disk_count, disk)),
         disk,
         kind,
@@ -228,13 +228,13 @@ fn push_write(
 
 fn lower_and_upper_tag(owner: Owner) -> (&'static str, &'static str) {
     match owner {
-        Owner::TransactionA => ("a", "A"),
-        Owner::TransactionB => ("b", "B"),
+        Owner::OlderTransaction => ("a", "A"),
+        Owner::NewerTransaction => ("b", "B"),
         Owner::Shared => unreachable!("共享的写不按事务起名"),
     }
 }
 
-fn push_units(table: &mut Vec<WriteSpec>, geometry: &Geometry, owner: Owner) -> Vec<usize> {
+fn push_units(table: &mut Vec<WriteSpecification>, geometry: &Geometry, owner: Owner) -> Vec<usize> {
     let (lower, _) = lower_and_upper_tag(owner);
     let mut units = Vec::new();
     for unit_number in 1..=geometry.units_per_transaction {
@@ -245,7 +245,7 @@ fn push_units(table: &mut Vec<WriteSpec>, geometry: &Geometry, owner: Owner) -> 
     units
 }
 
-fn push_records(table: &mut Vec<WriteSpec>, geometry: &Geometry, owner: Owner) -> Vec<usize> {
+fn push_records(table: &mut Vec<WriteSpecification>, geometry: &Geometry, owner: Owner) -> Vec<usize> {
     let (_, upper) = lower_and_upper_tag(owner);
     (0..geometry.disk_count)
         .map(|disk| push_write(table, geometry, &format!("r{upper}"), disk, StepKind::JournalRecord, owner))
@@ -259,7 +259,7 @@ struct TransactionWrites {
     system_slots: Vec<usize>,
 }
 
-fn push_transaction_writes(table: &mut Vec<WriteSpec>, geometry: &Geometry, owner: Owner, root_disk: usize) -> TransactionWrites {
+fn push_transaction_writes(table: &mut Vec<WriteSpecification>, geometry: &Geometry, owner: Owner, root_disk: usize) -> TransactionWrites {
     let (_, upper) = lower_and_upper_tag(owner);
     let units = push_units(table, geometry, owner);
     let records = push_records(table, geometry, owner);
@@ -294,7 +294,7 @@ fn single_transaction_chain(writes: &TransactionWrites, disk_count: usize) -> Ve
 // ── 按设备切段与崩溃状态枚举（登记第二节「Dom4」）──────────────────────────────────────────
 
 /// 录制流切成段，每段连同关它的屏障一起（登记表「种类」串把屏障也算进段里）。
-fn operation_segments(table: &[WriteSpec], stream: &[Event]) -> Vec<Vec<Event>> {
+fn operation_segments(table: &[WriteSpecification], stream: &[Event]) -> Vec<Vec<Event>> {
     let mut segments: Vec<Vec<Event>> = Vec::new();
     let mut current: Vec<Event> = Vec::new();
     let mut writes_in_current = 0usize;
@@ -332,7 +332,7 @@ fn operation_segments(table: &[WriteSpec], stream: &[Event]) -> Vec<Vec<Event>> 
     segments
 }
 
-fn write_segments(table: &[WriteSpec], stream: &[Event]) -> Vec<Vec<usize>> {
+fn write_segments(table: &[WriteSpecification], stream: &[Event]) -> Vec<Vec<usize>> {
     operation_segments(table, stream)
         .into_iter()
         .map(|segment| {
@@ -349,7 +349,7 @@ fn write_segments(table: &[WriteSpec], stream: &[Event]) -> Vec<Vec<usize>> {
 }
 
 /// 一段里每次写各取它的几态、任意组合：两态写取 0 / 1，原地覆写取 0 / 1 / 2；`prefix` 是前面各段全持久的编码。
-fn for_each_combination(table: &[WriteSpec], write_indexes: &[usize], prefix: StateCode, mut emit: impl FnMut(StateCode)) {
+fn for_each_combination(table: &[WriteSpecification], write_indexes: &[usize], prefix: StateCode, mut emit: impl FnMut(StateCode)) {
     let radices: Vec<u8> = write_indexes.iter().map(|&write_index| if table[write_index].is_in_place { 3 } else { 2 }).collect();
     let shifts: Vec<usize> = write_indexes.iter().map(|&write_index| BITS_PER_WRITE * write_index).collect();
     let mut digits = vec![0u8; write_indexes.len()];
@@ -373,16 +373,16 @@ fn for_each_combination(table: &[WriteSpec], write_indexes: &[usize], prefix: St
     }
 }
 
-fn segment_expansion(table: &[WriteSpec], segment: &[usize]) -> u128 {
+fn segment_expansion(table: &[WriteSpecification], segment: &[usize]) -> u128 {
     segment.iter().map(|&write_index| if table[write_index].is_in_place { 3u128 } else { 2u128 }).product()
 }
 
 /// D13（验证路线）已定项 4 的闭式：1 + Σ(2^两态写数 · 3^原地覆写数 − 1)。
-fn closed_form_state_count(table: &[WriteSpec], segments: &[Vec<usize>]) -> u128 {
+fn closed_form_state_count(table: &[WriteSpecification], segments: &[Vec<usize>]) -> u128 {
     1 + segments.iter().map(|segment| segment_expansion(table, segment) - 1).sum::<u128>()
 }
 
-fn crash_states_of_segments(table: &[WriteSpec], segments: &[Vec<usize>]) -> StateList {
+fn crash_states_of_segments(table: &[WriteSpecification], segments: &[Vec<usize>]) -> StateList {
     let expected_total = usize::try_from(closed_form_state_count(table, segments) + u128::try_from(segments.len()).expect("段数装得进 u128"))
         .expect("枚举的状态数装得进 usize");
     let mut states: Vec<StateCode> = Vec::with_capacity(expected_total);
@@ -397,7 +397,7 @@ fn crash_states_of_segments(table: &[WriteSpec], segments: &[Vec<usize>]) -> Sta
     sorted_deduplicated(states)
 }
 
-fn crash_states_of_stream(table: &[WriteSpec], stream: &[Event]) -> StateList {
+fn crash_states_of_stream(table: &[WriteSpecification], stream: &[Event]) -> StateList {
     crash_states_of_segments(table, &write_segments(table, stream))
 }
 
@@ -453,7 +453,7 @@ const ORDERED_KINDS: &[StepKind] = &[StepKind::JournalRecord, StepKind::RootReco
 struct World {
     candidate: Candidate,
     geometry: Geometry,
-    table: Vec<WriteSpec>,
+    table: Vec<WriteSpecification>,
     /// Σ(P)：这个候选允许的全部发出流。
     streams: Vec<Vec<Event>>,
     /// 逐状态深搜用的两条链；一次发布装多个事务时第一条是整条流、第二条是空的。
@@ -468,15 +468,15 @@ struct World {
     serial_stream: Option<Vec<Event>>,
 }
 
-fn ordering_waits(table: &[WriteSpec], chain_a: &[Event], chain_b: &[Event]) -> Vec<Option<usize>> {
-    chain_b
+fn ordering_waits(table: &[WriteSpecification], older_chain: &[Event], newer_chain: &[Event]) -> Vec<Option<usize>> {
+    newer_chain
         .iter()
         .map(|event| match event {
             Event::Write(write_index) if ORDERED_KINDS.contains(&table[*write_index].kind) => {
                 let wanted = &table[*write_index];
                 // 记录与系统配置槽写一份落一块盘：rB@d 等 rA@d、SB@d 等 SA@d；根槽写只有一份，落哪块盘由 txg 定，RB 等 RA 与盘无关
                 // （一盘几何里三种写各只有一块盘，两种写法同值；两盘几何的读法是第二段补的，见登记修订 7）。
-                chain_a.iter().position(|candidate_event| match candidate_event {
+                older_chain.iter().position(|candidate_event| match candidate_event {
                     Event::Write(candidate_index) => {
                         table[*candidate_index].kind == wanted.kind && (wanted.kind == StepKind::RootRecordFua || table[*candidate_index].disk == wanted.disk)
                     }
@@ -488,37 +488,37 @@ fn ordering_waits(table: &[WriteSpec], chain_a: &[Event], chain_b: &[Event]) -> 
         .collect()
 }
 
-fn all_interleavings(chain_a: &[Event], chain_b: &[Event], waits_of_b: &[Option<usize>]) -> Vec<Vec<Event>> {
+fn all_interleavings(older_chain: &[Event], newer_chain: &[Event], newer_waits: &[Option<usize>]) -> Vec<Vec<Event>> {
     let mut results = Vec::new();
     let mut current = Vec::new();
-    extend_interleavings(chain_a, chain_b, waits_of_b, 0, 0, &mut current, &mut results);
+    extend_interleavings(older_chain, newer_chain, newer_waits, 0, 0, &mut current, &mut results);
     results
 }
 
 fn extend_interleavings(
-    chain_a: &[Event],
-    chain_b: &[Event],
-    waits_of_b: &[Option<usize>],
-    position_a: usize,
-    position_b: usize,
+    older_chain: &[Event],
+    newer_chain: &[Event],
+    newer_waits: &[Option<usize>],
+    older_position: usize,
+    newer_position: usize,
     current: &mut Vec<Event>,
     results: &mut Vec<Vec<Event>>,
 ) {
-    if position_a == chain_a.len() && position_b == chain_b.len() {
+    if older_position == older_chain.len() && newer_position == newer_chain.len() {
         results.push(current.clone());
         return;
     }
-    if position_a < chain_a.len() {
-        current.push(chain_a[position_a]);
-        extend_interleavings(chain_a, chain_b, waits_of_b, position_a + 1, position_b, current, results);
+    if older_position < older_chain.len() {
+        current.push(older_chain[older_position]);
+        extend_interleavings(older_chain, newer_chain, newer_waits, older_position + 1, newer_position, current, results);
         current.pop();
     }
-    if position_b < chain_b.len() {
-        let transaction_b_may_start = true;
-        let waits_are_satisfied = waits_of_b[position_b].map_or(true, |needed| position_a > needed);
-        if transaction_b_may_start && waits_are_satisfied {
-            current.push(chain_b[position_b]);
-            extend_interleavings(chain_a, chain_b, waits_of_b, position_a, position_b + 1, current, results);
+    if newer_position < newer_chain.len() {
+        let newer_transaction_may_start = true;
+        let waits_are_satisfied = newer_waits[newer_position].map_or(true, |needed| older_position > needed);
+        if newer_transaction_may_start && waits_are_satisfied {
+            current.push(newer_chain[newer_position]);
+            extend_interleavings(older_chain, newer_chain, newer_waits, older_position, newer_position + 1, current, results);
             current.pop();
         }
     }
@@ -535,21 +535,21 @@ fn build_world(candidate: Candidate, geometry: &Geometry) -> World {
 
 fn build_two_chain_world(candidate: Candidate, geometry: &Geometry) -> World {
     let mut table = Vec::new();
-    let writes_of_a = push_transaction_writes(&mut table, geometry, Owner::TransactionA, geometry.root_disk_of_transaction_a);
-    let writes_of_b = push_transaction_writes(&mut table, geometry, Owner::TransactionB, geometry.root_disk_of_transaction_b);
-    let chain_a = single_transaction_chain(&writes_of_a, geometry.disk_count);
-    let chain_b = single_transaction_chain(&writes_of_b, geometry.disk_count);
-    let mut serial_stream = chain_a.clone();
-    serial_stream.extend(chain_b.iter().copied());
+    let older_writes = push_transaction_writes(&mut table, geometry, Owner::OlderTransaction, geometry.root_disk_of_the_older_transaction);
+    let newer_writes = push_transaction_writes(&mut table, geometry, Owner::NewerTransaction, geometry.root_disk_of_the_newer_transaction);
+    let older_chain = single_transaction_chain(&older_writes, geometry.disk_count);
+    let newer_chain = single_transaction_chain(&newer_writes, geometry.disk_count);
+    let mut serial_stream = older_chain.clone();
+    serial_stream.extend(newer_chain.iter().copied());
     let (streams, waits) = match candidate {
-        Candidate::SerialPipeline => (vec![serial_stream.clone()], vec![Some(chain_a.len() - 1); chain_b.len()]),
+        Candidate::SerialPipeline => (vec![serial_stream.clone()], vec![Some(older_chain.len() - 1); newer_chain.len()]),
         Candidate::ManyPublishesInFlightFree => {
-            let no_waits = vec![None; chain_b.len()];
-            (all_interleavings(&chain_a, &chain_b, &no_waits), no_waits)
+            let no_waits = vec![None; newer_chain.len()];
+            (all_interleavings(&older_chain, &newer_chain, &no_waits), no_waits)
         }
         Candidate::ManyPublishesInFlightOrdered => {
-            let waits = ordering_waits(&table, &chain_a, &chain_b);
-            (all_interleavings(&chain_a, &chain_b, &waits), waits)
+            let waits = ordering_waits(&table, &older_chain, &newer_chain);
+            (all_interleavings(&older_chain, &newer_chain, &waits), waits)
         }
         Candidate::OnePublishManyTransactions => unreachable!("一次发布装多个事务不走两条链的交错"),
     };
@@ -558,9 +558,9 @@ fn build_two_chain_world(candidate: Candidate, geometry: &Geometry) -> World {
         geometry: geometry.clone(),
         table,
         streams,
-        search_chains: [chain_a.clone(), chain_b.clone()],
+        search_chains: [older_chain.clone(), newer_chain.clone()],
         search_waits_of_second_chain: waits,
-        arm_chains: [chain_a, chain_b],
+        arm_chains: [older_chain, newer_chain],
         arm_tail: Vec::new(),
         serial_stream: Some(serial_stream),
     }
@@ -569,20 +569,20 @@ fn build_two_chain_world(candidate: Candidate, geometry: &Geometry) -> World {
 /// `a1 a2 b1 b2 屏障 rA rB 屏障 R(FUA) S 屏障`（登记第一节 Σ(P2)）。
 fn build_one_publish_world(geometry: &Geometry) -> World {
     let mut table = Vec::new();
-    let units_of_a = push_units(&mut table, geometry, Owner::TransactionA);
-    let units_of_b = push_units(&mut table, geometry, Owner::TransactionB);
-    let records_of_a = push_records(&mut table, geometry, Owner::TransactionA);
-    let records_of_b = push_records(&mut table, geometry, Owner::TransactionB);
-    let root = push_write(&mut table, geometry, "R", geometry.root_disk_of_transaction_a, StepKind::RootRecordFua, Owner::Shared);
+    let older_units = push_units(&mut table, geometry, Owner::OlderTransaction);
+    let newer_units = push_units(&mut table, geometry, Owner::NewerTransaction);
+    let older_records = push_records(&mut table, geometry, Owner::OlderTransaction);
+    let newer_records = push_records(&mut table, geometry, Owner::NewerTransaction);
+    let root = push_write(&mut table, geometry, "R", geometry.root_disk_of_the_older_transaction, StepKind::RootRecordFua, Owner::Shared);
     let system_slots: Vec<usize> = (0..geometry.disk_count)
         .map(|disk| push_write(&mut table, geometry, "S", disk, StepKind::SystemConfigurationSlot, Owner::Shared))
         .collect();
     let barriers = barrier_on_every_disk(geometry.disk_count);
-    let mut stream = writes_as_events(&units_of_a);
-    stream.extend(writes_as_events(&units_of_b));
+    let mut stream = writes_as_events(&older_units);
+    stream.extend(writes_as_events(&newer_units));
     stream.extend(barriers.iter().copied());
-    stream.extend(writes_as_events(&records_of_a));
-    stream.extend(writes_as_events(&records_of_b));
+    stream.extend(writes_as_events(&older_records));
+    stream.extend(writes_as_events(&newer_records));
     stream.extend(barriers.iter().copied());
     let mut tail = vec![Event::Write(root)];
     tail.extend(writes_as_events(&system_slots));
@@ -594,7 +594,7 @@ fn build_one_publish_world(geometry: &Geometry) -> World {
         events.extend(writes_as_events(records));
         events
     };
-    let arm_chains = [arm_chain(&units_of_a, &records_of_a), arm_chain(&units_of_b, &records_of_b)];
+    let arm_chains = [arm_chain(&older_units, &older_records), arm_chain(&newer_units, &newer_records)];
     World {
         candidate: Candidate::OnePublishManyTransactions,
         geometry: geometry.clone(),
@@ -620,7 +620,7 @@ fn truth_by_enumeration(world: &World) -> StateList {
 }
 
 /// 状态全集：每次写取它的全部几态的全部组合。
-fn all_state_vectors(table: &[WriteSpec]) -> StateList {
+fn all_state_vectors(table: &[WriteSpecification]) -> StateList {
     let every_write: Vec<usize> = (0..table.len()).collect();
     let mut vectors = Vec::new();
     for_each_combination(table, &every_write, 0, |code| vectors.push(code));
@@ -639,8 +639,8 @@ enum SegmentRole {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct SearchState {
-    position_a: usize,
-    position_b: usize,
+    older_position: usize,
+    newer_position: usize,
     unreleased_disks: u32,
     open_segment_role: Option<SegmentRole>,
     last_closed_role: SegmentRole,
@@ -668,7 +668,7 @@ fn close_if_every_disk_is_released(mut state: SearchState) -> SearchState {
     state
 }
 
-fn search_states_after_event(table: &[WriteSpec], state: SearchState, event: Event, target: StateCode) -> Vec<SearchState> {
+fn search_states_after_event(table: &[WriteSpecification], state: SearchState, event: Event, target: StateCode) -> Vec<SearchState> {
     match event {
         Event::Barrier(disk) => {
             let mut next = state;
@@ -706,10 +706,10 @@ fn search_states_after_event(table: &[WriteSpec], state: SearchState, event: Eve
 
 /// 算法 (b)：对一个目标向量，在两条链的交错上搜「有没有一条发出流让它落进枚举域」。
 fn some_stream_realizes_target(world: &World, target: StateCode) -> bool {
-    let [chain_a, chain_b] = &world.search_chains;
+    let [older_chain, newer_chain] = &world.search_chains;
     let initial = SearchState {
-        position_a: 0,
-        position_b: 0,
+        older_position: 0,
+        newer_position: 0,
         unreleased_disks: 0,
         open_segment_role: None,
         last_closed_role: SegmentRole::Before,
@@ -721,20 +721,20 @@ fn some_stream_realizes_target(world: &World, target: StateCode) -> bool {
         if !visited.insert(state) {
             continue;
         }
-        if state.position_a == chain_a.len() && state.position_b == chain_b.len() {
+        if state.older_position == older_chain.len() && state.newer_position == newer_chain.len() {
             return true;
         }
-        if state.position_a < chain_a.len() {
-            for mut next in search_states_after_event(&world.table, state, chain_a[state.position_a], target) {
-                next.position_a += 1;
+        if state.older_position < older_chain.len() {
+            for mut next in search_states_after_event(&world.table, state, older_chain[state.older_position], target) {
+                next.older_position += 1;
                 pending.push_back(next);
             }
         }
-        if state.position_b < chain_b.len() {
-            let wait = world.search_waits_of_second_chain.get(state.position_b).copied().flatten();
-            if wait.map_or(true, |needed| state.position_a > needed) {
-                for mut next in search_states_after_event(&world.table, state, chain_b[state.position_b], target) {
-                    next.position_b += 1;
+        if state.newer_position < newer_chain.len() {
+            let wait = world.search_waits_of_second_chain.get(state.newer_position).copied().flatten();
+            if wait.map_or(true, |needed| state.older_position > needed) {
+                for mut next in search_states_after_event(&world.table, state, newer_chain[state.newer_position], target) {
+                    next.newer_position += 1;
                     pending.push_back(next);
                 }
             }
@@ -754,7 +754,7 @@ fn truth_by_search(world: &World) -> StateList {
 
 /// 偏序：一次写 w 落在盘 d 上，流里 w 之后、在 d 上有一道屏障，则 w 先于那道屏障之后发出的每一次写；FUA 写先于它后面的每一次写。
 /// 返回每次写的「必须先持久」集合（传递闭包之后）。
-fn must_persist_before_masks(table: &[WriteSpec], stream: &[Event]) -> Vec<u32> {
+fn must_persist_before_masks(table: &[WriteSpecification], stream: &[Event]) -> Vec<u32> {
     let mut masks = vec![0u32; table.len()];
     let mut issued: Vec<(usize, bool)> = Vec::new();
     for &event in stream {
@@ -797,7 +797,7 @@ fn must_persist_before_masks(table: &[WriteSpec], stream: &[Event]) -> Vec<u32> 
 }
 
 /// 一份偏序的全部可达状态：偏序的下闭集，原地覆写的撕裂态只在它是下闭集的极大元时取。
-fn reachable_states_of_partial_order(table: &[WriteSpec], masks: &[u32]) -> Vec<StateCode> {
+fn reachable_states_of_partial_order(table: &[WriteSpecification], masks: &[u32]) -> Vec<StateCode> {
     assert!(table.len() <= 20, "T_exact 按子集枚举，写数要 ≤ 20");
     let mut states = Vec::new();
     for member_mask in 0u32..(1u32 << table.len()) {
@@ -854,21 +854,21 @@ fn persisted_everything_in(chain: &[Event]) -> StateCode {
 
 /// 按事务切那条臂：两条单事务链各自枚举域的积；一次发布装多个事务时再并上发布尾巴的状态。
 fn arm_by_transaction_states(world: &World) -> StateList {
-    let states_of_a = crash_states_of_stream(&world.table, &world.arm_chains[0]);
-    let states_of_b = crash_states_of_stream(&world.table, &world.arm_chains[1]);
-    let full_state_of_a = persisted_everything_in(&world.arm_chains[0]);
-    let full_state_of_b = persisted_everything_in(&world.arm_chains[1]);
-    assert!(contains(&states_of_a, full_state_of_a) && contains(&states_of_b, full_state_of_b), "链全持久的那个状态在自己的枚举域里");
+    let older_states = crash_states_of_stream(&world.table, &world.arm_chains[0]);
+    let newer_states = crash_states_of_stream(&world.table, &world.arm_chains[1]);
+    let older_full_state = persisted_everything_in(&world.arm_chains[0]);
+    let newer_full_state = persisted_everything_in(&world.arm_chains[1]);
+    assert!(contains(&older_states, older_full_state) && contains(&newer_states, newer_full_state), "链全持久的那个状态在自己的枚举域里");
     let mut product = Vec::new();
-    for &state_of_a in &states_of_a {
-        for &state_of_b in &states_of_b {
-            product.push(state_of_a | state_of_b);
+    for &older_state in &older_states {
+        for &newer_state in &newer_states {
+            product.push(older_state | newer_state);
         }
     }
     if !world.arm_tail.is_empty() {
         for tail_state in crash_states_of_stream(&world.table, &world.arm_tail) {
             if tail_state != 0 {
-                product.push(full_state_of_a | full_state_of_b | tail_state);
+                product.push(older_full_state | newer_full_state | tail_state);
             }
         }
     }
@@ -877,47 +877,47 @@ fn arm_by_transaction_states(world: &World) -> StateList {
 
 /// 阳性对照 PC1 在按事务切那条臂上的形态：把积换成串行拼接（A 的各状态 × B 全不持久，并上 A 全持久 × B 的各状态）。
 fn serial_concatenation_of_transaction_chains(world: &World) -> StateList {
-    let states_of_a = crash_states_of_stream(&world.table, &world.arm_chains[0]);
-    let states_of_b = crash_states_of_stream(&world.table, &world.arm_chains[1]);
-    let full_state_of_a = persisted_everything_in(&world.arm_chains[0]);
-    let mut states = states_of_a;
-    states.extend(states_of_b.into_iter().map(|state_of_b| full_state_of_a | state_of_b));
+    let older_states = crash_states_of_stream(&world.table, &world.arm_chains[0]);
+    let newer_states = crash_states_of_stream(&world.table, &world.arm_chains[1]);
+    let older_full_state = persisted_everything_in(&world.arm_chains[0]);
+    let mut states = older_states;
+    states.extend(newer_states.into_iter().map(|newer_state| older_full_state | newer_state));
     sorted_deduplicated(states)
 }
 
 // ── 判据用的谓词与计数 ──────────────────────────────────────────────────────────────────
 
-fn writes_of_owner(table: &[WriteSpec], owner: Owner) -> Vec<usize> {
+fn writes_of_owner(table: &[WriteSpecification], owner: Owner) -> Vec<usize> {
     (0..table.len()).filter(|&write_index| table[write_index].owner == owner).collect()
 }
 
 /// 跨事务状态 C：A、B 各至少有一次写不是「没持久」。
-fn is_cross_transaction(table: &[WriteSpec], state: StateCode) -> bool {
+fn is_cross_transaction(table: &[WriteSpecification], state: StateCode) -> bool {
     let some_nonzero = |owner: Owner| writes_of_owner(table, owner).into_iter().any(|write_index| value_of(state, write_index) != NOT_PERSISTED);
-    some_nonzero(Owner::TransactionA) && some_nonzero(Owner::TransactionB)
+    some_nonzero(Owner::OlderTransaction) && some_nonzero(Owner::NewerTransaction)
 }
 
-fn records_of_owner_all_persisted(table: &[WriteSpec], state: StateCode, owner: Owner) -> bool {
+fn records_of_owner_all_persisted(table: &[WriteSpecification], state: StateCode, owner: Owner) -> bool {
     (0..table.len())
         .filter(|&write_index| table[write_index].owner == owner && table[write_index].kind == StepKind::JournalRecord)
         .all(|write_index| value_of(state, write_index) == PERSISTED)
 }
 
 /// I_rec（按记录）：B 的记录都持久而 A 的记录不都持久。
-fn is_invalid_prefix_by_record(table: &[WriteSpec], state: StateCode) -> bool {
-    let transaction_a_records_all_persisted = records_of_owner_all_persisted(table, state, Owner::TransactionA);
-    let transaction_b_records_all_persisted = records_of_owner_all_persisted(table, state, Owner::TransactionB);
-    transaction_b_records_all_persisted && !transaction_a_records_all_persisted
+fn is_invalid_prefix_by_record(table: &[WriteSpecification], state: StateCode) -> bool {
+    let older_transaction_records_all_persisted = records_of_owner_all_persisted(table, state, Owner::OlderTransaction);
+    let newer_transaction_records_all_persisted = records_of_owner_all_persisted(table, state, Owner::NewerTransaction);
+    newer_transaction_records_all_persisted && !older_transaction_records_all_persisted
 }
 
 /// I_full（按全部写）：B 的每次写都持久，而 A 至少一次写不是「没持久」、又不是每次写都持久。
-fn is_invalid_prefix_by_all_writes(table: &[WriteSpec], state: StateCode) -> bool {
+fn is_invalid_prefix_by_all_writes(table: &[WriteSpecification], state: StateCode) -> bool {
     let values_of = |owner: Owner| -> Vec<u8> { writes_of_owner(table, owner).into_iter().map(|write_index| value_of(state, write_index)).collect() };
-    let values_of_a = values_of(Owner::TransactionA);
-    let values_of_b = values_of(Owner::TransactionB);
-    values_of_b.iter().all(|value| *value == PERSISTED)
-        && values_of_a.iter().any(|value| *value != NOT_PERSISTED)
-        && values_of_a.iter().any(|value| *value != PERSISTED)
+    let older_values = values_of(Owner::OlderTransaction);
+    let newer_values = values_of(Owner::NewerTransaction);
+    newer_values.iter().all(|value| *value == PERSISTED)
+        && older_values.iter().any(|value| *value != NOT_PERSISTED)
+        && older_values.iter().any(|value| *value != PERSISTED)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -934,7 +934,7 @@ impl InvalidPrefixKind {
         }
     }
 
-    fn holds(self, table: &[WriteSpec], state: StateCode) -> bool {
+    fn holds(self, table: &[WriteSpecification], state: StateCode) -> bool {
         match self {
             InvalidPrefixKind::ByRecord => is_invalid_prefix_by_record(table, state),
             InvalidPrefixKind::ByAllWrites => is_invalid_prefix_by_all_writes(table, state),
@@ -945,20 +945,20 @@ impl InvalidPrefixKind {
 const BOTH_INVALID_PREFIX_KINDS: [InvalidPrefixKind; 2] = [InvalidPrefixKind::ByRecord, InvalidPrefixKind::ByAllWrites];
 
 /// |(T ∩ C) \ 臂|：跨事务落盘子集里这条臂漏掉的个数。
-fn count_cross_transaction_misses(table: &[WriteSpec], truth: &[StateCode], covered: &[StateCode]) -> usize {
+fn count_cross_transaction_misses(table: &[WriteSpecification], truth: &[StateCode], covered: &[StateCode]) -> usize {
     truth.iter().filter(|state| is_cross_transaction(table, **state) && !contains(covered, **state)).count()
 }
 
 /// |(T \ C) \ 臂|：C 之外这条臂漏掉的个数。
-fn count_non_cross_misses(table: &[WriteSpec], truth: &[StateCode], covered: &[StateCode]) -> usize {
+fn count_non_cross_misses(table: &[WriteSpecification], truth: &[StateCode], covered: &[StateCode]) -> usize {
     truth.iter().filter(|state| !is_cross_transaction(table, **state) && !contains(covered, **state)).count()
 }
 
-fn count_invalid_prefixes_covered(table: &[WriteSpec], truth: &[StateCode], covered: &[StateCode], kind: InvalidPrefixKind) -> usize {
+fn count_invalid_prefixes_covered(table: &[WriteSpecification], truth: &[StateCode], covered: &[StateCode], kind: InvalidPrefixKind) -> usize {
     truth.iter().filter(|state| kind.holds(table, **state) && contains(covered, **state)).count()
 }
 
-fn count_invalid_prefixes_in(table: &[WriteSpec], states: &[StateCode], kind: InvalidPrefixKind) -> usize {
+fn count_invalid_prefixes_in(table: &[WriteSpecification], states: &[StateCode], kind: InvalidPrefixKind) -> usize {
     states.iter().filter(|state| kind.holds(table, **state)).count()
 }
 
@@ -978,7 +978,7 @@ struct CoverOutcome {
 
 /// 合并法：目标集里任何一个状态里「持久或撕裂的写」必须落在「没持久或撕裂的写」所在段之前或同段，把必须同段的写合成一段，
 /// 其余按这个偏序排成最细的段串；再按定义核一遍枚举域是否罩得住目标集。
-fn cover_by_merging(table: &[WriteSpec], target: &[StateCode]) -> CoverOutcome {
+fn cover_by_merging(table: &[WriteSpecification], target: &[StateCode]) -> CoverOutcome {
     let write_count = table.len();
     let mut at_most = vec![vec![false; write_count]; write_count];
     for &state in target {
@@ -1015,20 +1015,20 @@ fn cover_by_merging(table: &[WriteSpec], target: &[StateCode]) -> CoverOutcome {
             }
         }
     }
-    let mut group_ids: Vec<usize> = group_of.clone();
-    group_ids.sort_unstable();
-    group_ids.dedup();
-    let members_of = |group_id: usize| -> Vec<usize> { (0..write_count).filter(|&write_index| group_of[write_index] == group_id).collect() };
+    let mut group_identifiers: Vec<usize> = group_of.clone();
+    group_identifiers.sort_unstable();
+    group_identifiers.dedup();
+    let members_of = |group_identifier: usize| -> Vec<usize> { (0..write_count).filter(|&write_index| group_of[write_index] == group_identifier).collect() };
     let precedes = |earlier_group: usize, later_group: usize| -> bool {
         members_of(earlier_group).iter().any(|&earlier| members_of(later_group).iter().any(|&later| at_most[earlier][later])) && earlier_group != later_group
     };
-    let mut ordered_groups = group_ids.clone();
-    ordered_groups.sort_by_key(|group_id| (group_ids.iter().filter(|other| precedes(**other, *group_id)).count(), *group_id));
+    let mut ordered_groups = group_identifiers.clone();
+    ordered_groups.sort_by_key(|group_identifier| (group_identifiers.iter().filter(|other| precedes(**other, *group_identifier)).count(), *group_identifier));
     let segments: Vec<Vec<usize>> = ordered_groups.into_iter().map(members_of).collect();
     summarize_cover(table, target, segments)
 }
 
-fn summarize_cover(table: &[WriteSpec], target: &[StateCode], segments: Vec<Vec<usize>>) -> CoverOutcome {
+fn summarize_cover(table: &[WriteSpecification], target: &[StateCode], segments: Vec<Vec<usize>>) -> CoverOutcome {
     let covers_target = target.iter().all(|state| state_is_in_crash_states_of_segments(&segments, *state));
     let cover_state_count = closed_form_state_count(table, &segments);
     let equals_target = covers_target && cover_state_count == target.len() as u128;
@@ -1041,7 +1041,7 @@ struct ExhaustiveCover {
 }
 
 /// 有序划分穷举：把写表里的写分成有序的段，取罩得住目标集、枚举域最小的那些段串。
-fn cover_by_exhaustive_ordered_partitions(table: &[WriteSpec], target: &[StateCode]) -> ExhaustiveCover {
+fn cover_by_exhaustive_ordered_partitions(table: &[WriteSpecification], target: &[StateCode]) -> ExhaustiveCover {
     assert!(table.len() <= 8, "有序划分穷举只给写数 ≤ 8 的几何");
     let mut best = ExhaustiveCover { minimal_state_count: u128::MAX, optimal_covers: Vec::new() };
     let mut current: Vec<Vec<usize>> = Vec::new();
@@ -1050,7 +1050,7 @@ fn cover_by_exhaustive_ordered_partitions(table: &[WriteSpec], target: &[StateCo
     best
 }
 
-fn extend_ordered_partitions(table: &[WriteSpec], target: &[StateCode], remaining: u32, current: &mut Vec<Vec<usize>>, partial_count: u128, best: &mut ExhaustiveCover) {
+fn extend_ordered_partitions(table: &[WriteSpecification], target: &[StateCode], remaining: u32, current: &mut Vec<Vec<usize>>, partial_count: u128, best: &mut ExhaustiveCover) {
     if partial_count > best.minimal_state_count {
         return;
     }
@@ -1085,7 +1085,7 @@ struct PublishAttribution {
 }
 
 /// 一次根槽写之前、上一次根槽写之后的单元写与记录写都归它；系统配置槽写与屏障不归任何一次发布。
-fn publish_attribution(table: &[WriteSpec], stream: &[Event]) -> Vec<PublishAttribution> {
+fn publish_attribution(table: &[WriteSpecification], stream: &[Event]) -> Vec<PublishAttribution> {
     let mut publishes = Vec::new();
     let mut units = Vec::new();
     let mut records = Vec::new();
@@ -1108,8 +1108,8 @@ fn publish_attribution(table: &[WriteSpec], stream: &[Event]) -> Vec<PublishAttr
 
 // ── 文字渲染 ───────────────────────────────────────────────────────────────────────────
 
-fn render_stream(table: &[WriteSpec], stream: &[Event]) -> String {
-    let disk_count = table.iter().map(|spec| spec.disk).max().map_or(1, |highest| highest + 1);
+fn render_stream(table: &[WriteSpecification], stream: &[Event]) -> String {
+    let disk_count = table.iter().map(|specification| specification.disk).max().map_or(1, |highest| highest + 1);
     stream
         .iter()
         .map(|event| match event {
@@ -1126,7 +1126,7 @@ fn render_stream(table: &[WriteSpec], stream: &[Event]) -> String {
         .join(".")
 }
 
-fn render_state(table: &[WriteSpec], state: StateCode) -> String {
+fn render_state(table: &[WriteSpecification], state: StateCode) -> String {
     let parts: Vec<String> = (0..table.len())
         .filter(|&write_index| value_of(state, write_index) != NOT_PERSISTED)
         .map(|write_index| {
@@ -1144,11 +1144,11 @@ fn render_state(table: &[WriteSpec], state: StateCode) -> String {
     }
 }
 
-fn segment_sizes_text(table: &[WriteSpec], stream: &[Event]) -> String {
+fn segment_sizes_text(table: &[WriteSpecification], stream: &[Event]) -> String {
     write_segments(table, stream).iter().map(|segment| segment.len().to_string()).collect::<Vec<String>>().join("+")
 }
 
-fn segment_kinds_text(table: &[WriteSpec], stream: &[Event]) -> String {
+fn segment_kinds_text(table: &[WriteSpecification], stream: &[Event]) -> String {
     operation_segments(table, stream)
         .iter()
         .map(|segment| {
@@ -1171,13 +1171,13 @@ fn segment_kinds_text(table: &[WriteSpec], stream: &[Event]) -> String {
 }
 
 /// 按登记表的「种类」串造出事件：每段先写后屏障；写按盘轮转（根槽 FUA 落盘 0），屏障 ×N 落在盘 0 到 N − 1。
-fn stream_from_registered_kinds(text: &str, system_configuration_has_third_state: bool) -> (Vec<WriteSpec>, Vec<Event>) {
+fn stream_from_registered_kinds(text: &str, system_configuration_has_third_state: bool) -> (Vec<WriteSpecification>, Vec<Event>) {
     let geometry = Geometry {
         label: "registered_stream",
         units_per_transaction: 0,
         disk_count: 2,
-        root_disk_of_transaction_a: 0,
-        root_disk_of_transaction_b: 0,
+        root_disk_of_the_older_transaction: 0,
+        root_disk_of_the_newer_transaction: 0,
         system_configuration_has_third_state,
     };
     let mut table = Vec::new();
@@ -1223,21 +1223,21 @@ struct StreamMetrics {
     largest_segment_expansion: u128,
 }
 
-struct CellSpec {
+struct CellSpecification {
     label: &'static str,
     sampling_point: &'static str,
     geometry: Geometry,
     candidate: Candidate,
 }
 
-fn cell_specs() -> Vec<CellSpec> {
+fn cell_specifications() -> Vec<CellSpecification> {
     // G1 与 G2 是同一个几何（一盘、u = 2、系统配置槽写三态）上 P3 取 Σ_free 与 Σ_ord；G3 一盘 u = 1；G5 是 G1 而系统配置槽写只取两态。
     let groups: [(Geometry, [&'static str; 4], &'static str, &'static str); 3] = [
-        (geometry_g1(), ["g1_serial", "g1_one_publish", "g1_free", "g1_ordered"], "G1", "G2"),
-        (geometry_g3(), ["g3_serial", "g3_one_publish", "g3_free", "g3_ordered"], "G3", "G3_ordered"),
-        (geometry_g5(), ["g5_serial", "g5_one_publish", "g5_free", "g5_ordered"], "G5", "G5_ordered"),
+        (geometry_one_disk_two_units(), ["g1_serial", "g1_one_publish", "g1_free", "g1_ordered"], "G1", "G2"),
+        (geometry_one_disk_one_unit(), ["g3_serial", "g3_one_publish", "g3_free", "g3_ordered"], "G3", "G3_ordered"),
+        (geometry_one_disk_two_units_without_torn_state(), ["g5_serial", "g5_one_publish", "g5_free", "g5_ordered"], "G5", "G5_ordered"),
     ];
-    let mut specs = Vec::new();
+    let mut specifications = Vec::new();
     for (geometry, labels, free_point, ordered_point) in groups {
         let candidates_and_points = [
             (Candidate::SerialPipeline, free_point),
@@ -1246,10 +1246,10 @@ fn cell_specs() -> Vec<CellSpec> {
             (Candidate::ManyPublishesInFlightOrdered, ordered_point),
         ];
         for (label, (candidate, sampling_point)) in labels.into_iter().zip(candidates_and_points) {
-            specs.push(CellSpec { label, sampling_point, geometry: geometry.clone(), candidate });
+            specifications.push(CellSpecification { label, sampling_point, geometry: geometry.clone(), candidate });
         }
     }
-    specs
+    specifications
 }
 
 struct CellEvaluation {
@@ -1264,13 +1264,13 @@ struct CellEvaluation {
     exact_reachable: StateList,
 }
 
-fn evaluate_cell(spec: &CellSpec) -> CellEvaluation {
-    evaluate_cell_with(spec, &truth_by_search)
+fn evaluate_cell(specification: &CellSpecification) -> CellEvaluation {
+    evaluate_cell_with(specification, &truth_by_search)
 }
 
 /// 算法 (b) 由调用方给：第一段用逐状态的集合版，第二段的两盘格用定长数组版（`truth_by_search_fast`，单测与集合版逐格对拍）。
-fn evaluate_cell_with(spec: &CellSpec, search: &dyn Fn(&World) -> StateList) -> CellEvaluation {
-    let world = build_world(spec.candidate, &spec.geometry);
+fn evaluate_cell_with(specification: &CellSpecification, search: &dyn Fn(&World) -> StateList) -> CellEvaluation {
+    let world = build_world(specification.candidate, &specification.geometry);
     let truth = truth_by_enumeration(&world);
     let truth_by_search = search(&world);
     let streams: Vec<StreamMetrics> = world
@@ -1294,7 +1294,7 @@ fn evaluate_cell_with(spec: &CellSpec, search: &dyn Fn(&World) -> StateList) -> 
     let serial_stream_position = world.serial_stream.as_ref().and_then(|serial| world.streams.iter().position(|stream| stream == serial));
     let arm_by_transaction = arm_by_transaction_states(&world);
     let exact_reachable = exact_reachable_states(&world);
-    CellEvaluation { label: spec.label, sampling_point: spec.sampling_point, world, truth, truth_by_search, streams, serial_stream_position, arm_by_transaction, exact_reachable }
+    CellEvaluation { label: specification.label, sampling_point: specification.sampling_point, world, truth, truth_by_search, streams, serial_stream_position, arm_by_transaction, exact_reachable }
 }
 
 fn minimum_with_position(values: &[usize]) -> (usize, usize) {
@@ -1393,7 +1393,7 @@ struct RegisteredReading {
 fn registered_ordinary_publish_reading() -> RegisteredReading {
     let geometry = geometry_registered_publish_two_state();
     let mut table = Vec::new();
-    let writes = push_transaction_writes(&mut table, &geometry, Owner::TransactionA, 0);
+    let writes = push_transaction_writes(&mut table, &geometry, Owner::OlderTransaction, 0);
     let chain = single_transaction_chain(&writes, geometry.disk_count);
     let segments = write_segments(&table, &chain);
     RegisteredReading {
@@ -1494,8 +1494,8 @@ fn run_halt_checks(emitter: &mut Emitter, tally: &mut RunTally) {
 /// S2：串行流 a1 a2 | rA | RA SA | b1 b2 | rB | RB SB 上，按 `memory_pool.rs:993` `publishes_of_one_recording` 的规则手推：
 /// 第一次发布 = 单元写 a1、a2 + 记录写 rA + 根 RA；第二次 = b1、b2、rB、RB；两个系统配置槽写（SA、SB）与屏障不归任何一次发布。
 fn attribution_matches_hand_derivation() -> bool {
-    let world = build_world(Candidate::SerialPipeline, &geometry_g1());
-    let index_of = |name: &str| world.table.iter().position(|spec| spec.name == name).expect("写表里有这个名字");
+    let world = build_world(Candidate::SerialPipeline, &geometry_one_disk_two_units());
+    let index_of = |name: &str| world.table.iter().position(|specification| specification.name == name).expect("写表里有这个名字");
     let hand_derived = vec![
         PublishAttribution { units: vec![index_of("a1"), index_of("a2")], records: vec![index_of("rA")], root: index_of("RA") },
         PublishAttribution { units: vec![index_of("b1"), index_of("b2")], records: vec![index_of("rB")], root: index_of("RB") },
@@ -1525,11 +1525,11 @@ fn anchor_rows() -> Vec<AnchorRow> {
         expected_one_publish_arm_by_transaction: values[4],
     };
     vec![
-        row(geometry_g1(), [8, 64, 15, 22, 28]),
-        row(geometry_g3(), [6, 36, 11, 10, 12]),
+        row(geometry_one_disk_two_units(), [8, 64, 15, 22, 28]),
+        row(geometry_one_disk_one_unit(), [6, 36, 11, 10, 12]),
         row(geometry_g4a(), [28, 784, 55, 280, 370]),
         row(geometry_g4b(), [28, 784, 55, 280, 370]),
-        row(geometry_g5(), [7, 49, 13, 21, 27]),
+        row(geometry_one_disk_two_units_without_torn_state(), [7, 49, 13, 21, 27]),
     ]
 }
 
@@ -1572,7 +1572,7 @@ fn run_anchor_table(emitter: &mut Emitter, tally: &mut RunTally) {
 
 /// 登记第七节末尾「能力那几格的锚点」：罩住段串与真实发布形上的算术。
 fn run_capacity_anchors(emitter: &mut Emitter, tally: &mut RunTally) {
-    for (geometry, expected_cover_states, expected_cover_writes) in [(geometry_g1(), 2304u128, 10usize), (geometry_g4a(), 1_327_104u128, 18usize)] {
+    for (geometry, expected_cover_states, expected_cover_writes) in [(geometry_one_disk_two_units(), 2304u128, 10usize), (geometry_g4a(), 1_327_104u128, 18usize)] {
         let world = build_world(Candidate::SerialPipeline, &geometry);
         let product = arm_by_transaction_states(&world);
         let cover = cover_by_merging(&world.table, &product);
@@ -1600,12 +1600,12 @@ fn run_capacity_anchors(emitter: &mut Emitter, tally: &mut RunTally) {
     let single_chain_states = closed_form_state_count(&world.table, &chain_segments);
     let product_states = single_chain_states * single_chain_states;
     let witness_stream: Vec<Event> = {
-        let units_of_a: Vec<Event> = world.arm_chains[0].iter().copied().take_while(|event| matches!(event, Event::Write(index) if world.table[*index].kind == StepKind::UnitWrite)).collect();
-        let units_of_b: Vec<Event> = world.arm_chains[1].iter().copied().take_while(|event| matches!(event, Event::Write(index) if world.table[*index].kind == StepKind::UnitWrite)).collect();
-        let mut stream = units_of_a.clone();
-        stream.extend(units_of_b.iter().copied());
-        stream.extend(world.arm_chains[0][units_of_a.len()..].iter().copied());
-        stream.extend(world.arm_chains[1][units_of_b.len()..].iter().copied());
+        let older_units: Vec<Event> = world.arm_chains[0].iter().copied().take_while(|event| matches!(event, Event::Write(index) if world.table[*index].kind == StepKind::UnitWrite)).collect();
+        let newer_units: Vec<Event> = world.arm_chains[1].iter().copied().take_while(|event| matches!(event, Event::Write(index) if world.table[*index].kind == StepKind::UnitWrite)).collect();
+        let mut stream = older_units.clone();
+        stream.extend(newer_units.iter().copied());
+        stream.extend(world.arm_chains[0][older_units.len()..].iter().copied());
+        stream.extend(world.arm_chains[1][newer_units.len()..].iter().copied());
         stream
     };
     let witness_segments = write_segments(&world.table, &witness_stream);
@@ -1830,11 +1830,11 @@ fn emit_capacity_line(emitter: &mut Emitter, evaluation: &CellEvaluation) {
 
 // ── 阳性对照 ───────────────────────────────────────────────────────────────────────────
 
-fn index_of_write(table: &[WriteSpec], name: &str) -> usize {
-    table.iter().position(|spec| spec.name == name).unwrap_or_else(|| panic!("写表里没有 {name}"))
+fn index_of_write(table: &[WriteSpecification], name: &str) -> usize {
+    table.iter().position(|specification| specification.name == name).unwrap_or_else(|| panic!("写表里没有 {name}"))
 }
 
-fn state_with_only(table: &[WriteSpec], names: &[&str]) -> StateCode {
+fn state_with_only(table: &[WriteSpecification], names: &[&str]) -> StateCode {
     names.iter().fold(0, |code, name| with_value(code, index_of_write(table, name), PERSISTED))
 }
 
@@ -1843,12 +1843,12 @@ fn without_state(states: &[StateCode], removed: StateCode) -> StateList {
 }
 
 /// PC3 要的见证状态：两个事务的单元写都持久、rB 持久、rA 不持久（登记第五节 PC3 的例子）。
-fn recorded_prefix_witness(table: &[WriteSpec]) -> StateCode {
+fn recorded_prefix_witness(table: &[WriteSpecification]) -> StateCode {
     let mut code = 0;
-    for (write_index, spec) in table.iter().enumerate() {
-        let is_unit = spec.kind == StepKind::UnitWrite;
-        let is_record_of_b = spec.kind == StepKind::JournalRecord && spec.owner == Owner::TransactionB;
-        if is_unit || is_record_of_b {
+    for (write_index, specification) in table.iter().enumerate() {
+        let is_unit = specification.kind == StepKind::UnitWrite;
+        let is_record_of_the_newer_transaction = specification.kind == StepKind::JournalRecord && specification.owner == Owner::NewerTransaction;
+        if is_unit || is_record_of_the_newer_transaction {
             code = with_value(code, write_index, PERSISTED);
         }
     }
@@ -1891,13 +1891,13 @@ fn run_positive_controls(emitter: &mut Emitter, tally: &mut RunTally, evaluation
             let arm_states = crash_states_of_stream(table, stream_of_witness);
             let before = count_cross_transaction_misses(table, truth, &arm_states);
             let after = count_cross_transaction_misses(table, truth, &without_state(&arm_states, two_units_state));
-            let k2_before = count_cross_transaction_misses(table, truth, &evaluation.arm_by_transaction);
-            let k2_after = count_cross_transaction_misses(table, truth, &without_state(&evaluation.arm_by_transaction, two_units_state));
-            let ok = after == before + 1 && k2_after == k2_before + 1;
+            let per_transaction_cut_before = count_cross_transaction_misses(table, truth, &evaluation.arm_by_transaction);
+            let per_transaction_cut_after = count_cross_transaction_misses(table, truth, &without_state(&evaluation.arm_by_transaction, two_units_state));
+            let ok = after == before + 1 && per_transaction_cut_after == per_transaction_cut_before + 1;
             emit(
                 emitter,
                 format!(
-                    "name=positive_control control=delete_one_state cell={label} deleted={} arm_by_root_publish_misses_before={before} arm_by_root_publish_misses_after={after} arm_by_transaction_misses_before={k2_before} arm_by_transaction_misses_after={k2_after} ok={ok}",
+                    "name=positive_control control=delete_one_state cell={label} deleted={} arm_by_root_publish_misses_before={before} arm_by_root_publish_misses_after={after} arm_by_transaction_misses_before={per_transaction_cut_before} arm_by_transaction_misses_after={per_transaction_cut_after} ok={ok}",
                     render_state(table, two_units_state),
                 ),
             );
@@ -1909,13 +1909,13 @@ fn run_positive_controls(emitter: &mut Emitter, tally: &mut RunTally, evaluation
             let arm_states = crash_states_of_stream(table, stream_of_witness);
             let before = count_invalid_prefixes_covered(table, truth, &arm_states, InvalidPrefixKind::ByRecord);
             let after = count_invalid_prefixes_covered(table, truth, &without_state(&arm_states, prefix_witness), InvalidPrefixKind::ByRecord);
-            let k2_before = count_invalid_prefixes_covered(table, truth, &evaluation.arm_by_transaction, InvalidPrefixKind::ByRecord);
-            let k2_after = count_invalid_prefixes_covered(table, truth, &without_state(&evaluation.arm_by_transaction, prefix_witness), InvalidPrefixKind::ByRecord);
-            let ok = before == after + 1 && k2_before == k2_after + 1;
+            let per_transaction_cut_before = count_invalid_prefixes_covered(table, truth, &evaluation.arm_by_transaction, InvalidPrefixKind::ByRecord);
+            let per_transaction_cut_after = count_invalid_prefixes_covered(table, truth, &without_state(&evaluation.arm_by_transaction, prefix_witness), InvalidPrefixKind::ByRecord);
+            let ok = before == after + 1 && per_transaction_cut_before == per_transaction_cut_after + 1;
             emit(
                 emitter,
                 format!(
-                    "name=positive_control control=delete_one_invalid_prefix cell={label} deleted={} arm_by_root_publish_covered_before={before} arm_by_root_publish_covered_after={after} arm_by_transaction_covered_before={k2_before} arm_by_transaction_covered_after={k2_after} ok={ok}",
+                    "name=positive_control control=delete_one_invalid_prefix cell={label} deleted={} arm_by_root_publish_covered_before={before} arm_by_root_publish_covered_after={after} arm_by_transaction_covered_before={per_transaction_cut_before} arm_by_transaction_covered_after={per_transaction_cut_after} ok={ok}",
                     render_state(table, prefix_witness),
                 ),
             );
@@ -2061,7 +2061,7 @@ fn run_everything(emitter: &mut Emitter) -> RunTally {
         return tally;
     }
     run_anchor_table(emitter, &mut tally);
-    let evaluations: Vec<CellEvaluation> = cell_specs().iter().map(evaluate_cell).collect();
+    let evaluations: Vec<CellEvaluation> = cell_specifications().iter().map(evaluate_cell).collect();
     let mut judgements = Vec::new();
     for evaluation in &evaluations {
         judgements.push(emit_cell(emitter, &mut tally, evaluation));
@@ -2174,7 +2174,7 @@ fn main() {
             SegmentChoice::Second => tally.absorb(run_second_segment(&mut emitter)),
             SegmentChoice::Third => tally.absorb(run_third_segment(&mut emitter)),
             SegmentChoice::HaltChecksOnly => run_halt_checks(&mut emitter, &mut tally),
-            SegmentChoice::ScaleEstimateOnly => run_s3_estimate(&mut emitter),
+            SegmentChoice::ScaleEstimateOnly => run_scale_estimate(&mut emitter),
         }
     }
     emit(
@@ -2251,8 +2251,8 @@ impl Hasher for MixingHasher {
     }
 }
 
-type FastMap<K, V> = HashMap<K, V, BuildHasherDefault<MixingHasher>>;
-type FastSet<K> = std::collections::HashSet<K, BuildHasherDefault<MixingHasher>>;
+type FastMap<Key, Value> = HashMap<Key, Value, BuildHasherDefault<MixingHasher>>;
+type FastSet<Key> = std::collections::HashSet<Key, BuildHasherDefault<MixingHasher>>;
 
 struct Bitset {
     words: Vec<u64>,
@@ -2293,70 +2293,70 @@ impl Bitset {
 const MAXIMUM_STREAMING_WRITES: usize = 20;
 
 /// 写表的定长摘要：每次写的取值个数（两态 2、原地覆写 3）、混合进制的权、各谓词用的位掩码（每次写两位，0 / 1 / 2）。
-struct TableInfo {
+struct WriteTableSummary {
     write_count: usize,
     disk_count: usize,
     radix: Vec<u8>,
     weight: Vec<u64>,
     total_vectors: u64,
     writes_on_disk: Vec<u32>,
-    owner_a_any: u64,
-    owner_a_ones: u64,
-    owner_b_any: u64,
-    owner_b_ones: u64,
-    record_a_any: u64,
-    record_a_ones: u64,
-    record_b_any: u64,
-    record_b_ones: u64,
+    older_owner_any: u64,
+    older_owner_ones: u64,
+    newer_owner_any: u64,
+    newer_owner_ones: u64,
+    older_record_any: u64,
+    older_record_ones: u64,
+    newer_record_any: u64,
+    newer_record_ones: u64,
 }
 
-impl TableInfo {
-    fn new(table: &[WriteSpec]) -> TableInfo {
+impl WriteTableSummary {
+    fn new(table: &[WriteSpecification]) -> WriteTableSummary {
         let write_count = table.len();
         assert!(write_count <= MAXIMUM_STREAMING_WRITES, "流式路径的写表最多 20 次写");
-        let radix: Vec<u8> = table.iter().map(|spec| if spec.is_in_place { 3 } else { 2 }).collect();
+        let radix: Vec<u8> = table.iter().map(|specification| if specification.is_in_place { 3 } else { 2 }).collect();
         let mut weight = Vec::new();
         let mut running = 1u64;
         for &write_radix in &radix {
             weight.push(running);
             running *= u64::from(write_radix);
         }
-        let disk_count = table.iter().map(|spec| spec.disk).max().map_or(1, |highest| highest + 1);
+        let disk_count = table.iter().map(|specification| specification.disk).max().map_or(1, |highest| highest + 1);
         assert!(disk_count <= 2, "搜索状态里的未放行盘集合只留两位");
         let mut writes_on_disk = vec![0u32; disk_count];
-        for (write_index, spec) in table.iter().enumerate() {
-            writes_on_disk[spec.disk] |= 1u32 << write_index;
+        for (write_index, specification) in table.iter().enumerate() {
+            writes_on_disk[specification.disk] |= 1u32 << write_index;
         }
-        let masks_of = |select: &dyn Fn(&WriteSpec) -> bool| -> (u64, u64) {
+        let masks_of = |select: &dyn Fn(&WriteSpecification) -> bool| -> (u64, u64) {
             let mut any = 0u64;
             let mut ones = 0u64;
-            for (write_index, spec) in table.iter().enumerate() {
-                if select(spec) {
+            for (write_index, specification) in table.iter().enumerate() {
+                if select(specification) {
                     any |= 0b11u64 << (2 * write_index);
                     ones |= 0b01u64 << (2 * write_index);
                 }
             }
             (any, ones)
         };
-        let (owner_a_any, owner_a_ones) = masks_of(&|spec| spec.owner == Owner::TransactionA);
-        let (owner_b_any, owner_b_ones) = masks_of(&|spec| spec.owner == Owner::TransactionB);
-        let (record_a_any, record_a_ones) = masks_of(&|spec| spec.owner == Owner::TransactionA && spec.kind == StepKind::JournalRecord);
-        let (record_b_any, record_b_ones) = masks_of(&|spec| spec.owner == Owner::TransactionB && spec.kind == StepKind::JournalRecord);
-        TableInfo {
+        let (older_owner_any, older_owner_ones) = masks_of(&|specification| specification.owner == Owner::OlderTransaction);
+        let (newer_owner_any, newer_owner_ones) = masks_of(&|specification| specification.owner == Owner::NewerTransaction);
+        let (older_record_any, older_record_ones) = masks_of(&|specification| specification.owner == Owner::OlderTransaction && specification.kind == StepKind::JournalRecord);
+        let (newer_record_any, newer_record_ones) = masks_of(&|specification| specification.owner == Owner::NewerTransaction && specification.kind == StepKind::JournalRecord);
+        WriteTableSummary {
             write_count,
             disk_count,
             radix,
             weight,
             total_vectors: running,
             writes_on_disk,
-            owner_a_any,
-            owner_a_ones,
-            owner_b_any,
-            owner_b_ones,
-            record_a_any,
-            record_a_ones,
-            record_b_any,
-            record_b_ones,
+            older_owner_any,
+            older_owner_ones,
+            newer_owner_any,
+            newer_owner_ones,
+            older_record_any,
+            older_record_ones,
+            newer_record_any,
+            newer_record_ones,
         }
     }
 
@@ -2377,15 +2377,15 @@ impl TableInfo {
     }
 
     fn is_cross(&self, code: u64) -> bool {
-        code & self.owner_a_any != 0 && code & self.owner_b_any != 0
+        code & self.older_owner_any != 0 && code & self.newer_owner_any != 0
     }
 
     fn is_invalid_by_record(&self, code: u64) -> bool {
-        code & self.record_b_any == self.record_b_ones && code & self.record_a_any != self.record_a_ones
+        code & self.newer_record_any == self.newer_record_ones && code & self.older_record_any != self.older_record_ones
     }
 
     fn is_invalid_by_all_writes(&self, code: u64) -> bool {
-        code & self.owner_b_any == self.owner_b_ones && code & self.owner_a_any != 0 && code & self.owner_a_any != self.owner_a_ones
+        code & self.newer_owner_any == self.newer_owner_ones && code & self.older_owner_any != 0 && code & self.older_owner_any != self.older_owner_ones
     }
 }
 
@@ -2395,7 +2395,7 @@ enum Step {
     Barrier { disk: u8 },
 }
 
-fn steps_of(table: &[WriteSpec], chain: &[Event]) -> Vec<Step> {
+fn steps_of(table: &[WriteSpecification], chain: &[Event]) -> Vec<Step> {
     chain
         .iter()
         .map(|event| match *event {
@@ -2411,53 +2411,53 @@ fn steps_of(table: &[WriteSpec], chain: &[Event]) -> Vec<Step> {
 
 /// 两条链与第二条链的等待表（走过 A 的第几步之后 B 的这一步才可发出）。
 struct WalkContext {
-    steps_a: Vec<Step>,
-    steps_b: Vec<Step>,
-    waits_of_b: Vec<Option<usize>>,
+    older_steps: Vec<Step>,
+    newer_steps: Vec<Step>,
+    newer_waits: Vec<Option<usize>>,
     writes_on_disk: Vec<u32>,
 }
 
 impl WalkContext {
-    fn new(world: &World, info: &TableInfo) -> WalkContext {
-        let steps_a = steps_of(&world.table, &world.search_chains[0]);
-        let steps_b = steps_of(&world.table, &world.search_chains[1]);
-        assert!(steps_a.len() <= 31 && steps_b.len() <= 31, "搜索状态里每条链的位置只留五位");
-        let waits_of_b = if steps_b.is_empty() { Vec::new() } else { world.search_waits_of_second_chain.clone() };
-        WalkContext { steps_a, steps_b, waits_of_b, writes_on_disk: info.writes_on_disk.clone() }
+    fn new(world: &World, table_summary: &WriteTableSummary) -> WalkContext {
+        let older_steps = steps_of(&world.table, &world.search_chains[0]);
+        let newer_steps = steps_of(&world.table, &world.search_chains[1]);
+        assert!(older_steps.len() <= 31 && newer_steps.len() <= 31, "搜索状态里每条链的位置只留五位");
+        let newer_waits = if newer_steps.is_empty() { Vec::new() } else { world.search_waits_of_second_chain.clone() };
+        WalkContext { older_steps, newer_steps, newer_waits, writes_on_disk: table_summary.writes_on_disk.clone() }
     }
 
-    fn b_step_may_follow(&self, position_a: usize, position_b: usize) -> bool {
-        self.waits_of_b[position_b].map_or(true, |needed| position_a > needed)
+    fn newer_step_may_follow(&self, older_position: usize, newer_position: usize) -> bool {
+        self.newer_waits[newer_position].map_or(true, |needed| older_position > needed)
     }
 }
 
 /// 逐条数 Σ(P)：在（A 走到哪、B 走到哪）的格子上数路径，B 的等待表限制能走哪条边。
 fn count_interleavings(context: &WalkContext) -> u128 {
-    let (length_a, length_b) = (context.steps_a.len(), context.steps_b.len());
-    let mut ways = vec![vec![0u128; length_b + 1]; length_a + 1];
+    let (older_length, newer_length) = (context.older_steps.len(), context.newer_steps.len());
+    let mut ways = vec![vec![0u128; newer_length + 1]; older_length + 1];
     ways[0][0] = 1;
-    for position_a in 0..=length_a {
-        for position_b in 0..=length_b {
-            let here = ways[position_a][position_b];
+    for older_position in 0..=older_length {
+        for newer_position in 0..=newer_length {
+            let here = ways[older_position][newer_position];
             if here == 0 {
                 continue;
             }
-            if position_a < length_a {
-                ways[position_a + 1][position_b] += here;
+            if older_position < older_length {
+                ways[older_position + 1][newer_position] += here;
             }
-            if position_b < length_b && context.b_step_may_follow(position_a, position_b) {
-                ways[position_a][position_b + 1] += here;
+            if newer_position < newer_length && context.newer_step_may_follow(older_position, newer_position) {
+                ways[older_position][newer_position + 1] += here;
             }
         }
     }
-    ways[length_a][length_b]
+    ways[older_length][newer_length]
 }
 
 /// 深搜走到一半的状态。`key` 每次写占五位：它发出时已关了几段（段号）；`path` 每步一位（0 = A、1 = B），高位在前。
 #[derive(Clone, Copy)]
 struct Walk {
-    position_a: u8,
-    position_b: u8,
+    older_position: u8,
+    newer_position: u8,
     unreleased: u8,
     writes_in_current: u8,
     closed: u8,
@@ -2470,7 +2470,7 @@ struct Walk {
 
 impl Walk {
     fn start() -> Walk {
-        Walk { position_a: 0, position_b: 0, unreleased: 0, writes_in_current: 0, closed: 0, issued: 0, armed: 0, forced: 0, key: 0, path: 0 }
+        Walk { older_position: 0, newer_position: 0, unreleased: 0, writes_in_current: 0, closed: 0, issued: 0, armed: 0, forced: 0, key: 0, path: 0 }
     }
 }
 
@@ -2509,23 +2509,23 @@ trait LeafSink {
     fn leaf(&mut self, walk: &Walk, masks: &[u32; MAXIMUM_STREAMING_WRITES]);
 }
 
-fn walk_interleavings<S: LeafSink>(context: &WalkContext, walk: Walk, masks: &mut [u32; MAXIMUM_STREAMING_WRITES], sink: &mut S) {
-    let (position_a, position_b) = (usize::from(walk.position_a), usize::from(walk.position_b));
-    if position_a == context.steps_a.len() && position_b == context.steps_b.len() {
+fn walk_interleavings<Sink: LeafSink>(context: &WalkContext, walk: Walk, masks: &mut [u32; MAXIMUM_STREAMING_WRITES], sink: &mut Sink) {
+    let (older_position, newer_position) = (usize::from(walk.older_position), usize::from(walk.newer_position));
+    if older_position == context.older_steps.len() && newer_position == context.newer_steps.len() {
         sink.leaf(&walk, masks);
         return;
     }
-    if position_a < context.steps_a.len() {
+    if older_position < context.older_steps.len() {
         let mut next = walk;
-        apply_step(context, &mut next, context.steps_a[position_a], masks);
-        next.position_a += 1;
+        apply_step(context, &mut next, context.older_steps[older_position], masks);
+        next.older_position += 1;
         next.path <<= 1;
         walk_interleavings(context, next, masks, sink);
     }
-    if position_b < context.steps_b.len() && context.b_step_may_follow(position_a, position_b) {
+    if newer_position < context.newer_steps.len() && context.newer_step_may_follow(older_position, newer_position) {
         let mut next = walk;
-        apply_step(context, &mut next, context.steps_b[position_b], masks);
-        next.position_b += 1;
+        apply_step(context, &mut next, context.newer_steps[newer_position], masks);
+        next.newer_position += 1;
         next.path = (next.path << 1) | 1;
         walk_interleavings(context, next, masks, sink);
     }
@@ -2543,22 +2543,22 @@ fn split_tasks(context: &WalkContext, steps_deep: usize) -> Vec<CoverSearchTask>
     for _ in 0..steps_deep {
         let mut next_frontier = Vec::new();
         for task in &frontier {
-            let (position_a, position_b) = (usize::from(task.walk.position_a), usize::from(task.walk.position_b));
-            if position_a == context.steps_a.len() && position_b == context.steps_b.len() {
+            let (older_position, newer_position) = (usize::from(task.walk.older_position), usize::from(task.walk.newer_position));
+            if older_position == context.older_steps.len() && newer_position == context.newer_steps.len() {
                 next_frontier.push(*task);
                 continue;
             }
-            if position_a < context.steps_a.len() {
+            if older_position < context.older_steps.len() {
                 let mut child = *task;
-                apply_step(context, &mut child.walk, context.steps_a[position_a], &mut child.masks);
-                child.walk.position_a += 1;
+                apply_step(context, &mut child.walk, context.older_steps[older_position], &mut child.masks);
+                child.walk.older_position += 1;
                 child.walk.path <<= 1;
                 next_frontier.push(child);
             }
-            if position_b < context.steps_b.len() && context.b_step_may_follow(position_a, position_b) {
+            if newer_position < context.newer_steps.len() && context.newer_step_may_follow(older_position, newer_position) {
                 let mut child = *task;
-                apply_step(context, &mut child.walk, context.steps_b[position_b], &mut child.masks);
-                child.walk.position_b += 1;
+                apply_step(context, &mut child.walk, context.newer_steps[newer_position], &mut child.masks);
+                child.walk.newer_position += 1;
                 child.walk.path = (child.walk.path << 1) | 1;
                 next_frontier.push(child);
             }
@@ -2595,7 +2595,7 @@ struct PassOne {
 }
 
 fn pass_one(context: &WalkContext, threads: usize) -> PassOne {
-    let tasks = split_tasks(context, 12usize.min((context.steps_a.len() + context.steps_b.len()) / 2));
+    let tasks = split_tasks(context, 12usize.min((context.older_steps.len() + context.newer_steps.len()) / 2));
     let next_task = AtomicUsize::new(0);
     let mut sinks: Vec<PassOneSink> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
@@ -2650,7 +2650,7 @@ fn segments_of_signature(key: u128, write_count: usize) -> Vec<u32> {
 /// 一串段的枚举域：每个状态连同它的混合进制序号一起交给 `emit`。「前面各段全持久 + 当前段任意组合」，
 /// 当前段的全零组合不发（它就是上一段全持久那个状态），全局的全零状态发一次；个数 = 1 + Σ(2^两态写数 · 3^原地覆写数 − 1)。
 #[inline]
-fn for_each_crash_state(info: &TableInfo, segments: &[u32], mut emit: impl FnMut(u64, u64)) {
+fn for_each_crash_state(table_summary: &WriteTableSummary, segments: &[u32], mut emit: impl FnMut(u64, u64)) {
     emit(0, 0);
     let mut prefix_code = 0u64;
     let mut prefix_index = 0u64;
@@ -2673,14 +2673,14 @@ fn for_each_crash_state(info: &TableInfo, segments: &[u32], mut emit: impl FnMut
                     break 'combinations;
                 }
                 let write = writes[position];
-                if digits[position] + 1 < info.radix[write] {
+                if digits[position] + 1 < table_summary.radix[write] {
                     digits[position] += 1;
                     code += 1u64 << (2 * write);
-                    index += info.weight[write];
+                    index += table_summary.weight[write];
                     break;
                 }
                 code -= u64::from(digits[position]) << (2 * write);
-                index -= u64::from(digits[position]) * info.weight[write];
+                index -= u64::from(digits[position]) * table_summary.weight[write];
                 digits[position] = 0;
                 position += 1;
             }
@@ -2688,17 +2688,17 @@ fn for_each_crash_state(info: &TableInfo, segments: &[u32], mut emit: impl FnMut
         }
         for &write in &writes[..count] {
             prefix_code |= 1u64 << (2 * write);
-            prefix_index += info.weight[write];
+            prefix_index += table_summary.weight[write];
         }
     }
 }
 
-fn expansion_of_segment(info: &TableInfo, segment: u32) -> u128 {
-    (0..info.write_count).filter(|write| segment & (1u32 << write) != 0).map(|write| u128::from(info.radix[write])).product()
+fn expansion_of_segment(table_summary: &WriteTableSummary, segment: u32) -> u128 {
+    (0..table_summary.write_count).filter(|write| segment & (1u32 << write) != 0).map(|write| u128::from(table_summary.radix[write])).product()
 }
 
-fn closed_form_of_segments(info: &TableInfo, segments: &[u32]) -> u128 {
-    1 + segments.iter().map(|segment| expansion_of_segment(info, *segment) - 1).sum::<u128>()
+fn closed_form_of_segments(table_summary: &WriteTableSummary, segments: &[u32]) -> u128 {
+    1 + segments.iter().map(|segment| expansion_of_segment(table_summary, *segment) - 1).sum::<u128>()
 }
 
 /// 一个段签名上的读数。K1 在这个签名对应的每一条流上的读数都相同；`count` 是这个签名有几条流。
@@ -2715,14 +2715,14 @@ struct SignatureRow {
     largest_segment_expansion: u32,
 }
 
-fn evaluate_signatures(info: &TableInfo, signatures: &[(u128, u64, u64)], threads: usize) -> (Bitset, Vec<SignatureRow>) {
+fn evaluate_signatures(table_summary: &WriteTableSummary, signatures: &[(u128, u64, u64)], threads: usize) -> (Bitset, Vec<SignatureRow>) {
     const CHUNK: usize = 64;
     let next_start = AtomicUsize::new(0);
     let parts: Vec<(Bitset, Vec<SignatureRow>)> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|_| {
                 scope.spawn(|| {
-                    let mut union = Bitset::new(info.total_vectors);
+                    let mut union = Bitset::new(table_summary.total_vectors);
                     let mut rows = Vec::new();
                     loop {
                         let start = next_start.fetch_add(CHUNK, AtomicOrdering::Relaxed);
@@ -2730,18 +2730,18 @@ fn evaluate_signatures(info: &TableInfo, signatures: &[(u128, u64, u64)], thread
                             break;
                         }
                         for &(key, count, representative_path) in &signatures[start..(start + CHUNK).min(signatures.len())] {
-                            let segments = segments_of_signature(key, info.write_count);
+                            let segments = segments_of_signature(key, table_summary.write_count);
                             let (mut states, mut cross, mut invalid_record, mut invalid_all) = (0u32, 0u32, 0u32, 0u32);
-                            for_each_crash_state(info, &segments, |code, index| {
+                            for_each_crash_state(table_summary, &segments, |code, index| {
                                 union.insert_index(index);
                                 states += 1;
-                                if info.is_cross(code) {
+                                if table_summary.is_cross(code) {
                                     cross += 1;
                                 }
-                                if info.is_invalid_by_record(code) {
+                                if table_summary.is_invalid_by_record(code) {
                                     invalid_record += 1;
                                 }
-                                if info.is_invalid_by_all_writes(code) {
+                                if table_summary.is_invalid_by_all_writes(code) {
                                     invalid_all += 1;
                                 }
                             });
@@ -2753,9 +2753,9 @@ fn evaluate_signatures(info: &TableInfo, signatures: &[(u128, u64, u64)], thread
                                 cross_states: cross,
                                 invalid_record_states: invalid_record,
                                 invalid_all_writes_states: invalid_all,
-                                closed_form_matches: u128::from(states) == closed_form_of_segments(info, &segments),
+                                closed_form_matches: u128::from(states) == closed_form_of_segments(table_summary, &segments),
                                 largest_segment_writes: segments.iter().map(|segment| segment.count_ones()).max().unwrap_or(0) as u8,
-                                largest_segment_expansion: u32::try_from(segments.iter().map(|segment| expansion_of_segment(info, *segment)).max().unwrap_or(1))
+                                largest_segment_expansion: u32::try_from(segments.iter().map(|segment| expansion_of_segment(table_summary, *segment)).max().unwrap_or(1))
                                     .expect("两盘几何一段的展开数装得进 u32"),
                             });
                         }
@@ -2766,7 +2766,7 @@ fn evaluate_signatures(info: &TableInfo, signatures: &[(u128, u64, u64)], thread
             .collect();
         handles.into_iter().map(|handle| handle.join().expect("线程不 panic")).collect()
     });
-    let mut union = Bitset::new(info.total_vectors);
+    let mut union = Bitset::new(table_summary.total_vectors);
     let mut rows = Vec::new();
     for (part_union, mut part_rows) in parts {
         union.or_with(&part_union);
@@ -2776,8 +2776,8 @@ fn evaluate_signatures(info: &TableInfo, signatures: &[(u128, u64, u64)], thread
     (union, rows)
 }
 
-fn truth_list_of(info: &TableInfo, bits: &Bitset) -> StateList {
-    let mut states: StateList = bits.indices().into_iter().map(|index| StateCode::from(info.code_of_index(index))).collect();
+fn truth_list_of(table_summary: &WriteTableSummary, bits: &Bitset) -> StateList {
+    let mut states: StateList = bits.indices().into_iter().map(|index| StateCode::from(table_summary.code_of_index(index))).collect();
     states.sort_unstable();
     states
 }
@@ -2807,8 +2807,8 @@ fn close_masks(direct: &[u32; MAXIMUM_STREAMING_WRITES], write_count: usize) -> 
     }
 }
 
-struct ExactWalk<'a> {
-    info: &'a TableInfo,
+struct ExactWalk<'summary> {
+    table_summary: &'summary WriteTableSummary,
     masks: [u32; MAXIMUM_STREAMING_WRITES],
     order: Vec<usize>,
     successors: Vec<u32>,
@@ -2819,9 +2819,9 @@ impl ExactWalk<'_> {
     fn extend(&self, position: usize, chosen: u32, index: u64, emit: &mut dyn FnMut(u64)) {
         if position == self.order.len() {
             emit(index);
-            let eligible: Vec<usize> = (0..self.info.write_count).filter(|&write| self.in_place[write] && chosen & (1u32 << write) != 0 && self.successors[write] & chosen == 0).collect();
+            let eligible: Vec<usize> = (0..self.table_summary.write_count).filter(|&write| self.in_place[write] && chosen & (1u32 << write) != 0 && self.successors[write] & chosen == 0).collect();
             for subset in 1u32..(1u32 << eligible.len()) {
-                let torn_index = eligible.iter().enumerate().filter(|(position, _)| subset & (1u32 << position) != 0).fold(index, |sum, (_, &write)| sum + self.info.weight[write]);
+                let torn_index = eligible.iter().enumerate().filter(|(position, _)| subset & (1u32 << position) != 0).fold(index, |sum, (_, &write)| sum + self.table_summary.weight[write]);
                 emit(torn_index);
             }
             return;
@@ -2829,35 +2829,35 @@ impl ExactWalk<'_> {
         let write = self.order[position];
         self.extend(position + 1, chosen, index, emit);
         if self.masks[write] & !chosen == 0 {
-            self.extend(position + 1, chosen | (1u32 << write), index + self.info.weight[write], emit);
+            self.extend(position + 1, chosen | (1u32 << write), index + self.table_summary.weight[write], emit);
         }
     }
 }
 
 /// 一份偏序的全部可达状态（序号）：偏序的下闭集，撕裂态只在原地覆写是下闭集的极大元时取（与 `reachable_states_of_partial_order` 同义，只是按下闭集递归、不扫 2^n）。
-fn for_each_exact_state(info: &TableInfo, direct: &[u32; MAXIMUM_STREAMING_WRITES], emit: &mut dyn FnMut(u64)) {
-    let masks = close_masks(direct, info.write_count);
-    let mut order: Vec<usize> = (0..info.write_count).collect();
+fn for_each_exact_state(table_summary: &WriteTableSummary, direct: &[u32; MAXIMUM_STREAMING_WRITES], emit: &mut dyn FnMut(u64)) {
+    let masks = close_masks(direct, table_summary.write_count);
+    let mut order: Vec<usize> = (0..table_summary.write_count).collect();
     order.sort_by_key(|&write| (masks[write].count_ones(), write));
-    let successors: Vec<u32> = (0..info.write_count).map(|write| (0..info.write_count).filter(|&later| masks[later] & (1u32 << write) != 0).fold(0u32, |sum, later| sum | (1u32 << later))).collect();
-    let in_place: Vec<bool> = info.radix.iter().map(|write_radix| *write_radix == 3).collect();
-    let walk = ExactWalk { info, masks, order, successors, in_place };
+    let successors: Vec<u32> = (0..table_summary.write_count).map(|write| (0..table_summary.write_count).filter(|&later| masks[later] & (1u32 << write) != 0).fold(0u32, |sum, later| sum | (1u32 << later))).collect();
+    let in_place: Vec<bool> = table_summary.radix.iter().map(|write_radix| *write_radix == 3).collect();
+    let walk = ExactWalk { table_summary, masks, order, successors, in_place };
     walk.extend(0, 0, 0, emit);
 }
 
-fn evaluate_exact_union(info: &TableInfo, direct_masks: &[[u32; MAXIMUM_STREAMING_WRITES]], threads: usize) -> Bitset {
+fn evaluate_exact_union(table_summary: &WriteTableSummary, direct_masks: &[[u32; MAXIMUM_STREAMING_WRITES]], threads: usize) -> Bitset {
     let next_position = AtomicUsize::new(0);
     let parts: Vec<Bitset> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|_| {
                 scope.spawn(|| {
-                    let mut union = Bitset::new(info.total_vectors);
+                    let mut union = Bitset::new(table_summary.total_vectors);
                     loop {
                         let position = next_position.fetch_add(1, AtomicOrdering::Relaxed);
                         if position >= direct_masks.len() {
                             break;
                         }
-                        for_each_exact_state(info, &direct_masks[position], &mut |index| union.insert_index(index));
+                        for_each_exact_state(table_summary, &direct_masks[position], &mut |index| union.insert_index(index));
                     }
                     union
                 })
@@ -2865,7 +2865,7 @@ fn evaluate_exact_union(info: &TableInfo, direct_masks: &[[u32; MAXIMUM_STREAMIN
             .collect();
         handles.into_iter().map(|handle| handle.join().expect("线程不 panic")).collect()
     });
-    let mut union = Bitset::new(info.total_vectors);
+    let mut union = Bitset::new(table_summary.total_vectors);
     for part in &parts {
         union.or_with(part);
     }
@@ -2876,16 +2876,16 @@ fn evaluate_exact_union(info: &TableInfo, direct_masks: &[[u32; MAXIMUM_STREAMIN
 
 /// 与 `some_stream_realizes_target` 同一个搜索（状态 = 两条链各走到哪、未放行的盘、当前段的相、上一段的相），
 /// 只是状态压成 16 位、已访问用世代戳的定长数组，不用哈希表。相：0 之前（必须全持久）、1 当前（任意）、2 之后（必须全没持久）。
-struct Searcher<'a> {
-    context: &'a WalkContext,
+struct Searcher<'context> {
+    context: &'context WalkContext,
     stamps: Vec<u32>,
     epoch: u32,
     stack: Vec<u16>,
     visited_states: u64,
 }
 
-impl<'a> Searcher<'a> {
-    fn new(context: &'a WalkContext) -> Searcher<'a> {
+impl<'context> Searcher<'context> {
+    fn new(context: &'context WalkContext) -> Searcher<'context> {
         Searcher { context, stamps: vec![0; 1 << 16], epoch: 0, stack: Vec::new(), visited_states: 0 }
     }
 
@@ -2938,17 +2938,17 @@ impl<'a> Searcher<'a> {
         self.stack.clear();
         self.stamps[0] = epoch;
         self.stack.push(0);
-        let (length_a, length_b) = (self.context.steps_a.len(), self.context.steps_b.len());
+        let (older_length, newer_length) = (self.context.older_steps.len(), self.context.newer_steps.len());
         let mut out = [0u16; 3];
         while let Some(packed) = self.stack.pop() {
             self.visited_states += 1;
-            let position_a = usize::from(packed >> 11);
-            let position_b = usize::from((packed >> 6) & 31);
-            if position_a == length_a && position_b == length_b {
+            let older_position = usize::from(packed >> 11);
+            let newer_position = usize::from((packed >> 6) & 31);
+            if older_position == older_length && newer_position == newer_length {
                 return true;
             }
-            if position_a < length_a {
-                let produced = self.successors(packed, self.context.steps_a[position_a], target, &mut out);
+            if older_position < older_length {
+                let produced = self.successors(packed, self.context.older_steps[older_position], target, &mut out);
                 for &state in &out[..produced] {
                     let next = state + (1 << 11);
                     if self.stamps[usize::from(next)] != epoch {
@@ -2957,8 +2957,8 @@ impl<'a> Searcher<'a> {
                     }
                 }
             }
-            if position_b < length_b && self.context.b_step_may_follow(position_a, position_b) {
-                let produced = self.successors(packed, self.context.steps_b[position_b], target, &mut out);
+            if newer_position < newer_length && self.context.newer_step_may_follow(older_position, newer_position) {
+                let produced = self.successors(packed, self.context.newer_steps[newer_position], target, &mut out);
                 for &state in &out[..produced] {
                     let next = state + (1 << 6);
                     if self.stamps[usize::from(next)] != epoch {
@@ -2972,22 +2972,22 @@ impl<'a> Searcher<'a> {
     }
 }
 
-fn search_truth(context: &WalkContext, info: &TableInfo, threads: usize) -> Bitset {
+fn search_truth(context: &WalkContext, table_summary: &WriteTableSummary, threads: usize) -> Bitset {
     const CHUNK: u64 = 4096;
     let next_chunk = AtomicUsize::new(0);
     let parts: Vec<Bitset> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|_| {
                 scope.spawn(|| {
-                    let mut found = Bitset::new(info.total_vectors);
+                    let mut found = Bitset::new(table_summary.total_vectors);
                     let mut searcher = Searcher::new(context);
                     loop {
                         let start = next_chunk.fetch_add(1, AtomicOrdering::Relaxed) as u64 * CHUNK;
-                        if start >= info.total_vectors {
+                        if start >= table_summary.total_vectors {
                             break;
                         }
-                        for index in start..(start + CHUNK).min(info.total_vectors) {
-                            if searcher.realizable(info.code_of_index(index)) {
+                        for index in start..(start + CHUNK).min(table_summary.total_vectors) {
+                            if searcher.realizable(table_summary.code_of_index(index)) {
                                 found.insert_index(index);
                             }
                         }
@@ -2998,7 +2998,7 @@ fn search_truth(context: &WalkContext, info: &TableInfo, threads: usize) -> Bits
             .collect();
         handles.into_iter().map(|handle| handle.join().expect("线程不 panic")).collect()
     });
-    let mut found = Bitset::new(info.total_vectors);
+    let mut found = Bitset::new(table_summary.total_vectors);
     for part in &parts {
         found.or_with(part);
     }
@@ -3006,13 +3006,13 @@ fn search_truth(context: &WalkContext, info: &TableInfo, threads: usize) -> Bits
 }
 
 /// 登记 S3 要报的「逐状态深搜的规模」：每隔 `stride` 个状态向量跑一次搜索，报跑了几个、共访问几个搜索状态、单个最多访问几个、几个搜得到。
-fn search_sample(context: &WalkContext, info: &TableInfo, stride: u64) -> (u64, u64, u64, u64) {
+fn search_sample(context: &WalkContext, table_summary: &WriteTableSummary, stride: u64) -> (u64, u64, u64, u64) {
     let mut searcher = Searcher::new(context);
     let (mut vectors, mut visited_maximum, mut realized) = (0u64, 0u64, 0u64);
     let mut index = 0u64;
-    while index < info.total_vectors {
+    while index < table_summary.total_vectors {
         let before = searcher.visited_states;
-        if searcher.realizable(info.code_of_index(index)) {
+        if searcher.realizable(table_summary.code_of_index(index)) {
             realized += 1;
         }
         visited_maximum = visited_maximum.max(searcher.visited_states - before);
@@ -3023,25 +3023,25 @@ fn search_sample(context: &WalkContext, info: &TableInfo, stride: u64) -> (u64, 
 }
 
 fn truth_by_search_fast(world: &World) -> StateList {
-    let info = TableInfo::new(&world.table);
-    let context = WalkContext::new(world, &info);
-    truth_list_of(&info, &search_truth(&context, &info, worker_thread_count()))
+    let table_summary = WriteTableSummary::new(&world.table);
+    let context = WalkContext::new(world, &table_summary);
+    truth_list_of(&table_summary, &search_truth(&context, &table_summary, worker_thread_count()))
 }
 
 // ── 两条链的世界，不存流 ──────────────────────────────────────────────────────────────────
 
 fn build_two_chain_world_without_streams(candidate: Candidate, geometry: &Geometry) -> World {
     let mut table = Vec::new();
-    let writes_of_a = push_transaction_writes(&mut table, geometry, Owner::TransactionA, geometry.root_disk_of_transaction_a);
-    let writes_of_b = push_transaction_writes(&mut table, geometry, Owner::TransactionB, geometry.root_disk_of_transaction_b);
-    let chain_a = single_transaction_chain(&writes_of_a, geometry.disk_count);
-    let chain_b = single_transaction_chain(&writes_of_b, geometry.disk_count);
-    let mut serial_stream = chain_a.clone();
-    serial_stream.extend(chain_b.iter().copied());
+    let older_writes = push_transaction_writes(&mut table, geometry, Owner::OlderTransaction, geometry.root_disk_of_the_older_transaction);
+    let newer_writes = push_transaction_writes(&mut table, geometry, Owner::NewerTransaction, geometry.root_disk_of_the_newer_transaction);
+    let older_chain = single_transaction_chain(&older_writes, geometry.disk_count);
+    let newer_chain = single_transaction_chain(&newer_writes, geometry.disk_count);
+    let mut serial_stream = older_chain.clone();
+    serial_stream.extend(newer_chain.iter().copied());
     let waits = match candidate {
-        Candidate::SerialPipeline => vec![Some(chain_a.len() - 1); chain_b.len()],
-        Candidate::ManyPublishesInFlightFree => vec![None; chain_b.len()],
-        Candidate::ManyPublishesInFlightOrdered => ordering_waits(&table, &chain_a, &chain_b),
+        Candidate::SerialPipeline => vec![Some(older_chain.len() - 1); newer_chain.len()],
+        Candidate::ManyPublishesInFlightFree => vec![None; newer_chain.len()],
+        Candidate::ManyPublishesInFlightOrdered => ordering_waits(&table, &older_chain, &newer_chain),
         Candidate::OnePublishManyTransactions => unreachable!("一次发布装多个事务不走两条链的交错"),
     };
     World {
@@ -3049,9 +3049,9 @@ fn build_two_chain_world_without_streams(candidate: Candidate, geometry: &Geomet
         geometry: geometry.clone(),
         table,
         streams: Vec::new(),
-        search_chains: [chain_a.clone(), chain_b.clone()],
+        search_chains: [older_chain.clone(), newer_chain.clone()],
         search_waits_of_second_chain: waits,
-        arm_chains: [chain_a, chain_b],
+        arm_chains: [older_chain, newer_chain],
         arm_tail: Vec::new(),
         serial_stream: Some(serial_stream),
     }
@@ -3063,17 +3063,17 @@ fn render_path(world: &World, path: u64) -> String {
 }
 
 fn events_of_path(world: &World, path: u64) -> Vec<Event> {
-    let [chain_a, chain_b] = &world.search_chains;
-    let total_steps = chain_a.len() + chain_b.len();
-    let (mut position_a, mut position_b) = (0usize, 0usize);
+    let [older_chain, newer_chain] = &world.search_chains;
+    let total_steps = older_chain.len() + newer_chain.len();
+    let (mut older_position, mut newer_position) = (0usize, 0usize);
     let mut events = Vec::new();
     for step in 0..total_steps {
         if (path >> (total_steps - 1 - step)) & 1 == 0 {
-            events.push(chain_a[position_a]);
-            position_a += 1;
+            events.push(older_chain[older_position]);
+            older_position += 1;
         } else {
-            events.push(chain_b[position_b]);
-            position_b += 1;
+            events.push(newer_chain[newer_position]);
+            newer_position += 1;
         }
     }
     events
@@ -3083,7 +3083,7 @@ struct StreamingEvaluation {
     label: &'static str,
     sampling_point: &'static str,
     world: World,
-    info: TableInfo,
+    table_summary: WriteTableSummary,
     leaves: u64,
     expected_leaves: u128,
     order_masks: usize,
@@ -3097,26 +3097,26 @@ struct StreamingEvaluation {
     exact_reachable: StateList,
 }
 
-fn evaluate_streaming_cell(spec: &CellSpec, threads: usize) -> StreamingEvaluation {
-    let world = build_two_chain_world_without_streams(spec.candidate, &spec.geometry);
-    let info = TableInfo::new(&world.table);
-    let context = WalkContext::new(&world, &info);
+fn evaluate_streaming_cell(specification: &CellSpecification, threads: usize) -> StreamingEvaluation {
+    let world = build_two_chain_world_without_streams(specification.candidate, &specification.geometry);
+    let table_summary = WriteTableSummary::new(&world.table);
+    let context = WalkContext::new(&world, &table_summary);
     let expected_leaves = count_interleavings(&context);
     let pass = pass_one(&context, threads);
-    let (union, rows) = evaluate_signatures(&info, &pass.signatures, threads);
-    let truth = truth_list_of(&info, &union);
-    let truth_by_search = truth_list_of(&info, &search_truth(&context, &info, threads));
-    let exact_reachable = truth_list_of(&info, &evaluate_exact_union(&info, &pass.masks, threads));
+    let (union, rows) = evaluate_signatures(&table_summary, &pass.signatures, threads);
+    let truth = truth_list_of(&table_summary, &union);
+    let truth_by_search = truth_list_of(&table_summary, &search_truth(&context, &table_summary, threads));
+    let exact_reachable = truth_list_of(&table_summary, &evaluate_exact_union(&table_summary, &pass.masks, threads));
     let arm_by_transaction = arm_by_transaction_states(&world);
     let code_of = |state: &StateCode| u64::try_from(*state).expect("两盘几何的状态编码装得进 u64");
-    let truth_cross = truth.iter().filter(|state| info.is_cross(code_of(state))).count();
-    let truth_invalid_record = truth.iter().filter(|state| info.is_invalid_by_record(code_of(state))).count();
-    let truth_invalid_all_writes = truth.iter().filter(|state| info.is_invalid_by_all_writes(code_of(state))).count();
+    let truth_cross = truth.iter().filter(|state| table_summary.is_cross(code_of(state))).count();
+    let truth_invalid_record = truth.iter().filter(|state| table_summary.is_invalid_by_record(code_of(state))).count();
+    let truth_invalid_all_writes = truth.iter().filter(|state| table_summary.is_invalid_by_all_writes(code_of(state))).count();
     StreamingEvaluation {
-        label: spec.label,
-        sampling_point: spec.sampling_point,
+        label: specification.label,
+        sampling_point: specification.sampling_point,
         world,
-        info,
+        table_summary,
         leaves: pass.leaves,
         expected_leaves,
         order_masks: pass.masks.len(),
@@ -3143,12 +3143,12 @@ struct SecondJudgement {
     best_stream_recorded_covered: usize,
     /// K2 在「按记录」那一档上覆盖到的不合法前缀数。
     arm_recorded_covered: usize,
-    k1_largest_segment_writes: usize,
-    k1_largest_segment_expansion: u128,
+    root_slot_cut_largest_segment_writes: usize,
+    root_slot_cut_largest_segment_expansion: u128,
 }
 
 /// L3b：|(T ∩ T_exact ∩ C) \ 臂|。
-fn true_cross_misses(table: &[WriteSpec], truth: &[StateCode], exact: &[StateCode], arm: &[StateCode]) -> usize {
+fn true_cross_misses(table: &[WriteSpecification], truth: &[StateCode], exact: &[StateCode], arm: &[StateCode]) -> usize {
     let reachable_truth: Vec<StateCode> = truth.iter().copied().filter(|state| contains(exact, *state)).collect();
     count_cross_transaction_misses(table, &reachable_truth, arm)
 }
@@ -3162,8 +3162,8 @@ fn second_judgement_of_in_memory(evaluation: &CellEvaluation, base: CellJudgemen
         truth_not_in_exact: difference_count(&evaluation.truth, &evaluation.exact_reachable),
         best_stream_recorded_covered: evaluation.streams.iter().map(|metrics| metrics.recorded_prefixes_covered).max().unwrap_or(0),
         arm_recorded_covered: count_invalid_prefixes_covered(table, &evaluation.truth, &evaluation.arm_by_transaction, InvalidPrefixKind::ByRecord),
-        k1_largest_segment_writes: evaluation.streams.iter().map(|metrics| metrics.largest_segment_writes).max().unwrap_or(0),
-        k1_largest_segment_expansion: evaluation.streams.iter().map(|metrics| metrics.largest_segment_expansion).max().unwrap_or(1),
+        root_slot_cut_largest_segment_writes: evaluation.streams.iter().map(|metrics| metrics.largest_segment_writes).max().unwrap_or(0),
+        root_slot_cut_largest_segment_expansion: evaluation.streams.iter().map(|metrics| metrics.largest_segment_expansion).max().unwrap_or(1),
         base,
     }
 }
@@ -3203,7 +3203,7 @@ fn emit_streaming_cell(emitter: &mut Emitter, tally: &mut RunTally, evaluation: 
             evaluation.expected_leaves,
             rows.len(),
             evaluation.order_masks,
-            evaluation.info.total_vectors,
+            evaluation.table_summary.total_vectors,
         ),
     );
     let subset_ok = rows.iter().all(|row| row.cross_states as usize <= evaluation.truth_cross && (row.states - row.cross_states) as usize <= truth.len() - evaluation.truth_cross);
@@ -3330,13 +3330,13 @@ fn emit_streaming_cell(emitter: &mut Emitter, tally: &mut RunTally, evaluation: 
         truth_not_in_exact,
         best_stream_recorded_covered,
         arm_recorded_covered,
-        k1_largest_segment_writes: largest_writes,
-        k1_largest_segment_expansion: largest_expansion,
+        root_slot_cut_largest_segment_writes: largest_writes,
+        root_slot_cut_largest_segment_expansion: largest_expansion,
     }
 }
 
 /// `emit_cover_lines` 的不依赖 `CellEvaluation` 的版本（写数 > 8，有序划分穷举不做）。
-fn emit_cover_lines_of(emitter: &mut Emitter, tally: &mut RunTally, label: &str, table: &[WriteSpec], truth: &StateList, arm: &StateList) {
+fn emit_cover_lines_of(emitter: &mut Emitter, tally: &mut RunTally, label: &str, table: &[WriteSpecification], truth: &StateList, arm: &StateList) {
     for (set_name, target) in [("truth", truth), ("arm_by_transaction", arm)] {
         let cover = cover_by_merging(table, target);
         tally.self_check(cover.covers_target, &format!("L7a:cover_covers_target:{label}:{set_name}"));
@@ -3357,8 +3357,8 @@ fn emit_cover_lines_of(emitter: &mut Emitter, tally: &mut RunTally, label: &str,
 
 // ── 第二段的阳性对照 ──────────────────────────────────────────────────────────────────────
 
-fn first_write_name(table: &[WriteSpec], owner: Owner, kind: StepKind) -> String {
-    table.iter().find(|spec| spec.owner == owner && spec.kind == kind).map(|spec| spec.name.clone()).expect("写表里有这个所有者与种类的写")
+fn first_write_name(table: &[WriteSpecification], owner: Owner, kind: StepKind) -> String {
+    table.iter().find(|specification| specification.owner == owner && specification.kind == kind).map(|specification| specification.name.clone()).expect("写表里有这个所有者与种类的写")
 }
 
 /// PC1、PC2、PC3 与 PC2 在 L3b 上的对应（删 K2 里一个「走得到的跨事务状态」，L3b 恰好多 1）。K1 一侧取「枚举域里有这个状态」的字典序最小的那条流。
@@ -3376,10 +3376,10 @@ fn run_positive_controls_two_disk(
     if world.candidate == Candidate::SerialPipeline {
         return;
     }
-    let unit_of_a = first_write_name(table, Owner::TransactionA, StepKind::UnitWrite);
-    let unit_of_b = first_write_name(table, Owner::TransactionB, StepKind::UnitWrite);
+    let older_unit_write = first_write_name(table, Owner::OlderTransaction, StepKind::UnitWrite);
+    let newer_unit_write = first_write_name(table, Owner::NewerTransaction, StepKind::UnitWrite);
     if world.candidate == Candidate::ManyPublishesInFlightFree {
-        let witness = state_with_only(table, &[unit_of_b.as_str()]);
+        let witness = state_with_only(table, &[newer_unit_write.as_str()]);
         let serial = world.serial_stream.as_ref().expect("两条链的候选有串行流");
         let serial_states = crash_states_of_stream(table, serial);
         let serial_product = serial_concatenation_of_transaction_chains(world);
@@ -3399,18 +3399,18 @@ fn run_positive_controls_two_disk(
             tally.self_check(ok, &format!("V2:PC1:{label}:{arm_name}"));
         }
     }
-    let two_units_state = state_with_only(table, &[unit_of_a.as_str(), unit_of_b.as_str()]);
+    let two_units_state = state_with_only(table, &[older_unit_write.as_str(), newer_unit_write.as_str()]);
     if contains(truth, two_units_state) {
         let arm_states = streams_containing(two_units_state).expect("w2 在真值里就有一条流罩得住它");
         let before = count_cross_transaction_misses(table, truth, &arm_states);
         let after = count_cross_transaction_misses(table, truth, &without_state(&arm_states, two_units_state));
-        let k2_before = count_cross_transaction_misses(table, truth, arm_by_transaction);
-        let k2_after = count_cross_transaction_misses(table, truth, &without_state(arm_by_transaction, two_units_state));
-        let ok = after == before + 1 && k2_after == k2_before + 1;
+        let per_transaction_cut_before = count_cross_transaction_misses(table, truth, arm_by_transaction);
+        let per_transaction_cut_after = count_cross_transaction_misses(table, truth, &without_state(arm_by_transaction, two_units_state));
+        let ok = after == before + 1 && per_transaction_cut_after == per_transaction_cut_before + 1;
         emit(
             emitter,
             format!(
-                "name=positive_control control=delete_one_state cell={label} deleted={} arm_by_root_publish_misses_before={before} arm_by_root_publish_misses_after={after} arm_by_transaction_misses_before={k2_before} arm_by_transaction_misses_after={k2_after} ok={ok}",
+                "name=positive_control control=delete_one_state cell={label} deleted={} arm_by_root_publish_misses_before={before} arm_by_root_publish_misses_after={after} arm_by_transaction_misses_before={per_transaction_cut_before} arm_by_transaction_misses_after={per_transaction_cut_after} ok={ok}",
                 render_state(table, two_units_state),
             ),
         );
@@ -3421,13 +3421,13 @@ fn run_positive_controls_two_disk(
         let arm_states = streams_containing(prefix_witness).expect("见证状态在真值里就有一条流罩得住它");
         let before = count_invalid_prefixes_covered(table, truth, &arm_states, InvalidPrefixKind::ByRecord);
         let after = count_invalid_prefixes_covered(table, truth, &without_state(&arm_states, prefix_witness), InvalidPrefixKind::ByRecord);
-        let k2_before = count_invalid_prefixes_covered(table, truth, arm_by_transaction, InvalidPrefixKind::ByRecord);
-        let k2_after = count_invalid_prefixes_covered(table, truth, &without_state(arm_by_transaction, prefix_witness), InvalidPrefixKind::ByRecord);
-        let ok = before == after + 1 && k2_before == k2_after + 1;
+        let per_transaction_cut_before = count_invalid_prefixes_covered(table, truth, arm_by_transaction, InvalidPrefixKind::ByRecord);
+        let per_transaction_cut_after = count_invalid_prefixes_covered(table, truth, &without_state(arm_by_transaction, prefix_witness), InvalidPrefixKind::ByRecord);
+        let ok = before == after + 1 && per_transaction_cut_before == per_transaction_cut_after + 1;
         emit(
             emitter,
             format!(
-                "name=positive_control control=delete_one_invalid_prefix cell={label} deleted={} arm_by_root_publish_covered_before={before} arm_by_root_publish_covered_after={after} arm_by_transaction_covered_before={k2_before} arm_by_transaction_covered_after={k2_after} ok={ok}",
+                "name=positive_control control=delete_one_invalid_prefix cell={label} deleted={} arm_by_root_publish_covered_before={before} arm_by_root_publish_covered_after={after} arm_by_transaction_covered_before={per_transaction_cut_before} arm_by_transaction_covered_after={per_transaction_cut_after} ok={ok}",
                 render_state(table, prefix_witness),
             ),
         );
@@ -3483,8 +3483,8 @@ fn segment_score(objective: SegmentObjective, two_state_writes: u32, in_place_wr
 /// 在两条链的全部交错上求「一次发出流里最大一段的得分」的最大值：状态 = 两条链各走到哪、未放行的盘、当前段里的两态写数与原地覆写数。
 /// 段怎么关与 `operation_segments` 同一条规矩。
 struct LargestSegmentSearch {
-    steps_a: Vec<Step>,
-    steps_b: Vec<Step>,
+    older_steps: Vec<Step>,
+    newer_steps: Vec<Step>,
     in_place: Vec<bool>,
     objective: SegmentObjective,
     memo: FastMap<u64, (u128, u8)>,
@@ -3493,9 +3493,9 @@ struct LargestSegmentSearch {
 impl LargestSegmentSearch {
     fn new(world: &World, objective: SegmentObjective) -> LargestSegmentSearch {
         LargestSegmentSearch {
-            steps_a: steps_of(&world.table, &world.search_chains[0]),
-            steps_b: steps_of(&world.table, &world.search_chains[1]),
-            in_place: world.table.iter().map(|spec| spec.is_in_place).collect(),
+            older_steps: steps_of(&world.table, &world.search_chains[0]),
+            newer_steps: steps_of(&world.table, &world.search_chains[1]),
+            in_place: world.table.iter().map(|specification| specification.is_in_place).collect(),
             objective,
             memo: FastMap::default(),
         }
@@ -3532,25 +3532,25 @@ impl LargestSegmentSearch {
         }
     }
 
-    fn best(&mut self, position_a: usize, position_b: usize, unreleased: u8, two_state: u32, in_place: u32) -> u128 {
-        let key = (((position_a as u64 * 64 + position_b as u64) * 4 + u64::from(unreleased)) * 64 + u64::from(two_state)) * 8 + u64::from(in_place);
+    fn best(&mut self, older_position: usize, newer_position: usize, unreleased: u8, two_state: u32, in_place: u32) -> u128 {
+        let key = (((older_position as u64 * 64 + newer_position as u64) * 4 + u64::from(unreleased)) * 64 + u64::from(two_state)) * 8 + u64::from(in_place);
         if let Some(&(value, _)) = self.memo.get(&key) {
             return value;
         }
-        let (length_a, length_b) = (self.steps_a.len(), self.steps_b.len());
-        let (value, choice) = if position_a == length_a && position_b == length_b {
+        let (older_length, newer_length) = (self.older_steps.len(), self.newer_steps.len());
+        let (value, choice) = if older_position == older_length && newer_position == newer_length {
             (if two_state + in_place > 0 { segment_score(self.objective, two_state, in_place) } else { 0 }, 2u8)
         } else {
             let mut best_value = 0u128;
             let mut best_choice = 2u8;
-            for (choice, may_take) in [(0u8, position_a < length_a), (1u8, position_b < length_b)] {
+            for (choice, may_take) in [(0u8, older_position < older_length), (1u8, newer_position < newer_length)] {
                 if !may_take {
                     continue;
                 }
-                let step = if choice == 0 { self.steps_a[position_a] } else { self.steps_b[position_b] };
-                let (next_a, next_b) = if choice == 0 { (position_a + 1, position_b) } else { (position_a, position_b + 1) };
+                let step = if choice == 0 { self.older_steps[older_position] } else { self.newer_steps[newer_position] };
+                let (next_older_position, next_newer_position) = if choice == 0 { (older_position + 1, newer_position) } else { (older_position, newer_position + 1) };
                 let (unreleased_after, two_state_after, in_place_after, closed_score) = self.advance(step, unreleased, two_state, in_place);
-                let continued = self.best(next_a, next_b, unreleased_after, two_state_after, in_place_after);
+                let continued = self.best(next_older_position, next_newer_position, unreleased_after, two_state_after, in_place_after);
                 let value = closed_score.map_or(continued, |score| score.max(continued));
                 if best_choice == 2 || value > best_value {
                     best_value = value;
@@ -3565,23 +3565,23 @@ impl LargestSegmentSearch {
 
     /// 取到最大值的那条发出流（每个状态取字典序最小的选择：有并列时 A 先）。
     fn witness_stream(&mut self, world: &World) -> Vec<Event> {
-        let (mut position_a, mut position_b, mut unreleased, mut two_state, mut in_place) = (0usize, 0usize, 0u8, 0u32, 0u32);
+        let (mut older_position, mut newer_position, mut unreleased, mut two_state, mut in_place) = (0usize, 0usize, 0u8, 0u32, 0u32);
         let mut events = Vec::new();
         loop {
-            self.best(position_a, position_b, unreleased, two_state, in_place);
-            let key = (((position_a as u64 * 64 + position_b as u64) * 4 + u64::from(unreleased)) * 64 + u64::from(two_state)) * 8 + u64::from(in_place);
+            self.best(older_position, newer_position, unreleased, two_state, in_place);
+            let key = (((older_position as u64 * 64 + newer_position as u64) * 4 + u64::from(unreleased)) * 64 + u64::from(two_state)) * 8 + u64::from(in_place);
             let (_, choice) = self.memo[&key];
             let step = match choice {
                 0 => {
-                    events.push(world.search_chains[0][position_a]);
-                    let step = self.steps_a[position_a];
-                    position_a += 1;
+                    events.push(world.search_chains[0][older_position]);
+                    let step = self.older_steps[older_position];
+                    older_position += 1;
                     step
                 }
                 1 => {
-                    events.push(world.search_chains[1][position_b]);
-                    let step = self.steps_b[position_b];
-                    position_b += 1;
+                    events.push(world.search_chains[1][newer_position]);
+                    let step = self.newer_steps[newer_position];
+                    newer_position += 1;
                     step
                 }
                 _ => return events,
@@ -3673,8 +3673,8 @@ fn run_second_segment(emitter: &mut Emitter) -> RunTally {
     let mut judgements: Vec<SecondJudgement> = Vec::new();
     for (geometry, labels, free_point, ordered_point) in second_segment_geometries() {
         for (label, candidate) in [(labels[0], Candidate::SerialPipeline), (labels[1], Candidate::OnePublishManyTransactions)] {
-            let spec = CellSpec { label, sampling_point: free_point, geometry: geometry.clone(), candidate };
-            let evaluation = evaluate_cell_with(&spec, &truth_by_search_fast);
+            let specification = CellSpecification { label, sampling_point: free_point, geometry: geometry.clone(), candidate };
+            let evaluation = evaluate_cell_with(&specification, &truth_by_search_fast);
             let base = emit_cell(emitter, &mut tally, &evaluation);
             let miss_maximum = evaluation.streams.iter().map(|metrics| metrics.cross_misses + metrics.non_cross_misses).max().unwrap_or(0);
             let extra_states = evaluation.streams.iter().map(|metrics| metrics.state_count).max().unwrap_or(0) as isize - evaluation.truth.len() as isize;
@@ -3695,17 +3695,17 @@ fn run_second_segment(emitter: &mut Emitter) -> RunTally {
             judgements.push(second_judgement_of_in_memory(&evaluation, base));
         }
         for (label, candidate, point) in [(labels[2], Candidate::ManyPublishesInFlightFree, free_point), (labels[3], Candidate::ManyPublishesInFlightOrdered, ordered_point)] {
-            let spec = CellSpec { label, sampling_point: point, geometry: geometry.clone(), candidate };
-            let evaluation = evaluate_streaming_cell(&spec, threads);
+            let specification = CellSpecification { label, sampling_point: point, geometry: geometry.clone(), candidate };
+            let evaluation = evaluate_streaming_cell(&specification, threads);
             judgements.push(emit_streaming_cell(emitter, &mut tally, &evaluation));
             let mut by_representative: Vec<&SignatureRow> = evaluation.rows.iter().collect();
             by_representative.sort_unstable_by_key(|row| row.representative_path);
             let table = &evaluation.world.table;
             let find_stream = |state: StateCode| -> Option<StateList> {
                 by_representative.iter().find_map(|row| {
-                    let segments: Vec<Vec<usize>> = segments_of_signature(row.key, evaluation.info.write_count)
+                    let segments: Vec<Vec<usize>> = segments_of_signature(row.key, evaluation.table_summary.write_count)
                         .into_iter()
-                        .map(|mask| (0..evaluation.info.write_count).filter(|write| mask & (1u32 << write) != 0).collect())
+                        .map(|mask| (0..evaluation.table_summary.write_count).filter(|write| mask & (1u32 << write) != 0).collect())
                         .collect();
                     state_is_in_crash_states_of_segments(&segments, state).then(|| crash_states_of_segments(table, &segments))
                 })
@@ -3739,7 +3739,7 @@ fn run_second_segment(emitter: &mut Emitter) -> RunTally {
     tally
 }
 
-fn judgement_of<'a>(judgements: &'a [SecondJudgement], label: &str) -> &'a SecondJudgement {
+fn judgement_of<'judgements>(judgements: &'judgements [SecondJudgement], label: &str) -> &'judgements SecondJudgement {
     judgements.iter().find(|judgement| judgement.base.label == label).expect("这一格在第二段里跑过")
 }
 
@@ -3789,27 +3789,27 @@ fn run_second_threshold_shifts(emitter: &mut Emitter, tally: &mut RunTally, judg
 }
 
 fn run_second_geometry_sensitivity(emitter: &mut Emitter, judgements: &[SecondJudgement]) {
-    let (free_a, free_b) = (judgement_of(judgements, "g4a_free"), judgement_of(judgements, "g4b_free"));
-    let same = free_a.base.arm_by_root_publish_leak_judgement == free_b.base.arm_by_root_publish_leak_judgement && (free_a.l3b > 0) == (free_b.l3b > 0);
+    let (roots_on_two_disks_free_judgement, roots_on_one_disk_free_judgement) = (judgement_of(judgements, "g4a_free"), judgement_of(judgements, "g4b_free"));
+    let same = roots_on_two_disks_free_judgement.base.arm_by_root_publish_leak_judgement == roots_on_one_disk_free_judgement.base.arm_by_root_publish_leak_judgement && (roots_on_two_disks_free_judgement.l3b > 0) == (roots_on_one_disk_free_judgement.l3b > 0);
     emit(
         emitter,
         format!(
             "name=geometry_sensitivity pair=G4a_vs_G4b_free same_judgement={} l2_judgement_g4a={} l2_judgement_g4b={} cross_misses_minimum_g4a={} cross_misses_minimum_g4b={} cross_misses_maximum_g4a={} cross_misses_maximum_g4b={} l3a_g4a={} l3a_g4b={} l3b_g4a={} l3b_g4b={} recorded_truth_g4a={} recorded_truth_g4b={} all_writes_truth_g4a={} all_writes_truth_g4b={}",
             yes_no(same),
-            free_a.base.arm_by_root_publish_leak_judgement,
-            free_b.base.arm_by_root_publish_leak_judgement,
-            free_a.base.arm_by_root_publish_minimum_cross_misses,
-            free_b.base.arm_by_root_publish_minimum_cross_misses,
-            free_a.base.arm_by_root_publish_maximum_cross_misses,
-            free_b.base.arm_by_root_publish_maximum_cross_misses,
-            free_a.l3a,
-            free_b.l3a,
-            free_a.l3b,
-            free_b.l3b,
-            free_a.base.recorded_truth_count,
-            free_b.base.recorded_truth_count,
-            free_a.base.all_writes_truth_count,
-            free_b.base.all_writes_truth_count,
+            roots_on_two_disks_free_judgement.base.arm_by_root_publish_leak_judgement,
+            roots_on_one_disk_free_judgement.base.arm_by_root_publish_leak_judgement,
+            roots_on_two_disks_free_judgement.base.arm_by_root_publish_minimum_cross_misses,
+            roots_on_one_disk_free_judgement.base.arm_by_root_publish_minimum_cross_misses,
+            roots_on_two_disks_free_judgement.base.arm_by_root_publish_maximum_cross_misses,
+            roots_on_one_disk_free_judgement.base.arm_by_root_publish_maximum_cross_misses,
+            roots_on_two_disks_free_judgement.l3a,
+            roots_on_one_disk_free_judgement.l3a,
+            roots_on_two_disks_free_judgement.l3b,
+            roots_on_one_disk_free_judgement.l3b,
+            roots_on_two_disks_free_judgement.base.recorded_truth_count,
+            roots_on_one_disk_free_judgement.base.recorded_truth_count,
+            roots_on_two_disks_free_judgement.base.all_writes_truth_count,
+            roots_on_one_disk_free_judgement.base.all_writes_truth_count,
         ),
     );
     for (free_label, ordered_label, pair_name) in [("g4a_free", "g4a_ordered", "G4a_vs_G4a_ordered"), ("g4b_free", "g4b_ordered", "G4b_vs_G4b_ordered")] {
@@ -3846,12 +3846,12 @@ fn run_two_disk_dynamic_programming_checks(emitter: &mut Emitter, tally: &mut Ru
         let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry);
         let by_states = largest_segment_of(&world, SegmentObjective::Expansion);
         let by_writes = largest_segment_of(&world, SegmentObjective::Writes);
-        let agrees = by_states.value == free.k1_largest_segment_expansion && by_writes.value == free.k1_largest_segment_writes as u128 && by_states.replay_agrees && by_writes.replay_agrees;
+        let agrees = by_states.value == free.root_slot_cut_largest_segment_expansion && by_writes.value == free.root_slot_cut_largest_segment_writes as u128 && by_states.replay_agrees && by_writes.replay_agrees;
         emit(
             emitter,
             format!(
                 "name=capacity_dynamic_programming_check geometry={} dynamic_programming_largest_expansion={} signatures_largest_expansion={} dynamic_programming_most_writes={} signatures_most_writes={} agrees={agrees}",
-                geometry.label, by_states.value, free.k1_largest_segment_expansion, by_writes.value, free.k1_largest_segment_writes,
+                geometry.label, by_states.value, free.root_slot_cut_largest_segment_expansion, by_writes.value, free.root_slot_cut_largest_segment_writes,
             ),
         );
         tally.self_check(agrees, &format!("L8:dynamic_programming_vs_signatures:{}", geometry.label));
@@ -3859,8 +3859,8 @@ fn run_two_disk_dynamic_programming_checks(emitter: &mut Emitter, tally: &mut Ru
 }
 
 fn run_second_failure_clauses(emitter: &mut Emitter, judgements: &[SecondJudgement], writes_floor_ok: bool) {
-    let f1 = judgements.iter().any(|judgement| judgement.exact_not_in_truth > 0);
-    emit(emitter, format!("name=failure_clause clause=F1 triggered={} observation=exact_not_in_truth_over_the_eight_two_disk_cells", yes_no(f1)));
+    let exact_not_in_truth_triggered = judgements.iter().any(|judgement| judgement.exact_not_in_truth > 0);
+    emit(emitter, format!("name=failure_clause clause=F1 triggered={} observation=exact_not_in_truth_over_the_eight_two_disk_cells", yes_no(exact_not_in_truth_triggered)));
     for (free_label, ordered_label) in [("g4a_free", "g4a_ordered"), ("g4b_free", "g4b_ordered")] {
         for label in [free_label, ordered_label] {
             let cell = judgement_of(judgements, label);
@@ -3951,7 +3951,7 @@ fn true_cross_misses_of_masks(masks: &[(u64, u64)], target: &[u64], removed: Opt
 }
 
 /// T ∩ T_exact ∩ C（用 `is_cross_transaction` 与排好序的 T、T_exact 查，不用掩码版谓词）。
-fn true_cross_target(table: &[WriteSpec], truth: &[StateCode], exact: &[StateCode]) -> Vec<u64> {
+fn true_cross_target(table: &[WriteSpecification], truth: &[StateCode], exact: &[StateCode]) -> Vec<u64> {
     truth
         .iter()
         .copied()
@@ -3961,10 +3961,10 @@ fn true_cross_target(table: &[WriteSpec], truth: &[StateCode], exact: &[StateCod
 }
 
 /// 方法 B：对每个段签名枚举 Dom4(σ)，数落在目标集里的个数，返回目标集减它。
-fn true_cross_misses_by_enumeration(info: &TableInfo, rows: &[SignatureRow], target: &[u64], threads: usize) -> Vec<u32> {
-    let mut target_bits = Bitset::new(info.total_vectors);
+fn true_cross_misses_by_enumeration(table_summary: &WriteTableSummary, rows: &[SignatureRow], target: &[u64], threads: usize) -> Vec<u32> {
+    let mut target_bits = Bitset::new(table_summary.total_vectors);
     for &code in target {
-        target_bits.insert_index(info.index_of_code(code));
+        target_bits.insert_index(table_summary.index_of_code(code));
     }
     const CHUNK: usize = 64;
     let next_start = AtomicUsize::new(0);
@@ -3979,9 +3979,9 @@ fn true_cross_misses_by_enumeration(info: &TableInfo, rows: &[SignatureRow], tar
                             break;
                         }
                         for (position, row) in rows.iter().enumerate().take((start + CHUNK).min(rows.len())).skip(start) {
-                            let segments = segments_of_signature(row.key, info.write_count);
+                            let segments = segments_of_signature(row.key, table_summary.write_count);
                             let mut hits = 0usize;
-                            for_each_crash_state(info, &segments, |_, index| {
+                            for_each_crash_state(table_summary, &segments, |_, index| {
                                 if target_bits.has(index) {
                                     hits += 1;
                                 }
@@ -4018,24 +4018,24 @@ struct TrueCrossRead {
     serial_agrees_across_methods: bool,
 }
 
-fn read_k1_true_cross(evaluation: &StreamingEvaluation, threads: usize) -> TrueCrossRead {
+fn read_root_slot_cut_true_cross(evaluation: &StreamingEvaluation, threads: usize) -> TrueCrossRead {
     let table = &evaluation.world.table;
     let rows = &evaluation.rows;
-    let info = &evaluation.info;
+    let table_summary = &evaluation.table_summary;
     let target = true_cross_target(table, &evaluation.truth, &evaluation.exact_reachable);
     let misses: Vec<u32> = rows
         .iter()
         .map(|row| {
-            let masks = segment_digit_masks(&segments_of_signature(row.key, info.write_count));
+            let masks = segment_digit_masks(&segments_of_signature(row.key, table_summary.write_count));
             u32::try_from(true_cross_misses_of_masks(&masks, &target, None)).expect("漏数装得进 u32")
         })
         .collect();
-    let methods_agree = misses == true_cross_misses_by_enumeration(info, rows, &target, threads);
+    let methods_agree = misses == true_cross_misses_by_enumeration(table_summary, rows, &target, threads);
     // 取最小与最大时并列的，取字典序最小的那条流（与 `emit_streaming_cell` 取最小值那条流同一规矩）。
     let better = |candidate: usize, current: usize, prefer_larger: bool| {
-        let (a, b) = (misses[candidate], misses[current]);
-        let strictly = if prefer_larger { a > b } else { a < b };
-        strictly || (a == b && rows[candidate].representative_path < rows[current].representative_path)
+        let (candidate_misses, current_misses) = (misses[candidate], misses[current]);
+        let strictly = if prefer_larger { candidate_misses > current_misses } else { candidate_misses < current_misses };
+        strictly || (candidate_misses == current_misses && rows[candidate].representative_path < rows[current].representative_path)
     };
     let (mut minimum_row, mut maximum_row) = (0usize, 0usize);
     for position in 0..rows.len() {
@@ -4079,9 +4079,9 @@ struct TrueCrossJudgement {
 
 /// 第三段的一格：L11 的两条算法、与第二段 L2 的逐签名比、阳性对照 PC1（串行拼接）与 PC2（删一态）。
 fn emit_true_cross_cell(emitter: &mut Emitter, tally: &mut RunTally, evaluation: &StreamingEvaluation, threads: usize) -> TrueCrossJudgement {
-    let (label, table, rows, info) = (evaluation.label, &evaluation.world.table, &evaluation.rows, &evaluation.info);
+    let (label, table, rows, table_summary) = (evaluation.label, &evaluation.world.table, &evaluation.rows, &evaluation.table_summary);
     tally.self_check(evaluation.truth == evaluation.truth_by_search, &format!("V3:truth_methods:{label}"));
-    let read = read_k1_true_cross(evaluation, threads);
+    let read = read_root_slot_cut_true_cross(evaluation, threads);
     let target_size = read.target.len();
     emit(
         emitter,
@@ -4097,8 +4097,8 @@ fn emit_true_cross_cell(emitter: &mut Emitter, tally: &mut RunTally, evaluation:
     );
     tally.self_check(read.methods_agree, &format!("V5:l11_two_methods:{label}"));
     tally.self_check(read.serial_agrees_across_methods, &format!("V5:l11_serial_two_membership_tests:{label}"));
-    let below_l2 = rows.iter().zip(&read.misses).all(|(row, &miss)| miss as usize <= evaluation.truth_cross - row.cross_states as usize);
-    tally.self_check(below_l2 && target_size <= evaluation.truth_cross, &format!("V5:l11_not_above_l2:{label}"));
+    let misses_not_above_the_cross_bound = rows.iter().zip(&read.misses).all(|(row, &miss)| miss as usize <= evaluation.truth_cross - row.cross_states as usize);
+    tally.self_check(misses_not_above_the_cross_bound && target_size <= evaluation.truth_cross, &format!("V5:l11_not_above_l2:{label}"));
     let (arm, exact) = (&evaluation.arm_by_transaction, &evaluation.exact_reachable);
     let l3b = true_cross_misses(table, &evaluation.truth, exact, arm);
     let streams_in_rows: u64 = rows.iter().map(|row| row.count).sum();
@@ -4121,9 +4121,9 @@ fn emit_true_cross_cell(emitter: &mut Emitter, tally: &mut RunTally, evaluation:
         ),
     );
     // PC1：串行拼接那一条流在 K1 上必须漏掉见证状态 {a1, b1}（A、B 各只有第一个单元写持久：跨事务，T、T_exact 里都有；单独的 b1 不是跨事务状态，不当见证）。
-    let unit_of_a = first_write_name(table, Owner::TransactionA, StepKind::UnitWrite);
-    let unit_of_b = first_write_name(table, Owner::TransactionB, StepKind::UnitWrite);
-    let witness = state_with_only(table, &[unit_of_a.as_str(), unit_of_b.as_str()]);
+    let older_unit_write = first_write_name(table, Owner::OlderTransaction, StepKind::UnitWrite);
+    let newer_unit_write = first_write_name(table, Owner::NewerTransaction, StepKind::UnitWrite);
+    let witness = state_with_only(table, &[older_unit_write.as_str(), newer_unit_write.as_str()]);
     let witness_code = u64::try_from(witness).expect("两盘几何的状态编码装得进 u64");
     let serial = evaluation.world.serial_stream.as_ref().expect("两条链的世界有串行流");
     let witness_in_target = read.target.contains(&witness_code);
@@ -4139,7 +4139,7 @@ fn emit_true_cross_cell(emitter: &mut Emitter, tally: &mut RunTally, evaluation:
     );
     tally.self_check(pc1_ok, &format!("V2:PC1_l11:{label}"));
     // PC2：从取到最小漏数的那条流的枚举域里删一个目标集里的状态，L11 恰好多 1。
-    let minimum_masks = segment_digit_masks(&segments_of_signature(rows[read.minimum_row].key, info.write_count));
+    let minimum_masks = segment_digit_masks(&segments_of_signature(rows[read.minimum_row].key, table_summary.write_count));
     match read.target.iter().copied().find(|&code| code_in_digit_masks(&minimum_masks, code)) {
         Some(removed) => {
             let before = true_cross_misses_of_masks(&minimum_masks, &read.target, None);
@@ -4198,27 +4198,27 @@ fn run_third_segment(emitter: &mut Emitter) -> RunTally {
     let mut judgements: Vec<TrueCrossJudgement> = Vec::new();
     for (geometry, labels, free_point, ordered_point) in second_segment_geometries() {
         for (label, candidate, point) in [(labels[2], Candidate::ManyPublishesInFlightFree, free_point), (labels[3], Candidate::ManyPublishesInFlightOrdered, ordered_point)] {
-            let spec = CellSpec { label, sampling_point: point, geometry: geometry.clone(), candidate };
-            let evaluation = evaluate_streaming_cell(&spec, threads);
+            let specification = CellSpecification { label, sampling_point: point, geometry: geometry.clone(), candidate };
+            let evaluation = evaluate_streaming_cell(&specification, threads);
             judgements.push(emit_true_cross_cell(emitter, &mut tally, &evaluation, threads));
         }
     }
     emit_true_cross_threshold_shifts(emitter, &mut tally, &judgements);
     let by_label = |label: &str| judgements.iter().find(|judgement| judgement.label == label).expect("这一格在第三段里跑过");
     for (left, right, pair) in [("g4a_free", "g4b_free", "G4a_vs_G4b_free"), ("g4a_free", "g4a_ordered", "G4a_vs_G4a_ordered"), ("g4b_free", "g4b_ordered", "G4b_vs_G4b_ordered")] {
-        let (a, b) = (by_label(left), by_label(right));
-        let (judgement_a, judgement_b) = (leak_judgement(a.minimum, a.maximum, 0), leak_judgement(b.minimum, b.maximum, 0));
+        let (left_judgement, right_judgement) = (by_label(left), by_label(right));
+        let (left_cell_judgement, right_cell_judgement) = (leak_judgement(left_judgement.minimum, left_judgement.maximum, 0), leak_judgement(right_judgement.minimum, right_judgement.maximum, 0));
         emit(
             emitter,
             format!(
-                "name=geometry_sensitivity quantity=l11 pair={pair} same_judgement={} l11_judgement_left={judgement_a} l11_judgement_right={judgement_b} l11_minimum_left={} l11_minimum_right={} l11_maximum_left={} l11_maximum_right={} l11_streams_with_misses_left={} l11_streams_with_misses_right={}",
-                yes_no(judgement_a == judgement_b),
-                a.minimum,
-                b.minimum,
-                a.maximum,
-                b.maximum,
-                a.streams_with_misses,
-                b.streams_with_misses,
+                "name=geometry_sensitivity quantity=l11 pair={pair} same_judgement={} l11_judgement_left={left_cell_judgement} l11_judgement_right={right_cell_judgement} l11_minimum_left={} l11_minimum_right={} l11_maximum_left={} l11_maximum_right={} l11_streams_with_misses_left={} l11_streams_with_misses_right={}",
+                yes_no(left_cell_judgement == right_cell_judgement),
+                left_judgement.minimum,
+                right_judgement.minimum,
+                left_judgement.maximum,
+                right_judgement.maximum,
+                left_judgement.streams_with_misses,
+                right_judgement.streams_with_misses,
             ),
         );
     }
@@ -4245,21 +4245,21 @@ fn run_third_segment(emitter: &mut Emitter) -> RunTally {
 
 /// 子命令 `s3`：G4a、G4b 上 Σ_free 与 Σ_ord 的交错数（两条算法数）、去掉同一段里写序之后的不同段签名数、
 /// 不同的偏序数、逐状态深搜的状态全集与每隔 1009 个向量抽一个跑搜索的访问量（只用来估规模，不进任何判据）。
-fn run_s3_estimate(emitter: &mut Emitter) {
+fn run_scale_estimate(emitter: &mut Emitter) {
     for (geometry, labels, _, _) in second_segment_geometries() {
         for (label, candidate) in [(labels[2], Candidate::ManyPublishesInFlightFree), (labels[3], Candidate::ManyPublishesInFlightOrdered)] {
             let started = std::time::Instant::now();
             let world = build_two_chain_world_without_streams(candidate, &geometry);
-            let info = TableInfo::new(&world.table);
-            let context = WalkContext::new(&world, &info);
+            let table_summary = WriteTableSummary::new(&world.table);
+            let context = WalkContext::new(&world, &table_summary);
             let expected = count_interleavings(&context);
             let pass = pass_one(&context, worker_thread_count());
             eprintln!("s3 {label}: pass one {:?}", started.elapsed());
             let started = std::time::Instant::now();
             let stride = 1009u64;
-            let (vectors, visited_total, visited_maximum, realized) = search_sample(&context, &info, stride);
+            let (vectors, visited_total, visited_maximum, realized) = search_sample(&context, &table_summary, stride);
             eprintln!("s3 {label}: search sample {:?}", started.elapsed());
-            let space = (context.steps_a.len() + 1) * (context.steps_b.len() + 1) * (1usize << info.disk_count) * 4 * 3;
+            let space = (context.older_steps.len() + 1) * (context.newer_steps.len() + 1) * (1usize << table_summary.disk_count) * 4 * 3;
             emit(
                 emitter,
                 format!(
@@ -4268,7 +4268,7 @@ fn run_s3_estimate(emitter: &mut Emitter) {
                     yes_no(u128::from(pass.leaves) == expected),
                     pass.signatures.len(),
                     pass.masks.len(),
-                    info.total_vectors,
+                    table_summary.total_vectors,
                 ),
             );
         }
@@ -4282,8 +4282,8 @@ mod tests {
     use super::*;
 
     fn evaluation_of(label: &str) -> CellEvaluation {
-        let spec = cell_specs().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
-        evaluate_cell(&spec)
+        let specification = cell_specifications().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
+        evaluate_cell(&specification)
     }
 
     // ── 甲类：每条流上的枚举域等于闭式 ──────────────────────────────────────────────
@@ -4300,7 +4300,7 @@ mod tests {
 
     #[test]
     fn closed_form_starts_from_one_not_zero() {
-        let world = build_world(Candidate::SerialPipeline, &geometry_g1());
+        let world = build_world(Candidate::SerialPipeline, &geometry_one_disk_two_units());
         let segments = write_segments(&world.table, world.serial_stream.as_ref().expect("串行流"));
         let sum_of_segments: u128 = segments.iter().map(|segment| segment_expansion(&world.table, segment) - 1).sum();
         assert_eq!(closed_form_state_count(&world.table, &segments), sum_of_segments + 1);
@@ -4327,7 +4327,7 @@ mod tests {
 
     #[test]
     fn serial_segments_split_at_every_barrier_and_force_unit_access_write() {
-        let world = build_world(Candidate::SerialPipeline, &geometry_g1());
+        let world = build_world(Candidate::SerialPipeline, &geometry_one_disk_two_units());
         let serial = world.serial_stream.as_ref().expect("串行流");
         assert_eq!(segment_sizes_text(&world.table, serial), "2+1+1+1+2+1+1+1");
     }
@@ -4364,8 +4364,8 @@ mod tests {
     }
 
     #[test]
-    fn a_unit_write_of_the_next_transaction_issued_before_the_root_is_attributed_to_the_earlier_publish() {
-        let world = build_world(Candidate::ManyPublishesInFlightFree, &geometry_g1());
+    fn unit_write_of_the_next_transaction_issued_before_the_root_is_attributed_to_the_earlier_publish() {
+        let world = build_world(Candidate::ManyPublishesInFlightFree, &geometry_one_disk_two_units());
         let index_of = |name: &str| index_of_write(&world.table, name);
         let stream = vec![
             Event::Write(index_of("a1")),
@@ -4467,9 +4467,9 @@ mod tests {
 
     #[test]
     fn the_ordered_candidate_has_the_independently_counted_number_of_streams() {
-        let world = build_world(Candidate::ManyPublishesInFlightOrdered, &geometry_g1());
+        let world = build_world(Candidate::ManyPublishesInFlightOrdered, &geometry_one_disk_two_units());
         assert_eq!(world.streams.len(), 3747);
-        let free = build_world(Candidate::ManyPublishesInFlightFree, &geometry_g1());
+        let free = build_world(Candidate::ManyPublishesInFlightFree, &geometry_one_disk_two_units());
         assert_eq!(free.streams.len(), 12870);
     }
 
@@ -4498,10 +4498,10 @@ mod tests {
     #[test]
     fn arm_by_transaction_state_count_is_the_product_of_the_two_chains() {
         let evaluation = evaluation_of("g1_free");
-        let chain_a = crash_states_of_stream(&evaluation.world.table, &evaluation.world.arm_chains[0]);
-        let chain_b = crash_states_of_stream(&evaluation.world.table, &evaluation.world.arm_chains[1]);
-        assert_eq!(evaluation.arm_by_transaction.len(), chain_a.len() * chain_b.len());
-        assert_eq!(chain_a.len() * chain_b.len(), 64);
+        let older_chain = crash_states_of_stream(&evaluation.world.table, &evaluation.world.arm_chains[0]);
+        let newer_chain = crash_states_of_stream(&evaluation.world.table, &evaluation.world.arm_chains[1]);
+        assert_eq!(evaluation.arm_by_transaction.len(), older_chain.len() * newer_chain.len());
+        assert_eq!(older_chain.len() * newer_chain.len(), 64);
     }
 
     #[test]
@@ -4538,7 +4538,7 @@ mod tests {
     // ── 阳性对照 ───────────────────────────────────────────────────────────────────
 
     #[test]
-    fn serial_concatenation_misses_the_state_where_only_the_first_unit_of_b_is_persisted_on_both_arms() {
+    fn serial_concatenation_misses_the_state_where_only_the_first_unit_of_the_newer_transaction_is_persisted_on_both_arms() {
         let evaluation = evaluation_of("g1_free");
         let table = &evaluation.world.table;
         let witness = state_with_only(table, &["b1"]);
@@ -4591,13 +4591,13 @@ mod tests {
     }
 
     #[test]
-    fn invalid_prefix_by_record_is_directional_between_a_and_b() {
+    fn invalid_prefix_by_record_is_directional_between_the_older_and_newer_transactions() {
         let evaluation = evaluation_of("g1_ordered");
         let table = &evaluation.world.table;
-        let b_record_only = state_with_only(table, &["rB"]);
-        let a_record_only = state_with_only(table, &["rA"]);
-        assert!(is_invalid_prefix_by_record(table, b_record_only));
-        assert!(!is_invalid_prefix_by_record(table, a_record_only));
+        let newer_record_only = state_with_only(table, &["rB"]);
+        let older_record_only = state_with_only(table, &["rA"]);
+        assert!(is_invalid_prefix_by_record(table, newer_record_only));
+        assert!(!is_invalid_prefix_by_record(table, older_record_only));
         assert_eq!(count_invalid_prefixes_in(table, &evaluation.truth, InvalidPrefixKind::ByRecord), 1);
     }
 
@@ -4616,7 +4616,7 @@ mod tests {
     }
 
     #[test]
-    fn merging_agrees_with_exhaustive_ordered_partitions_on_the_u1_cells() {
+    fn merging_agrees_with_exhaustive_ordered_partitions_on_the_one_unit_cells() {
         for label in ["g3_serial", "g3_one_publish", "g3_free", "g3_ordered"] {
             let evaluation = evaluation_of(label);
             let table = &evaluation.world.table;
@@ -4631,7 +4631,7 @@ mod tests {
     }
 
     #[test]
-    fn a_state_set_that_is_exactly_one_stream_has_an_exactly_equal_cover() {
+    fn state_set_that_is_exactly_one_stream_has_an_exactly_equal_cover() {
         let evaluation = evaluation_of("g1_serial");
         let cover = cover_by_merging(&evaluation.world.table, &evaluation.truth);
         assert!(cover.equals_target);
@@ -4655,7 +4655,7 @@ mod tests {
 
     #[test]
     fn doubled_barriers_on_one_disk_do_not_change_the_crash_state_set() {
-        let world = build_world(Candidate::SerialPipeline, &geometry_g1());
+        let world = build_world(Candidate::SerialPipeline, &geometry_one_disk_two_units());
         let serial = world.serial_stream.as_ref().expect("串行流");
         let mut doubled = Vec::new();
         for event in serial {
@@ -4669,15 +4669,15 @@ mod tests {
     }
 
     #[test]
-    fn a_torn_write_appears_only_in_the_current_segment_never_before_it() {
-        let world = build_world(Candidate::SerialPipeline, &geometry_g1());
+    fn torn_write_appears_only_in_the_current_segment_never_before_it() {
+        let world = build_world(Candidate::SerialPipeline, &geometry_one_disk_two_units());
         let serial = world.serial_stream.as_ref().expect("串行流");
         let states = crash_states_of_stream(&world.table, serial);
-        let torn_a = index_of_write(&world.table, "SA");
-        let first_of_b = index_of_write(&world.table, "b1");
+        let older_system_configuration_write = index_of_write(&world.table, "SA");
+        let newer_first_write = index_of_write(&world.table, "b1");
         for state in states {
-            if value_of(state, torn_a) == TORN {
-                assert_eq!(value_of(state, first_of_b), NOT_PERSISTED);
+            if value_of(state, older_system_configuration_write) == TORN {
+                assert_eq!(value_of(state, newer_first_write), NOT_PERSISTED);
             }
         }
     }
@@ -4685,20 +4685,20 @@ mod tests {
     #[test]
     fn force_unit_access_closes_its_own_segment_and_does_not_make_earlier_writes_durable() {
         let table = vec![
-            WriteSpec { name: "plain".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
-            WriteSpec { name: "fua".to_string(), disk: 0, kind: StepKind::RootRecordFua, owner: Owner::Shared, is_in_place: false },
-            WriteSpec { name: "after".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
+            WriteSpecification { name: "plain".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
+            WriteSpecification { name: "fua".to_string(), disk: 0, kind: StepKind::RootRecordFua, owner: Owner::Shared, is_in_place: false },
+            WriteSpecification { name: "after".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
         ];
         let stream = vec![Event::Write(0), Event::Write(1), Event::Write(2), Event::Barrier(0)];
         assert_eq!(write_segments(&table, &stream), vec![vec![0, 1], vec![2]]);
     }
 
     #[test]
-    fn a_barrier_on_one_disk_does_not_close_a_segment_with_unreleased_writes_on_the_other() {
+    fn barrier_on_one_disk_does_not_close_a_segment_with_unreleased_writes_on_the_other() {
         let table = vec![
-            WriteSpec { name: "d0".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
-            WriteSpec { name: "d1".to_string(), disk: 1, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
-            WriteSpec { name: "later".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
+            WriteSpecification { name: "d0".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
+            WriteSpecification { name: "d1".to_string(), disk: 1, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
+            WriteSpecification { name: "later".to_string(), disk: 0, kind: StepKind::UnitWrite, owner: Owner::Shared, is_in_place: false },
         ];
         let stream = vec![Event::Write(0), Event::Write(1), Event::Barrier(0), Event::Write(2), Event::Barrier(1), Event::Barrier(0)];
         assert_eq!(write_segments(&table, &stream), vec![vec![0, 1, 2]]);
@@ -4708,13 +4708,13 @@ mod tests {
 
     #[test]
     fn root_slots_of_the_two_disk_geometries_follow_the_three_region_assignment() {
-        assert_eq!(geometry_g4a().root_disk_of_transaction_a, 0);
-        assert_eq!(geometry_g4a().root_disk_of_transaction_b, 1);
-        assert_eq!(geometry_g4b().root_disk_of_transaction_a, 0);
-        assert_eq!(geometry_g4b().root_disk_of_transaction_b, 0);
+        assert_eq!(geometry_g4a().root_disk_of_the_older_transaction, 0);
+        assert_eq!(geometry_g4a().root_disk_of_the_newer_transaction, 1);
+        assert_eq!(geometry_g4b().root_disk_of_the_older_transaction, 0);
+        assert_eq!(geometry_g4b().root_disk_of_the_newer_transaction, 0);
         let world = build_world(Candidate::SerialPipeline, &geometry_g4a());
         let root_disk_of = |prefix: &str| {
-            let roots: Vec<&WriteSpec> = world.table.iter().filter(|spec| spec.kind == StepKind::RootRecordFua && spec.name.starts_with(prefix)).collect();
+            let roots: Vec<&WriteSpecification> = world.table.iter().filter(|specification| specification.kind == StepKind::RootRecordFua && specification.name.starts_with(prefix)).collect();
             assert_eq!(roots.len(), 1);
             roots[0].disk
         };
@@ -4780,16 +4780,16 @@ mod tests {
         total_steps: usize,
     }
 
-    fn order_pairs_of(table: &[WriteSpec]) -> Vec<(usize, usize)> {
+    fn order_pairs_of(table: &[WriteSpecification]) -> Vec<(usize, usize)> {
         let find = |prefix: &str, disk_suffix: &str| index_of_write(table, &format!("{prefix}{disk_suffix}"));
         let mut pairs = Vec::new();
-        let disks = table.iter().map(|spec| spec.disk).max().expect("写表非空") + 1;
+        let disks = table.iter().map(|specification| specification.disk).max().expect("写表非空") + 1;
         for disk in 0..disks {
             let suffix = if disks == 1 { String::new() } else { format!("@{disk}") };
             pairs.push((find("rA", &suffix), find("rB", &suffix)));
             pairs.push((find("SA", &suffix), find("SB", &suffix)));
         }
-        let root_of = |tag: &str| table.iter().position(|spec| spec.kind == StepKind::RootRecordFua && spec.name.starts_with(&format!("R{tag}"))).expect("每个事务一次根槽写");
+        let root_of = |tag: &str| table.iter().position(|specification| specification.kind == StepKind::RootRecordFua && specification.name.starts_with(&format!("R{tag}"))).expect("每个事务一次根槽写");
         pairs.push((root_of("A"), root_of("B")));
         pairs
     }
@@ -4802,27 +4802,27 @@ mod tests {
     impl LeafSink for CountingSink {
         fn leaf(&mut self, walk: &Walk, _masks: &[u32; MAXIMUM_STREAMING_WRITES]) {
             self.leaves += 1;
-            let (mut issue_step_of_a, mut issue_step_of_b) = ([0u8; 32], [0u8; 32]);
-            let (mut position_a, mut position_b) = (0usize, 0usize);
+            let (mut older_issue_step, mut newer_issue_step) = ([0u8; 32], [0u8; 32]);
+            let (mut older_position, mut newer_position) = (0usize, 0usize);
             for step in 0..self.total_steps {
                 if (walk.path >> (self.total_steps - 1 - step)) & 1 == 0 {
-                    issue_step_of_a[position_a] = step as u8;
-                    position_a += 1;
+                    older_issue_step[older_position] = step as u8;
+                    older_position += 1;
                 } else {
-                    issue_step_of_b[position_b] = step as u8;
-                    position_b += 1;
+                    newer_issue_step[newer_position] = step as u8;
+                    newer_position += 1;
                 }
             }
-            if self.pairs_of_chain_positions.iter().all(|&(of_a, of_b)| issue_step_of_a[of_a] < issue_step_of_b[of_b]) {
+            if self.pairs_of_chain_positions.iter().all(|&(older_chain_position, newer_chain_position)| older_issue_step[older_chain_position] < newer_issue_step[newer_chain_position]) {
                 self.obeying += 1;
             }
         }
     }
 
     /// 深搜前 `steps` 步之后的任务里每隔几个取一个，把这些任务下面的全部叶子收下来：两盘几何的抽查用（不进任何判据，只拿来逐条对拍流函数）。
-    fn sampled_leaves(world: &World, tasks_wanted: usize) -> (TableInfo, Vec<(u128, u64, [u32; MAXIMUM_STREAMING_WRITES])>) {
-        let info = TableInfo::new(&world.table);
-        let context = WalkContext::new(world, &info);
+    fn sampled_leaves(world: &World, tasks_wanted: usize) -> (WriteTableSummary, Vec<(u128, u64, [u32; MAXIMUM_STREAMING_WRITES])>) {
+        let table_summary = WriteTableSummary::new(&world.table);
+        let context = WalkContext::new(world, &table_summary);
         let tasks = split_tasks(&context, 18);
         let stride = (tasks.len() / tasks_wanted).max(1);
         let mut sink = CollectingSink { leaves: Vec::new() };
@@ -4830,7 +4830,7 @@ mod tests {
             let mut masks = task.masks;
             walk_interleavings(&context, task.walk, &mut masks, &mut sink);
         }
-        (info, sink.leaves)
+        (table_summary, sink.leaves)
     }
 
     fn two_disk_one_unit_geometry() -> Geometry {
@@ -4843,9 +4843,9 @@ mod tests {
     fn interleaving_counts_equal_the_independent_python_counts() {
         // 数字来自 /tmp 里那份只按登记第一节读法写的 Python 小脚本（命令与输出在第二段报告里）。
         for (geometry, candidate, expected) in [
-            (geometry_g1(), Candidate::ManyPublishesInFlightFree, 12_870u128),
-            (geometry_g1(), Candidate::ManyPublishesInFlightOrdered, 3_747),
-            (geometry_g3(), Candidate::ManyPublishesInFlightOrdered, 973),
+            (geometry_one_disk_two_units(), Candidate::ManyPublishesInFlightFree, 12_870u128),
+            (geometry_one_disk_two_units(), Candidate::ManyPublishesInFlightOrdered, 3_747),
+            (geometry_one_disk_one_unit(), Candidate::ManyPublishesInFlightOrdered, 973),
             (geometry_g4a(), Candidate::ManyPublishesInFlightFree, 155_117_520),
             (geometry_g4a(), Candidate::ManyPublishesInFlightOrdered, 37_834_712),
             (geometry_g4b(), Candidate::ManyPublishesInFlightOrdered, 37_834_712),
@@ -4853,8 +4853,8 @@ mod tests {
             (two_disk_one_unit_geometry(), Candidate::ManyPublishesInFlightOrdered, 2_431_135),
         ] {
             let world = build_two_chain_world_without_streams(candidate, &geometry);
-            let info = TableInfo::new(&world.table);
-            assert_eq!(count_interleavings(&WalkContext::new(&world, &info)), expected, "{} {}", geometry.label, candidate.name());
+            let table_summary = WriteTableSummary::new(&world.table);
+            assert_eq!(count_interleavings(&WalkContext::new(&world, &table_summary)), expected, "{} {}", geometry.label, candidate.name());
         }
         assert_eq!(155_117_520u128, (1..=15u128).fold(1u128, |sum, step| sum * (15 + step) / step));
     }
@@ -4863,14 +4863,14 @@ mod tests {
     fn the_depth_first_walk_visits_exactly_the_counted_interleavings_and_the_ordered_ones_are_exactly_those_obeying_the_three_orders() {
         for (candidate, expected) in [(Candidate::ManyPublishesInFlightFree, 10_400_600u64), (Candidate::ManyPublishesInFlightOrdered, 2_431_135)] {
             let world = build_two_chain_world_without_streams(candidate, &two_disk_one_unit_geometry());
-            let info = TableInfo::new(&world.table);
-            let context = WalkContext::new(&world, &info);
+            let table_summary = WriteTableSummary::new(&world.table);
+            let context = WalkContext::new(&world, &table_summary);
             let pairs_of_chain_positions: Vec<(usize, usize)> = order_pairs_of(&world.table)
                 .into_iter()
-                .map(|(of_a, of_b)| {
+                .map(|(older_chain_position, newer_chain_position)| {
                     (
-                        world.search_chains[0].iter().position(|event| *event == Event::Write(of_a)).expect("A 的链里有这次写"),
-                        world.search_chains[1].iter().position(|event| *event == Event::Write(of_b)).expect("B 的链里有这次写"),
+                        world.search_chains[0].iter().position(|event| *event == Event::Write(older_chain_position)).expect("A 的链里有这次写"),
+                        world.search_chains[1].iter().position(|event| *event == Event::Write(newer_chain_position)).expect("B 的链里有这次写"),
                     )
                 })
                 .collect();
@@ -4883,15 +4883,15 @@ mod tests {
     }
 
     #[test]
-    fn ordered_streams_on_two_disks_put_the_root_of_a_before_the_root_of_b_whichever_disks_they_land_on() {
+    fn ordered_streams_on_two_disks_put_the_older_root_before_the_newer_root_whichever_disks_they_land_on() {
         let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightOrdered, &geometry_g4a());
         let (_, leaves) = sampled_leaves(&world, 100);
         assert!(leaves.len() > 500);
         let pairs = order_pairs_of(&world.table);
         assert_eq!(pairs.len(), 5);
-        let root_of_a = world.table.iter().position(|spec| spec.name == "RA@0").expect("A 的根落盘 0");
-        let root_of_b = world.table.iter().position(|spec| spec.name == "RB@1").expect("B 的根落盘 1");
-        assert!(pairs.contains(&(root_of_a, root_of_b)));
+        let older_root_write = world.table.iter().position(|specification| specification.name == "RA@0").expect("A 的根落盘 0");
+        let newer_root_write = world.table.iter().position(|specification| specification.name == "RB@1").expect("B 的根落盘 1");
+        assert!(pairs.contains(&(older_root_write, newer_root_write)));
         for (_, path, _) in leaves {
             assert!(obeys_ordering(&pairs, &events_of_path(&world, path)));
         }
@@ -4902,9 +4902,9 @@ mod tests {
     #[test]
     fn streaming_evaluation_equals_the_in_memory_evaluation_on_the_one_disk_cells() {
         for label in ["g1_serial", "g1_free", "g1_ordered", "g3_free", "g3_ordered", "g5_free", "g5_ordered"] {
-            let spec = cell_specs().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
-            let memory = evaluate_cell(&spec);
-            let streaming = evaluate_streaming_cell(&spec, 3);
+            let specification = cell_specifications().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
+            let memory = evaluate_cell(&specification);
+            let streaming = evaluate_streaming_cell(&specification, 3);
             assert_eq!(streaming.truth, memory.truth, "{label}");
             assert_eq!(streaming.truth_by_search, memory.truth_by_search, "{label}");
             assert_eq!(streaming.exact_reachable, memory.exact_reachable, "{label}");
@@ -4951,30 +4951,30 @@ mod tests {
     #[test]
     fn the_streaming_judgement_and_the_minimum_cross_miss_stream_equal_the_in_memory_ones() {
         for label in ["g1_free", "g1_ordered", "g3_free", "g5_ordered"] {
-            let spec = cell_specs().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
-            let memory = evaluate_cell(&spec);
-            let streaming = evaluate_streaming_cell(&spec, 2);
+            let specification = cell_specifications().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
+            let memory = evaluate_cell(&specification);
+            let streaming = evaluate_streaming_cell(&specification, 2);
             let mut memory_tally = RunTally::default();
             let mut streaming_tally = RunTally::default();
             let memory_base = emit_cell(&mut Emitter::new(), &mut memory_tally, &memory);
             let memory_judgement = second_judgement_of_in_memory(&memory, memory_base);
             let streaming_judgement = emit_streaming_cell(&mut Emitter::new(), &mut streaming_tally, &streaming);
             assert!(memory_tally.void_conditions.is_empty() && streaming_tally.void_conditions.is_empty(), "{label}");
-            let (a, b) = (&memory_judgement, &streaming_judgement);
-            assert_eq!(a.base.arm_by_root_publish_leak_judgement, b.base.arm_by_root_publish_leak_judgement, "{label}");
-            assert_eq!(a.base.arm_by_root_publish_minimum_cross_misses, b.base.arm_by_root_publish_minimum_cross_misses, "{label}");
-            assert_eq!(a.base.arm_by_root_publish_maximum_cross_misses, b.base.arm_by_root_publish_maximum_cross_misses, "{label}");
-            assert_eq!((a.l3a, a.l3b, a.exact_not_in_truth, a.truth_not_in_exact), (b.l3a, b.l3b, b.exact_not_in_truth, b.truth_not_in_exact), "{label}");
-            assert_eq!((a.base.recorded_truth_count, a.base.all_writes_truth_count), (b.base.recorded_truth_count, b.base.all_writes_truth_count), "{label}");
-            assert_eq!(a.best_stream_recorded_covered, b.best_stream_recorded_covered, "{label}");
-            assert_eq!(a.arm_recorded_covered, b.arm_recorded_covered, "{label}");
-            assert_eq!((a.k1_largest_segment_writes, a.k1_largest_segment_expansion), (b.k1_largest_segment_writes, b.k1_largest_segment_expansion), "{label}");
+            let (memory_side, streaming_side) = (&memory_judgement, &streaming_judgement);
+            assert_eq!(memory_side.base.arm_by_root_publish_leak_judgement, streaming_side.base.arm_by_root_publish_leak_judgement, "{label}");
+            assert_eq!(memory_side.base.arm_by_root_publish_minimum_cross_misses, streaming_side.base.arm_by_root_publish_minimum_cross_misses, "{label}");
+            assert_eq!(memory_side.base.arm_by_root_publish_maximum_cross_misses, streaming_side.base.arm_by_root_publish_maximum_cross_misses, "{label}");
+            assert_eq!((memory_side.l3a, memory_side.l3b, memory_side.exact_not_in_truth, memory_side.truth_not_in_exact), (streaming_side.l3a, streaming_side.l3b, streaming_side.exact_not_in_truth, streaming_side.truth_not_in_exact), "{label}");
+            assert_eq!((memory_side.base.recorded_truth_count, memory_side.base.all_writes_truth_count), (streaming_side.base.recorded_truth_count, streaming_side.base.all_writes_truth_count), "{label}");
+            assert_eq!(memory_side.best_stream_recorded_covered, streaming_side.best_stream_recorded_covered, "{label}");
+            assert_eq!(memory_side.arm_recorded_covered, streaming_side.arm_recorded_covered, "{label}");
+            assert_eq!((memory_side.root_slot_cut_largest_segment_writes, memory_side.root_slot_cut_largest_segment_expansion), (streaming_side.root_slot_cut_largest_segment_writes, streaming_side.root_slot_cut_largest_segment_expansion), "{label}");
             let cross_misses: Vec<usize> = memory.streams.iter().map(|metrics| metrics.cross_misses).collect();
             let (_, position) = minimum_with_position(&cross_misses);
             let minimum_row = streaming
                 .rows
                 .iter()
-                .filter(|row| streaming.truth_cross - row.cross_states as usize == a.base.arm_by_root_publish_minimum_cross_misses)
+                .filter(|row| streaming.truth_cross - row.cross_states as usize == memory_side.base.arm_by_root_publish_minimum_cross_misses)
                 .min_by_key(|row| row.representative_path)
                 .expect("有取到最小值的签名");
             assert_eq!(render_path(&streaming.world, minimum_row.representative_path), render_stream(&memory.world.table, &memory.world.streams[position]), "{label}");
@@ -4985,9 +4985,9 @@ mod tests {
 
     #[test]
     fn the_fixed_array_search_equals_the_set_based_search_on_every_one_disk_cell_and_on_the_two_disk_one_publish_cell() {
-        for spec in cell_specs() {
-            let world = build_world(spec.candidate, &spec.geometry);
-            assert_eq!(truth_by_search_fast(&world), truth_by_search(&world), "{}", spec.label);
+        for specification in cell_specifications() {
+            let world = build_world(specification.candidate, &specification.geometry);
+            assert_eq!(truth_by_search_fast(&world), truth_by_search(&world), "{}", specification.label);
         }
         let world = build_world(Candidate::OnePublishManyTransactions, &geometry_g4a());
         assert_eq!(truth_by_search_fast(&world), truth_by_search(&world), "g4a_one_publish");
@@ -4997,19 +4997,19 @@ mod tests {
 
     #[test]
     fn index_and_code_agree_and_the_category_masks_equal_the_per_state_predicates() {
-        for geometry in [geometry_g1(), geometry_g4a(), geometry_g4b()] {
+        for geometry in [geometry_one_disk_two_units(), geometry_g4a(), geometry_g4b()] {
             let world = build_world(Candidate::SerialPipeline, &geometry);
             let table = &world.table;
-            let info = TableInfo::new(table);
-            let mut seen: Vec<StateCode> = (0..info.total_vectors).map(|index| StateCode::from(info.code_of_index(index))).collect();
+            let table_summary = WriteTableSummary::new(table);
+            let mut seen: Vec<StateCode> = (0..table_summary.total_vectors).map(|index| StateCode::from(table_summary.code_of_index(index))).collect();
             seen.sort_unstable();
             assert_eq!(seen, all_state_vectors(table), "{}", geometry.label);
-            for index in (0..info.total_vectors).step_by(7) {
-                let code = info.code_of_index(index);
+            for index in (0..table_summary.total_vectors).step_by(7) {
+                let code = table_summary.code_of_index(index);
                 let state = StateCode::from(code);
-                assert_eq!(info.is_cross(code), is_cross_transaction(table, state), "{} {index}", geometry.label);
-                assert_eq!(info.is_invalid_by_record(code), is_invalid_prefix_by_record(table, state), "{} {index}", geometry.label);
-                assert_eq!(info.is_invalid_by_all_writes(code), is_invalid_prefix_by_all_writes(table, state), "{} {index}", geometry.label);
+                assert_eq!(table_summary.is_cross(code), is_cross_transaction(table, state), "{} {index}", geometry.label);
+                assert_eq!(table_summary.is_invalid_by_record(code), is_invalid_prefix_by_record(table, state), "{} {index}", geometry.label);
+                assert_eq!(table_summary.is_invalid_by_all_writes(code), is_invalid_prefix_by_all_writes(table, state), "{} {index}", geometry.label);
             }
         }
     }
@@ -5022,14 +5022,14 @@ mod tests {
             (Candidate::ManyPublishesInFlightOrdered, geometry_g4a()),
         ] {
             let world = build_two_chain_world_without_streams(candidate, &geometry);
-            let (info, leaves) = sampled_leaves(&world, 200);
+            let (table_summary, leaves) = sampled_leaves(&world, 200);
             assert!(leaves.len() > 800, "{}", geometry.label);
             for (key, path, direct) in leaves {
                 let events = events_of_path(&world, path);
                 let expected_segments: Vec<u32> = write_segments(&world.table, &events).iter().map(|segment| segment.iter().fold(0u32, |mask, &write| mask | (1u32 << write))).collect();
-                assert_eq!(segments_of_signature(key, info.write_count), expected_segments, "{} {path}", geometry.label);
-                let closed = close_masks(&direct, info.write_count);
-                assert_eq!(&closed[..info.write_count], &must_persist_before_masks(&world.table, &events)[..], "{} {path}", geometry.label);
+                assert_eq!(segments_of_signature(key, table_summary.write_count), expected_segments, "{} {path}", geometry.label);
+                let closed = close_masks(&direct, table_summary.write_count);
+                assert_eq!(&closed[..table_summary.write_count], &must_persist_before_masks(&world.table, &events)[..], "{} {path}", geometry.label);
             }
         }
     }
@@ -5037,15 +5037,15 @@ mod tests {
     #[test]
     fn enumeration_by_signature_equals_the_stream_enumeration_state_by_state_with_consistent_indexes() {
         let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry_g4a());
-        let (info, leaves) = sampled_leaves(&world, 20);
+        let (table_summary, leaves) = sampled_leaves(&world, 20);
         for (key, path, _) in leaves.into_iter().step_by(11).take(60) {
-            let segments = segments_of_signature(key, info.write_count);
+            let segments = segments_of_signature(key, table_summary.write_count);
             let mut states: StateList = Vec::new();
-            for_each_crash_state(&info, &segments, |code, index| {
-                assert_eq!(info.code_of_index(index), code);
+            for_each_crash_state(&table_summary, &segments, |code, index| {
+                assert_eq!(table_summary.code_of_index(index), code);
                 states.push(StateCode::from(code));
             });
-            assert_eq!(states.len() as u128, closed_form_of_segments(&info, &segments));
+            assert_eq!(states.len() as u128, closed_form_of_segments(&table_summary, &segments));
             states.sort_unstable();
             assert_eq!(states, crash_states_of_stream(&world.table, &events_of_path(&world, path)));
         }
@@ -5054,7 +5054,7 @@ mod tests {
     #[test]
     fn the_recursive_down_set_enumeration_equals_the_subset_scan_on_two_disk_orders() {
         let free = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry_g4a());
-        let (info, leaves) = sampled_leaves(&free, 30);
+        let (table_summary, leaves) = sampled_leaves(&free, 30);
         let mut checked = 0;
         for (_, path, _) in leaves.into_iter().step_by(37).take(25) {
             let events = events_of_path(&free, path);
@@ -5062,7 +5062,7 @@ mod tests {
             let mut direct = [0u32; MAXIMUM_STREAMING_WRITES];
             direct[..masks.len()].copy_from_slice(&masks);
             let mut states: StateList = Vec::new();
-            for_each_exact_state(&info, &direct, &mut |index| states.push(StateCode::from(info.code_of_index(index))));
+            for_each_exact_state(&table_summary, &direct, &mut |index| states.push(StateCode::from(table_summary.code_of_index(index))));
             states.sort_unstable();
             assert_eq!(states, sorted_deduplicated(reachable_states_of_partial_order(&free.table, &masks)), "{path}");
             checked += 1;
@@ -5072,7 +5072,7 @@ mod tests {
 
     #[test]
     fn true_cross_misses_count_only_the_cross_states_that_are_both_in_the_truth_and_exactly_reachable() {
-        let world = build_world(Candidate::SerialPipeline, &geometry_g1());
+        let world = build_world(Candidate::SerialPipeline, &geometry_one_disk_two_units());
         let table = &world.table;
         let reachable = state_with_only(table, &["a1", "b1"]);
         let model_only = state_with_only(table, &["a1", "a2", "b1"]);
@@ -5085,10 +5085,10 @@ mod tests {
 
     #[test]
     fn pass_one_keeps_the_smallest_path_and_the_full_count_of_every_signature_whatever_the_thread_split() {
-        for geometry in [geometry_g1(), geometry_g3()] {
+        for geometry in [geometry_one_disk_two_units(), geometry_one_disk_one_unit()] {
             let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry);
-            let info = TableInfo::new(&world.table);
-            let context = WalkContext::new(&world, &info);
+            let table_summary = WriteTableSummary::new(&world.table);
+            let context = WalkContext::new(&world, &table_summary);
             let mut sink = CollectingSink { leaves: Vec::new() };
             walk_interleavings(&context, Walk::start(), &mut [0; MAXIMUM_STREAMING_WRITES], &mut sink);
             let mut expected: std::collections::BTreeMap<u128, (u64, u64)> = std::collections::BTreeMap::new();
@@ -5108,16 +5108,16 @@ mod tests {
 
     #[test]
     fn the_largest_segment_dynamic_programming_equals_the_maximum_over_every_signature_on_the_cells_with_a_brute_force_count() {
-        for geometry in [geometry_g1(), geometry_g3(), two_disk_one_unit_geometry()] {
+        for geometry in [geometry_one_disk_two_units(), geometry_one_disk_one_unit(), two_disk_one_unit_geometry()] {
             let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry);
-            let info = TableInfo::new(&world.table);
-            let context = WalkContext::new(&world, &info);
+            let table_summary = WriteTableSummary::new(&world.table);
+            let context = WalkContext::new(&world, &table_summary);
             let pass = pass_one(&context, 4);
             let mut most_expansion = 0u128;
             let mut most_writes = 0u32;
             for (key, _, _) in &pass.signatures {
-                for segment in segments_of_signature(*key, info.write_count) {
-                    most_expansion = most_expansion.max(expansion_of_segment(&info, segment));
+                for segment in segments_of_signature(*key, table_summary.write_count) {
+                    most_expansion = most_expansion.max(expansion_of_segment(&table_summary, segment));
                     most_writes = most_writes.max(segment.count_ones());
                 }
             }
@@ -5133,7 +5133,7 @@ mod tests {
     fn the_largest_segment_witness_stream_on_one_disk_two_units_is_pinned() {
         // 一盘：任何屏障与 FUA 都放行唯一的盘，一段里的写只能是两条链在同一对屏障之间的写：手推最大是两个事务的两个单元写共四个
         // （a1 a2 b1 b2 都发在 A 的第一道屏障之前），别的段（记录、根与系统配置槽）至多两个。
-        let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry_g1());
+        let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry_one_disk_two_units());
         let by_writes = largest_segment_of(&world, SegmentObjective::Writes);
         assert_eq!(by_writes.writes_in_best_segment, 4);
         assert_eq!(by_writes.value, 4);
@@ -5142,7 +5142,7 @@ mod tests {
     }
 
     #[test]
-    fn real_publish_shape_largest_k1_segment_is_at_least_the_registered_forty_eight_writes_and_the_witness_replays() {
+    fn real_publish_shape_largest_root_slot_cut_segment_is_at_least_the_registered_forty_eight_writes_and_the_witness_replays() {
         let world = build_two_chain_world_without_streams(Candidate::ManyPublishesInFlightFree, &geometry_real_publish_shape());
         let by_writes = largest_segment_of(&world, SegmentObjective::Writes);
         let by_states = largest_segment_of(&world, SegmentObjective::Expansion);
@@ -5159,7 +5159,7 @@ mod tests {
 
     #[test]
     fn the_true_cross_target_keeps_only_the_cross_states_in_both_the_truth_and_the_exact_set_by_hand() {
-        let world = build_world(Candidate::SerialPipeline, &geometry_g3());
+        let world = build_world(Candidate::SerialPipeline, &geometry_one_disk_one_unit());
         let table = &world.table;
         let in_both = state_with_only(table, &["a1", "b1"]);
         let in_truth_only = state_with_only(table, &["a1", "rA", "b1"]);
@@ -5174,27 +5174,27 @@ mod tests {
     fn membership_in_segment_masks_matches_the_hand_derived_cases_and_the_miss_counter_counts_deletions() {
         // 三次写，段串 [写 0 与写 1] [写 2]；两位一写：写 0 取 1 = 0b01，写 1 取 1 = 0b0100，写 2 取 1 = 0b010000。
         let masks = segment_digit_masks(&[0b011, 0b100]);
-        let (w0, w1, w2) = (0b01u64, 0b01u64 << 2, 0b01u64 << 4);
-        for code in [0, w0, w1, w0 | w1, w0 | w1 | w2, 0b10] {
+        let (persisted_write_zero, persisted_write_one, persisted_write_two) = (0b01u64, 0b01u64 << 2, 0b01u64 << 4);
+        for code in [0, persisted_write_zero, persisted_write_one, persisted_write_zero | persisted_write_one, persisted_write_zero | persisted_write_one | persisted_write_two, 0b10] {
             assert!(code_in_digit_masks(&masks, code), "{code:#b}");
         }
-        for code in [w2, w0 | w2, w1 | w2, 0b10 | w2] {
+        for code in [persisted_write_two, persisted_write_zero | persisted_write_two, persisted_write_one | persisted_write_two, 0b10 | persisted_write_two] {
             assert!(!code_in_digit_masks(&masks, code), "{code:#b}");
         }
-        let target = [w0, w2, w0 | w1 | w2];
+        let target = [persisted_write_zero, persisted_write_two, persisted_write_zero | persisted_write_one | persisted_write_two];
         // 手算：w0 在（当前段 0）、w2 不在（前一段没全持久）、全持久在（当前段 1）→ 漏 1；再从枚举域里删 w0 → 漏 2。
         assert_eq!(true_cross_misses_of_masks(&masks, &target, None), 1);
-        assert_eq!(true_cross_misses_of_masks(&masks, &target, Some(w0)), 2);
+        assert_eq!(true_cross_misses_of_masks(&masks, &target, Some(persisted_write_zero)), 2);
     }
 
     #[test]
     fn membership_by_masks_equals_membership_by_table_and_by_enumeration_on_every_vector_of_sampled_one_disk_streams() {
-        let spec = cell_specs().into_iter().find(|candidate| candidate.label == "g3_free").expect("这个格存在");
-        let memory = evaluate_cell(&spec);
+        let specification = cell_specifications().into_iter().find(|candidate| candidate.label == "g3_free").expect("这个格存在");
+        let memory = evaluate_cell(&specification);
         let table = &memory.world.table;
-        let info = TableInfo::new(table);
-        for index in 0..info.total_vectors {
-            assert_eq!(info.index_of_code(info.code_of_index(index)), index);
+        let table_summary = WriteTableSummary::new(table);
+        for index in 0..table_summary.total_vectors {
+            assert_eq!(table_summary.index_of_code(table_summary.code_of_index(index)), index);
         }
         for stream in memory.world.streams.iter().step_by(53) {
             let segments = write_segments(table, stream);
@@ -5212,13 +5212,13 @@ mod tests {
     /// 两盘一单元（每个事务 7 次写、两条链各 13 个事件）的格：T_exact（184）远小于 T（82944），T_exact 过滤那一半在这里才敏感。
     /// 数与 `research/results/e167-multi-inflight-crash-cut-python-l11-two-disk-recount-2026-10-01.py`（独立 Python，只按定义写，原样输出是同名 `-a-ordered.out`、`-b-ordered.out`、`-a-free.out`）逐个相等；
     /// Python 的「段签名数」把段内写序也算进签名，与装置的签名（段内按集合）不同口径，所以不钉。
-    fn check_two_disk_one_unit_cell(candidate: Candidate, txg_of_a: usize, expected: (u128, usize, usize, usize, usize, u32, u32, u64, usize)) {
-        let geometry = geometry_two_disks("two_disk_u1", 1, txg_of_a);
-        let spec = CellSpec { label: "two_disk_u1", sampling_point: "two_disk_u1", geometry, candidate };
-        let streaming = evaluate_streaming_cell(&spec, 3);
-        let read = read_k1_true_cross(&streaming, 3);
+    fn check_two_disk_one_unit_cell(candidate: Candidate, txg_of_the_older_transaction: usize, expected: (u128, usize, usize, usize, usize, u32, u32, u64, usize)) {
+        let geometry = geometry_two_disks("two_disk_u1", 1, txg_of_the_older_transaction);
+        let specification = CellSpecification { label: "two_disk_u1", sampling_point: "two_disk_u1", geometry, candidate };
+        let streaming = evaluate_streaming_cell(&specification, 3);
+        let read = read_root_slot_cut_true_cross(&streaming, 3);
         assert!(read.methods_agree && read.serial_agrees_across_methods);
-        let l2_maximum = streaming.rows.iter().map(|row| streaming.truth_cross - row.cross_states as usize).max().expect("至少一个段签名");
+        let cross_bound_maximum = streaming.rows.iter().map(|row| streaming.truth_cross - row.cross_states as usize).max().expect("至少一个段签名");
         let observed = (
             streaming.expected_leaves,
             streaming.truth.len(),
@@ -5231,12 +5231,12 @@ mod tests {
             read.serial_misses,
         );
         assert_eq!(observed, expected);
-        assert!(read.maximum as usize <= l2_maximum);
+        assert!(read.maximum as usize <= cross_bound_maximum);
         let table = &streaming.world.table;
         for (row, &miss) in streaming.rows.iter().zip(&read.misses).step_by(97) {
-            let segments: Vec<Vec<usize>> = segments_of_signature(row.key, streaming.info.write_count)
+            let segments: Vec<Vec<usize>> = segments_of_signature(row.key, streaming.table_summary.write_count)
                 .into_iter()
-                .map(|mask| (0..streaming.info.write_count).filter(|write| mask & (1u32 << write) != 0).collect())
+                .map(|mask| (0..streaming.table_summary.write_count).filter(|write| mask & (1u32 << write) != 0).collect())
                 .collect();
             let states = crash_states_of_segments(table, &segments);
             assert_eq!(miss as usize, read.target.iter().filter(|&&code| !contains(&states, StateCode::from(code))).count());
@@ -5244,7 +5244,7 @@ mod tests {
     }
 
     #[test]
-    fn l11_on_the_two_disk_one_unit_ordered_cell_equals_the_independent_python_recount() {
+    fn missed_states_on_the_two_disk_one_unit_ordered_cell_equal_the_independent_python_recount() {
         // 根落同一块盘以外的一面（A 的 txg 取余 0：RA 落盘 0、RB 落盘 1）。
         // （交错数，|T|，|T_exact|，|T ∩ C|，|T ∩ T_exact ∩ C|，L11 最小，最大，有漏流数，σ_ser 上的值）
         check_two_disk_one_unit_cell(Candidate::ManyPublishesInFlightOrdered, 3, (2_431_135, 82_944, 184, 82_369, 165, 0, 150, 2_431_067, 150));
@@ -5253,7 +5253,7 @@ mod tests {
     }
 
     #[test]
-    fn l11_on_the_two_disk_one_unit_free_cell_equals_the_independent_python_recount() {
+    fn missed_states_on_the_two_disk_one_unit_free_cell_equal_the_independent_python_recount() {
         // 自由交错 10400600 条流，T_exact 256、T ∩ T_exact ∩ C 为 225，只有 103 条流一个都不漏。
         check_two_disk_one_unit_cell(Candidate::ManyPublishesInFlightFree, 3, (10_400_600, 82_944, 256, 82_369, 225, 0, 210, 10_400_497, 210));
     }
@@ -5261,7 +5261,7 @@ mod tests {
     /// 一盘四格的 L11：与 `research/results/e167-multi-inflight-crash-cut-python-l11-recount-2026-10-01.py` 的输出逐个相等（Python 只按定义算，不读这份装置）。
     /// 一盘上 T_exact = T，所以这几个数同时等于第一段 L2 的最小、最大（27 / 42、13 / 28、11 / 20、5 / 14）。
     #[test]
-    fn l11_on_the_one_disk_cells_equals_the_independent_python_recount_and_the_in_memory_brute_force() {
+    fn missed_states_on_the_one_disk_cells_equal_the_independent_python_recount_and_the_in_memory_brute_force() {
         // （格，目标集大小，最小，最大，有漏的流数，串行流上的漏数）
         for (label, target_size, minimum, maximum, streams_with_misses, serial_misses) in [
             ("g1_free", 49usize, 27u32, 42u32, 12_870u64, 42usize),
@@ -5269,13 +5269,13 @@ mod tests {
             ("g3_free", 25, 11, 20, 3_432, 20),
             ("g3_ordered", 19, 5, 14, 973, 14),
         ] {
-            let spec = cell_specs().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
-            let streaming = evaluate_streaming_cell(&spec, 3);
-            let read = read_k1_true_cross(&streaming, 3);
+            let specification = cell_specifications().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
+            let streaming = evaluate_streaming_cell(&specification, 3);
+            let read = read_root_slot_cut_true_cross(&streaming, 3);
             assert!(read.methods_agree && read.serial_agrees_across_methods, "{label}");
             assert_eq!((read.target.len(), read.minimum, read.maximum, read.streams_with_misses, read.serial_misses), (target_size, minimum, maximum, streams_with_misses, serial_misses), "{label}");
             // 内存路径：逐条发出流枚举，数目标集里没落进它的状态。
-            let memory = evaluate_cell(&spec);
+            let memory = evaluate_cell(&specification);
             let table = &memory.world.table;
             let memory_target = true_cross_target(table, &memory.truth, &memory.exact_reachable);
             assert_eq!(memory_target, read.target, "{label}");
@@ -5304,12 +5304,12 @@ mod tests {
         let mut judgements = Vec::new();
         let mut tally = RunTally::default();
         for label in ["g1_free", "g1_ordered", "g3_free", "g3_ordered"] {
-            let spec = cell_specs().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
-            let streaming = evaluate_streaming_cell(&spec, 2);
+            let specification = cell_specifications().into_iter().find(|candidate| candidate.label == label).expect("这个格存在");
+            let streaming = evaluate_streaming_cell(&specification, 2);
             judgements.push(emit_true_cross_cell(&mut Emitter::new(), &mut tally, &streaming, 2));
         }
         // 两盘一单元有序格：T_exact 比 T 小得多，L11 低于 L2（不高于 L2 那条自检在这里才不是同值）。
-        let two_disk = CellSpec { label: "two_disk_u1", sampling_point: "two_disk_u1", geometry: two_disk_one_unit_geometry(), candidate: Candidate::ManyPublishesInFlightOrdered };
+        let two_disk = CellSpecification { label: "two_disk_u1", sampling_point: "two_disk_u1", geometry: two_disk_one_unit_geometry(), candidate: Candidate::ManyPublishesInFlightOrdered };
         judgements.push(emit_true_cross_cell(&mut Emitter::new(), &mut tally, &evaluate_streaming_cell(&two_disk, 2), 2));
         emit_true_cross_threshold_shifts(&mut Emitter::new(), &mut tally, &judgements);
         assert!(tally.void_conditions.is_empty(), "{:?}", tally.void_conditions);

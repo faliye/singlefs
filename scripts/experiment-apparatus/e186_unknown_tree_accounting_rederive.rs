@@ -33,19 +33,19 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Judgement {
     /// 第一次跑的判据：写者这次为不认识的树写进去的行，代段 = 这次的 txg；没写就空真。
-    VacuousU5,
+    VacuousCarriedRowsClause,
     /// 第二次跑的判据：那半句所说的行在这条臂下不存在 ⇒ 要改；`Carry` 下照原谓词判。
-    DanglingU5,
+    DanglingCarriedRowsClause,
 }
 
 /// 不带参数时的判据：第一次跑的那一种，产物逐字节等于第一次跑的产物（登记第二次跑第十一节停机条款第 5 项）。
-const DEFAULT_JUDGEMENT: Judgement = Judgement::VacuousU5;
+const DEFAULT_JUDGEMENT: Judgement = Judgement::VacuousCarriedRowsClause;
 
 impl Judgement {
     fn label(self) -> &'static str {
         match self {
-            Judgement::VacuousU5 => "vacuous-u5",
-            Judgement::DanglingU5 => "dangling-u5",
+            Judgement::VacuousCarriedRowsClause => "vacuous-u5",
+            Judgement::DanglingCarriedRowsClause => "dangling-u5",
         }
     }
 
@@ -54,8 +54,8 @@ impl Judgement {
         match arguments {
             [] => Ok(DEFAULT_JUDGEMENT),
             [flag, value] if flag == "--judgement" => match value.as_str() {
-                "vacuous-u5" => Ok(Judgement::VacuousU5),
-                "dangling-u5" => Ok(Judgement::DanglingU5),
+                "vacuous-u5" => Ok(Judgement::VacuousCarriedRowsClause),
+                "dangling-u5" => Ok(Judgement::DanglingCarriedRowsClause),
                 other => Err(format!("--judgement 只认 vacuous-u5 或 dangling-u5，这里是 {other}")),
             },
             other => Err(format!("参数只认 --judgement <vacuous-u5|dangling-u5>，这里是 {other:?}")),
@@ -109,7 +109,7 @@ const WATERMARK_TUPLE_LOSS_HAS_AN_INVARIANT: bool = true;
 const SECOND_TREE_STATISTIC_LOSS_HAS_AN_INVARIANT: bool = false;
 
 /// 登记第一节第 8 条的取样维度。`k_keep` 今天没有对象（K 代已撤回），模型不读它，只为覆盖 E113 的点。
-const K_KEEP_VALUES: [u64; 5] = [1, 2, 4, 8, 20];
+const RETIRED_KEPT_GENERATION_COUNT_VALUES: [u64; 5] = [1, 2, 4, 8, 20];
 const INVISIBLE_WINDOW_GENERATION_VALUES: [u64; 4] = [0, 1, 3, 8];
 const UNKNOWN_WRITABLE_HEAD_COUNT_VALUES: [u64; 3] = [0, 2, 4];
 const REGISTERED_TREE_COUNT_VALUES: [u64; 2] = [0, UNKNOWN_TREE_COUNT];
@@ -191,7 +191,7 @@ const ACCOUNTING_ARMS: [AccountingPolicy; 3] = [AccountingPolicy::Carry, Account
 struct SamplePoint {
     geometry: Geometry,
     /// 已撤回的「只留最近 K 代」的 K：模型不读它（阴性对照丙），只进产物。
-    retired_k_keep: u64,
+    retired_kept_generation_count: u64,
     invisible_window_generations: u64,
     unknown_writable_head_count: u64,
     trees_with_registered_bit: u64,
@@ -211,7 +211,7 @@ impl SamplePoint {
         format!(
             "geometry={} k_keep={} w_gens={} h_new={} registered={} g_gens={} s={} lpc={} r_tree_dim={}",
             self.geometry.label(),
-            self.retired_k_keep,
+            self.retired_kept_generation_count,
             self.invisible_window_generations,
             self.unknown_writable_head_count,
             self.trees_with_registered_bit,
@@ -227,7 +227,7 @@ impl SamplePoint {
 fn all_sample_points() -> Vec<SamplePoint> {
     let mut points = Vec::new();
     for geometry in GEOMETRIES {
-        for retired_k_keep in K_KEEP_VALUES {
+        for retired_kept_generation_count in RETIRED_KEPT_GENERATION_COUNT_VALUES {
             for invisible_window_generations in INVISIBLE_WINDOW_GENERATION_VALUES {
                 for unknown_writable_head_count in UNKNOWN_WRITABLE_HEAD_COUNT_VALUES {
                     for trees_with_registered_bit in REGISTERED_TREE_COUNT_VALUES {
@@ -236,7 +236,7 @@ fn all_sample_points() -> Vec<SamplePoint> {
                                 for tree_dimension_statistic_count in TREE_DIMENSION_STATISTIC_COUNT_VALUES {
                                     points.push(SamplePoint {
                                         geometry,
-                                        retired_k_keep,
+                                        retired_kept_generation_count,
                                         invisible_window_generations,
                                         unknown_writable_head_count,
                                         trees_with_registered_bit,
@@ -531,7 +531,7 @@ enum StepRecognition {
 }
 
 /// U7（I-3.13）认台阶行用哪一种：登记第六节「台阶行按 D5 意义认，不按语法认」。
-const STEP_RECOGNITION_OF_INVARIANT_I313: StepRecognition = StepRecognition::ByWatermarkChangeHistory;
+const STEP_RECOGNITION_OF_THE_ROW_GENERATION_INVARIANT: StepRecognition = StepRecognition::ByWatermarkChangeHistory;
 
 fn row_counts_as_a_step(row: &AccountingRow, version_txg: u64, history: &WatermarkChangeHistory, recognition: StepRecognition) -> bool {
     match recognition {
@@ -630,7 +630,7 @@ impl ClauseUnit {
     }
 
     /// 读法 B1 计不计它：㊀ ㊁ 两条不计（每条非现任臂都要改它，计进去等于先给现任臂一票）。
-    fn counts_under_reading_b1(self) -> bool {
+    fn counts_when_the_judged_items_are_excluded(self) -> bool {
         !matches!(self, ClauseUnit::DecisionEightItemEightCarryUnknownRows | ClauseUnit::DecisionEightItemEightRejectUnknownBits)
     }
 }
@@ -673,7 +673,7 @@ fn rows_the_writer_wrote_for_unknown_trees(version: &AccountingVersion) -> Vec<A
 }
 
 /// 第二次跑的新 U5（登记第二次跑第六节）：N = 0 ⇒ 真（没有对象）；N > 0 且 W_g 为空 ⇒ 假（条款成了空指称）；N > 0 且 W_g 非空 ⇒ W_g 每一行代段 = R_g 的 txg 才真。
-fn dangling_u5_holds(initial: &AccountingVersion, version: &AccountingVersion) -> bool {
+fn dangling_carried_rows_clause_holds(initial: &AccountingVersion, version: &AccountingVersion) -> bool {
     let unknown_tree_row_count = unknown_tree_row_count_of(initial);
     let written = rows_the_writer_wrote_for_unknown_trees(version);
     if unknown_tree_row_count == 0 { return true; }
@@ -704,10 +704,10 @@ fn clause_holds_on_version(
             generation_rule(StepRecognition::ByWatermarkChangeHistory, RowsJudged::AllRows)
         }
         ClauseUnit::DecisionEightItemTwelveCarriedRows => match judgement {
-            Judgement::VacuousU5 => version.rows_written_for_unknown_trees.iter().all(|row| row.generation_txg == version.txg),
-            Judgement::DanglingU5 => dangling_u5_holds(initial, version),
+            Judgement::VacuousCarriedRowsClause => version.rows_written_for_unknown_trees.iter().all(|row| row.generation_txg == version.txg),
+            Judgement::DanglingCarriedRowsClause => dangling_carried_rows_clause_holds(initial, version),
         },
-        ClauseUnit::InvariantGenerationEqualsTheVersionTxg => generation_rule(STEP_RECOGNITION_OF_INVARIANT_I313, RowsJudged::AllRows),
+        ClauseUnit::InvariantGenerationEqualsTheVersionTxg => generation_rule(STEP_RECOGNITION_OF_THE_ROW_GENERATION_INVARIANT, RowsJudged::AllRows),
         ClauseUnit::InvariantWritableHeadHasAWatermarkRow => {
             let heads_that_must_have_a_watermark_row: Vec<TreeOwner> = known_writable_heads(point).into_iter().chain(unknown_writable_heads(point)).collect();
             heads_that_must_have_a_watermark_row
@@ -733,9 +733,9 @@ fn clause_holds_on_version(
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum ClauseReading {
     /// 判的那一种：D8 已定项 8 的 ㊀ ㊁ 不计。
-    ExcludesTheJudgedItemB1,
+    ExcludesTheJudgedItems,
     /// 附带量：㊀ ㊁ 各算一条。
-    CountsTheJudgedItemB2,
+    CountsTheJudgedItems,
 }
 
 /// 第七节「条款账本（B1）」与「B2 增项」逐格照抄，与装置的谓词是两条路（第十节「账本两条路」）。
@@ -750,25 +750,25 @@ fn clause_units_from_the_hand_ledger(
     let accounting_arm_acts = matches!(effective_flags_policy_of(flags_policy, point), UnknownFlagsPolicy::Skip | UnknownFlagsPolicy::RejectEntry);
     let has_unknown_heads = point.unknown_writable_head_count > 0;
     let no_step_at_all = point.earlier_step_count == 0 && !point.initial_publish_changed_the_watermark;
-    let ledger_b1 = if !accounting_arm_acts || !has_unknown_heads {
+    let ledger_excluding_the_judged_items = if !accounting_arm_acts || !has_unknown_heads {
         0
     } else {
         match (judgement, accounting_policy) {
             (_, AccountingPolicy::Carry) => 0,
-            (Judgement::VacuousU5, AccountingPolicy::NoCarry) => u64::from(no_step_at_all),
-            (Judgement::DanglingU5, AccountingPolicy::NoCarry) => {
+            (Judgement::VacuousCarriedRowsClause, AccountingPolicy::NoCarry) => u64::from(no_step_at_all),
+            (Judgement::DanglingCarriedRowsClause, AccountingPolicy::NoCarry) => {
                 if no_step_at_all {
                     2
                 } else {
                     1
                 }
             }
-            (Judgement::VacuousU5, AccountingPolicy::KeepWithRoot) => match (point.initial_publish_changed_the_watermark, point.tree_dimension_statistic_count) {
+            (Judgement::VacuousCarriedRowsClause, AccountingPolicy::KeepWithRoot) => match (point.initial_publish_changed_the_watermark, point.tree_dimension_statistic_count) {
                 (false, _) => 6,
                 (true, 1) => 0,
                 (true, _) => 4,
             },
-            (Judgement::DanglingU5, AccountingPolicy::KeepWithRoot) => match (point.initial_publish_changed_the_watermark, point.tree_dimension_statistic_count) {
+            (Judgement::DanglingCarriedRowsClause, AccountingPolicy::KeepWithRoot) => match (point.initial_publish_changed_the_watermark, point.tree_dimension_statistic_count) {
                 (false, _) => 7,
                 (true, 1) => 1,
                 (true, _) => 5,
@@ -776,11 +776,11 @@ fn clause_units_from_the_hand_ledger(
         }
     };
     match reading {
-        ClauseReading::ExcludesTheJudgedItemB1 => ledger_b1,
-        ClauseReading::CountsTheJudgedItemB2 => {
+        ClauseReading::ExcludesTheJudgedItems => ledger_excluding_the_judged_items,
+        ClauseReading::CountsTheJudgedItems => {
             let carry_item_extra = u64::from(accounting_arm_acts && has_unknown_heads && accounting_policy != AccountingPolicy::Carry);
             let reject_item_extra = u64::from(flags_policy != UnknownFlagsPolicy::RejectEntry);
-            ledger_b1 + carry_item_extra + reject_item_extra
+            ledger_excluding_the_judged_items + carry_item_extra + reject_item_extra
         }
     }
 }
@@ -833,7 +833,7 @@ fn steps_by_the_watermark_change_history(version: &AccountingVersion, history: &
 }
 
 /// I-3.13 按池级 checker 今天的语法认法判出的违例行数（附带量，停机条款第 3 项照它写）。
-fn i313_violations_under_the_checker_syntax(version: &AccountingVersion, history: &WatermarkChangeHistory) -> u64 {
+fn row_generation_invariant_violations_under_the_checker_syntax(version: &AccountingVersion, history: &WatermarkChangeHistory) -> u64 {
     version
         .rows
         .iter()
@@ -860,8 +860,8 @@ struct CellOutcome {
     silent_harm_count: u64,
     /// U1–U13 每一条在每一版上为假（1）还是真（0）的轨迹。
     clause_false_trajectories: Vec<(ClauseUnit, Option<Trajectory>)>,
-    clause_units_b1: u64,
-    clause_units_b2: u64,
+    clause_units_excluding_the_judged_items: u64,
+    clause_units_counting_the_judged_items: u64,
     /// W2：R_g 记账树里的全部行数，R_1 … R_G 上取最大值；没有新版本记 0（一行都没写）。
     rows_written_all_rows: u64,
     /// W1：代段等于 R_g 的 txg 的行数（E113 口径），同上取最大值。
@@ -874,7 +874,7 @@ struct CellOutcome {
     /// 不认识的树代段等于 R 的 txg 的行数（随根留着的阳性对照：每一版都有一行，为正版数 = G）。
     trajectory_unknown_rows_at_the_initial_txg: Option<Trajectory>,
     trajectory_rows_dropped_per_generation: Option<Trajectory>,
-    trajectory_i313_syntactic_violations: Option<Trajectory>,
+    trajectory_row_generation_invariant_syntactic_violations: Option<Trajectory>,
     trajectory_crates_step_reading_differences: Option<Trajectory>,
 }
 
@@ -908,7 +908,7 @@ fn evaluate_cell(point: &SamplePoint, history: &WatermarkChangeHistory, flags_po
     let mut unknown_rows_off_this_txg_by_version = Vec::new();
     let mut unknown_rows_at_the_initial_txg_by_version = Vec::new();
     let mut rows_dropped_by_version = Vec::new();
-    let mut i313_syntactic_violations_by_version = Vec::new();
+    let mut row_generation_invariant_syntactic_violations_by_version = Vec::new();
     let mut crates_step_reading_differences_by_version = Vec::new();
     let mut clause_false_by_version: BTreeMap<ClauseUnit, Vec<u64>> = ALL_CLAUSE_UNITS.iter().map(|clause| (*clause, Vec::new())).collect();
     for (version_index, version) in published.versions.iter().enumerate() {
@@ -924,7 +924,7 @@ fn evaluate_cell(point: &SamplePoint, history: &WatermarkChangeHistory, flags_po
         unknown_rows_at_the_initial_txg_by_version
             .push(version.rows.iter().filter(|row| row.belongs_to_an_unknown_tree() && row.generation_txg == INITIAL_VERSION_TXG).count().try_into().expect("计数装得进 u64"));
         rows_dropped_by_version.push(unknown_tuples.iter().map(|tuple| rows_of_tuple(previous, *tuple).saturating_sub(rows_of_tuple(version, *tuple))).sum::<u64>());
-        i313_syntactic_violations_by_version.push(i313_violations_under_the_checker_syntax(version, history));
+        row_generation_invariant_syntactic_violations_by_version.push(row_generation_invariant_violations_under_the_checker_syntax(version, history));
         let crates_steps: BTreeSet<AccountingRow> = steps_by_the_crates_reading(version).into_iter().collect();
         let change_history_steps: BTreeSet<AccountingRow> = steps_by_the_watermark_change_history(version, history).into_iter().collect();
         crates_step_reading_differences_by_version.push(crates_steps.symmetric_difference(&change_history_steps).count().try_into().expect("计数装得进 u64"));
@@ -961,9 +961,9 @@ fn evaluate_cell(point: &SamplePoint, history: &WatermarkChangeHistory, flags_po
             trajectory.is_some_and(|trajectory| trajectory.peak > 0)
         }
     };
-    let clause_units_b1: u64 =
-        clause_false_trajectories.iter().filter(|(clause, trajectory)| clause.counts_under_reading_b1() && clause_counts(*clause, *trajectory)).count().try_into().expect("计数装得进 u64");
-    let clause_units_b2: u64 = clause_false_trajectories.iter().filter(|(clause, trajectory)| clause_counts(*clause, *trajectory)).count().try_into().expect("计数装得进 u64");
+    let clause_units_excluding_the_judged_items: u64 =
+        clause_false_trajectories.iter().filter(|(clause, trajectory)| clause.counts_when_the_judged_items_are_excluded() && clause_counts(*clause, *trajectory)).count().try_into().expect("计数装得进 u64");
+    let clause_units_counting_the_judged_items: u64 = clause_false_trajectories.iter().filter(|(clause, trajectory)| clause_counts(*clause, *trajectory)).count().try_into().expect("计数装得进 u64");
 
     CellOutcome {
         flags_policy,
@@ -976,8 +976,8 @@ fn evaluate_cell(point: &SamplePoint, history: &WatermarkChangeHistory, flags_po
         rows_dropped_over_all_generations,
         silent_harm_count,
         clause_false_trajectories,
-        clause_units_b1,
-        clause_units_b2,
+        clause_units_excluding_the_judged_items,
+        clause_units_counting_the_judged_items,
         rows_written_all_rows: rows_written_all_rows_by_version.iter().copied().max().unwrap_or(0),
         rows_written_this_generation: rows_written_this_generation_by_version.iter().copied().max().unwrap_or(0),
         trajectory_unknown_tuples_remaining: trajectory_of(&unknown_tuples_remaining_by_version),
@@ -987,7 +987,7 @@ fn evaluate_cell(point: &SamplePoint, history: &WatermarkChangeHistory, flags_po
         trajectory_unknown_rows_off_this_txg: trajectory_of(&unknown_rows_off_this_txg_by_version),
         trajectory_unknown_rows_at_the_initial_txg: trajectory_of(&unknown_rows_at_the_initial_txg_by_version),
         trajectory_rows_dropped_per_generation: trajectory_of(&rows_dropped_by_version),
-        trajectory_i313_syntactic_violations: trajectory_of(&i313_syntactic_violations_by_version),
+        trajectory_row_generation_invariant_syntactic_violations: trajectory_of(&row_generation_invariant_syntactic_violations_by_version),
         trajectory_crates_step_reading_differences: trajectory_of(&crates_step_reading_differences_by_version),
     }
 }
@@ -995,9 +995,9 @@ fn evaluate_cell(point: &SamplePoint, history: &WatermarkChangeHistory, flags_po
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum RowsWrittenReading {
     /// 判的那一种：R_g 记账树里的全部行数。
-    AllRowsW2,
+    AllRowsOfTheVersion,
     /// 附带量：代段等于 R_g 的 txg 的行数（E113 口径）。
-    ThisGenerationRowsW1,
+    ThisGenerationRowsOnly,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -1018,12 +1018,12 @@ struct Reading {
 impl Reading {
     fn label(self) -> String {
         let clause = match self.clause {
-            ClauseReading::ExcludesTheJudgedItemB1 => "b1",
-            ClauseReading::CountsTheJudgedItemB2 => "b2",
+            ClauseReading::ExcludesTheJudgedItems => "b1",
+            ClauseReading::CountsTheJudgedItems => "b2",
         };
         let rows_written = match self.rows_written {
-            RowsWrittenReading::AllRowsW2 => "w2",
-            RowsWrittenReading::ThisGenerationRowsW1 => "w1",
+            RowsWrittenReading::AllRowsOfTheVersion => "w2",
+            RowsWrittenReading::ThisGenerationRowsOnly => "w1",
         };
         let reject_entry_semantics = match self.reject_entry_semantics {
             RejectEntrySemanticsReading::Counted => "q2_counted",
@@ -1037,15 +1037,15 @@ impl Reading {
     }
 }
 
-const JUDGED_READING_Q2_COUNTED: Reading =
-    Reading { clause: ClauseReading::ExcludesTheJudgedItemB1, rows_written: RowsWrittenReading::AllRowsW2, reject_entry_semantics: RejectEntrySemanticsReading::Counted };
-const JUDGED_READING_Q2_NOT_COUNTED: Reading =
-    Reading { clause: ClauseReading::ExcludesTheJudgedItemB1, rows_written: RowsWrittenReading::AllRowsW2, reject_entry_semantics: RejectEntrySemanticsReading::NotCounted };
+const JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED: Reading =
+    Reading { clause: ClauseReading::ExcludesTheJudgedItems, rows_written: RowsWrittenReading::AllRowsOfTheVersion, reject_entry_semantics: RejectEntrySemanticsReading::Counted };
+const JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED: Reading =
+    Reading { clause: ClauseReading::ExcludesTheJudgedItems, rows_written: RowsWrittenReading::AllRowsOfTheVersion, reject_entry_semantics: RejectEntrySemanticsReading::NotCounted };
 const INCIDENTAL_READINGS: [Reading; 4] = [
-    Reading { clause: ClauseReading::CountsTheJudgedItemB2, rows_written: RowsWrittenReading::AllRowsW2, reject_entry_semantics: RejectEntrySemanticsReading::Counted },
-    Reading { clause: ClauseReading::CountsTheJudgedItemB2, rows_written: RowsWrittenReading::AllRowsW2, reject_entry_semantics: RejectEntrySemanticsReading::NotCounted },
-    Reading { clause: ClauseReading::ExcludesTheJudgedItemB1, rows_written: RowsWrittenReading::ThisGenerationRowsW1, reject_entry_semantics: RejectEntrySemanticsReading::Counted },
-    Reading { clause: ClauseReading::ExcludesTheJudgedItemB1, rows_written: RowsWrittenReading::ThisGenerationRowsW1, reject_entry_semantics: RejectEntrySemanticsReading::NotCounted },
+    Reading { clause: ClauseReading::CountsTheJudgedItems, rows_written: RowsWrittenReading::AllRowsOfTheVersion, reject_entry_semantics: RejectEntrySemanticsReading::Counted },
+    Reading { clause: ClauseReading::CountsTheJudgedItems, rows_written: RowsWrittenReading::AllRowsOfTheVersion, reject_entry_semantics: RejectEntrySemanticsReading::NotCounted },
+    Reading { clause: ClauseReading::ExcludesTheJudgedItems, rows_written: RowsWrittenReading::ThisGenerationRowsOnly, reject_entry_semantics: RejectEntrySemanticsReading::Counted },
+    Reading { clause: ClauseReading::ExcludesTheJudgedItems, rows_written: RowsWrittenReading::ThisGenerationRowsOnly, reject_entry_semantics: RejectEntrySemanticsReading::NotCounted },
 ];
 
 type LexicographicVector = [u64; 7];
@@ -1072,13 +1072,13 @@ fn lexicographic_vector(outcome: &CellOutcome, published_generations: u64, claus
 
 fn vector_under(outcome: &CellOutcome, point: &SamplePoint, reading: Reading) -> LexicographicVector {
     let clause_units_of_the_list = match reading.clause {
-        ClauseReading::ExcludesTheJudgedItemB1 => outcome.clause_units_b1,
-        ClauseReading::CountsTheJudgedItemB2 => outcome.clause_units_b2,
+        ClauseReading::ExcludesTheJudgedItems => outcome.clause_units_excluding_the_judged_items,
+        ClauseReading::CountsTheJudgedItems => outcome.clause_units_counting_the_judged_items,
     };
     let clause_units_to_change = clause_units_of_the_list + reject_entry_semantics_extra_clause_units(outcome.flags_policy, reading.reject_entry_semantics);
     let rows_written_per_generation = match reading.rows_written {
-        RowsWrittenReading::AllRowsW2 => outcome.rows_written_all_rows,
-        RowsWrittenReading::ThisGenerationRowsW1 => outcome.rows_written_this_generation,
+        RowsWrittenReading::AllRowsOfTheVersion => outcome.rows_written_all_rows,
+        RowsWrittenReading::ThisGenerationRowsOnly => outcome.rows_written_this_generation,
     };
     lexicographic_vector(outcome, point.published_generations, clause_units_to_change, rows_written_per_generation)
 }
@@ -1162,7 +1162,7 @@ const ACCOUNTING_PAIRS: [(AccountingPolicy, AccountingPolicy); 3] = [
 ];
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-struct Q1UnderFlagsArm {
+struct AccountingWinnersUnderFlagsArm {
     flags_policy: UnknownFlagsPolicy,
     first_separating_position: Option<usize>,
     pair_first_separating_positions: Vec<Option<usize>>,
@@ -1170,7 +1170,7 @@ struct Q1UnderFlagsArm {
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-struct Q2UnderAccountingArm {
+struct FlagsWinnersUnderAccountingArm {
     accounting_policy: AccountingPolicy,
     reject_entry_versus_skip_first_separating_position: Option<usize>,
     /// `RejectEntry` 那一格第 6 位对 `Skip` 那一格第 6 位。
@@ -1182,14 +1182,14 @@ struct Q2UnderAccountingArm {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 struct PointAnalysis {
-    q1_by_flags_arm: Vec<Q1UnderFlagsArm>,
+    accounting_winners_by_flags_arm: Vec<AccountingWinnersUnderFlagsArm>,
     overall_winners: Vec<(UnknownFlagsPolicy, AccountingPolicy)>,
-    q2_by_accounting_arm: Vec<Q2UnderAccountingArm>,
+    flags_winners_by_accounting_arm: Vec<FlagsWinnersUnderAccountingArm>,
     all_fifteen_cells_equal: bool,
 }
 
 fn analyse_point(evaluated: &EvaluatedPoint, reading: Reading) -> PointAnalysis {
-    let q1_by_flags_arm = FLAGS_ARMS
+    let accounting_winners_by_flags_arm = FLAGS_ARMS
         .iter()
         .map(|flags_policy| {
             let vectors: Vec<LexicographicVector> = ACCOUNTING_ARMS.iter().map(|accounting_policy| evaluated.vector(*flags_policy, *accounting_policy, reading)).collect();
@@ -1197,7 +1197,7 @@ fn analyse_point(evaluated: &EvaluatedPoint, reading: Reading) -> PointAnalysis 
                 .iter()
                 .map(|(left, right)| first_separating_position(&[evaluated.vector(*flags_policy, *left, reading), evaluated.vector(*flags_policy, *right, reading)]))
                 .collect();
-            Q1UnderFlagsArm {
+            AccountingWinnersUnderFlagsArm {
                 flags_policy: *flags_policy,
                 first_separating_position: first_separating_position(&vectors),
                 pair_first_separating_positions,
@@ -1209,13 +1209,13 @@ fn analyse_point(evaluated: &EvaluatedPoint, reading: Reading) -> PointAnalysis 
         FLAGS_ARMS.iter().flat_map(|flags_policy| ACCOUNTING_ARMS.iter().map(move |accounting_policy| (*flags_policy, *accounting_policy))).collect();
     let all_vectors: Vec<LexicographicVector> = all_cells.iter().map(|(flags_policy, accounting_policy)| evaluated.vector(*flags_policy, *accounting_policy, reading)).collect();
     let overall_winners = winner_indices(&all_vectors).into_iter().map(|index| all_cells[index]).collect();
-    let q2_by_accounting_arm = ACCOUNTING_ARMS
+    let flags_winners_by_accounting_arm = ACCOUNTING_ARMS
         .iter()
         .map(|accounting_policy| {
             let reject_entry = evaluated.vector(UnknownFlagsPolicy::RejectEntry, *accounting_policy, reading);
             let skip = evaluated.vector(UnknownFlagsPolicy::Skip, *accounting_policy, reading);
             let flags_vectors: Vec<LexicographicVector> = FLAGS_ARMS.iter().map(|flags_policy| evaluated.vector(*flags_policy, *accounting_policy, reading)).collect();
-            Q2UnderAccountingArm {
+            FlagsWinnersUnderAccountingArm {
                 accounting_policy: *accounting_policy,
                 reject_entry_versus_skip_first_separating_position: first_separating_position(&[reject_entry, skip]),
                 position_six_reject_entry_versus_skip: reject_entry[5].cmp(&skip[5]),
@@ -1224,7 +1224,7 @@ fn analyse_point(evaluated: &EvaluatedPoint, reading: Reading) -> PointAnalysis 
             }
         })
         .collect();
-    PointAnalysis { q1_by_flags_arm, overall_winners, q2_by_accounting_arm, all_fifteen_cells_equal: first_separating_position(&all_vectors).is_none() }
+    PointAnalysis { accounting_winners_by_flags_arm, overall_winners, flags_winners_by_accounting_arm, all_fifteen_cells_equal: first_separating_position(&all_vectors).is_none() }
 }
 
 fn cell_label(flags_policy: UnknownFlagsPolicy, accounting_policy: AccountingPolicy) -> String {
@@ -1274,12 +1274,12 @@ fn render_cell_line(point_index: usize, evaluated: &EvaluatedPoint, outcome: &Ce
         outcome.writable_generations,
         outcome.read_only_violations,
         outcome.revived_dead_trees,
-        render_vector(&vector_under(outcome, point, JUDGED_READING_Q2_COUNTED)),
-        render_vector(&vector_under(outcome, point, JUDGED_READING_Q2_NOT_COUNTED)),
-        outcome.clause_units_b1,
-        clause_units_from_the_hand_ledger(point, outcome.flags_policy, outcome.accounting_policy, ClauseReading::ExcludesTheJudgedItemB1, evaluated.judgement),
-        outcome.clause_units_b2,
-        clause_units_from_the_hand_ledger(point, outcome.flags_policy, outcome.accounting_policy, ClauseReading::CountsTheJudgedItemB2, evaluated.judgement),
+        render_vector(&vector_under(outcome, point, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED)),
+        render_vector(&vector_under(outcome, point, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED)),
+        outcome.clause_units_excluding_the_judged_items,
+        clause_units_from_the_hand_ledger(point, outcome.flags_policy, outcome.accounting_policy, ClauseReading::ExcludesTheJudgedItems, evaluated.judgement),
+        outcome.clause_units_counting_the_judged_items,
+        clause_units_from_the_hand_ledger(point, outcome.flags_policy, outcome.accounting_policy, ClauseReading::CountsTheJudgedItems, evaluated.judgement),
         outcome.rows_written_all_rows,
         outcome.rows_written_this_generation,
         render_clauses_false(outcome),
@@ -1291,7 +1291,7 @@ fn render_cell_line(point_index: usize, evaluated: &EvaluatedPoint, outcome: &Ce
         render_trajectory(outcome.trajectory_unknown_rows_at_the_initial_txg),
         render_trajectory(outcome.trajectory_rows_dropped_per_generation),
         outcome.rows_dropped_over_all_generations,
-        render_trajectory(outcome.trajectory_i313_syntactic_violations),
+        render_trajectory(outcome.trajectory_row_generation_invariant_syntactic_violations),
         render_trajectory(outcome.trajectory_crates_step_reading_differences),
     )
 }
@@ -1305,9 +1305,9 @@ fn render_ordering_of_reject_entry_against_skip(ordering: std::cmp::Ordering) ->
 }
 
 fn render_point_verdict_line(point_index: usize, evaluated: &EvaluatedPoint, counted: &PointAnalysis, not_counted: &PointAnalysis) -> String {
-    let q1 = &counted.q1_by_flags_arm;
-    let q1_first = q1.iter().map(|arm| format!("{}:{}", flags_label(arm.flags_policy), render_position(arm.first_separating_position))).collect::<Vec<_>>().join(",");
-    let q1_pairs = q1
+    let accounting_winners = &counted.accounting_winners_by_flags_arm;
+    let accounting_winners_first_separating = accounting_winners.iter().map(|arm| format!("{}:{}", flags_label(arm.flags_policy), render_position(arm.first_separating_position))).collect::<Vec<_>>().join(",");
+    let accounting_winner_pairs = accounting_winners
         .iter()
         .map(|arm| {
             let pairs = ACCOUNTING_PAIRS
@@ -1320,18 +1320,18 @@ fn render_point_verdict_line(point_index: usize, evaluated: &EvaluatedPoint, cou
         })
         .collect::<Vec<_>>()
         .join(",");
-    let q1_winners =
-        q1.iter().map(|arm| format!("{}:{}", flags_label(arm.flags_policy), join_labels(&arm.winners, |policy| accounting_label(*policy).to_string()))).collect::<Vec<_>>().join(",");
+    let accounting_winner_sets =
+        accounting_winners.iter().map(|arm| format!("{}:{}", flags_label(arm.flags_policy), join_labels(&arm.winners, |policy| accounting_label(*policy).to_string()))).collect::<Vec<_>>().join(",");
     let overall = |analysis: &PointAnalysis| join_labels(&analysis.overall_winners, |(flags_policy, accounting_policy)| cell_label(*flags_policy, *accounting_policy));
-    let q2_field = |analysis: &PointAnalysis, render: &dyn Fn(&Q2UnderAccountingArm) -> String| {
-        analysis.q2_by_accounting_arm.iter().map(|arm| format!("{}:{}", accounting_label(arm.accounting_policy), render(arm))).collect::<Vec<_>>().join(",")
+    let flags_winners_field = |analysis: &PointAnalysis, render: &dyn Fn(&FlagsWinnersUnderAccountingArm) -> String| {
+        analysis.flags_winners_by_accounting_arm.iter().map(|arm| format!("{}:{}", accounting_label(arm.accounting_policy), render(arm))).collect::<Vec<_>>().join(",")
     };
-    let first = |arm: &Q2UnderAccountingArm| render_position(arm.reject_entry_versus_skip_first_separating_position);
-    let six = |arm: &Q2UnderAccountingArm| render_ordering_of_reject_entry_against_skip(arm.position_six_reject_entry_versus_skip).to_string();
-    let separable = |arm: &Q2UnderAccountingArm| u8::from(arm.separable_at_position_six).to_string();
-    let flags_winners = |arm: &Q2UnderAccountingArm| join_labels(&arm.flags_winners, |policy| flags_label(*policy).to_string());
+    let first = |arm: &FlagsWinnersUnderAccountingArm| render_position(arm.reject_entry_versus_skip_first_separating_position);
+    let six = |arm: &FlagsWinnersUnderAccountingArm| render_ordering_of_reject_entry_against_skip(arm.position_six_reject_entry_versus_skip).to_string();
+    let separable = |arm: &FlagsWinnersUnderAccountingArm| u8::from(arm.separable_at_position_six).to_string();
+    let flags_winners = |arm: &FlagsWinnersUnderAccountingArm| join_labels(&arm.flags_winners, |policy| flags_label(*policy).to_string());
     format!(
-        "name=point_verdict point={point_index} {} legal={} q1_first_separating={q1_first} q1_pair_first_separating={q1_pairs} q1_winners={q1_winners} \
+        "name=point_verdict point={point_index} {} legal={} q1_first_separating={accounting_winners_first_separating} q1_pair_first_separating={accounting_winner_pairs} q1_winners={accounting_winner_sets} \
          overall_winners_q2_counted={} overall_winners_q2_not_counted={} \
          q2_reject_vs_skip_first_separating_counted={} q2_reject_vs_skip_first_separating_not_counted={} \
          q2_position_six_counted={} q2_position_six_not_counted={} q2_separable_counted={} q2_separable_not_counted={} \
@@ -1340,30 +1340,30 @@ fn render_point_verdict_line(point_index: usize, evaluated: &EvaluatedPoint, cou
         u8::from(evaluated.point.is_legal_under_todays_step_rows()),
         overall(counted),
         overall(not_counted),
-        q2_field(counted, &first),
-        q2_field(not_counted, &first),
-        q2_field(counted, &six),
-        q2_field(not_counted, &six),
-        q2_field(counted, &separable),
-        q2_field(not_counted, &separable),
-        q2_field(counted, &flags_winners),
-        q2_field(not_counted, &flags_winners),
-        u8::from(q2_flags_winners_signature(counted) != q2_flags_winners_signature(not_counted)),
+        flags_winners_field(counted, &first),
+        flags_winners_field(not_counted, &first),
+        flags_winners_field(counted, &six),
+        flags_winners_field(not_counted, &six),
+        flags_winners_field(counted, &separable),
+        flags_winners_field(not_counted, &separable),
+        flags_winners_field(counted, &flags_winners),
+        flags_winners_field(not_counted, &flags_winners),
+        u8::from(flags_winners_signature(counted) != flags_winners_signature(not_counted)),
         u8::from(counted.all_fifteen_cells_equal),
         u8::from(not_counted.all_fifteen_cells_equal),
     )
 }
 
 /// Q2 后半「胜者是否换档」比的东西：每条记账臂下 flags 五格的胜者，加十五格总胜者里的 flags 臂。
-fn q2_flags_winners_signature(analysis: &PointAnalysis) -> (Vec<Vec<UnknownFlagsPolicy>>, BTreeSet<UnknownFlagsPolicy>) {
+fn flags_winners_signature(analysis: &PointAnalysis) -> (Vec<Vec<UnknownFlagsPolicy>>, BTreeSet<UnknownFlagsPolicy>) {
     (
-        analysis.q2_by_accounting_arm.iter().map(|arm| arm.flags_winners.clone()).collect(),
+        analysis.flags_winners_by_accounting_arm.iter().map(|arm| arm.flags_winners.clone()).collect(),
         analysis.overall_winners.iter().map(|(flags_policy, _accounting_policy)| *flags_policy).collect(),
     )
 }
 
-fn q1_winners_signature(analysis: &PointAnalysis) -> Vec<Vec<AccountingPolicy>> {
-    analysis.q1_by_flags_arm.iter().map(|arm| arm.winners.clone()).collect()
+fn accounting_winners_signature(analysis: &PointAnalysis) -> Vec<Vec<AccountingPolicy>> {
+    analysis.accounting_winners_by_flags_arm.iter().map(|arm| arm.winners.clone()).collect()
 }
 
 /// 一组取样点的描述：几个点，每一维取到了哪些值（报「依赖取样点」时列翻转点用）。
@@ -1378,7 +1378,7 @@ impl PointSetDescription {
         self.point_count += 1;
         let coordinates: [(&'static str, String); 9] = [
             ("geometry", point.geometry.label().to_string()),
-            ("k_keep", point.retired_k_keep.to_string()),
+            ("k_keep", point.retired_kept_generation_count.to_string()),
             ("w_gens", point.invisible_window_generations.to_string()),
             ("h_new", point.unknown_writable_head_count.to_string()),
             ("registered", point.trees_with_registered_bit.to_string()),
@@ -1415,8 +1415,8 @@ fn accounting_arm_acts_under(flags_policy: UnknownFlagsPolicy, point: &SamplePoi
 }
 
 /// 第八节判别力自证·Q2：钉住选定读法（Q2「计」）下同一记账臂 `RejectEntry` 格与 `Skip` 格第 6 位的比较，翻 Q2 那一位之后比较变了才算由绿转红。
-fn q2_self_proof_turns_red(evaluated: &EvaluatedPoint, accounting_policy: AccountingPolicy) -> bool {
-    let pinned_reading = JUDGED_READING_Q2_COUNTED;
+fn flags_question_self_proof_turns_red(evaluated: &EvaluatedPoint, accounting_policy: AccountingPolicy) -> bool {
+    let pinned_reading = JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED;
     let flipped_reading = pinned_reading.with_reject_entry_semantics(RejectEntrySemanticsReading::NotCounted);
     let pinned = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, pinned_reading)[5].cmp(&evaluated.vector(UnknownFlagsPolicy::Skip, accounting_policy, pinned_reading)[5]);
     let after_flip =
@@ -1425,18 +1425,18 @@ fn q2_self_proof_turns_red(evaluated: &EvaluatedPoint, accounting_policy: Accoun
 }
 
 /// 第八节判别力自证·Q1 第 6 位：钉住 `Carry` 与随根留着第 6 位的比较，把随根留着的第 6 位改成等于 `Carry` 的值之后比较变了才算由绿转红。
-fn q1_position_six_self_proof_turns_red(evaluated: &EvaluatedPoint, flags_policy: UnknownFlagsPolicy) -> bool {
-    let carry = evaluated.vector(flags_policy, AccountingPolicy::Carry, JUDGED_READING_Q2_COUNTED);
-    let keep_with_root = evaluated.vector(flags_policy, AccountingPolicy::KeepWithRoot, JUDGED_READING_Q2_COUNTED);
+fn accounting_question_position_six_self_proof_turns_red(evaluated: &EvaluatedPoint, flags_policy: UnknownFlagsPolicy) -> bool {
+    let carry = evaluated.vector(flags_policy, AccountingPolicy::Carry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
+    let keep_with_root = evaluated.vector(flags_policy, AccountingPolicy::KeepWithRoot, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
     let pinned = carry[5].cmp(&keep_with_root[5]);
     let corrupted_keep_with_root_position_six = carry[5];
     pinned != carry[5].cmp(&corrupted_keep_with_root_position_six)
 }
 
 /// 第八节判别力自证·Q1 第 7 位：钉住两格第 7 位的比较，把 `Carry` 的第 7 位减去 `h_new` × `r_tree_dim` 之后比较变了才算由绿转红。
-fn q1_position_seven_self_proof_turns_red(evaluated: &EvaluatedPoint, flags_policy: UnknownFlagsPolicy) -> bool {
-    let carry = evaluated.vector(flags_policy, AccountingPolicy::Carry, JUDGED_READING_Q2_COUNTED);
-    let keep_with_root = evaluated.vector(flags_policy, AccountingPolicy::KeepWithRoot, JUDGED_READING_Q2_COUNTED);
+fn accounting_question_position_seven_self_proof_turns_red(evaluated: &EvaluatedPoint, flags_policy: UnknownFlagsPolicy) -> bool {
+    let carry = evaluated.vector(flags_policy, AccountingPolicy::Carry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
+    let keep_with_root = evaluated.vector(flags_policy, AccountingPolicy::KeepWithRoot, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
     let pinned = carry[6].cmp(&keep_with_root[6]);
     let corrupted_carry_position_seven = carry[6] - evaluated.point.unknown_writable_head_count * evaluated.point.tree_dimension_statistic_count;
     pinned != corrupted_carry_position_seven.cmp(&keep_with_root[6])
@@ -1444,16 +1444,16 @@ fn q1_position_seven_self_proof_turns_red(evaluated: &EvaluatedPoint, flags_poli
 
 /// 第二次跑第八节新自证（`dangling-u5`）：钉住 `Carry` 与 `NoCarry` 第 6 位的比较，把 `NoCarry` 的 U5 换回空真读法（第 6 位减 1）之后比较变了才算由绿转红。
 /// 跑在 `h_new = 2`、`lpc = 1`、`r_tree_dim = 1` 的点上：第一次跑的判据下 `Carry` 与 `NoCarry` 在这里第 6 位相等。
-fn q1_dangling_u5_self_proof_turns_red(evaluated: &EvaluatedPoint, flags_policy: UnknownFlagsPolicy) -> bool {
-    let carry = evaluated.vector(flags_policy, AccountingPolicy::Carry, JUDGED_READING_Q2_COUNTED);
-    let no_carry = evaluated.vector(flags_policy, AccountingPolicy::NoCarry, JUDGED_READING_Q2_COUNTED);
+fn accounting_question_dangling_carried_rows_self_proof_turns_red(evaluated: &EvaluatedPoint, flags_policy: UnknownFlagsPolicy) -> bool {
+    let carry = evaluated.vector(flags_policy, AccountingPolicy::Carry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
+    let no_carry = evaluated.vector(flags_policy, AccountingPolicy::NoCarry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
     let pinned = carry[5].cmp(&no_carry[5]);
     let no_carry_position_six_under_the_vacuous_reading = no_carry[5].saturating_sub(1);
     pinned != carry[5].cmp(&no_carry_position_six_under_the_vacuous_reading)
 }
 
 /// 第二次跑第八节新自证的取样点：`h_new = 2`、`lpc = 1`、`r_tree_dim = 1`。
-fn is_a_point_of_the_dangling_u5_self_proof(point: &SamplePoint) -> bool {
+fn is_a_point_of_the_dangling_carried_rows_self_proof(point: &SamplePoint) -> bool {
     point.unknown_writable_head_count == 2 && point.initial_publish_changed_the_watermark && point.tree_dimension_statistic_count == 1
 }
 
@@ -1470,19 +1470,19 @@ enum PositiveControl {
     NoCarryLosesTuples,
     KeepWithRootKeepsTheInitialRow,
     /// 第二次跑第五节补的三条（新 U5，三条记账臂各一条），只在 `dangling-u5` 下跑。
-    DanglingU5CarryHolds,
-    DanglingU5NoCarryDangles,
-    DanglingU5KeepWithRootDangles,
+    DanglingCarriedRowsCarryHolds,
+    DanglingCarriedRowsNoCarryDangles,
+    DanglingCarriedRowsKeepWithRootDangles,
 }
 
 /// 新 U5 的三条阳性对照（`dangling-u5` 下接在 `POSITIVE_CONTROLS` 后面跑）。
-const DANGLING_U5_POSITIVE_CONTROLS: [PositiveControl; 3] =
-    [PositiveControl::DanglingU5CarryHolds, PositiveControl::DanglingU5NoCarryDangles, PositiveControl::DanglingU5KeepWithRootDangles];
+const DANGLING_CARRIED_ROWS_POSITIVE_CONTROLS: [PositiveControl; 3] =
+    [PositiveControl::DanglingCarriedRowsCarryHolds, PositiveControl::DanglingCarriedRowsNoCarryDangles, PositiveControl::DanglingCarriedRowsKeepWithRootDangles];
 
 fn positive_controls_of(judgement: Judgement) -> Vec<PositiveControl> {
     let mut controls = POSITIVE_CONTROLS.to_vec();
-    if judgement == Judgement::DanglingU5 {
-        controls.extend(DANGLING_U5_POSITIVE_CONTROLS);
+    if judgement == Judgement::DanglingCarriedRowsClause {
+        controls.extend(DANGLING_CARRIED_ROWS_POSITIVE_CONTROLS);
     }
     controls
 }
@@ -1511,9 +1511,9 @@ impl PositiveControl {
             PositiveControl::CarryWritesTheUnknownRows => "Carry",
             PositiveControl::NoCarryLosesTuples => "NoCarry",
             PositiveControl::KeepWithRootKeepsTheInitialRow => "KeepWithRoot",
-            PositiveControl::DanglingU5CarryHolds => "DanglingU5_Carry",
-            PositiveControl::DanglingU5NoCarryDangles => "DanglingU5_NoCarry",
-            PositiveControl::DanglingU5KeepWithRootDangles => "DanglingU5_KeepWithRoot",
+            PositiveControl::DanglingCarriedRowsCarryHolds => "DanglingU5_Carry",
+            PositiveControl::DanglingCarriedRowsNoCarryDangles => "DanglingU5_NoCarry",
+            PositiveControl::DanglingCarriedRowsKeepWithRootDangles => "DanglingU5_KeepWithRoot",
         }
     }
 }
@@ -1543,8 +1543,8 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
         }
         PositiveControl::RejectEntryCountedSemanticsAddsOne => {
             for accounting_policy in ACCOUNTING_ARMS {
-                let counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_Q2_COUNTED);
-                let not_counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_Q2_NOT_COUNTED);
+                let counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
+                let not_counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED);
                 judge(counted[5] == not_counted[5] + 1);
             }
         }
@@ -1559,7 +1559,7 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
         PositiveControl::PerBitEqualsTheArmItReducesTo => {
             let reduces_to = if point.trees_with_registered_bit == 0 { UnknownFlagsPolicy::ReadOnly } else { UnknownFlagsPolicy::Skip };
             for accounting_policy in ACCOUNTING_ARMS {
-                for reading in [JUDGED_READING_Q2_COUNTED, JUDGED_READING_Q2_NOT_COUNTED] {
+                for reading in [JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED] {
                     judge(evaluated.vector(UnknownFlagsPolicy::PerBit, accounting_policy, reading) == evaluated.vector(reduces_to, accounting_policy, reading));
                 }
             }
@@ -1581,24 +1581,24 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
             for flags_policy in &acting_flags {
                 let cell = evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::KeepWithRoot);
                 let every_version_keeps_an_initial_row = cell.trajectory_unknown_rows_at_the_initial_txg.is_some_and(|trajectory| trajectory.positive_versions == point.published_generations);
-                let i313_false = cell
+                let row_generation_invariant_false = cell
                     .clause_false_trajectories
                     .iter()
                     .any(|(clause, trajectory)| *clause == ClauseUnit::InvariantGenerationEqualsTheVersionTxg && trajectory.is_some_and(|trajectory| trajectory.peak > 0));
-                judge(every_version_keeps_an_initial_row && i313_false);
+                judge(every_version_keeps_an_initial_row && row_generation_invariant_false);
             }
         }
         // 新 U5 的三条（第二次跑第五节补的表）：`Carry` 每一版都为真，另两条每一版都为假（为正版数 = G）。
-        PositiveControl::DanglingU5CarryHolds if has_unknown_heads => {
+        PositiveControl::DanglingCarriedRowsCarryHolds if has_unknown_heads => {
             for flags_policy in &acting_flags {
-                let trajectory = u5_false_trajectory_of(evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::Carry));
+                let trajectory = carried_rows_clause_false_trajectory_of(evaluated.outcome_under_the_arms(*flags_policy, AccountingPolicy::Carry));
                 judge(trajectory.is_some_and(|trajectory| trajectory.peak == 0 && trajectory.positive_versions == 0 && trajectory.final_value == 0));
             }
         }
-        PositiveControl::DanglingU5NoCarryDangles | PositiveControl::DanglingU5KeepWithRootDangles if has_unknown_heads => {
-            let accounting_policy = if control == PositiveControl::DanglingU5NoCarryDangles { AccountingPolicy::NoCarry } else { AccountingPolicy::KeepWithRoot };
+        PositiveControl::DanglingCarriedRowsNoCarryDangles | PositiveControl::DanglingCarriedRowsKeepWithRootDangles if has_unknown_heads => {
+            let accounting_policy = if control == PositiveControl::DanglingCarriedRowsNoCarryDangles { AccountingPolicy::NoCarry } else { AccountingPolicy::KeepWithRoot };
             for flags_policy in &acting_flags {
-                let trajectory = u5_false_trajectory_of(evaluated.outcome_under_the_arms(*flags_policy, accounting_policy));
+                let trajectory = carried_rows_clause_false_trajectory_of(evaluated.outcome_under_the_arms(*flags_policy, accounting_policy));
                 judge(trajectory.is_some_and(|trajectory| trajectory.peak == 1 && trajectory.positive_versions == point.published_generations && trajectory.final_value == 1));
             }
         }
@@ -1608,15 +1608,15 @@ fn positive_control_failures(evaluated: &EvaluatedPoint, control: PositiveContro
         | PositiveControl::CarryWritesTheUnknownRows
         | PositiveControl::NoCarryLosesTuples
         | PositiveControl::KeepWithRootKeepsTheInitialRow
-        | PositiveControl::DanglingU5CarryHolds
-        | PositiveControl::DanglingU5NoCarryDangles
-        | PositiveControl::DanglingU5KeepWithRootDangles => {}
+        | PositiveControl::DanglingCarriedRowsCarryHolds
+        | PositiveControl::DanglingCarriedRowsNoCarryDangles
+        | PositiveControl::DanglingCarriedRowsKeepWithRootDangles => {}
     }
     (checked, failures)
 }
 
 /// U5 在 R_1 … R_G 上的为假轨迹；没有新版本（只读挂载）交回 `None`。
-fn u5_false_trajectory_of(cell: &CellOutcome) -> Option<Trajectory> {
+fn carried_rows_clause_false_trajectory_of(cell: &CellOutcome) -> Option<Trajectory> {
     cell.clause_false_trajectories
         .iter()
         .find(|(clause, _trajectory)| *clause == ClauseUnit::DecisionEightItemTwelveCarriedRows)
@@ -1634,7 +1634,7 @@ fn negative_control_no_window_failures(evaluated: &EvaluatedPoint) -> (u64, u64)
 
 /// 阴性对照乙：`h_new = 0` 的点上，同一 flags 臂下三条记账格七位（判的两种读法）有一位不同，或某条 U 为假 ⇒ 记账效应是硬编码的。
 /// 「某条 U」只取读法 B1 下计的那几条（U1–U11，登记第十二节修订）：U12、U13 只在 B2 下计，是附带量，
-/// 由 `negative_control_no_unknown_heads_incidental_b2_clauses` 照报、不判。
+/// 由 `negative_control_no_unknown_heads_incidental_clauses_counting_the_judged_items` 照报、不判。
 fn negative_control_no_unknown_heads_failures(evaluated: &EvaluatedPoint) -> (u64, u64) {
     if evaluated.point.unknown_writable_head_count > 0 {
         return (0, 0);
@@ -1642,7 +1642,7 @@ fn negative_control_no_unknown_heads_failures(evaluated: &EvaluatedPoint) -> (u6
     let mut checked = 0u64;
     let mut failures = 0u64;
     for flags_policy in FLAGS_ARMS {
-        for reading in [JUDGED_READING_Q2_COUNTED, JUDGED_READING_Q2_NOT_COUNTED] {
+        for reading in [JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED] {
             let vectors: Vec<LexicographicVector> = ACCOUNTING_ARMS.iter().map(|accounting_policy| evaluated.vector(flags_policy, *accounting_policy, reading)).collect();
             checked += 1;
             failures += u64::from(first_separating_position(&vectors).is_some());
@@ -1650,7 +1650,7 @@ fn negative_control_no_unknown_heads_failures(evaluated: &EvaluatedPoint) -> (u6
     }
     for cell in &evaluated.cells {
         for (clause, trajectory) in &cell.clause_false_trajectories {
-            if !clause.counts_under_reading_b1() {
+            if !clause.counts_when_the_judged_items_are_excluded() {
                 continue;
             }
             checked += 1;
@@ -1662,7 +1662,7 @@ fn negative_control_no_unknown_heads_failures(evaluated: &EvaluatedPoint) -> (u6
 
 /// 阴性对照乙的附带量：`h_new = 0` 的点上 U12（任一版为假）与 U13（按臂判）各有几格为假。照报、不判。
 /// 交回 (查了几格, U12 为假几格, U13 为假几格)。
-fn negative_control_no_unknown_heads_incidental_b2_clauses(evaluated: &EvaluatedPoint) -> (u64, u64, u64) {
+fn negative_control_no_unknown_heads_incidental_clauses_counting_the_judged_items(evaluated: &EvaluatedPoint) -> (u64, u64, u64) {
     if evaluated.point.unknown_writable_head_count > 0 {
         return (0, 0, 0);
     }
@@ -1696,7 +1696,7 @@ fn negative_control_no_unknown_heads_incidental_b2_clauses(evaluated: &Evaluated
 #[derive(Clone, Copy, Debug)]
 enum PointChange {
     Geometry(Geometry),
-    RetiredKKeep(u64),
+    RetiredKeptGenerationCount(u64),
     InvisibleWindowGenerations(u64),
     UnknownWritableHeads(u64),
     RegisteredTrees(u64),
@@ -1709,7 +1709,7 @@ fn point_with(point: &SamplePoint, change: PointChange) -> SamplePoint {
     let mut changed = *point;
     match change {
         PointChange::Geometry(geometry) => changed.geometry = geometry,
-        PointChange::RetiredKKeep(retired_k_keep) => changed.retired_k_keep = retired_k_keep,
+        PointChange::RetiredKeptGenerationCount(retired_kept_generation_count) => changed.retired_kept_generation_count = retired_kept_generation_count,
         PointChange::InvisibleWindowGenerations(generations) => changed.invisible_window_generations = generations,
         PointChange::UnknownWritableHeads(head_count) => changed.unknown_writable_head_count = head_count,
         PointChange::RegisteredTrees(tree_count) => changed.trees_with_registered_bit = tree_count,
@@ -1725,8 +1725,8 @@ fn point_with(point: &SamplePoint, change: PointChange) -> SamplePoint {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SensitivityVerdict {
-    Q1AccountingWinners,
-    Q2FlagsWinnersAndRejectEntryVersusSkip,
+    AccountingWinners,
+    FlagsWinnersAndRejectEntryVersusSkip,
 }
 
 /// 第八节「几何敏感性」表：每对两点方向相反，判决那一格在两点上都报。
@@ -1741,12 +1741,12 @@ fn sensitivity_pairs() -> Vec<SensitivityPair> {
     let mut pairs = vec![
         SensitivityPair {
             name: "lpc_0_to_1_where_h_new_positive_and_r_tree_dim_1",
-            verdict: SensitivityVerdict::Q1AccountingWinners,
+            verdict: SensitivityVerdict::AccountingWinners,
             applies_to: |point| point.unknown_writable_head_count > 0 && point.tree_dimension_statistic_count == 1 && !point.initial_publish_changed_the_watermark,
             change: PointChange::StepHistory(0, true),
         },
-        SensitivityPair { name: "r_tree_dim_1_to_2", verdict: SensitivityVerdict::Q1AccountingWinners, applies_to: |point| point.tree_dimension_statistic_count == 1, change: PointChange::TreeDimensionStatistics(2) },
-        SensitivityPair { name: "registered_0_to_4", verdict: SensitivityVerdict::Q2FlagsWinnersAndRejectEntryVersusSkip, applies_to: |point| point.trees_with_registered_bit == 0, change: PointChange::RegisteredTrees(UNKNOWN_TREE_COUNT) },
+        SensitivityPair { name: "r_tree_dim_1_to_2", verdict: SensitivityVerdict::AccountingWinners, applies_to: |point| point.tree_dimension_statistic_count == 1, change: PointChange::TreeDimensionStatistics(2) },
+        SensitivityPair { name: "registered_0_to_4", verdict: SensitivityVerdict::FlagsWinnersAndRejectEntryVersusSkip, applies_to: |point| point.trees_with_registered_bit == 0, change: PointChange::RegisteredTrees(UNKNOWN_TREE_COUNT) },
     ];
     // lpc 0 → 1 保留各点自己的 s：StepHistory 的 s 在用时按那一点改写（见 `partner_of`）。
     for (earlier_step_count, initial_publish_changed_the_watermark) in STEP_HISTORY_VALUES.into_iter().skip(1) {
@@ -1758,18 +1758,18 @@ fn sensitivity_pairs() -> Vec<SensitivityPair> {
                 (3, false) => "s_lpc_0_0_to_3_0",
                 _ => "s_lpc_0_0_to_3_1",
             },
-            verdict: SensitivityVerdict::Q1AccountingWinners,
+            verdict: SensitivityVerdict::AccountingWinners,
             applies_to: |point| !point.is_legal_under_todays_step_rows(),
             change: PointChange::StepHistory(earlier_step_count, initial_publish_changed_the_watermark),
         });
     }
     for (name, generations) in [("w_gens_0_to_1", 1), ("w_gens_0_to_3", 3), ("w_gens_0_to_8", 8)] {
-        pairs.push(SensitivityPair { name, verdict: SensitivityVerdict::Q2FlagsWinnersAndRejectEntryVersusSkip, applies_to: |point| point.invisible_window_generations == 0, change: PointChange::InvisibleWindowGenerations(generations) });
+        pairs.push(SensitivityPair { name, verdict: SensitivityVerdict::FlagsWinnersAndRejectEntryVersusSkip, applies_to: |point| point.invisible_window_generations == 0, change: PointChange::InvisibleWindowGenerations(generations) });
     }
     for (name, head_count) in [("h_new_0_to_2", 2), ("h_new_0_to_4", 4)] {
-        pairs.push(SensitivityPair { name, verdict: SensitivityVerdict::Q1AccountingWinners, applies_to: |point| point.unknown_writable_head_count == 0, change: PointChange::UnknownWritableHeads(head_count) });
+        pairs.push(SensitivityPair { name, verdict: SensitivityVerdict::AccountingWinners, applies_to: |point| point.unknown_writable_head_count == 0, change: PointChange::UnknownWritableHeads(head_count) });
     }
-    for verdict in [SensitivityVerdict::Q1AccountingWinners, SensitivityVerdict::Q2FlagsWinnersAndRejectEntryVersusSkip] {
+    for verdict in [SensitivityVerdict::AccountingWinners, SensitivityVerdict::FlagsWinnersAndRejectEntryVersusSkip] {
         pairs.push(SensitivityPair {
             name: "geometry_e113_to_implementation_two_devices",
             verdict,
@@ -1777,7 +1777,7 @@ fn sensitivity_pairs() -> Vec<SensitivityPair> {
             change: PointChange::Geometry(Geometry::ImplementationTwoDevices),
         });
         pairs.push(SensitivityPair { name: "g_gens_1_to_10", verdict, applies_to: |point| point.published_generations == 1, change: PointChange::PublishedGenerations(10) });
-        pairs.push(SensitivityPair { name: "k_keep_1_to_20", verdict, applies_to: |point| point.retired_k_keep == 1, change: PointChange::RetiredKKeep(20) });
+        pairs.push(SensitivityPair { name: "k_keep_1_to_20", verdict, applies_to: |point| point.retired_kept_generation_count == 1, change: PointChange::RetiredKeptGenerationCount(20) });
     }
     pairs
 }
@@ -1857,11 +1857,11 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
         &|_point| 19,
     );
     let closed_form_points: [(Geometry, u64, u64, bool, u64, RowsWrittenReading, [u64; 3]); 5] = [
-        (Geometry::UnknownTreeFullArms, 2, 1, true, 1, RowsWrittenReading::AllRowsW2, [23, 21, 21]),
-        (Geometry::ImplementationTwoDevices, 4, 3, false, 2, RowsWrittenReading::AllRowsW2, [37, 29, 37]),
-        (Geometry::ImplementationTwoDevices, 4, 3, false, 2, RowsWrittenReading::ThisGenerationRowsW1, [24, 16, 16]),
-        (Geometry::ImplementationTwoDevices, 2, 0, false, 1, RowsWrittenReading::AllRowsW2, [18, 16, 18]),
-        (Geometry::ImplementationTwoDevices, 2, 0, false, 1, RowsWrittenReading::ThisGenerationRowsW1, [17, 15, 15]),
+        (Geometry::UnknownTreeFullArms, 2, 1, true, 1, RowsWrittenReading::AllRowsOfTheVersion, [23, 21, 21]),
+        (Geometry::ImplementationTwoDevices, 4, 3, false, 2, RowsWrittenReading::AllRowsOfTheVersion, [37, 29, 37]),
+        (Geometry::ImplementationTwoDevices, 4, 3, false, 2, RowsWrittenReading::ThisGenerationRowsOnly, [24, 16, 16]),
+        (Geometry::ImplementationTwoDevices, 2, 0, false, 1, RowsWrittenReading::AllRowsOfTheVersion, [18, 16, 18]),
+        (Geometry::ImplementationTwoDevices, 2, 0, false, 1, RowsWrittenReading::ThisGenerationRowsOnly, [17, 15, 15]),
     ];
     for (geometry, head_count, earlier_step_count, initial_publish_changed_the_watermark, statistic_count, rows_written, expected_by_accounting_arm) in closed_form_points {
         for (accounting_policy, expected) in ACCOUNTING_ARMS.into_iter().zip(expected_by_accounting_arm) {
@@ -1869,8 +1869,8 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
                 format!(
                     "closed_form_{}_{}_h_new_{head_count}_s_{earlier_step_count}_lpc_{}_r_tree_dim_{statistic_count}_{}_is_{expected}",
                     match rows_written {
-                        RowsWrittenReading::AllRowsW2 => "w2",
-                        RowsWrittenReading::ThisGenerationRowsW1 => "w1",
+                        RowsWrittenReading::AllRowsOfTheVersion => "w2",
+                        RowsWrittenReading::ThisGenerationRowsOnly => "w1",
                     },
                     geometry.label(),
                     u8::from(initial_publish_changed_the_watermark),
@@ -1886,8 +1886,8 @@ fn anchor_failures(evaluated_points: &[EvaluatedPoint]) -> Vec<(String, u64, u64
                 &move |evaluated| {
                     let cell = evaluated.outcome_under_the_arms(UnknownFlagsPolicy::Skip, accounting_policy);
                     match rows_written {
-                        RowsWrittenReading::AllRowsW2 => cell.rows_written_all_rows,
-                        RowsWrittenReading::ThisGenerationRowsW1 => cell.rows_written_this_generation,
+                        RowsWrittenReading::AllRowsOfTheVersion => cell.rows_written_all_rows,
+                        RowsWrittenReading::ThisGenerationRowsOnly => cell.rows_written_this_generation,
                     }
                 },
                 &move |_point| expected,
@@ -1964,7 +1964,7 @@ impl Consequence {
 /// 一组取样点上 Q1 反向接受条款的判定（被判点数、不进判的 `h_new = 0` 点数、形态、后果、各胜者集合的点数）。
 struct AcceptanceTally {
     judged_points: u64,
-    excluded_points_h_new_0: u64,
+    excluded_points_without_unknown_writable_heads: u64,
     form: AcceptanceForm,
     consequence: Consequence,
     winner_sets: BTreeMap<Vec<AccountingPolicy>, u64>,
@@ -1997,7 +1997,7 @@ fn form_of_the_winner_sets(sets: &BTreeMap<Vec<AccountingPolicy>, u64>) -> (Acce
 
 /// 第二次跑第十节：只判 `h_new > 0` 的点（输入每个点一对：`h_new > 0` 与这个点十五格总胜者里的记账臂集合），`h_new = 0` 的点照数、不进判。
 fn carry_acceptance_of(points: &[(bool, Vec<AccountingPolicy>)]) -> AcceptanceTally {
-    let judged: Vec<&Vec<AccountingPolicy>> = points.iter().filter(|(h_new_positive, _winners)| *h_new_positive).map(|(_h_new_positive, winners)| winners).collect();
+    let judged: Vec<&Vec<AccountingPolicy>> = points.iter().filter(|(has_unknown_writable_heads, _winners)| *has_unknown_writable_heads).map(|(_has_unknown_writable_heads, winners)| winners).collect();
     let mut winner_sets: BTreeMap<Vec<AccountingPolicy>, u64> = BTreeMap::new();
     for winners in &judged {
         *winner_sets.entry((*winners).clone()).or_default() += 1;
@@ -2005,7 +2005,7 @@ fn carry_acceptance_of(points: &[(bool, Vec<AccountingPolicy>)]) -> AcceptanceTa
     let judged_points: u64 = judged.len().try_into().expect("计数装得进 u64");
     let total_points: u64 = points.len().try_into().expect("计数装得进 u64");
     let (form, consequence) = if judged.is_empty() { (AcceptanceForm::NoJudgedPoints, Consequence::NoJudgedPoints) } else { form_of_the_winner_sets(&winner_sets) };
-    AcceptanceTally { judged_points, excluded_points_h_new_0: total_points - judged_points, form, consequence, winner_sets }
+    AcceptanceTally { judged_points, excluded_points_without_unknown_writable_heads: total_points - judged_points, form, consequence, winner_sets }
 }
 
 /// 一个点十五格总胜者里的记账臂（去重、按臂次序）。
@@ -2019,10 +2019,10 @@ fn render_acceptance_line(judgement: Judgement, group: &str, judged: bool, tally
     format!(
         "name=verdict check=q1_carry_acceptance_form judgement={} reading={} group={group} judged={} judged_points={} excluded_points_h_new_0={} form={} consequence={} winner_sets={winner_sets}",
         judgement.label(),
-        JUDGED_READING_Q2_COUNTED.label(),
+        JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED.label(),
         if judged { "yes" } else { "no" },
         tally.judged_points,
-        tally.excluded_points_h_new_0,
+        tally.excluded_points_without_unknown_writable_heads,
         tally.form.label(),
         tally.consequence.label(),
     )
@@ -2037,7 +2037,7 @@ fn acceptance_tallies(evaluated_points: &[EvaluatedPoint]) -> BTreeMap<&'static 
     let mut points_by_group: BTreeMap<String, Vec<(bool, Vec<AccountingPolicy>)>> = BTreeMap::new();
     for evaluated in evaluated_points {
         let point = &evaluated.point;
-        let acceptance_point = (point.unknown_writable_head_count > 0, overall_winner_accounting_arms(&analyse_point(evaluated, JUDGED_READING_Q2_COUNTED)));
+        let acceptance_point = (point.unknown_writable_head_count > 0, overall_winner_accounting_arms(&analyse_point(evaluated, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED)));
         points_by_group.entry(group_of(point)).or_default().push(acceptance_point.clone());
         if point.is_legal_under_todays_step_rows() {
             points_by_group.entry("legal_pooled".to_string()).or_default().push(acceptance_point);
@@ -2050,37 +2050,37 @@ fn acceptance_tallies(evaluated_points: &[EvaluatedPoint]) -> BTreeMap<&'static 
 const EXPECTED_ACCEPTANCE_POINT_COUNTS: [(&str, u64, u64); 3] = [("legal_r_tree_dim_1", 3200, 1600), ("legal_r_tree_dim_2", 3200, 1600), ("legal_pooled", 6400, 3200)];
 
 fn all_readings() -> Vec<Reading> {
-    [JUDGED_READING_Q2_COUNTED, JUDGED_READING_Q2_NOT_COUNTED].into_iter().chain(INCIDENTAL_READINGS).collect()
+    [JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED].into_iter().chain(INCIDENTAL_READINGS).collect()
 }
 
 /// 停机条款第 6 项的格一侧：两种判据下 U5 以外的条款轨迹相同、七位向量除第 6 位外相同、第 6 位之差等于新旧 U5 记数之差（六种读法都比）。
-fn cells_differ_only_in_u5(vacuous: &CellOutcome, dangling: &CellOutcome, point: &SamplePoint) -> bool {
+fn cells_differ_only_in_the_carried_rows_clause(vacuous: &CellOutcome, dangling: &CellOutcome, point: &SamplePoint) -> bool {
     let other_clause_trajectories_agree = vacuous
         .clause_false_trajectories
         .iter()
         .zip(&dangling.clause_false_trajectories)
         .all(|(before, after)| before.0 == after.0 && (before.0 == ClauseUnit::DecisionEightItemTwelveCarriedRows || before.1 == after.1));
-    let u5_count_of = |cell: &CellOutcome| u64::from(u5_false_trajectory_of(cell).is_some_and(|trajectory| trajectory.peak > 0));
-    let (u5_vacuous, u5_dangling) = (u5_count_of(vacuous), u5_count_of(dangling));
+    let carried_rows_clause_count_of = |cell: &CellOutcome| u64::from(carried_rows_clause_false_trajectory_of(cell).is_some_and(|trajectory| trajectory.peak > 0));
+    let (vacuous_carried_rows_clause_count, dangling_carried_rows_clause_count) = (carried_rows_clause_count_of(vacuous), carried_rows_clause_count_of(dangling));
     let vectors_agree = all_readings().into_iter().all(|reading| {
         let before = vector_under(vacuous, point, reading);
         let after = vector_under(dangling, point, reading);
-        [0usize, 1, 2, 3, 4, 6].iter().all(|position| before[*position] == after[*position]) && after[5] + u5_vacuous == before[5] + u5_dangling
+        [0usize, 1, 2, 3, 4, 6].iter().all(|position| before[*position] == after[*position]) && after[5] + vacuous_carried_rows_clause_count == before[5] + dangling_carried_rows_clause_count
     });
     other_clause_trajectories_agree && vectors_agree
 }
 
 /// 停机条款第 6 项的 Q2 一侧：六种读法下，每条记账臂下 flags 臂的比较与十五格总胜者里的 flags 臂集合在两种判据下相同。
-fn q2_judgements_agree(vacuous: &EvaluatedPoint, dangling: &EvaluatedPoint) -> bool {
+fn flags_question_judgements_agree(vacuous: &EvaluatedPoint, dangling: &EvaluatedPoint) -> bool {
     all_readings().into_iter().all(|reading| {
         let before = analyse_point(vacuous, reading);
         let after = analyse_point(dangling, reading);
-        before.q2_by_accounting_arm == after.q2_by_accounting_arm && q2_flags_winners_signature(&before).1 == q2_flags_winners_signature(&after).1
+        before.flags_winners_by_accounting_arm == after.flags_winners_by_accounting_arm && flags_winners_signature(&before).1 == flags_winners_signature(&after).1
     })
 }
 
 /// 停机条款第 7 项：新 U5 照 N（R 里不认识的树的行数）判与照 `h_new > 0` 判，在这一点上一致。
-fn u5_object_count_matches_h_new(point: &SamplePoint) -> bool {
+fn carried_rows_object_count_matches_the_unknown_writable_heads(point: &SamplePoint) -> bool {
     (unknown_tree_row_count_of(&initial_version(point)) > 0) == (point.unknown_writable_head_count > 0)
 }
 
@@ -2110,7 +2110,7 @@ fn add_analysis_to_summaries(summaries: &mut BTreeMap<SummaryKey, PointSetDescri
     let mut add = |kind: &'static str, arm: String, value: String| {
         summaries.entry((kind, reading_label.clone(), group.clone(), arm, value)).or_default().add(point);
     };
-    for arm in &analysis.q1_by_flags_arm {
+    for arm in &analysis.accounting_winners_by_flags_arm {
         let flags = flags_label(arm.flags_policy);
         add("q1_first_separating", flags.to_string(), render_position(arm.first_separating_position));
         add("q1_winners", flags.to_string(), join_labels(&arm.winners, |policy| accounting_label(*policy).to_string()));
@@ -2121,7 +2121,7 @@ fn add_analysis_to_summaries(summaries: &mut BTreeMap<SummaryKey, PointSetDescri
     let overall_accounting_arms: Vec<AccountingPolicy> =
         analysis.overall_winners.iter().map(|(_flags_policy, accounting_policy)| *accounting_policy).collect::<BTreeSet<AccountingPolicy>>().into_iter().collect();
     add("q1_overall_winner_accounting_arms", "all".to_string(), join_labels(&overall_accounting_arms, |policy| accounting_label(*policy).to_string()));
-    for arm in &analysis.q2_by_accounting_arm {
+    for arm in &analysis.flags_winners_by_accounting_arm {
         let accounting = accounting_label(arm.accounting_policy).to_string();
         add("q2_reject_vs_skip_first_separating", accounting.clone(), render_position(arm.reject_entry_versus_skip_first_separating_position));
         add("q2_position_six", accounting.clone(), render_ordering_of_reject_entry_against_skip(arm.position_six_reject_entry_versus_skip).to_string());
@@ -2135,12 +2135,12 @@ fn add_analysis_to_summaries(summaries: &mut BTreeMap<SummaryKey, PointSetDescri
 
 /// 每个分组的 Q2 计数：几个点，几个点上有一条记账臂 `RejectEntry` 对 `Skip` 在第 6 位分得开（两种读法各数），几个点上 flags 胜者随读法换档。
 #[derive(Default)]
-struct Q2GroupTally {
+struct FlagsQuestionGroupTally {
     points: u64,
     separable_points_counted: u64,
     separable_points_not_counted: u64,
     changed_points_judged: u64,
-    changed_points_incidental_b2: u64,
+    changed_points_incidental_counting_the_judged_items: u64,
 }
 
 fn render_verdict_holds(failures: u64) -> &'static str {
@@ -2166,8 +2166,8 @@ fn main() {
     let point_count: u64 = evaluated_points.len().try_into().expect("计数装得进 u64");
     // 不带参数（第一次跑的判据）时配置行一个字不加，产物逐字节等于第一次跑的产物；第二次跑的判据另报这两个字段。
     let judgement_fields = match judgement {
-        Judgement::VacuousU5 => String::new(),
-        Judgement::DanglingU5 => format!(
+        Judgement::VacuousCarriedRowsClause => String::new(),
+        Judgement::DanglingCarriedRowsClause => format!(
             " judgement={} u5_predicate=n_zero_true_n_positive_nothing_written_false_else_every_written_row_at_this_txg acceptance_judged_points=h_new_positive_legal_only",
             judgement.label()
         ),
@@ -2182,17 +2182,17 @@ fn main() {
          vector_positions=blocks_freed_while_referenced,rdonly_violations+dead_revived,rows_lost_tuples,silent,g_gens_minus_writable_gens,clause_units_to_change,rows_written_per_gen \
          trajectory_fields=peak/positive_versions/final_over_r1_to_rg clauses_false=listed_when_peak_is_1_others_are_0/0/0_u13_judged_per_arm \
          step_recognition=watermark_change_history_by_statistic_and_tree{judgement_fields}",
-        JUDGED_READING_Q2_COUNTED.label(),
-        JUDGED_READING_Q2_NOT_COUNTED.label(),
+        JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED.label(),
+        JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED.label(),
         INCIDENTAL_READINGS.iter().map(|reading| reading.label()).collect::<Vec<String>>().join("+"),
     ));
 
     let mut summaries: BTreeMap<SummaryKey, PointSetDescription> = BTreeMap::new();
-    let mut q2_tallies: BTreeMap<String, Q2GroupTally> = BTreeMap::new();
+    let mut flags_question_tallies: BTreeMap<String, FlagsQuestionGroupTally> = BTreeMap::new();
     let mut ranked_cell_count = 0u64;
-    let mut ledger_mismatches_b1 = 0u64;
-    let mut ledger_mismatches_b2 = 0u64;
-    let mut points_where_q1_depends_on_the_q2_reading = 0u64;
+    let mut ledger_mismatches_excluding_the_judged_items = 0u64;
+    let mut ledger_mismatches_counting_the_judged_items = 0u64;
+    let mut points_where_the_accounting_winners_depend_on_the_reject_entry_reading = 0u64;
     let mut non_distinguishing_points_counted = 0u64;
     let mut non_distinguishing_points_not_counted = 0u64;
     let mut analyses: Vec<(PointAnalysis, PointAnalysis)> = Vec::with_capacity(evaluated_points.len());    for (point_index, evaluated) in evaluated_points.iter().enumerate() {
@@ -2201,31 +2201,31 @@ fn main() {
         ranked_cell_count += cell_count;
         for cell in &evaluated.cells {
             writer.line(&render_cell_line(point_index, evaluated, cell));
-            ledger_mismatches_b1 += u64::from(cell.clause_units_b1 != clause_units_from_the_hand_ledger(point, cell.flags_policy, cell.accounting_policy, ClauseReading::ExcludesTheJudgedItemB1, judgement));
-            ledger_mismatches_b2 += u64::from(cell.clause_units_b2 != clause_units_from_the_hand_ledger(point, cell.flags_policy, cell.accounting_policy, ClauseReading::CountsTheJudgedItemB2, judgement));
+            ledger_mismatches_excluding_the_judged_items += u64::from(cell.clause_units_excluding_the_judged_items != clause_units_from_the_hand_ledger(point, cell.flags_policy, cell.accounting_policy, ClauseReading::ExcludesTheJudgedItems, judgement));
+            ledger_mismatches_counting_the_judged_items += u64::from(cell.clause_units_counting_the_judged_items != clause_units_from_the_hand_ledger(point, cell.flags_policy, cell.accounting_policy, ClauseReading::CountsTheJudgedItems, judgement));
         }
-        let counted = analyse_point(evaluated, JUDGED_READING_Q2_COUNTED);
-        let not_counted = analyse_point(evaluated, JUDGED_READING_Q2_NOT_COUNTED);
-        points_where_q1_depends_on_the_q2_reading += u64::from(counted.q1_by_flags_arm != not_counted.q1_by_flags_arm);
+        let counted = analyse_point(evaluated, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
+        let not_counted = analyse_point(evaluated, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED);
+        points_where_the_accounting_winners_depend_on_the_reject_entry_reading += u64::from(counted.accounting_winners_by_flags_arm != not_counted.accounting_winners_by_flags_arm);
         non_distinguishing_points_counted += u64::from(counted.all_fifteen_cells_equal);
         non_distinguishing_points_not_counted += u64::from(not_counted.all_fifteen_cells_equal);
         writer.line(&render_point_verdict_line(point_index, evaluated, &counted, &not_counted));
-        add_analysis_to_summaries(&mut summaries, point, JUDGED_READING_Q2_COUNTED, &counted);
-        add_analysis_to_summaries(&mut summaries, point, JUDGED_READING_Q2_NOT_COUNTED, &not_counted);
+        add_analysis_to_summaries(&mut summaries, point, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED, &counted);
+        add_analysis_to_summaries(&mut summaries, point, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED, &not_counted);
         let incidental_analyses: Vec<PointAnalysis> = INCIDENTAL_READINGS.iter().map(|reading| analyse_point(evaluated, *reading)).collect();
         for (reading, analysis) in INCIDENTAL_READINGS.iter().zip(&incidental_analyses) {
             add_analysis_to_summaries(&mut summaries, point, *reading, analysis);
         }
-        let changed_judged = q2_flags_winners_signature(&counted) != q2_flags_winners_signature(&not_counted);
-        let changed_incidental_b2 = q2_flags_winners_signature(&incidental_analyses[0]) != q2_flags_winners_signature(&incidental_analyses[1]);
+        let changed_judged = flags_winners_signature(&counted) != flags_winners_signature(&not_counted);
+        let changed_incidental_counting_the_judged_items = flags_winners_signature(&incidental_analyses[0]) != flags_winners_signature(&incidental_analyses[1]);
         summaries.entry(("q2_flags_winners_changed", "b1_w2".to_string(), group_of(point), "all".to_string(), u8::from(changed_judged).to_string())).or_default().add(point);
-        summaries.entry(("q2_flags_winners_changed", "b2_w2".to_string(), group_of(point), "all".to_string(), u8::from(changed_incidental_b2).to_string())).or_default().add(point);
-        let tally = q2_tallies.entry(group_of(point)).or_default();
+        summaries.entry(("q2_flags_winners_changed", "b2_w2".to_string(), group_of(point), "all".to_string(), u8::from(changed_incidental_counting_the_judged_items).to_string())).or_default().add(point);
+        let tally = flags_question_tallies.entry(group_of(point)).or_default();
         tally.points += 1;
-        tally.separable_points_counted += u64::from(counted.q2_by_accounting_arm.iter().any(|arm| arm.separable_at_position_six));
-        tally.separable_points_not_counted += u64::from(not_counted.q2_by_accounting_arm.iter().any(|arm| arm.separable_at_position_six));
+        tally.separable_points_counted += u64::from(counted.flags_winners_by_accounting_arm.iter().any(|arm| arm.separable_at_position_six));
+        tally.separable_points_not_counted += u64::from(not_counted.flags_winners_by_accounting_arm.iter().any(|arm| arm.separable_at_position_six));
         tally.changed_points_judged += u64::from(changed_judged);
-        tally.changed_points_incidental_b2 += u64::from(changed_incidental_b2);
+        tally.changed_points_incidental_counting_the_judged_items += u64::from(changed_incidental_counting_the_judged_items);
         analyses.push((counted, not_counted));
     }
 
@@ -2249,7 +2249,7 @@ fn main() {
     writer.line(&format!("name=verdict check=negative_control_no_unknown_heads_no_accounting_effect clauses_judged=b1_only checked={checked} failures={failures} holds={}", render_verdict_holds(failures)));
     let (incidental_checked, carry_item_false, reject_item_false) = evaluated_points
         .iter()
-        .map(negative_control_no_unknown_heads_incidental_b2_clauses)
+        .map(negative_control_no_unknown_heads_incidental_clauses_counting_the_judged_items)
         .fold((0, 0, 0), |sum, part| (sum.0 + part.0, sum.1 + part.1, sum.2 + part.2));
     writer.line(&format!(
         "name=incidental check=negative_control_no_unknown_heads_b2_only_clauses judged=no cells={incidental_checked} u12_false_cells={carry_item_false} u13_false_cells={reject_item_false}"
@@ -2258,44 +2258,44 @@ fn main() {
 
     let index_by_description: BTreeMap<String, usize> = evaluated_points.iter().enumerate().map(|(index, evaluated)| (evaluated.point.describe(), index)).collect();
     let partner_index = |point: &SamplePoint| -> usize { index_by_description[&point.describe()] };
-    let all_readings: Vec<Reading> = [JUDGED_READING_Q2_COUNTED, JUDGED_READING_Q2_NOT_COUNTED].into_iter().chain(INCIDENTAL_READINGS).collect();
-    let mut k_keep_checked = 0u64;
-    let mut k_keep_failures = 0u64;
-    let mut g_gens_checked = 0u64;
-    let mut g_gens_mismatches = 0u64;
+    let all_readings: Vec<Reading> = [JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED].into_iter().chain(INCIDENTAL_READINGS).collect();
+    let mut kept_generation_count_checked = 0u64;
+    let mut kept_generation_count_failures = 0u64;
+    let mut published_generations_checked = 0u64;
+    let mut published_generations_mismatches = 0u64;
     for evaluated in &evaluated_points {
         let point = &evaluated.point;
-        if point.retired_k_keep != K_KEEP_VALUES[0] {
-            let partner = &evaluated_points[partner_index(&point_with(point, PointChange::RetiredKKeep(K_KEEP_VALUES[0])))];
+        if point.retired_kept_generation_count != RETIRED_KEPT_GENERATION_COUNT_VALUES[0] {
+            let partner = &evaluated_points[partner_index(&point_with(point, PointChange::RetiredKeptGenerationCount(RETIRED_KEPT_GENERATION_COUNT_VALUES[0])))];
             for cell in &evaluated.cells {
                 for reading in &all_readings {
-                    k_keep_checked += 1;
-                    k_keep_failures += u64::from(vector_under(cell, point, *reading) != partner.vector(cell.flags_policy, cell.accounting_policy, *reading));
+                    kept_generation_count_checked += 1;
+                    kept_generation_count_failures += u64::from(vector_under(cell, point, *reading) != partner.vector(cell.flags_policy, cell.accounting_policy, *reading));
                 }
             }
         }
         if point.published_generations == 1 {
             let partner = &evaluated_points[partner_index(&point_with(point, PointChange::PublishedGenerations(10)))];
             for flags_policy in FLAGS_ARMS {
-                g_gens_checked += 1;
-                g_gens_mismatches += u64::from(evaluated.outcome_under_the_arms(flags_policy, AccountingPolicy::NoCarry).rows_lost != partner.outcome_under_the_arms(flags_policy, AccountingPolicy::NoCarry).rows_lost);
+                published_generations_checked += 1;
+                published_generations_mismatches += u64::from(evaluated.outcome_under_the_arms(flags_policy, AccountingPolicy::NoCarry).rows_lost != partner.outcome_under_the_arms(flags_policy, AccountingPolicy::NoCarry).rows_lost);
             }
         }
     }
     writer.line(&format!(
-        "name=verdict check=negative_control_k_keep_not_read checked={k_keep_checked} failures={k_keep_failures} holds={}",
-        render_verdict_holds(k_keep_failures)
+        "name=verdict check=negative_control_k_keep_not_read checked={kept_generation_count_checked} failures={kept_generation_count_failures} holds={}",
+        render_verdict_holds(kept_generation_count_failures)
     ));
     writer.line(&format!(
-        "name=verdict check=ledger_two_paths cells={ranked_cell_count} mismatches_b1={ledger_mismatches_b1} mismatches_b2={ledger_mismatches_b2} holds={}",
-        render_verdict_holds(ledger_mismatches_b1 + ledger_mismatches_b2)
+        "name=verdict check=ledger_two_paths cells={ranked_cell_count} mismatches_b1={ledger_mismatches_excluding_the_judged_items} mismatches_b2={ledger_mismatches_counting_the_judged_items} holds={}",
+        render_verdict_holds(ledger_mismatches_excluding_the_judged_items + ledger_mismatches_counting_the_judged_items)
     ));
     for (name, checked, mismatches) in anchor_failures(&evaluated_points) {
         writer.line(&format!("name=verdict check=anchor anchor={name} checked={checked} mismatches={mismatches} holds={}", render_verdict_holds(mismatches)));
     }
     writer.line(&format!(
-        "name=verdict check=anchor anchor=no_carry_rows_lost_same_at_g_gens_1_and_10 checked={g_gens_checked} mismatches={g_gens_mismatches} holds={}",
-        render_verdict_holds(g_gens_mismatches)
+        "name=verdict check=anchor anchor=no_carry_rows_lost_same_at_g_gens_1_and_10 checked={published_generations_checked} mismatches={published_generations_mismatches} holds={}",
+        render_verdict_holds(published_generations_mismatches)
     ));
     writer.line(&format!(
         "name=verdict check=anchor anchor=today_tree_dimension_statistics_is_1 checked=1 mismatches={} holds={}",
@@ -2330,47 +2330,47 @@ fn main() {
     ));
 
     // 第八节判别力自证：弄坏之后还绿的格数（not_turning_red）不为 0，那一位在那一对上没有判别力（第十节）。
-    let mut q2_checked = 0u64;
-    let mut q2_not_turning_red = 0u64;
-    let mut q1_six_checked = 0u64;
-    let mut q1_six_not_turning_red = 0u64;
-    let mut q1_seven_checked = 0u64;
-    let mut q1_dangling_u5_checked = 0u64;
-    let mut q1_dangling_u5_not_turning_red = 0u64;
-    let mut q1_seven_not_turning_red = 0u64;
+    let mut flags_question_checked = 0u64;
+    let mut flags_question_not_turning_red = 0u64;
+    let mut accounting_question_position_six_checked = 0u64;
+    let mut accounting_question_position_six_not_turning_red = 0u64;
+    let mut accounting_question_position_seven_checked = 0u64;
+    let mut accounting_question_dangling_carried_rows_checked = 0u64;
+    let mut accounting_question_dangling_carried_rows_not_turning_red = 0u64;
+    let mut accounting_question_position_seven_not_turning_red = 0u64;
     for evaluated in &evaluated_points {
         let point = &evaluated.point;
         if point.invisible_window_generations == 0 {
             for accounting_policy in ACCOUNTING_ARMS {
-                q2_checked += 1;
-                q2_not_turning_red += u64::from(!q2_self_proof_turns_red(evaluated, accounting_policy));
+                flags_question_checked += 1;
+                flags_question_not_turning_red += u64::from(!flags_question_self_proof_turns_red(evaluated, accounting_policy));
             }
         }
         let acting_flags = FLAGS_ARMS.iter().copied().filter(|flags_policy| accounting_arm_acts_under(*flags_policy, point));
         if point.tree_dimension_statistic_count == 1 && point.unknown_writable_head_count > 0 {
             for flags_policy in acting_flags {
                 if point.unknown_writable_head_count == 2 && !point.initial_publish_changed_the_watermark {
-                    q1_six_checked += 1;
-                    q1_six_not_turning_red += u64::from(!q1_position_six_self_proof_turns_red(evaluated, flags_policy));
+                    accounting_question_position_six_checked += 1;
+                    accounting_question_position_six_not_turning_red += u64::from(!accounting_question_position_six_self_proof_turns_red(evaluated, flags_policy));
                 }
                 if point.initial_publish_changed_the_watermark {
-                    q1_seven_checked += 1;
-                    q1_seven_not_turning_red += u64::from(!q1_position_seven_self_proof_turns_red(evaluated, flags_policy));
+                    accounting_question_position_seven_checked += 1;
+                    accounting_question_position_seven_not_turning_red += u64::from(!accounting_question_position_seven_self_proof_turns_red(evaluated, flags_policy));
                 }
-                if is_a_point_of_the_dangling_u5_self_proof(point) {
-                    q1_dangling_u5_checked += 1;
-                    q1_dangling_u5_not_turning_red += u64::from(!q1_dangling_u5_self_proof_turns_red(evaluated, flags_policy));
+                if is_a_point_of_the_dangling_carried_rows_self_proof(point) {
+                    accounting_question_dangling_carried_rows_checked += 1;
+                    accounting_question_dangling_carried_rows_not_turning_red += u64::from(!accounting_question_dangling_carried_rows_self_proof_turns_red(evaluated, flags_policy));
                 }
             }
         }
     }
     let mut self_proofs = vec![
-        ("self_proof_q2_reject_entry_versus_skip_position_six_where_w_gens_0", q2_checked, q2_not_turning_red),
-        ("self_proof_q1_carry_versus_keep_with_root_position_six_where_h_new_2_lpc_0_r_tree_dim_1", q1_six_checked, q1_six_not_turning_red),
-        ("self_proof_q1_carry_versus_keep_with_root_position_seven_where_h_new_positive_lpc_1_r_tree_dim_1", q1_seven_checked, q1_seven_not_turning_red),
+        ("self_proof_q2_reject_entry_versus_skip_position_six_where_w_gens_0", flags_question_checked, flags_question_not_turning_red),
+        ("self_proof_q1_carry_versus_keep_with_root_position_six_where_h_new_2_lpc_0_r_tree_dim_1", accounting_question_position_six_checked, accounting_question_position_six_not_turning_red),
+        ("self_proof_q1_carry_versus_keep_with_root_position_seven_where_h_new_positive_lpc_1_r_tree_dim_1", accounting_question_position_seven_checked, accounting_question_position_seven_not_turning_red),
     ];
-    if judgement == Judgement::DanglingU5 {
-        self_proofs.push(("self_proof_q1_carry_versus_no_carry_position_six_where_h_new_2_lpc_1_r_tree_dim_1", q1_dangling_u5_checked, q1_dangling_u5_not_turning_red));
+    if judgement == Judgement::DanglingCarriedRowsClause {
+        self_proofs.push(("self_proof_q1_carry_versus_no_carry_position_six_where_h_new_2_lpc_1_r_tree_dim_1", accounting_question_dangling_carried_rows_checked, accounting_question_dangling_carried_rows_not_turning_red));
     }
     for (name, checked, not_turning_red) in self_proofs {
         writer.line(&format!("name=verdict check={name} checked={checked} not_turning_red={not_turning_red} turns_red={}", render_verdict_holds(not_turning_red)));
@@ -2378,7 +2378,7 @@ fn main() {
     writer.line(&format!(
         "name=verdict check=non_distinguishing_points points_all_fifteen_cells_equal_q2_counted={non_distinguishing_points_counted} points_all_fifteen_cells_equal_q2_not_counted={non_distinguishing_points_not_counted}"
     ));
-    writer.line(&format!("name=verdict check=q1_independent_of_q2_reading points_where_q1_differs={points_where_q1_depends_on_the_q2_reading} holds={}", render_verdict_holds(points_where_q1_depends_on_the_q2_reading)));
+    writer.line(&format!("name=verdict check=q1_independent_of_q2_reading points_where_q1_differs={points_where_the_accounting_winners_depend_on_the_reject_entry_reading} holds={}", render_verdict_holds(points_where_the_accounting_winners_depend_on_the_reject_entry_reading)));
 
     // Q1 判定：一个分组、一条 flags 臂下，各点的记账胜者是同一个集合 ⇒ 记这个集合；随点变 ⇒ 依赖取样点（翻转点在 summary 行里按集合列）。
     let mut winner_sets: BTreeMap<(&'static str, String, String, String), Vec<(String, u64)>> = BTreeMap::new();
@@ -2392,7 +2392,7 @@ fn main() {
         let rendered_sets = sets.iter().map(|(set, count)| format!("{set}:{count}")).collect::<Vec<String>>().join("|");
         writer.line(&format!("name=verdict check={kind} reading={reading_label} group={group} arm={arm} distinct_winner_sets={} judgement={judgement} winner_sets={rendered_sets}", sets.len()));
     }
-    for (group, tally) in &q2_tallies {
+    for (group, tally) in &flags_question_tallies {
         writer.line(&format!(
             "name=verdict check=q2_reject_entry_versus_skip group={group} points={} separable_points_q2_counted={} separable_points_q2_not_counted={} \
              flags_winners_changed_points_b1_w2={} flags_winners_changed_points_b2_w2={} judgement_b1_w2={}",
@@ -2400,7 +2400,7 @@ fn main() {
             tally.separable_points_counted,
             tally.separable_points_not_counted,
             tally.changed_points_judged,
-            tally.changed_points_incidental_b2,
+            tally.changed_points_incidental_counting_the_judged_items,
             if tally.changed_points_judged > 0 { "changes_tier" } else { "same_tier" }
         ));
     }
@@ -2416,14 +2416,14 @@ fn main() {
             let own_analyses = &analyses[index];
             pair_count += 1;
             let differs = match pair.verdict {
-                SensitivityVerdict::Q1AccountingWinners => q1_winners_signature(&own_analyses.0) != q1_winners_signature(&partner_analyses.0),
-                SensitivityVerdict::Q2FlagsWinnersAndRejectEntryVersusSkip => {
+                SensitivityVerdict::AccountingWinners => accounting_winners_signature(&own_analyses.0) != accounting_winners_signature(&partner_analyses.0),
+                SensitivityVerdict::FlagsWinnersAndRejectEntryVersusSkip => {
                     let signature = |analyses: &(PointAnalysis, PointAnalysis)| {
                         (
-                            q2_flags_winners_signature(&analyses.0),
-                            q2_flags_winners_signature(&analyses.1),
-                            analyses.0.q2_by_accounting_arm.iter().map(|arm| (arm.position_six_reject_entry_versus_skip, arm.separable_at_position_six)).collect::<Vec<_>>(),
-                            analyses.1.q2_by_accounting_arm.iter().map(|arm| (arm.position_six_reject_entry_versus_skip, arm.separable_at_position_six)).collect::<Vec<_>>(),
+                            flags_winners_signature(&analyses.0),
+                            flags_winners_signature(&analyses.1),
+                            analyses.0.flags_winners_by_accounting_arm.iter().map(|arm| (arm.position_six_reject_entry_versus_skip, arm.separable_at_position_six)).collect::<Vec<_>>(),
+                            analyses.1.flags_winners_by_accounting_arm.iter().map(|arm| (arm.position_six_reject_entry_versus_skip, arm.separable_at_position_six)).collect::<Vec<_>>(),
                         )
                     };
                     signature(own_analyses) != signature(partner_analyses)
@@ -2434,8 +2434,8 @@ fn main() {
             }
         }
         let verdict_label = match pair.verdict {
-            SensitivityVerdict::Q1AccountingWinners => "q1_accounting_winners",
-            SensitivityVerdict::Q2FlagsWinnersAndRejectEntryVersusSkip => "q2_flags_winners_and_reject_entry_versus_skip",
+            SensitivityVerdict::AccountingWinners => "q1_accounting_winners",
+            SensitivityVerdict::FlagsWinnersAndRejectEntryVersusSkip => "q2_flags_winners_and_reject_entry_versus_skip",
         };
         let judgement = if flipped.point_count > 0 { "depends_on_point" } else { "two_points_same" };
         writer.line(&format!(
@@ -2444,7 +2444,7 @@ fn main() {
             flipped.render("flipped_")
         ));
     }
-    if judgement == Judgement::DanglingU5 {
+    if judgement == Judgement::DanglingCarriedRowsClause {
         // 第二次跑第六节「加一个量」：判 ㊀ 只看 `legal_pooled` 那一行，两个 `r_tree_dim` 分组照报；E113 口径两组单报、标不判。
         let tallies_by_group = acceptance_tallies(&evaluated_points);
         for (group, judged) in ACCEPTANCE_GROUPS {
@@ -2454,7 +2454,7 @@ fn main() {
             .iter()
             .map(|(group, judged_points, excluded_points)| {
                 let tally = &tallies_by_group[group];
-                u64::from(tally.judged_points != *judged_points || tally.excluded_points_h_new_0 != *excluded_points || tally.form == AcceptanceForm::NoJudgedPoints)
+                u64::from(tally.judged_points != *judged_points || tally.excluded_points_without_unknown_writable_heads != *excluded_points || tally.form == AcceptanceForm::NoJudgedPoints)
             })
             .sum();
         writer.line(&format!(
@@ -2466,26 +2466,26 @@ fn main() {
         // 停机条款第 6 项：两种判据逐（点, 格）比，U5 以外一格都不许不同；Q2 判定一点都不许不同。
         let mut cells_compared = 0u64;
         let mut cell_mismatches = 0u64;
-        let mut q2_mismatches = 0u64;
+        let mut flags_question_mismatches = 0u64;
         for evaluated in &evaluated_points {
-            let vacuous = evaluate_point(evaluated.point, Judgement::VacuousU5);
+            let vacuous = evaluate_point(evaluated.point, Judgement::VacuousCarriedRowsClause);
             for (dangling_cell, vacuous_cell) in evaluated.cells.iter().zip(&vacuous.cells) {
                 cells_compared += 1;
-                cell_mismatches += u64::from(!cells_differ_only_in_u5(vacuous_cell, dangling_cell, &evaluated.point));
+                cell_mismatches += u64::from(!cells_differ_only_in_the_carried_rows_clause(vacuous_cell, dangling_cell, &evaluated.point));
             }
-            q2_mismatches += u64::from(!q2_judgements_agree(&vacuous, evaluated));
+            flags_question_mismatches += u64::from(!flags_question_judgements_agree(&vacuous, evaluated));
         }
         writer.line(&format!(
             "name=verdict check=judgements_differ_only_in_u5 cells={cells_compared} mismatches={cell_mismatches} holds={}",
             render_verdict_holds(cell_mismatches)
         ));
         writer.line(&format!(
-            "name=verdict check=judgements_q2_identical points={point_count} mismatches={q2_mismatches} holds={}",
-            render_verdict_holds(q2_mismatches)
+            "name=verdict check=judgements_q2_identical points={point_count} mismatches={flags_question_mismatches} holds={}",
+            render_verdict_holds(flags_question_mismatches)
         ));
 
         // 停机条款第 7 项：新 U5 照 N 判与照 `h_new > 0` 判在每个点上一致。
-        let object_mismatches: u64 = evaluated_points.iter().map(|evaluated| u64::from(!u5_object_count_matches_h_new(&evaluated.point))).sum();
+        let object_mismatches: u64 = evaluated_points.iter().map(|evaluated| u64::from(!carried_rows_object_count_matches_the_unknown_writable_heads(&evaluated.point))).sum();
         writer.line(&format!(
             "name=verdict check=u5_object_count_matches_h_new points={point_count} mismatches={object_mismatches} holds={}",
             render_verdict_holds(object_mismatches)
@@ -2501,7 +2501,7 @@ mod tests {
     fn point_at(geometry: Geometry, unknown_writable_head_count: u64, earlier_step_count: u64, initial_publish_changed_the_watermark: bool, tree_dimension_statistic_count: u64) -> SamplePoint {
         SamplePoint {
             geometry,
-            retired_k_keep: 4,
+            retired_kept_generation_count: 4,
             invisible_window_generations: 3,
             unknown_writable_head_count,
             trees_with_registered_bit: 0,
@@ -2535,8 +2535,8 @@ mod tests {
         static VACUOUS: std::sync::OnceLock<Vec<EvaluatedPoint>> = std::sync::OnceLock::new();
         static DANGLING: std::sync::OnceLock<Vec<EvaluatedPoint>> = std::sync::OnceLock::new();
         let slot = match judgement {
-            Judgement::VacuousU5 => &VACUOUS,
-            Judgement::DanglingU5 => &DANGLING,
+            Judgement::VacuousCarriedRowsClause => &VACUOUS,
+            Judgement::DanglingCarriedRowsClause => &DANGLING,
         };
         slot.get_or_init(|| all_sample_points().into_iter().map(|point| super::evaluate_point(point, judgement)).collect())
     }
@@ -2579,15 +2579,15 @@ mod tests {
     fn reject_entry_counted_semantics_adds_exactly_one_clause_unit_and_skip_gets_none() {
         let evaluated = evaluate_point(point_at(Geometry::ImplementationTwoDevices, 2, 1, false, 1));
         for accounting_policy in ACCOUNTING_ARMS {
-            let counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_Q2_COUNTED);
-            let not_counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_Q2_NOT_COUNTED);
+            let counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED);
+            let not_counted = evaluated.vector(UnknownFlagsPolicy::RejectEntry, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED);
             assert_eq!(counted[5], not_counted[5] + 1);
             assert_eq!(
-                evaluated.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_Q2_COUNTED),
-                evaluated.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_Q2_NOT_COUNTED)
+                evaluated.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED),
+                evaluated.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED)
             );
         }
-        assert_eq!(evaluated.vector(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::Carry, JUDGED_READING_Q2_COUNTED)[5], 1);
+        assert_eq!(evaluated.vector(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::Carry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED)[5], 1);
     }
 
     #[test]
@@ -2597,8 +2597,8 @@ mod tests {
             assert_eq!(cell.writable_generations, 0);
             assert_eq!(cell.rows_lost, 0);
             assert_eq!(cell.rows_written_all_rows, 0);
-            assert_eq!(cell.clause_units_b1, 0);
-            assert_eq!(cell.clause_units_b2, 1, "U13 按臂判：只读挂载不是「该条目 EIO」");
+            assert_eq!(cell.clause_units_excluding_the_judged_items, 0);
+            assert_eq!(cell.clause_units_counting_the_judged_items, 1, "U13 按臂判：只读挂载不是「该条目 EIO」");
         }
     }
 
@@ -2609,7 +2609,7 @@ mod tests {
             point.trees_with_registered_bit = trees_with_registered_bit;
             let evaluated = evaluate_point(point);
             for accounting_policy in ACCOUNTING_ARMS {
-                for reading in [JUDGED_READING_Q2_COUNTED, JUDGED_READING_Q2_NOT_COUNTED] {
+                for reading in [JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED] {
                     assert_eq!(evaluated.vector(UnknownFlagsPolicy::PerBit, accounting_policy, reading), evaluated.vector(reduces_to, accounting_policy, reading));
                 }
             }
@@ -2617,14 +2617,14 @@ mod tests {
     }
 
     #[test]
-    fn no_carry_loses_the_second_statistic_tuple_at_the_first_publish_whatever_k_keep_says() {
-        for retired_k_keep in [1u64, 20] {
+    fn no_carry_loses_the_second_statistic_tuple_at_the_first_publish_whatever_the_kept_generation_count_says() {
+        for retired_kept_generation_count in [1u64, 20] {
             for published_generations in [1u64, 10] {
                 let mut point = point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 2);
-                point.retired_k_keep = retired_k_keep;
+                point.retired_kept_generation_count = retired_kept_generation_count;
                 point.published_generations = published_generations;
                 let cell = cell_at(point, UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry);
-                assert_eq!(cell.rows_lost, 2, "k_keep = {retired_k_keep}, G = {published_generations}：两个不认识的头各丢第二个统计量那一元组");
+                assert_eq!(cell.rows_lost, 2, "k_keep = {retired_kept_generation_count}, G = {published_generations}：两个不认识的头各丢第二个统计量那一元组");
                 assert_eq!(cell.silent_harm_count, 1, "第二个统计量的元组丢失没有不变量盖");
             }
         }
@@ -2634,18 +2634,18 @@ mod tests {
     fn no_carry_keeps_the_watermark_tuple_through_its_step_rows() {
         let cell = cell_at(point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1), UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry);
         assert_eq!(cell.rows_lost, 0);
-        assert_eq!(cell.clause_units_b1, 0);
+        assert_eq!(cell.clause_units_excluding_the_judged_items, 0);
         assert_eq!(cell.rows_dropped_over_all_generations, 2, "行数口径：R 那一行（不是台阶）在 R_1 里没了，两个头各一行");
     }
 
     #[test]
     fn keep_with_root_breaks_six_clauses_when_the_initial_row_is_not_a_step_and_none_when_it_is() {
         let not_a_step = cell_at(point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1), UnknownFlagsPolicy::Skip, AccountingPolicy::KeepWithRoot);
-        assert_eq!(not_a_step.clause_units_b1, 6, "U1 U2 U3 U4 U6 U7");
+        assert_eq!(not_a_step.clause_units_excluding_the_judged_items, 6, "U1 U2 U3 U4 U6 U7");
         let is_a_step = cell_at(point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 1), UnknownFlagsPolicy::Skip, AccountingPolicy::KeepWithRoot);
-        assert_eq!(is_a_step.clause_units_b1, 0);
+        assert_eq!(is_a_step.clause_units_excluding_the_judged_items, 0);
         let second_statistic = cell_at(point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 2), UnknownFlagsPolicy::Skip, AccountingPolicy::KeepWithRoot);
-        assert_eq!(second_statistic.clause_units_b1, 4, "U1 U3 U6 U7");
+        assert_eq!(second_statistic.clause_units_excluding_the_judged_items, 4, "U1 U3 U6 U7");
         assert_eq!(not_a_step.trajectory_unknown_rows_at_the_initial_txg, Some(Trajectory { peak: 2, positive_versions: 10, final_value: 2 }));
     }
 
@@ -2654,16 +2654,16 @@ mod tests {
         for (earlier_step_count, initial_publish_changed_the_watermark) in STEP_HISTORY_VALUES {
             for statistic_count in [1u64, 2] {
                 let cell = cell_at(point_at(Geometry::ImplementationTwoDevices, 2, earlier_step_count, initial_publish_changed_the_watermark, statistic_count), UnknownFlagsPolicy::Skip, AccountingPolicy::Carry);
-                assert_eq!(cell.clause_units_b1, 0, "s = {earlier_step_count}, lpc = {initial_publish_changed_the_watermark}, r = {statistic_count}");
+                assert_eq!(cell.clause_units_excluding_the_judged_items, 0, "s = {earlier_step_count}, lpc = {initial_publish_changed_the_watermark}, r = {statistic_count}");
                 assert_eq!(cell.rows_lost, 0);
             }
         }
     }
 
     #[test]
-    fn no_carry_without_any_step_loses_the_unknown_heads_watermark_rows_under_i911() {
+    fn no_carry_without_any_step_loses_the_unknown_heads_watermark_rows_under_the_watermark_row_invariant() {
         let cell = cell_at(point_at(Geometry::UnknownTreeFullArms, 2, 0, false, 1), UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry);
-        assert_eq!(cell.clause_units_b1, 1, "U8");
+        assert_eq!(cell.clause_units_excluding_the_judged_items, 1, "U8");
         assert_eq!(cell.rows_lost, 2);
         assert_eq!(cell.silent_harm_count, 0, "水位元组丢失有 I-9.11 盖");
     }
@@ -2691,22 +2691,22 @@ mod tests {
     }
 
     #[test]
-    fn w1_ranking_puts_carry_ahead_of_keep_with_root_on_clause_units_despite_more_rows() {
+    fn this_generation_rows_ranking_puts_carry_ahead_of_keep_with_root_on_clause_units_despite_more_rows() {
         let evaluated = evaluate_point(point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1));
-        let w1_reading = INCIDENTAL_READINGS[2];
-        assert_eq!(w1_reading.rows_written, RowsWrittenReading::ThisGenerationRowsW1);
-        let carry = evaluated.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry, w1_reading);
-        let keep_with_root = evaluated.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::KeepWithRoot, w1_reading);
+        let this_generation_rows_reading = INCIDENTAL_READINGS[2];
+        assert_eq!(this_generation_rows_reading.rows_written, RowsWrittenReading::ThisGenerationRowsOnly);
+        let carry = evaluated.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry, this_generation_rows_reading);
+        let keep_with_root = evaluated.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::KeepWithRoot, this_generation_rows_reading);
         assert_eq!(carry, [192, 0, 0, 0, 0, 0, 19]);
         assert_eq!(keep_with_root, [192, 0, 0, 0, 0, 6, 17]);
         assert!(carry < keep_with_root);
     }
 
     #[test]
-    fn w2_ranking_puts_carry_ahead_of_keep_with_root_when_the_second_statistic_is_not_a_step() {
+    fn all_rows_ranking_puts_carry_ahead_of_keep_with_root_when_the_second_statistic_is_not_a_step() {
         let evaluated = evaluate_point(point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 2));
-        let carry = evaluated.vector(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::Carry, JUDGED_READING_Q2_NOT_COUNTED);
-        let keep_with_root = evaluated.vector(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::KeepWithRoot, JUDGED_READING_Q2_NOT_COUNTED);
+        let carry = evaluated.vector(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::Carry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED);
+        let keep_with_root = evaluated.vector(UnknownFlagsPolicy::RejectEntry, AccountingPolicy::KeepWithRoot, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED);
         // 自己那些行 11 + 6 × 2 = 23；Carry 每头 s + lpc + r = 4 行，随根留着每头 s + r = 3 行。
         assert_eq!(carry, [0, 0, 0, 0, 0, 0, 23 + 2 * 4]);
         assert_eq!(keep_with_root, [0, 0, 0, 0, 0, 4, 23 + 2 * 3]);
@@ -2729,7 +2729,7 @@ mod tests {
     #[test]
     fn checker_syntax_counts_the_second_statistic_but_skips_the_kept_watermark_row() {
         let cell = cell_at(point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 2), UnknownFlagsPolicy::Skip, AccountingPolicy::KeepWithRoot);
-        assert_eq!(cell.trajectory_i313_syntactic_violations, Some(Trajectory { peak: 2, positive_versions: 10, final_value: 2 }));
+        assert_eq!(cell.trajectory_row_generation_invariant_syntactic_violations, Some(Trajectory { peak: 2, positive_versions: 10, final_value: 2 }));
     }
 
     #[test]
@@ -2749,12 +2749,12 @@ mod tests {
 
     #[test]
     fn device_predicates_and_the_hand_ledger_agree_on_every_cell_under_both_readings() {
-        for judgement in [Judgement::VacuousU5, Judgement::DanglingU5] {
+        for judgement in [Judgement::VacuousCarriedRowsClause, Judgement::DanglingCarriedRowsClause] {
             let mut compared = 0u64;
             for evaluated in all_evaluated_points_under(judgement) {
                 for cell in &evaluated.cells {
-                    assert_eq!(cell.clause_units_b1, clause_units_from_the_hand_ledger(&evaluated.point, cell.flags_policy, cell.accounting_policy, ClauseReading::ExcludesTheJudgedItemB1, judgement), "{judgement:?} {:?} {cell:?}", evaluated.point);
-                    assert_eq!(cell.clause_units_b2, clause_units_from_the_hand_ledger(&evaluated.point, cell.flags_policy, cell.accounting_policy, ClauseReading::CountsTheJudgedItemB2, judgement), "{judgement:?} {:?} {cell:?}", evaluated.point);
+                    assert_eq!(cell.clause_units_excluding_the_judged_items, clause_units_from_the_hand_ledger(&evaluated.point, cell.flags_policy, cell.accounting_policy, ClauseReading::ExcludesTheJudgedItems, judgement), "{judgement:?} {:?} {cell:?}", evaluated.point);
+                    assert_eq!(cell.clause_units_counting_the_judged_items, clause_units_from_the_hand_ledger(&evaluated.point, cell.flags_policy, cell.accounting_policy, ClauseReading::CountsTheJudgedItems, judgement), "{judgement:?} {:?} {cell:?}", evaluated.point);
                     compared += 1;
                 }
             }
@@ -2771,12 +2771,12 @@ mod tests {
     }
 
     #[test]
-    fn k_keep_is_not_read_by_the_model() {
-        for point in all_sample_points().into_iter().filter(|point| point.retired_k_keep == 20 && point.invisible_window_generations == 3) {
+    fn kept_generation_count_is_not_read_by_the_model() {
+        for point in all_sample_points().into_iter().filter(|point| point.retired_kept_generation_count == 20 && point.invisible_window_generations == 3) {
             let with_largest = evaluate_point(point);
-            let with_smallest = evaluate_point(point_with(&point, PointChange::RetiredKKeep(1)));
+            let with_smallest = evaluate_point(point_with(&point, PointChange::RetiredKeptGenerationCount(1)));
             for cell in &with_largest.cells {
-                for reading in [JUDGED_READING_Q2_COUNTED, JUDGED_READING_Q2_NOT_COUNTED] {
+                for reading in [JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED, JUDGED_READING_REJECT_ENTRY_SEMANTICS_NOT_COUNTED] {
                     assert_eq!(vector_under(cell, &point, reading), with_smallest.vector(cell.flags_policy, cell.accounting_policy, reading), "{point:?}");
                 }
             }
@@ -2789,13 +2789,13 @@ mod tests {
         no_window.invisible_window_generations = 0;
         let evaluated = evaluate_point(no_window);
         for accounting_policy in ACCOUNTING_ARMS {
-            assert!(q2_self_proof_turns_red(&evaluated, accounting_policy));
+            assert!(flags_question_self_proof_turns_red(&evaluated, accounting_policy));
         }
-        assert!(q1_position_six_self_proof_turns_red(&evaluated, UnknownFlagsPolicy::Skip));
+        assert!(accounting_question_position_six_self_proof_turns_red(&evaluated, UnknownFlagsPolicy::Skip));
         let initial_is_a_step = evaluate_point(point_at(Geometry::ImplementationTwoDevices, 2, 1, true, 1));
-        assert!(q1_position_seven_self_proof_turns_red(&initial_is_a_step, UnknownFlagsPolicy::RejectEntry));
+        assert!(accounting_question_position_seven_self_proof_turns_red(&initial_is_a_step, UnknownFlagsPolicy::RejectEntry));
         // 记账臂没有作用点的格（只读挂载）七位全平，弄坏也不变：自证在那里不成立，只在记账臂起作用的格上查。
-        assert!(!q1_position_six_self_proof_turns_red(&evaluated, UnknownFlagsPolicy::ReadOnly));
+        assert!(!accounting_question_position_six_self_proof_turns_red(&evaluated, UnknownFlagsPolicy::ReadOnly));
     }
 
     #[test]
@@ -2809,8 +2809,8 @@ mod tests {
 
     // ---- 第二次跑（`dangling-u5`）的单测：登记第二次跑第七、八、九、十一节 ----
 
-    fn u5_false_units(cell: &CellOutcome) -> u64 {
-        u64::from(u5_false_trajectory_of(cell).is_some_and(|trajectory| trajectory.peak > 0))
+    fn carried_rows_clause_false_units(cell: &CellOutcome) -> u64 {
+        u64::from(carried_rows_clause_false_trajectory_of(cell).is_some_and(|trajectory| trajectory.peak > 0))
     }
 
     fn arguments_of(parts: &[&str]) -> Vec<String> {
@@ -2819,19 +2819,19 @@ mod tests {
 
     #[test]
     fn the_default_judgement_is_the_first_runs_and_the_parameter_picks_either() {
-        assert_eq!(DEFAULT_JUDGEMENT, Judgement::VacuousU5);
-        assert_eq!(Judgement::from_arguments(&[]), Ok(Judgement::VacuousU5));
-        assert_eq!(Judgement::from_arguments(&arguments_of(&["--judgement", "vacuous-u5"])), Ok(Judgement::VacuousU5));
-        assert_eq!(Judgement::from_arguments(&arguments_of(&["--judgement", "dangling-u5"])), Ok(Judgement::DanglingU5));
+        assert_eq!(DEFAULT_JUDGEMENT, Judgement::VacuousCarriedRowsClause);
+        assert_eq!(Judgement::from_arguments(&[]), Ok(Judgement::VacuousCarriedRowsClause));
+        assert_eq!(Judgement::from_arguments(&arguments_of(&["--judgement", "vacuous-u5"])), Ok(Judgement::VacuousCarriedRowsClause));
+        assert_eq!(Judgement::from_arguments(&arguments_of(&["--judgement", "dangling-u5"])), Ok(Judgement::DanglingCarriedRowsClause));
         assert!(Judgement::from_arguments(&arguments_of(&["--judgement", "other"])).is_err());
         assert!(Judgement::from_arguments(&arguments_of(&["--judgement"])).is_err());
         assert!(Judgement::from_arguments(&arguments_of(&["dangling-u5"])).is_err());
-        assert_eq!(Judgement::VacuousU5.label(), "vacuous-u5");
-        assert_eq!(Judgement::DanglingU5.label(), "dangling-u5");
+        assert_eq!(Judgement::VacuousCarriedRowsClause.label(), "vacuous-u5");
+        assert_eq!(Judgement::DanglingCarriedRowsClause.label(), "dangling-u5");
     }
 
     #[test]
-    fn dangling_u5_on_the_registered_point_counts_zero_one_one_across_the_accounting_arms() {
+    fn dangling_carried_rows_clause_on_the_registered_point_counts_zero_one_one_across_the_accounting_arms() {
         let point = point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1);
         let never_false = Trajectory { peak: 0, positive_versions: 0, final_value: 0 };
         let false_in_every_version = Trajectory { peak: 1, positive_versions: 10, final_value: 1 };
@@ -2841,75 +2841,75 @@ mod tests {
             (AccountingPolicy::NoCarry, 1, false_in_every_version, 1),
             (AccountingPolicy::KeepWithRoot, 1, false_in_every_version, 7),
         ];
-        let dangling = super::evaluate_point(point, Judgement::DanglingU5);
-        for (accounting_policy, expected_u5, expected_trajectory, expected_position_six) in expectations {
-            let cell = cell_at_under(point, UnknownFlagsPolicy::Skip, accounting_policy, Judgement::DanglingU5);
-            assert_eq!(u5_false_units(&cell), expected_u5, "{accounting_policy:?}");
-            assert_eq!(u5_false_trajectory_of(&cell), Some(expected_trajectory), "{accounting_policy:?}");
-            assert_eq!(dangling.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_Q2_COUNTED)[5], expected_position_six, "{accounting_policy:?}");
+        let dangling = super::evaluate_point(point, Judgement::DanglingCarriedRowsClause);
+        for (accounting_policy, expected_carried_rows_clause_units, expected_trajectory, expected_position_six) in expectations {
+            let cell = cell_at_under(point, UnknownFlagsPolicy::Skip, accounting_policy, Judgement::DanglingCarriedRowsClause);
+            assert_eq!(carried_rows_clause_false_units(&cell), expected_carried_rows_clause_units, "{accounting_policy:?}");
+            assert_eq!(carried_rows_clause_false_trajectory_of(&cell), Some(expected_trajectory), "{accounting_policy:?}");
+            assert_eq!(dangling.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED)[5], expected_position_six, "{accounting_policy:?}");
             // 第一次跑的判据下三条臂的 U5 都是 0；新判据比它多的正是 U5（写加法）。
-            let vacuous_cell = cell_at_under(point, UnknownFlagsPolicy::Skip, accounting_policy, Judgement::VacuousU5);
-            assert_eq!(u5_false_units(&vacuous_cell), 0, "{accounting_policy:?}");
-            assert_eq!(cell.clause_units_b1, vacuous_cell.clause_units_b1 + expected_u5, "{accounting_policy:?}");
+            let vacuous_cell = cell_at_under(point, UnknownFlagsPolicy::Skip, accounting_policy, Judgement::VacuousCarriedRowsClause);
+            assert_eq!(carried_rows_clause_false_units(&vacuous_cell), 0, "{accounting_policy:?}");
+            assert_eq!(cell.clause_units_excluding_the_judged_items, vacuous_cell.clause_units_excluding_the_judged_items + expected_carried_rows_clause_units, "{accounting_policy:?}");
         }
     }
 
     #[test]
-    fn dangling_u5_counts_nothing_where_the_accounting_arm_does_not_act_or_there_is_no_unknown_head() {
+    fn dangling_carried_rows_clause_counts_nothing_where_the_accounting_arm_does_not_act_or_there_is_no_unknown_head() {
         let point = point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1);
         for flags_policy in [UnknownFlagsPolicy::Ignore, UnknownFlagsPolicy::ReadOnly] {
             for accounting_policy in ACCOUNTING_ARMS {
-                let cell = cell_at_under(point, flags_policy, accounting_policy, Judgement::DanglingU5);
-                assert_eq!(u5_false_units(&cell), 0, "{flags_policy:?} {accounting_policy:?}");
+                let cell = cell_at_under(point, flags_policy, accounting_policy, Judgement::DanglingCarriedRowsClause);
+                assert_eq!(carried_rows_clause_false_units(&cell), 0, "{flags_policy:?} {accounting_policy:?}");
             }
         }
         let without_unknown_head = point_at(Geometry::UnknownTreeFullArms, 0, 1, false, 1);
         for accounting_policy in ACCOUNTING_ARMS {
-            let cell = cell_at_under(without_unknown_head, UnknownFlagsPolicy::Skip, accounting_policy, Judgement::DanglingU5);
-            assert_eq!(u5_false_units(&cell), 0, "{accounting_policy:?}");
-            assert_eq!(u5_false_trajectory_of(&cell), Some(Trajectory { peak: 0, positive_versions: 0, final_value: 0 }), "{accounting_policy:?}");
+            let cell = cell_at_under(without_unknown_head, UnknownFlagsPolicy::Skip, accounting_policy, Judgement::DanglingCarriedRowsClause);
+            assert_eq!(carried_rows_clause_false_units(&cell), 0, "{accounting_policy:?}");
+            assert_eq!(carried_rows_clause_false_trajectory_of(&cell), Some(Trajectory { peak: 0, positive_versions: 0, final_value: 0 }), "{accounting_policy:?}");
         }
     }
 
     #[test]
-    fn dangling_u5_ledger_columns_follow_the_registered_second_run_table() {
+    fn dangling_carried_rows_clause_ledger_columns_follow_the_registered_second_run_table() {
         // (几何点: h_new, s, lpc, r_tree_dim)，三条记账臂的 B1 第 6 位（Skip 下）：登记第七节「另三格钉账本别的列」。
         let columns = [((2u64, 1u64, true, 1u64), [0u64, 1, 1]), ((2, 0, false, 1), [0, 2, 7]), ((2, 1, true, 2), [0, 1, 5])];
         for ((head_count, earlier_step_count, lpc, statistic_count), expected) in columns {
-            let evaluated = super::evaluate_point(point_at(Geometry::UnknownTreeFullArms, head_count, earlier_step_count, lpc, statistic_count), Judgement::DanglingU5);
+            let evaluated = super::evaluate_point(point_at(Geometry::UnknownTreeFullArms, head_count, earlier_step_count, lpc, statistic_count), Judgement::DanglingCarriedRowsClause);
             for (accounting_policy, expected_position_six) in ACCOUNTING_ARMS.into_iter().zip(expected) {
-                assert_eq!(evaluated.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_Q2_COUNTED)[5], expected_position_six, "{head_count} {earlier_step_count} {lpc} {statistic_count} {accounting_policy:?}");
+                assert_eq!(evaluated.vector(UnknownFlagsPolicy::Skip, accounting_policy, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED)[5], expected_position_six, "{head_count} {earlier_step_count} {lpc} {statistic_count} {accounting_policy:?}");
             }
         }
     }
 
     #[test]
-    fn dangling_u5_self_proof_turns_red_where_the_vacuous_reading_cannot_tell_carry_from_no_carry() {
+    fn dangling_carried_rows_clause_self_proof_turns_red_where_the_vacuous_reading_cannot_tell_carry_from_no_carry() {
         let point = point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 1);
-        assert!(is_a_point_of_the_dangling_u5_self_proof(&point));
-        let dangling = super::evaluate_point(point, Judgement::DanglingU5);
+        assert!(is_a_point_of_the_dangling_carried_rows_self_proof(&point));
+        let dangling = super::evaluate_point(point, Judgement::DanglingCarriedRowsClause);
         for flags_policy in [UnknownFlagsPolicy::Skip, UnknownFlagsPolicy::RejectEntry] {
-            assert!(q1_dangling_u5_self_proof_turns_red(&dangling, flags_policy), "{flags_policy:?}");
+            assert!(accounting_question_dangling_carried_rows_self_proof_turns_red(&dangling, flags_policy), "{flags_policy:?}");
         }
         // 记账臂没有作用点的格（只读挂载）七位全平，弄坏也不变：自证只在记账臂起作用的格上查。
-        assert!(!q1_dangling_u5_self_proof_turns_red(&dangling, UnknownFlagsPolicy::ReadOnly));
+        assert!(!accounting_question_dangling_carried_rows_self_proof_turns_red(&dangling, UnknownFlagsPolicy::ReadOnly));
         // 第一次跑的判据下 Carry 与 NoCarry 在这一点第 6 位相等（第一次跑判据错在这里），这条自证在那里本来就红不起来。
-        let vacuous = super::evaluate_point(point, Judgement::VacuousU5);
+        let vacuous = super::evaluate_point(point, Judgement::VacuousCarriedRowsClause);
         assert_eq!(
-            vacuous.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry, JUDGED_READING_Q2_COUNTED)[5],
-            vacuous.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry, JUDGED_READING_Q2_COUNTED)[5]
+            vacuous.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::Carry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED)[5],
+            vacuous.vector(UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry, JUDGED_READING_REJECT_ENTRY_SEMANTICS_COUNTED)[5]
         );
-        assert!(!q1_dangling_u5_self_proof_turns_red(&vacuous, UnknownFlagsPolicy::Skip));
-        assert!(!is_a_point_of_the_dangling_u5_self_proof(&point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1)));
-        assert!(!is_a_point_of_the_dangling_u5_self_proof(&point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 2)));
+        assert!(!accounting_question_dangling_carried_rows_self_proof_turns_red(&vacuous, UnknownFlagsPolicy::Skip));
+        assert!(!is_a_point_of_the_dangling_carried_rows_self_proof(&point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1)));
+        assert!(!is_a_point_of_the_dangling_carried_rows_self_proof(&point_at(Geometry::UnknownTreeFullArms, 2, 1, true, 2)));
     }
 
     #[test]
-    fn positive_and_negative_controls_hold_on_every_point_under_dangling_u5() {
-        let evaluated_points = all_evaluated_points_under(Judgement::DanglingU5);
-        let controls = positive_controls_of(Judgement::DanglingU5);
+    fn positive_and_negative_controls_hold_on_every_point_under_the_dangling_carried_rows_clause() {
+        let evaluated_points = all_evaluated_points_under(Judgement::DanglingCarriedRowsClause);
+        let controls = positive_controls_of(Judgement::DanglingCarriedRowsClause);
         assert_eq!(controls.len(), POSITIVE_CONTROLS.len() + 3);
-        assert_eq!(positive_controls_of(Judgement::VacuousU5), POSITIVE_CONTROLS.to_vec());
+        assert_eq!(positive_controls_of(Judgement::VacuousCarriedRowsClause), POSITIVE_CONTROLS.to_vec());
         for control in controls {
             let (checked, failures) = evaluated_points.iter().map(|evaluated| positive_control_failures(evaluated, control)).fold((0, 0), |sum, part| (sum.0 + part.0, sum.1 + part.1));
             assert!(checked > 0, "{control:?} 一格都没查");
@@ -2923,18 +2923,18 @@ mod tests {
     }
 
     #[test]
-    fn the_new_u5_controls_fail_on_the_first_runs_cells() {
+    fn the_new_carried_rows_clause_controls_fail_on_the_first_runs_cells() {
         // 判别力：新 U5 的阳性对照在第一次跑的判据算出的格上必须红，否则这三条对照分不出两种判据。
-        let vacuous_points = all_evaluated_points_under(Judgement::VacuousU5);
-        for control in DANGLING_U5_POSITIVE_CONTROLS {
+        let vacuous_points = all_evaluated_points_under(Judgement::VacuousCarriedRowsClause);
+        for control in DANGLING_CARRIED_ROWS_POSITIVE_CONTROLS {
             let failures: u64 = vacuous_points.iter().map(|evaluated| positive_control_failures(evaluated, control).1).sum();
-            let expected_to_fail = control != PositiveControl::DanglingU5CarryHolds;
+            let expected_to_fail = control != PositiveControl::DanglingCarriedRowsCarryHolds;
             assert_eq!(failures > 0, expected_to_fail, "{control:?}");
         }
     }
 
-    fn pt(h_new_positive: bool, winners: &[AccountingPolicy]) -> (bool, Vec<AccountingPolicy>) {
-        (h_new_positive, winners.to_vec())
+    fn pt(has_unknown_writable_heads: bool, winners: &[AccountingPolicy]) -> (bool, Vec<AccountingPolicy>) {
+        (has_unknown_writable_heads, winners.to_vec())
     }
 
     #[test]
@@ -2961,73 +2961,73 @@ mod tests {
     fn points_with_no_unknown_writable_head_are_reported_but_not_judged() {
         use AccountingPolicy::{Carry, KeepWithRoot, NoCarry};
         let tally = carry_acceptance_of(&[pt(true, &[Carry]), pt(false, &[Carry, NoCarry, KeepWithRoot]), pt(true, &[Carry]), pt(false, &[Carry, NoCarry, KeepWithRoot])]);
-        assert_eq!((tally.judged_points, tally.excluded_points_h_new_0), (2, 2));
+        assert_eq!((tally.judged_points, tally.excluded_points_without_unknown_writable_heads), (2, 2));
         assert_eq!((tally.form, tally.consequence), (AcceptanceForm::UniqueCarry, Consequence::CarryStands));
         assert_eq!(tally.winner_sets.len(), 1);
-        assert_eq!(render_acceptance_line(Judgement::DanglingU5, "legal_pooled", true, &tally),
+        assert_eq!(render_acceptance_line(Judgement::DanglingCarriedRowsClause, "legal_pooled", true, &tally),
             "name=verdict check=q1_carry_acceptance_form judgement=dangling-u5 reading=b1_w2_q2_counted group=legal_pooled judged=yes judged_points=2 excluded_points_h_new_0=2 form=unique_carry consequence=carry_stands winner_sets=Carry:2");
     }
 
     #[test]
     fn judged_and_excluded_point_counts_match_the_registered_anchors() {
-        let tallies = acceptance_tallies(all_evaluated_points_under(Judgement::DanglingU5));
+        let tallies = acceptance_tallies(all_evaluated_points_under(Judgement::DanglingCarriedRowsClause));
         for (group, judged_points, excluded_points) in EXPECTED_ACCEPTANCE_POINT_COUNTS {
-            assert_eq!((tallies[group].judged_points, tallies[group].excluded_points_h_new_0), (judged_points, excluded_points), "{group}");
+            assert_eq!((tallies[group].judged_points, tallies[group].excluded_points_without_unknown_writable_heads), (judged_points, excluded_points), "{group}");
         }
         assert_eq!(EXPECTED_ACCEPTANCE_POINT_COUNTS.map(|(_, judged_points, _)| judged_points), [3200, 3200, 6400]);
         // 命令独立数出来的 E113 口径点数 1920 与全部点数（登记第七节乙类）。
         let e113_style = all_sample_points().iter().filter(|point| !point.is_legal_under_todays_step_rows()).count();
         assert_eq!(e113_style, 1920);
-        assert_eq!(tallies["e113_style_r_tree_dim_1"].judged_points + tallies["e113_style_r_tree_dim_1"].excluded_points_h_new_0, 960);
-        assert_eq!(tallies["e113_style_r_tree_dim_2"].judged_points + tallies["e113_style_r_tree_dim_2"].excluded_points_h_new_0, 960);
+        assert_eq!(tallies["e113_style_r_tree_dim_1"].judged_points + tallies["e113_style_r_tree_dim_1"].excluded_points_without_unknown_writable_heads, 960);
+        assert_eq!(tallies["e113_style_r_tree_dim_2"].judged_points + tallies["e113_style_r_tree_dim_2"].excluded_points_without_unknown_writable_heads, 960);
     }
 
     #[test]
-    fn the_two_judgements_differ_only_in_u5_on_every_point_and_cell() {
-        let vacuous = all_evaluated_points_under(Judgement::VacuousU5);
-        let dangling = all_evaluated_points_under(Judgement::DanglingU5);
+    fn the_two_judgements_differ_only_in_the_carried_rows_clause_on_every_point_and_cell() {
+        let vacuous = all_evaluated_points_under(Judgement::VacuousCarriedRowsClause);
+        let dangling = all_evaluated_points_under(Judgement::DanglingCarriedRowsClause);
         assert_eq!(vacuous.len(), dangling.len());
         let mut cells_compared = 0u64;
-        let mut cells_where_u5_differs = 0u64;
+        let mut cells_where_the_carried_rows_clause_differs = 0u64;
         for (before, after) in vacuous.iter().zip(dangling) {
             assert_eq!(before.point, after.point);
             for (vacuous_cell, dangling_cell) in before.cells.iter().zip(&after.cells) {
                 cells_compared += 1;
-                cells_where_u5_differs += u64::from(u5_false_units(vacuous_cell) != u5_false_units(dangling_cell));
-                assert!(cells_differ_only_in_u5(vacuous_cell, dangling_cell, &after.point), "{:?} {:?} {:?}", after.point, dangling_cell.flags_policy, dangling_cell.accounting_policy);
+                cells_where_the_carried_rows_clause_differs += u64::from(carried_rows_clause_false_units(vacuous_cell) != carried_rows_clause_false_units(dangling_cell));
+                assert!(cells_differ_only_in_the_carried_rows_clause(vacuous_cell, dangling_cell, &after.point), "{:?} {:?} {:?}", after.point, dangling_cell.flags_policy, dangling_cell.accounting_policy);
             }
-            assert!(q2_judgements_agree(before, after), "{:?}", after.point);
+            assert!(flags_question_judgements_agree(before, after), "{:?}", after.point);
         }
         assert_eq!(cells_compared, EXPECTED_POINT_COUNT * CELLS_PER_POINT);
-        assert!(cells_where_u5_differs > 0, "两种判据真的不同，这条对拍才有分辨力");
+        assert!(cells_where_the_carried_rows_clause_differs > 0, "两种判据真的不同，这条对拍才有分辨力");
     }
 
     #[test]
-    fn the_judgement_comparison_turns_red_when_something_other_than_u5_moves() {
+    fn the_judgement_comparison_turns_red_when_something_other_than_the_carried_rows_clause_moves() {
         let point = point_at(Geometry::UnknownTreeFullArms, 2, 1, false, 1);
-        let vacuous = cell_at_under(point, UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry, Judgement::VacuousU5);
-        let dangling = cell_at_under(point, UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry, Judgement::DanglingU5);
-        assert!(cells_differ_only_in_u5(&vacuous, &dangling, &point));
+        let vacuous = cell_at_under(point, UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry, Judgement::VacuousCarriedRowsClause);
+        let dangling = cell_at_under(point, UnknownFlagsPolicy::Skip, AccountingPolicy::NoCarry, Judgement::DanglingCarriedRowsClause);
+        assert!(cells_differ_only_in_the_carried_rows_clause(&vacuous, &dangling, &point));
         let mut wrongly_freed = dangling.clone();
         wrongly_freed.blocks_freed_while_referenced += 1;
-        assert!(!cells_differ_only_in_u5(&vacuous, &wrongly_freed, &point));
+        assert!(!cells_differ_only_in_the_carried_rows_clause(&vacuous, &wrongly_freed, &point));
         let mut extra_clause_unit = dangling.clone();
-        extra_clause_unit.clause_units_b1 += 1;
-        assert!(!cells_differ_only_in_u5(&vacuous, &extra_clause_unit, &point));
+        extra_clause_unit.clause_units_excluding_the_judged_items += 1;
+        assert!(!cells_differ_only_in_the_carried_rows_clause(&vacuous, &extra_clause_unit, &point));
         let mut other_clause_moved = dangling.clone();
         for (clause, trajectory) in &mut other_clause_moved.clause_false_trajectories {
             if *clause == ClauseUnit::DecisionSixteenItemNineRewriteEachPublish {
                 *trajectory = Some(Trajectory { peak: 1, positive_versions: 1, final_value: 1 });
             }
         }
-        assert!(!cells_differ_only_in_u5(&vacuous, &other_clause_moved, &point));
+        assert!(!cells_differ_only_in_the_carried_rows_clause(&vacuous, &other_clause_moved, &point));
     }
 
     #[test]
-    fn u5_object_count_equals_h_new_positive_on_every_point() {
+    fn carried_rows_object_count_equals_unknown_writable_heads_positive_on_every_point() {
         let mut checked = 0u64;
         for point in all_sample_points() {
-            assert!(u5_object_count_matches_h_new(&point), "{point:?}");
+            assert!(carried_rows_object_count_matches_the_unknown_writable_heads(&point), "{point:?}");
             checked += 1;
         }
         assert_eq!(checked, EXPECTED_POINT_COUNT);

@@ -23,12 +23,14 @@
 #   bash scripts/experiment-apparatus/e185-r2-segment-run.sh wall-clock --disk-model <型号>        第一段
 #   bash scripts/experiment-apparatus/e185-r2-segment-run.sh stage-split --disk-model <型号>       第二段
 #   段名可以写几个（照写的次序跑），--disk-model 写在最后
-#   bash scripts/experiment-apparatus/e185-r2-segment-run.sh --selftest    自证：点盘那两格（假 findmnt、假 lsblk 放在 PATH 最前面）与复用那六格（假 cargo、假装置），不编、不跑真装置；
+#   bash scripts/experiment-apparatus/e185-r2-segment-run.sh --selftest    自证：点盘那两格（假 findmnt、假 lsblk 放在 PATH 最前面）、装置内存预算那一格（临时目录里的多机配置）与复用那六格（假 cargo、假装置），不编、不跑真装置；
 #     判定写进临时 prune-server：只在临时服务底下跑（long_run_item_verdicts.py selftest-service，即客户端 selftest_service_problem；不在就退 2、一格都不跑），起法：
 #     python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e185-r2-segment-run.sh --selftest
 # 弄坏开关（只在 --selftest 起的那几趟里认：自证设 E185_R2_SELFTEST_MARK 指到它建的标记文件，别处设了退 2）。逐项写开关名、弄坏哪一处，下一行起写打开后红的格（自证打「✗ e185-r2 自证：<格名>（…）」）：
 #   E185_R2_BREAK=disk-unchecked  点盘不比型号、一律算在那块盘上
 #       「e185-r2 自证：点到的盘这一台没有：退 78、点名型号与出路」
+#   E185_R2_BREAK=memory-by-task-cap  不把 E185_MEMORY_CAP 设成这一台能给的内存（装置取本进程 cgroup 的 memory.max）
+#       「e185-r2 自证：装置内存预算取这一台能给的内存、不取服务给的上限」
 #   E185_R2_BREAK=reuse-ignored  库里判绿的项也照起装置现判（不认 plan 答的 reuse）
 #       「reuse-three-questions」「key-independent-of-directory」「reuse-sentinel」「forced-still-reused-red」
 #   E185_R2_BREAK=finish-ignored  不认 long_run_item_verdicts.py finish 的退出码（复用哨兵红、键中途变了照退 0）
@@ -42,7 +44,9 @@
 # 环境：E185_PRODUCT_DIRECTORY（产物目录，默认 research/results）、E185_IMAGE_DIRECTORY（真盘臂的镜像目录，默认 <MULTI_HOST_RUN_PEER_SCRATCH>/e185-images：
 #   派到第二台时 multi-host-run.sh 给的第二台本地这一趟的目录，不在 NFS 上、不在开机清空的目录里，跑完连目录删；没有这个变量取 ${CARGO_TARGET_DIR:-target}/e185-images）、E185_RUN_DATE。
 #   镜像目录要落在 --disk-model 点名的那块盘上（上面「点盘」）。
-# 上限：装置的内存预算不设 E185_MEMORY_CAP：装置取本进程 cgroup 的 memory.max（任务服务给的上限），读不到才取装置自己的缺省（memory_cap_given）；外层不套内存包装（额度由任务服务给）；线程不设，装置取登记值 .claude/heavy-thread-default。
+# 上限：装置的内存预算 E185_MEMORY_CAP 没设时，本脚本（e185_r2_settle_memory_cap）把它设成这一台能给的内存（多机配置 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项，scripts/hosts/task_memory.py 的 host_slice_cap_bytes），
+#   装置照它定准备队列同时开几份，不取本进程 cgroup 的 memory.max（任务服务给的额度，不是这一台能给多少）；调用方设了 E185_MEMORY_CAP 照它；这一台那一项取不到就不设，
+#   装置取它自己的缺省（memory_cap_given：本进程 cgroup 的 memory.max，读不到取缺省）；外层不套内存包装；线程不设，装置取登记值 .claude/heavy-thread-default。
 # 退出码：0 跑完；1 有项判红而装置退 0（末行不齐）、复用哨兵红或键在跑的中途变了；2 段名认不出、没写 --disk-model、弄坏开关设在自证之外；75 prune-server 不可用；
 #   78 点到的盘这一台没有（上面「点盘」）；别的照 cargo 与装置自己的退出码（装置退 3 是停机条款，见登记第十一节；几项里头一个退非 0 的那一个）。
 set -euo pipefail
@@ -71,6 +75,36 @@ disk_check() {
   echo "✗ 点到的盘这一台没有：要型号「$wanted」的盘，镜像目录 $directory 所在设备往上各层的型号是「${models%|}」（没读到算空）：这一趟一步都没编、没跑（退 78，运行条件不满足）"
   echo "→ 怎么办：在有那块盘的那一台跑（同一条命令重交，派哪台由服务定；这一台没有就会再退 78），或把 E185_IMAGE_DIRECTORY 指到那块盘上的目录；不换一块盘量"
   return 78
+}
+
+# 装置的内存预算（文件头「上限」）：<仓根>。E185_MEMORY_CAP 没设就设成这一台能给的内存（<仓根>/scripts/hosts/task_memory.py 的 host_slice_cap_bytes），
+# 装置不再取本进程 cgroup 的 memory.max；这一台那一项取不到（多机配置不在、没写、<仓根> 里没有 task_memory.py）不设。说明写进 memory_cap_note（输入清单里打）。
+# 弄坏开关 memory-by-task-cap：不设
+e185_r2_settle_memory_cap() {
+  local reading host_cap host_text
+  if [[ -n "${E185_MEMORY_CAP:-}" ]]; then
+    memory_cap_note="E185_MEMORY_CAP=$E185_MEMORY_CAP（调用方给的）"
+    return 0
+  fi
+  reading=$(python3 -c 'import os, sys
+sys.dont_write_bytecode = True
+try:
+    sys.path.insert(0, os.path.join(sys.argv[1], "scripts", "hosts"))
+    import task_memory
+    cap, text = task_memory.host_slice_cap_bytes(os.environ)
+except Exception as error:
+    cap, text = None, "%s：%s" % (type(error).__name__, error)
+print("%s\t%s" % (cap if cap is not None else "-", " ".join(text.split())))' "$1") || reading=$'-\tpython3 起不来'
+  host_cap=${reading%%$'\t'*}
+  host_text=${reading#*$'\t'}
+  if [[ "$host_cap" == - ]]; then
+    memory_cap_note="E185_MEMORY_CAP 没设（这一台能给的内存取不到：$host_text），装置取本进程 cgroup 的 memory.max（任务服务给的额度），读不到取装置自己的缺省"
+  elif e185_r2_break_is memory-by-task-cap; then
+    memory_cap_note="弄坏开关 memory-by-task-cap：E185_MEMORY_CAP 不设，装置取本进程 cgroup 的 memory.max"
+  else
+    export E185_MEMORY_CAP=$host_cap
+    memory_cap_note="E185_MEMORY_CAP=$host_cap（这一台能给的内存：$host_text），装置不取本进程 cgroup 的 memory.max"
+  fi
 }
 
 items_of_segment() { # <段>：这一段的项（装置的一次起法一项）
@@ -106,7 +140,7 @@ library_failure_exit() { # <哪一步> <退出码>
 }
 
 selftest() {
-  local work exit_code failures=0 reuse_output reuse_red real_root="$PWD"
+  local work exit_code failures=0 reuse_output reuse_red real_root="$PWD" memory_given memory_absent memory_kept
   python3 "$real_root/$ITEM_VERDICTS" selftest-service || return 2
   work=$(mktemp -d "${TMPDIR:-/tmp}/e185-r2-selftest.XXXXXX")
   trap 'rm -rf -- "$work"' RETURN
@@ -129,6 +163,25 @@ selftest() {
   else
     echo "  ✗ e185-r2 自证：点到的盘这一台没有：退 78、点名型号与出路（退 $exit_code：$(cat "$work/mismatch.out")）"; failures=$((failures + 1))  # gate-lint:detail
   fi
+  # 装置内存预算那一格（文件头「上限」）：多机配置（HOSTS 写 127.0.0.1 与一个文档用的假地址）里这一台那一项 50G、假地址那一项 1G，服务交 4000M：装置收到 50G 的字节数；
+  # 多机配置不在：不设；调用方已设 E185_MEMORY_CAP：照留
+  printf '%s\n' "HOSTS=127.0.0.1 192.0.2.70" \
+    "CARGO_BIN_DIRECTORY_BY_HOST=127.0.0.1=/selftest/this-cargo 192.0.2.70=/selftest/other-cargo" \
+    "BUILD_ROOT_BY_HOST=127.0.0.1=/selftest/this-builds 192.0.2.70=/selftest/other-builds" \
+    "SLICE_MEMORY_CAP_BY_HOST=127.0.0.1=50G 192.0.2.70=1G" \
+    "QUIESCE_STOP_COMMAND=" "QUIESCE_STOPPED_CHECK_COMMAND=" "QUIESCE_START_COMMAND=" "QUIESCE_STARTED_CHECK_COMMAND=" \
+    "ENABLE_ACROSS_MACHINES=0" "ENABLE_GPU=0" "NFS_SHARED_ROOTS=$work" > "$work/multi-host.env"
+  memory_given=$(unset E185_MEMORY_CAP; export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" TASK_SERVER_MEMORY_CAP_BYTES=4194304000
+    e185_r2_settle_memory_cap "$real_root"; echo "${E185_MEMORY_CAP:-unset}")
+  memory_absent=$(unset E185_MEMORY_CAP; export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env.absent" TASK_SERVER_MEMORY_CAP_BYTES=4194304000
+    e185_r2_settle_memory_cap "$real_root"; echo "${E185_MEMORY_CAP:-unset}")
+  memory_kept=$(export E185_MEMORY_CAP=3G SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env"
+    e185_r2_settle_memory_cap "$real_root"; echo "${E185_MEMORY_CAP:-unset}")
+  if [[ "$memory_given" == 53687091200 && "$memory_absent" == unset && "$memory_kept" == 3G ]]; then
+    echo "  ✓ e185-r2 自证：装置内存预算取这一台能给的内存、不取服务给的上限"
+  else
+    echo "  ✗ e185-r2 自证：装置内存预算取这一台能给的内存、不取服务给的上限（这一台 50G、服务交 4000M 应当得到 53687091200，实际 $memory_given；多机配置不在应当不设，实际 $memory_absent；调用方给了 3G 应当照留，实际 $memory_kept）"; failures=$((failures + 1))  # gate-lint:detail
+  fi
   # 复用那六格（long_run_item_verdicts.py 文件头「复用格」）：样板树是本脚本的拷贝，crates、Cargo.lock、.claude、long_run_item_verdicts.py 是指回真仓的符号链接（输入清单 sha256 那几份照读）
   mkdir -p "$work/template/scripts/experiment-apparatus"
   cp -- "$SCRIPT_PATH" "$work/template/$SCRIPT_KEY"
@@ -142,7 +195,7 @@ selftest() {
   echo "$reuse_output"
   reuse_red=$(sed -n 's/^long_run_item_verdicts 复用格.*：6 格，红 \([0-9]*\) 格$/\1/p' <<< "$reuse_output")
   if [[ -z "$reuse_red" ]]; then failures=$((failures + 6)); echo "  ✗ e185-r2 自证：复用那六格没跑完（没有「long_run_item_verdicts 复用格」那一行），按六格红算"; else failures=$((failures + reuse_red)); fi
-  echo "e185-r2-segment-run.sh 自证：8 格里 $failures 格红"
+  echo "e185-r2-segment-run.sh 自证：9 格里 $failures 格红"
   (( failures == 0 )) || echo "  → 怎么办：照上面 ✗ 那一格括号里的输出看 disk_check 的判法与假 lsblk 的样子，复用那几格看 long_run_item_verdicts.py 打的条件"
   (( failures == 0 ))
 }
@@ -188,6 +241,7 @@ mkdir -p "$product_directory" "$image_directory"
 disk_exit=0; disk_check "$image_directory" "$disk_model" || disk_exit=$?
 (( disk_exit == 0 )) || exit "$disk_exit"
 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"
+e185_r2_settle_memory_cap "$PWD"
 
 for segment in "${segments[@]}"; do
   {
@@ -204,7 +258,7 @@ for segment in "${segments[@]}"; do
     echo "镜像目录所在文件系统：$(findmnt -no FSTYPE --target "$image_directory")"
     echo "nproc $(nproc)"
     echo "getconf CLK_TCK $(getconf CLK_TCK)"
-    echo "上限：外层不套内存包装（额度由任务服务给）；装置内存预算：E185_MEMORY_CAP=${E185_MEMORY_CAP:-没设，装置取本进程 cgroup 的 memory.max（任务服务给的上限）}"
+    echo "上限：外层不套内存包装（额度由任务服务给）；装置内存预算：$memory_cap_note"
     echo "E185_REGISTERED_APPARATUS_SHA256=$registered_apparatus_sha256"
   } > "$product_directory/e185-r2-inputs-$segment-$run_date.txt" 2>&1
 done

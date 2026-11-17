@@ -14,7 +14,7 @@
 #   binary_identity_build <bin 名>[,<bin 名>…] <cargo build 的参数…>   起 cargo build <参数…> --message-format=json-render-diagnostics（编译的诊断照旧打到标准错误），
 #                                                从 cargo 报的 compiler-artifact 行里逐个取这几个 bin 的 executable，照给的次序放进 BUILT_BINARIES、头一个另放进 BUILT_BINARY：
 #                                                这一趟实际编出来的那几份（一条 cargo 编几个 bin 的，名字逗号隔开一起给）。
-#                                                编译目录由 task-server 给、经 CARGO_TARGET_DIR 交下来，不往仓根 target/ 编（.claude/main-agent.md「一轮怎么开、怎么收」）；
+#                                                编译目录由 task-server 给、经 CARGO_TARGET_DIR 交下来，不往仓根 target/ 编（.claude/skills/dispatch/SKILL.md「一轮怎么开、怎么收」第 11 条）；
 #                                                仓根 target/ 下那一份可能是早先编的旧二进制，不拼那条路径。cargo 退非 0 返回 1；编过了却有一个 bin 报不出 executable
 #                                                返回 2、打原因与出路（两种 BUILT_BINARY 都是空串、BUILT_BINARIES 是空数组）
 # gate-similar: scripts/hosts/compile-then-swap.py 它管「编译放在另一个目录、编完整份换上」，不管长跑脚本开跑后装置在不在变；scripts/hosts/source-stamp.py 它给源码树记指纹，不给二进制记；没有已有的库管长跑里装置是哪一版

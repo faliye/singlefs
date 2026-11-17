@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 量的是此刻这台机器的显卡，上一次量到的数不替这一次作保
 # run-condition: check python3 -c 'import sys, torch; sys.exit(0 if torch.cuda.is_available() else 1)' :: 装好带 CUDA 的 torch，并确认显卡在、驱动起得来（nvidia-smi 能列出卡）
+# task-server-card-lease: on-demand
 """E21 的**计算段上界**：显存内的带宽受限算子能跑多快。
 
 不需要 nvcc：scrub / EC / 压缩的内层循环都是**带宽受限**的，
@@ -13,6 +14,10 @@
   * **阳性对照**：显存内算子必须远快于「含传输的同一个算子」。
     测不出这个差别 ⇒ 计时没有判别力（多半是没同步），整轮作废。
   * N=5 取中位，先跑一轮丢弃。
+
+按需领卡（文件头 `task-server-card-lease: on-demand`；领还卡的逻辑与退出码在同目录 e21_card_lease.py 文件头）：整条经 task-server/task submit 交，服务起跑不分卡；
+上卡这一段在子进程里跑，只看得到领到的那一张（torch 里序号 0），跑完、出错、被打断都还卡。没有领卡通道退 78，领卡没成退 1、不写产物。自证是
+e21-card-lease-selftest.py（假客户端、假 torch，不起真卡）。
 """
 import sys, time, statistics, torch
 import os as preflight_os, sys as preflight_sys  # noqa: E402
@@ -21,15 +26,16 @@ preflight_sys.dont_write_bytecode = True
 preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
 from project_preflight import preflight  # noqa: E402
 preflight(__file__)
+import e21_card_lease  # noqa: E402
 
-DEV, MIB, ROUNDS = 0, 1024, 5
+DEV, MIB, ROUNDS = e21_card_lease.VISIBLE_DEVICE_INDEX, 1024, 5
 
 def timed(fn):
     torch.cuda.synchronize(DEV); t0 = time.perf_counter()
     fn(); torch.cuda.synchronize(DEV)
     return time.perf_counter() - t0
 
-def main():
+def main(_card):
     if not torch.cuda.is_available():
         sys.stderr.write("e21: 没有 CUDA —— 这不是「为 0」，是没测\n"); sys.exit(2)
     free, _ = torch.cuda.mem_get_info(DEV)
@@ -65,4 +71,4 @@ def main():
         sys.stderr.write(f"e21: 阳性对照失败——含传输只比纯计算慢 {ratio:.1f}×（要求 >3），"
                          "多半是没同步，整轮作废\n"); sys.exit(4)
 
-main()
+sys.exit(e21_card_lease.run_on_leased_card(main))

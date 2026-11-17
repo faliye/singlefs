@@ -100,6 +100,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../hosts/heavy-threads.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 source "$(dirname "${BASH_SOURCE[0]}")/long-run-lib/binary-identity.sh"
+# clip_text <字节数>：标准输入每行取前 <字节数> 个字节，再丢掉被切在中间的半个字符，输出总是合法的 UTF-8（GNU 的 cut -c 与 cut -b 都按字节切，三个字节的汉字会被切断；给人看的失败行与日志摘录用它截）
+clip_text() { cut -b "1-$1" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null; }
 SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 cd "$(dirname "$0")/../.." || { echo "  ✗ 进不去仓根" >&2; echo "     → 怎么办：本脚本得留在仓里的 scripts/experiment-apparatus/ 下（它按自己的位置找仓根）；挪走了就放回去再起" >&2; exit 2; }
 
@@ -599,11 +601,11 @@ run_segment() {
   if [[ -n "$SHARE" && "$seg" == keys-* && "$seg" != keys-fixed ]]; then
     # shard 那一步只算了一半流：这份输出不是整档的块键清单，不写完成记录（整档的清单由不分片的那一趟沿用块键文件时打出）。
     mv -- "$out_tmp" "$WORK_DIRECTORY/logs/$seg.share-${SHARE%/*}-of-${SHARE#*/}.out" || return 1
-    echo "件 $seg（这一份 $SHARE）：块键算完（$seconds 秒；$(tail -n 1 -- "$WORK_DIRECTORY/logs/$seg.share-${SHARE%/*}-of-${SHARE#*/}.out" | cut -c1-200)）"
+    echo "件 $seg（这一份 $SHARE）：块键算完（$seconds 秒；$(tail -n 1 -- "$WORK_DIRECTORY/logs/$seg.share-${SHARE%/*}-of-${SHARE#*/}.out" | clip_text 200)）"
     return 0
   fi
   store_segment_result "$seg" "$out_tmp" "$seconds" || return 1
-  echo "件 $seg：做完（$seconds 秒；$(tail -n 1 -- "$(segment_output_path "$seg")" | cut -c1-200)）"
+  echo "件 $seg：做完（$seconds 秒；$(tail -n 1 -- "$(segment_output_path "$seg")" | clip_text 200)）"
   return 0
 }
 

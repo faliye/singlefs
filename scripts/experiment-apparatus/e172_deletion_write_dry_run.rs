@@ -248,7 +248,7 @@ fn read_u32(bytes: &[u8], offset: usize) -> u64 {
     read_little_endian(bytes, offset, 4)
 }
 
-fn read_u48(bytes: &[u8], offset: usize) -> u64 {
+fn read_unsigned_48_bit(bytes: &[u8], offset: usize) -> u64 {
     read_little_endian(bytes, offset, 6)
 }
 
@@ -547,7 +547,7 @@ struct LocationEntry {
 fn location_at(bytes: &[u8], offset: usize) -> LocationEntry {
     LocationEntry {
         device: u32::try_from(read_u32(bytes, offset)).expect("4 字节装得进 u32"),
-        slot: read_u48(bytes, offset + 4),
+        slot: read_unsigned_48_bit(bytes, offset + 4),
         checksum: read_u32(bytes, offset + 10),
     }
 }
@@ -852,7 +852,7 @@ fn decode_journal_record(bytes: &[u8], coverage: &mut CoverageMap, failures: &mu
     }
     JournalRecord {
         instance: read_u32(bytes, 16),
-        counter: read_u48(bytes, 20),
+        counter: read_unsigned_48_bit(bytes, 20),
         txg: read_u64(bytes, 26),
         watermark: read_u64(bytes, 271),
     }
@@ -1120,7 +1120,7 @@ fn tree_of_region(region: &DecodedRegion) -> u64 {
 /// 分配记录树 key = (设备 4, 槽号 6)（layout/01 第 297 行）：key 区间起点的设备段与按位置序号（第 298 行）。
 fn allocation_position_of(node: &IndexNode) -> (u64, u64) {
     let device = read_u32(&node.key_range_low, 0);
-    let start_slot = read_u48(&node.key_range_low, 4);
+    let start_slot = read_unsigned_48_bit(&node.key_range_low, 4);
     let position = match node.level {
         0 => start_slot / ALLOCATION_LEAF_SLOTS,
         _ => start_slot / ALLOCATION_LEVEL_ONE_SLOTS,
@@ -2406,7 +2406,7 @@ fn segment_row_of(history_name: &str, segment: &SegmentAnalysis, before: &Versio
 
 /// 分配记录：key (设备 4, 槽号 6)、value (跨度段 2，最高位是已释放标志, 分配代或释放代 8)（layout/01 第 297 行）。
 fn allocation_records_of(node: &IndexNode) -> BTreeMap<(u64, u64), (u64, u64)> {
-    node.entries.iter().map(|entry| ((read_u32(entry, 0), read_u48(entry, 4)), (read_u16(entry, 10), read_u64(entry, 12)))).collect()
+    node.entries.iter().map(|entry| ((read_u32(entry, 0), read_unsigned_48_bit(entry, 4)), (read_u16(entry, 10), read_u64(entry, 12)))).collect()
 }
 
 const ALLOCATION_SPAN_RELEASED_FLAG: u64 = 0x8000;
@@ -3848,13 +3848,13 @@ fn leaf_branch_check(judgements: &[HistoryJudgement]) -> (String, bool) {
         .map(|judgement| judgement.name.as_str())
         .collect();
     second_branch_histories.sort_unstable();
-    let is_exactly_h3 = second_branch_histories == ["h3"];
+    let is_exactly_the_record_two_kept_history = second_branch_histories == ["h3"];
     (
         format!(
-            "name=l03_7_branch_check second_branch_histories={} exactly_h3={is_exactly_h3}",
+            "name=l03_7_branch_check second_branch_histories={} exactly_h3={is_exactly_the_record_two_kept_history}",
             if second_branch_histories.is_empty() { "none".to_string() } else { second_branch_histories.join(",") }
         ),
-        is_exactly_h3,
+        is_exactly_the_record_two_kept_history,
     )
 }
 
@@ -4094,9 +4094,9 @@ fn row_four_and_five_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
     lines.push(format!("name=verdict row=4 pairs_with_unique_roles={pairs_with_unique_roles} unique_units_without_basis={without_basis}"));
     // R5.a（附带，不进任何判定）：H1 最后一批与 2 → 1 那一批的角色集合差（两个方向）。
     if let Some((two_to_one, final_batch, only_two_to_one, only_final)) = session.and_then(final_batch_difference) {
-        let row_five_h1_matches = matches_the_registered_final_batch_difference(&only_two_to_one, &only_final);
+        let row_five_harness_history_matches = matches_the_registered_final_batch_difference(&only_two_to_one, &only_final);
         lines.push(format!(
-            "name=r5a history=h1 two_to_one_txg={} final_txg={} only_in_two_to_one={} only_in_final={} matches_registered={row_five_h1_matches} incidental=true",
+            "name=r5a history=h1 two_to_one_txg={} final_txg={} only_in_two_to_one={} only_in_final={} matches_registered={row_five_harness_history_matches} incidental=true",
             two_to_one.label_txg(),
             final_batch.label_txg(),
             names_text(&only_two_to_one),
@@ -4104,28 +4104,28 @@ fn row_four_and_five_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
         ));
     }
     // R5.b（跑前登记 e172-r2 第六节 6.3）：H3 最后一批写了 t3（叶里还剩 2 号）且 2 → 1 独有里没有 t3 ⇒「照现写」。
-    let mut row_five_h3_matches = false;
+    let mut row_five_record_two_kept_history_matches = false;
     let mut final_writes_inode_leaf = false;
-    let h3 = judgements.iter().find(|judgement| judgement.name == "h3");
-    if let Some((two_to_one, final_batch, only_two_to_one, only_final)) = h3.and_then(final_batch_difference) {
+    let record_two_kept_judgement = judgements.iter().find(|judgement| judgement.name == "h3");
+    if let Some((two_to_one, final_batch, only_two_to_one, only_final)) = record_two_kept_judgement.and_then(final_batch_difference) {
         final_writes_inode_leaf = final_batch.role_names().iter().any(|role| role == "t3");
         let two_to_one_only_has_inode_leaf = only_two_to_one.iter().any(|role| role == "t3");
-        row_five_h3_matches = final_writes_inode_leaf && !two_to_one_only_has_inode_leaf;
+        row_five_record_two_kept_history_matches = final_writes_inode_leaf && !two_to_one_only_has_inode_leaf;
         lines.push(format!(
-            "name=r5b history=h3 two_to_one_txg={} final_txg={} final_writes_t3={final_writes_inode_leaf} only_in_two_to_one={} only_in_final={} matches_registered={row_five_h3_matches}",
+            "name=r5b history=h3 two_to_one_txg={} final_txg={} final_writes_t3={final_writes_inode_leaf} only_in_two_to_one={} only_in_final={} matches_registered={row_five_record_two_kept_history_matches}",
             two_to_one.label_txg(),
             final_batch.label_txg(),
             names_text(&only_two_to_one),
             names_text(&only_final)
         ));
         // 判别力自证（第八节 8.2 第 3 行）：H1 的期望（2 → 1 独有 = {t3}、最后一批独有为空）拿去判 H3。
-        let h1_expectation_green_on_h3 = matches_the_registered_final_batch_difference(&only_two_to_one, &only_final);
+        let harness_expectation_green_on_the_record_two_kept_history = matches_the_registered_final_batch_difference(&only_two_to_one, &only_final);
         lines.push(format!(
-            "name=r5b_discrimination history=h3 h1_expectation_green={h1_expectation_green_on_h3} h3_expectation_green={row_five_h3_matches} exactly_one_green={}",
-            h1_expectation_green_on_h3 != row_five_h3_matches
+            "name=r5b_discrimination history=h3 h1_expectation_green={harness_expectation_green_on_the_record_two_kept_history} h3_expectation_green={row_five_record_two_kept_history_matches} exactly_one_green={}",
+            harness_expectation_green_on_the_record_two_kept_history != row_five_record_two_kept_history_matches
         ));
     }
-    lines.push(format!("name=verdict row=5 h3_final_writes_t3={final_writes_inode_leaf} h3_matches_registered={row_five_h3_matches}"));
+    lines.push(format!("name=verdict row=5 h3_final_writes_t3={final_writes_inode_leaf} h3_matches_registered={row_five_record_two_kept_history_matches}"));
     lines
 }
 
@@ -4188,8 +4188,8 @@ fn row_six_seven_eight_lines(judgements: &[HistoryJudgement]) -> Vec<String> {
     }
     // R6.b 的前提（V6 也核）：H3 意图的调用方时间与顺序写的时间不同，意图那一格才分辨得开。
     let mut intent_differs_from_sequential = false;
-    if let Some(h3) = judgements.iter().find(|judgement| judgement.name == "h3") {
-        let configuration = &h3.configuration;
+    if let Some(record_two_kept_judgement) = judgements.iter().find(|judgement| judgement.name == "h3") {
+        let configuration = &record_two_kept_judgement.configuration;
         let intent_seconds = configuration.get("intent_write_time_seconds").cloned().unwrap_or_else(|| "absent".to_string());
         let sequential_seconds = configuration.get("sequential_write_time_seconds").cloned().unwrap_or_else(|| "absent".to_string());
         intent_differs_from_sequential = intent_seconds != "absent" && intent_seconds != sequential_seconds;
@@ -4488,8 +4488,8 @@ mod tests {
     /// `research/` 可以整个删掉，别的实验的产物缺了报本次未跑：读不到时用到它们的单测逐份报一行本次未跑、照常返回。
     /// 路径写成字面的 `concat!`（写法与为什么见 `e7_index_bench::ARCHIVED_PRODUCT_NOT_RUN_MARKER`）。
     /// 第 3 次重跑登记 `research/prompts/e172-r3-prereg.md` 第五节 5.7 第 1 步的两份导出（主 agent 跑、入库）。
-    const H1H2_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r3-deletion-write-dump-h1h2-2026-11-02.out");
-    const H3_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r3-deletion-write-dump-h3-2026-11-02.out");
+    const HARNESS_AND_MOUNT_CONTINUATION_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r3-deletion-write-dump-h1h2-2026-11-02.out");
+    const RECORD_TWO_KEPT_EXPORT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../research/results/e172-r3-deletion-write-dump-h3-2026-11-02.out");
 
     struct ExportFixture {
         export_files: Vec<ExportFile>,
@@ -4503,7 +4503,7 @@ mod tests {
         static FIXTURE: OnceLock<Result<ExportFixture, Vec<(&'static str, String)>>> = OnceLock::new();
         FIXTURE.get_or_init(|| {
             let read = |path: &'static str| std::fs::read_to_string(path).map_err(|error| (path, error.to_string()));
-            let (first_text, second_text) = match (read(H1H2_EXPORT), read(H3_EXPORT)) {
+            let (first_text, second_text) = match (read(HARNESS_AND_MOUNT_CONTINUATION_EXPORT), read(RECORD_TWO_KEPT_EXPORT)) {
                 (Ok(first_text), Ok(second_text)) => (first_text, second_text),
                 (first, second) => return Err([first.err(), second.err()].into_iter().flatten().collect()),
             };
@@ -4707,9 +4707,9 @@ mod tests {
             assert!(configuration_matches_registration(history), "{}", history.name);
             assert_eq!(history.configuration.get("file_bytes").map(String::as_str), Some("81585"));
         }
-        let h3 = history_named("h3");
-        let sequential = field_number(&h3.configuration, "sequential_write_time_seconds").expect("H3 带顺序写的时间");
-        assert_eq!(field_number(&h3.configuration, "intent_write_time_seconds"), Some(sequential + 60));
+        let record_two_kept_history = history_named("h3");
+        let sequential = field_number(&record_two_kept_history.configuration, "sequential_write_time_seconds").expect("H3 带顺序写的时间");
+        assert_eq!(field_number(&record_two_kept_history.configuration, "intent_write_time_seconds"), Some(sequential + 60));
         assert!(!history_named("h1").configuration.contains_key("intent_write_time_seconds"));
         assert!(!history_named("h2").configuration.contains_key("intent_write_time_seconds"));
     }
@@ -4734,8 +4734,8 @@ mod tests {
         assert_eq!(cell_row("h1", 5, "L03-6", "mode").actual, "33188");
         assert_eq!(cell_row("h1", 5, "L03-5", "times").actual, "1788000060/1788000060/1788000060");
         assert!(!cell_row("h1", 5, "L03-5", "times").discriminable);
-        let h3_intent_seconds = history_named("h3").configuration.get("intent_write_time_seconds").expect("H3 带意图的调用方时间").clone();
-        assert_eq!(cell_row("h3", 6, "L03-5", "times").expected, three_equal_times_text(&h3_intent_seconds));
+        let record_two_kept_intent_seconds = history_named("h3").configuration.get("intent_write_time_seconds").expect("H3 带意图的调用方时间").clone();
+        assert_eq!(cell_row("h3", 6, "L03-5", "times").expected, three_equal_times_text(&record_two_kept_intent_seconds));
         assert!(cell_row("h3", 6, "L03-5", "times").discriminable);
     }
 
@@ -4805,7 +4805,7 @@ mod tests {
     }
 
     #[test]
-    fn h1_intent_segment_string_kind_string_and_roles_are_decoded_independently() {
+    fn harness_history_intent_segment_string_kind_string_and_roles_are_decoded_independently() {
         return_not_run_unless_exports_present!();
         let row = judgement_named("h1").segment_rows.iter().find(|row| row.publish_kind == "unlink_intent").expect("意图那一行");
         assert_eq!(row.actual_count_text, "26+2+1+2");
@@ -4847,10 +4847,10 @@ mod tests {
     #[test]
     fn mount_writes_are_attributed_to_the_same_segments_the_export_cuts() {
         return_not_run_unless_exports_present!();
-        let h2 = judgement_named("h2");
-        assert!(!h2.attribution_rows.is_empty());
-        assert_eq!(h2.misattributed_writes(), 0, "{:?}", h2.attribution_rows.iter().filter(|row| !row.is_match).collect::<Vec<_>>());
-        let acquisition_writes = h2.attribution_rows.iter().filter(|row| row.decoded == WriteAttribution::InstanceAcquisition).count();
+        let mount_continuation_judgement = judgement_named("h2");
+        assert!(!mount_continuation_judgement.attribution_rows.is_empty());
+        assert_eq!(mount_continuation_judgement.misattributed_writes(), 0, "{:?}", mount_continuation_judgement.attribution_rows.iter().filter(|row| !row.is_match).collect::<Vec<_>>());
+        let acquisition_writes = mount_continuation_judgement.attribution_rows.iter().filter(|row| row.decoded == WriteAttribution::InstanceAcquisition).count();
         assert_eq!(acquisition_writes, 2);
     }
 
@@ -4880,7 +4880,7 @@ mod tests {
 
     /// PC-C 只重封了墓碑容器自己的载荷校验和：父指针（墓碑树根条目、映射、journal 点名项）里那 4 字节整单元校验和照样对不上，S2 那一格要红。
     #[test]
-    fn a_resealed_container_still_fails_the_parent_location_checksum() {
+    fn resealed_container_still_fails_the_parent_location_checksum() {
         return_not_run_unless_exports_present!();
         let history = history_named("h1");
         let corrupted = corrupted_copy(history, PositiveControl::BumpTombstoneDeathTxg).expect("改得到墓碑容器");
@@ -4891,7 +4891,7 @@ mod tests {
     }
 
     #[test]
-    fn h1_window_string_is_the_four_registered_strings_end_to_end() {
+    fn harness_history_window_string_is_the_four_registered_strings_end_to_end() {
         return_not_run_unless_exports_present!();
         // 跑前登记 e172-r3 第七节 A-roles-final：H1 最后一批 12 个单元（多 tr@0、tr），整窗四串 26、24、22、24；只钉期望一栏。
         assert!(
@@ -4944,7 +4944,7 @@ mod tests {
 
     /// T3：H3 选到 L03-7 第二支、只有 H3 选到；第二支的期望一栏（写出的叶 1 片、根条目数 1）。
     #[test]
-    fn only_h3_takes_the_second_l03_7_branch_and_expects_one_leaf_and_one_root_entry() {
+    fn only_the_record_two_kept_history_takes_the_second_layout03_item7_branch_and_expects_one_leaf_and_one_root_entry() {
         return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=l03_7_branch_check ").contains("second_branch_histories=h3 exactly_h3=true"));
         assert_eq!(cell_row("h3", 9, "L03-7", "inode_root_entry_count").expected, "1");
@@ -4956,7 +4956,7 @@ mod tests {
 
     /// T4：H3 意图 L03-5 的期望 = 导出的 `intent_write_time_seconds=`（与顺序写的时间不同），可分辨。
     #[test]
-    fn h3_intent_times_expect_the_callers_time_and_are_discriminable() {
+    fn record_two_kept_history_intent_times_expect_the_callers_time_and_are_discriminable() {
         return_not_run_unless_exports_present!();
         let configuration = &history_named("h3").configuration;
         let row = cell_row("h3", 6, "L03-5", "times");
@@ -4979,7 +4979,7 @@ mod tests {
 
     /// T6：R5.b 行在；判别力自证行里两套期望（H1 的、H3 的）不同时判绿。
     #[test]
-    fn row_five_h3_line_is_reported_and_its_two_expectations_are_never_both_green() {
+    fn row_five_record_two_kept_history_line_is_reported_and_its_two_expectations_are_never_both_green() {
         return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=r5b history=h3 ").contains(" final_writes_t3="));
         let discrimination = line_starting_with("name=r5b_discrimination history=h3 ");
@@ -5009,7 +5009,7 @@ mod tests {
 
     /// T8：PC-G 的副本恰有一次写换了段，换的是挂载写行之前那一截的最后一次写。
     #[test]
-    fn pc_g_moves_exactly_the_last_write_of_the_mount_segment_into_the_next_segment() {
+    fn positive_control_moves_exactly_the_last_write_of_the_mount_segment_into_the_next_segment() {
         return_not_run_unless_exports_present!();
         let history = history_named("h2");
         let corrupted = corrupted_copy(history, PositiveControl::ShiftMountSegmentEndToItsLastWrite).expect("H2 有挂载写行之前那一段");
@@ -5030,7 +5030,7 @@ mod tests {
 
     /// T9：PC-H 的副本恰改了一次系统配置槽写，那次解出 5，整槽校验和过。
     #[test]
-    fn pc_h_rewrites_exactly_one_system_configuration_write_to_5_and_reseals_its_slot() {
+    fn positive_control_rewrites_exactly_one_system_configuration_write_to_5_and_reseals_its_slot() {
         return_not_run_unless_exports_present!();
         for history in &fixture().histories {
             let corrupted = corrupted_copy(history, PositiveControl::RewriteIntentTimeThresholdAsSeconds).expect("每段历史的意图都有系统配置槽写");
@@ -5052,7 +5052,7 @@ mod tests {
 
     /// T10：PC-I 的副本里 H3 意图 1 号记录三格 = 顺序写的时间，码 3 载荷校验和过。
     #[test]
-    fn pc_i_copies_the_sequential_write_time_into_the_h3_intent_record_and_reseals_the_container() {
+    fn positive_control_copies_the_sequential_write_time_into_the_record_two_kept_intent_record_and_reseals_the_container() {
         return_not_run_unless_exports_present!();
         let history = history_named("h3");
         let sequential = field_number(&history.configuration, "sequential_write_time_seconds").expect("H3 带顺序写的时间");
@@ -5086,7 +5086,7 @@ mod tests {
 
     /// T13：H3 的 A-txg、A-根槽、A-journal、A-系统配置期望一栏等于跑前登记 e172-r2 第七节 7.1 的 H3 值。
     #[test]
-    fn h3_txg_root_slot_journal_and_system_configuration_anchors_expect_the_registered_h3_values() {
+    fn record_two_kept_history_txg_root_slot_journal_and_system_configuration_anchors_expect_the_registered_values() {
         return_not_run_unless_exports_present!();
         assert!(line_starting_with("name=anchor anchor=A-txg history=h3 deletion_publishes ").contains(" expected=6,7,8,9 "));
         for (txg, root, journal, generation, slot) in [

@@ -1,11 +1,14 @@
 """E201（三oracle合谋今树整表） 的逐行驱动（跑前登记 research/prompts/e201-preregistration.md 第五节 5.5「row_driver.py 不原样用」那一行）。
 
-出处：照抄 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py（提交 f4605214d 那一版，sha256
-ada76e750630ba6060380249f6077081e8597a2bf876fcc978fc9648143b5f89）第 44 行起的代码，原文件头换成这一段，改了这几处：
+出处：由 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py（提交 f4605214d 那一版）第 44 行起的代码改成，
+文件头换成这一段；与那一份不同的有这几处：
   一、编装置去掉 `nice -n 19`、加 `--features gpu`（run_compile；装置走给定状态引擎这一判段入口，配了 GPU 而二进制没编进 gpu 特性时判段报本次未跑）；
   二、O3 阳性对照那一步去掉 `nice -n 19`（run_image_control）；任务里面不套任何包装（线程、内存、机器、卡都由统一任务服务定）；
   三、`--positive-control` 收全登记 5.2 那九样（装置八样加 O3；`见证` 属可写挂载探针，这一次不跑，不收）；
-  四、快照从计划目录同步（`--snapshot-from <计划目录里的树>`，读法 1；原有参数，用法不变）。
+  四、快照从计划目录同步（`--snapshot-from <计划目录里的树>`，读法 1；原有参数，用法不变）；
+  五、不按键复用：输出根里已有的行目录一律删掉重做，不读里面的结果，`row-result.tsv` 不记键；一行判没判过、复用不复用只由 full_table_run.py
+     经 prune-server 的判定库按行判（它文件头「判定库」）；
+  六、超时之后的限时乘 3 只给调用方用 `--timed-out-before-rows` 点名的行（不在输出根里留标记、不读上一次的结果）。
   另有几处跟着搬家改的：本目录是 E201 的，E171 研究一侧的 device_timing.py、o3_bad_image_judge.py 与两张名单按 E171 的目录取（e171_research_side）；
   弄坏开关的变量换成 E201_ROW_DRIVER_BREAK（只在自证里认），多两项。
 文件名不叫 row_driver.py：E171 的比对器按名字 `import row_driver`，同名会串（e171_research_side.py 文件头）。
@@ -18,14 +21,14 @@ ada76e750630ba6060380249f6077081e8597a2bf876fcc978fc9648143b5f89）第 44 行起
 每行一个目录 `<输出根>/row-<序号>/`：`row-result.tsv`、`device.out`、`device.err`、`compile.log`、`dump/`、`o3.out`、`o3.log`、`o3-control.out`（`--positive-control O3` 时）。
 选行：不给 `--rows`、`--first-slice` 就是表里全部行；给了是指定范围，驱动往标准错误打一行 `row_scope scope=narrowed …`，
 缩过的那一趟不当正式产物。
-按键复用：输出根里已有的行目录，`row-result.tsv` 记的 `reuse_key`（快照摘要、行号、行名与会改变这一行结果的参数拼成）与这一趟相同、结局不是编不过、
-不是测量管子缺陷、不是超时，就当作做完了、不重跑；键不同、没有 `row-result.tsv`（上一次中途停下的）或结局是编不过、超时的行目录，驱动删掉重做
-（编不过的行重做时照上面的规则补位，同键的上一次结果是超时的行限时再乘 3，重做时在行目录里先留标记文件 `timed-out-before`，重做中途停下也不丢；`row-result.tsv` 另记 `time_limit_seconds` 与 `timed_out_before`）。
+不按键复用：点名的每一行都现跑；输出根里已有的同号行目录删掉重做，不读里面的东西（full_table_run.py 的各片每一次尝试拿到的是服务新给的产物目录）。
+`--timed-out-before-rows` 点名的行限时乘 3（device_timing.row_time_limit_seconds）；`row-result.tsv` 记 `time_limit_seconds` 与 `timed_out_before`。
 
 跑法（full_table_run.py 的各片在进程外起它，整条命令不套包装；线程数照线道线程数设进各自的环境，frozen_o3.thread_environment）：
   python3 current_tree_row_driver.py --repo-root <仓根> --work-root <目录> --output-root <输出根> [--rows 1,6 | --first-slice] [--empty-mutation]
       --threads <每线道> --lanes <线道数> [--positive-control <九样之一>] [--o3-control-bad-states <目录>]
       --snapshot-from <计划目录里的树> --streams 1,2 --keep-dumps --baseline-timing <基线的 -timing 产物> --timing-output <新文件>
+      [--timed-out-before-rows 3,7]
 弄坏开关只在自证里认（test_current_tree_row_driver.py 在进程里调 run_compile、run_with_time_limit，不经本脚本的命令行；命令行设了一律在参数解析之前退 2）。
 逐项写开关名、弄坏哪一处，下一行起写打开后红的测试（unittest 的失败行「FAIL: <测试名>」的句首）：
   E201_ROW_DRIVER_BREAK=timeout-not-enforced  行的限时不执行、一直等
@@ -54,10 +57,15 @@ import threading
 import time
 
 import e171_research_side
-import device_timing
-import frozen_o3
-from run_directory import STREAM_NAMES
-from bad_implementation_table import (MAXIMUM_SUBSTITUTIONS_PER_ROW, STATUS_ANCHOR_NOT_UNIQUE, STATUS_LOCATED, STATUS_NOT_FOUND,
+# E171 修后版目录在 import e171_research_side 时已插进 sys.path，这里的判断为假、运行期不动 sys.path。这一句写在本模块里，是给算键的库看的：
+# scripts/gate/lib_function_units.py 解一份模块的 import 只在本目录与这份模块自己写的 sys.path 插入里找（PythonModule.search_directories），
+# 不写，device_timing、frozen_o3、run_directory、bad_implementation_table 这四份解不出，每行的判法闭包拒算 import-unresolved（test_current_tree_row_driver.py 的 JudgeImportTests 钉住）
+if e171_research_side.E171_DIRECTORY not in sys.path:
+    sys.path.insert(1, e171_research_side.E171_DIRECTORY)
+import device_timing  # noqa: E402
+import frozen_o3  # noqa: E402
+from run_directory import STREAM_NAMES  # noqa: E402
+from bad_implementation_table import (MAXIMUM_SUBSTITUTIONS_PER_ROW, STATUS_ANCHOR_NOT_UNIQUE, STATUS_LOCATED, STATUS_NOT_FOUND,  # noqa: E402
                                        Located, MutationRow, SelectedRow, anchor_hit_count, apply_mutation, empty_mutation,
                                        group_names_of_file, locate_by_name, read_mutation_rows, read_selected_rows,
                                        substitute_for)
@@ -98,9 +106,6 @@ LANE_BUILD_RECORD_FILE = "build-record.tsv"
 LANE_COMPILE_ARTIFACTS_FILE = "compile-artifacts.jsonl"
 SNAPSHOT_DIGEST_FILE = "snapshot-digest"
 STATUS_MEASUREMENT_PIPE_DEFECT = "measurement_pipe_defect"
-REUSE_KEY_FIELD = "reuse_key"  # row-result.tsv 里的键：这一行的复用键（reuse_key_of）
-# 行目录里的标记文件：同键的上一次结果是超时、这一次重做时先留下（里面写复用键）。重做中途停下、行目录没有 row-result.tsv 了，下一次凭它仍把限时乘 3
-TIMED_OUT_MARKER_FILE = "timed-out-before"
 REBUILD_CHECK_FIELD = "packages_checked_rebuilt"  # row-result.tsv 里的键：编完核过重编了的包；编过的行没有这个键，就是没核过（旧驱动跑的）
 EXIT_WORK_ROOT_REFUSED = 2
 EXIT_MEASUREMENT_PIPE_DEFECT = 5
@@ -489,63 +494,30 @@ def names_in_the_tables(selected_rows: list[SelectedRow], other_table_paths: lis
     return names
 
 
-def read_result(directory: str) -> dict[str, object]:
-    with open(os.path.join(directory, "row-result.tsv"), encoding="utf-8") as handle:
-        return dict(line.rstrip("\n").split("\t", 1) for line in handle if "\t" in line)
+def row_numbers(text: str) -> frozenset[int]:
+    """`--timed-out-before-rows` 的值：逗号隔开的序号（空串是一行都不点）。"""
+    return frozenset(int(token) for token in text.split(",") if token)
 
 
-def reuse_key_of(arguments: argparse.Namespace, number: int, row_name: str) -> str:
-    """一行的复用键：快照摘要、行号、行名与会改变这一行结果的参数拼起来取 sha256；键相同的行目录里的结果可以直接用。"""
-    parts = [arguments.snapshot_digest, str(number), row_name, arguments.streams, str(arguments.writable_mount_probe), str(arguments.positive_control),
-             str(arguments.disable_oracle), str(arguments.no_executor), str(arguments.keep_dumps), str(arguments.o3_control_bad_states)]
-    return hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
-
-
-def earlier_result_with_the_key(row_directory: str, key: str) -> dict[str, object] | None:
-    """行目录里同键的上一次结果；没有行目录、没有 `row-result.tsv` 或键不同交 None。"""
-    if not os.path.exists(os.path.join(row_directory, "row-result.tsv")):
-        return None
-    result = read_result(row_directory)
-    return result if result.get(REUSE_KEY_FIELD) == key else None
-
-
-def marked_as_timed_out_before(row_directory: str, key: str) -> bool:
-    """行目录里有标记文件、且里面写的就是这一趟的复用键：这一行上一次同键的结果是超时，重做中途停过。"""
-    path = os.path.join(row_directory, TIMED_OUT_MARKER_FILE)
-    if not os.path.exists(path):
-        return False
-    with open(path, encoding="utf-8") as handle:
-        return handle.read().strip() == key
-
-
-def result_is_reusable(result: dict[str, object]) -> bool:
-    """编不过、测量管子缺陷、超时的结果不复用：这几类重做（编不过的补位，超时的限时再乘 3）。"""
-    return (result.get("status") not in (STATUS_COMPILE_FAILED, STATUS_MEASUREMENT_PIPE_DEFECT)
-            and result.get("device_exit") != str(ROW_TIMEOUT_EXIT_CODE))
+def row_time_limit(arguments: argparse.Namespace, number: int) -> tuple[int, bool]:
+    """这一行装置那一步的限时与它是不是调用方点名的「上一次超时」的行（`--timed-out-before-rows`，限时乘 3；device_timing.row_time_limit_seconds）。"""
+    timed_out_before = number in arguments.timed_out_before_rows
+    return device_timing.row_time_limit_seconds(arguments.baseline_process_wall_seconds, timed_out_before), timed_out_before
 
 
 def run_row_on_the_lane(number: int, selected: SelectedRow | None, empty_of: MutationRow | None, table: list[MutationRow],
                         rows_in_the_table: set[str], used_substitutes: set[str], arguments: argparse.Namespace,
                         lane: int) -> dict[str, object]:
-    """一条线道一次只跑一行（同一条线道共用一棵树与一个编译目录）。"""
+    """一条线道一次只跑一行（同一条线道共用一棵树与一个编译目录）。输出根里已有的同号行目录删掉重做，不读里面的结果。"""
     row_directory = os.path.join(arguments.output_root, f"row-{number}")
     row_name = selected.name if selected else (empty_mutation(empty_of).name if empty_of else "-")
-    reuse_key = reuse_key_of(arguments, number, row_name)
-    earlier = earlier_result_with_the_key(row_directory, reuse_key)
-    if earlier is not None and result_is_reusable(earlier):
-        return earlier
-    timed_out_before = ((earlier is not None and earlier.get("device_exit") == str(ROW_TIMEOUT_EXIT_CODE))
-                        or marked_as_timed_out_before(row_directory, reuse_key))
     if os.path.isdir(row_directory):
-        shutil.rmtree(row_directory)  # 键不同、没做完、编不过或超时的行目录：驱动自己建的，删掉重做
+        shutil.rmtree(row_directory)
     os.makedirs(row_directory, exist_ok=False)
-    if timed_out_before:
-        with open(os.path.join(row_directory, TIMED_OUT_MARKER_FILE), "w", encoding="utf-8") as handle:
-            handle.write(reuse_key + "\n")
     lane_tree = os.path.join(arguments.work_root, f"lane{lane}", "tree")
     lane_target = os.path.join(arguments.work_root, f"lane{lane}", "target")
     snapshot_root = os.path.join(arguments.work_root, "snapshot")
-    fields: dict[str, object] = {"row_number": number, "row_name": row_name, "lane": lane, REUSE_KEY_FIELD: reuse_key}
+    fields: dict[str, object] = {"row_number": number, "row_name": row_name, "lane": lane}
     started = now_ns()
     compile_kind = "incremental" if os.path.isdir(lane_target) else "cold"
     sync_tree(snapshot_root, lane_tree)
@@ -584,7 +556,7 @@ def run_row_on_the_lane(number: int, selected: SelectedRow | None, empty_of: Mut
     if arguments.disable_oracle:
         extra += ["--disable-oracle", arguments.disable_oracle]
     binary = os.path.join(lane_target, "release", DEVICE_BINARY_NAME)
-    time_limit_seconds = device_timing.row_time_limit_seconds(arguments.baseline_process_wall_seconds, timed_out_before)
+    time_limit_seconds, timed_out_before = row_time_limit(arguments, number)
     device_exit, device_ns = run_device(arguments.repo_root, binary, row_directory, arguments.threads, extra, time_limit_seconds)
     fields.update({"status": STATUS_OK, "device_exit": device_exit, "device_ns": device_ns, "time_limit_seconds": time_limit_seconds,
                    "timed_out_before": str(timed_out_before).lower()})
@@ -700,7 +672,7 @@ def argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="E201 逐行驱动")
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--work-root", required=True, help="草稿目录：快照与每条线道的树与编译目录放这里")
-    parser.add_argument("--output-root", required=True, help="每行一个 row-<序号>/ 目录；已存在的行目录拒绝覆盖")
+    parser.add_argument("--output-root", required=True, help="每行一个 row-<序号>/ 目录；已存在的同号行目录删掉重做")
     parser.add_argument("--selected-rows", default=os.path.join(E171_DIRECTORY, "bad-implementations-step-8.tsv"))
     parser.add_argument("--other-selected-rows", action="append", default=[],
                         help="别的表（同一格式）：它们的名字补位时一样跳过；扩表那一次给步长 8 那张")
@@ -724,6 +696,8 @@ def argument_parser() -> argparse.ArgumentParser:
                         help="同一棵冻结树、同一组 --streams 的基线那一趟的 -timing 产物：T 取它的 process_wall（登记修订 2 第 2.5 节）")
     parser.add_argument("--timing-output", required=True,
                         help="新文件（已存在就拒）：每行装置 device.out 里的 E7TIMING 行原样收进来，每行前一行 row_device（修订 2 第 2.6 节）")
+    parser.add_argument("--timed-out-before-rows", type=row_numbers, default=frozenset(),
+                        help="上一次超时、这一次限时乘 3 的行（登记 5.9 表里的序号，逗号隔开）；不给是一行都不乘")
     return parser
 
 
@@ -762,7 +736,6 @@ def run_parsed_arguments(parser: argparse.ArgumentParser, arguments: argparse.Na
     snapshot_root = os.path.join(arguments.work_root, "snapshot")
     sync_tree(arguments.snapshot_from or arguments.repo_root, snapshot_root)
     digest, file_count = snapshot_digest(snapshot_root)
-    arguments.snapshot_digest = digest
     refusals = work_root_refusals(arguments.work_root, arguments.lanes, digest)
     if refusals:
         print(f"work_root_refused reasons={','.join(refusals)}")

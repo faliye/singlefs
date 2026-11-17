@@ -58,4 +58,5 @@ for key, fields in devices:
               item, state, entry, fields["device"], header["device_mebibytes"], script_capacity, product_capacity,
               capacity_equal, window_rule, expected_window, product_window, window_equal))
 print("E7RESULT name=verdict item=anchor_check readings_checked=%d mismatches=%d" % (len(devices), mismatches))
+print("E7RESULT name=done emitted=%d" % (len(devices) + 3))
 sys.exit(1 if mismatches else 0)

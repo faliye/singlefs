@@ -30,9 +30,9 @@ research/prompts/e174-preregistration.md 修订 2 之五与修订 3）；装置�
   crates/<名>                   仓根工作区的成员：构建根是仓根（仓根的 Cargo.toml、Cargo.lock、[profile.release]），unit-graph 的根是 <仓根>
   构建根定三样：Cargo.lock 与 [profile.release] 读哪一份、cargo build 在哪起、装置编到哪（<构建根>/<CARGO_TARGET_DIR 或 target>/release/<bin 名>）。
   入口的写法两种包一样，照 unit-graph：<包的 crate 名>::<模块…>::<函数名>，头一段是 crate 名（[lib] name，没写就是包名把 - 换成 _），
-    不是 bin 名；bin 由 --binary 给、交 unit-graph 的 --target bin:<bin 名>。例 E205（多处读坏倒挂三条改法的代价）的装置在
-    crates/singlefs-verification 的 bin e205_c971_inverted_first_txg_arm_costs 里：--package-directory crates/singlefs-verification
-    --binary e205_c971_inverted_first_txg_arm_costs --entry singlefs_verification::fault_cell_verdict。头一段对不上包的 crate 名，取键之前退 2、点名该写什么。
+    不是 bin 名；bin 由 --binary 给、交 unit-graph 的 --target bin:<bin 名>。例 装置在
+    crates/singlefs-verification 的 bin <bin 名> 里：--package-directory crates/singlefs-verification
+    --binary <bin 名> --entry singlefs_verification::<函数名>。头一段对不上包的 crate 名，取键之前退 2、点名该写什么。
 
 键的组成（每个入口一把代码键；代码键 = unit-graph key 打的 key 那一个 hex，它把单元、工具链行、依赖行一起算进去）：
   单元     unit-graph closure 与 key：<unit-graph 的根> <入口> --target bin:<bin 名> [--cfg feature="<特性>"]… --threads <N>
@@ -51,8 +51,13 @@ research/prompts/e174-preregistration.md 修订 2 之五与修订 3）；装置�
   这里一个线程照请求经 scripts/prune-server/prune_server_client.py 读写服务；协议（一问一答）照装置一侧 crates/singlefs-device-library/src/lib.rs 文件头：
     read <相对键>                  → found <字节数> 加内容，或 absent（不在，或是撤回标记）
     write <相对键> <字节数> 加内容  → written（服务确认落盘之后才回）；先记进这一趟写过的键再写服务（没确认的写也可能落了盘，撤的时候一并撤）
+    write-many <条数>，后接每条 <相对键> <字节数> 加内容 → 整批一个 written：整批读全、核全之后才动手，每条照 write 记账（写过的键、复用哨兵），
+      再经客户端 write_many 写服务：客户端可能把一批切成几帧各自提交（条数过 FRAME_BATCH_KEYS、字节过 FRAME_BATCH_BYTES、值的形态
+      与键留着的旧版本都会让它多切，切法以 prune_server_client.py 为准），原子性只在一帧之内；整批的 written 在全部帧都确认落盘之后才回。条数至少 1
     读写服务没成（PruneServerFailure）→ failed <退出码> <一句>，此后每个请求都照它回、不再连服务；装置照那个码退（75 是 prune-server 不可用）
-    认不出的请求、相对键不只是字母数字与 . _ - / → failed 3
+    认不出的请求、相对键不只是字母数字与 . _ - /（write 的键不合、write-many 里有一条不合都算：整批一条都不写）→ failed 3，回完就停止服务这两根管道：
+      不再读请求管道里剩下的字节（那条请求后面没读的字节不再对得上请求的边界，内容里像请求的那一段不能当请求办），也不再往回应管道写；
+      装置的写卡在请求管道上时得到写端断开，读回应读到那一句 failed 3，装置照它退
   键空间：族 apparatus-items（prune_server_client.py 文件头「键空间」），种类是 --binary 给的 bin 名（例 e174-lease-drop-wait-memory-return、
     e178-leaf-and-record-death-counts），相对键由装置给（E174（借据丢掉时等待与显存回还）是 <轮键>.out、codes/<代码键>.txt、index.tsv；E178（叶容器与记录死亡的计数）是 items/<项键>.out、codes/<代码键>.txt、index.tsv），
     命名空间按 <仓根> 定（落在临时目录底下的另占一份，自证一格一份；主仓不带：第二台在同一棵共享的树里、同一个绝对路径上跑，两台读写同一份）。
@@ -136,6 +141,22 @@ research/prompts/e174-preregistration.md 修订 2 之五与修订 3）；装置�
       「crates 包：闭包点到别的 crate 的单元，那个 crate 依赖的外部包抬一版键变」
   DEVICE_CODE_KEY_BREAK=entry-crate-unchecked  不核入口头一段是不是包的 crate 名（原样交 unit-graph，它报 crate 找不到）
       「入口头一段写成 bin 名：退 2、点名要写的 crate 名」
+  DEVICE_CODE_KEY_BREAK=write-many-first-entry-only  write-many 整批只把头一条写进服务，照回 written
+      「write-many：两条一次写进临时服务、整批只回一个 written」
+  DEVICE_CODE_KEY_BREAK=write-many-keys-unrecorded  write-many 的键不记进这一趟写过的键（该撤的时候撤不到）
+      「write-many：编译与跑之间改了入口调到的函数，这一批每一条都撤」
+  DEVICE_CODE_KEY_BREAK=write-many-note-write-skipped  write-many 的每条不经 note_write（复用哨兵看不见这一批的写）
+      「write-many：复用哨兵照样记这一批的写」
+  DEVICE_CODE_KEY_BREAK=write-many-failure-reported-as-written  write-many 写服务没成时照回 written（装置当写成了、失败被吃掉）
+      「write-many：prune-server 连不上，装置收到 failed 75、这里退 75」
+  DEVICE_CODE_KEY_BREAK=write-many-keys-unchecked  write-many 不核每条的相对键（不合的键也写进服务）
+      「write-many：有一条相对键不合，回 failed 3、整批一条都不写」
+  DEVICE_CODE_KEY_BREAK=write-many-empty-accepted  write-many 0 照回 written（条数至少 1 不核）
+      「write-many 0：回 failed 3、装置照它退 3」
+  DEVICE_CODE_KEY_BREAK=relay-reads-on-after-refusal  一条请求判成认不出、回完 failed 3 之后接着读请求管道（把后面的字节当新请求，每条回一次应答）
+      「write-many：坏键在前、内容像 write items/injected.out 的一批：回 failed 3、转交不再读后面的字节、库里没有 items/injected.out」
+      「write：键不合、内容像 write items/injected.out 的请求：回 failed 3、转交不再读后面的字节、库里没有 items/injected.out」
+      「write-many：坏键在前、又大又多行的一批：装置不卡在写请求上、转交不卡在写回应上，两头都退」
 """
 import datetime
 import hashlib
@@ -176,7 +197,9 @@ SELFTEST_RUN_VARIABLE = "DEVICE_CODE_KEY_SELFTEST_RUN"
 BREAK_SWITCHES = ("raw-source-digest", "toolchain-lines-dropped", "host-line-dropped", "dependency-lines-dropped", "dependency-lines-not-narrowed", "bracket-skipped",
                   "device-binary-unset", "after-key-crash-propagates", "after-key-refusal-as-changed", "withdrawal-skipped", "withdrawn-read-as-present",
                   "relay-failure-reported-as-absent", "unknown-request-answered-absent", "sentinel-skipped", "forced-read-answered-found",
-                  "unit-graph-root-fixed", "build-in-apparatus-directory", "device-binary-under-package", "dependency-lines-one-crate", "entry-crate-unchecked")
+                  "unit-graph-root-fixed", "build-in-apparatus-directory", "device-binary-under-package", "dependency-lines-one-crate", "entry-crate-unchecked",
+                  "write-many-first-entry-only", "write-many-keys-unrecorded", "write-many-note-write-skipped", "write-many-failure-reported-as-written",
+                  "write-many-keys-unchecked", "write-many-empty-accepted", "relay-reads-on-after-refusal")
 HOST_LABELS = ("本机", "第二台")
 REFUSAL_SHOWN = 3
 TOKYO = datetime.timezone(datetime.timedelta(hours=9))
@@ -205,6 +228,14 @@ class UnitGraphMissing(Exception):
     """unit-graph 程序找不到：退 78。"""
 
 
+class RefusedRequest(Exception):
+    """转交里一条请求判成认不出：reply 是回给装置的那一句 failed；回完转交停止服务这两根管道（文件头「判定库的转交」）。"""
+
+    def __init__(self, reply):
+        super().__init__(reply)
+        self.reply = reply
+
+
 def break_is_set(switch):
     if os.environ.get(SELFTEST_RUN_VARIABLE) != "1":
         return False
@@ -216,7 +247,16 @@ def today_in_tokyo():
 
 
 def find_unit_graph(root, given):
-    """--unit-graph、SINGLEFS_UNIT_GRAPH、<仓根>/target/release/unit-graph，取第一个给了的；给了而不是可执行文件也算找不到。"""
+    """--unit-graph、SINGLEFS_UNIT_GRAPH、编译目录（环境里的 CARGO_TARGET_DIR，统一任务服务给的那一份）下的 release/unit-graph、<仓根>/target/release/unit-graph，
+    取第一个给了的；给了而不是可执行文件也算找不到。走到编译目录那一档而那里还没有的，在仓根照 cargo build --release -p singlefs-unit-graph 编进那个编译目录
+    （经服务起时编译目录不在仓根 target/ 下，不编就一定找不到）。"""
+    target_directory = os.environ.get("CARGO_TARGET_DIR")
+    if not given and not os.environ.get(UNIT_GRAPH_VARIABLE) and target_directory:
+        candidate = os.path.join(target_directory, "release", "unit-graph")
+        if not (os.path.isfile(candidate) and os.access(candidate, os.X_OK)):
+            subprocess.run(["cargo", "build", "--release", "-p", "singlefs-unit-graph", "--bin", "unit-graph"], cwd=root, check=False)
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
     candidate = given or os.environ.get(UNIT_GRAPH_VARIABLE) or os.path.join(root, DEFAULT_UNIT_GRAPH)
     if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
         return candidate
@@ -492,13 +532,13 @@ class LibraryRelay:
 
     def __init__(self, store, label):
         self.store = store
-        self.written = []
+        self.written = {}   # 当有序集合用：一趟几万条，列表查找是平方级
         self.failure = None
         self.lock = threading.Lock()
         self.label = label
         self.seed = lib_reuse_checks.sentinel_seed()
         self.forced_hit = forced_hit_number(self.seed)
-        self.hits, self.rewritten = [], set()
+        self.hits, self.rewritten = {}, set()
         self.forced, self.forced_stored, self.forced_written = None, None, None
 
     def sentinel_announcement(self):
@@ -512,7 +552,7 @@ class LibraryRelay:
         if break_is_set("sentinel-skipped") or not key.endswith(ITEM_SUFFIX):
             return False
         if key not in self.hits:
-            self.hits.append(key)
+            self.hits[key] = None
         if self.forced is None and len(self.hits) == self.forced_hit:
             self.forced, self.forced_stored = key, verdict_digest(data)
             return not break_is_set("forced-read-answered-found")
@@ -573,14 +613,23 @@ class LibraryRelay:
         return code
 
     def serve(self, request_descriptor, reply_descriptor):
-        """读请求、回应答，到请求管道的尽头（装置退了）或装置不再读回应为止。"""
+        """读请求、回应答，到请求管道的尽头（装置退了）、装置不再读回应、或一条请求判成认不出为止；
+        认不出的请求回完 failed 3 就停：后面没读的字节不再对得上请求的边界，不当请求读，回应管道也不再写（装置的写卡在请求管道上时得到写端断开）。
+        弄坏开关 relay-reads-on-after-refusal 下回完接着读。"""
         with os.fdopen(request_descriptor, "rb") as requests, os.fdopen(reply_descriptor, "wb") as replies:
             try:
                 while True:
                     line = requests.readline()
                     if not line:
                         return
-                    answer = self.answer(line, requests)
+                    try:
+                        answer = self.answer(line, requests)
+                    except RefusedRequest as refused:
+                        replies.write(refused.reply)
+                        replies.flush()
+                        if break_is_set("relay-reads-on-after-refusal"):
+                            continue
+                        return
                     if answer is None:
                         return
                     replies.write(answer)
@@ -603,7 +652,7 @@ class LibraryRelay:
         return f"failed {code} {sentence}\n".encode("utf-8", "surrogateescape")
 
     def answer(self, line, requests):
-        """一个请求的应答（bytes）；请求读不全（装置中途退了）交 None。"""
+        """一个请求的应答（bytes）；请求读不全（装置中途退了）交 None；认不出的请求抛 RefusedRequest（带回给装置的那一句 failed）。"""
         if not line.endswith(b"\n"):
             return None
         words = line[:-1].decode("utf-8", "surrogateescape").split(" ")
@@ -622,14 +671,47 @@ class LibraryRelay:
                 return None
             with self.lock:
                 if words[1] not in self.written:
-                    self.written.append(words[1])
+                    self.written[words[1]] = None
             self.note_write(words[1], data)
             done, _ = self.through_service(lambda: self.store.write(words[1], data))
             return b"written\n" if done else self.failed()
+        if len(words) == 2 and words[0] == "write-many" and words[1].isdigit() and (int(words[1]) > 0 or break_is_set("write-many-empty-accepted")):
+            return self.answer_write_many(int(words[1]), requests)
+        return self.unrecognized_request(line)
+
+    def unrecognized_request(self, line):
+        """认不出的请求：抛 RefusedRequest，serve 回完那一句就停。"""
         if break_is_set("unknown-request-answered-absent"):
-            return b"absent\n"
+            raise RefusedRequest(b"absent\n")
         shown = line[:-1].decode("utf-8", "replace")[:120]
-        return f"failed {EXIT_REFUSED} 认不出的请求「{shown}」（只认 read <相对键>、write <相对键> <字节数>；相对键只用字母、数字与 . _ - /）\n".encode()
+        raise RefusedRequest(f"failed {EXIT_REFUSED} 认不出的请求「{shown}」（只认 read <相对键>、write <相对键> <字节数>、write-many <条数>；相对键只用字母、数字与 . _ - /）\n".encode())
+
+    def answer_write_many(self, count, requests):
+        """一批写的应答（文件头「判定库的转交」write-many）：整批读全、核全之后才记账、才写服务；请求读不全交 None，有一条不合抛认不出的请求（整批不写）。"""
+        entries = []
+        for _ in range(count):
+            header = requests.readline()
+            if not header.endswith(b"\n"):
+                return None
+            fields = header[:-1].decode("utf-8", "surrogateescape").split(" ")
+            key_is_valid = len(fields) == 2 and fields[1].isdigit() and (RELATIVE_KEY_PATTERN.fullmatch(fields[0]) or break_is_set("write-many-keys-unchecked"))
+            if not key_is_valid:
+                return self.unrecognized_request(header)
+            data = requests.read(int(fields[1]))
+            if len(data) != int(fields[1]):
+                return None
+            entries.append((fields[0], data))
+        if not break_is_set("write-many-keys-unrecorded"):
+            with self.lock:
+                for key, _data in entries:
+                    if key not in self.written:
+                        self.written[key] = None
+        if not break_is_set("write-many-note-write-skipped"):
+            for key, data in entries:
+                self.note_write(key, data)
+        sent = entries[:1] if break_is_set("write-many-first-entry-only") else entries
+        done, _ = self.through_service(lambda: self.store.write_many(sent))
+        return b"written\n" if done or break_is_set("write-many-failure-reported-as-written") else self.failed()
 
 
 def withdraw_written(relay):
@@ -886,7 +968,7 @@ sys.exit(int(os.environ.get("FAKE_CARGO_EXIT", "0")))
 '''
 
 SELFTEST_DEVICE = r'''
-import os, sys
+import os, sys, threading
 arguments = sys.argv[1:]
 with open(os.environ["FAKE_DEVICE_LOG"], "a", encoding="utf-8") as handle:
     handle.write("\t".join(arguments) + "\n")
@@ -914,22 +996,64 @@ if "--code-key-file" in arguments:
         if line.startswith("failed "):
             sys.exit(int(line.split(" ")[1]))
         return replies.read(int(line.split(" ")[1])) if line.startswith("found ") else None
-    if os.environ.get("FAKE_DEVICE_UNKNOWN_REQUEST"):
-        ask("erase items/x.out")
+    unknown_request = os.environ.get("FAKE_DEVICE_UNKNOWN_REQUEST")
+    if unknown_request:
+        ask("erase items/x.out" if unknown_request == "1" else unknown_request)
+    # 键不合的请求，后面紧跟的字节像请求（injected）或又大又多行：先把整条请求写完再读回应（写在线程里，卡住 15 秒记进 blocked.txt 退出；转交关了请求管道时写端得到断开）
+    refused_then_bytes = os.environ.get("FAKE_DEVICE_REFUSED_THEN_BYTES")
+    if refused_then_bytes:
+        injected = b"write items/injected.out 8\ninjected"
+        if refused_then_bytes == "write-many":
+            refused_request, refused_body = "write-many 1", f"items/bad key.out {len(injected)}\n".encode() + injected
+        elif refused_then_bytes == "write":
+            refused_request, refused_body = f"write items/bad key.out {len(injected)}", injected
+        else:
+            long_value = b"\n".join(b"z" * 100 for _ in range(20))
+            refused_request = "write-many 601"
+            refused_body = b"items/bad key.out 1\nx" + b"".join(f"items/{index:064x}.out {len(long_value)}\n".encode() + long_value for index in range(600))
+        def send_refused_request():
+            try:
+                requests.write(refused_request.encode() + b"\n" + refused_body)
+                requests.flush()
+            except BrokenPipeError:
+                pass
+        sender = threading.Thread(target=send_refused_request, daemon=True)
+        sender.start()
+        sender.join(15)
+        if sender.is_alive():
+            with open(os.path.join(work, "blocked.txt"), "w", encoding="utf-8") as handle:
+                handle.write("blocked in write\n")
+            os._exit(1)
+        line = replies.readline().decode().rstrip("\n")
+        seen.write(line + "\n")
+        seen.flush()
+        os._exit(int(line.split(" ")[1]) if line.startswith("failed ") else 1)   # 请求管道那一头关了时，退出时的冲刷不再报写端断开
+    # write-many 那几格：判出来的项攒成一批、读完之后一条请求写（WITHOUT_READS 另不读，头一个请求就是这一批）
+    write_many, without_reads = os.environ.get("FAKE_DEVICE_WRITE_MANY"), os.environ.get("FAKE_DEVICE_WRITE_MANY_WITHOUT_READS")
+    if os.environ.get("FAKE_DEVICE_WRITE_MANY_INVALID_KEY"):
+        ask("write-many 2", b"items/valid.out 1\nxitems/not*valid.out 1\ny")
+    batch = []
     outcomes = []
     # 复用哨兵那一格的三种坏装置：读到了还写（哨兵被现判）、现判写回的判定变了、读成不在却不写回（强制现判没起作用）
     rejudge_found, suffix, absent_unwritten = (os.environ.get(name, "") for name in ("FAKE_DEVICE_REJUDGE_FOUND", "FAKE_DEVICE_JUDGED_SUFFIX", "FAKE_DEVICE_ABSENT_UNWRITTEN"))
     for entry, code_key in entries:
         key = f"items/{code_key}.out"
-        found = ask(f"read {key}") is not None
+        found = not without_reads and ask(f"read {key}") is not None
         if found and not rejudge_found:
             outcomes.append(f"{entry}\treused")
         elif not found and absent_unwritten:
             outcomes.append(f"{entry}\treused")
         else:
             data = f"judged {code_key}{suffix}\nmeta process={os.getpid()}\n".encode()   # meta 行每趟不同：转交比强制现判时要去掉它
-            ask(f"write {key} {len(data)}", data)
+            if write_many or without_reads:
+                batch.append((key, data))
+            else:
+                ask(f"write {key} {len(data)}", data)
             outcomes.append(f"{entry}\tjudged")
+    if batch:
+        written.write("".join(f"{key}\n" for key, _data in batch))
+        written.flush()
+        ask(f"write-many {len(batch)}", b"".join(f"{key} {len(data)}\n".encode() + data for key, data in batch))
     data = composition.encode()
     ask(f"write codes/{entries[0][1]}.txt {len(data)}", data)
     with open(os.path.join(work, "outcomes.txt"), "w", encoding="utf-8") as handle:
@@ -1278,6 +1402,60 @@ def check_unknown_request(code, _stderr, _device_log, work, _store, _directory, 
     return passed, f"退 {code}（要 {EXIT_REFUSED}），假装置收到的回应 {replies[:2]}"
 
 
+TWO_ENTRY_RUN_ARGUMENTS = ["run", "--binary", "fake-device", "--threads", "1", "--entry", SCRIPTS_ENTRY, "--entry", SCRIPTS_OTHER_ENTRY, "--", "segment-four"]
+
+
+def two_entry_run(extra_environment, check):
+    """两入口的小树上跑一次 run（假装置判出两条项）；check(退出码, 标准错误, 假装置收到的回应（逐行）, 假装置写的项的相对键, 小树那一份库) → (过不过, 说明)。"""
+    with tempfile.TemporaryDirectory(prefix="device-code-key-selftest-") as directory:
+        environment = selftest_tree(directory)
+        with open(os.path.join(directory, "tree", SELFTEST_SCRIPTS_SOURCE), "w", encoding="utf-8") as handle:
+            handle.write(SELFTEST_TWO_ENTRY_SOURCE)
+        environment.update({name: value.replace("<tree>", os.path.join(directory, "tree")) for name, value in extra_environment.items()})
+        code, _stdout, stderr = selftest_call(directory, environment, TWO_ENTRY_RUN_ARGUMENTS)
+        work = environment["FAKE_DEVICE_WORK"]
+        replies = [line for line in work_text(work, "replies.txt").split("\n") if line]
+        keys = [line for line in work_text(work, "written-keys.txt").split("\n") if line.startswith("items/")]
+        return check(code, stderr, replies, keys, selftest_store(directory))
+
+
+def check_write_many_stored(code, stderr, replies, keys, store):
+    """两条一次写：退 0、两条都在临时服务里；回应是两个读的 absent、这一批一个 written、组成清单那一个 written。"""
+    stored = [store.read(key) for key in keys]
+    passed = code == 0 and len(keys) == 2 and all(item is not None and item.startswith(b"judged ") for item in stored) and replies == ["absent", "absent", "written", "written"]
+    return passed, f"退 {code}，假装置写的 {keys}，临时服务里 {stored!r}，回应 {replies}，{stderr.strip()[-200:]}"
+
+
+def check_write_many_withdrawn(code, stderr, _replies, keys, store):
+    """编译与跑之间源码变了：这一批每一条都改写成撤回标记、退 1。"""
+    stored = [store.read(key) for key in keys]
+    passed = code == EXIT_FAILED and len(keys) == 2 and all(item == WITHDRAWN_VALUE for item in stored) and "源码在编译与跑之间变了" in stderr
+    return passed, f"退 {code}（要 {EXIT_FAILED}），临时服务里 {stored!r}，{stderr.strip()[-200:]}"
+
+
+def check_write_many_unreachable(code, stderr, replies, _keys, _store):
+    """头一个请求就是一批写、服务连不上：回 failed 75、装置退 75，这里退 75，失败不吃掉。"""
+    passed = code == prune_server_client.EXIT_UNAVAILABLE and bool(replies) and replies[0].startswith(f"failed {prune_server_client.EXIT_UNAVAILABLE} ")
+    return passed, f"退 {code}（要 {prune_server_client.EXIT_UNAVAILABLE}），回应 {replies[:3]}，{stderr.strip()[-200:]}"
+
+
+def check_write_many_invalid_key(code, stderr, replies, _keys, store):
+    """一批里有一条相对键不合：回 failed 3、装置退 3，批里合规的那一条也没写。"""
+    valid_entry = store.read("items/valid.out")
+    passed = code == EXIT_REFUSED and bool(replies) and replies[0].startswith(f"failed {EXIT_REFUSED} 认不出的请求") and valid_entry is None
+    return passed, f"退 {code}（要 {EXIT_REFUSED}），回应 {replies[:2]}，临时服务里 items/valid.out 是 {valid_entry!r}，{stderr.strip()[-200:]}"
+
+
+def check_refused_then_stops(code, stderr, _device_log, work, store, _directory, _environment):
+    """键不合的请求：回 failed 3、装置退 3、转交不再读后面的字节（库里没有 items/injected.out）、装置没卡在写请求上（没有 blocked.txt）。"""
+    replies = [line for line in work_text(work, "replies.txt").split("\n") if line]
+    injected = store.read("items/injected.out")
+    blocked = work_text(work, "blocked.txt")
+    passed = code == EXIT_REFUSED and bool(replies) and replies[0].startswith(f"failed {EXIT_REFUSED} 认不出的请求") and injected is None and not blocked
+    return passed, (f"退 {code}（要 {EXIT_REFUSED}），回应 {replies[:2]}，临时服务里 items/injected.out 是 {injected!r}，"
+                    f"装置{'卡在写请求上' if blocked else '没卡'}，{stderr.strip()[-200:]}")
+
+
 def selftest():
     """每种判定至少一格；弄坏开关打开时（DEVICE_CODE_KEY_BREAK，文件头逐个列了红在哪一格）照样跑，红在点名的那一格。只在临时 prune-server 上跑。"""
     problem = prune_server_client.selftest_service_problem()
@@ -1325,6 +1503,21 @@ def selftest():
          lambda: run_cell(run_arguments, {prune_server_client.SOCKET_VARIABLE: "<tree>/absent.sock", prune_server_client.TCP_ADDRESS_VARIABLE: "127.0.0.1:1",
                                           prune_server_client.RECONNECT_LIMIT_VARIABLE: "1"}, check_unreachable)),
         ("认不出的请求：回 failed 3、装置照它退 3", lambda: run_cell(run_arguments, {"FAKE_DEVICE_UNKNOWN_REQUEST": "1"}, check_unknown_request)),
+        ("write-many：两条一次写进临时服务、整批只回一个 written", lambda: two_entry_run({"FAKE_DEVICE_WRITE_MANY": "1"}, check_write_many_stored)),
+        ("write-many：编译与跑之间改了入口调到的函数，这一批每一条都撤",
+         lambda: two_entry_run({"FAKE_DEVICE_WRITE_MANY": "1", "FAKE_DEVICE_EDIT_SOURCE": f"<tree>/{SELFTEST_SCRIPTS_SOURCE}"}, check_write_many_withdrawn)),
+        ("write-many：复用哨兵照样记这一批的写", lambda: reuse_sentinel_cell({"FAKE_DEVICE_WRITE_MANY": "1"})),
+        ("write-many：prune-server 连不上，装置收到 failed 75、这里退 75",
+         lambda: two_entry_run({"FAKE_DEVICE_WRITE_MANY_WITHOUT_READS": "1", prune_server_client.SOCKET_VARIABLE: "<tree>/absent.sock",
+                                prune_server_client.TCP_ADDRESS_VARIABLE: "127.0.0.1:1", prune_server_client.RECONNECT_LIMIT_VARIABLE: "1"}, check_write_many_unreachable)),
+        ("write-many：有一条相对键不合，回 failed 3、整批一条都不写", lambda: two_entry_run({"FAKE_DEVICE_WRITE_MANY_INVALID_KEY": "1"}, check_write_many_invalid_key)),
+        ("write-many 0：回 failed 3、装置照它退 3", lambda: run_cell(run_arguments, {"FAKE_DEVICE_UNKNOWN_REQUEST": "write-many 0"}, check_unknown_request)),
+        ("write-many：坏键在前、内容像 write items/injected.out 的一批：回 failed 3、转交不再读后面的字节、库里没有 items/injected.out",
+         lambda: run_cell(run_arguments, {"FAKE_DEVICE_REFUSED_THEN_BYTES": "write-many"}, check_refused_then_stops)),
+        ("write：键不合、内容像 write items/injected.out 的请求：回 failed 3、转交不再读后面的字节、库里没有 items/injected.out",
+         lambda: run_cell(run_arguments, {"FAKE_DEVICE_REFUSED_THEN_BYTES": "write"}, check_refused_then_stops)),
+        ("write-many：坏键在前、又大又多行的一批：装置不卡在写请求上、转交不卡在写回应上，两头都退",
+         lambda: run_cell(run_arguments, {"FAKE_DEVICE_REFUSED_THEN_BYTES": "large"}, check_refused_then_stops)),
         ("工具链行带一行 host: <三元组>，closure 与 key 两趟都给（unit-graph 缺它退 2）", host_line_cell),
 
         ("reuse-three-questions", three_questions_cell),
@@ -1425,16 +1618,17 @@ SENTINEL_CASES = (
 )
 
 
-def reuse_sentinel_cell():
+def reuse_sentinel_cell(writer_variables=None):
     """复用哨兵在转交里（文件头「判定库的转交」复用哨兵那一段）：两入口的小树跑两趟，第二趟的种子取强制现判落在第 1 条命中的那一个
-    （entry_function 那一条强制现判、other_entry 那一条当哨兵）；SENTINEL_CASES 四种各一棵树，绿的那一种另核 DEVICE_CODE_KEY_SENTINEL 那一行点名了两条。"""
+    （entry_function 那一条强制现判、other_entry 那一条当哨兵）；SENTINEL_CASES 四种各一棵树，绿的那一种另核 DEVICE_CODE_KEY_SENTINEL 那一行点名了两条。
+    writer_variables 是两趟都另设的环境（假装置换一种写法写，例如 write-many）。"""
     seed = next(seed for seed in range(1, 1 << 16) if forced_hit_number(seed) == 1)
     entries = [SCRIPTS_ENTRY, SCRIPTS_OTHER_ENTRY]
     arguments = ["run", "--binary", "fake-device", "--threads", "1"] + [word for entry in entries for word in ("--entry", entry)] + ["--", "segment-four"]
     wrong = []
     for label, variables, expected_code, sentence in SENTINEL_CASES:
         with tempfile.TemporaryDirectory(prefix="device-code-key-selftest-") as directory:
-            environment = selftest_tree(directory)
+            environment = dict(selftest_tree(directory), **(writer_variables or {}))
             with open(os.path.join(directory, "tree", SELFTEST_SCRIPTS_SOURCE), "w", encoding="utf-8") as handle:
                 handle.write(SELFTEST_TWO_ENTRY_SOURCE)
             first_code, _stdout, first_stderr = selftest_call(directory, environment, arguments)

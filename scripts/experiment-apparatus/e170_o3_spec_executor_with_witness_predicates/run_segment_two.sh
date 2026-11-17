@@ -202,6 +202,9 @@ decision_of() { awk -F'\t' -v item="$1" '$1 == item {print $2}' "$STATE/plan/dec
 
 : > "$STATUS"
 # 一步（文件头「按步判定」）：库里判绿就把那一份写到产物名上、不起命令；不然起命令、记判定（退非 0 记红）。<产物> 是这一步写的那一份
+in_executor() { # <执行器目录> <脚本> <参数…>：在执行器目录里起它的一份 python 脚本
+  (cd "$1" && python3 "${@:2}")
+}
 step() { # <项> <产物> <命令…>
   local name="$1" output="$2" code red=()
   shift 2
@@ -230,12 +233,14 @@ capture() { # <产物> <命令…>：命令的标准输出就是这一步的产�
 }
 
 freeze_check() {  # <名> <执行器目录> <带冻结行的产物> <when>：冻结行此刻照算一遍，与第一段（v1 是第 1 次重跑第一段）产物里的逐行比（V8）
-  (cd "$2" && python3 -c "
-import sys; sys.path.insert(0, '.')
+  (cd "$2" && python3 -c '
+import sys; sys.path.insert(0, ".")
 import executor_main
+executor, reference_path, when = sys.argv[1:4]
 now = []; executor_main.freeze_lines(now.append)
-reference = [line.rstrip('\n') for line in open('$3') if line.startswith(('name=freeze ', 'name=freeze_seed '))]
-print(f'name=freeze_check executor=$1 when=$4 identical={str(now == reference and len(reference) > 0).lower()} lines_now={len(now)} reference_lines={len(reference)} seed_now={now[-1].split(\"=\")[-1]}')")
+reference = [line.rstrip("\n") for line in open(reference_path) if line.startswith(("name=freeze ", "name=freeze_seed "))]
+seed_now = now[-1].split("=")[-1]
+print(f"name=freeze_check executor={executor} when={when} identical={str(now == reference and len(reference) > 0).lower()} lines_now={len(now)} reference_lines={len(reference)} seed_now={seed_now}")' "$1" "$3" "$4")
 }
 
 inputs() {  # 5.3：每个导出目录照 manifest.tsv 的 sha256: 行核；manifest 不列的坏状态文件逐个算 sha256（name=input_file）；B8–B10
@@ -331,35 +336,35 @@ step x21-row-242 "$P-x21-row-242.out" mutated_run X21 242 >> "$STATUS"
 step x21-row-269 "$P-x21-row-269.out" mutated_run X21 269 >> "$STATUS"
 step x27-row-270 "$P-x27-row-270.out" mutated_run X27 270 >> "$STATUS"
 
-step v1-against-stored "$P-v1-against-stored.out" bash -c "cd '$V2' && python3 comparator_v1_against_stored.py \
-  --pair I1:states:'$P-v1-i1.out':'$ROOT/research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out' \
-  --pair I2:states:'$P-v1-i2.out':'$ROOT/research/results/e170-r1-o3-spec-executor-2026-10-03-s2-executor.out' \
-  --pair I3:bad_states:'$P-v1-i3-images.out':'$ROOT/research/results/e170-r1-o3-spec-executor-2026-10-03-s3-bad-states.out' \
-  --pair I4:images:'$P-v1-i4-images.out':'$ROOT/research/results/e171-three-oracle-collusion-2026-10-03-s2-images-o3.out' \
-  --pair row-242:states:'$P-v1-row-242.out':'$ROWS/row-242/o3.out' --pair row-269:states:'$P-v1-row-269.out':'$ROWS/row-269/o3.out' \
-  --pair row-270:states:'$P-v1-row-270.out':'$ROWS/row-270/o3.out' --output '$P-v1-against-stored.out'"
-step v2-i1-against-segment-one "$P-v2-i1-against-segment-one.out" bash -c "cd '$V2' && python3 comparator_v1_against_stored.py \
-  --pair I1-v2-batches-1-2:states:'$P-v2-i1.out':'$V2_FREEZE' --output '$P-v2-i1-against-segment-one.out'"
+step v1-against-stored "$P-v1-against-stored.out" in_executor "$V2" comparator_v1_against_stored.py \
+  --pair I1:states:"$P-v1-i1.out":"$ROOT/research/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out" \
+  --pair I2:states:"$P-v1-i2.out":"$ROOT/research/results/e170-r1-o3-spec-executor-2026-10-03-s2-executor.out" \
+  --pair I3:bad_states:"$P-v1-i3-images.out":"$ROOT/research/results/e170-r1-o3-spec-executor-2026-10-03-s3-bad-states.out" \
+  --pair I4:images:"$P-v1-i4-images.out":"$ROOT/research/results/e171-three-oracle-collusion-2026-10-03-s2-images-o3.out" \
+  --pair row-242:states:"$P-v1-row-242.out":"$ROWS/row-242/o3.out" --pair row-269:states:"$P-v1-row-269.out":"$ROWS/row-269/o3.out" \
+  --pair row-270:states:"$P-v1-row-270.out":"$ROWS/row-270/o3.out" --output "$P-v1-against-stored.out"
+step v2-i1-against-segment-one "$P-v2-i1-against-segment-one.out" in_executor "$V2" comparator_v1_against_stored.py \
+  --pair I1-v2-batches-1-2:states:"$P-v2-i1.out":"$V2_FREEZE" --output "$P-v2-i1-against-segment-one.out"
 
-step comparator-q1 "$P-comparator-q1.out" bash -c "cd '$V2' && python3 comparator_two_versions.py \
-  --pair I1:states:'$P-v1-i1.out':'$P-v2-i1.out' --pair I2:states:'$P-v1-i2.out':'$P-v2-i2.out' \
-  --pair I3:images:'$P-v1-i3-images.out':'$P-v2-i3-images.out' --pair I4:images:'$P-v1-i4-images.out':'$P-v2-i4-images.out' \
-  --batches 1,2 --names I3:'$I2' --names I4:'$I4':'$KNOWN_BAD' --unit-tests '$P-i5-v1-tests-on-v2.out' \
-  --anchors '$P-v2-i1.out' --anchors '$P-v2-i2.out' --positive-control-input I2 --scratch '$SCRATCH' --output '$P-comparator-q1.out'"
+step comparator-q1 "$P-comparator-q1.out" in_executor "$V2" comparator_two_versions.py \
+  --pair I1:states:"$P-v1-i1.out":"$P-v2-i1.out" --pair I2:states:"$P-v1-i2.out":"$P-v2-i2.out" \
+  --pair I3:images:"$P-v1-i3-images.out":"$P-v2-i3-images.out" --pair I4:images:"$P-v1-i4-images.out":"$P-v2-i4-images.out" \
+  --batches 1,2 --names I3:"$I2" --names I4:"$I4":"$KNOWN_BAD" --unit-tests "$P-i5-v1-tests-on-v2.out" \
+  --anchors "$P-v2-i1.out" --anchors "$P-v2-i2.out" --positive-control-input I2 --scratch "$SCRATCH" --output "$P-comparator-q1.out"
 
-step comparator-q2-q3 "$P-comparator-q2-q3.out" bash -c "cd '$V2' && python3 comparator_witness_classes.py \
-  --row 242:'$P-v1-row-242.out':'$P-v2-row-242.out':'$P-reference-row-242.out' \
-  --row 269:'$P-v1-row-269.out':'$P-v2-row-269.out':'$P-reference-row-269.out' \
-  --row 270:'$P-v1-row-270.out':'$P-v2-row-270.out':'$P-reference-row-270.out' \
-  --mutated 242:X21:'$P-x21-row-242.out' --mutated 269:X21:'$P-x21-row-269.out' --mutated 270:X27:'$P-x27-row-270.out' \
-  --legal I1:previous_legal_history:states:1,2:'$P-v2-i1.out':'$P-reference-i1.out' \
-  --legal I2:previous_legal_history:states:1,2:'$P-v2-i2.out':'$P-reference-i2.out' \
-  --legal I3-base:previous_legal_history:images:-:'$P-v2-i3-images.out':'$P-reference-i3-images.out' \
-  --legal I4-base:previous_legal_history:images:-:'$P-v2-i4-images.out':'$P-reference-i4-images.out' \
-  --legal I1-batch-3:batch_three:states:3:'$P-v2-i1.out':'$P-reference-i1.out' \
-  --legal I2-batch-3:batch_three:states:3:'$P-v2-i2.out':'$P-reference-i2.out' \
-  --legal e171-s4-baseline:e171_s4_baseline:states:1,2,3:'$P-v2-e171-s4-baseline.out':'$P-reference-e171-s4-baseline.out' \
-  --positive-control-legal-input I2 --scratch '$SCRATCH' --output '$P-comparator-q2-q3.out'"
+step comparator-q2-q3 "$P-comparator-q2-q3.out" in_executor "$V2" comparator_witness_classes.py \
+  --row 242:"$P-v1-row-242.out":"$P-v2-row-242.out":"$P-reference-row-242.out" \
+  --row 269:"$P-v1-row-269.out":"$P-v2-row-269.out":"$P-reference-row-269.out" \
+  --row 270:"$P-v1-row-270.out":"$P-v2-row-270.out":"$P-reference-row-270.out" \
+  --mutated 242:X21:"$P-x21-row-242.out" --mutated 269:X21:"$P-x21-row-269.out" --mutated 270:X27:"$P-x27-row-270.out" \
+  --legal I1:previous_legal_history:states:1,2:"$P-v2-i1.out":"$P-reference-i1.out" \
+  --legal I2:previous_legal_history:states:1,2:"$P-v2-i2.out":"$P-reference-i2.out" \
+  --legal I3-base:previous_legal_history:images:-:"$P-v2-i3-images.out":"$P-reference-i3-images.out" \
+  --legal I4-base:previous_legal_history:images:-:"$P-v2-i4-images.out":"$P-reference-i4-images.out" \
+  --legal I1-batch-3:batch_three:states:3:"$P-v2-i1.out":"$P-reference-i1.out" \
+  --legal I2-batch-3:batch_three:states:3:"$P-v2-i2.out":"$P-reference-i2.out" \
+  --legal e171-s4-baseline:e171_s4_baseline:states:1,2,3:"$P-v2-e171-s4-baseline.out":"$P-reference-e171-s4-baseline.out" \
+  --positive-control-legal-input I2 --scratch "$SCRATCH" --output "$P-comparator-q2-q3.out"
 
 freeze_check v1 "$V1" "$V1_FREEZE" end >> "$STATUS"
 freeze_check v2 "$V2" "$V2_FREEZE" end >> "$STATUS"

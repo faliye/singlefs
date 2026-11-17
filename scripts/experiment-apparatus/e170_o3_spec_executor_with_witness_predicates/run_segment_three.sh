@@ -134,12 +134,14 @@ library_failure_exit() { # <哪一步> <退出码>：75（prune-server 不可用
 }
 
 freeze_check() {  # <名> <执行器目录> <带冻结行的产物> <when>：冻结行此刻照算一遍，与第一段（v1 是第 1 次重跑第一段）产物里的逐行比（V8）
-  (cd "$2" && python3 -c "
-import sys; sys.path.insert(0, '.')
+  (cd "$2" && python3 -c '
+import sys; sys.path.insert(0, ".")
 import executor_main
+executor, reference_path, when = sys.argv[1:4]
 now = []; executor_main.freeze_lines(now.append)
-reference = [line.rstrip('\n') for line in open('$3') if line.startswith(('name=freeze ', 'name=freeze_seed '))]
-print(f'name=freeze_check executor=$1 when=$4 identical={str(now == reference and len(reference) > 0).lower()} lines_now={len(now)} reference_lines={len(reference)} seed_now={now[-1].split(\"=\")[-1]}')")
+reference = [line.rstrip("\n") for line in open(reference_path) if line.startswith(("name=freeze ", "name=freeze_seed "))]
+seed_now = now[-1].split("=")[-1]
+print(f"name=freeze_check executor={executor} when={when} identical={str(now == reference and len(reference) > 0).lower()} lines_now={len(now)} reference_lines={len(reference)} seed_now={seed_now}")' "$1" "$3" "$4")
 }
 
 inputs() {  # V2：用到的导出目录照 manifest.tsv 的 sha256: 行核；第二段产物（比对器与参照谓词的输入）逐个记 sha256；B8–B10；冻结行开头核对
