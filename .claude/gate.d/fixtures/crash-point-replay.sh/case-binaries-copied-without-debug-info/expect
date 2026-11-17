@@ -1,0 +1,25 @@
+exit=3
+want=样本档：
+want=· 样本带 .gate-crash-cases-only：当作 --crash-cases-only
+want=── 没有 TASK_SERVER_SHARD_PHASE：这一件里自己走计划、单片、合并三步
+want=· 计划：2 片（样本根的 .gate-shard-count 点名；照服务分片的计划那一步预先编登记的崩溃枚举用例的测试二进制，各片与合并直接起）
+want=✓ 计划：登记的崩溃枚举用例要用的测试二进制按命令分 1 组各编一回（cargo test … --no-run，不持卡），2 个放进
+want=（硬链接 0 份、拷 2 份）；没放的 0 个由各片自己经 cargo test 起
+want=（拷的里去掉调试段 2 份；判器核对的表拷 2 份）
+want=· 样本档：到计划结束为止 cargo test 起了 1 遍（其中只编不跑 1 遍）
+want=· crash-case:plain-stream：第 0/2 片起计划那一步编好的测试二进制（判器键所读的文件都没变：same watched=1），不经 cargo、不编：
+want=CRASH_POINT_REPLAY_PROGRESS sample-binary-run: target=plain_stream share=[0/2] directory=[singlefs-verification]
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-case: target=plain_stream share=[0/2] through-binary=[1]
+want=· 样本档：到第 0/2 片结束为止 cargo test 起了 1 遍（其中只编不跑 1 遍）
+want=· crash-case:other-stream：第 1/2 片起计划那一步编好的测试二进制（判器键所读的文件都没变：same watched=1），不经 cargo、不编：
+want=CRASH_POINT_REPLAY_PROGRESS sample-binary-run: target=other_stream share=[1/2] directory=[singlefs-verification]
+want=✓ crash-case:other-stream 第 1/2 片判完它领的块
+want=· 样本档：到第 1/2 片结束为止 cargo test 起了 1 遍（其中只编不跑 1 遍）
+want=── 合并：九格照常判，crash-case-replay 格核账、一块不现判
+want=· crash-case:plain-stream：合并那一步起计划那一步编好的测试二进制（判器键所读的文件都没变：same watched=1），不经 cargo、不编：
+want=CRASH_POINT_REPLAY_PROGRESS sample-binary-run: target=plain_stream share=[unset] directory=[singlefs-verification]
+want=· 样本档：到合并结束为止 cargo test 起了 1 遍（其中只编不跑 1 遍）
+want=✓ 崩溃状态块：现判 0、复用 5、拒算 0、本次未跑 0
+want=逐格：crash-case-replay：绿（--crash-cases-only：只判了按块那一路，按条复用那一趟没起）
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

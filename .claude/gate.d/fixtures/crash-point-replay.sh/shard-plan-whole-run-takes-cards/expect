@@ -1,0 +1,12 @@
+exit=3
+want=· 样本带 .gate-shard-phase：当作服务交的 TASK_SERVER_SHARD_PHASE=plan
+want=· 计划：预先编登记的崩溃枚举用例的测试二进制（不持卡，只编不跑）：
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-build: target=plain_stream
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-build: target=other_stream
+want=✓ 计划：登记的崩溃枚举用例要用的测试二进制按命令分 1 组各编一回（cargo test … --no-run，不持卡），2 个放进
+want=· 计划：预先编按条复用那一趟的测试二进制（不持卡，只编不跑）：
+want=! 计划：按条复用那一趟只编那一步退 1
+want=· 样本档：到计划结束为止 cargo test 起了 2 遍（其中只编不跑 2 遍）
+want=✓ 分片的计划：5 片（取上界 5 片：多机配置 HOSTS 点名 5 项，一项一片；不点名用例的整轮（全部登记的 2 条崩溃枚举用例与包里按条复用那一趟）照上界分；0 条点名的崩溃枚举用例（0 是全部登记的））
+want=样本根的 .gate-shard-phase 只演计划那一步，写完计划退 3 不退 0
+not-green-by-design=crash-case-replay 样本只演服务交的计划那一步，写完计划退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

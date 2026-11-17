@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=── 第二趟（break-switch-replay）
+want=· 按条复用：1 份脚本、5 条判定（基准趟 1 条、开关 4 条），现判 1、复用 4、拒算 0
+want=· 开关趟落盘：取回 4 趟（键相同、跑完就落了盘，不再起），这一趟要起 1 趟
+want=开关趟：现跑 1 趟、取回 4 趟
+want=break-switch-replay：绿

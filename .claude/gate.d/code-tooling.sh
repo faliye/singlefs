@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录、跑研究脚本与共用库自己的自证、起各道门禁的 --list；research-gate-lint 格调的上游 gate-lint.sh、shell-lint.sh 要 gawk，缺了由它们自己拒绝（退 78），那一格按红记，不交给 gate.sh 预判；function-units-two-implementations-agree 格编 unit-graph 要的 cargo 缺了那一格自己判红
-# gate-stage: 工具层自检（四十格：研究脚本的自证都过、有阶段在跑；带判定库的脚本自证里复用三问都过；项目规则清单（@ 引用加 read-once 登记）；阶段归属表按格登记；钩子注册与写范围表与定义头；定义的形状（model 与 tools 写明、tools 不给 Agent、四节齐、不抄规则的长行、调度表与定义两向相等）；改动范围只许一份取法；研究脚本与钩子的拒绝出路与 shell 纪律；阶段声称的样本与编造的日期；带编号登记位的样本都排在 doc-lint 之外；kb 登记表；门禁结构；环境检查排在跑测试的阶段之后；目录形态；提交里没有超过单文件上限的文件；阶段在 cd 之前取好自己的位置；并行度默认值只经每台默认重活线程数的登记位取；跑法不写死内存上限与台数；函数单元两份实现对拍；同一个 Rust 编译目标里不同模块的条目不撞名；变异门禁的 --list-items 在被判的仓上跑得通；门禁阶段的弄坏开关只在样本根上认；入口脚本带列项、自证与每项一行；弄坏开关文件头三样写全；门禁阶段的弄坏开关逐条复跑、判错的样本与头注点名的相等；研究脚本与钩子平常跑时设了弄坏开关要被拒；登记的脚本与钩子的弄坏开关逐条复跑、点名的项都在失败行里；kb 目录登记位里的每个目录连同子目录都在写回员的写范围里；脚本不经 ~ 与 $HOME 取数据根下共享的那几项；CLAUDE.md 登记的规则都被定义点名；runner 表里套临时服务包装的自证与要临时服务的表里登记成 required 的两边对齐；要临时服务的自证的整条写法在登记表文件头、拒绝说明、骨架、客户端文件头、自证登记表、runner 表、门禁的包装前缀常量这七处逐字相同、包装的解析收得下、不带尖括号占位的 --server-binary；建仓副本的写法都经共用库算闭包、不手抄拷贝清单）
+# gate-stage: 工具层自检（四十三格：研究脚本的自证都过、有阶段在跑；带判定库的脚本自证里复用三问都过；项目规则清单（@ 引用加 read-once 登记）；阶段归属表按格登记；钩子注册与写范围表与定义头；定义的形状（model 与 tools 写明、tools 不给 Agent、四节齐、不抄规则的长行、调度表与定义两向相等）；改动范围只许一份取法；研究脚本与钩子的拒绝出路与 shell 纪律；阶段声称的样本与编造的日期；带编号登记位的样本都排在 doc-lint 之外；kb 登记表；门禁结构；环境检查排在跑测试的阶段之后；目录形态；提交里没有超过单文件上限的文件；阶段在 cd 之前取好自己的位置；并行度默认值只经每台默认重活线程数的登记位取；跑法不写死内存上限与台数；函数单元两份实现对拍；同一个 Rust 编译目标里不同模块的条目不撞名；变异门禁的 --list-items 在被判的仓上跑得通；门禁阶段的弄坏开关只在样本根上认；入口脚本带列项、自证与每项一行；弄坏开关文件头三样写全；门禁阶段的弄坏开关逐条复跑、判错的样本与头注点名的相等；研究脚本与钩子平常跑时设了弄坏开关要被拒；登记的脚本与钩子的弄坏开关逐条复跑、点名的项都在失败行里；kb 目录登记位里的每个目录连同子目录都在写回员的写范围里；脚本不经 ~ 与 $HOME 取数据根下共享的那几项；CLAUDE.md 登记的规则都被定义点名；runner 表里套临时服务包装的自证与要临时服务的表里登记成 required 的两边对齐；要临时服务的自证的整条写法在登记表文件头、拒绝说明、骨架、客户端文件头、自证登记表、runner 表、门禁的包装前缀常量这七处逐字相同、包装的解析收得下、不带尖括号占位的 --server-binary；建仓副本的写法都经共用库算闭包、不手抄拷贝清单；登记的自证成功句报并行度或文件头写明不能并行；跑过两小时也不拆的豁免表每一行写对：理由、出处、不重复、项名不是目录与整道门禁）
 # gate-fixture: yes
 # gate-category: 代码类
 # 不写 gate-covers：.claude/gate-not-implemented.tsv 里的两项判的是被测代码的行为，这一道只判工具层自己。
 # gate-similar: research-build-and-replay.sh 它编 research/ 的装置、跑它们的单测，不跑研究脚本的自证（stage-mine.py、relabel-item.py、claim-experiment.sh 这几份的自证不要 research 工作区先编好，同别的研究脚本一样在这里的 runner 表里跑）；这一道的 research-script-selftests 格跑 runner 表里研究脚本的自证、research-script-selftest-coverage 格核每份实现了 --selftest 的都有阶段在跑，不编译
 # gate-similar: model-differential-and-scenarios.sh 它在真仓上判 harness 用例一条一个场景，crash-case-check.py 的判别力由这一道 research-script-selftests 格跑它的 --selftest；判的对象一个是用例源码，一个是脚本的自证
-# gate-similar: doc-text.sh 也扫全仓文件，但判的是文本里登记过的禁用写法与旧术语；这一道 fixture-claims 格判文件名与样本目录里编出来的日期、阶段头部声称的样本在不在
+# gate-similar: doc-text.sh 也扫全仓文件，但判的是文本里登记过的禁用写法；这一道 fixture-claims 格判文件名与样本目录里编出来的日期、阶段头部声称的样本在不在
 # gate-similar: code-source-discipline.sh 它判实验二进制的变异表、绝对值断言与读数纪律，对象是实验源码；crates-mutation-rows.py 与 check-segment-registry.py 这类脚本的自证由这一道 research-script-selftests 格替它们跑
 # gate-similar: doc-process-records.sh 它是改动范围共用取法的使用者之一，判三方与同步留下的记录；这一道 change-range-single-source 格判每个阶段只经那一份取法、列路径带 quotepath，对象是门禁阶段的源码
 # gate-similar: doc-experiments.sh 它也是改动范围共用取法的使用者，判实验页与产物；这一道只判工具层自己（脚本、钩子、登记表、定义头、门禁结构与次序），不读实验页
@@ -16,9 +16,10 @@
 # gate-similar: hooks-registered.sh 上游这一道判 settings.json 里注册的钩子在、hook-events 挂全、带 --selftest 的自检通过；这一道 agent-write-scope 格判的是项目点名的那几个钩子挂在要的 matcher 上、写范围表与定义双向一致、定义头，钩子的自证只归它跑
 # gate-similar: manifest.sh 上游这一道判规范包自己的 CLAUDE.md 与 rules/ 对得上；这一道 rules-manifest 格判项目本地 .claude/rules/ 与项目 CLAUDE.md 的 @ 引用，射程不重叠
 # gate-similar: doc-lint.sh 上游这一道的 J 段判排除表自己的形状（理由、目录在、下面有 .md）；这一道 fixture-registrations-excluded 格判样本目录里有登记位的阶段都在排除表里、排除表没有指向 fixtures 下不存在的阶段，对象是样本与表的对账，不并进 doc-lint
+# gate-similar: doc-process-records.sh 它的 crates-adversarial-review、agent-def-adversarial-review 两格判按内容哈希登记的豁免表（.claude/crates-review-exempt、.claude/agent-def-review-exempt）；这一道 long-run-split-exempt 格判按项名登记、理由带 records 出处的 .claude/long-run-split-exempt，键与对象都不同，没有可并进它们的判据；本道里别的排除表格（heavy-thread-defaults、hardcoded-quota、shared-data-root-literals、repository-copy-closure、selftest-parallelism）各绑着自己的扫描判法，这张表没有扫描对象，不并进它们
 # gate-similar: stage-selftest.sh 上游这一道拿 fixtures 下的红绿样本证明本地阶段会红；这一道 fixture-claims 格只判阶段头部的声称与样本目录对不对得上，gate-structure 格只判结构（格名表、--list、--check），都判不了样本本身有没有判别力
 #
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就四十格按下面的次序全跑，格名写错退 2）：
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就四十三格按下面的次序全跑，格名写错退 2）：
 # gate-cell: research-script-selftests runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）
 # gate-cell: research-script-selftest-coverage scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑
 # gate-cell: reuse-selftests 登记表 verdict-library-scripts.tsv 里每份带判定库的脚本，自证的复用三问都过；声称复用的都登记了
@@ -39,7 +40,7 @@
 # gate-cell: stage-location-before-cd 门禁阶段在 cd 到项目根之前取好自己的位置，cd 之后不再用 dirname "$0" 找旁边的文件
 # gate-cell: heavy-thread-defaults 脚本、门禁、钩子与 crates 里自己定并行度默认值的写法都经每台默认重活线程数的登记位取，排除表指得到、只缩不涨
 # gate-cell: hardcoded-quota 脚本、门禁与钩子里不定内存上限与台数（上限、机器由 task-server 按记录定），排除表指得到、只缩不涨
-# gate-cell: memory-bounded-parallelism 按内存上限定开几个进程或线程的入口都登记在 .claude/memory-bounded-parallelism.tsv，表每行六列成形、入口在，登记的入口代码里还有这类写法
+# gate-cell: memory-bounded-parallelism 按内存上限定开几个进程或线程的入口都登记在 .claude/memory-bounded-parallelism.tsv，表每行两列（入口、理由）成形、入口在，登记的入口代码里还有这类写法
 # gate-cell: function-units-two-implementations-agree 函数单元的两份实现（crates/singlefs-unit-graph 与 scripts/gate/lib_function_units.py）原样与产品行为视图两趟：dump 逐单元相同，登记入口的闭包与键逐个相同
 # gate-cell: rust-name-collisions 同一个 Rust 编译目标里不同模块各自定义的同名条目（fn、struct、enum、union、const、static、type、trait，私有的与只在测试里的也算）判红，逐处列出文件:行
 # gate-cell: mutation-list-items 变异门禁的 --list-items 在被判的仓上跑通：退 0、报出键对不上的条数，没有「没算出来」、回溯与 PicklingError
@@ -54,11 +55,13 @@
 # gate-cell: shared-data-root-literals 脚本、钩子、门禁与服务不经 ~ 与 $HOME 取数据根下共享的那几项（经 lib_work_root.py 的 shared_data_root() 取），排除表指得到、只缩不涨
 # gate-cell: cp-preserve-mode 项目脚本、钩子、门禁、样本根的搭建脚本与服务里的 cp 不带保留权限的选项（-a、-p、--archive、不带值或带 mode / all 的 --preserve）
 # gate-cell: peer-launch-direct 项目脚本与门禁不自己起 multi-host-run.sh --peer 往第二台起活（照服务的分片协议，派哪台由服务定）
-# gate-cell: retired-names 退役名单 retired-names.tsv 里的名字在脚本、门禁、钩子、crates 与服务里一处都没有（不留「设了就拒」的放行；搬迁登记表 path-moves.tsv 记的是旧路径，不扫）
 # gate-cell: verdict-library-code 登记表 verdict-library-scripts.tsv 写了判定库的行第三列都是 prune-server，点名的脚本里没有取不到库照跑的分支、prune-server 行没有本地库读写
 # gate-cell: temporary-service-runners runner 表里套了临时服务包装的自证，与要临时服务的表 selftest-temporary-service.tsv 里登记成 required 的两边对齐（裸写、缺条、包装了表里没有的都点名；own-server 不要求包装）
 # gate-cell: temporary-service-wrapper-form 要临时服务的自证的整条写法在七处逐字相同（登记表文件头、拒绝说明、骨架、客户端文件头、自证登记表、runner 表、包装前缀常量）、包装的解析收得下、整条里没有带尖括号占位的 --server-binary
 # gate-cell: repository-copy-closure scripts/、.claude/gate.d/、.claude/hooks/ 里建仓副本的写法都经 scripts/hosts/lib_repository_copy.py 算闭包（拷源点名仓根条目的 cp、rsync、git archive、shutil.copy 一族与手抄的拷贝清单字面量判红），排除表一行一处、带理由、只缩不涨
+# gate-cell: selftest-cells-alone 有选格手段的自证（写着「<名字>_SELFTEST_CELLS=<格名…」的）逐格单跑与整份跑判定相同：单跑红而整份里绿、单跑绿而整份里红的格点名判红
+# gate-cell: selftest-parallelism 登记表 selftest-registry.tsv 里登记成 selftest 的每份脚本，成功句报并行度或文件头写明不能并行（# selftest-serial:），排除表指得到、只缩不涨
+# gate-cell: long-run-split-exempt 跑过两小时也不拆的豁免表 .claude/long-run-split-exempt 的每一行写对：有 #、理由至少 8 个字、理由里有存在的 records/<文件>.md:<行>（行号不超过文件行数）、项名不重复、不是目录也不是门禁文件名
 #
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码经共用库 lib/stage-cells.sh（写法在它的文件头），这里只登记格、解析项目根。
 #
@@ -67,19 +70,25 @@
 #                                      runner-red-record-failed、runner-not-run-green、runner-all-not-run、runner-recorded-before-the-run-ends、
 #                                      runner-bare-temporary-service-red、runner-plan-unavailable、runner-item-picked、runner-item-unknown、
 #                                      runner-judge-entries-unreadable-red（样本根的 .selftest-judge-guard.py 顶替守卫，里面没有判法名单那一句）
+#                                      runner-memory-bound-batches-green、runner-memory-bound-unlisted-red（样本根的 .selftest-memory-bound 顶替登记的大自证）
+#                                      runner-record-skips-forwarded-green（收尾记库的「!」行转进日志）
 #   research-script-selftest-coverage  red、green、coverage-claims-red、coverage-claims-green、coverage-nested-red、coverage-suffix-red
 #   reuse-selftests                    reuse-selftests-red、reuse-selftests-green、reuse-selftests-reuse-three-questions、reuse-selftests-red-over-green、
 #                                      reuse-selftests-red-record-failed（按条复用，setup.sh 都 git init）
 #   rules-manifest                     rules-manifest-red、rules-manifest-green、rules-manifest-read-once-red、rules-manifest-read-once-green
-#   rules-named-by-definitions         rules-named-by-definitions-red、rules-named-by-definitions-green
+#   rules-named-by-definitions         rules-named-by-definitions-red、rules-named-by-definitions-green、rules-named-by-definitions-main-only-green、
+#                                      rules-named-by-definitions-main-only-unregistered-red、rules-named-by-definitions-main-only-named-red、
+#                                      rules-named-by-definitions-main-only-reason-red（样本根自己的 .claude/gate.d/rules-main-agent-only.tsv）
 #   stage-owners                       stage-owners-red、stage-owners-green
 #   agent-write-scope                  agent-write-scope-red、agent-write-scope-multiedit-red、agent-write-scope-timer-red、agent-write-scope-run-scope-red、
+#                                      agent-write-scope-find-timestamp-red、
 #                                      agent-write-scope-green
 #   agent-definition-shape             agent-definition-shape-model-red、agent-definition-shape-tools-red、agent-definition-shape-agent-tool-red、agent-definition-shape-sections-red、
 #                                      agent-definition-shape-rule-copy-red、agent-definition-shape-table-red、agent-definition-shape-green
 #   change-range-single-source         change-range-single-source-red、change-range-single-source-green、change-range-single-source-path-moves-red、change-range-single-source-path-moves-green、
 #                                      change-range-single-source-path-moves-evidence-red、change-range-single-source-path-moves-evidence-green、
-#                                      change-range-single-source-path-moves-committed-green、change-range-single-source-path-moves-base-row-green
+#                                      change-range-single-source-path-moves-committed-green、change-range-single-source-path-moves-base-row-green、
+#                                      change-range-single-source-prose-green
 #   research-gate-lint                 research-gate-lint-red、research-gate-lint-green、research-gate-lint-arithmetic-shift-red、research-gate-lint-pending-outside-green、research-gate-lint-pending-stale-red
 #   fixture-claims                     fixture-claims-red、fixture-claims-unnumbered-red、fixture-claims-cells-red、fixture-claims-unmarked-red、
 #                                      fixture-claims-marker-malformed-red、fixture-claims-none-with-directory-red、fixture-claims-exempt-red、fixture-claims-green
@@ -100,33 +109,53 @@
 #                                      （setup.sh 现写小工作区、git init，--list-items 只起 git 与 rustc -vV）
 #   break-switches-sample-only         break-switches-sample-only-red、break-switches-sample-only-green
 #   entry-scripts                      entry-scripts-red、entry-scripts-green、entry-scripts-reuse-three-questions、entry-scripts-red-over-green（setup.sh 都 git init）
-#   break-switch-headers               break-switch-headers-red、break-switch-headers-green
+#   break-switch-headers               break-switch-headers-red、break-switch-headers-green、break-switch-headers-quote-unbalanced-red（点名的项里「」没配平：一份少收尾、一份多收尾，加一份成对的）
 #   stage-break-switch-replay          stage-break-switch-replay-red、stage-break-switch-replay-green、stage-break-switch-replay-progress-green（样本里的小阶段只读一份文件，进度那份另先睡 2 秒，经这一道所在仓的 stage-selftest.sh 喂）、
 #                                      stage-break-switch-replay-reuse-three-questions、stage-break-switch-replay-samples-in-key、stage-break-switch-replay-red-over-green、
 #                                      stage-break-switch-replay-item-green、stage-break-switch-replay-item-unknown（按条复用与逐项点名，setup.sh 都 git init）
+#                                      stage-break-switch-replay-interrupted-resume（被打断之后第二趟只补没判的）、stage-break-switch-replay-unread-row-red、stage-break-switch-replay-unread-row-green
+#                                      stage-break-switch-replay-jobs-registered-green、stage-break-switch-replay-jobs-registered-red、stage-break-switch-replay-threads-split-green、
+#                                      stage-break-switch-replay-memory-knob-red（并行度：样本根的 .stage-break-switch-replay-memory 顶替内存、线程与峰值）
+#                                      stage-break-switch-replay-key-changed-red（一道小阶段每喂一次往自己的样本目录里追加一个文件：跑的过程中键变了，点名点错的那一条失败行带「跑的过程中键变了」）
 #   break-switch-outside-selftest      break-switch-outside-selftest-red、break-switch-outside-selftest-green、break-switch-outside-selftest-guard-combined-red、
 #                                      break-switch-outside-selftest-guard-combined-green
 #   break-switch-replay                break-switch-replay-red、break-switch-replay-unnamed-red、break-switch-replay-undecodable-red、break-switch-replay-green、break-switch-replay-slow-baseline-green、
 #                                      break-switch-replay-temporary-service-green、break-switch-replay-progress-green、
 #                                      break-switch-replay-reuse-three-questions、break-switch-replay-named-in-key、break-switch-replay-red-over-green、
 #                                      break-switch-replay-item-co-run-green、break-switch-replay-item-unknown（按条复用与逐项点名，setup.sh 都 git init）
+#                                      break-switch-replay-interrupted-resume（被打断之后第二趟只补没落盘的）、break-switch-replay-forced-trip-rerun-green（强制现判那一条不取回）
+#                                      break-switch-replay-scoped-cells-green、break-switch-replay-whole-scope-red、break-switch-replay-scoped-named-quiet-red、
+#                                      break-switch-replay-scoped-key-separate-green（指定范围只起点名的格、不指定范围起整份、点名的格没红判红、两种范围的判定不共用单元键）
+#                                      break-switch-replay-jobs-registered-green、break-switch-replay-jobs-registered-red、break-switch-replay-jobs-threads-capped-green、
+#                                      break-switch-replay-jobs-inner-threads-green（并行度取登记的每台默认重活线程数、不按内存上限收：样本根的 .break-switch-replay-jobs 给内存上限与线程数，
+#                                      registered 那两份一份脚本 32 条开关、内存上限 1536 MiB、线程 8）
+#                                      break-switch-replay-refused-red（按条复用的共用段开跑前有拒算就判红、一条都不起）
+#                                      break-switch-replay-trip-group-stopped-green、break-switch-replay-reruns-serial-green
+#                                      （每趟自成一组、到点停整组核清才还名额；要重跑的别的趟收完之后一次一条）
+#                                      break-switch-replay-mismatch-detail-red（一份开关红五格、点名一格加一格没红：日志只列前三行，完整的失败行与点名的项落到明细文件、回读核过；setup.sh 都 git init）
+#                                      break-switch-replay-key-changed-red（基准趟往自己读的表末尾加一行，开关那一条判成不符：跑的过程中键变了，那一条的失败行带「跑的过程中键变了」与变了的数据文件；setup.sh 都 git init）
 #   kb-directories-write-scope         kb-directories-write-scope-red、kb-directories-write-scope-green
 #   prune-server-selftest              prune-server-selftest-green、prune-server-selftest-absent-green、prune-server-selftest-failed-red、prune-server-selftest-empty-red、prune-server-selftest-no-summary-red、prune-server-selftest-exit-red（假的自证是样本根里的 .prune-server-selftest-program，不编）
 #   shared-data-root-literals          shared-data-root-literals-red、shared-data-root-literals-data-root-red、shared-data-root-literals-green
 #   cp-preserve-mode                   cp-preserve-mode-red、cp-preserve-mode-green
 #   peer-launch-direct                 peer-launch-direct-red、peer-launch-direct-green
-#   retired-names                      retired-names-red、retired-names-green
 #   verdict-library-code               verdict-library-code-red、verdict-library-code-green
 #   temporary-service-runners          temporary-service-runners-red、temporary-service-runners-green（样本根自己的要临时服务的表与 .selftest-runners，不起自证）
 #   temporary-service-wrapper-form     temporary-service-wrapper-form-green、temporary-service-wrapper-form-binary-placeholder-red、temporary-service-wrapper-form-prefix-differs-red、temporary-service-wrapper-form-unparsable-red、temporary-service-wrapper-form-place-missing-red（样本根放齐七处里的文件，不起自证）
 #   repository-copy-closure            repository-copy-closure-red、repository-copy-closure-green
+#   selftest-cells-alone               selftest-cells-alone-red、selftest-cells-alone-green、selftest-cells-alone-reuse-three-questions、selftest-cells-alone-threads-split-green、
+#                                      selftest-cells-alone-jobs-registered-green、selftest-cells-alone-jobs-registered-red（样本的小自证只在内存里判，setup.sh 都 git init）
+#   selftest-parallelism               selftest-parallelism-red、selftest-parallelism-green（样本根自己的登记表、排除表与几份小脚本，只读文本）
+#   long-run-split-exempt              long-run-split-exempt-red、long-run-split-exempt-green、long-run-split-exempt-empty（样本根自己的豁免表、records 文件与门禁文件，只读文本）
+#   break-switch-replay、selftest-cells-alone  prune-server-shared-build-green（两格一起跑：样本根的 sample-prune-server-build 顶替 cargo build，第二次被起就退 1；两格取 prune-server 二进制共用同一趟编出的那一份，只起一次，两格都判绿；setup.sh 都 git init）
+#   break-switch-headers、break-switch-replay  break-switch-header-gap-red（两格一起跑：一份复跑登记表点名的文件头，点名行缩进不够，两格都红在同一条开关；复跑格的 setup.sh 都 git init）
 #   （不属于哪一格）                   sample-root-bare-red（判的根是样本却不在临时 prune-server 底下：退 2、一格不判；样本根放 .sample-environment-bare 造出裸跑的样子，其余样本都是在临时服务底下被喂的，它们就是这一判的绿侧；写法在文件末尾 code_tooling_sample_service_check 上方）
 # 每格的样本放了什么写在那一格的注释里。各份绿样本里 vm-bench.sh、stage-owners.tsv、定义、settings.json 这副架子是并道时为八格全跑补的，留着不碍事。
 # 弄坏开关（样本自检时设进环境；每条一行「开关=值  弄坏哪一处」，下面逐行点名打开后判错的样本，fixtures/code-tooling.sh/ 下的目录名；
 # 这一道的 stage-break-switch-replay 格逐条复跑，比点名的与实测判错的。每格的样本放了什么、红在哪一句，写在那一格的注释里）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0（共用库别的项见那份文件头）
-#     agent-write-scope-multiedit-red、agent-write-scope-red、agent-write-scope-run-scope-red、agent-write-scope-timer-red
-#     break-switch-headers-red、break-switch-outside-selftest-red、break-switch-replay-red
+#     agent-write-scope-multiedit-red、agent-write-scope-red、agent-write-scope-run-scope-red、agent-write-scope-timer-red、agent-write-scope-find-timestamp-red
+#     preflight-guarded-red、break-switch-headers-red、break-switch-outside-selftest-red、break-switch-replay-red
 #     break-switch-replay-undecodable-red、break-switch-replay-unnamed-red、break-switches-sample-only-red、change-range-single-source-path-moves-evidence-red
 #     change-range-single-source-path-moves-red、change-range-single-source-red、committed-file-size-detached-red、committed-file-size-red
 #     committed-file-size-unpushed-red、coverage-claims-red、coverage-nested-red、coverage-suffix-red
@@ -151,15 +180,25 @@
 #     shared-data-root-literals-red、shared-data-root-literals-data-root-red
 #     cp-preserve-mode-red
 #     peer-launch-direct-red
-#     retired-names-red、verdict-library-code-red
-#     rules-named-by-definitions-red
+#     verdict-library-code-red
+#     rules-named-by-definitions-red、rules-named-by-definitions-main-only-unregistered-red
+#     rules-named-by-definitions-main-only-named-red、rules-named-by-definitions-main-only-reason-red
 #     runner-bare-temporary-service-red、temporary-service-runners-red
 #     temporary-service-wrapper-form-binary-placeholder-red、temporary-service-wrapper-form-place-missing-red、temporary-service-wrapper-form-prefix-differs-red、temporary-service-wrapper-form-unparsable-red
 #     break-switch-replay-red-over-green、stage-break-switch-replay-red-over-green
+#     break-switch-replay-scoped-named-quiet-red、break-switch-replay-whole-scope-red
+#     break-switch-replay-mismatch-detail-red、break-switch-headers-quote-unbalanced-red
+#     break-switch-replay-key-changed-red、stage-break-switch-replay-key-changed-red
 #     repository-copy-closure-red
 #     reuse-selftests-red-over-green、function-units-two-implementations-agree-red-over-green、mutation-list-items-red-over-green、entry-scripts-red-over-green
 #     runner-red-record-failed、reuse-selftests-red-record-failed
 #     runner-judge-entries-unreadable-red
+#     runner-memory-bound-unlisted-red、stage-break-switch-replay-unread-row-red
+#     break-switch-replay-refused-red、selftest-cells-alone-red
+#     break-switch-replay-jobs-registered-red、stage-break-switch-replay-jobs-registered-red、selftest-cells-alone-jobs-registered-red
+#     selftest-parallelism-red
+#     long-run-split-exempt-red、break-switch-header-gap-red
+#     stage-break-switch-replay-memory-knob-red
 #   CODE_TOOLING_BREAK=runner-exit-swallowed  research-script-selftests 回读时把每条的退出码都当 0
 #     runner-all-not-run
 #     runner-guard-red
@@ -191,6 +230,23 @@
 #     reuse-selftests-red-record-failed（同一句找不到，再算一次计划答「复用 2 条」）
 #   CODE_TOOLING_BREAK=selftest-recorded-at-end  research-script-selftests 每条跑完不当场记，只在整格收尾一次记（中途被停，判完的全丢）
 #     runner-recorded-before-the-run-ends
+#   CODE_TOOLING_BREAK=record-skip-lines-dropped  收尾那一趟 verdict-record 退 0 时它打的「!」行（跑的过程中键变了、不记的）不转进日志，只剩 RECORD 行
+#                                       （research-script-selftests 的 selftest_record_skips_report 与按条复用的共用段 ItemVerdicts.report_record_skips 两处）
+#     runner-record-skips-forwarded-green（「--selftest：跑的过程中键变了（开跑」与「另有 1 条没转进日志」两条 want 找不到）
+#     break-switch-replay-record-skips-forwarded-green（同两条 want 找不到）
+#   CODE_TOOLING_BREAK=key-change-not-rechecked  stage-break-switch-replay 与 break-switch-replay 判成「没对上（不符）」时不重算那一条的键（ItemVerdicts.key_changes）：
+#                                       跑的过程中键变了，那一条的失败行也不写「跑的过程中键变了」，日志里没有「重算键」那一行
+#     break-switch-replay-key-changed-red（「· 重算键：没对上的 1 条照开跑前同一份请求重算，键变了 1 条」与「跑的过程中键变了（开跑前算的键」两条 want 找不到）
+#     stage-break-switch-replay-key-changed-red（同两条 want 找不到）
+#     break-switch-replay-mismatch-detail-red（「键变了 0 条」那条 want 找不到：没有重算，日志里没有那一行）
+#     stage-break-switch-replay-red（同一条 want 找不到）
+#   CODE_TOOLING_BREAK=key-change-noted-always  同两格重算出来的一概当键变了：键没变的那一条也接「跑的过程中键变了」那一句，日志里写「键变了 1 条」
+#     break-switch-replay-mismatch-detail-red（「键变了 0 条」那条 want 找不到）
+#     stage-break-switch-replay-red（同一条 want 找不到）
+#   CODE_TOOLING_BREAK=selftest-memory-bound-ignored  research-script-selftests 登记的大自证照别的一样进批（几份大自证叠在一批，整格的内存峰值是它们的和）
+#     runner-memory-bound-batches-green
+#   CODE_TOOLING_BREAK=selftest-memory-bound-unlisted-accepted  research-script-selftests 不核登记的大自证在不在 runner 表里（runner 表里改了名就悄悄少分一批）
+#     runner-memory-bound-unlisted-red
 #   CODE_TOOLING_BREAK=bare-temporary-service-selftest-accepted  research-script-selftests 不核只在临时 prune-server 上跑的自证写没写成包装写法（裸写照起、退 2）
 #     runner-bare-temporary-service-red
 #   CODE_TOOLING_BREAK=temporary-service-table-ignored  认「这份自证要不要临时服务」看源码里有没有 selftest_service_problem、不读要临时服务的表（own-server 的被要求包装，表里 required 而源码没写那几个字的认不出；四个格共用 temporary_service_is_required）
@@ -202,6 +258,8 @@
 #   CODE_TOOLING_BREAK=stage-replay-binary-not-passed  stage-break-switch-replay 开跑前不取 prune-server 二进制、套包装起 stage-selftest.sh 时不带 --server-binary（包装不现编，退 2、每条开关都没跑成）
 #     stage-break-switch-replay-green、stage-break-switch-replay-item-green、stage-break-switch-replay-progress-green、stage-break-switch-replay-red
 #     stage-break-switch-replay-red-over-green、stage-break-switch-replay-reuse-three-questions、stage-break-switch-replay-samples-in-key
+#     stage-break-switch-replay-interrupted-resume、stage-break-switch-replay-unread-row-green、stage-break-switch-replay-key-changed-red
+#     stage-break-switch-replay-jobs-registered-green、stage-break-switch-replay-jobs-registered-red、stage-break-switch-replay-threads-split-green
 #   CODE_TOOLING_BREAK=sample-service-unchecked  判的根是样本时不核在不在临时 prune-server 底下（裸跑也判，样本的判定写进真服务）
 #     sample-root-bare-red
 #   ADMISSION_BREAK=plan-unavailable-as-failure  归 scripts/gate/admission.py：research-script-selftests 计划退 75 照复用失灵判红、整道退 1
@@ -223,6 +281,8 @@
 #     reuse-selftests-reuse-three-questions
 #   CODE_TOOLING_BREAK=claims-any-file  research-script-selftest-coverage 退回「全文出现 --selftest 就算声称有」
 #     coverage-claims-green
+#   CODE_TOOLING_BREAK=coverage-scans-build-output  research-script-selftest-coverage 不跳过 scripts 下叫 target 的编译产物目录（里面代码写着 --selftest 的 .sh 也算声称有自证、没人跑）
+#     coverage-claims-green
 #   CODE_TOOLING_BREAK=selftest-coverage-top-level-only  research-script-selftest-coverage 只扫 scripts/<类>/ 那一层、不进装置目录
 #     coverage-claims-green
 #     coverage-nested-red
@@ -238,6 +298,9 @@
 #     fixture-claims-unnumbered-red
 #   CODE_TOOLING_BREAK=tool-version-dates-judged  fixture-claims 第 ④ 条把工具版本串「(<提交的十六进制> <年-月-日>)」里的日期也当样本正文的日期判
 #     fixture-claims-green
+#   CODE_TOOLING_BREAK=date-judge-drifted  fixture-claims 第 ④ 条在进程里判日期的下界多算一天（与上游 date_out_of_range 的答案分叉：边界日期对不上就报判据失效）
+#     fixture-claims-green
+#     fixture-claims-red
 #   CODE_TOOLING_BREAK=bare-red-green-only  fixture-claims 退回只认裸 red / green 样本目录、不按格数红绿
 #     fixture-claims-cells-red
 #     fixture-claims-green
@@ -414,19 +477,18 @@
 #     hardcoded-quota-red
 #   CODE_TOOLING_BREAK=quota-exempt-growth-unchecked  hardcoded-quota 的排除表不比基准
 #     hardcoded-quota-red
-#   CODE_TOOLING_BREAK=memory-table-columns-unchecked  memory-bounded-parallelism 不核登记表每行六列
+#   CODE_TOOLING_BREAK=memory-table-columns-unchecked  memory-bounded-parallelism 不核登记表每行两列
 #     memory-bounded-parallelism-red
 #   CODE_TOOLING_BREAK=memory-table-entry-unchecked  memory-bounded-parallelism 不核入口在不在、登没登两次
 #     memory-bounded-parallelism-red
-#   CODE_TOOLING_BREAK=memory-table-numbers-unchecked  memory-bounded-parallelism 不核每件峰值与底座是整数
-#     memory-bounded-parallelism-red
-#   CODE_TOOLING_BREAK=memory-table-source-unchecked  memory-bounded-parallelism 不核出处点到任务号
-#     memory-bounded-parallelism-red
-#   CODE_TOOLING_BREAK=memory-table-count-source-unchecked  memory-bounded-parallelism 不核件数从哪来的写法
+#   CODE_TOOLING_BREAK=memory-table-reason-unchecked  memory-bounded-parallelism 不核理由够不够长
 #     memory-bounded-parallelism-red
 #   CODE_TOOLING_BREAK=memory-bounded-unregistered-accepted  memory-bounded-parallelism 代码里按内存定并发的写法不核所在入口登没登记
 #     memory-bounded-parallelism-red
 #   CODE_TOOLING_BREAK=memory-bounded-stale-accepted  memory-bounded-parallelism 登记的入口不核代码里还有没有这类写法
+#     memory-bounded-parallelism-red
+#   CODE_TOOLING_BREAK=memory-bounded-prefilter-memory-only  memory-bounded-parallelism 的预筛只认 memory、不认 bytes（只带 gibibytes、free_bytes 的写法被漏掉）
+#     memory-bounded-parallelism-green
 #     memory-bounded-parallelism-red
 #   CODE_TOOLING_BREAK=path-moves-unchecked  change-range-single-source 不判搬迁登记表（写法、出处在不在、此刻生效的行串没串、有没有搬迁实据）
 #     change-range-single-source-path-moves-base-row-green
@@ -435,6 +497,12 @@
 #     change-range-single-source-path-moves-evidence-red
 #     change-range-single-source-path-moves-green
 #     change-range-single-source-path-moves-red
+#   CODE_TOOLING_BREAK=change-range-docstrings-judged  change-range-single-source 把 python 的文档串照代码判
+#     change-range-single-source-prose-green
+#   CODE_TOOLING_BREAK=change-range-selftest-bodies-judged  change-range-single-source 把 python 自证函数体里造的输入照代码判
+#     change-range-single-source-prose-green
+#   CODE_TOOLING_BREAK=change-range-exempt-marker-ignored  change-range-single-source 不认行尾的 # change-range:exempt <理由>
+#     change-range-single-source-prose-green
 #   LAG_BASELINE_BREAK=move-evidence-unchecked  归共用库 lib-lag-baseline.py（下面七条同）：不核此刻生效的行串没串、有没有搬迁实据
 #     change-range-single-source-path-moves-base-row-green
 #     change-range-single-source-path-moves-committed-green
@@ -504,19 +572,46 @@
 #     entry-scripts-reuse-three-questions
 #   CODE_TOOLING_BREAK=switch-items-unchecked  break-switch-headers 不判点名的项
 #     break-switch-headers-red
+#     break-switch-header-gap-red
+#   CODE_TOOLING_BREAK=headers-quotes-unpaired-unchecked  break-switch-headers 不判点名的项里「」配不配平
+#     break-switch-headers-quote-unbalanced-red
+#   CODE_TOOLING_BREAK=headers-replay-files-unread  break-switch-headers 不读复跑登记表（只判 scripts/ 与 .claude/hooks/ 下的，登记表点名的别处文件不判、豁免照算）
+#     break-switch-headers-green
+#     break-switch-headers-red
+#     break-switch-header-gap-red
+#   CODE_TOOLING_BREAK=replay-header-gaps-unjudged  break-switch-replay 复跑开跑前不判登记的文件头开关表写没写全（缩进不够读不出点名的项的，照样复跑）
+#     break-switch-header-gap-red
 #   CODE_TOOLING_BREAK=switch-replay-named-unchecked  stage-break-switch-replay 不比点名的与实测判错的
 #     stage-break-switch-replay-red
+#     stage-break-switch-replay-jobs-registered-red（点名少写的那一条不算不符，退 0）
 #     stage-break-switch-replay-red-over-green
+#     stage-break-switch-replay-key-changed-red（点名点错的那一条判不成「不符」，没有「键变了」那句）
 #   CODE_TOOLING_BREAK=stage-replay-samples-unkeyed  stage-break-switch-replay 每条的键不带它喂的样本目录的内容（改错的样子：样本改了照复用）
 #     stage-break-switch-replay-samples-in-key
+#     stage-break-switch-replay-key-changed-red（样本目录跑的过程中变了，键不跟着变，没有「键变了」那句）
 #   CODE_TOOLING_BREAK=stage-replay-key-whole-gate-directory  stage-break-switch-replay 每条的键另加有样本目录的每一道阶段的整份文件（改一道、注释也算，全部作废）
 #     stage-break-switch-replay-reuse-three-questions
 #     stage-break-switch-replay-samples-in-key
+#   CODE_TOOLING_BREAK=stage-replay-recorded-at-end  stage-break-switch-replay 一条判完不当场记，只在整格收尾一次记（中途被停，判完的全丢）
+#     stage-break-switch-replay-interrupted-resume
+#   CODE_TOOLING_BREAK=stage-unread-rows-unchecked  stage-break-switch-replay 不判头注里写了 X_BREAK= 却读不出的行（那一条悄悄不复跑）
+#     stage-break-switch-replay-unread-row-red
+#   CODE_TOOLING_BREAK=stage-replay-jobs-by-memory  stage-break-switch-replay 同时跑的条数再照内存份额（这一台能给的与这一条拿到的上限里小的、扣掉本进程用量）÷ 那一道阶段每条开关开满时的峰值收
+#     stage-break-switch-replay-jobs-registered-green、stage-break-switch-replay-jobs-registered-red（份额约 2.5 GiB、峰值 1 GiB：同时最多 2 条，不是登记的线程数 3 条）
+#   CODE_TOOLING_BREAK=stage-replay-inner-jobs-unset  stage-break-switch-replay 起 stage-selftest.sh 不带 --jobs（喂样本的并行度照它自己的核数）
+#     stage-break-switch-replay-jobs-registered-green、stage-break-switch-replay-threads-split-green
+#   CODE_TOOLING_BREAK=stage-replay-inner-threads-uncapped  stage-break-switch-replay 每条 stage-selftest 的 --jobs 仍取每台默认重活线程数、不按外层路数分（外层路数 × 里层 --jobs 超过线程数）
+#     stage-break-switch-replay-jobs-registered-green、stage-break-switch-replay-jobs-registered-red、stage-break-switch-replay-threads-split-green
+#   CODE_TOOLING_BREAK=stage-replay-memory-knob-unchecked  stage-break-switch-replay 样本根 .stage-break-switch-replay-memory 里读不出的行悄悄跳过
+#     stage-break-switch-replay-memory-knob-red
 #   CODE_TOOLING_BREAK=replay-plan-ignored  break-switch-replay 与 stage-break-switch-replay 不按计划跳过复用的条，点到的全部起（每趟整格重跑）
 #     break-switch-replay-reuse-three-questions
 #     break-switch-replay-named-in-key
+#     break-switch-replay-interrupted-resume
+#     break-switch-replay-forced-trip-rerun-green
 #     stage-break-switch-replay-reuse-three-questions
 #     stage-break-switch-replay-samples-in-key
+#     stage-break-switch-replay-interrupted-resume
 #   CODE_TOOLING_BREAK=replay-red-not-recorded  break-switch-replay 与 stage-break-switch-replay 判红时不交 verdict-record --red-names（只记绿，判红的不撤同一把键原有的绿）
 #     break-switch-replay-red-over-green
 #     stage-break-switch-replay-red-over-green
@@ -537,17 +632,28 @@
 #   CODE_TOOLING_BREAK=replay-items-unchecked  break-switch-replay 不比点名的项
 #     break-switch-replay-red
 #     break-switch-replay-undecodable-red
+#     break-switch-replay-scoped-named-quiet-red（指定范围、点名的格没红：脚本退 1 却只在转述行里带不一样的 ✗，判绿）
+#     break-switch-replay-mismatch-detail-red（点名的一格没红这一条 want 找不到）
 #   CODE_TOOLING_BREAK=replay-output-strict-decode  break-switch-replay 按文本收自证输出、不容坏字节
 #     break-switch-replay-undecodable-red
 #   CODE_TOOLING_BREAK=replay-unnamed-rows-unchecked  break-switch-replay 不查多红（失败行比点名的多不判）
 #     break-switch-replay-unnamed-red
+#     break-switch-replay-whole-scope-red（不指定范围起整份，没点名的两格红了不判，判绿）
+#     break-switch-replay-mismatch-detail-red（没被点名的四行多红这一条 want 找不到）
+#   CODE_TOOLING_BREAK=replay-mismatch-detail-truncated  break-switch-replay 判「不符」的明细文件照日志的样子截：只写前三行失败行，每行只写前八十个字，点名的项只写前三项、每项只写前六十个字
+#     break-switch-replay-mismatch-detail-red
 #   CODE_TOOLING_BREAK=replay-baseline-unsubtracted  break-switch-replay 不起基准趟、不减自证本来就有的失败行
+#     break-switch-replay-key-changed-red（基准趟不起，没人往表里加那一行，键不变，没有「键变了」那句）
 #     break-switch-replay-green
 #     break-switch-replay-reuse-three-questions（基准趟那一条不判、不记库，下一趟它照现判：三问 ① 红）
 #     break-switch-replay-named-in-key
+#     break-switch-replay-interrupted-resume（基准趟不起，判完的趟数与取回的趟数都对不上）
+#     break-switch-replay-forced-trip-rerun-green（基准趟那一条没记库，第二趟现判的多一条）
+#     break-switch-replay-scoped-key-separate-green（基准趟不起，两趟现跑的都只有 2 趟）
 #   CODE_TOOLING_BREAK=replay-summary-rows-required  break-switch-replay 汇总行也要点名
 #     break-switch-replay-green
 #     break-switch-replay-item-co-run-green
+#     break-switch-replay-interrupted-resume
 #   CODE_TOOLING_BREAK=replay-carriage-return-kept  break-switch-replay 把单独的 \r 留在行里
 #     break-switch-replay-unnamed-red
 #   CODE_TOOLING_BREAK=replay-bad-bytes-first  break-switch-replay 有坏字节就只记坏字节、不再比点名
@@ -559,6 +665,7 @@
 #   CODE_TOOLING_BREAK=replay-progress-silent  break-switch-replay 与 stage-break-switch-replay 不打进度、不起报进度的线程（整格跑完之前日志里一行不涨）
 #     break-switch-replay-progress-green
 #     stage-break-switch-replay-progress-green
+#     break-switch-replay-jobs-registered-green、break-switch-replay-jobs-registered-red、break-switch-replay-jobs-threads-capped-green、break-switch-replay-jobs-inner-threads-green（开跑那一行不打）
 #   CODE_TOOLING_BREAK=replay-key-whole-registry  break-switch-replay 每条的键另加复跑登记表里每一份脚本的整份文件（改一份、注释也算，全部作废）
 #     break-switch-replay-reuse-three-questions
 #     break-switch-replay-named-in-key
@@ -566,6 +673,46 @@
 #     break-switch-replay-named-in-key
 #   CODE_TOOLING_BREAK=replay-siblings-not-co-run  break-switch-replay 同一份只起要现判的那几条开关趟、别的不陪跑（改错的样子：汇总行少了陪跑的开关趟）
 #     break-switch-replay-item-co-run-green
+#   CODE_TOOLING_BREAK=replay-trips-not-stored  break-switch-replay 开关趟跑完不落盘（一份没跑齐就被打断，跑完的那几趟全丢）
+#     break-switch-replay-interrupted-resume
+#     break-switch-replay-forced-trip-rerun-green
+#   CODE_TOOLING_BREAK=replay-trips-not-loaded  break-switch-replay 不取回落了盘的开关趟，要起的整份照起
+#     break-switch-replay-interrupted-resume
+#     break-switch-replay-forced-trip-rerun-green
+#   CODE_TOOLING_BREAK=replay-forced-trip-loaded  break-switch-replay 复用哨兵抽中强制现判的那一条也取回（强制现判没真起，判定稳不稳比不出）
+#     break-switch-replay-forced-trip-rerun-green
+#   CODE_TOOLING_BREAK=replay-scope-ignored  break-switch-replay 指定范围时也不选格，每条开关趟与基准趟照整份起（键里也不带选格那一行）
+#     break-switch-replay-scoped-cells-green（没点名的两格也红了，逐条判红）
+#     break-switch-replay-scoped-named-quiet-red（范围那一行写的是只起点名的格 0 条）
+#     break-switch-replay-scoped-key-separate-green（两趟键相同，第二趟复用第一趟的）
+#   CODE_TOOLING_BREAK=replay-cell-name-colon-only  break-switch-replay 指定范围时点名的项只认「自证：<格名>：」，「✗ 自证 <格名>：」读不出格名，那条开关与基准趟整份起
+#     break-switch-replay-scoped-cells-space-form-green（整份起，没点名的两格也红了，逐条判红）
+#   CODE_TOOLING_BREAK=replay-whole-scoped  break-switch-replay 不指定范围时也只起点名的格
+#     break-switch-replay-whole-scope-red（没点名的格不起，判绿）
+#     break-switch-replay-scoped-key-separate-green（第二趟写的是指定范围，键与第一趟相同、复用）
+#   CODE_TOOLING_BREAK=replay-scoped-key-shared  break-switch-replay 只起点名的格的那几趟，键里不另带选格那一行（与不指定范围共用同一把键）
+#     break-switch-replay-scoped-key-separate-green（第二趟复用第一趟的判定）
+#   CODE_TOOLING_BREAK=replay-jobs-by-memory  break-switch-replay 并行条数照这一趟的内存上限算（⌊上限的份额 ÷ 每趟内存⌋、不超过线程数，parallel_library.jobs_for），在跑各趟的内存估计之和不超过份额
+#     break-switch-replay-jobs-registered-green（上限 1536 MiB、每趟 4096 MiB：并行 1 条，开关趟一条接一条，等不到同时 8 趟在跑，每条开关多红一行没点名的）
+#     break-switch-replay-jobs-registered-red（开跑那一行写的是并行 1 条）
+#     break-switch-replay-jobs-threads-capped-green（开跑那一行括号里写的是内存上限、每趟与份额，不是登记的线程数）
+#   CODE_TOOLING_BREAK=replay-inner-threads-uncapped  break-switch-replay 不把每趟里层的线程数收到「登记的线程数 ÷ 外层路数的上限」：不设 SINGLEFS_THREAD_CAP，里层仍是每台默认重活线程数（外层路数 × 里层线程数超过登记的线程数）
+#     break-switch-replay-jobs-threads-capped-green、break-switch-replay-jobs-inner-threads-green
+#   CODE_TOOLING_BREAK=replay-machine-progress-silent  break-switch-replay 不打行首顶格的 TASK_SERVER_PROGRESS 机读进度行（别的进度行照打）
+#     break-switch-replay-progress-green
+#   CODE_TOOLING_BREAK=replay-trip-leader-only-stopped  break-switch-replay 与 selftest-cells-alone 每趟不开新会话，到点只 kill 直接起的那一个、不收整组、不核组里留没留下进程，名额当场还
+#     break-switch-replay-trip-group-stopped-green
+#   CODE_TOOLING_BREAK=replay-reruns-batched  break-switch-replay 一份的开关趟齐了、要重跑的当场派进池子，与还在跑的趟、同一批要重跑的一起起
+#     break-switch-replay-reruns-serial-green
+#   CODE_TOOLING_BREAK=refused-items-run-anyway  按条复用的共用段（UNIT_VERDICT_ROUNDS_LIBRARY 的 ItemVerdicts.stop_on_refusals）开跑前有拒算也不判红，拒算的条照跑到底、不入库
+#     break-switch-replay-refused-red
+#   CODE_TOOLING_BREAK=cells-alone-whole-only  selftest-cells-alone 不单跑，每格照整份那一趟里红没红记
+#     selftest-cells-alone-green selftest-cells-alone-red selftest-cells-alone-threads-split-green（只起整份那一趟，外层 1 条、里层拿满线程数，样本自证核到的 SINGLEFS_THREAD_CAP 不是 2）
+#     selftest-cells-alone-jobs-registered-green selftest-cells-alone-jobs-registered-red（同上）
+#   CODE_TOOLING_BREAK=cells-alone-inner-threads-uncapped  selftest-cells-alone 不把每趟里层的线程数收到「登记的线程数 ÷ 外层路数的上限」：SINGLEFS_THREAD_CAP 仍交每台默认重活线程数（外层路数 × 里层线程数超过登记的线程数）
+#     selftest-cells-alone-threads-split-green、selftest-cells-alone-jobs-registered-green、selftest-cells-alone-jobs-registered-red
+#   CODE_TOOLING_BREAK=cells-alone-jobs-by-memory  selftest-cells-alone 并行条数照这一趟的内存上限算（⌊上限的份额 ÷ 每趟内存⌋、不超过线程数，parallel_library.jobs_for）
+#     selftest-cells-alone-jobs-registered-green、selftest-cells-alone-jobs-registered-red（上限 1536 MiB、每趟 4096 MiB：并行 1 趟，外层 1 条、里层拿满线程数 8，样本自证核到的 SINGLEFS_THREAD_CAP 不是 2）
 #   CODE_TOOLING_BREAK=kb-scope-subdirectory-unchecked  kb-directories-write-scope 只探登记目录下一层的 .md、不探子目录
 #     kb-directories-write-scope-red
 #   AGENT_WRITE_SCOPE_BREAK=any-model  agent-write-scope 关掉定义 model 取值那一条
@@ -576,6 +723,10 @@
 #     agent-write-scope-timer-red
 #   AGENT_WRITE_SCOPE_BREAK=run-scope-unchecked  agent-write-scope 不判范围声明闸注册在 Bash 的 matcher 上
 #     agent-write-scope-run-scope-red
+#   AGENT_WRITE_SCOPE_BREAK=find-timestamp-unchecked  agent-write-scope 不判 find 时刻写法闸注册在 Bash 的 matcher 上
+#     agent-write-scope-find-timestamp-red
+#   AGENT_WRITE_SCOPE_BREAK=session-checks-unchecked  agent-write-scope 不判会话检测钩子注册着、matcher 覆盖四种 source
+#     agent-write-scope-red、agent-write-scope-timer-red
 #   CODE_TOOLING_BREAK=definition-model-unchecked  agent-definition-shape 不判 frontmatter 有没有 model 一行
 #     agent-definition-shape-model-red
 #   CODE_TOOLING_BREAK=definition-tools-unchecked  agent-definition-shape 不判 frontmatter 有没有 tools 一行
@@ -596,6 +747,16 @@
 #     rules-named-by-definitions-red
 #   CODE_TOOLING_BREAK=rules-named-by-basename  rules-named-by-definitions 只写文件名、不带目录的也算点名
 #     rules-named-by-definitions-red
+#   CODE_TOOLING_BREAK=rules-named-main-only-ignored  rules-named-by-definitions 不认只管主 agent 的登记表，登记了的规则照样要求有定义点名
+#     rules-named-by-definitions-main-only-green
+#   CODE_TOOLING_BREAK=rules-named-main-only-unregistered-unchecked  rules-named-by-definitions 不核登记表里的路径在不在 CLAUDE.md 的登记里
+#     rules-named-by-definitions-main-only-unregistered-red
+#   CODE_TOOLING_BREAK=rules-named-main-only-named-unchecked  rules-named-by-definitions 不核登记表里的规则是不是其实已经有定义点名
+#     rules-named-by-definitions-main-only-named-red
+#   CODE_TOOLING_BREAK=rules-named-main-only-reason-unchecked  rules-named-by-definitions 不核登记表里的理由够不够 8 个字
+#     rules-named-by-definitions-main-only-reason-red
+#   CODE_TOOLING_BREAK=prune-server-build-not-shared  各格取 prune-server 二进制不共用本趟编出的那一份、各编各的（样本的假编译第二次被起就退 1）
+#     prune-server-shared-build-green
 #   CODE_TOOLING_BREAK=prune-server-failed-ignored  prune-server-selftest 不看末行的 failed= 与退出码
 #     prune-server-selftest-exit-red
 #     prune-server-selftest-failed-red
@@ -640,10 +801,6 @@
 #     peer-launch-direct-green
 #   CODE_TOOLING_BREAK=peer-launch-prose-scanned  peer-launch-direct 把注释与带空白的字面量也照代码扫
 #     peer-launch-direct-green
-#   CODE_TOOLING_BREAK=retired-names-comments-unscanned  retired-names 不扫注释行
-#     retired-names-red
-#   CODE_TOOLING_BREAK=retired-moves-table-scanned  retired-names 连搬迁登记表 path-moves.tsv 也扫（旧路径一栏写着退役的名字）
-#     retired-names-green
 #   CODE_TOOLING_BREAK=library-code-third-column-unchecked  verdict-library-code 不判第三列
 #     verdict-library-code-red
 #   CODE_TOOLING_BREAK=library-code-silent-run-unseen  verdict-library-code 不搜取不到库照跑的写法
@@ -667,8 +824,26 @@
 #     repository-copy-closure-red
 #   CODE_TOOLING_BREAK=repository-copy-exempt-growth-unchecked  repository-copy-closure 的排除表不比基准
 #     repository-copy-closure-red
+#   CODE_TOOLING_BREAK=selftest-parallelism-report-anywhere  selftest-parallelism 把整行注释里的「并行 N」也算报了并行度
+#     selftest-parallelism-red
+#   CODE_TOOLING_BREAK=selftest-parallelism-serial-reason-unchecked  selftest-parallelism 的 # selftest-serial: 理由不看长短
+#     selftest-parallelism-red
+#   CODE_TOOLING_BREAK=selftest-parallelism-exempt-unchecked  selftest-parallelism 的排除表行不核指向（不在的文件、已经达标的那一份照放行）
+#     selftest-parallelism-red
+#   CODE_TOOLING_BREAK=long-run-exempt-form-unchecked  long-run-split-exempt 不判一行有没有 # 和 # 左边有没有项名
+#     long-run-split-exempt-red
+#   CODE_TOOLING_BREAK=long-run-exempt-reason-unchecked  long-run-split-exempt 不判理由去掉空白之后够不够 8 个字
+#     long-run-split-exempt-red
+#   CODE_TOOLING_BREAK=long-run-exempt-citation-unchecked  long-run-split-exempt 不判理由里的 records/<文件>.md:<行> 出处（有没有、文件在不在、行号在不在文件行数以内）
+#     long-run-split-exempt-red
+#   CODE_TOOLING_BREAK=long-run-exempt-duplicate-unchecked  long-run-split-exempt 不判项名重复
+#     long-run-split-exempt-red
+#   CODE_TOOLING_BREAK=long-run-exempt-scope-unchecked  long-run-split-exempt 不判项名是目录或整道门禁的文件名
+#     long-run-split-exempt-red
+#   CODE_TOOLING_BREAK=long-run-exempt-empty-accepted  long-run-split-exempt 登记表一行都没有也报绿（不退 77）
+#     long-run-split-exempt-empty
 #
-#   bash .claude/gate.d/code-tooling.sh [项目根]                                四十格都跑
+#   bash .claude/gate.d/code-tooling.sh [项目根]                                四十三格都跑
 #   bash .claude/gate.d/code-tooling.sh --list                                  逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/code-tooling.sh --check <格名>[,<格名>…] [项目根]       只跑点名的格
 #   bash .claude/gate.d/code-tooling.sh --list-items [--check <格名>…] [项目根]  逐行打分项的三格可点的项（格名<TAB>项），不起自证、不算键（这一道「逐项点名」一节）
@@ -691,6 +866,8 @@ source "$STAGE_REPOSITORY/scripts/hosts/heavy-threads.sh"
 # 开关复跑两格的判法入口（单元键里的 judge，两格文件头「按条复用」）：令牌照字面写，scripts/gate/lib_function_units.py 的 registered_judging_entries 从这里现取、它的自证逐个收闭包
 BREAK_SWITCH_REPLAY_JUDGE_TOKEN="judge:.claude/gate.d/$STAGE_NAME::break_switch_replay_judge_code"
 STAGE_BREAK_SWITCH_REPLAY_JUDGE_TOKEN="judge:.claude/gate.d/$STAGE_NAME::stage_break_switch_replay_judge_code"
+# selftest-cells-alone 格的判法入口（那一格文件头「按条复用」），写法同上
+SELFTEST_CELLS_ALONE_JUDGE_TOKEN="judge:.claude/gate.d/$STAGE_NAME::selftest_cells_alone_judge_code"
 
 stage_cell research-script-selftests cell_research_script_selftests "runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）" \
   "按红的那条自证给的下一步修被测脚本，再单独跑那一条命令看它转绿；runner 表在这一道的 SELFTEST_RUNNERS"
@@ -732,8 +909,8 @@ stage_cell heavy-thread-defaults cell_heavy_thread_defaults "脚本、门禁、�
   "shell 经 scripts/hosts/heavy-threads.sh 的 heavy_thread_default、python 经 scripts/hosts/heavy_threads.py 的 default_heavy_threads 取，起命令里不写线程（整条经 task-server/task submit 交，线程由服务定）；不是重活的登记进 .claude/heavy-thread-exempt（<路径>:<锚串>  # 理由），排除只缩不涨"
 stage_cell hardcoded-quota cell_hardcoded_quota "脚本、门禁与钩子里不定内存上限与台数（上限、机器由 task-server 按记录定），排除表指得到、只缩不涨" \
   "删掉脚本里定的上限与台数，整条经 task-server/task submit -- <命令> 交（服务按记录给上限、撞了放大重排，机器与分片也归它）；自证造的假值与这一轮不改的文件，在排除表 .claude/gate.d/hardcoded-quota-exempt.tsv 登记理由（<路径>:<锚串>  # 理由），排除只缩不涨；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
-stage_cell memory-bounded-parallelism cell_memory_bounded_parallelism "按内存上限定开几个进程或线程的入口都登记在 .claude/memory-bounded-parallelism.tsv，表每行六列成形、入口在，登记的入口代码里还有这类写法" \
-  "确是每件占一大块内存、31 份同时开会撞上限的，把入口登进 .claude/memory-bounded-parallelism.tsv（六列写法在它文件头）；不是的改成照每台默认重活线程数开（.claude/heavy-thread-default）；登记了而代码里已经没有的删掉那一行；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
+stage_cell memory-bounded-parallelism cell_memory_bounded_parallelism "按内存上限定开几个进程或线程的入口都登记在 .claude/memory-bounded-parallelism.tsv，表每行两列（入口、理由）成形、入口在，登记的入口代码里还有这类写法" \
+  "确是每件占一大块内存、31 份同时开会撞上限的，把入口登进 .claude/memory-bounded-parallelism.tsv（入口、理由两列，写法在它文件头）；不是的改成照每台默认重活线程数开（.claude/heavy-thread-default）；登记了而代码里已经没有的删掉那一行；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
 stage_cell function-units-two-implementations-agree cell_function_units_two_implementations_agree "函数单元的两份实现（crates/singlefs-unit-graph 与 scripts/gate/lib_function_units.py）原样与产品行为视图两趟：dump 逐单元相同，登记入口的闭包与键逐个相同" \
   "照点名的单元查两边的切分与闭包规则，以 crates/singlefs-unit-graph 为准改 python 那一份；判法与样本写在这一格的注释里"
 stage_cell rust-name-collisions cell_rust_name_collisions "同一个 Rust 编译目标里不同模块各自定义的同名条目（fn、struct、enum、union、const、static、type、trait，私有的与只在测试里的也算）判红，逐处列出文件:行" \
@@ -762,8 +939,6 @@ stage_cell cp-preserve-mode cell_cp_preserve_mode "项目脚本、钩子、门�
   "要时间戳的写 --preserve=timestamps、要链接的再加 links（整棵树 cp -dR --preserve=timestamps,links），都不要的写 cp -R；python 改用 shutil.copy2 / copytree"
 stage_cell peer-launch-direct cell_peer_launch_direct "项目脚本与门禁不自己起 multi-host-run.sh --peer 往第二台起活（照服务的分片协议，派哪台由服务定）" \
   "照 task-server/task_server_lib.py 文件头「分片」改：文件头写「# task-server-shards: <第一个参数>」，照 TASK_SERVER_SHARD_PHASE 跑计划、各片、合并；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
-stage_cell retired-names cell_retired_names "退役名单 retired-names.tsv 里的名字在脚本、门禁、钩子、crates 与服务里一处都没有（不留「设了就拒」的放行；搬迁登记表 path-moves.tsv 记的是旧路径，不扫）" \
-  "照名单里那个名字的出路改掉那一行（不留兼容、不单留拒绝、没有放行表）；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
 stage_cell verdict-library-code cell_verdict_library_code "登记表 verdict-library-scripts.tsv 写了判定库的行第三列都是 prune-server，点名的脚本里没有取不到库照跑的分支、prune-server 行没有本地库读写" \
   "取不到库名、服务连不上一律退出（连不上退 75），判定只经 prune-server 的客户端读写；一族接完（导进服务、--verify、删旧目录）再翻第三列；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
 stage_cell temporary-service-runners cell_temporary_service_runners "runner 表里套了临时服务包装的自证，与要临时服务的表 selftest-temporary-service.tsv 里登记成 required 的两边对齐（裸写、缺条、包装了表里没有的都点名；own-server 不要求包装）" \
@@ -772,6 +947,12 @@ stage_cell temporary-service-wrapper-form cell_temporary_service_wrapper_form "�
   "照逐处的出路把点名的那一处改回包装用法行给的整条（不带 --server-binary、不写尖括号占位，二进制写在整条之外）；包装改了用法就各处一起改；判法与取的几处在 code-tooling.sh 里这一格函数上方的注释"
 stage_cell repository-copy-closure cell_repository_copy_closure "scripts/、.claude/gate.d/、.claude/hooks/ 里建仓副本的写法都经 scripts/hosts/lib_repository_copy.py 算闭包（拷源点名仓根条目的 cp、rsync、git archive、shutil.copy 一族与手抄的拷贝清单字面量判红），排除表一行一处、带理由、只缩不涨" \
   "python 调 lib_repository_copy.copy_closure 再 copy_entries，shell 起 python3 scripts/hosts/minimal-copy.py <仓根> <副本> --with <条目>=<为什么>…；确实不是建仓副本的登记进 .claude/gate.d/repository-copy-closure-exempt.tsv（只缩不涨）；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
+stage_cell selftest-cells-alone cell_selftest_cells_alone "有选格手段的自证（写着「<名字>_SELFTEST_CELLS=<格名…」的）逐格单跑与整份跑判定相同：单跑红而整份里绿、单跑绿而整份里红的格点名判红" \
+  "让点名的那一格自己建它要读的状态（变量、文件、环境），不读前面的格留下的，前面的格收拾干净自己留下的（.claude/rules/test-script-discipline.md「用例原子化：每一条都能单独跑」）；列不出格名的照出路改那份自证写错格名时的输出"
+stage_cell selftest-parallelism cell_selftest_parallelism "登记表 selftest-registry.tsv 里登记成 selftest 的每份脚本，成功句报并行度或文件头写明不能并行（# selftest-serial:），排除表指得到、只缩不涨" \
+  "照 .claude/rules/test-script-discipline.md「编译与算法都要快」：互不依赖的格与开关轮按每台默认重活线程数并行跑、成功句报「并行 N 路」；确实不能并行的在文件头写 # selftest-serial: <为什么，至少 8 个字>；存量登记进 .claude/gate.d/selftest-parallelism-exempt.tsv（只缩不涨）；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
+stage_cell long-run-split-exempt cell_long_run_split_exempt "跑过两小时也不拆的豁免表 .claude/long-run-split-exempt 的每一行写对：有 #、理由至少 8 个字、理由里有存在的 records/<文件>.md:<行>（行号不超过文件行数）、项名不重复、不是目录也不是门禁文件名" \
+  "每行写成「<项名>  # <理由，至少 8 个字，带用户那句话的出处 records/<文件>.md:<行>>」，项名取入口 --list-items 列的那一个，一项一行、不写目录与门禁文件名（.claude/rules/long-run-split.md「豁免」）；项拆开或不再超时的，那一行同一次删掉；判法与样本在 code-tooling.sh 里这一格函数上方的注释"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -821,6 +1002,44 @@ ROOT="$(pwd)"
 judged_root_is_sample() {
   [[ "$(pwd -P)" != "$STAGE_CELLS_STAGE_REPOSITORY" && -z "${GATE_STAGED_FROM:-}" ]]
 }
+
+# 列文件的共用写法，research-script-selftest-coverage、break-switch-headers、break-switch-outside-selftest、break-switch-replay 四格用：
+#   files_under(目录, 后缀们, 跳过的目录名们) 给出 glob(f"{目录}/**/*") 同一批文件（隐藏的目录与文件不进，符号链接的目录照走），另跳过 skipped 里名字的目录
+#   （缺省只跳 target：编译产物目录，scripts/experiment-apparatus 下有几千份、合计几个 GiB，里面没有 .sh 与 .py）；suffixes 给了只留这些后缀的。路径用 / 接，从目录名起头。
+#   各格装成模块：tree = types.ModuleType("lib_tree_listing"); exec(compile(sys.argv[<n>], "tree-listing-library", "exec"), tree.__dict__)
+TREE_LISTING_LIBRARY="$(cat <<'PY_TREE_LISTING'
+import os
+
+
+def files_under(directory, suffixes=None, skipped=("target",)):
+    found = []
+    for current, directories, names in os.walk(directory, followlinks=True):
+        directories[:] = sorted(name for name in directories if not name.startswith(".") and name not in skipped)
+        for name in names:
+            if name.startswith(".") or (suffixes is not None and not name.endswith(suffixes)):
+                continue
+            found.append(os.path.join(current, name))
+    return found
+PY_TREE_LISTING
+)"
+
+# 逐份文件扫描的并行写法，扫源码的几格（memory-bounded-parallelism、repository-copy-closure 等）用：map_in_processes(函数, 一串输入, 并行度) 逐个作用、按输入的次序交结果，
+#   fork 出子进程并行（函数与它读的模块级名字要在调用之前定义好，结果要能 pickle）；输入少、并行度 1 的在本进程里跑。每份文件的读与逐行判是互不依赖的纯计算，正则吃的是 CPU，线程帮不上，所以用进程。
+#   装法照 TREE_LISTING_LIBRARY。
+PARALLEL_MAP_LIBRARY="$(cat <<'PY_PARALLEL_MAP'
+import concurrent.futures, multiprocessing
+
+CHUNK = 16
+
+
+def map_in_processes(function, items, jobs):
+    items = list(items)
+    if jobs <= 1 or len(items) < 2 * CHUNK:
+        return [function(item) for item in items]
+    with concurrent.futures.ProcessPoolExecutor(max_workers=min(jobs, len(items)), mp_context=multiprocessing.get_context("fork")) as pool:
+        return list(pool.map(function, items, chunksize=CHUNK))
+PY_PARALLEL_MAP
+)"
 
 # 目录与清单表的双向比对，rules-manifest、stage-owners、agent-write-scope、kb-registry 四格共用；两个方向都判，只判一个方向的另一个方向永远不红。
 # 各格的 python 段把它当第一个参数收进来，装成模块：
@@ -1042,6 +1261,83 @@ def named_tokens(entry, candidates):
 PY_BREAK_SWITCH_TABLE
 )"
 
+# 弄坏开关文件头「读没读开关、写全没写全」的判法与复跑登记表的取法：break-switch-headers、break-switch-replay 两格（含复跑格收尾数「没接复跑」那一段）共用这一份，
+# 同一份文件头两格结论相同；点名哪一条开关缺什么、点名的项里哪一行的「」没配平的句子也只在这里拼（gap_sentence）。「」配不配平以复跑格读点名的项用的 quoted_items
+# （BREAK_SWITCH_REPLAY_JUDGE_LIBRARY）读出的各项为准：复跑格里开关表与判法本来在同一个模块（break_switch_replay_judge_code 打的两段），break-switch-headers 格把判法那一段另装进去。
+# 装进开关表读法的同一个模块（BREAK_SWITCH_TABLE_LIBRARY 先装，这一段接着装进它的 __dict__，用它的 switch_entries、incomplete、quoted_items），装法：
+#   table = types.ModuleType("lib_break_switch_table"); exec(compile(sys.argv[N], "break-switch-table-library", "exec"), table.__dict__)
+#   exec(compile(sys.argv[K], "break-switch-replay-judge-library", "exec"), table.__dict__)   # 复跑格已经装了的不重装
+#   exec(compile(sys.argv[M], "break-switch-header-library", "exec"), table.__dict__)
+# 不并进 BREAK_SWITCH_TABLE_LIBRARY：那一段是两个开关复跑格单元键里的判法（break_switch_replay_judge_code 打的），多一个函数登记表里每份脚本的每条开关都作废重跑；
+# 这一段只在复跑开跑前预检文件头时用，不进任何一条判定的键。
+BREAK_SWITCH_HEADER_LIBRARY="$(cat <<'PY_BREAK_SWITCH_HEADER'
+import os, re
+
+READS_BREAK_SWITCH = re.compile(r"\$\{?[A-Z][A-Z0-9_]*_BREAK\b|environ(?:\.get)?\s*[\(\[]\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']|getenv\(\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']"
+                                r"|^\s*[A-Z_][A-Z0-9_]*\s*=\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']", re.M)
+
+
+def reads_break_switch(text):
+    """代码（整行注释不算）里读了名字以 _BREAK 结尾的变量：shell 的 $X_BREAK / ${X_BREAK…}，python 的 environ.get("X_BREAK") / environ["X_BREAK"] / getenv("X_BREAK") 与 = "X_BREAK" 的常量。"""
+    code = "\n".join(row for row in text.split("\n") if not row.lstrip().startswith("#"))
+    return bool(READS_BREAK_SWITCH.search(code))
+
+
+QUOTES_PAIRED = "点名的项里「」配平"   # header_gaps 的 ignored 里写它：不判点名的项里「」配不配平（只给弄坏开关用）
+
+
+def quote_gap(entry):
+    """点名的项里「」配不配平 → 没配平的说明（写出最先碰到的那一处在第几行与怎么改），配平是 None。
+    配不配平以 quoted_items（复跑读点名的项用的那一份）读出的各项为准：文本里有一个「或」没算进读出的项里，就是没配平，复跑读不到它点名的是哪一格。"""
+    text = entry["items"]
+    found = quoted_items(text)
+    if (text.count("「") == sum(item.count("「") + 1 for item in found)
+            and text.count("」") == sum(item.count("」") + 1 for item in found)):
+        return None
+    opened = []
+    for position, character in enumerate(text):
+        if character == "「":
+            opened.append(position)
+        elif character == "」":
+            if not opened:
+                return f"第 {entry['line'] + 1 + text.count(chr(10), 0, position)} 行多一个收尾的括号，补上它对应的起头括号，或删掉这个"
+            opened.pop()
+    return f"第 {entry['line'] + 1 + text.count(chr(10), 0, opened[0] if opened else 0)} 行起头的括号没有收尾，在该收住的地方补上收尾的括号"
+
+
+def header_gaps(text, ignored=()):
+    """文件头开关表没写全的地方 → [(行号, "<名字>=<值>", 缺的那几样, 点名的项里「」没配平的说明或 None)]；一条开关都读不出的是 [(None, None, ["开关表"], None)]；
+    空表示三样都写全、点名的项里「」配平。ignored 里的样不算缺（只给弄坏开关用；QUOTES_PAIRED 是不判「」配平）。"""
+    entries = switch_entries(text)
+    if not entries:
+        return [(None, None, ["开关表"], None)]
+    gaps = []
+    for entry in entries:
+        missing = [what for what in incomplete(entry) if what not in ignored]
+        unpaired = None if QUOTES_PAIRED in ignored else quote_gap(entry)
+        if missing or unpaired:
+            gaps.append((entry["line"], f"{entry['name']}={entry['value']}", missing, unpaired))
+    return gaps
+
+
+def gap_sentence(path, gap):
+    """header_gaps 的一项 → 点名这一条开关缺什么、点名的项里哪一行的「」没配平的一句（两格都打这一句）。"""
+    line, switch, missing, unpaired = gap
+    if line is None:
+        return f"{path}：代码里读了弄坏开关，文件头没有一条「X_BREAK=<值>  <弄坏哪一处>」再下一行起写点名的项的开关"
+    parts = ([f"缺{'、'.join(missing)}"] if missing else []) + ([f"点名的项里「」没配平：{unpaired}"] if unpaired else [])
+    return f"{path}:{line} {switch} " + "；".join(parts)
+
+
+def replay_registry_paths(registry_path):
+    """复跑登记表（一行「<路径><TAB>…」，# 起头的行与空行不算）第一列点名的文件，按表里的次序；表不在是空。"""
+    if not os.path.isfile(registry_path):
+        return []
+    with open(registry_path, encoding="utf-8", errors="replace") as handle:
+        return [line.rstrip("\n").split("\t")[0] for line in handle if line.strip() and not line.startswith("#")]
+PY_BREAK_SWITCH_HEADER
+)"
+
 # break-switch-replay 格的判法（单元键里的 judge，那一格文件头「按条复用」）：输出怎么收、失败行怎么减基准趟、点名的项怎么比、汇总行怎么认、哪条算绿。
 # 格里与开关表的读法拼成一个模块装（break_switch_replay_judge_code 打的就是这两段），只放判法、不起进程；起自证、限时、重跑与进度在格自己那一段。
 BREAK_SWITCH_REPLAY_JUDGE_LIBRARY="$(cat <<'PY_BREAK_SWITCH_REPLAY_JUDGE'
@@ -1198,18 +1494,40 @@ PY_STAGE_BREAK_SWITCH_REPLAY_JUDGE
 break_switch_replay_judge_code() { printf '%s\n' "$BREAK_SWITCH_TABLE_LIBRARY" "$BREAK_SWITCH_REPLAY_JUDGE_LIBRARY"; }
 stage_break_switch_replay_judge_code() { printf '%s\n' "$BREAK_SWITCH_TABLE_LIBRARY" "$STAGE_BREAK_SWITCH_REPLAY_JUDGE_LIBRARY"; }
 
-# 按条复用的共用段（stage-break-switch-replay、break-switch-replay、reuse-selftests、function-units-two-implementations-agree、mutation-list-items、entry-scripts 六格，
-#   不各写一份；research-script-selftests 格是 shell 写的那一份，样板同它）：
+# 按条复用的共用段（stage-break-switch-replay、break-switch-replay、reuse-selftests、function-units-two-implementations-agree、mutation-list-items、entry-scripts、
+#   selftest-cells-alone 七格，不各写一份；research-script-selftests 格是 shell 写的那一份，样板同它）：
 #   经 scripts/gate/admission.py 的 verdict-plan 算键、查库（复用哨兵在它里面抽），verdict-record 照键记绿、记红撤绿，失灵与服务不可用交 plan-failure 判；
+#   开跑前判拒算（ItemVerdicts.stop_on_refusals）：计划里有一条拒算，逐种打拒算的原因（形态与文件:行）、出路，这一格当场退 1、一条都不起（拒算的照跑也入不了库，只认拒算 0）；
+#   样本 break-switch-replay-refused-red，弄坏开关 CODE_TOOLING_BREAK=refused-items-run-anyway（不判，照跑到底）；
 #   样本根另放的 .unit-verdict-sample/prior/（上一版的树）先照判绿记进样本自己的判定库，.unit-verdict-sample/red-over-green 在时计划另设 ADMISSION_BREAK=verdict-lookup-skipped
 #   （不读库、一律现判），判红记库之后再算一次计划、逐条打现判的原因（门禁样本根里 admission.py 才认这个开关）。装法照 BREAK_SWITCH_TABLE_LIBRARY。
-#   另有 report_plan（计划那一句与逐条原因）、content_digest（被判那棵树里当数据读的文件与目录折成键里的 line:）、toolchain_line（rustc -vV 与 cargo -V）。
+#   另有 report_plan（计划那一句与逐条原因）、content_digest（被判那棵树里当数据读的文件与目录折成键里的 line:）、toolchain_line（rustc -vV 与 cargo -V）、
+#   TripJournal（一趟的结局按键落盘、取回，break-switch-replay 格文件头「开关趟落盘」）、SampleStop（样本档造中途被停，code_tooling_interrupted_rounds）。
+#   收尾那一趟（record 带 final）verdict-record 退 0 时它打的「!」行原样转进日志，至多 RECORD_SKIP_LINES_SHOWN 行、多出的报「另有 N 条」（ItemVerdicts.report_record_skips；
+#   一份判完就记的那几趟不转，收尾那一趟照同一份计划再比一次）；样本 break-switch-replay-record-skips-forwarded-green，弄坏开关 CODE_TOOLING_BREAK=record-skip-lines-dropped。
+#   判成「没对上（不符）」的条才重算键（ItemVerdicts.key_changes，stage-break-switch-replay 与 break-switch-replay 两格在汇总前调它）：照 plan 交进去的同一批请求里那几条起同一条
+#   admission.py verdict-plan（计划文件写 -），与开跑前算的键不同就是跑的过程中键变了（别的会话在写这一条判法闭包里的单元；活的主工作区上才有，冻结快照树里不会）；
+#   那一条的失败行接一句「跑的过程中键变了（开跑前算的键、现在的键）：组成清单有 N 处不同：…（至多 KEY_CHANGE_UNITS_SHOWN 处，余下报条数）；出路：在冻结快照树里重判…」，
+#   变了的单元取两把键各自在库里的组成清单比（library-files fetch 搬来 compositions/<键>.tsv.gz）；键没变的那一条失败行一个字不加，这一条的红绿与退出码都不改。
+#   没有「没对上（不符）」的趟一个进程都不多起；重算只写一行「· 重算键：…」。样本 break-switch-replay-key-changed-red、stage-break-switch-replay-key-changed-red（跑的过程中键变了）
+#   与 break-switch-replay-mismatch-detail-red、stage-break-switch-replay-red（键没变，「键变了 0 条」）；弄坏开关 CODE_TOOLING_BREAK=key-change-not-rechecked（不重算）、
+#   key-change-noted-always（一概当键变了）。
 UNIT_VERDICT_ROUNDS_LIBRARY="$(cat <<'PY_UNIT_VERDICT_ROUNDS'
-import hashlib, os, subprocess, threading
+import gzip, hashlib, json, os, shutil, subprocess, sys, threading
 
 REUSE, JUDGE, REFUSED = "reuse", "judge", "refused"
+REFUSAL_REASONS_SHOWN = 20   # 开跑前判拒算（ItemVerdicts.stop_on_refusals）时逐个列出的拒算原因至多几种
+KEY_CHANGE_UNITS_SHOWN = 3   # 判成没对上的那一条跑的过程中键变了时，失败行里列出变了的单元至多几处，余下报条数（ItemVerdicts.key_changes）
+KEY_CHANGE_REMEDY = ("出路：在冻结快照树里重判这一条（python3 scripts/hosts/minimal-copy.py <仓根> <快照树> --with-gate-tables --with-test-inputs 取树，"
+                     "两趟之间谁都不改它，树里起这一格；别的会话写这一条判法闭包里的单元时，活树上的键会在跑的过程中变）")
+RECORD_SKIP_LINES_SHOWN = 20   # 收尾那一趟 verdict-record 退 0 时转进日志的「!」行至多几行（ItemVerdicts.report_record_skips）
+RECORD_SKIP_LINES_SAMPLE_MARKER = "record-skip-lines-shown"   # 样本根 .unit-verdict-sample/ 下的这一份写一个正整数，顶替 RECORD_SKIP_LINES_SHOWN
 FORCED_REASON_PREFIX = "强制现判"
 STATE_WORDS = {REUSE: "复用", JUDGE: "现判", REFUSED: "拒算"}
+LIBRARY_DIRECTORY_NAME = "singlefs-unit-verdicts"   # admission.py 的 VERDICT_LIBRARY_DIRECTORY_NAME：库名只当命名空间，本地不建
+STOP_AFTER_MARKER = ".unit-verdict-sample/interrupted-resume/stop-after"
+STOP_ARMED_VARIABLE = "CODE_TOOLING_SAMPLE_STOP_ARMED"
+SAMPLE_STOP_EXIT = 137
 
 
 def admission_run(admission, arguments, output_path, environment_changes=None):
@@ -1236,13 +1554,59 @@ def plan_rows(output):
     return rows
 
 
+def plan_keys(output):
+    """verdict-plan 逐条那几行：{名字: 键}；拒算的没有键，不进。"""
+    keys = {}
+    for line in output.split("\n"):
+        fields = line.split("\t", 3)
+        if len(fields) == 4 and fields[1] in (REUSE, JUDGE):
+            keys[fields[0]] = fields[2]
+    return keys
+
+
+def break_on(switch):
+    """弄坏开关（CODE_TOOLING_BREAK，逗号连几个）里有没有 switch。"""
+    return switch in os.environ.get("CODE_TOOLING_BREAK", "").split(",")
+
+
+def composition_diff(earlier, later):
+    """两份组成清单（行的列表）比出变了什么 → 说明句的清单：单元行（种类、限定名、文件:起止行、指纹）按（种类、限定名、文件）比指纹，别的输入行按原文比。
+    比法同 admission.py 的 changed_composition（键对不上时报变了的单元那一份）；不载入它：载入就是把整份 admission.py 读进这一格的进程。"""
+    def split(lines):
+        units, others = {}, set()
+        for line in lines:
+            parts = line.split("\t")
+            if len(parts) == 4 and parts[0] not in ("external", "tool", "file") and ":" in parts[2]:
+                units[(parts[0], parts[1], parts[2].split(":", 1)[0])] = parts[3]
+            else:
+                others.add(line)
+        return units, others
+
+    earlier_units, earlier_others = split(earlier)
+    later_units, later_others = split(later)
+    notes = []
+    for identity in sorted(set(earlier_units) | set(later_units)):
+        kind, name, file = identity
+        label = f"{kind} {file}" if name == file else f"{kind} {file}::{name}"
+        if identity not in earlier_units:
+            notes.append(f"多了 {label}")
+        elif identity not in later_units:
+            notes.append(f"少了 {label}")
+        elif earlier_units[identity] != later_units[identity]:
+            notes.append(f"变了 {label}")
+    notes.extend(f"新的输入行 {line.replace(chr(9), ' ')[:160]}" for line in sorted(later_others - earlier_others))
+    notes.extend(f"没了的输入行 {line.replace(chr(9), ' ')[:160]}" for line in sorted(earlier_others - later_others))
+    return notes
+
+
 class ItemVerdicts:
     """一格一趟的按条复用。ok：计划算出来了；red：复用失灵或配置错（这一格判红）；unavailable：prune-server 不可用（这一格退 75）；problem：算不出的那一句。"""
 
     def __init__(self, admission, root, kind, scratch, caller, sample, how, record_red=True):
         self.admission, self.root, self.kind, self.scratch, self.caller = admission, root, kind, scratch, caller
         self.sample, self.how, self.record_red = sample, how, record_red
-        self.decisions, self.names, self.problem = {}, [], ""
+        self.decisions, self.keys, self.names, self.problem = {}, {}, [], ""
+        self.request_of = {}   # 名字 → plan 交进去的那一行请求（key_changes 照同一批请求重算）
         self.ok = self.red = self.unavailable = False
         self.lock, self.serial = threading.Lock(), 0
 
@@ -1290,6 +1654,7 @@ class ItemVerdicts:
     def plan(self, request_lines):
         """算键、查库；交算没算出来。哨兵那几行（抽中谁、种子）照打进日志。"""
         self.names = [line.split("\t", 1)[0] for line in request_lines]
+        self.request_of = {line.split("\t", 1)[0]: line for line in request_lines}
         with open(self.path("requests"), "w", encoding="utf-8") as handle:
             handle.write("".join(line + "\n" for line in request_lines))
         if not self.seed_prior():
@@ -1304,9 +1669,33 @@ class ItemVerdicts:
             if "哨兵" in line and "\t" not in line:
                 print(line.rstrip(), flush=True)
         self.decisions = {name: (decision, reason) for name, decision, reason in plan_rows(output)}
+        self.keys = plan_keys(output)
+        self.stop_on_refusals()
         os.symlink("plan", self.path("plan-per-entry"))
         self.ok = True
         return True
+
+    def stop_on_refusals(self):
+        """开跑前判拒算：拒算的条单元闭包收不全、键算不出，照跑也一条都入不了库、下一趟照样现判，跑到底只是白跑。计划里有拒算的，
+        逐种打拒算的原因（admission.py 交的那一句：拒算的形态、文件:行与那一行）、条数与头一条，打出路，删掉这一趟的临时目录（scratch，各格自己建的），
+        这一格当场退 1、一条都不起。拒算没有登记表可豁免（崩溃测试函数的 .claude/gate.d/refused-tests.tsv 只管 crash-point-replay），只认拒算 0。
+        弄坏开关 CODE_TOOLING_BREAK=refused-items-run-anyway：不判，拒算的条照跑到底、不入库。"""
+        refused = [(name, reason) for name, (decision, reason) in self.decisions.items() if decision == REFUSED]
+        if not refused or "refused-items-run-anyway" in os.environ.get("CODE_TOOLING_BREAK", "").split(","):
+            return
+        names_of = {}
+        for name, reason in refused:
+            names_of.setdefault(reason, []).append(name)
+        summary = f"{self.caller}：开跑前算键，{len(self.decisions)} 条里拒算 {len(refused)} 条（单元闭包收不全、键算不出，照跑也一条都入不了库），这一格当场判红、一条都没起"
+        print(f"  ✗ {summary}", flush=True)  # gate-lint:summary
+        for reason, names in list(names_of.items())[:REFUSAL_REASONS_SHOWN]:
+            print(f"  ✗ {reason}（{len(names)} 条，头一条「{names[0]}」）", flush=True)  # gate-lint:detail
+        if len(names_of) > REFUSAL_REASONS_SHOWN:
+            print(f"    …拒算的原因另有 {len(names_of) - REFUSAL_REASONS_SHOWN} 种没列", flush=True)
+        print("     → 怎么办：改掉上面点名的那一处（「拒算：」后面是拒算的形态与文件:行），写成闭包折得出的写法（认得出的写法在 scripts/gate/lib_function_units.py 文件头），"
+              f"再跑：{self.how}；拒算没有登记表可豁免，这一格只认拒算 0", flush=True)
+        shutil.rmtree(self.scratch, ignore_errors=True)
+        sys.exit(1)
 
     def decision(self, name):
         if not self.ok:
@@ -1319,6 +1708,10 @@ class ItemVerdicts:
         if decision == JUDGE and reason.startswith(FORCED_REASON_PREFIX):
             return "强制现判"
         return STATE_WORDS.get(decision, "现判")
+
+    def forced(self, name):
+        """这一条是复用哨兵抽中强制现判的那一条。"""
+        return self.state(name) == "强制现判"
 
     def record(self, green, red, final=False):
         """照计划里的键记：判绿记绿，判红记红、撤同一把键原有的绿（record_red 是 False 时不交判红的）。
@@ -1342,6 +1735,8 @@ class ItemVerdicts:
                 print(f"  · 判绿记库：{last_lines(output, 1)}", flush=True)
             if final and red and self.record_red:
                 print(f"  · 判红记库：{len(red)} 条记红、撤掉同一把键原有的绿，下一趟这几条现判（{last_lines(output, 1)}）", flush=True)
+            if final:
+                self.report_record_skips(output)
             return
         plan_path = self.path("plan" if final else "plan-per-entry")
         if red and self.record_red and "red-record-failure-kept-green" in os.environ.get("CODE_TOOLING_BREAK", "").split(","):
@@ -1355,6 +1750,99 @@ class ItemVerdicts:
             return
         print(f"  ! 判定记库：admission.py verdict-record 没成（{last_lines(output)}），下一趟这几条照判", flush=True)
         self.failure("verdict-record", code, output_path)
+
+    def record_skip_lines_shown(self):
+        """转进日志的「!」行至多几行：RECORD_SKIP_LINES_SHOWN；样本根 .unit-verdict-sample/record-skip-lines-shown 写着正整数的照它（样本不必造二十多条）。"""
+        if not self.marker(RECORD_SKIP_LINES_SAMPLE_MARKER):
+            return RECORD_SKIP_LINES_SHOWN
+        with open(os.path.join(self.root, ".unit-verdict-sample", RECORD_SKIP_LINES_SAMPLE_MARKER), encoding="utf-8") as handle:
+            text = handle.read().strip()
+        return int(text) if text.isdigit() and int(text) > 0 else RECORD_SKIP_LINES_SHOWN
+
+    def report_record_skips(self, output):
+        """收尾那一趟 verdict-record 退 0 时它逐条打的「!」行（跑的过程中键变了、不记的，写不进服务的；admission.py 文件头 verdict-record）原样转进日志：
+        记库的输出文件（scratch 下的 record-<序号>.out）收尾就删，不转就只剩 RECORD 行里的 changed= 一个数。至多 record_skip_lines_shown() 行，多出的报一句「另有 N 条」。
+        弄坏开关 CODE_TOOLING_BREAK=record-skip-lines-dropped：一行都不转。"""
+        if "record-skip-lines-dropped" in os.environ.get("CODE_TOOLING_BREAK", "").split(","):
+            return
+        skipped = [line.rstrip() for line in output.split("\n") if line.lstrip().startswith("!")]
+        shown = self.record_skip_lines_shown()
+        for line in skipped[:shown]:
+            print(line, flush=True)
+        if len(skipped) > shown:
+            print(f"  ! 记库没记的另有 {len(skipped) - shown} 条没转进日志（verdict-record 这一趟共打 {len(skipped)} 条「!」行）", flush=True)
+
+    def library_name(self):
+        """这一格的判定库名：<被判那棵树的 git common-dir>/<LIBRARY_DIRECTORY_NAME>/<种类>（只当名字，本地不建）；取不到 git common-dir 是空串。"""
+        done = subprocess.run(["git", "-C", self.root, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                              capture_output=True, text=True, errors="replace", stdin=subprocess.DEVNULL)
+        common_directory = done.stdout.strip() if done.returncode == 0 else ""
+        return f"{common_directory}/{LIBRARY_DIRECTORY_NAME}/{self.kind}" if common_directory else ""
+
+    @staticmethod
+    def stored_composition(directory, key):
+        """library-files fetch 搬到 directory 底下的那把键的组成清单（行的列表）；没搬来、解不开是 None。"""
+        try:
+            with gzip.open(os.path.join(directory, "compositions", f"{key}.tsv.gz"), "rt", encoding="utf-8", errors="surrogateescape") as handle:
+                return handle.read().rstrip("\n").split("\n")
+        except (OSError, EOFError):
+            return None
+
+    def changed_units(self, keys_of):
+        """{名字: (开跑前的键, 现在的键)} → ({名字: 变了的单元的说明句清单，取不到是 None}, 取不到的原因)：
+        两把键的组成清单取库里按键存的那两份（verdict-plan 算键时存的 compositions/<键>.tsv.gz，admission.py library-files fetch 搬来）。"""
+        library, problem, directory = self.library_name(), "", self.path("recheck-compositions")
+        if not library:
+            problem = "取不到被判那棵树的 git common-dir，判定库名拼不出"
+        elif keys_of:
+            relatives = sorted({f"compositions/{key}.tsv.gz" for pair in keys_of.values() for key in pair})
+            code, output = admission_run(self.admission, ["library-files", "fetch", library, directory, *relatives], self.path("recheck-fetch.out"))
+            if code != 0:
+                problem = f"admission.py library-files fetch 退 {code}（{last_lines(output)}）"
+        notes_of = {}
+        for name, (earlier_key, later_key) in keys_of.items():
+            earlier, later = (None, None) if problem else (self.stored_composition(directory, key) for key in (earlier_key, later_key))
+            notes_of[name] = None if earlier is None or later is None else composition_diff(earlier, later)
+        return notes_of, problem or "库里没有那两把键的组成清单"
+
+    def key_changes(self, names, fresh_requests=None):
+        """判成没对上的那几条（names）里，跑的过程中键变了的 → {名字: 失败行里接在后面的一句}；键都没变、没有计划（按条复用算不出）、names 空的是 {}。
+        没对上的条才重算：照 plan 交进去的同一批请求里那几条，起同一条 admission.py verdict-plan（计划文件写 -：不落计划、不存哨兵状态），不另写算键；
+        请求里有调用方自己算的输入（line: 行，例：stage-break-switch-replay 格喂的样本目录摘要）而它们也会在跑的过程中变的，调用方照此刻的内容重拼那几条，经 fresh_requests（{名字: 请求行}）交进来；
+        开跑前算的键与此刻重算的不同就是键变了，变了的单元取两把键各自的组成清单比（至多 KEY_CHANGE_UNITS_SHOWN 处，余下报条数），出路写在冻结快照树里重判。
+        重算只写一行「· 重算键：…」，不改这一条的红绿与退出码；重算没成只打一行「!」，不当键没变。
+        弄坏开关 CODE_TOOLING_BREAK=key-change-not-rechecked：不重算、一条都不报；key-change-noted-always：重算出来的一概当键变了（键没变的也接那一句）。"""
+        asked = [name for name in names if name in self.keys]
+        if not self.ok or not asked or break_on("key-change-not-rechecked"):
+            return {}
+        requests_path = self.path("recheck.requests")
+        with open(requests_path, "w", encoding="utf-8") as handle:
+            handle.write("".join((fresh_requests or {}).get(name, self.request_of[name]) + "\n" for name in asked))
+        code, output = admission_run(self.admission, ["verdict-plan", self.root, self.kind, requests_path, "-"], self.path("recheck.out"))
+        if not any(line.startswith("PLAN ") for line in output.split("\n")):
+            print(f"  ! 重算键没成（admission.py verdict-plan 退 {code}：{last_lines(output)}）：没对上的 {len(asked)} 条的键在跑的过程中变没变，这一趟说不准", flush=True)
+            return {}
+        keys_now = plan_keys(output)
+        changed = [name for name in asked if break_on("key-change-noted-always") or keys_now.get(name) != self.keys[name]]
+        print(f"  · 重算键：没对上的 {len(asked)} 条照开跑前同一份请求重算，键变了 {len(changed)} 条", flush=True)
+        notes_of, unreadable = self.changed_units({name: (self.keys[name], keys_now[name]) for name in changed if name in keys_now})
+        sentences = {}
+        for name in changed:
+            earlier_key, later_key = self.keys[name], keys_now.get(name)
+            head = f"跑的过程中键变了（开跑前算的键 {earlier_key[:12]}，现在{'算出的键 ' + later_key[:12] if later_key else '算不出键'}）"
+            notes = notes_of.get(name)
+            if later_key is None:
+                detail = "现在这一条的单元闭包收不全、键算不出"
+            elif notes is None:
+                detail = f"变了的单元读不到（{unreadable}）"
+            elif not notes:
+                detail = "两把键的组成清单相同，键的写法变了"
+            else:
+                shown = "；".join(notes[:KEY_CHANGE_UNITS_SHOWN])
+                rest = f"；另有 {len(notes) - KEY_CHANGE_UNITS_SHOWN} 处没列" if len(notes) > KEY_CHANGE_UNITS_SHOWN else ""
+                detail = f"组成清单有 {len(notes)} 处不同：{shown}{rest}"
+            sentences[name] = f"{head}：{detail}；{KEY_CHANGE_REMEDY}"
+        return sentences
 
     def reread_after_red(self):
         """样本根带 .unit-verdict-sample/red-over-green 时：判红记库之后不设 ADMISSION_BREAK 再算一次计划，打复用几条、现判几条，现判的逐条写原因。"""
@@ -1396,6 +1884,80 @@ class ItemVerdicts:
                 if decision == REUSE:
                     print(f"    复用「{name}」：{reason}", flush=True)
         return judged, reused, refused
+
+
+class TripJournal:
+    """一趟的结局按键落盘（break-switch-replay 格文件头「开关趟落盘」）：相对路径 trips/<键>.json，放在这一格自己那个种类底下，经 admission.py library-files 读写
+    （一趟一帧，服务回确认才算数）。load 取回键相同的那几趟；unavailable 是取回时 prune-server 不可用，problem 是别的取不回的那一句。storing 为假时不写。"""
+
+    def __init__(self, verdicts, storing=True):
+        self.verdicts, self.storing = verdicts, storing
+        self.unavailable, self.problem = False, ""
+        self.library = verdicts.library_name() if verdicts.ok else ""
+
+    def relative(self, key):
+        return f"trips/{key}.json"
+
+    def store(self, name, trip):
+        key = self.verdicts.keys.get(name)
+        if not (self.storing and self.library and key):
+            return
+        directory = self.verdicts.path("trips-to-store")
+        path = os.path.join(directory, "trips", f"{key}.json")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(trip, handle, ensure_ascii=False)
+        code, output = admission_run(self.verdicts.admission, ["library-files", "store", self.library, directory, self.relative(key)], path + ".out")
+        if code != 0:
+            print(f"  ! 开关趟落盘没成（{name}：admission.py library-files store 退 {code}，{last_lines(output)}），被打断的话下一趟这一趟照起", flush=True)
+
+    def load(self, names):
+        """names 里键相同、落了盘的那几趟：{名字: 那一趟的结局}。"""
+        keyed = {name: self.verdicts.keys[name] for name in names if name in self.verdicts.keys}
+        if not (self.library and keyed):
+            return {}
+        directory = self.verdicts.path("trips-fetched")
+        code, output = admission_run(self.verdicts.admission, ["library-files", "fetch", self.library, directory, *[self.relative(key) for key in keyed.values()]],
+                                     self.verdicts.path("trips-fetch.out"))
+        if code != 0:
+            self.unavailable = code == 75
+            self.problem = f"admission.py library-files fetch 退 {code}（{last_lines(output)}）"
+            return {}
+        loaded = {}
+        for name, key in keyed.items():
+            path = os.path.join(directory, "trips", f"{key}.json")
+            if not os.path.isfile(path):
+                continue
+            with open(path, encoding="utf-8") as handle:
+                loaded[name] = json.load(handle)
+        return loaded
+
+
+class SampleStop:
+    """样本档造「这一格中途被停」：被判的根是样本、STOP_AFTER_MARKER 在、STOP_ARMED_VARIABLE 设着（只有被打断的那一趟设）时，passed() 数到那份文件写的次数就当场退 137，
+    不收尾、不记库。armed 的那一趟调用方只开一个线程，停在第几趟是定数。别的时候什么都不做。"""
+
+    def __init__(self, sample, root, scratch):
+        marker = os.path.join(root, STOP_AFTER_MARKER)
+        self.limit, self.count, self.scratch, self.lock = 0, 0, scratch, threading.Lock()
+        if sample and os.environ.get(STOP_ARMED_VARIABLE) and os.path.isfile(marker):
+            with open(marker, encoding="utf-8") as handle:
+                self.limit = int(handle.read().strip())
+
+    @property
+    def armed(self):
+        return self.limit > 0
+
+    def passed(self):
+        if not self.armed:
+            return
+        with self.lock:
+            self.count += 1
+            reached = self.count >= self.limit
+        if reached:
+            print(f"  · 样本档：判完第 {self.count} 趟、落了盘，照 {STOP_AFTER_MARKER} 停掉这一趟", flush=True)
+            shutil.rmtree(self.scratch, ignore_errors=True)
+            os._exit(SAMPLE_STOP_EXIT)
 
 
 def content_digest(path, skipped=("target", ".git")):
@@ -1449,7 +2011,8 @@ code_tooling_three_question_rounds() {
     if [[ "$round" == unrelated || "$round" == unit ]]; then
       local change_script="$marker/unrelated.sh"
       [[ "$round" == unit ]] && change_script="$marker/change.sh"
-      if ! bash "$change_script"; then
+      # 写成「$ROOT/<样本里的相对路径>」（ROOT 就是此刻的目录）：收闭包时照「$<折不出的目录>/<折得出的尾巴>」认，不当仓根下不在的路径拒算
+      if ! bash "$ROOT/$change_script"; then
         echo "  ✗ 样本的 $change_script 没跑成，复用三问判不了"
         echo "     → 怎么办：照它的报错改样本；它只许改样本根里的文件。"
         rm -rf -- "$rounds_scratch"
@@ -1473,6 +2036,25 @@ code_tooling_three_question_rounds() {
   return "$rounds_red"
 }
 
+# code_tooling_interrupted_rounds <格名> <跑一趟的函数>：打断之后第二趟只补没判的（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」）。
+#   被判的根是样本、带 .unit-verdict-sample/interrupted-resume/stop-after（一个正整数）的，同一份判定库上跑三趟：第一趟判完那么多趟就当场退 137、不收尾（SampleStop），
+#   第二趟同一条命令接着跑、第三趟全部复用。第一趟不是退 137 判红；后两趟这一格没判绿判红。现判几条、取回几趟写在样本的 expect 里。
+code_tooling_interrupted_rounds() {
+  local cell="$1" pass="$2" interrupted_exit resumed_red=0
+  echo "── 打断与续跑：被打断的那一趟（$cell）"
+  CODE_TOOLING_SAMPLE_STOP_ARMED=1 "$pass" ""; interrupted_exit=$?
+  if ((interrupted_exit != 137)); then
+    echo "  ✗ 样本档：被打断的那一趟退 $interrupted_exit（要 137：判完 stop-after 写的趟数就停），续跑判不了"
+    echo "     → 怎么办：看上面几行：stop-after 写得比要跑的趟数多，就改小它；那一趟自己报了错，先修它再喂这份样本。"
+    return 1
+  fi
+  echo "── 打断与续跑：第二趟（$cell）"
+  "$pass" "" || resumed_red=1
+  echo "── 打断与续跑：第三趟（$cell）"
+  "$pass" "" || resumed_red=1
+  return "$resumed_red"
+}
+
 # ── 格 research-script-selftests：runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）
 #
 # 判据：SELFTEST_RUNNERS 里每一条自证都退 0；表全不全归 research-script-selftest-coverage 格。lib/stage-cells.sh 不是阶段，它的自证只在这张表里跑。
@@ -1488,9 +2070,15 @@ code_tooling_three_question_rounds() {
 # 分批并行：SELFTEST_RUNNERS_STARTED_ALONE 里最慢的那几条先各自单独起、跑到完；其余按表次序每批 N 条并行，一批收齐再起下一批，
 #   N = 每台默认重活线程数（scripts/hosts/heavy-threads.sh 的 heavy_thread_default：SINGLEFS_THREAD_CAP 设了照它，否则 .claude/heavy-thread-default 的登记值；
 #   取不了这一格判红）减去单独起的条数，至少 1。
+#   SELFTEST_RUNNERS_MEMORY_BOUND 里的大自证（真仓现算整张单元图的这类，一条十几 GiB；这一道整格登记在 .claude/memory-bounded-parallelism.tsv 里准许按内存定并发）各占一批：
+#   排到它时先收齐手上这一批，它单独起、跑完再往下，大自证不互相叠、也不与别的自证同批；同时写在 SELFTEST_RUNNERS_STARTED_ALONE 里的照这一条办。登记的不在 runner 表里判红。
+#   新量到一条十几 GiB 的自证（task-server/task status 的内存峰值），连同出处加进这张表。样本根的 .selftest-memory-bound（一行一条，只在样本根有 .selftest-runners 时认）顶替这张表。
+#   样本 runner-memory-bound-batches-green：四条自证，表里 大、小 相间，.selftest-environment 设每批至多 8 条：每条开跑留一个记号、睡 1 秒，大的那条看见别的记号、小的那条看见大的记号就退 1；判绿。
+#   样本 runner-memory-bound-unlisted-red：登记的一条不在样本的 runner 表里，整格判红、一条都不起。
 #
 # 按条复用：表里每一条自证一条判定（scripts/gate/admission.py verdict-plan / verdict-record，种类 code-tooling.sh:research-script-selftests），
-#   键是那份脚本整份的单元闭包（它 import / source 到的模块与函数、读的数据文件、解释器版本，算法在 admission.py 文件头「单元键」）、
+#   键是那份脚本的单元闭包（它 import / source 到的模块与函数、读的数据文件、解释器版本，算法在 admission.py 文件头「单元键」；bash 起的另带
+#   program-argument:<脚本之后的每个词>，脚本体只收这组参数真走到的那一支，lib_function_units.py 文件头「程序入口带参数」；python 起的整份收）、
 #   这一条命令原文（line:command=）、selftest-registry.tsv 里那份脚本登记的种类（line:selftest-registration=）与判法的闭包（judge:，在这一道所在的仓里算）；不带路径与行号。
 #   判法取 selftest-process-guard.py 里判盯不盯的那几个函数（SELFTEST_JUDGE_ENTRIES：认哪条命令要盯、真工具链的位置、替身、进程树与 execve 记录怎么判；
 #   名单只在守卫里那一份，selftest_judge_entries_load 按 ast 读它，读不出这一格判红；样本 runner-judge-entries-unreadable-red 三条自证都退 0、样本根的
@@ -1503,6 +2091,8 @@ code_tooling_three_question_rounds() {
 #   一条判完就记：每条自证跑完，起它的那个后台作业写完退出码就当场照键记这一条（selftest_record_one，判法与回读同一份 selftest_outcome；
 #   admission.py verdict-record 每把键一份文件、同目录临时文件写完 fsync 再改名换上），这一格中途被停，已经跑完的那几条都在库里，下一趟它们复用、只补没判的；
 #   当场记的那一趟不判复用哨兵，收尾照旧把这一趟的判绿、判红名单整份再交一次 verdict-record（同一把键写同样的内容），哨兵与「· 判绿记库」那一行在收尾那一趟。
+#   收尾那一趟退 0 时它打的「!」行（跑的过程中键变了、不记的）原样转进日志，至多 SELFTEST_RECORD_SKIP_LINES_SHOWN 行、多出的报「另有 N 条」（selftest_record_skips_report；
+#   当场记的那几趟不转：收尾那一趟照同一份计划再比一次，变了的还在它里面）；样本 runner-record-skips-forwarded-green，弄坏开关 CODE_TOOLING_BREAK=record-skip-lines-dropped。
 #   样本 runner-recorded-before-the-run-ends（两条，样本根的 .selftest-environment 设 SINGLEFS_THREAD_CAP=1：每批一条、按表次序）：
 #   a 退 0；b 在样本自己的判定库（git common-dir 底下）里找 a 那一条的判绿记录，找到退 0、找不到退 1：整格收尾之前 a 已经在库里，判绿、两条都记。
 #   成功句报「表里 N 条：现判 J、复用 M、拒算 R、本次未跑 0」，现判与拒算逐条列为什么（键对不上时是变了的单元），没过的那一条另报为什么现判。
@@ -1544,6 +2134,9 @@ SELFTEST_RUNNERS=(
   "python3 scripts/crash/check-segment-registry.py --selftest" "python3 scripts/kb/replace-once.py --selftest"
   "python3 scripts/kb/replace-batch.py --selftest" "python3 scripts/experiment-apparatus/e152-tables.py --selftest"
   "python3 scripts/experiment-apparatus/e203_admission_scan_cost_counters.py --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e203-admission-scan-cost-run.sh --selftest"
+  "python3 scripts/experiment-apparatus/e206_fixed_point_cost_counters.py --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e206-fixed-point-cost-run.sh --selftest"
+  "python3 scripts/experiment-apparatus/e207_strict_scan_steps_counters.py --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e207-strict-scan-steps-run.sh --selftest"
+  "python3 scripts/experiment-apparatus/e209_spike_cause_counters.py --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e209-spike-cause-run.sh --selftest"
   "python3 scripts/agents/agent-watch.py --selftest" "python3 scripts/kb/quote-rust-items.py --selftest"
   "python3 scripts/kb/sweep-term.py --selftest" "python3 scripts/kb/archive-past-rounds.py --selftest"
   "python3 scripts/kb/insert-row.py --selftest" "bash scripts/hosts/cache-keepalive.sh --selftest"
@@ -1553,7 +2146,7 @@ SELFTEST_RUNNERS=(
   "bash scripts/kb/verify-citations.sh --selftest"
   "python3 scripts/agents/agent-handover.py --selftest" "python3 scripts/kb/decision-slim-check.py --selftest"
   "python3 scripts/kb/pdf-text.py --selftest" "python3 scripts/kb/rules-sweep-audit.py --selftest"
-  "python3 scripts/agents/dispatch-prompt.py --selftest" "python3 scripts/agents/three-way-materials.py --selftest"
+  "python3 scripts/agents/dispatch-prompt.py --selftest" "python3 scripts/agents/three-way-materials.py --selftest" "python3 scripts/agents/verdict-skeleton.py --selftest" "python3 scripts/agents/who-touched.py --selftest"
   "python3 scripts/gate/lib_rebuilt_packages.py --selftest"
   "python3 scripts/mutation/lib_release_only_tests.py --selftest"
   "python3 scripts/gate/lib_function_units.py --selftest"
@@ -1565,7 +2158,7 @@ SELFTEST_RUNNERS=(
   "bash scripts/gate/changed-paths.sh --selftest"
   "bash scripts/gate/gate-staged.sh --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/admission.py --selftest"
   "bash scripts/hosts/capped.sh --selftest"
-  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/crash/crash-point-replay-shard-run.sh --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/mutation/mutation-shard-run.sh --selftest"
+  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/mutation/mutation-shard-run.sh --selftest"
   "bash scripts/hosts/multi-host-run.sh --selftest" "bash scripts/hosts/run-with-memory-cap.sh --selftest" "bash scripts/hosts/run-build-directory.sh --selftest" "python3 scripts/agents/copy-originals.py --selftest"
   "python3 task-server/task_server_lib.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/replay.sh --selftest"
@@ -1584,12 +2177,13 @@ SELFTEST_RUNNERS=(
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/crash/crash-amplification-two-hosts.sh --selftest"
   "bash scripts/crash/gpu-quiesce-run.sh --selftest"
   "python3 scripts/hosts/gpu-card-health.py --selftest"
+  "python3 scripts/hosts/queue-health.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/crash/crash-point-replay.sh --selftest"
   "python3 scripts/crash/gpu-exemptions-check.py --selftest"
   "python3 scripts/crash/cpu-judging-sites-check.py --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/crash/lib_verdict_library.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/mutation/broad-mutation.py --selftest" "python3 scripts/mutation/mutation-prune.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/verus-proof-check.py --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e165-pin-red-examples.py --selftest"
-  "bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --selftest"
+  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --selftest"
   "python3 scripts/experiment-apparatus/e165-compare-kill-bounds.py --selftest"
   "python3 scripts/gate/hook-swap.py --selftest" "python3 scripts/hosts/host-dispatch.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/selftest-process-guard.py --selftest" "bash scripts/devices/vm-bench.sh --selftest"
@@ -1597,6 +2191,7 @@ SELFTEST_RUNNERS=(
   "python3 scripts/hosts/minimal-copy.py --selftest" "python3 scripts/hosts/lib_repository_copy.py --selftest" "bash scripts/hosts/work-directory-ownership.sh --selftest"
   "bash scripts/devices/qemu-blklogwrites-check.sh --selftest" "bash scripts/devices/build-patched-qemu.sh --selftest"
   "python3 scripts/gate/stage-mine.py --selftest"
+  "python3 scripts/gate/patch-of-the-current-tree.py --selftest"
   "python3 scripts/kb/relabel-item.py --selftest" "bash scripts/kb/claim-experiment.sh --selftest" "python3 scripts/kb/lib_experiment_number_directories.py --selftest"
   "python3 scripts/hosts/target-prune.py --selftest" "python3 scripts/gate/crate-sources-reachable.py --selftest" "python3 scripts/gate/refused-test-registry.py --selftest"
   "python3 scripts/gate/comment-history-check.py --selftest" "python3 scripts/gate/directory-layout-check.py --selftest" "python3 scripts/gate/rust-name-collisions.py --selftest"
@@ -1622,12 +2217,12 @@ SELFTEST_RUNNERS=(
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_two.sh --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates/run_segment_three.sh --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_two_q5.sh --selftest"
-  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_known_bad_recopy_check.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_q5_record_path_counts.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_replay_result_lines.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e170_o3_spec_executor_with_witness_predicates_journal_header_487/run_segment_one_b_anchors_and_freeze.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/long_run_item_verdicts.py --selftest"
   "python3 scripts/hosts/rocksdb-prebuilt.py --selftest"
+  "python3 scripts/experiment-apparatus/e21-card-lease-selftest.py --selftest"
   "python3 scripts/kb/milestone-close-owed-check.py --selftest" "python3 scripts/kb/move-directory-in-use-check.py --selftest"
   "python3 scripts/hosts/clean-session-scratch.py --selftest" "bash scripts/gate/staged-tree-worktree.sh --selftest"
   "bash scripts/crash/crash-point-replay-shard-configuration-check.sh --selftest" "python3 scripts/kb/path-successor.py --selftest"
@@ -1636,7 +2231,10 @@ SELFTEST_RUNNERS=(
   "python3 .claude/gate.d/lib-lag-baseline.py --selftest"
   "python3 scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/drive.py --selftest"
   "python3 scripts/experiment-apparatus/e197_scan_journal_glue_memory_by_device_count/report.py --selftest"
-  "python3 scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/full_table_run.py --selftest"
+  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/full_table_run.py --selftest"
+  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e171_three_oracle_collusion/row_driver.py --selftest"
+  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e171_three_oracle_collusion/shared_steps.py --selftest"
+  "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e171-row-shard-selftest.sh --selftest"
   "python3 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/contrast_revision_6_against_revision_8.py --selftest"
   "python3 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/contrast_segment_two_revision_10.py --selftest"
   "python3 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/frozen_tree_lines_revision_8.py --selftest"
@@ -1653,12 +2251,14 @@ SELFTEST_RUNNERS=(
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_11.py --selftest"
   "python3 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_8.py --selftest"
 )
+# 登记的大自证（这一格文件头「分批并行」）：各占一批，整条写法与 SELFTEST_RUNNERS 里的逐字相同
+SELFTEST_RUNNERS_MEMORY_BOUND=("python3 scripts/gate/lib_function_units.py --selftest" "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/verus-proof-check.py --selftest")
 # 包装写法的前缀（这一格文件头「只在临时 prune-server 上跑的自证」）与认它要包的那一句（被起的脚本源码里出现它就要包）
 SELFTEST_TEMPORARY_SERVICE_PREFIX="python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --"
 SELFTEST_TEMPORARY_SERVICE_MARK="selftest_service_problem"
-# selftest_inner_command <表里的一条>：包装写法打 -- 后面那条原命令，别的原样打
-selftest_inner_command() {
-  if [[ "$1" == "$SELFTEST_TEMPORARY_SERVICE_PREFIX "* ]]; then printf '%s\n' "${1#"$SELFTEST_TEMPORARY_SERVICE_PREFIX "}"; else printf '%s\n' "$1"; fi
+# selftest_inner_into <表里的一条>：包装写法取 -- 后面那条原命令，别的原样，放进 selftest_inner（不起子 shell：表一百多条，逐条调要起一百多个）
+selftest_inner_into() {
+  if [[ "$1" == "$SELFTEST_TEMPORARY_SERVICE_PREFIX "* ]]; then selftest_inner="${1#"$SELFTEST_TEMPORARY_SERVICE_PREFIX "}"; else selftest_inner="$1"; fi
 }
 # 要临时服务的自证登记表（TEMPORARY_SERVICE_TABLE，写法在它的文件头，读法是 .claude/hooks/lib_project_code_runs.py 的 read_temporary_service_table，这里不另写一份解析）：
 #   这一道里凡是判「这份自证要不要临时服务」的地方（research-script-selftests 格 runner 表里该不该套包装、reuse-selftests 与 break-switch-replay 两格要不要先取二进制、
@@ -1678,7 +2278,11 @@ temporary_service_table_load() {
     echo "     → 怎么办：表是新立的，写法在它的文件头；确认它进了这一棵树（--staged 判的是暂存区，要先 git add 这个文件）"
     return 1
   fi
-  if ! output="$(python3 - "$STAGE_REPOSITORY/.claude/hooks/lib_project_code_runs.py" "$TEMPORARY_SERVICE_TABLE" <<'PY'
+  # 同一趟里表不变：第一个读成的格把读出的行落进本趟共用的临时目录，别的格直接读那份（每读一次要起一个 python 载入 lib_project_code_runs.py）；读不成的不落，各格各自报
+  local cached="${CODE_TOOLING_RUN_SCRATCH:+$CODE_TOOLING_RUN_SCRATCH/temporary-service-table.tsv}"
+  if [[ -n "$cached" && -f "$cached" ]]; then
+    output="$(<"$cached")"
+  elif ! output="$(python3 - "$STAGE_REPOSITORY/.claude/hooks/lib_project_code_runs.py" "$TEMPORARY_SERVICE_TABLE" <<'PY'
 import importlib.util, sys
 spec = importlib.util.spec_from_file_location("lib_project_code_runs", sys.argv[1])
 library = importlib.util.module_from_spec(spec)
@@ -1695,6 +2299,9 @@ PY
     printf '%s\n' "$output" | sed 's/^/      /'   # gate-lint:detail
     echo "     → 怎么办：照上面逐行改表（一行 <路径> required 或 own-server 加 # 理由，写法在表的文件头）；判法在 .claude/hooks/lib_project_code_runs.py 的 temporary_service_table_at"
     return 1
+  fi
+  if [[ -n "$cached" && ! -f "$cached" ]]; then
+    printf '%s\n' "$output" >"$cached.$BASHPID" && mv -f -- "$cached.$BASHPID" "$cached" || rm -f -- "$cached.$BASHPID"
   fi
   while IFS=$'\t' read -r key judgement; do
     [[ -n "$key" ]] && TEMPORARY_SERVICE_JUDGEMENT[$key]="$judgement"
@@ -1725,21 +2332,51 @@ temporary_service_bare_runners() {
 #   PRUNE_SERVER_BINARY 设了（非空，绝对路径）用它（与 scripts/prune-server/prune_server_client_selftest.py 的 resolve_binary 认同一个变量）；
 #   没设照 prune-server-selftest 格的编法（经 capped.sh、--offline、被判那棵树的 prune-server/）编进 <编译目录>/target（调用的那一格自己的临时目录，跑完随它删）。
 #   取不到退 1，为什么打在标准错误
+#   整道门禁这一趟只编一次：开跑前建了本趟共用的临时目录（CODE_TOOLING_RUN_SCRATCH）时，没设 PRUNE_SERVER_BINARY 的各格取它都落到那个目录里的同一份编译
+#   （flock 排队：并发的格等第一个编完；编不过的结局也记下，后到的格直接得到同一句原因、不再编第二次）；没有共用目录、没有 flock 的才编进调用方给的 <编译目录>。
+#   样本根里放了 sample-prune-server-build 的（只在样本根认），不认 PRUNE_SERVER_BINARY、不起 cargo：`<那份文件> <目标目录>`（直接执行，带执行位），由它在 <目标目录>/release/ 下造出 prune-server。
+#   弄坏开关 CODE_TOOLING_BREAK=prune-server-build-not-shared：不共用，各格各编进自己的 <编译目录>，prune-server-shared-build-green 里第二次起假编译被拒、两格判红。
 code_tooling_prune_server_binary() {
-  if [[ -n "${PRUNE_SERVER_BINARY:-}" ]]; then
+  local sample_build=0 shared="${CODE_TOOLING_RUN_SCRATCH:-}" cache
+  [[ -f "${ROOT:-}/sample-prune-server-build" ]] && declare -F judged_root_is_sample >/dev/null && judged_root_is_sample && sample_build=1
+  if [[ -n "${PRUNE_SERVER_BINARY:-}" ]] && ((! sample_build)); then
     [[ "$PRUNE_SERVER_BINARY" == /* && -x "$PRUNE_SERVER_BINARY" ]] || { echo "PRUNE_SERVER_BINARY=$PRUNE_SERVER_BINARY 不是可执行文件的绝对路径" >&2; return 1; }
     printf '%s\n' "$PRUNE_SERVER_BINARY"
     return 0
   fi
-  if ! CARGO_TARGET_DIR="$1/target" \
+  cache="$shared/prune-server-build"
+  if [[ -z "$shared" || "${CODE_TOOLING_BREAK:-}" == prune-server-build-not-shared ]] || ! command -v flock >/dev/null || ! mkdir -p -- "$cache"; then
+    code_tooling_prune_server_build_into "$1"
+    return
+  fi
+  (
+    flock 9 || exit 1
+    [[ -e "$cache/outcome" ]] && exit 0
+    if code_tooling_prune_server_build_into "$cache" >"$cache/binary" 2>"$cache/error"; then printf '0\n' >"$cache/outcome"; else printf '1\n' >"$cache/outcome"; fi
+  ) 9>"$cache/lock"
+  if [[ "$(cat -- "$cache/outcome" 2>/dev/null)" == 0 ]]; then
+    cat -- "$cache/binary"
+    return 0
+  fi
+  cat -- "$cache/error" >&2 2>/dev/null
+  return 1
+}
+# code_tooling_prune_server_build_into <编译目录>：把被判那棵树的 prune-server 编进 <编译目录>/target（样本根的 sample-prune-server-build 顶替 cargo），打二进制的路径；编不成退 1、原因打在标准错误，日志是 <编译目录>/prune-server-build.log
+code_tooling_prune_server_build_into() {
+  if [[ -f "${ROOT:-}/sample-prune-server-build" ]] && declare -F judged_root_is_sample >/dev/null && judged_root_is_sample; then
+    if ! "$ROOT/sample-prune-server-build" "$1/target" >"$1/prune-server-build.log" 2>&1; then
+      echo "样本的假编译没成：$(tail -n 3 "$1/prune-server-build.log" | tr '\n' ' ' | clip_text 300)" >&2
+      return 1
+    fi
+  elif ! CARGO_TARGET_DIR="$1/target" \
       cargo build --release --offline --manifest-path "$ROOT/prune-server/Cargo.toml" --bin prune-server >"$1/prune-server-build.log" 2>&1; then
-    echo "cargo build --release --offline --manifest-path prune-server/Cargo.toml --bin prune-server 没成：$(tail -n 3 "$1/prune-server-build.log" | tr '\n' ' ' | cut -c1-300)" >&2
+    echo "cargo build --release --offline --manifest-path prune-server/Cargo.toml --bin prune-server 没成：$(tail -n 3 "$1/prune-server-build.log" | tr '\n' ' ' | clip_text 300)" >&2
     return 1
   fi
   [[ -x "$1/target/release/prune-server" ]] || { echo "编完不见 $1/target/release/prune-server" >&2; return 1; }
   printf '%s\n' "$1/target/release/prune-server"
 }
-SELFTEST_RUNNERS_STARTED_ALONE=("python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/crash/crash-point-replay-shard-run.sh --selftest" "python3 scripts/agents/agent-watch.py --selftest"
+SELFTEST_RUNNERS_STARTED_ALONE=("python3 scripts/agents/agent-watch.py --selftest"
   "python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/prune-server/prune_server_client_selftest.py --selftest")
 
 # selftest_plan_runners <草稿目录>：table_runners 每一条一条判定请求（这一格文件头「按条复用」），经 scripts/gate/admission.py verdict-plan 算键、查库；
@@ -1784,8 +2421,8 @@ PY_SELFTEST_JUDGE_ENTRIES
   return 1
 }
 selftest_plan_runners() {
-  local scratch="$1" runner tier name decision key reason entry plan_exit
-  local -a words=() table_files=() judge_tokens=() plan_environment=() wrapper_token=()
+  local scratch="$1" runner tier name decision key reason entry plan_exit word
+  local -a words=() table_files=() judge_tokens=() plan_environment=() wrapper_token=() argument_tokens=()
   # 样本根带 .unit-verdict-sample/red-over-green：库里已有上一版照判绿记进来的同一把键，这一格的计划另设 ADMISSION_BREAK=verdict-lookup-skipped（不读库、一律现判）
   #   照样现判（这一格文件头「按条复用」记红、撤绿）；门禁样本根里 admission.py 才认这个开关
   judged_root_is_sample && [[ -f .unit-verdict-sample/red-over-green ]] && plan_environment=(env ADMISSION_BREAK=verdict-lookup-skipped)
@@ -1795,17 +2432,33 @@ selftest_plan_runners() {
   for entry in "${SELFTEST_JUDGE_ENTRIES[@]}"; do judge_tokens+=("judge:$entry"); done
   [[ "${CODE_TOOLING_BREAK:-}" == selftest-judge-whole-guard ]] && judge_tokens=("judge:scripts/gate/selftest-process-guard.py")
   : >"$scratch/requests"
+  # 登记表（登记在哪一档）读一次放进 selftest_tier_of：每条自证查一次，不逐条起 awk 读整张表；一个脚本登记了几行取头一行
+  local registry_line registry_key registry_rest
+  local -A selftest_tier_of=()
+  if [[ -f .claude/hooks/selftest-registry.tsv ]]; then
+    while IFS= read -r registry_line || [[ -n "$registry_line" ]]; do
+      registry_key="${registry_line%%$'\t'*}"
+      [[ -n "$registry_key" && -z "${selftest_tier_of[$registry_key]+set}" ]] || continue
+      registry_rest=""; [[ "$registry_line" == *$'\t'* ]] && registry_rest="${registry_line#*$'\t'}"
+      selftest_tier_of[$registry_key]="${registry_rest%%$'\t'*}"
+    done <.claude/hooks/selftest-registry.tsv
+  fi
   if [[ "${CODE_TOOLING_BREAK:-}" == selftest-key-whole-runner-table ]]; then
-    for runner in "${table_runners[@]}"; do read -r -a words <<<"$(selftest_inner_command "$runner")"; [[ -f "${words[1]:-}" ]] && table_files+=("file:${words[1]}"); done
+    for runner in "${table_runners[@]}"; do selftest_inner_into "$runner"; read -r -a words <<<"$selftest_inner"; [[ -f "${words[1]:-}" ]] && table_files+=("file:${words[1]}"); done
   fi
   for runner in "${table_runners[@]}"; do
-    read -r -a words <<<"$(selftest_inner_command "$runner")"
+    selftest_inner_into "$runner"; read -r -a words <<<"$selftest_inner"
     wrapper_token=()
     [[ "$runner" == "$SELFTEST_TEMPORARY_SERVICE_PREFIX "* ]] && wrapper_token=("file:scripts/prune-server/prune_server_client_selftest.py")
-    tier="$(awk -F'\t' -v script="${words[1]:-}" '$1 == script { print $2; exit }' .claude/hooks/selftest-registry.tsv 2>/dev/null)"
+    # bash 起的自证判的是「这份脚本带这组参数跑」：脚本之后的词照次序进 program-argument:，闭包只收它们真走到的那一支（这一格文件头「按条复用」）
+    argument_tokens=()
+    if [[ "${words[0]:-}" == bash ]]; then
+      for word in "${words[@]:2}"; do argument_tokens+=("program-argument:$word"); done
+    fi
+    tier=""; [[ -n "${words[1]:-}" ]] && tier="${selftest_tier_of[${words[1]}]:-}"
     { printf '%s\t%s' "$runner" "${words[1]:-${words[0]:-}}"
       printf '\t%s' "${judge_tokens[@]}" "judge-root:$STAGE_REPOSITORY" "line:command=$runner" "line:selftest-registration=${tier:-没登记}" \
-        ${wrapper_token[@]+"${wrapper_token[@]}"} ${table_files[@]+"${table_files[@]}"}
+        ${argument_tokens[@]+"${argument_tokens[@]}"} ${wrapper_token[@]+"${wrapper_token[@]}"} ${table_files[@]+"${table_files[@]}"}
       printf '\n'; } >>"$scratch/requests"
   done
   if judged_root_is_sample && [[ -d .unit-verdict-sample/prior ]]; then
@@ -1891,6 +2544,28 @@ selftest_record_one() {
   printf '%s\n' "$record_exit" >"$scratch/$1.record-exit"
 }
 
+# 收尾那一趟 verdict-record 退 0 时转进日志的「!」行至多几行（同 UNIT_VERDICT_ROUNDS_LIBRARY 的 RECORD_SKIP_LINES_SHOWN，那一份在 python 的 here-doc 里，两处同改）
+SELFTEST_RECORD_SKIP_LINES_SHOWN=20
+
+# selftest_record_skips_report <记库的输出文件>：收尾那一趟 verdict-record 退 0 时它逐条打的「!」行（跑的过程中键变了、不记的，写不进服务的）原样转进日志：
+# 草稿目录收尾就删，不转就只剩 RECORD 行里的 changed= 一个数。至多 SELFTEST_RECORD_SKIP_LINES_SHOWN 行（样本根 .unit-verdict-sample/record-skip-lines-shown
+# 写着正整数的照它），多出的报一句「另有 N 条」；同 UNIT_VERDICT_ROUNDS_LIBRARY 的 ItemVerdicts.report_record_skips。
+# 弄坏开关 CODE_TOOLING_BREAK=record-skip-lines-dropped：一行都不转
+selftest_record_skips_report() {
+  local shown="$SELFTEST_RECORD_SKIP_LINES_SHOWN" total value
+  [[ "${CODE_TOOLING_BREAK:-}" == record-skip-lines-dropped ]] && return 0
+  if judged_root_is_sample && [[ -f .unit-verdict-sample/record-skip-lines-shown ]]; then
+    value="$(tr -d '[:space:]' < .unit-verdict-sample/record-skip-lines-shown)"
+    [[ "$value" =~ ^[1-9][0-9]*$ ]] && shown="$value"
+  fi
+  total="$(awk '/^[[:space:]]*!/ { count++ } END { print count + 0 }' "$1")"
+  awk -v shown="$shown" '/^[[:space:]]*!/ && printed < shown { print; printed++ }' "$1"
+  if ((total > shown)); then
+    echo "  ! 记库没记的另有 $((total - shown)) 条没转进日志（verdict-record 这一趟共打 $total 条「!」行）"
+  fi
+  return 0
+}
+
 # selftest_record_verdicts <草稿目录> <判绿的命令文件> <判红的命令文件>：现判而判绿的那几条照键记进库，现判而判红的（自证退非 0、不是 77）照同一把键记红、
 # 撤掉这把键原有的绿（这一格文件头「按条复用」记红、撤绿、下趟现判），经 admission.py verdict-record 的 --red-names；拒算的没有键，不记。
 # 只记绿的那一趟记不下只报、不判红，复用哨兵报红（强制现判那一条判定不稳）的经 plan-failure 判红；交了红的记不下带 --red 交 plan-failure：记红没成它判失灵、
@@ -1906,12 +2581,13 @@ selftest_record_verdicts() {
   if ((record_exit == 0)); then
     [[ -s "$2" ]] && echo "  · 判绿记库：$(tail -n 1 "$1/record.out")"
     ((${#red_option[@]})) && echo "  · 判红记库：$(grep -c . "$3") 条记红、撤掉同一把键原有的绿，下一趟这几条现判（$(tail -n 1 "$1/record.out")）"
+    selftest_record_skips_report "$1/record.out"
   elif ((${#red_option[@]})) && [[ "${CODE_TOOLING_BREAK:-}" == red-record-failure-kept-green ]]; then
     # 弄坏开关：记红没成只打一行「!」、不交 plan-failure，同一把键原有的绿留着、下一趟照复用
     echo "  ! 判定记库：admission.py verdict-record 没成（$(tail -n 2 "$1/record.out" | tr '\n' ' ')），下一趟这几条照跑"
   elif ((${#red_option[@]})); then
     # 记红没成（admission.py 文件头「按条复用失灵」）：带 --red 交 plan-failure，它判失灵、撤掉这几把键原有的绿（撤不掉说整道判红）
-    echo "  · 判定记库：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$1/record.out" | tr '\n' ' ' | cut -c1-300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
+    echo "  · 判定记库：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$1/record.out" | tr '\n' ' ' | clip_text 300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
     selftest_plan_failure_verdict verdict-record "$record_exit" --red "$ROOT" "$STAGE_NAME:research-script-selftests" "$1/plan" "$3" "$1/record.out"
   else
     echo "  ! 判定记库：admission.py verdict-record 没成（$(tail -n 2 "$1/record.out" | tr '\n' ' ')），下一趟这几条照跑"
@@ -1933,11 +2609,13 @@ selftest_reread_after_red() {
 }
 
 # selftest_runner_table_load：取这一趟的 runner 表（research-script-selftests 与 temporary-service-runners 两格共用）：
-#   设全局 runners（表）、table_source（表取自哪，报错时写）、started_alone（单独起的那几条）；被判的根是样本且有 .selftest-runners 时，换成样本根里的（单独起的那一路不走）
+#   设全局 runners（表）、table_source（表取自哪，报错时写）、started_alone（单独起的那几条）、memory_bound_runners（登记的大自证）；
+#   被判的根是样本且有 .selftest-runners 时，换成样本根里的（单独起的那一路不走，大自证取样本根的 .selftest-memory-bound，没有就是没有）
 selftest_runner_table_load() {
   runners=("${SELFTEST_RUNNERS[@]}")
   table_source="这一道的 SELFTEST_RUNNERS"
   started_alone=("${SELFTEST_RUNNERS_STARTED_ALONE[@]}")
+  memory_bound_runners=("${SELFTEST_RUNNERS_MEMORY_BOUND[@]}")
   if judged_root_is_sample && [[ -f .selftest-runners ]]; then
     runners=()
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -1946,7 +2624,35 @@ selftest_runner_table_load() {
     done < .selftest-runners
     table_source="样本根的 .selftest-runners（$ROOT 是样本，不是这一道所在的仓）"
     started_alone=()
+    memory_bound_runners=()
+    if [[ -f .selftest-memory-bound ]]; then
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ -z "${line//[[:space:]]/}" || "$line" =~ ^[[:space:]]*# ]] && continue
+        memory_bound_runners+=("$line")
+      done < .selftest-memory-bound
+    fi
   fi
+}
+
+# start_selftest <表里的序号> <命令>：后台起一条，输出写 <序号>.out、退出码写 <序号>.exit、守卫的判定写 <序号>.guard，进程号记进 started_pids；
+# 退出码写完，同一个后台作业里当场照键记这一条（selftest_record_one）。只由 research-script-selftests 格调，读那一格设的 scratch、selftest_process_guard、
+# selftest_server_binary，往它的 started_pids 里记。写在格外的顶层：套在格函数里时，格函数的单元把这段正文也当自己的命令认，
+# 命令位置上的 $inner 落在格函数名下拒算（scripts/gate/lib_function_units.py 的 UNKEYED_PROGRAM_WORDS 登的是 start_selftest 这一个函数）
+start_selftest() {
+  # runner 表每条是「解释器 脚本 参数」，按空白切词起，与原来逐条顺序跑时同一个起法；经守卫起：登记过的盯着它的进程树，别的守卫原样 exec
+  local wrap_prefix=() inner
+  # 包装写法：包装在守卫外面起、二进制交这一趟取的那一份，守卫盯 -- 后面那条原命令（这一格文件头「只在临时 prune-server 上跑的自证」）
+  selftest_inner_into "$2"; inner="$selftest_inner"
+  [[ "$inner" != "$2" ]] && wrap_prefix=(python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary "$selftest_server_binary" --)
+  if [[ "${CODE_TOOLING_BREAK:-}" == guard-skipped ]]; then
+    { printf 'watched\tfindings=0\tscan=no\texamined=0\texit=-\n' > "$scratch/$1.guard"; ${wrap_prefix[@]+"${wrap_prefix[@]}"} $inner > "$scratch/$1.out" 2>&1; printf '%s\n' "$?" > "$scratch/$1.exit"
+      selftest_record_one "$1" "$2"; } &
+  else
+    { ${wrap_prefix[@]+"${wrap_prefix[@]}"} python3 "$selftest_process_guard" --registry-root "$ROOT" --verdict-file "$scratch/$1.guard" -- $inner > "$scratch/$1.out" 2>&1
+      printf '%s\n' "$?" > "$scratch/$1.exit"
+      selftest_record_one "$1" "$2"; } &
+  fi
+  started_pids+=("$!")
 }
 
 cell_research_script_selftests() {
@@ -1956,16 +2662,19 @@ selftest_runner_table_load
 if [[ -n "${CODE_TOOLING_PICKED[research-script-selftests]:-}" ]]; then
   declare -A picked_selftest_scripts=()
   while IFS= read -r line; do [[ -n "$line" ]] && picked_selftest_scripts[$line]=1; done <<<"${CODE_TOOLING_PICKED[research-script-selftests]}"
-  picked_selftest_runners=(); picked_alone=()
+  picked_selftest_runners=(); picked_alone=(); picked_memory_bound=()
   for runner in "${runners[@]}"; do
-    read -r -a words <<<"$(selftest_inner_command "$runner")"
+    selftest_inner_into "$runner"; read -r -a words <<<"$selftest_inner"
     if [[ -n "${words[1]:-}" && -n "${picked_selftest_scripts[${words[1]}]+set}" ]]; then picked_selftest_runners+=("$runner"); fi
   done
   for runner in ${started_alone[@]+"${started_alone[@]}"}; do
     for line in ${picked_selftest_runners[@]+"${picked_selftest_runners[@]}"}; do [[ "$line" == "$runner" ]] && picked_alone+=("$runner"); done
   done
+  for runner in ${memory_bound_runners[@]+"${memory_bound_runners[@]}"}; do
+    for line in ${picked_selftest_runners[@]+"${picked_selftest_runners[@]}"}; do [[ "$line" == "$runner" ]] && picked_memory_bound+=("$runner"); done
+  done
   echo "  · 只跑点名的 ${#picked_selftest_scripts[@]} 份脚本的自证：表里 ${#runners[@]} 条留 ${#picked_selftest_runners[@]} 条（表取自 $table_source）"
-  runners=(${picked_selftest_runners[@]+"${picked_selftest_runners[@]}"}); started_alone=(${picked_alone[@]+"${picked_alone[@]}"})
+  runners=(${picked_selftest_runners[@]+"${picked_selftest_runners[@]}"}); started_alone=(${picked_alone[@]+"${picked_alone[@]}"}); memory_bound_runners=(${picked_memory_bound[@]+"${picked_memory_bound[@]}"})
   table_source="$table_source里 --item 点名的那几条"
 fi
 # 样本根的 .selftest-environment（一行一条，空行与 # 开头的行不算）：`名字=值` 导出、`!名字` 摘掉，在这一格开跑前套上，当作这一格被起的那一刻外面的环境；
@@ -2004,6 +2713,16 @@ for runner in ${started_alone[@]+"${started_alone[@]}"}; do
     exit 1
   fi
   alone_set[$runner]=1
+done
+# 登记的大自证（这一格文件头「分批并行」）：不在 runner 表里判红；弄坏开关 selftest-memory-bound-ignored 下照别的一样进批
+declare -A selftest_memory_bound_set=()
+for runner in ${memory_bound_runners[@]+"${memory_bound_runners[@]}"}; do
+  if [[ -z "${in_table[$runner]+set}" && "${CODE_TOOLING_BREAK:-}" != selftest-memory-bound-unlisted-accepted ]]; then
+    echo "  ✗ 登记的大自证「$runner」不在 runner 表里（取自 $table_source）"
+    echo "     → 怎么办：runner 表里改了名或删了那一条，就同步改 SELFTEST_RUNNERS_MEMORY_BOUND；对不上的那一条会悄悄不分批、与别的自证叠在一起。"
+    exit 1
+  fi
+  [[ "${CODE_TOOLING_BREAK:-}" == selftest-memory-bound-ignored ]] || selftest_memory_bound_set[$runner]=1
 done
 
 # 按条复用（这一格文件头「按条复用」）：每一条自证一条判定，键相同的不起；表全部复用就一条都不起
@@ -2065,13 +2784,18 @@ if ! thread_cap="$(heavy_thread_default)"; then
 fi
 batch_size=$((thread_cap - ${#alone_set[@]}))
 ((batch_size >= 1)) || batch_size=1
+selftest_memory_bound_count=0
+for runner in "${runners[@]}"; do
+  [[ -n "${selftest_memory_bound_set[$runner]+set}" ]] && selftest_memory_bound_count=$((selftest_memory_bound_count + 1))
+done
+((selftest_memory_bound_count)) && echo "  · 这一趟要起的里面，登记的大自证 $selftest_memory_bound_count 条各占一批，不与别的自证同批（SELFTEST_RUNNERS_MEMORY_BOUND）"
 
 # 这一趟要起的里面有包装写法的：开跑前取一次 prune-server 二进制，交给每一条（这一格文件头「只在临时 prune-server 上跑的自证」）
 selftest_server_binary=""; selftest_wrapped_count=0
 for runner in "${runners[@]}"; do [[ "$runner" == "$SELFTEST_TEMPORARY_SERVICE_PREFIX "* ]] && selftest_wrapped_count=$((selftest_wrapped_count + 1)); done
 if ((selftest_wrapped_count)); then
   if ! selftest_server_binary="$(code_tooling_prune_server_binary "$selftest_plan_scratch" 2>"$selftest_plan_scratch/server-binary.err")"; then
-    echo "  ✗ 取不到 prune-server 二进制（$(tail -n 3 "$selftest_plan_scratch/server-binary.err" | tr '\n' ' ' | cut -c1-400)），要包在临时服务底下起的 $selftest_wrapped_count 条一条都没起"
+    echo "  ✗ 取不到 prune-server 二进制（$(tail -n 3 "$selftest_plan_scratch/server-binary.err" | tr '\n' ' ' | clip_text 400)），要包在临时服务底下起的 $selftest_wrapped_count 条一条都没起"
     echo "     → 怎么办：修好 prune-server/ 的编译（cargo build --release --offline --manifest-path prune-server/Cargo.toml --bin prune-server）再跑这一格；二进制不另指，这一格自己编一份"
     exit 1
   fi
@@ -2080,26 +2804,8 @@ fi
 scratch="$(mktemp -d)" || { echo "  ✗ 建不了放逐条输出与退出码的临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格；一条自证都没跑。"; exit 1; }
 started_pids=()
 selftest_process_guard="$STAGE_REPOSITORY/scripts/gate/selftest-process-guard.py"
-# start_selftest <表里的序号> <命令>：后台起一条，输出写 <序号>.out、退出码写 <序号>.exit、守卫的判定写 <序号>.guard，进程号记进 started_pids；
-# 退出码写完，同一个后台作业里当场照键记这一条（selftest_record_one）
-start_selftest() {
-  # runner 表每条是「解释器 脚本 参数」，按空白切词起，与原来逐条顺序跑时同一个起法；经守卫起：登记过的盯着它的进程树，别的守卫原样 exec
-  local wrap_prefix=() inner
-  # 包装写法：包装在守卫外面起、二进制交这一趟取的那一份，守卫盯 -- 后面那条原命令（这一格文件头「只在临时 prune-server 上跑的自证」）
-  inner="$(selftest_inner_command "$2")"
-  [[ "$inner" != "$2" ]] && wrap_prefix=(python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service --server-binary "$selftest_server_binary" --)
-  if [[ "${CODE_TOOLING_BREAK:-}" == guard-skipped ]]; then
-    { printf 'watched\tfindings=0\tscan=no\texamined=0\texit=-\n' > "$scratch/$1.guard"; ${wrap_prefix[@]+"${wrap_prefix[@]}"} $inner > "$scratch/$1.out" 2>&1; printf '%s\n' "$?" > "$scratch/$1.exit"
-      selftest_record_one "$1" "$2"; } &
-  else
-    { ${wrap_prefix[@]+"${wrap_prefix[@]}"} python3 "$selftest_process_guard" --registry-root "$ROOT" --verdict-file "$scratch/$1.guard" -- $inner > "$scratch/$1.out" 2>&1
-      printf '%s\n' "$?" > "$scratch/$1.exit"
-      selftest_record_one "$1" "$2"; } &
-  fi
-  started_pids+=("$!")
-}
 for index in "${!runners[@]}"; do
-  [[ -n "${alone_set[${runners[$index]}]+set}" ]] && start_selftest "$index" "${runners[$index]}"
+  [[ -n "${alone_set[${runners[$index]}]+set}" && -z "${selftest_memory_bound_set[${runners[$index]}]+set}" ]] && start_selftest "$index" "${runners[$index]}"
 done
 alone_pids=(${started_pids[@]+"${started_pids[@]}"})
 batch=(); batches=0
@@ -2113,6 +2819,12 @@ run_selftest_batch() {
   batch=()
 }
 for index in "${!runners[@]}"; do
+  if [[ -n "${selftest_memory_bound_set[${runners[$index]}]+set}" ]]; then
+    ((${#batch[@]})) && run_selftest_batch
+    batch=("$index")
+    run_selftest_batch
+    continue
+  fi
   [[ -n "${alone_set[${runners[$index]}]+set}" ]] && continue
   batch+=("$index")
   ((${#batch[@]} == batch_size)) && run_selftest_batch
@@ -2230,7 +2942,7 @@ cell_temporary_service_runners() {
   local required_count=0 own_server_count=0 wrapped_count=0 problem_count
   mapfile -t bare < <(temporary_service_bare_runners)
   for runner in "${runners[@]}"; do
-    read -r -a words <<<"$(selftest_inner_command "$runner")"
+    selftest_inner_into "$runner"; read -r -a words <<<"$selftest_inner"
     script="${words[1]:-空}"
     runner_scripts[$script]=1
     [[ "$runner" == "$SELFTEST_TEMPORARY_SERVICE_PREFIX "* ]] || continue
@@ -2493,12 +3205,15 @@ PY_WRAPPER_FORM
 # 「实现了」只认 .sh / .py 经 code_of 去掉注释与出路文字之后的代码，不列具体写法（==、case、match 都认）；行尾注释同样去掉（shell 不在引号里、前面是空白的 #
 #   之后那一段，python 的注释记号；例：共用库函数头后面「# 调用方的 --selftest 起的：…」不算实现了）；「有阶段在调」只认 code_of 之后的代码。
 # 阶段取门禁目录顶层全部 *.sh，与 gate.sh 起的是同一批。
+# 扫哪些：scripts/ 下全部文件（隐藏的目录与文件不进，叫 target 的编译产物目录不进：里面没有 .sh 与 .py，几千份二进制不整读）；先看后缀、是 .sh / .py 才打开。
+#   每道阶段的代码只扫一遍，找出全部「<词> --selftest」与「变量="…py/sh"」，再按路径尾对每份脚本查，不为每道阶段、每份脚本各跑一次全文正则。
+#   弄坏开关 CODE_TOOLING_BREAK=coverage-scans-build-output：进 target 目录，coverage-claims-green（setup.sh 在 scripts/gate/target/release/ 下造一份写着 --selftest 的 .sh）判错。
 #
 # 样本：red 放一份只在某个阶段的 echo 出路里被提到的 --selftest 脚本，必须报它没人跑；green 放一份真被阶段调用的与 NOT_RUN_HERE 每一行的那份脚本，判绿并报对数。
 #   NOT_RUN_HERE 是这一道自己的表，绿样本里缺了哪一行的脚本，那一行就判过期：往表里加一行，同时往 green、coverage-claims-green 里各放一份那个路径的脚本、改两份 expect 的份数。
 #   coverage-claims-green 放一份只在注释、行尾注释与出路里提 --selftest 的 .py、一份只在行尾注释里提它的共用库 .sh、一份提到它的 .tsv（都不算实现了）
 #   与一份由不带编号的阶段 tooling-runs.sh 在跑的 .sh，
-#   判绿并报 10 份中 1 份（另九份是 NOT_RUN_HERE 那九行）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
+#   判绿并报「声称有 --selftest 的 N 份中 1 份有门禁阶段在跑」，其余 N − 1 份就是 NOT_RUN_HERE 的每一行（N 随表的行数走，不写死）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
 #   coverage-nested-red 放一份装置目录那一层的 scripts/experiment-apparatus/sample_rig/drive.py（实现了 --selftest、没人跑），必须报它没人跑；
 #   coverage-suffix-red 放 scripts/experiment-apparatus/replay.sh 与 scripts/crash/crash-point-replay.sh 两份，阶段只跑后一份的自证，必须报前一份没人跑。
 NOT_RUN_HERE=(
@@ -2510,9 +3225,14 @@ NOT_RUN_HERE=(
   "scripts/gate/large-file-check.py	它自己没有自证：文件头那句「这份脚本没有 --selftest」被算成实现了；判法由这一道 committed-file-size 格的五份样本与五条弄坏开关证红"
   "scripts/kb/lib_atomic_replace.py	它自己没有自证：只被 import，代码里的 --selftest 是认祖先进程命令行的那个串；自证在 replace-once.py、insert-row.py、replace-batch.py 各自的 --selftest"
   "scripts/prune-server/prune_server_client.py	它自己没有自证：命令行认到 --selftest 只为退 2、指到 prune_server_client_selftest.py（那一份的 --selftest 在 runner 表里）"
+  "scripts/experiment-apparatus/e203_admission_scan_cost_library.py	它自己没有自证：只由入口 e203-admission-scan-cost-run.sh 起，文中的 --selftest 是入口自证的起法与弄坏开关的说明；判法由入口 --selftest（经临时 prune-server，在 runner 表里）覆盖"
+  "scripts/experiment-apparatus/e206_fixed_point_cost_library.py	它自己没有自证：只由入口 e206-fixed-point-cost-run.sh 起，文中的 --selftest 是入口自证的起法与弄坏开关的说明；判法由入口 --selftest（经临时 prune-server，在 runner 表里）覆盖"
+  "scripts/experiment-apparatus/e207_strict_scan_steps_library.py	它自己没有自证：只由入口 e207-strict-scan-steps-run.sh 起，文中的 --selftest 是入口自证的起法与弄坏开关的说明；判法由入口 --selftest（经临时 prune-server，在 runner 表里）覆盖"
+  "scripts/experiment-apparatus/e209_spike_cause_library.py	它自己没有自证：只由入口 e209-spike-cause-run.sh 起，文中的 --selftest 是入口自证的起法与弄坏开关的说明；判法由入口 --selftest（经临时 prune-server，在 runner 表里）覆盖"
+  "scripts/experiment-apparatus/e21_card_lease.py	它自己没有自证：只被 e21-compute.py、e21-prove-gpu.py、e21-transfer.py 与自证 import，直接执行只打用法；代码里认到 --selftest 只是弄坏开关的守卫的拒绝说明里提到 --selftest（那一个是自证自己起的）；判法由 e21-card-lease-selftest.py 的 --selftest（在 runner 表里）覆盖"
 )
 cell_research_script_selftest_coverage() {
-coverage="$(python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "$SOURCE_CODE_LINES_LIBRARY" "${CODE_TOOLING_BREAK:-}" "${NOT_RUN_HERE[@]}" <<'PY_COVERAGE'
+coverage="$(python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "$SOURCE_CODE_LINES_LIBRARY" "${CODE_TOOLING_BREAK:-}" "$TREE_LISTING_LIBRARY" "${NOT_RUN_HERE[@]}" <<'PY_COVERAGE'
 import glob, os, re, sys, types
 code_text = types.ModuleType("lib_code_without_text")
 exec(compile(sys.argv[1], "code-without-text-library", "exec"), code_text.__dict__)
@@ -2520,7 +3240,9 @@ source_lines = types.ModuleType("lib_source_code_lines")
 exec(compile(sys.argv[2], "source-code-lines-library", "exec"), source_lines.__dict__)
 code_of = code_text.code_of
 broken = sys.argv[3]
-exempt = dict(row.split("\t", 1) for row in sys.argv[4:])
+tree = types.ModuleType("lib_tree_listing")
+exec(compile(sys.argv[4], "tree-listing-library", "exec"), tree.__dict__)
+exempt = dict(row.split("\t", 1) for row in sys.argv[5:])
 EVERY_STRING = re.compile(r"(?s).*")   # python 只去注释记号，字符串字面量一概留着（scan_strings）：实现 --selftest 的那个串就在字面量里
 def without_trailing_comments(path, text):
     """去掉行尾注释（shell 不在引号里、前面是空白的 #，python 的注释记号）：行尾注释里提到的 --selftest 不算实现了。"""
@@ -2530,37 +3252,62 @@ def without_trailing_comments(path, text):
         return "\n".join(source_lines.shell_code_lines(text, code_text.OUTPUT_TEXT))
     return "\n".join(source_lines.python_code_lines(text, code_text.OUTPUT_TEXT, EVERY_STRING, scan_strings=True))
 def implements_selftest(path):
+    # 后缀先判、再打开：编译产物与别的二进制（scripts 下的 target 目录里几千份、几个 GiB）不整读；claims-any-file 下不看后缀
+    if broken != "claims-any-file" and not path.endswith((".sh", ".py")):
+        return False
     text = open(path, encoding="utf-8", errors="replace").read()
     if broken == "claims-any-file":
         return "--selftest" in text
-    if not path.endswith((".sh", ".py")) or "--selftest" not in text:
+    if "--selftest" not in text:
         return False
     return "--selftest" in code_of(without_trailing_comments(path, text))
-scan_pattern = "scripts/*/*" if broken == "selftest-coverage-top-level-only" else "scripts/**/*"
-claimed = sorted(path for path in glob.glob(scan_pattern, recursive=True)
-                 if os.path.isfile(path) and implements_selftest(path))
+if broken == "selftest-coverage-top-level-only":
+    scanned = glob.glob("scripts/*/*")
+elif broken == "coverage-scans-build-output":
+    scanned = tree.files_under("scripts", skipped=())
+else:
+    scanned = tree.files_under("scripts")
+claimed = sorted(path for path in scanned if os.path.isfile(path) and implements_selftest(path))
+# 路径尾 → 有几份 claimed 以它收尾（按整段路径切）：只指一份的最短尾就是这份脚本在这一批里的名字
+tail_count = {}
+for other in claimed:
+    parts = other.split("/")
+    for size in range(1, len(parts) + 1):
+        tail = "/".join(parts[-size:])
+        tail_count[tail] = tail_count.get(tail, 0) + 1
 def unique_tail(script):
-    # 在 claimed 里只指它一份的最短路径尾：文件名不重名就是文件名，重名才带上一层层目录
     parts = script.split("/")
     for size in range(1, len(parts) + 1):
         tail = "/".join(parts[-size:])
-        if sum(1 for other in claimed if other == tail or other.endswith("/" + tail)) == 1:
+        if tail_count[tail] == 1:
             return tail
     return script
 tail_of = {script: (os.path.basename(script) if broken == "selftest-coverage-name-substring" else unique_tail(script)) for script in claimed}
 left_boundary = "" if broken == "selftest-coverage-name-substring" else r"(?<![\w.-])"
 run = set()
 stage_pattern = "[0-9][0-9]-*.sh" if broken == "numbered-stages-only" else "*.sh"
+SELFTEST_AFTER_SPACE = re.compile(r"\s+--selftest")
+BOUNDARY_CHARACTER = re.compile(r"[\w.-]")
+def tail_at_boundary(text, end, tail):
+    """text[:end] 以 tail 收尾、且 tail 左边不紧挨字母、数字、点与连字符（left_boundary 那一条；name-substring 下不看左边）。"""
+    start = end - len(tail)
+    if start < 0 or text[start:end] != tail:
+        return False
+    return not left_boundary or start == 0 or BOUNDARY_CHARACTER.match(text[start - 1]) is None
 for stage in sorted(glob.glob(os.path.join(".claude/gate.d", stage_pattern))):
     code = code_of(open(stage, encoding="utf-8").read())
     variables = dict(re.findall(r'^\s*(\w+)="([^"\n]*\.(?:py|sh))"', code, re.M))
+    # 阶段代码只扫一遍：每处「空白 --selftest」前面（可隔一个引号）收尾的词，是不是哪份脚本的尾；变量只看有没有被 "$变量" --selftest 起过
+    selftest_ends = []
+    for found in SELFTEST_AFTER_SPACE.finditer(code):
+        selftest_ends.append(found.start())
+        if found.start() and code[found.start() - 1] in "\"'":
+            selftest_ends.append(found.start() - 1)
+    invoked_values = [value for variable, value in variables.items() if re.search(r'"\$' + variable + r'"\s+--selftest', code)]
     for script in claimed:
-        tail = re.escape(tail_of[script])
-        if re.search(left_boundary + tail + r'["\']?\s+--selftest', code):
+        tail = tail_of[script]
+        if any(tail_at_boundary(code, end, tail) for end in selftest_ends) or any(tail_at_boundary(value, len(value), tail) for value in invoked_values):
             run.add(script)
-        for variable, value in variables.items():
-            if re.search(left_boundary + tail + "$", value) and re.search(r'"\$' + variable + r'"\s+--selftest', code):
-                run.add(script)
 print(f"CLAIMED\t{len(claimed)}\tRUN\t{len(run)}")
 for script in claimed:
     if script not in run and script not in exempt:
@@ -2670,9 +3417,19 @@ PY
 # 样本：rules-named-by-definitions-red（样本仓：CLAUDE.md @ 两条项目规则与一条上游规则，read-once 一条项目规则；共用约束与一份定义只点名其中两条，
 #   一条 @ 规则只被定义写成不带目录的文件名、一条 read-once 规则谁都没提，两条逐条点名判红）；
 #   rules-named-by-definitions-green（同一副架子，四条都被按路径点名；一条只写在代码围栏里的 @ 不算登记、不判），判绿报「查了 4 条规则、2 份定义」。
+#   只管主 agent 的规则登记在 .claude/gate.d/rules-main-agent-only.tsv：一行「规则路径<TAB>理由」，# 起头的行与空行不算；登了的规则不要求定义点名。
+#   这张表自己判红三种：登记的路径不在 CLAUDE.md 的登记里；登记的规则其实已有定义按路径点名（多余的行，判红不放过，删掉那一行）；理由不到 8 个字；
+#   一行不是两列或同一条规则登了两行也判红。表不在照没有登记办。
+#   rules-named-by-definitions-main-only-green（四条规则里一条登了表、没有定义点名，其余三条被点名），判绿报「查了 4 条规则（含 1 条登记为只管主 agent）、2 份定义」；
+#   rules-named-by-definitions-main-only-unregistered-red（表里登的路径不在 CLAUDE.md 里）、-main-only-named-red（表里登的规则已被共用约束点名）、
+#   -main-only-reason-red（理由只有 3 个字），各判红在表的那一行。
 # 弄坏开关 CODE_TOOLING_BREAK=rules-named-read-once-skipped：只判 @ 规则，read-once 登记的不判；
 #   rules-named-by-definitions-red 输出里找不到 read-once 那一条（「.claude/rules/once-only.md」），rules-named-by-definitions-green 输出里找不到「查了 4 条规则」（只剩 3 条）。
 # 弄坏开关 CODE_TOOLING_BREAK=rules-named-by-basename：只写文件名、不带目录的也算点名；rules-named-by-definitions-red 输出里找不到「.claude/rules/basename-only.md」那一条。
+# 弄坏开关 CODE_TOOLING_BREAK=rules-named-main-only-ignored：登记表不认，登记了的规则照样要求点名；rules-named-by-definitions-main-only-green 判红在「.claude/rules/main-only.md」那一条。
+# 弄坏开关 CODE_TOOLING_BREAK=rules-named-main-only-unregistered-unchecked：不核表里的路径在不在 CLAUDE.md 的登记里；-main-only-unregistered-red 输出里找不到「不在 CLAUDE.md 的 @ 引用与 read-once 登记里」。
+# 弄坏开关 CODE_TOOLING_BREAK=rules-named-main-only-named-unchecked：不核表里的规则是不是已有定义点名；-main-only-named-red 输出里找不到「这一行多余」。
+# 弄坏开关 CODE_TOOLING_BREAK=rules-named-main-only-reason-unchecked：不核理由够不够 8 个字；-main-only-reason-red 输出里找不到「理由不到 8 个字」。
 # 退役判据：定义不再开 omitClaudeMd（子 agent 照读 CLAUDE.md 与它 @ 的规则）时删掉这一格。
 cell_rules_named_by_definitions() {
 python3 - "$MANIFEST_LIBRARY" "${CODE_TOOLING_BREAK:-}" <<'PY'
@@ -2706,31 +3463,67 @@ definition_texts = {}
 for path in definitions:
     with open(path, encoding="utf-8", errors="replace") as handle:
         definition_texts[path] = handle.read()
-unnamed, named_counts = [], []
+MAIN_ONLY = ".claude/gate.d/rules-main-agent-only.tsv"
+main_only, table_problems = {}, []
+if os.path.isfile(MAIN_ONLY):
+    with open(MAIN_ONLY, encoding="utf-8", errors="replace") as handle:
+        for number, line in enumerate(handle, 1):
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            fields = line.rstrip("\n").split("\t")
+            if len(fields) != 2:
+                table_problems.append(f"{MAIN_ONLY} 第 {number} 行不是「规则路径<TAB>理由」两列：{line.rstrip()}")
+                continue
+            rule, reason = fields[0].strip(), fields[1].strip()
+            if rule in main_only:
+                table_problems.append(f"{MAIN_ONLY} 第 {number} 行：{rule} 登记了不止一行")
+                continue
+            main_only[rule] = number
+            if len(reason) < 8 and broken != "rules-named-main-only-reason-unchecked":
+                table_problems.append(f"{MAIN_ONLY} 第 {number} 行：{rule} 的理由不到 8 个字（写它为什么只管主 agent）")
+unnamed, named_counts, exempt_count = [], [], 0
 for rule in registered:
     if broken == "rules-named-by-basename":
         pattern = re.compile(r"(?<![\w.-])" + re.escape(os.path.basename(rule)) + r"(?![\w.-])")
     else:
         pattern = re.compile(r"(?<![\w./-])" + re.escape(rule) + r"(?![\w.-])")
     naming = [path for path, body in definition_texts.items() if pattern.search(body)]
+    if rule in main_only and broken != "rules-named-main-only-ignored":
+        exempt_count += 1
+        if naming and broken != "rules-named-main-only-named-unchecked":
+            table_problems.append(f"{MAIN_ONLY} 第 {main_only[rule]} 行：{rule} 登记成只管主 agent，可 {'、'.join(naming)} 已按路径点名它，这一行多余")
+        continue
     if naming:
         named_counts.append(len(naming))
     else:
         unnamed.append(rule)
+if broken != "rules-named-main-only-unregistered-unchecked":
+    for rule, number in main_only.items():
+        if rule not in registered:
+            table_problems.append(f"{MAIN_ONLY} 第 {number} 行：{rule} 不在 {MD} 的 @ 引用与 read-once 登记里")
 if unnamed:
     for rule in unnamed:
         print(f"  ✗ {rule}：{MD} 登记了它，.claude/agents/*.md 与 .claude/agent-common.md 里一份都没按路径点名")   # gate-lint:detail
     print(f"  ✗ {len(unnamed)} 条规则没有一份定义点名（查了 {len(registered)} 条规则、{len(definitions)} 份定义），定义开了 omitClaudeMd，这几条没有子 agent 会读")
     print("     → 怎么办：在用得到它的定义「开工先读：」一行或共用约束里按路径点名它（改定义照 .claude/rules/implementation-workflow.md「改 agent 定义与共用约束，走同一条三步」，归工具实现员照判决改）；"
-          "这条规则确实没有子 agent 要读的，从 CLAUDE.md 的 @ 与 read-once 里去掉之前先问用户")
+          f"这条规则只有主 agent 用、没有子 agent 要读的，在 {MAIN_ONLY} 加一行「规则路径<TAB>为什么只管主 agent」；"
+          "确实没有谁要读的，从 CLAUDE.md 的 @ 与 read-once 里去掉之前先问用户")
+if table_problems:
+    for problem in table_problems:
+        print(f"  ✗ {problem}")   # gate-lint:detail
+    print(f"  ✗ 只管主 agent 的登记表 {MAIN_ONLY} 有 {len(table_problems)} 处不对")
+    print(f"     → 怎么办：改表。一行一条规则「规则路径<TAB>理由」，路径要在 {MD} 的 @ 引用或 read-once 登记里、理由至少 8 个字写它为什么只管主 agent；"
+          "已经有定义点名的规则删掉它那一行")
+if unnamed or table_problems:
     sys.exit(1)
-print(f"  ✓ {MD} 登记的规则都至少被一份定义点名：查了 {len(registered)} 条规则、{len(definitions)} 份定义，被点名最少的一条 {min(named_counts)} 份")
+scope = f"查了 {len(registered)} 条规则" + (f"（含 {exempt_count} 条登记为只管主 agent）" if exempt_count else "")
+print(f"  ✓ {MD} 登记的规则都至少被一份定义点名：{scope}、{len(definitions)} 份定义，被点名最少的一条 {min(named_counts, default=0)} 份")
 PY
 }
 
 # ── 格 stage-owners：阶段归属表与各道门禁的格逐格一致、派给的 agent 有定义，每道阶段认第一个参数当项目根
 #
-# 判据（.claude/rules/verification.md「门禁的结构」）：.claude/gate.d/stage-owners.tsv 一行一格，四列：门禁文件名、格名、判红时派给谁修、为什么。任一条不成立判红：
+# 判据（.claude/rules/verification-reference.md「门禁的结构」）：.claude/gate.d/stage-owners.tsv 一行一格，四列：门禁文件名、格名、判红时派给谁修、为什么。任一条不成立判红：
 #   ① 门禁目录顶层每道 *.sh 的 --list 出的每一格在表里恰好一行。--list 经 gate-structure-check.py 的 header_cells、make_shims、start_stage 起
 #      （替身拦重活、限时）；没有格名表的不起它（起它就是全跑），与 --list 没退 0、起了重活、一格都没打的一起报「列不出格」；
 #   ② 表里每一行的门禁文件在、那一格在它的 --list 里；③ 第三列每个 agent 名都有 .claude/agents/<名字>.md；④ 每行四列、没有空列；
@@ -2741,8 +3534,14 @@ PY
 #   目录里有一格没登记、一道没有格名表、一道 --list 退 1、一道不认第一个参数，必须逐个报出；
 #   stage-owners-green 两道门禁三格逐格登记，判绿并报门禁数、格数与 agent 数。
 cell_stage_owners() {
-python3 - "$MANIFEST_LIBRARY" "$STAGE_REPOSITORY/scripts/gate/gate-structure-check.py" "${CODE_TOOLING_BREAK:-}" <<'PY'
-import glob, importlib.util, os, re, shutil, sys, tempfile, types
+local jobs
+if ! jobs="$(heavy_thread_default)"; then
+  echo "  ✗ 取不了每台默认重活线程数（原因在上一行），各道阶段 --list 的并行度定不了，一道都没起"
+  echo "     → 怎么办：照上一行的出路修 .claude/heavy-thread-default（线程固定取登记值，SINGLEFS_THREAD_CAP 由服务套的 capped.sh 设，不自己设），再跑这一格；不退回按核数算。"
+  exit 1
+fi
+python3 - "$MANIFEST_LIBRARY" "$STAGE_REPOSITORY/scripts/gate/gate-structure-check.py" "${CODE_TOOLING_BREAK:-}" "$jobs" <<'PY'
+import concurrent.futures, glob, importlib.util, os, re, shutil, sys, tempfile, types
 sys.dont_write_bytecode = True
 manifest = types.ModuleType("lib_manifest")
 exec(compile(sys.argv[1], "manifest-library", "exec"), manifest.__dict__)
@@ -2768,13 +3567,20 @@ cells_by_stage, unlisted = {}, []
 scratch = tempfile.mkdtemp(prefix="stage-owners-list-")
 try:
     shim_directory = structure.make_shims(scratch)
-    trace = os.path.join(scratch, "shim-trace")
+    # gate-structure 格这一趟起过的 --list --force 结果就在共用的临时目录里（structure.LIST_CACHE_DIRECTORY）：同一棵树、同一条命令，读那一份，不再起第二遍
+    if os.environ.get("CODE_TOOLING_RUN_SCRATCH"):
+        structure.LIST_CACHE_DIRECTORY = os.path.join(os.environ["CODE_TOOLING_RUN_SCRATCH"], "stage-list")
+    listed_stages = [stage for stage in stage_files if structure.header_cells(os.path.join(root, ".claude", "gate.d", stage))]
+    structure.process_group.install_stop_on_signals(only_defaults=True)   # 起阶段在池里的线程上，停止信号的处理要先在主线程装好
+    # 各道阶段的 --list 彼此独立（各自一个会话、各自的 trace 文件）：按每台默认重活线程数同时起，结果按阶段次序取回
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(int(sys.argv[4]), len(listed_stages) or 1))) as pool:
+        listings = dict(zip(listed_stages, pool.map(lambda stage: structure.start_stage(root, stage, ["--list", "--force"], shim_directory,
+                                                                                     os.path.join(scratch, f"shim-trace-{stage}")), listed_stages)))
     for stage in stage_files:
-        stage_path = os.path.join(root, ".claude", "gate.d", stage)
-        if not structure.header_cells(stage_path):
+        if stage not in listings:
             unlisted.append(f"{stage}：文件头没有格名表（# gate-cell: 行），不起它的 --list（起它就是全跑）")
             continue
-        exit_code, stdout, stderr, called = structure.start_stage(root, stage, ["--list", "--force"], shim_directory, trace)
+        exit_code, stdout, stderr, called = listings[stage]
         if called:
             unlisted.append(f"{stage}：--list 起了重活（{'、'.join(called)}）")
         elif exit_code is None:
@@ -2874,9 +3680,10 @@ PY
 #   ⑤ Bash 注册 bash-command-detector.sh；⑥ Agent 注册 runner-dispatch-guard.sh；⑦ SendMessage 注册 continuation-guard.sh；
 #   ⑧ 每个定义的 frontmatter 有 omitClaudeMd: true，正文有一行以「开工先读：」开头；
 #   ⑨ Bash 注册上游 claude-hooks/pattern-process-guard.sh，且那个文件在（它的判别力归上游 selftest）；
-#   ⑩ SessionStart 有一条 matcher 覆盖 compact、一条同时覆盖 startup 与 resume（可以是同一条），命令都指向 session-start.sh；
+#   ⑩ SessionStart 里命令指向上游 claude-hooks/session-checks.sh 的注册，matcher 合起来覆盖 startup、resume、clear、compact 四种 source（检查项的文件头、执行位与自证归上游 hooks-registered.sh）；
 #   ⑫ Bash 注册 project-code-guard.sh；⑭ AskUserQuestion 注册 ask-user-claim-guard.sh；⑯ SubagentHandback 注册 handback-guard.sh；
 #   ⑲ Bash 注册 run-scope-guard.sh（范围声明闸；注在不覆盖 Bash 的 matcher 上的不算）；
+#   ⑳ Bash 注册 find-timestamp-guard.sh（find 时刻写法闸；注在不覆盖 Bash 的 matcher 上的不算，逐条点名）；
 #   ⑰ PreToolUse 里命令指向 timer-only-remind-guard.sh 的注册，matcher 合起来覆盖 CronCreate、ScheduleWakeup、RemoteTrigger、Skill、Monitor 与 Bash（TIMER_GUARD_TOOLS）；
 #   ⑱ Stop 里有命令指向 remind-rearm-stop-guard.sh 的注册（循环提醒到点之后自启动靠它）；
 #   ⑬ 共用模块 lib_shell_words.py、lib_project_code_runs.py 顶层定义的每个函数名，.claude/hooks/ 下别的文件里不许再 def 一份；名字从模块现读，
@@ -2884,10 +3691,11 @@ PY
 #   ⑮ frontmatter 的 model 只许 ALLOWED_MODELS 里的取值。
 # 钩子的自证不在这里跑，归上游 hooks-registered.sh；它只核有一条注册指向钩子、不核挂在要的 matcher 上，所以 matcher 留在这一格判。
 #
-# 样本：agent-write-scope-red 的 .claude/hooks/ 里放一份手抄 shell_tokens 的 hook 与一份手抄 judged_by_name 的 hook，必须各报出文件与行号；
+# 样本：agent-write-scope-red 的 .claude/hooks/ 里放一份手抄 shell_tokens 的 hook 与一份手抄 judged_by_name 的 hook，必须各报出文件与行号，settings.json 没有 SessionStart，必须报没注册会话检测钩子；
 #   agent-write-scope-multiedit-red 的 settings.json 只把 write-guard.sh 注册在 "Write|Edit" 上，必须报没覆盖 MultiEdit；
-#   agent-write-scope-timer-red 的 settings.json 把 timer-only-remind-guard.sh 注册在不含 Monitor 的 matcher 上、Stop 里没有 remind-rearm-stop-guard.sh，必须报没挂全工具（没覆盖 Monitor）与没注册停止钩子；
+#   agent-write-scope-timer-red 的 settings.json 把 timer-only-remind-guard.sh 注册在不含 Monitor 的 matcher 上、Stop 里没有 remind-rearm-stop-guard.sh，必须报没挂全工具（没覆盖 Monitor）与没注册停止钩子，SessionStart 的 matcher 只写 startup|resume|compact，必须报会话检测钩子没挂全 source（没覆盖 clear）；
 #   agent-write-scope-run-scope-red 是 green 那一份，只把 run-scope-guard.sh 注册在 "Write|Edit|MultiEdit" 上（不覆盖 Bash），必须报没注册范围声明闸；
+#   agent-write-scope-find-timestamp-red 是 green 那一份，find-timestamp-guard.sh 只注册在 "Write|Edit|MultiEdit" 上（不覆盖 Bash），必须报没注册 find 时刻写法闸、点名注错的那一条；
 #   agent-write-scope-green 的 .claude/hooks/ 里放两份从共用模块导入、只写自己判定的 hook（连同被判仓自己那两份模块），必须判绿，成功行数进去的别的文件数要对。
 # 共用模块的函数名取自这一道脚本旁边 ../hooks/ 下那两份（取自 $0 的目录，不取项目根）：样本仓里放坏的模块碰不到它。
 cell_agent_write_scope() {
@@ -2968,6 +3776,17 @@ if entries is not None:
         for command in mention_only_commands([entry for entry in entries if matcher_covers(entry.get("matcher", ""), "Bash")], "run-scope-guard.sh"):
             print(f"     这一条只是提到 run-scope-guard.sh、没有跑它，不算注册：{command}")  # gate-lint:detail
         print('     → 怎么办：在 hooks.PreToolUse 的 Bash 那一条里加 command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/run-scope-guard.sh"（注在别的 matcher 上的挪过来）。')
+    find_timestamp_registered = [entry for entry in entries
+                                 if matcher_covers(entry.get("matcher", ""), "Bash")
+                                 and any(command_invokes(hook.get("command"), "find-timestamp-guard.sh") for hook in entry.get("hooks") or [])]
+    if not find_timestamp_registered and os.environ.get("AGENT_WRITE_SCOPE_BREAK") != "find-timestamp-unchecked":
+        failed = True
+        print(f"  ✗ {settings_path} 没注册 find 时刻写法闸：PreToolUse 里没有 matcher 覆盖 Bash、命令指向 find-timestamp-guard.sh 的一条——find 的时刻写成本机 bfs 不认的样子也没人拒")
+        for entry in entries:
+            for hook in entry.get("hooks") or []:
+                if command_invokes(hook.get("command"), "find-timestamp-guard.sh") and not matcher_covers(entry.get("matcher", ""), "Bash"):
+                    print(f"     这一条注在不覆盖 Bash 的 matcher「{entry.get('matcher', '')}」上，不算：{hook.get('command')}")  # gate-lint:detail
+        print('     → 怎么办：在 hooks.PreToolUse 的 Bash 那一条里加 command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/find-timestamp-guard.sh"（注在别的 matcher 上的挪过来）。')
     dispatch_registered = [entry for entry in entries
                            if matcher_covers(entry.get("matcher", ""), "Agent")
                            and any(command_invokes(hook.get("command"), "runner-dispatch-guard.sh") for hook in entry.get("hooks") or [])]
@@ -3026,20 +3845,21 @@ try:
 except Exception:
     session_entries = None  # 读不了这份 JSON 的那一条上面已经报过、已判红
 if session_entries is not None:
-    compact_reminder_registered = [entry for entry in session_entries
-                                   if matcher_covers(entry.get("matcher", ""), "compact")
-                                   and any(command_invokes(hook.get("command"), "session-start.sh") for hook in entry.get("hooks") or [])]
-    if not compact_reminder_registered:
+    SESSION_SOURCES = ("startup", "resume", "clear", "compact")
+    session_checks_hook = "singlefs-ai-sop/scripts/claude-hooks/session-checks.sh"
+    session_checks_registered = [entry for entry in session_entries
+                                 if any(command_invokes(hook.get("command"), session_checks_hook) for hook in entry.get("hooks") or [])]
+    session_uncovered = [source for source in SESSION_SOURCES
+                         if not any(matcher_covers(entry.get("matcher", ""), source) for entry in session_checks_registered)]
+    session_checks_judged = os.environ.get("AGENT_WRITE_SCOPE_BREAK") != "session-checks-unchecked"
+    if session_checks_judged and not session_checks_registered:
         failed = True
-        print(f"  ✗ {settings_path} 没注册压缩后提示 hook：SessionStart 里没有 matcher 覆盖 compact、命令指向 session-start.sh 的一条")
-        print('     → 怎么办：在 hooks.SessionStart 里加一条 matcher "startup|resume|compact"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/session-start.sh"。')
-    oom_report_registered = [entry for entry in session_entries
-                             if matcher_covers(entry.get("matcher", ""), "startup") and matcher_covers(entry.get("matcher", ""), "resume")
-                             and any(command_invokes(hook.get("command"), "session-start.sh") for hook in entry.get("hooks") or [])]
-    if not oom_report_registered:
+        print(f"  ✗ {settings_path} 没注册会话检测钩子：SessionStart 里没有命令指向 {session_checks_hook} 的一条——启动、恢复、清空与压缩之后项目登记的检查项没人跑")
+        print('     → 怎么办：在 hooks.SessionStart 里加一条 matcher "startup|resume|clear|compact"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/' + session_checks_hook + '"。')
+    elif session_checks_judged and session_uncovered:
         failed = True
-        print(f"  ✗ {settings_path} 没注册启动时的 OOM 报告 hook：SessionStart 里没有 matcher 同时覆盖 startup 与 resume、命令指向 session-start.sh 的一条")
-        print('     → 怎么办：在 hooks.SessionStart 里把 session-start.sh 那一条的 matcher 写成 "startup|resume|compact"（会话崩了再起是 startup 或 resume，这时要先看内核 OOM 杀过谁）。')
+        print(f"  ✗ {settings_path} 会话检测钩子没挂全 source：命令指向 {session_checks_hook} 的注册，matcher 合起来没覆盖：{'、'.join(session_uncovered)}——那几种时机检查项不跑")
+        print('     → 怎么办：把那一条的 matcher 写成 "startup|resume|clear|compact"。')
 try:
     stop_entries = (json.load(open(settings_path, encoding="utf-8")).get("hooks") or {}).get("Stop") or []
 except Exception:
@@ -3449,6 +4269,10 @@ PY
 #      包装函数调，或 git 带 -z；参数列表换了行、这一行以引号开头的，往上看三行找调用前缀。不带时中文路径被转成带引号的八进制串，git 不报错。
 #   ③ 调共用取法（gate_changed_paths、gate_added_lines）要判退出码：同一行带 ||，或放在 if / while 里。
 #   「代码行」的认法在 is_text：出路文字与注释里提到这些词不算。
+#   .py 文件读成语法树，文档串（模块、类、函数开头那一句字符串）与自证函数体（名字带 selftest 或 self_test 的函数）换成空白再判：
+#     文档串是说明；自证函数体里设 GATE_BASE、取 merge-base 是造给共用取法的输入，不是阶段取改动范围。读不成语法树的整份照原样判；嵌在 .sh 里的 python 不读语法树。
+#   行内豁免：命中的那一行不是调用（报错文字里点名失败的是哪条子命令这类），行尾写「# change-range:exempt <为什么不是调用>」，理由至少 8 个字，
+#     这一行三条都不判；理由不够 8 个字的照判。豁免了的逐行打在「行内豁免 N 行」那一句里。
 #   ④ 搬迁登记表 .claude/gate.d/path-moves.tsv（被判的根里那一份；只缩不涨的表与基准那一版比时照它换算，读法在 lib-lag-baseline.py 文件头「搬迁登记」）：
 #      每一行「<旧前缀><TAB><新前缀><TAB><YYYY-MM-DD><TAB>records/<文件>.md」写对、出处文件在；此刻生效的行（这一行不在 gate 基准那一版的登记表里，gate 基准那一版里旧前缀下有文件、新前缀下没有文件；
 #      提交进基准之后不再生效）之间，任一行的旧前缀或新前缀不许等于、包含或落在另一行的旧前缀或新前缀下面；生效的每一行有搬迁实据：基准里旧前缀下的每份文件，
@@ -3460,7 +4284,11 @@ PY
 #
 # 样本：change-range-single-source-red 把三条判据该抓的写法各放几种（自己取 merge-base、@{u}...、HEAD~1、HEAD^、换了行的参数列表续行里的 "merge-base"、
 #   不带或带 =true 的 quotepath、包装函数名叫 git 而这一行没调它、test 的 -z、printf "$(git …)"、换行的参数列表、不判退出码的共用取法），逐条点名判红；
+#   change-range-single-source-red 的 51-样本列路径不带选项.sh 第 4 行是一条行尾带「# change-range:exempt 太短」的列路径调用：理由不够 8 个字，照判、点名。
 #   change-range-single-source-green 放五种合法写法与 unset GATE_BASE、merge-base --is-ancestor、HEAD^{tree}、判了退出码的调用，判绿。
+#   change-range-single-source-prose-green（不在 git 仓里）：模块与函数的文档串里写着 merge-base、HEAD~1、GATE_BASE、gate_changed_paths、ls-files、--name-only（50），
+#   自证函数 base_shape_selftest 里设 GATE_BASE、取 merge-base、列文件（51），报错里点名 "ls-files" 的 .py 一行与内嵌 python 的出路文字里写着 git ls-files 的 .sh 一行，
+#   两行行尾都带理由够长的 # change-range:exempt（52、53）：判绿，成功句报查了 4 份、行内豁免 2 行并逐行点名。
 #   change-range-single-source-path-moves-red（不在 git 仓里）的搬迁登记表五行：日期不是 YYYY-MM-DD、只有三列、出处不在各一行，逐行点名判红；
 #   前两行写法对，旧前缀还在磁盘上、新前缀不在磁盘上都不核（判不了哪几行生效）。
 #   change-range-single-source-path-moves-green（不在 git 仓里）的表两行写法对、出处在：判绿报 2 行，成功句写判不了哪几行此刻生效、串与实据没核。
@@ -3477,6 +4305,9 @@ PY
 #   基准树满足「旧前缀下有文件、新前缀下没有文件」，可那一行已在基准那一版的登记表里，不生效，判绿，成功句写此刻生效的 0 行、点名「已在基准 HEAD 那一版的登记表里」。
 # 弄坏开关 CODE_TOOLING_BREAK=path-moves-unchecked：不判 ④，change-range-single-source-path-moves-red 与 change-range-single-source-path-moves-evidence-red 判绿（期望退出 1，实测 0），
 #   change-range-single-source-path-moves-green、change-range-single-source-path-moves-evidence-green、change-range-single-source-path-moves-committed-green 与 change-range-single-source-path-moves-base-row-green 里「✓ 搬迁登记表 …」那条 want 找不到。
+# 弄坏开关 CODE_TOOLING_BREAK=change-range-docstrings-judged：文档串照代码判，change-range-single-source-prose-green 判红（期望退出 0，开关下退 1：50 的文档串几行被点名）。
+# 弄坏开关 CODE_TOOLING_BREAK=change-range-selftest-bodies-judged：自证函数体照代码判，change-range-single-source-prose-green 判红（期望退出 0，开关下退 1：51 的自证函数体几行被点名）。
+# 弄坏开关 CODE_TOOLING_BREAK=change-range-exempt-marker-ignored：行尾的豁免不认，change-range-single-source-prose-green 判红（期望退出 0，开关下退 1：52、53 带豁免的两行被点名）。
 # 共用库 lib-lag-baseline.py 的开关 LAG_BASELINE_BREAK 各项（写法在那份文件头）在这一格样本上红在哪一句；逐条点名判错的样本在文件头开关表：
 #   move-evidence-unchecked：change-range-single-source-path-moves-evidence-red 判绿（期望退出 1，实测 0），
 #     change-range-single-source-path-moves-evidence-green、change-range-single-source-path-moves-committed-green 与 change-range-single-source-path-moves-base-row-green 里「此刻生效」那条 want 找不到，
@@ -3492,10 +4323,13 @@ PY
 cell_change_range_single_source() {
 [[ -d .claude/gate.d ]] || { echo "  ! 没有 .claude/gate.d，这一格无对象可判"; exit 77; }
 python3 - "$STAGE_NAME" "$STAGE_DIRECTORY/lib-lag-baseline.py" "${CODE_TOOLING_BREAK:-}" <<'PY'
-import glob, importlib.util, os, re, sys
+import ast, glob, importlib.util, os, re, sys
 
 own_name = sys.argv[1]
 lag_baseline_library, broken = sys.argv[2], sys.argv[3]
+docstrings_judged = broken == 'change-range-docstrings-judged'
+selftest_bodies_judged = broken == 'change-range-selftest-bodies-judged'
+exempt_marker_ignored = broken == 'change-range-exempt-marker-ignored'
 # 这一道文件里这一格自己的那一段（正则与出路里全是它要抓的写法）：从这一格的标题行到下一格的标题行，按空行判，行号不变
 OWN_CELL_START = re.compile(r'^# ── 格 change-range-single-source：')
 NEXT_CELL_START = re.compile(r'^# ── (格 |汇总)')
@@ -3519,6 +4353,10 @@ STATUS_HANDLED = re.compile(r'\|\||^\s*(if|elif|while|until|!)\b')
 WRAPPER_REACH = 3
 LOOKBACK = 3
 CONTINUATION = re.compile(r"""^\s*["'\[]""")
+# 行内豁免：命中的那一行不是调用，行尾写「# change-range:exempt <理由>」，理由至少 EXEMPT_REASON_MINIMUM 个字
+EXEMPT_MARKER = re.compile(r'#\s*change-range:exempt\b[ \t]*(?P<reason>.*?)\s*$')
+EXEMPT_REASON_MINIMUM = 8
+SELFTEST_FUNCTION_NAME = re.compile(r'self_?test')
 
 def is_text(stripped):
     """出路文字与注释：以这些开头、而且这一行不跑 git、不带引号括起的列路径参数的。"""
@@ -3552,8 +4390,38 @@ def uses_quoting(line, variables, wrappers):
             return True
     return False
 
+def blank_span(all_lines, start, end):
+    """把语法树给的 (行, 字节列) 到 (行, 字节列) 那一段换成空格：行号与这一段之外的字符不变（语法树的列按 UTF-8 字节数）。"""
+    (start_row, start_byte), (end_row, end_byte) = start, end
+    for row in range(start_row, end_row + 1):
+        line = all_lines[row - 1]
+        encoded = line.encode('utf-8')
+        first = len(encoded[:start_byte].decode('utf-8', 'replace')) if row == start_row else 0
+        last = len(encoded[:end_byte].decode('utf-8', 'replace')) if row == end_row else len(line)
+        all_lines[row - 1] = line[:first] + ' ' * (last - first) + line[last:]
+
+def blank_python_prose(all_lines):
+    """python 的文档串（模块、类、函数开头那一句字符串）与自证函数体（名字带 selftest / self_test）换成空白，行号不变；读不成语法树的整份照原样判。"""
+    try:
+        tree = ast.parse('\n'.join(all_lines))
+    except (SyntaxError, ValueError):
+        return
+    for node in ast.walk(tree):
+        body = getattr(node, 'body', None)
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) or not body:
+            continue
+        if not selftest_bodies_judged and isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) \
+                and SELFTEST_FUNCTION_NAME.search(node.name):
+            for row in range(body[0].lineno, node.end_lineno + 1):
+                all_lines[row - 1] = ''
+            continue
+        first = body[0]
+        if not docstrings_judged and isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant) \
+                and isinstance(first.value.value, str):
+            blank_span(all_lines, (first.lineno, first.col_offset), (first.end_lineno, first.end_col_offset))
+
 def judge(path):
-    """返回 (算基准的行, 不带 quotepath 的列路径行, 不判退出码的共用取法调用)。"""
+    """返回 (算基准的行, 不带 quotepath 的列路径行, 不判退出码的共用取法调用, 行内豁免了的 (行号, 理由))。"""
     with open(path, encoding='utf-8', errors='replace') as handle:
         all_lines = handle.read().split('\n')
     if os.path.basename(path) == own_name:
@@ -3565,34 +4433,47 @@ def judge(path):
                 inside = False
             if inside:
                 all_lines[index] = ''
+    if path.endswith('.py'):
+        blank_python_prose(all_lines)
     variables, wrappers = quoting_names(all_lines)
-    base_hits, list_hits, status_hits = [], [], []
+    base_hits, list_hits, status_hits, exempt_hits = [], [], [], []
     for index, line in enumerate(all_lines):
         stripped = line.strip()
         if not stripped or is_text(stripped):
             continue
         number = index + 1
         runs_git_here = RUNS_GIT_ANYWHERE.search(line) or (CONTINUATION.match(line) and QUOTED_BASE_ARGUMENT.search(line))
-        if (BASE_PATTERN.search(line) or BASE_IN_GIT_PATTERN.search(line) and runs_git_here) \
-                and not BASE_ALLOWED.search(line):
-            base_hits.append((number, stripped))
+        base_hit = bool((BASE_PATTERN.search(line) or BASE_IN_GIT_PATTERN.search(line) and runs_git_here)
+                        and not BASE_ALLOWED.search(line))
+        list_hit = False
         if LIST_PATTERN.search(line) and not uses_quoting(line, variables, wrappers):
             # 参数列表换了行（这一行以引号或方括号开头）：往上找这条语句开头的那一行，看调用前缀带没带选项
             head = index
             while head > 0 and index - head < LOOKBACK and CONTINUATION.match(all_lines[head]):
                 head -= 1
-            if head == index or not uses_quoting(all_lines[head], variables, wrappers):
-                list_hits.append((number, stripped))
-        if SHARED_CALL.search(line) and not re.match(r'^\s*(gate_changed_paths|gate_added_lines)\s*\(\)', line) \
-                and not STATUS_HANDLED.search(line):
+            list_hit = head == index or not uses_quoting(all_lines[head], variables, wrappers)
+        status_hit = bool(SHARED_CALL.search(line) and not re.match(r'^\s*(gate_changed_paths|gate_added_lines)\s*\(\)', line)
+                          and not STATUS_HANDLED.search(line))
+        if not (base_hit or list_hit or status_hit):
+            continue
+        marker = None if exempt_marker_ignored else EXEMPT_MARKER.search(line)
+        if marker and len(marker.group('reason')) >= EXEMPT_REASON_MINIMUM:
+            exempt_hits.append((number, marker.group('reason')))
+            continue
+        if base_hit:
+            base_hits.append((number, stripped))
+        if list_hit:
+            list_hits.append((number, stripped))
+        if status_hit:
             status_hits.append((number, stripped))
-    return base_hits, list_hits, status_hits
+    return base_hits, list_hits, status_hits, exempt_hits
 
 scanned = sorted(path for pattern in ('.claude/gate.d/*.sh', '.claude/gate.d/*.py')
                  for path in glob.glob(pattern))
-base_bad, list_bad, status_bad = [], [], []
+base_bad, list_bad, status_bad, exempt_all = [], [], [], []
 for path in scanned:
-    base_hits, list_hits, status_hits = judge(path)
+    base_hits, list_hits, status_hits, exempt_hits = judge(path)
+    exempt_all += [(path, number, reason) for number, reason in exempt_hits]
     base_bad += [(path, number, line) for number, line in base_hits]
     list_bad += [(path, number, line) for number, line in list_hits]
     status_bad += [(path, number, line) for number, line in status_hits]
@@ -3619,6 +4500,9 @@ if status_bad:
         print(f'      {path}:{number}  {line[:120]}')   # gate-lint:detail
     print('     → 怎么办：写成 x="$(gate_changed_paths …)" || { echo 取不到改动范围…; echo 出路…; exit 1; }，或放进 if；')
     print('               git 失败时共用脚本退非 0、什么都不交，不判退出码就会把「没取到」读成「这次什么都没改」。')
+if base_bad or list_bad or status_bad:
+    print('     → 命中的那一行不是调用（报错文字里点名失败的是哪条子命令这类）：行尾写 # change-range:exempt <为什么不是调用，至少 8 个字>；'
+          'python 的文档串与自证函数体（名字带 selftest）本来不判')
 # ④ 搬迁登记表（判法 lib-lag-baseline.py 的 path_move_problems，用这一道所在仓里那一份；表取被判的根里那一份）
 move_count, move_problems, move_note = 0, [], ''
 if broken != 'path-moves-unchecked':
@@ -3636,6 +4520,13 @@ if move_problems:
     for what, _howto in move_problems:
         print(f'      {what}')   # gate-lint:detail
     print('     → 怎么办：' + '；'.join(dict.fromkeys(howto for _what, howto in move_problems)))
+if exempt_all:
+    print(f'     行内豁免 {len(exempt_all)} 行（行尾 # change-range:exempt 写了理由）：'
+          + '；'.join(f'{path}:{number}（{reason}）' for path, number, reason in exempt_all))
+else:
+    print('     行内豁免 0 行')
+if docstrings_judged or selftest_bodies_judged or exempt_marker_ignored:
+    print(f'  ! 弄坏开关 {broken} 生效：python 的文档串、自证函数体或行内豁免照代码判')
 if failed:
     sys.exit(1)
 
@@ -3643,10 +4534,10 @@ outside = []
 for pattern in ('scripts/*/*.sh', 'scripts/*/*.py', '.claude/scripts/*', '.claude/hooks/*'):
     for path in sorted(glob.glob(pattern)):
         if os.path.isfile(path) and path != 'scripts/gate/changed-paths.sh':
-            base_hits, list_hits, status_hits = judge(path)
+            base_hits, list_hits, status_hits, _exempt_hits = judge(path)
             if base_hits or list_hits or status_hits:
                 outside.append(f'{path}（算基准 {len(base_hits)} 行、不带 quotepath 的列路径 {len(list_hits)} 行、不判退出码 {len(status_hits)} 处）')
-print(f'  ✓ 查了 .claude/gate.d/ 下 {len(scanned)} 份：没有阶段自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false，调共用取法都判了退出码')
+print(f'  ✓ 查了 .claude/gate.d/ 下 {len(scanned)} 份：没有阶段自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false，调共用取法都判了退出码；python 的文档串与自证函数体（名字带 selftest）不判')
 if broken == 'path-moves-unchecked':
     print('  ! 弄坏开关 path-moves-unchecked 生效：搬迁登记表 .claude/gate.d/path-moves.tsv 没判')
 else:
@@ -3753,19 +4644,34 @@ syntax_note="语法：没判（弄坏开关 syntax-unchecked）"
 syntax_directories=("${TARGETS[@]}")
 [[ -d "$ROOT/.claude/gate.d" ]] && syntax_directories+=("$ROOT/.claude/gate.d")
 if [[ "${CODE_TOOLING_BREAK:-}" != syntax-unchecked ]]; then
-  syntax_shell_count=0; syntax_python_files=(); syntax_bad=()
+  # .sh 的 bash -n 一份一个进程、彼此独立：按每台默认重活线程数同时跑（一个 python 进程管池，坏的按 find 的次序列在前）；.py 在同一个进程里接着 compile
+  if ! syntax_jobs="$(heavy_thread_default)"; then
+    echo "  ✗ 取不了每台默认重活线程数（原因在上一行），语法检查的并行度定不了，这一项没判"
+    echo "     → 怎么办：照上一行的出路修 .claude/heavy-thread-default（线程固定取登记值，SINGLEFS_THREAD_CAP 由服务套的 capped.sh 设，不自己设），再跑这一格；不退回按核数算。"
+    exit 1
+  fi
+  syntax_shell_files=(); syntax_python_files=(); syntax_bad=()
   while IFS= read -r -d '' file; do
     case "$file" in
-      *.sh)
-        syntax_shell_count=$((syntax_shell_count + 1))
-        if ! syntax_message="$(bash -n "$file" 2>&1)"; then syntax_bad+=("${file#"$ROOT"/}：${syntax_message%%$'\n'*}"); fi ;;
+      *.sh) syntax_shell_files+=("$file") ;;
       *.py) syntax_python_files+=("$file") ;;
     esac
   done < <(find "${syntax_directories[@]}" \( -name fixtures -o -name target \) -prune -o -type f \( -name '*.sh' -o -name '*.py' \) -print0 | sort -z)
-  if ((${#syntax_python_files[@]})); then
-    while IFS= read -r line; do [[ -n "$line" ]] && syntax_bad+=("${line#"$ROOT"/}"); done < <(python3 - "${syntax_python_files[@]}" <<'PY'
-import sys
-for path in sys.argv[1:]:
+  syntax_shell_count=${#syntax_shell_files[@]}
+  if ((syntax_shell_count + ${#syntax_python_files[@]})); then
+    while IFS= read -r line; do [[ -n "$line" ]] && syntax_bad+=("${line#"$ROOT"/}"); done < <(python3 - "$syntax_jobs" ${syntax_shell_files[@]+"${syntax_shell_files[@]}"} -- ${syntax_python_files[@]+"${syntax_python_files[@]}"} <<'PY'
+import concurrent.futures, subprocess, sys
+separator = sys.argv.index("--")
+jobs, shell_files, python_files = int(sys.argv[1]), sys.argv[2:separator], sys.argv[separator + 1:]
+def shell_message(path):
+    done = subprocess.run(["bash", "-n", path], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace")
+    return None if done.returncode == 0 else f"{path}：{done.stdout.split(chr(10))[0]}"
+if shell_files:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(jobs, len(shell_files)))) as pool:
+        for message in pool.map(shell_message, shell_files):
+            if message:
+                print(message)
+for path in python_files:
     try:
         with open(path, encoding="utf-8") as source:
             compile(source.read(), path, "exec")
@@ -3898,6 +4804,8 @@ exit "$failed"
 #      not-green-by-design=<格名> <为什么>（理由至少 8 个字）才算绿；
 #   ④ 全仓文件名里的日期，与 fixtures/ 下正文里的日期，都要落在可能的区间里：判据 source 上游 lib.sh 的 date_out_of_range，
 #      下界取本仓第一个提交（取不到退回上游的 SOP_START_DATE）。正文只扫 fixtures 的理由写在第 ④ 条那段代码旁。
+#      第 ④ 条在一个 python 进程里判（不为每个文件、每个日期起子 shell 与 date）：判据只有上游 lib.sh 的 date_out_of_range 那一份，这里经它取一次「今天」与下界，
+#      再拿四个边界日期（明天、今天、下界、下界前一天）的答案与进程里的判法逐个对，对不上报判据失效；弄坏开关 date-judge-drifted 把进程里的下界多算一天。
 #      工具版本串里的日期不判：一行里写成「(<7 到 40 位十六进制> <年-月-日>)」的（rustc -V、cargo -V 的样子），那个日期是那一版工具的发布日，
 #      不是写样本的日子（例 formal-verification.sh 样本里的 rustc-version）；成功句另报不判的个数。弄坏开关 tool-version-dates-judged 下照判。
 # 射程：判的是声称与目录对不对得上，判不了样本本身有没有判别力（归 stage-selftest.sh）；不声称（none）的阶段只有豁免表里登记了的才过，
@@ -4233,64 +5141,104 @@ date_skipped=0
     printf 'BROKEN\t判据对 1970-01-01 都报不出越界：date_out_of_range 被改名、删掉，或边界口径变了\n'
     exit 0
   fi
-  date_re='[0-9]{4}-[0-9]{2}-[0-9]{2}'
   # 唯一的排除：这一格自己的样本，里面的越界日期就是判别力；跳过几份现算着报进成功句。
   own_fixture=".claude/gate.d/fixtures/${STAGE_NAME}/fixture-claims-"
-  scanned=0; dated=0; bodies=0; body_dates=0; version_dated=0; skipped_own=0; unreadable_bodies=()
-  # 路径走 NUL：git 默认把非 ASCII 路径整条引起来并转义成八进制，报出来的那一行既搜不到也对不上 want
-  while IFS= read -r -d '' path; do
+  # 判据只有上游 lib.sh 的 date_out_of_range 那一份：这里只经它取一次「今天」与下界、再拿四个边界日期的答案交给 python（它在进程里逐个日期判，不为每个日期起子 shell 与 date）；
+  # python 对这四个日期的答案与 lib.sh 的不同，就是两边的判据分叉了，报 BROKEN
+  today="$(latest_today)"; lower_bound="$(date_lower_bound "$start_date")"
+  probe_arguments=()
+  for probe_date in "$(date -d "$today + 1 day" +%F)" "$today" "$lower_bound" "$(date -d "$lower_bound - 1 day" +%F)"; do
+    if probe_why="$(date_out_of_range "$probe_date" "$start_date")"; then probe_arguments+=("$probe_date" "$probe_why"); else probe_arguments+=("$probe_date" ""); fi
+  done
+  python3 - "$own_fixture" "$start_date" "$start_source" "$today" "$lower_bound" "$DATE_GRACE_DAYS" "${CODE_TOOLING_BREAK:-}" "${probe_arguments[@]}" <<'PY_DATE_CLAIMS'
+import calendar, os, re, subprocess, sys
+sys.stdout.reconfigure(errors="surrogateescape")
+own_fixture, start_date, start_source, today, lower_bound, grace_days, broken = sys.argv[1:8]
+probes = list(zip(sys.argv[8::2], sys.argv[9::2]))
+DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+MONTH_FILE = re.compile(r"(^|/)([0-9]{4}-(0[1-9]|1[0-2]))\.md\Z")
+VERSION_DATE = re.compile(r"\([0-9a-f]{7,40} ([0-9]{4}-[0-9]{2}-[0-9]{2})\)")
+
+
+def out_of_range(checked):
+    """上游 lib.sh date_out_of_range 的判据：晚于今天，或早于下界（第一个提交往前放宽 DATE_GRACE_DAYS 天），交为什么；在范围内交 None。"""
+    if checked > today:
+        return f"晚于今天（{today}，按最晚的时区算）"
+    if lower_bound and (checked <= lower_bound if broken == "date-judge-drifted" else checked < lower_bound):
+        return f"早于这个仓第一个提交（{start_date}）{grace_days} 天以上"
+    return None
+
+
+drift = [f"{day}：lib.sh 说「{answer or '在范围内'}」，这一格说「{out_of_range(day) or '在范围内'}」" for day, answer in probes if (out_of_range(day) or "") != answer]
+if drift:
+    print("BROKEN\t这一格里日期的判法与上游 date_out_of_range 的答案对不上：" + "；".join(drift))
+    sys.exit(0)
+# 路径走 NUL：git 默认把非 ASCII 路径整条引起来并转义成八进制，报出来的那一行既搜不到也对不上 want；--cached 与 --others 各列一次的同一路径只留一条
+listing = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], stdout=subprocess.PIPE, check=True).stdout
+paths = sorted({os.fsdecode(raw) for raw in listing.split(b"\0") if raw})
+scanned = dated = bodies = body_dates = version_dated = skipped_own = 0
+unreadable_bodies = []
+for path in paths:
     # --cached 列的是索引：git mv 过又被 reset 掉暂存时索引里还留着旧名、文件已不在，不滤掉会判红不存在的文件。
-    [[ -e "$path" ]] || continue
-    scanned=$((scanned + 1))
-    # 名字是 <年-月>.md 的文件 date_re 抓不到，单独判：整月与允许区间没有交集（两个端点都越界）才算越界；拿月初比会误判合法的当月。
-    if [[ "$path" =~ (^|/)([0-9]{4}-(0[1-9]|1[0-2]))\.md$ ]]; then
-      month="${BASH_REMATCH[2]}"
-      month_end="$(date -d "$month-01 + 1 month - 1 day" +%F)"
-      dated=$((dated + 1))
-      if date_out_of_range "$month-01" "$start_date" >/dev/null \
-         && why="$(date_out_of_range "$month_end" "$start_date")"; then
-        printf 'BADNAME\t%s\t%s（整月）\t%s\n' "$path" "$month" "$why"
-      fi
-    fi
-    [[ "$path" =~ $date_re ]] || continue
-    dated=$((dated + 1))
-    while IFS= read -r found; do
-      [[ -n "$found" ]] || continue
-      if why="$(date_out_of_range "$found" "$start_date")"; then
-        printf 'BADNAME\t%s\t%s\t%s\n' "$path" "$found" "$why"
-      fi
-    done < <(grep -oE "$date_re" <<<"$path" | sort -u)
-  done < <(git ls-files -z --cached --others --exclude-standard | sort -z -u)
-  # 正文只扫 fixtures：真 kb 正文里的日期常常说的是外部的事（别家项目、RFC 历史、引编造日期当例子），
-  # 而下界假设「本仓的事不可能早于本仓第一个提交」对它们不成立。
-  while IFS= read -r -d '' body; do
-    [[ -e "$body" ]] || continue
-    if [[ "$body" == "$own_fixture"* ]]; then skipped_own=$((skipped_own + 1)); continue; fi
-    # grep 出错（读不了）与「没有日期」不是一回事：读不了的不计进 bodies，逐个列进没扫的清单；-a 让二进制样本按文本读
-    # lib.sh 开着 set -e：grep 没命中（退 1）不许把子 shell 带走，退出码在 if 里取
-    if hits="$(grep -a -noE "$date_re" "$body" 2>/dev/null)"; then grep_rc=0; else grep_rc=$?; fi
-    if ((grep_rc == 2)); then unreadable_bodies+=("$body"); continue; fi
-    bodies=$((bodies + 1))
-    # 工具版本串里的日期（rustc / cargo -V 的「(<提交的十六进制> <年-月-日>)」）是那一版工具的发布日，不是写样本的日子：照「行号:日期」记下，下面不判
-    if version_hits="$(grep -a -noE "\([0-9a-f]{7,40} $date_re\)" "$body" 2>/dev/null)"; then :; else version_hits=""; fi
-    if [[ "${CODE_TOOLING_BREAK:-}" == tool-version-dates-judged ]]; then version_hits=""; fi
-    version_dates=" "
-    while IFS= read -r version_hit; do
-      [[ -n "$version_hit" ]] || continue
-      version_dates+="${version_hit%%:*}:$(grep -oE "$date_re" <<<"${version_hit#*:}") "
-    done <<<"$version_hits"
-    while IFS= read -r hit; do
-      [[ -n "$hit" ]] || continue
-      line_number="${hit%%:*}"; found="${hit##*:}"
-      if [[ "$version_dates" == *" $line_number:$found "* ]]; then version_dated=$((version_dated + 1)); continue; fi
-      body_dates=$((body_dates + 1))
-      if why="$(date_out_of_range "$found" "$start_date")"; then
-        printf 'BADBODY\t%s:%s\t%s\t%s\n' "$body" "$line_number" "$found" "$why"
-      fi
-      # 整行去重，不按行号去重：按行号会丢掉同一行上的第二个日期。
-    done < <(sort -u <<<"$hits")
-  done < <(git ls-files -z --cached --others --exclude-standard '.claude/gate.d/fixtures/' | sort -z -u)
-  printf 'COUNT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$scanned" "$dated" "$bodies" "$body_dates" "$start_date" "$skipped_own" "$own_fixture" "$start_source" "$version_dated" "${unreadable_bodies[*]:-（没有）}"
+    if not os.path.exists(path):
+        continue
+    scanned += 1
+    # 名字是 <年-月>.md 的文件 DATE 抓不到，单独判：整月与允许区间没有交集（两个端点都越界）才算越界；拿月初比会误判合法的当月。
+    month_found = MONTH_FILE.search(path)
+    if month_found:
+        month = month_found.group(2)
+        year_number, month_number = int(month[:4]), int(month[5:])
+        month_end = f"{month}-{calendar.monthrange(year_number, month_number)[1]:02d}"
+        dated += 1
+        if out_of_range(f"{month}-01") is not None and out_of_range(month_end) is not None:
+            print(f"BADNAME\t{path}\t{month}（整月）\t{out_of_range(month_end)}")
+    names_dates = sorted(set(DATE.findall(path)))
+    if not names_dates:
+        continue
+    dated += 1
+    for found in names_dates:
+        why = out_of_range(found)
+        if why is not None:
+            print(f"BADNAME\t{path}\t{found}\t{why}")
+# 正文只扫 fixtures：真 kb 正文里的日期常常说的是外部的事（别家项目、RFC 历史、引编造日期当例子），
+# 而下界假设「本仓的事不可能早于本仓第一个提交」对它们不成立。
+BYTE_DATE = re.compile(DATE.pattern.encode())
+BYTE_VERSION_DATE = re.compile(VERSION_DATE.pattern.encode())
+for body in (path for path in paths if path.startswith(".claude/gate.d/fixtures/") and os.path.exists(path)):
+    if body.startswith(own_fixture):
+        skipped_own += 1
+        continue
+    # 读不了与「没有日期」不是一回事：读不了的不计进 bodies，逐个列进没扫的清单；二进制样本按文本读（grep -a）
+    try:
+        with open(body, "rb") as handle:
+            lines = handle.read().split(b"\n")
+    except OSError:
+        unreadable_bodies.append(body)
+        continue
+    bodies += 1
+    hits = set()
+    versions = set()
+    for number, line in enumerate(lines, 1):
+        if not line:
+            continue
+        for found in BYTE_DATE.findall(line):
+            hits.add((number, found.decode("ascii")))
+        # 工具版本串里的日期（rustc / cargo -V 的「(<提交的十六进制> <年-月-日>)」）是那一版工具的发布日，不是写样本的日子：照「行号、日期」记下，下面不判
+        if broken != "tool-version-dates-judged":
+            for found in BYTE_VERSION_DATE.findall(line):
+                versions.add((number, found.decode("ascii")))
+    # 整行去重（同一行同一日期只算一次），不按行号去重：按行号会丢掉同一行上的第二个日期。
+    for number, found in sorted(hits):
+        if (number, found) in versions:
+            version_dated += 1
+            continue
+        body_dates += 1
+        why = out_of_range(found)
+        if why is not None:
+            print(f"BADBODY\t{body}:{number}\t{found}\t{why}")
+print("COUNT\t" + "\t".join(str(part) for part in (scanned, dated, bodies, body_dates, start_date, skipped_own, own_fixture, start_source, version_dated))
+      + "\t" + (" ".join(unreadable_bodies) or "（没有）"))
+PY_DATE_CLAIMS
 ) > "$date_report" 2>&1 || date_rc=$?
 
 if grep -qE '^BAD(NAME|BODY)' "$date_report"; then
@@ -4525,6 +5473,8 @@ if not registered:
 
 on_disk = set()
 for path in sorted(glob.glob(f"{KB}/*.md")):
+    if re.search(r'\.[a-z]{2}\.md$', path):
+        continue
     on_disk.add(path)
 for entry in sorted(os.listdir(KB)):
     full = os.path.join(KB, entry)
@@ -4567,7 +5517,7 @@ PY
 
 # ── 格 gate-structure：每道门禁有格名表，--list 与表一致且不起重活，--check 写错格名退 2
 #
-# 判据与起法都在 scripts/gate/gate-structure-check.py（规则：.claude/rules/verification.md「门禁的结构」），这一格只调它、按它的退出码记：
+# 判据与起法都在 scripts/gate/gate-structure-check.py（规则：.claude/rules/verification-reference.md「门禁的结构」），这一格只调它、按它的退出码记：
 #   它另判 source 了 preflight.sh 的每道门禁，preflight 那一行的下一行是守卫（找不到 preflight 时当场打 ✗ 与出路、退 2，不让 set -- 清空参数之后全跑），
 #   起 --list 与 --check 时每次放进它自己的会话、超时与退出之后收整组（scripts/gate/lib_process_group.py）。
 #   守卫这一判并进这一格、不另立一格：比过上游 preflight-lint.py（判 preflight 那一行在不在、它之前只许哪几种行，上游副本不就地改，守卫只能挂在那一行之后）
@@ -4582,7 +5532,8 @@ cell_gate_structure() {
 structure_check="$STAGE_REPOSITORY/scripts/gate/gate-structure-check.py"
 [[ -f "$structure_check" ]] || { echo "  ✗ 找不到 $structure_check"; echo "     → 怎么办：它随仓走（scripts/gate/gate-structure-check.py），被删了就从 git 找回来；别在这一格另写一份判法。"; exit 1; }
 structure_exit=0
-python3 "$structure_check" "$ROOT" || structure_exit=$?
+# --list --force 的结果落进本趟共用的临时目录，stage-owners 格读同一份（各道阶段只被起一次 --list）；没有共用目录时设空、不落不读
+GATE_STRUCTURE_CHECK_LIST_CACHE="${CODE_TOOLING_RUN_SCRATCH:+$CODE_TOOLING_RUN_SCRATCH/stage-list}" python3 "$structure_check" "$ROOT" || structure_exit=$?
 [[ "${CODE_TOOLING_BREAK:-}" == structure-exit-ignored ]] && structure_exit=0
 case "$structure_exit" in
   0|77) exit "$structure_exit" ;;
@@ -4654,7 +5605,7 @@ exec(compile(sys.argv[1], "code-without-text-library", "exec"), code_text.__dict
 environment_stage, broken = sys.argv[2], sys.argv[4]
 ordered = [os.path.basename(path) for path in sys.argv[3].split("\n") if path.strip()]
 TEST_RUNNING = re.compile(r'\bcargo\s+(?:\+\S+\s+)?(?:test|build|run|nextest|bench)\b'
-                          r'|\b(?:replay|mutate|mutation-shard-run|crash-point-replay-shard-run|multi-host-run|vm-bench|lkmm)\.sh\b'
+                          r'|\b(?:replay|mutate|mutation-shard-run|multi-host-run|vm-bench|lkmm)\.sh\b'
                           r'|\bqemu-system|\bherd7\b')
 if not ordered:
     print("  ! .claude/gate.d/ 顶层一道阶段都没有，这一格无对象可判")
@@ -4755,7 +5706,16 @@ exempt_table_baseline() { # <表的相对路径> <放基准那一版的文件>
       echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"
       exit 1
     fi
-    base_name="$(gate_diff_base gate)"
+    # gate 基准一趟里不变：第一个调的格把它落进本趟共用的临时目录，别的格读那份（gate_diff_base 要起几次 git）
+    base_cache="${CODE_TOOLING_RUN_SCRATCH:+$CODE_TOOLING_RUN_SCRATCH/gate-base}"
+    if [[ -n "$base_cache" && -f "$base_cache" ]]; then
+      base_name="$(<"$base_cache")"
+    else
+      base_name="$(gate_diff_base gate)"
+      if [[ -n "$base_cache" && -n "$base_name" ]]; then
+        printf '%s\n' "$base_name" >"$base_cache.$BASHPID" && mv -f -- "$base_cache.$BASHPID" "$base_cache" || rm -f -- "$base_cache.$BASHPID"
+      fi
+    fi
     if base_problem="$(python3 "$STAGE_DIRECTORY/lib-lag-baseline.py" show "$base_name" "$1" 2>&1 >"$2")"; then
       base_state="table"
     else
@@ -5688,11 +6648,10 @@ PY
 # ── 格 memory-bounded-parallelism：按内存上限定开几个进程或线程的入口都登记在 .claude/memory-bounded-parallelism.tsv（除了按内存限并发的那几样，
 #   别的一律照每台默认重活线程数开；记录在 records/2026-11-05-删轻型并入重型.md「并包」）
 #
-# 登记表 .claude/memory-bounded-parallelism.tsv（写法在它的文件头）：一行一个入口，制表符分隔六列，空行与 # 开头的行不算。正方向逐行判：
-#   ① 六列都在、都不空；② 入口在：仓根下的相对路径要是一份文件，cargo:<包>:<目标> 要在 crates/*/Cargo.toml 里找到包名是 <包> 的那一份、
+# 登记表 .claude/memory-bounded-parallelism.tsv（写法在它的文件头）：一行一个入口，制表符分隔两列（入口、理由），空行与 # 开头的行不算；没有程序读表里的内容，这一格只判形状。正方向逐行判：
+#   ① 两列都在、都不空（多一列、少一列都判红，旧的六列写法同样判红）；② 入口在：仓根下的相对路径要是一份文件，cargo:<包>:<目标> 要在 crates/*/Cargo.toml 里找到包名是 <包> 的那一份、
 #      包里有叫 <目标> 的目标（src/bin/<目标>.rs、src/bin/<目标>/main.rs、tests/<目标>.rs、examples/<目标>.rs，或 Cargo.toml 的 [[bin]]、[[test]]、[[example]] 里 name 对上的）；
-#      同一个入口登记两行也判红；③ 每件峰值是正整数、底座是 0 或正整数（字节，不带单位）；④ 出处点到任务号：「<任务号> attempt-<第几次> <日志里那一行或量法>」；
-#   ⑤ 件数从哪来是 item-plan、fixed:<正整数>、argument:<选项名>（选项名一到两个 - 起头）三种之一。表不在按空表判。
+#      同一个入口登记两行也判红；③ 理由至少 REASON_MINIMUM_CHARACTERS 个字（写明为什么不能照每台默认重活线程数同时开）。表不在按空表判。
 # 反方向（代码里按内存定并发的写法，所在入口要登记）：扫被判的根下 scripts/、.claude/gate.d/、.claude/hooks/、crates/ 的 *.sh、*.py、*.rs（与 heavy-thread-defaults 同一个范围），
 #   跳过 target/、__pycache__/、.git/ 与 .claude/gate.d/fixtures/；只看代码：逐行读法在共用库 SOURCE_CODE_LINES_LIBRARY（shell 去掉注释与出路文字，python 经 tokenize、
 #   rust 按引号去掉注释与字符串字面量），留下的字面量只有内容整个是以 memory.max 收尾的路径（读 cgroup 的内存上限）的那一种；之后引号里的一律不认（字面量里有 memory.max 的记成读内存上限）。
@@ -5708,29 +6667,41 @@ PY
 #   有这类写法的文件不在任何一个登记入口罩着的文件里，判红，点名文件:行与种类（每份文件列前 3 行）；登记了的入口罩着的文件里一处这类写法都没有，也判红。
 # 判不了的：变量里拼出来的路径、按 import / mod / use 引的模块（库文件要被入口罩着，入口的代码行里要写出它的路径，或把库文件本身登成入口）、
 #   引号里拼的算式、跨行的写法（内存上限与并发数分在两行）、名字里不带上面那些词的写法（只叫 cap、limit 的）；只读内存上限来显示或记录、不拿它定并发的（内存包装、峰值表）不在这一格判。
-#   表里的峰值对不对、件数从哪来与服务的算法对不对得上、理由成不成立靠 review；服务怎么读这张表归 task-server。
+#   理由成不成立靠 review；任务服务不读这张表。
 # 样本：memory-bounded-parallelism-green 的表三行：.claude/gate.d/sample-stage.sh（代码行点名 scripts/mutation/sample_rows.py，那份里有 memory_bound_for）、
 #   scripts/experiment-apparatus/budget_run.sh（walker 数 = (gibibytes − 8) ÷ 4）、cargo:demo:demo_device（crates/demo/src/bin/demo_device.rs 里 free_threads 与 free_bytes 同一行）；
 #   不算的几样：scripts/hosts/wrapper_peak.sh 只读 memory.max 来记录、RUN_WITH_MEMORY_CAP_KEY 与线程变量同一行，crates/demo/src/card_queue.rs 按显存排卡（lanes 与 gpu_memory_total 同一行），
 #   注释、echo 与文档串里写的 memory_bound；判绿并报表 3 行、按内存定并发的写法 3 份文件。
-#   memory-bounded-parallelism-red：表里五列的一行、入口文件不在的一行、cargo:demo:missing_target、每件峰值写 6.8G、出处没有任务号、件数从哪来写 by-memory、
+#   memory-bounded-parallelism-red：表里三列的一行、旧的六列写法的一行、入口文件不在的一行、cargo:demo:missing_target、同一个入口第二次登记、理由只有几个字，
 #   入口在而罩着的文件里没有这类写法（scripts/hosts/plain_run.sh），各点名一处；没登记的 scripts/experiment-apparatus/unregistered_run.sh（probe 数 = gibibytes ÷ 5）
 #   与 crates/demo/src/lease.rs（借主机内存额度排队）各点名。
-# 弄坏开关（CODE_TOOLING_BREAK）：memory-table-columns-unchecked（不核六列）：memory-bounded-parallelism-red 里「第 3 行不是六列」那条 want 找不到；
-#   memory-table-entry-unchecked（不核入口在不在、登没登两次）：「入口 scripts/experiment-apparatus/gone_run.sh：仓根下没有这份文件」「入口 cargo:demo:missing_target」两条 want 找不到；
-#   memory-table-numbers-unchecked（不核两个数是整数）：「每件峰值「6.8G」」那条 want 找不到；memory-table-source-unchecked（不核出处点到任务号）：「出处「量的」」那条 want 找不到；
-#   memory-table-count-source-unchecked（不核件数从哪来）：「件数从哪来「by-memory」」那条 want 找不到；
+# 弄坏开关（CODE_TOOLING_BREAK）：memory-table-columns-unchecked（不核两列）：memory-bounded-parallelism-red 里「第 3 行不是两列」「第 4 行不是两列」两条 want 找不到；
+#   memory-table-entry-unchecked（不核入口在不在、登没登两次）：「入口 scripts/experiment-apparatus/gone_run.sh：仓根下没有这份文件」「入口 cargo:demo:missing_target」「第 2 行已经登记过」三条 want 找不到；
+#   memory-table-reason-unchecked（不核理由够不够长）：「理由「样本：太短」」那条 want 找不到；
 #   memory-bounded-unregistered-accepted（代码里按内存定并发的写法不核入口登没登记）：unregistered_run.sh、lease.rs 两条 want 与「2 份文件」找不到；
-#   memory-bounded-stale-accepted（登记的入口不核代码里还有没有这类写法）：「scripts/hosts/plain_run.sh」那条 want 找不到。
+#   memory-bounded-stale-accepted（登记的入口不核代码里还有没有这类写法）：「scripts/hosts/plain_run.sh」那条 want 找不到；
+#   memory-bounded-prefilter-memory-only（预筛只认 memory）：green 里 budget_run.sh（gibibytes）、demo_device.rs（free_bytes）两处找不到、red 里 unregistered_run.sh 那条 want 找不到。
+# 扫描：逐份文件按每台默认重活线程数并行（map_in_processes，fork 的子进程，结果按文件次序合并）；预筛是判红的必要条件：site_form 交非空只有两条路（词集合含 DECISIVE_WORD_SETS 的一组，
+#   或含 MEMORY_WORD_SETS 的一组再加并发词），每一组都含 memory、bytes（gibibytes 以它收尾）之一，引号里的 memory.max 也含 memory，所以文件或一行代码小写之后既没有 memory 也没有 bytes 就不可能交非空，
+#   不逐行拆标识符的词。
 cell_memory_bounded_parallelism() {
-python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "$SOURCE_CODE_LINES_LIBRARY" "${CODE_TOOLING_BREAK:-}" <<'PY'
+local jobs
+if ! jobs="$(heavy_thread_default)"; then
+  echo "  ✗ 取不了每台默认重活线程数（原因在上一行），逐份扫描的并行度定不了，一份都没扫"
+  echo "     → 怎么办：照上一行的出路修 .claude/heavy-thread-default（线程固定取登记值，SINGLEFS_THREAD_CAP 由服务套的 capped.sh 设，不自己设），再跑这一格；不退回按核数算。"
+  exit 1
+fi
+python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "$SOURCE_CODE_LINES_LIBRARY" "${CODE_TOOLING_BREAK:-}" "$PARALLEL_MAP_LIBRARY" "$jobs" <<'PY'
 import collections, os, re, sys, tomllib, types
 code_text = types.ModuleType("lib_code_without_text")
 exec(compile(sys.argv[1], "code-without-text-library", "exec"), code_text.__dict__)
 source_lines = types.ModuleType("lib_source_code_lines")
 exec(compile(sys.argv[2], "source-code-lines-library", "exec"), source_lines.__dict__)
+parallel = types.ModuleType("lib_parallel_map")
+exec(compile(sys.argv[4], "parallel-map-library", "exec"), parallel.__dict__)
 OUTPUT_TEXT = code_text.OUTPUT_TEXT
 broken = sys.argv[3]
+jobs = int(sys.argv[5])
 
 TABLE = ".claude/memory-bounded-parallelism.tsv"
 SCAN_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/hooks", "crates")
@@ -5748,8 +6719,8 @@ MEMORY_WORD_SETS = tuple(map(frozenset, ({"memory", "cap"}, {"memory", "max"}, {
                                          {"host", "memory"}, {"gibibytes"}, {"budget", "bytes"}, {"free", "bytes"})))
 DECISIVE_WORD_SETS = tuple(map(frozenset, ({"memory", "bound"}, {"lease", "host", "memory"})))
 COUNT_ASSIGNMENT = re.compile(r"^\s*(?:local\s+|let\s+(?:mut\s+)?)?count\s*=(?!=)")
-COUNT_SOURCE_FORM = re.compile(r"item-plan|fixed:[1-9][0-9]*|argument:-{1,2}[A-Za-z0-9][A-Za-z0-9-]*")
-TASK_SOURCE_FORM = re.compile(r"[1-9][0-9]* attempt-[1-9][0-9]*\s+\S.*")
+TABLE_COLUMNS = 2           # 入口、理由
+REASON_MINIMUM_CHARACTERS = 8
 REFERENCE = re.compile(r"(?<![A-Za-z0-9_.\-])(?:scripts|\.claude/gate\.d|\.claude/hooks|crates)/[A-Za-z0-9_./\-]*?[A-Za-z0-9_\-]\.(?:sh|py|rs)\b")
 CLOSURE_DEPTH = 2
 LINES_SHOWN = 3
@@ -5878,12 +6849,12 @@ if os.path.isfile(TABLE):
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         columns = line.split("\t")
-        if len(columns) != 6 or any(not column.strip() for column in columns):
+        if len(columns) != TABLE_COLUMNS or any(not column.strip() for column in columns):
             if broken != "memory-table-columns-unchecked":
-                table_problems.append(f"第 {number} 行不是六列（入口、每件峰值、出处、件数从哪来、底座、理由，制表符分隔、每列都不空）：分出 {len(columns)} 列「{line[:120]}」")
+                table_problems.append(f"第 {number} 行不是两列（入口、理由，制表符分隔、每列都不空）：分出 {len(columns)} 列「{line[:120]}」")
                 continue
-            columns = (columns + [""] * 6)[:6]
-        entry, peak, source, count_source, base, _reason = (column.strip() for column in columns)
+            columns = (columns + [""] * TABLE_COLUMNS)[:TABLE_COLUMNS]
+        entry, reason = (column.strip() for column in columns)
         files, entry_problem = entry_files(entry)
         if broken != "memory-table-entry-unchecked":
             if entry_problem:
@@ -5891,31 +6862,51 @@ if os.path.isfile(TABLE):
             elif entry in seen:
                 table_problems.append(f"第 {number} 行的入口 {entry} 第 {seen[entry]} 行已经登记过（一个入口一行）")
         seen.setdefault(entry, number)
-        if broken != "memory-table-numbers-unchecked" and not (re.fullmatch(r"[1-9][0-9]*", peak) and re.fullmatch(r"0|[1-9][0-9]*", base)):
-            table_problems.append(f"第 {number} 行的每件峰值「{peak}」或底座「{base}」不是整数字节数（每件峰值是正整数、底座是 0 或正整数，都不带单位）")
-        if broken != "memory-table-source-unchecked" and not TASK_SOURCE_FORM.fullmatch(source):
-            table_problems.append(f"第 {number} 行的出处「{source[:80]}」没点到任务号（要写成「<任务号> attempt-<第几次> <日志里那一行或量法>」）")
-        if broken != "memory-table-count-source-unchecked" and not COUNT_SOURCE_FORM.fullmatch(count_source):
-            table_problems.append(f"第 {number} 行的件数从哪来「{count_source}」不是 item-plan、fixed:<正整数>、argument:<选项名> 三种之一")
+        if broken != "memory-table-reason-unchecked" and len(reason) < REASON_MINIMUM_CHARACTERS:
+            table_problems.append(f"第 {number} 行的理由「{reason}」太短（至少 {REASON_MINIMUM_CHARACTERS} 个字，写明为什么不能照每台默认重活线程数同时开）")
         rows.append((number, entry, files))
 
 sites = {}                      # 路径 → [(行号, 种类, 原行)]
 scanned_by_directory = collections.Counter()
 scanned = 0
-for directory, path, language in scanned_files():
+# 预筛（必要条件）：site_form 交非空，只有两条路——词集合含 DECISIVE_WORD_SETS 的一组，或有 MEMORY_WORD_SETS 的一组再加并发词；两处每一组都含 memory、bytes（gibibytes 以它收尾）
+#   之一，引号里的 memory.max 也含 memory；词是标识符小写之后拆出来的。所以文件或一行代码小写之后既没有 memory 也没有 bytes，就不可能交非空，不必逐行拆词。
+#   弄坏开关 memory-bounded-prefilter-memory-only：预筛只认 memory，只带 bytes 的几处（gibibytes、free_bytes）被漏掉
+PREFILTER_WORDS = ("memory",) if broken == "memory-bounded-prefilter-memory-only" else ("memory", "bytes")
+
+
+def may_contain_site(text):
+    lowered = text.lower()
+    return any(word in lowered for word in PREFILTER_WORDS)
+
+
+def scan_file(item):
+    """一份文件 → (目录, 路径, 读不了的原因或 None, [(行号, 种类, 原行)])；各份文件互不依赖，在子进程里并行跑。"""
+    directory, path, language = item
     try:
         text = open(path, encoding="utf-8", errors="replace").read()
     except OSError as error:
-        problems.append(f"读不了 {path}：{error}")
+        return directory, path, f"读不了 {path}：{error}", []
+    if not may_contain_site(text):
+        return directory, path, None, []
+    original = text.split("\n")
+    found = []
+    for number, code in enumerate(code_lines_of(language, text), 1):
+        if code.strip() and may_contain_site(code):
+            form = site_form(code)
+            if form:
+                found.append((number, form, original[number - 1] if number <= len(original) else code))
+    return directory, path, None, found
+
+
+for directory, path, read_problem, found in parallel.map_in_processes(scan_file, list(scanned_files()), jobs):
+    if read_problem:
+        problems.append(read_problem)
         continue
     scanned += 1
     scanned_by_directory[directory] += 1
-    original = text.split("\n")
-    for number, code in enumerate(code_lines_of(language, text), 1):
-        if code.strip():
-            form = site_form(code)
-            if form:
-                sites.setdefault(os.path.normpath(path), []).append((number, form, original[number - 1] if number <= len(original) else code))
+    if found:
+        sites.setdefault(os.path.normpath(path), []).extend(found)
 
 covered, stale = set(), []
 for number, entry, files in rows:
@@ -5940,7 +6931,7 @@ if table_problems:
     print(f"  ✗ 登记表 {TABLE} 有 {len(table_problems)} 处不对：")  # gate-lint:summary
     for problem in table_problems:
         print(f"     {problem}")  # gate-lint:detail
-    print(f"     → 怎么办：照 {TABLE} 文件头的六列写法改那一行：入口写仓根下的相对路径或 cargo:<包>:<目标名>，两个数写字节整数，出处写「<任务号> attempt-<第几次> …」，件数从哪来写 item-plan、fixed:<n>、argument:<选项名>。")
+    print(f"     → 怎么办：照 {TABLE} 文件头的两列写法改那一行：入口写仓根下的相对路径或 cargo:<包>:<目标名>，理由写为什么不能照每台默认重活线程数同时开（不写峰值、任务号这类没人读的数，旧的六列写法不认）。")
 if unregistered:
     failed = True
     print(f"  ✗ {len(unregistered)} 份文件里按内存上限定开几个进程或线程，所在入口没登记在 {TABLE}（没登记的照每台默认重活线程数开）：")  # gate-lint:summary
@@ -5950,7 +6941,7 @@ if unregistered:
             print(f"     {path}:{number}  {form}  「{line.strip()[:160]}」")  # gate-lint:detail
         if len(entries) > LINES_SHOWN:
             print(f"     {path} 另有 {len(entries) - LINES_SHOWN} 行")  # gate-lint:detail
-    print(f"     → 怎么办：确是每件占一大块内存、31 份同时开会撞上限的（用户 2026-11-05 定只有这一类按内存限并发），把入口登进 {TABLE}（六列，量到的峰值与出处，写法在它文件头）；")
+    print(f"     → 怎么办：确是每件占一大块内存、31 份同时开会撞上限的（用户 2026-11-05 定只有这一类按内存限并发），把入口登进 {TABLE}（入口、理由两列，写法在它文件头）；")
     print("               入口的代码行里写出库文件的路径，或把库文件本身登成入口。不是这一类的，改成照每台默认重活线程数开（.claude/heavy-thread-default），不按内存算份数、不借内存额度排队。")
 if stale:
     failed = True
@@ -5962,7 +6953,7 @@ if failed:
     sys.exit(1)
 by_directory = "、".join(f"{name} {scanned_by_directory[name]}" for name in SCAN_DIRECTORIES if scanned_by_directory[name])
 site_count = sum(len(entries) for entries in sites.values())
-table_note = f"表 {len(rows)} 行，每行六列成形、入口在" if os.path.isfile(TABLE) else f"{TABLE} 不在（按空表判）"
+table_note = f"表 {len(rows)} 行，每行两列成形、入口在" if os.path.isfile(TABLE) else f"{TABLE} 不在（按空表判）"
 print(f"  ✓ 按内存上限定并发的入口都登记了：{table_note}；扫了 {scanned} 份（{by_directory}），按内存定并发的写法 {site_count} 处在 {len(sites)} 份文件里，都落在登记的入口罩着的文件里")
 PY
 }
@@ -6577,128 +7568,6 @@ print(f"  ✓ 项目脚本里没有直接起 multi-host-run.sh --peer 的：扫�
 PY
 }
 
-# ── 格 retired-names：退役的名字（判定库服务化与多机改动退掉的变量、参数、子命令、目录名、错误种类、特性、脚本名）还留在代码、注释、出路文字与登记表里
-#   （records/2026-11-01-判定库服务化.md 批次 22：选库变量、本地库目录、导入与拷库的说法在服务化之后还活在 27 份文件里，没有一格会红）
-# 名单：被判的根里 .claude/gate.d/retired-names.tsv（名字<TAB>种类<TAB>出路，写法在它的文件头）；名单读不出、一行写不对判红。名字照字面认：
-#   前一个字符不是字母、数字、_ 与 -，后一个字符不是字母、数字、_ 与 -（以 - 起头的参数名里那一段不另算）。
-# 扫哪些：被判的根下 scripts/、.claude/gate.d/、.claude/hooks/、.claude/scripts/、crates/、prune-server/ 里的每一份文本文件（前 8 KiB 里有 NUL 字节的当二进制、不扫）；
-#   跳过 target/、__pycache__/、.git/、.claude/gate.d/fixtures/ 与 .claude/hooks/fixtures/（样本是造出来的输入），与名单自己、
-#   搬迁登记表 .claude/gate.d/path-moves.tsv（它的旧路径一栏记的就是搬走之前的名字，搬迁换算要靠旧路径认；写法在 .claude/rules/path-moves.md）。
-#   整行原文都判：代码、注释、出路文字、文档串、登记表的说明列（说明里还写着退役的名字，就是知识没跟上代码）。
-# 没有放行：「设了就拒」的拒绝分支也不留（不兼容旧东西，一个门禁），名单里的名字在别处出现就改掉；也没有放行表。
-# 判不了的：拼出来的名字（"SINGLEFS_" "VERDICT_…" 分开写）、编码过的、在扫的目录之外（规则与 kb 归 doc 那几道）；名字退役之后又被别的意思拿去用的，改名单那一行，靠 review。
-# 比过（gate-similar）：doc-text.sh 的旧术语那一格判 kb 与文档里登记过改名的术语旧名，射程是文档、名单是 .claude/kb/term-renames.md，不读代码；
-#   break-switch-outside-selftest 格判弄坏开关平常跑时被拒，不判退役的名字还在不在；shared-data-root-literals 格判数据根的取法。三格的对象与名单都不同，并不进去。
-# 样本：retired-names-red（名单三个名字；scripts/hosts/uses_old.sh 一行代码读退役变量、一行注释写它，scripts/gate/uses_old.py 一个退役参数，.claude/hooks/sample_hook.sh
-#   读第三个退役变量，共 4 处逐处点名）；
-#   retired-names-green（名字前后接了字母或 - 的不算、样本目录 .claude/gate.d/fixtures/ 下的不扫、名单与搬迁登记表不扫；判绿并报扫了 5 份）。
-# 弄坏开关（CODE_TOOLING_BREAK）：retired-names-comments-unscanned（注释行不扫）：retired-names-red 里 uses_old.sh:3 那条 want 与「4 处」找不到；
-#   retired-moves-table-scanned（连搬迁登记表也扫）：retired-names-green 判红（期望退出 0，实测 1：path-moves.tsv:2 上的退役名字被点名）。
-cell_retired_names() {
-python3 - "${CODE_TOOLING_BREAK:-}" <<'PY'
-import collections, os, re, sys
-broken = sys.argv[1]
-
-NAMES_TABLE = ".claude/gate.d/retired-names.tsv"
-MOVES_TABLE = ".claude/gate.d/path-moves.tsv"
-SCAN_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/hooks", ".claude/scripts", "crates", "prune-server")
-SKIPPED_NAMES = {"target", "__pycache__", ".git"}
-SKIPPED_PREFIXES = (".claude/gate.d/fixtures/", ".claude/hooks/fixtures/")
-OWN_TABLES = {NAMES_TABLE} if broken == "retired-moves-table-scanned" else {NAMES_TABLE, MOVES_TABLE}
-BINARY_PROBE_BYTES = 8192
-COMMENT_LINE = re.compile(r"^\s*(?:#|//)")
-comments_unscanned = broken == "retired-names-comments-unscanned"
-
-
-def read_names():
-    names, problems = [], []
-    if not os.path.isfile(NAMES_TABLE):
-        return None, [f"名单 {NAMES_TABLE} 不在"]
-    for number, line in enumerate(open(NAMES_TABLE, encoding="utf-8").read().split("\n"), 1):
-        if not line.strip() or line.startswith("#"):
-            continue
-        fields = line.split("\t")
-        if len(fields) != 3 or not all(field.strip() for field in fields) or fields[0] != fields[0].strip():
-            problems.append(f"{NAMES_TABLE} 第 {number} 行不是「名字<TAB>种类<TAB>出路」三列都不空：{line[:120]}")
-            continue
-        names.append((fields[0], fields[2]))
-    return names, problems
-
-
-def scanned_files():
-    for directory in SCAN_DIRECTORIES:
-        if not os.path.isdir(directory):
-            continue
-        for current, directories, files in os.walk(directory):
-            directories[:] = sorted(name for name in directories if name not in SKIPPED_NAMES
-                                    and not (os.path.join(current, name) + "/").startswith(SKIPPED_PREFIXES))
-            for name in sorted(files):
-                path = os.path.join(current, name)
-                if path not in OWN_TABLES:
-                    yield directory, path
-
-
-names, problems = read_names()
-if names is None:
-    print(f"  ✗ {problems[0]}：退役的名字没处读")
-    print("     → 怎么办：它随仓走（.claude/gate.d/retired-names.tsv），被删了就从 git 找回来；写法在它的文件头。")
-    sys.exit(1)
-way_out = dict(names)
-NAME_PATTERN = re.compile("|".join(r"(?<![A-Za-z0-9_-])" + re.escape(name) + r"(?![A-Za-z0-9_-])"
-                                   for name in sorted(way_out, key=len, reverse=True))) if way_out else None
-
-hits = collections.OrderedDict()   # 路径 → [(行号, 名字们, 原行)]
-scanned_by_directory = collections.Counter()
-scanned = 0
-for directory, path in scanned_files():
-    try:
-        with open(path, "rb") as handle:
-            data = handle.read()
-    except OSError as error:
-        problems.append(f"读不了 {path}：{error}")
-        continue
-    if b"\0" in data[:BINARY_PROBE_BYTES]:
-        continue
-    scanned += 1
-    scanned_by_directory[directory] += 1
-    if NAME_PATTERN is None:
-        continue
-    text = data.decode("utf-8", "replace")
-    if not NAME_PATTERN.search(text):
-        continue
-    lines = text.split("\n")
-    for number, line in enumerate(lines, 1):
-        if comments_unscanned and COMMENT_LINE.match(line):
-            continue
-        found = sorted(set(NAME_PATTERN.findall(line)))
-        if found:
-            hits.setdefault(path, []).append((number, found, line))
-
-unallowed = [(path, number, found, line) for path, entries in hits.items() for number, found, line in entries]
-
-if scanned == 0:
-    print(f"  ⊘ 本次无对象可判：{'、'.join(SCAN_DIRECTORIES)} 下没有要扫的文件")
-    sys.exit(77)
-failed = False
-for problem in problems:
-    failed = True
-    print(f"  ✗ {problem}")
-    print("     → 怎么办：名单照 .claude/gate.d/retired-names.tsv 文件头的写法改；读不了的文件看它的权限，这一格要读到射程里的每一份。")
-if unallowed:
-    failed = True
-    print(f"  ✗ {len(unallowed)} 处还写着退役的名字（名单 {NAMES_TABLE}）：")  # gate-lint:summary
-    for path, number, found, line in unallowed:
-        print(f"     {path}:{number}  {'、'.join(found)}  「{line.strip()[:160]}」")  # gate-lint:detail
-    for name in sorted({name for _path, _number, found, _line in unallowed for name in found}):
-        print(f"     {name}：{way_out[name]}")  # gate-lint:detail
-    print("     → 怎么办：照上面每个名字的出路改掉那一行（代码删掉、注释与出路文字照现行写法重写），不留兼容、不单留拒绝、没有放行表。")
-if failed:
-    sys.exit(1)
-by_directory = "、".join(f"{name} {scanned_by_directory[name]}" for name in SCAN_DIRECTORIES if scanned_by_directory[name])
-print(f"  ✓ 退役的名字都删干净了：扫了 {scanned} 份（{by_directory}），名单 {len(way_out)} 个名字")
-PY
-}
-
 # ── 格 verdict-library-code：登记表 verdict-library-scripts.tsv 与它点名的脚本对账（.claude/rules/verification.md「判定库只有一份」；
 #   欠账 C948（判定另存别处的库）的会红那一半：取不到库就照跑不记的分支、第三列写 prune-server 的脚本里还有本地库读写、第三列还不是 prune-server）
 # 读什么：被判的根里 .claude/gate.d/verdict-library-scripts.tsv（列的写法在它文件头）与 .claude/gate.d/verdict-library-code-forms.tsv（写法表：种类、名字、正则）。
@@ -6715,11 +7584,11 @@ PY
 #      写在命中那一行的代码里，或写在包着那一行的块的开头行里（往上逐层取缩进更浅的那一行：if / elif / while 的条件、case 的分支），就放过并计数；
 #      else 那一行不写开关名，else 那一支照判；文件头开关表里没登记的名字照判。开关平常跑时被拒由 break-switch-outside-selftest 格判，这一格不重判。
 #   同一份脚本登记了几行的，① 逐行判、②③ 按那份脚本判一次（几行里有一行是 prune-server 就照 ③ 判）。点名的路径不在判红。
-#   库根的三种选法（选库变量、库根参数、打库根的子命令）由 retired-names 格判（名单里登记了），这一格不重判。
+#   库根的三种选法（选库变量、库根参数、打库根的子命令）这一格不判。
 # 判不了的：拼出来的写法、写法表外的说法、经别的库间接开的本地库（例：调一份没登记的共用库去写文件）、不按缩进写的块（一行写完的 if、续行）；
 #   自证函数里的本地库读写照判（只放过开关护着的分支与说明）；靠 review。
 # 比过（gate-similar）：reuse-selftests 格读同一张登记表，但它跑每份的自证核复用三问（判法在 scripts/gate/lib_reuse_checks.py），不读脚本正文；
-#   这一格只读正文与第三列、不起任何自证，并进 reuse-selftests 会让一格静态判据跟着自证一起跑、一起本次未跑。retired-names 格判退役名字，不读登记表。
+#   这一格只读正文与第三列、不起任何自证，并进 reuse-selftests 会让一格静态判据跟着自证一起跑、一起本次未跑。
 # 样本：verdict-library-code-red（登记表四行：两行 prune-server 各点名一份脚本；silent.sh 文件头开关表登记 SAMPLE_BREAK=silent-run-tolerated，
 #   两句取不到库照跑的、一句在那个开关护着的 if 的 else 那一支、一句在文件头没登记的名字 unlisted-mode 护着的块里，local.py 一处 common-dir 拼库目录与一处 sqlite；
 #   一行第三列还写库根的 git common-dir（点名的 old_root.sh 里有 git 目录下的库目录，不是 prune-server 行、③ 不判它）；共点名照跑 4 处、本地库 2 处、第三列 1 行）；
@@ -7019,7 +7888,7 @@ function_units_build_unit_graph() {
       cargo build --release --offline --manifest-path "$build_home/workspace/Cargo.toml" -p singlefs-unit-graph > "$build_log" 2>&1; then
     # build_home 连同里面的日志随这一格收尾删掉：判红时把日志拷到 TMPDIR 下留着，出路指那一份
     kept_build_log="$(mktemp "${TMPDIR:-/tmp}/singlefs-unit-graph-build.XXXXXX.log")" && cp -- "$build_log" "$kept_build_log" || kept_build_log="（没留下：拷不出来）"
-    echo "  ✗ 编不出 unit-graph（cargo build --release -p singlefs-unit-graph，日志留在 $kept_build_log）：$(tail -n 3 "$build_log" | tr '\n' ' ' | cut -c1-300)"
+    echo "  ✗ 编不出 unit-graph（cargo build --release -p singlefs-unit-graph，日志留在 $kept_build_log）：$(tail -n 3 "$build_log" | tr '\n' ' ' | clip_text 300)"
     echo "     → 怎么办：看那份日志，看完自己删；编译错就修 crates/singlefs-unit-graph。"
     return 1
   fi
@@ -7467,7 +8336,7 @@ reuse_selftests_pass() {
   done < <(awk -F'\t' '!/^#/ && NF >= 2 { print $1 }' .claude/gate.d/verdict-library-scripts.tsv 2>/dev/null)
   build_scratch="$(mktemp -d)" || { echo "  ✗ 建不了编 prune-server 的临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格"; return 1; }
   # 程序要编二进制时起 bash -c code_tooling_prune_server_binary：函数经 export -f 交下去，它读的 ROOT 在起程序的那一句里设进环境
-  export -f code_tooling_prune_server_binary
+  export -f code_tooling_prune_server_binary code_tooling_prune_server_build_into
   if ROOT="$ROOT" REUSE_CHECKS_BREAK="$break_items" python3 -c "$REUSE_SELFTESTS_PROGRAM" "$UNIT_VERDICT_ROUNDS_LIBRARY" "$STAGE_REPOSITORY/scripts/gate/admission.py" \
        "$STAGE_NAME:reuse-selftests" "$STAGE_REPOSITORY" "$ROOT" "$jobs" "${CODE_TOOLING_BREAK:-}" "$(judged_root_is_sample && echo 1)" "$1" "$needs_server" "$build_scratch" \
        "judge:.claude/gate.d/$STAGE_NAME::reuse_selftests_judge_code"; then pass_exit=0; else pass_exit=$?; fi
@@ -7655,7 +8524,6 @@ rounds = types.ModuleType("lib_unit_verdict_rounds")
 exec(compile(sys.argv[1], "unit-verdict-rounds-library", "exec"), rounds.__dict__)
 admission, kind, judge_root, root, broken, sample, states_path, judge_token = sys.argv[2:6] + [sys.argv[6], sys.argv[7] == "1", sys.argv[8], sys.argv[9]]
 TABLE = os.path.join("crates", "mutations.tsv")
-LISTING = os.path.join(judge_root, "scripts", "mutation", "crates-mutation-rows.py")
 SHARED_INPUTS = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", ".claude/gate.d/stage-inputs.tsv",
                  ".claude/gate.d/crash-point-replay-items.tsv", ".claude/heavy-thread-default", "scripts/crash/crash-amplification.sh")
 NO_FILE_GROUP = "（第二列没写文件的行）"
@@ -7715,9 +8583,10 @@ def finish(exit_code):
 if names and not judged:
     print(f"  ✓ crates-mutation-rows.py --list-items：变异表按改的文件分的 {len(names)} 组都有键相同、判过绿的判定，全部复用，这一格没起它")
     finish(0)
-# 有一组要现判（或表里一行成形的都没有）：整张表跑一趟
-done = subprocess.run(["python3", LISTING, "--list-items", root], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace",
-                      stdin=subprocess.DEVNULL)
+# 有一组要现判（或表里一行成形的都没有）：整张表跑一趟。脚本路径就地写成 os.path.join(<这一道所在的仓>, <字面尾巴>)：收闭包时照「<折不出的目录>/<仓里的相对路径>」
+# 认到仓里那一份（写成模块级的名字再引，尾巴认不出、拒算 subprocess-path-unfolded）
+done = subprocess.run(["python3", os.path.join(judge_root, "scripts", "mutation", "crates-mutation-rows.py"), "--list-items", root],
+                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", stdin=subprocess.DEVNULL)
 output, list_exit = done.stdout, done.returncode
 summary = next((line for line in output.split("\n") if re.match(r"^  · 键对不上 [0-9]+ 条", line)), "")
 if broken == "list-items-exit-only":
@@ -7960,25 +8829,40 @@ entry_scripts_judge_code() { printf '%s\n' "$ENTRY_SCRIPTS_PROGRAM"; }
 # ── 格 break-switch-headers：还 checks-owed.md C625（弄坏开关文件头三样没有门禁）的格式那一半。
 # 判据：被判的根里 scripts/ 与 .claude/hooks/ 下（fixtures 目录除外）的 .sh、.py，代码里读了名字以 _BREAK 结尾的变量的
 #   （shell 的 $X_BREAK / ${X_BREAK…}，python 的 environ.get("X_BREAK") / environ["X_BREAK"] / getenv("X_BREAK") 与 `= "X_BREAK"` 的常量，注释行不算），
-#   文件头里要有至少一条 mutate.sh 写法的开关（读法在 BREAK_SWITCH_TABLE_LIBRARY），每一条三样写全：名字与值、弄坏哪一处、下一行起至少一行点名的项。
+#   文件头里要有至少一条 mutate.sh 写法的开关（读法在 BREAK_SWITCH_TABLE_LIBRARY），每一条三样写全：名字与值、弄坏哪一处、下一行起至少一行点名的项；
+#   点名的项里「」要成对：复跑格按「」读点名的项，少一个收尾的括号就读不到它点名的是哪一格，只在复跑时才暴露。配不配平以复跑格读点名的项用的 quoted_items 读出的各项为准
+#   （BREAK_SWITCH_HEADER_LIBRARY 的 quote_gap，与复跑格开跑前的预检同一份），不配平判红：点名这一条开关、第几行、怎么改（补上收尾的括号，或删掉多出来的那一个）。点名的项里没有「」的（门禁阶段写样本目录名）不判。
+#   复跑登记表 .claude/gate.d/break-switch-replay-files.tsv 第一列点名的文件（放在 task-server/ 这类别处的同样）一起判：break-switch-replay 格判「文件头开关表没写全」的，这一格点名同一条。
 #   立账时还没改成这种写法的存量逐份登记在 .claude/gate.d/break-switch-headers-exempt.tsv（「<相对仓根的路径><TAB># 理由>」），登记了的不判；
-#   一行指到的文件不在、或那份已经写全了（或不再读开关），判红：那一行删掉。表只缩不涨（不判涨，靠 review）。
+#   一行指到的文件不在、或那份已经写全了（或不再读开关）、或那份在复跑登记表里（复跑那一格不认豁免），判红：那一行删掉。表只缩不涨（不判涨，靠 review）。
 # 管不到的：逐个打开开关、看自证红在点名的那一项（复跑方）——研究脚本与钩子那一半是 break-switch-replay 格（只复跑登记表里的），门禁阶段那一半是 stage-break-switch-replay 格。
 # 一份读开关的都没有：退 77。
-# 样本：break-switch-headers-red（一份读开关却没有表、一份一条没写弄坏哪一处、一份一条没点名的项、豁免表一行指到写全了的、一行指到不在的，逐条点名判红）；
-#   break-switch-headers-green（一份写全、一份登记在豁免表、一份只在注释里提开关不算读，报「读开关的 2 份：写全 1 份、豁免 1 份」）。
-# 弄坏开关 CODE_TOOLING_BREAK=switch-items-unchecked：不判点名的项，break-switch-headers-red 里「点名的项」那条 want 找不到。
+# 样本：break-switch-headers-red（一份读开关却没有表、一份一条没写弄坏哪一处、一份一条没点名的项、豁免表一行指到写全了的、一行指到不在的；
+#   复跑登记表点名 task-server/ 下两份，点名行都与开关行一样深，其中一份也登在豁免表里，逐条点名判红）；
+#   break-switch-headers-green（一份写全、一份登记在豁免表、一份只在注释里提开关不算读、一份在复跑登记表里写全，报「读开关的 3 份：写全 2 份、豁免 1 份」）；
+#   break-switch-headers-quote-unbalanced-red（一份点名的项里起头的括号没有收尾、一份多一个收尾的括号、一份「」成对且里面套着一层成对的；点名第 4 行与怎么改，报「2 处不对（读开关的 3 份：写全 1 份、豁免 0 份）」）。
+# 弄坏开关 CODE_TOOLING_BREAK=switch-items-unchecked：不判点名的项，break-switch-headers-red 里「点名的项」那条 want 找不到；
+#   headers-quotes-unpaired-unchecked：不判点名的项里「」配不配平，break-switch-headers-quote-unbalanced-red 判绿（期望退出 1，实测 0）；
+#   开关 headers-replay-files-unread（文件头那一条）打开时不读复跑登记表，break-switch-headers-red 里 task-server/ 那几条 want 找不到，break-switch-headers-green 的份数对不上。
+# 同一份文件头两格结论相同：读没读开关（reads_break_switch）、写全没写全（header_gaps）、红句（gap_sentence）、复跑登记表点名的文件（replay_registry_paths）
+#   都只在 BREAK_SWITCH_HEADER_LIBRARY 里写一份，这一格与 break-switch-replay 格开跑前的预检都调它；复跑格的红句是同一句前面加「复跑登记表:行号」。
+#   样本 break-switch-header-gap-red 两格一起跑：登记表点名的 task-server/shallow-items.py 开关那一条的点名行与开关行一样深（缩进不够），两格都红、红句点名 SHALLOW_BREAK=skip；
+#   弄坏开关 switch-items-unchecked、headers-replay-files-unread 打开时这一格的那条 want 找不到（复跑格另有 replay-header-gaps-unjudged）。
 cell_break_switch_headers() {
   local exempt=".claude/gate.d/break-switch-headers-exempt.tsv"
-  python3 - "$BREAK_SWITCH_TABLE_LIBRARY" "$exempt" "${CODE_TOOLING_BREAK:-}" <<'PY'
-import glob, os, re, sys, types
+  python3 - "$BREAK_SWITCH_TABLE_LIBRARY" "$exempt" "${CODE_TOOLING_BREAK:-}" "$BREAK_SWITCH_HEADER_LIBRARY" "$BREAK_SWITCH_REPLAY_JUDGE_LIBRARY" "$TREE_LISTING_LIBRARY" <<'PY'
+import glob, os, sys, types
+tree = types.ModuleType("lib_tree_listing")
+exec(compile(sys.argv[6], "tree-listing-library", "exec"), tree.__dict__)
 table = types.ModuleType("lib_break_switch_table")
 exec(compile(sys.argv[1], "break-switch-table-library", "exec"), table.__dict__)
+exec(compile(sys.argv[5], "break-switch-replay-judge-library", "exec"), table.__dict__)   # 复跑格读点名的项用的 quoted_items（点名的项里「」配不配平以它读出的为准）
+exec(compile(sys.argv[4], "break-switch-header-library", "exec"), table.__dict__)   # 读没读开关、写全没写全、「」配没配平、复跑登记表的取法：与 break-switch-replay 格同一份
 exempt_path, broken = sys.argv[2:4]
-READ = re.compile(r"\$\{?[A-Z][A-Z0-9_]*_BREAK\b|environ(?:\.get)?\s*[\(\[]\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']|getenv\(\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']"
-                  r"|^\s*[A-Z_][A-Z0-9_]*\s*=\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']", re.M)
-paths = sorted(path for directory in ("scripts", ".claude/hooks") for extension in ("sh", "py")
-               for path in glob.glob(f"{directory}/**/*.{extension}", recursive=True) if "/fixtures/" not in path)
+REPLAY_REGISTRY = ".claude/gate.d/break-switch-replay-files.tsv"   # break-switch-replay 格复跑的文件：它判没写全的，这一格同样判
+registered = set() if broken == "headers-replay-files-unread" else set(table.replay_registry_paths(REPLAY_REGISTRY))
+paths = sorted({path for directory in ("scripts", ".claude/hooks") for path in tree.files_under(directory, (".sh", ".py"), skipped=("target", "fixtures"))}
+               | {path for path in registered if os.path.isfile(path)})   # 指到不在的那一行归 break-switch-replay 格点名
 problems, exempt = [], {}
 if os.path.isfile(exempt_path):
     for number, line in enumerate(open(exempt_path, encoding="utf-8"), 1):
@@ -7992,23 +8876,17 @@ if os.path.isfile(exempt_path):
 readers, complete, exempted = [], [], []
 for path in paths:
     text = open(path, encoding="utf-8", errors="replace").read()
-    code = "\n".join(row for row in text.split("\n") if not row.lstrip().startswith("#"))
-    if not READ.search(code):
+    if not table.reads_break_switch(text):
         continue
     readers.append(path)
-    entries = table.switch_entries(text)
-    gaps = [(entry, [what for what in table.incomplete(entry) if not (what == "点名的项" and broken == "switch-items-unchecked")]) for entry in entries]
-    gaps = [(entry, missing) for entry, missing in gaps if missing]
-    written = bool(entries) and not gaps
-    if path in exempt:
+    gaps = table.header_gaps(text, ignored={"switch-items-unchecked": ("点名的项",), "headers-quotes-unpaired-unchecked": (table.QUOTES_PAIRED,)}.get(broken, ()))
+    written = not gaps
+    if path in exempt and path not in registered:
         exempted.append(path)
         if written:
             problems.append(f"{exempt_path}:{exempt[path]} {path} 的开关表已经三样写全了，豁免那一行删掉")
         continue
-    if not entries:
-        problems.append(f"{path}：代码里读了弄坏开关，文件头没有一条「X_BREAK=<值>  <弄坏哪一处>」再下一行起写点名的项的开关")
-    for entry, missing in gaps:
-        problems.append(f"{path}:{entry['line']} {entry['name']}={entry['value']} 缺{'、'.join(missing)}")
+    problems.extend(table.gap_sentence(path, gap) for gap in gaps)
     if written:
         complete.append(path)
 for path, number in sorted(exempt.items(), key=lambda item: item[1]):
@@ -8016,6 +8894,8 @@ for path, number in sorted(exempt.items(), key=lambda item: item[1]):
         problems.append(f"{exempt_path}:{number} 指到的 {path} 不在，那一行删掉")
     elif path not in readers:
         problems.append(f"{exempt_path}:{number} {path} 代码里不读弄坏开关了，那一行删掉")
+    elif path in registered:
+        problems.append(f"{exempt_path}:{number} {path} 在复跑登记表 {REPLAY_REGISTRY} 里，复跑那一格要判它的开关表，豁免不算数，那一行删掉、开关表写全")
 if not readers and not problems:
     print("  ! scripts/ 与 .claude/hooks/ 里没有读弄坏开关的脚本，这一格无对象可判")
     sys.exit(77)
@@ -8053,6 +8933,7 @@ import collections, contextlib, itertools, os, threading, time
 
 MEMORY_SAMPLE_SECONDS = 5      # 报进度的线程每过这么多秒（进度间隔更短时照进度间隔）采一次后代进程的内存，峰值只从这些采样里取
 LONGEST_RUNNING_SHOWN = 3      # 每次报总进度列出跑得最久的几趟
+MACHINE_PROGRESS_PREFIX = "TASK_SERVER_PROGRESS"      # 行首顶格的机读进度行的头（统一任务服务读它：done=<跑完几趟> total=<要跑几趟>）
 KIB_PER_MIB = 1024
 
 
@@ -8083,8 +8964,8 @@ def command_words(pid):
     return " ".join(words[:3])[:80] or "（读不到）"
 
 
-def descendants_of(root_pid):
-    """→ root_pid 的全部后代进程号（不含它自己），按 /proc/<进程号>/stat 的父进程号连；读的时候已经退了的不算。"""
+def children_map():
+    """→ {父进程号: [子进程号…]}：扫一遍 /proc/<进程号>/stat 的父进程号；读的时候已经退了的不算。"""
     children_of = collections.defaultdict(list)
     for name in os.listdir("/proc"):
         if not name.isdigit():
@@ -8098,12 +8979,22 @@ def descendants_of(root_pid):
         fields = stat[stat.rfind(b")") + 1:].split()
         if len(fields) >= 2 and fields[1].isdigit():
             children_of[int(fields[1])].append(int(name))
+    return children_of
+
+
+def subtree_of(children_of, root_pid):
+    """→ root_pid 的全部后代进程号（不含它自己），按 children_map 连。"""
     found, pending = [], list(children_of.get(root_pid, []))
     while pending:
         pid = pending.pop()
         found.append(pid)
         pending.extend(children_of.get(pid, []))
     return found
+
+
+def descendants_of(root_pid):
+    """→ root_pid 的全部后代进程号（不含它自己）。"""
+    return subtree_of(children_map(), root_pid)
 
 
 def cgroup_charge_kib():
@@ -8121,11 +9012,16 @@ class ReplayProgress:
     """开关复跑的逐条进度。item_done：每条判完打一行「<格名> 第 k / N 条<对上没有>：<哪一条>，用了 S 秒」（k 按判完的先后数）；
     start：打开跑那一行，另起一条线程，每过 interval_seconds 秒打一行总进度、跑得最久的几趟、extra_lines 给的行与一行内存，
     每过 MEMORY_SAMPLE_SECONDS 秒（进度间隔更短时照它）采一次后代进程的内存记峰值；close：停线程，打收尾一行（逐条进度几行、派出去几条、内存峰值）。
-    silent（弄坏开关 replay-progress-silent）：一行都不打、不起线程。行都以「·」起头、不带 ✗，打完立即冲出去
+    machine_readable：另在开跑时与每跑完一趟时打一行行首顶格的 TASK_SERVER_PROGRESS done=<跑完几趟> total=<要跑几趟>：一趟一报，判法等一份的趟齐了才集中判，
+    按判完的条数报，服务看到的是一阵一阵涨、按它推的预计用时偏长；trips 是开跑时要跑的趟数，trip_finished 每跑完一趟（取回的落盘趟算当场跑完）记一趟，
+    trips_added 是派出去之前加上的（要重跑的那一趟），trips_left 是改成「跑完的加还要跑的」（基准趟没过、开关一条没起的那几份扣掉）。
+    silent（弄坏开关 replay-progress-silent）：一行都不打、不起线程。行都以「·」起头、不带 ✗（机读行除外，它不带 ✗），打完立即冲出去
     （标准输出接到日志时 python 按块缓冲，不冲就要等整格跑完才落进日志，统一任务服务看日志满 10 分钟没涨就当卡住停掉）。"""
 
-    def __init__(self, cell, total, interval_seconds, silent, extra_lines=None):
+    def __init__(self, cell, total, interval_seconds, silent, extra_lines=None, machine_readable=False, trips=0):
         self.cell, self.total, self.interval_seconds, self.silent = cell, total, interval_seconds, silent
+        self.machine_readable = machine_readable
+        self.trips_total, self.trips_done = trips, 0   # 机读进度：要跑几趟、跑完几趟
         self.extra_lines = extra_lines or (lambda: [])
         self.sample_seconds = min(interval_seconds, MEMORY_SAMPLE_SECONDS)
         self.lock = threading.Lock()          # 管在跑的趟、计数与峰值；拿着它可以再拿 print_lock，反过来不许
@@ -8145,6 +9041,32 @@ class ReplayProgress:
             return
         with self.print_lock:
             print(f"  · {text}", flush=True)
+
+    def say_machine(self):
+        """机读进度一行，行首顶格（调用方拿着 self.lock 或还没起线程，跑完与要跑的趟数此刻不变）。"""
+        if self.silent or not self.machine_readable:
+            return
+        with self.print_lock:
+            print(f"{MACHINE_PROGRESS_PREFIX} done={self.trips_done} total={self.trips_total}", flush=True)
+
+    def trip_finished(self):
+        """跑完一趟（取回的落盘趟当场算跑完）：记一趟，打一行机读进度。"""
+        with self.lock:
+            self.trips_done += 1
+            self.say_machine()
+
+    def trips_added(self, count):
+        """要多跑 count 趟（派出去之前调）：要跑的趟数加上，打一行机读进度。"""
+        with self.lock:
+            self.trips_total += count
+            self.say_machine()
+
+    def trips_left(self, count):
+        """此刻还要跑 count 趟：要跑的趟数改成跑完的加 count，改了才打一行机读进度。"""
+        with self.lock:
+            if self.trips_total != self.trips_done + count:
+                self.trips_total = self.trips_done + count
+                self.say_machine()
 
     @contextlib.contextmanager
     def running(self, group, label):
@@ -8169,6 +9091,7 @@ class ReplayProgress:
         if self.silent:
             return
         self.say(headline)
+        self.say_machine()
         self.thread = threading.Thread(target=self.beat, daemon=True)
         self.thread.start()
 
@@ -8232,12 +9155,434 @@ class ReplayProgress:
 PY_SWITCH_REPLAY_PROGRESS
 )"
 
+# 开关复跑的并行度、指定范围与每趟的起法（break-switch-replay 格文件头「范围」「并行度」「每趟的进程组」；判定在格自己那一段）。装法照 BREAK_SWITCH_TABLE_LIBRARY：
+#   parallel_library = types.ModuleType("lib_switch_replay_parallelism"); exec(compile(<这一段>, "switch-replay-parallelism-library", "exec"), parallel_library.__dict__)
+# 起趟的 TripLauncher 也给 selftest-cells-alone 格用（同一份起法，不各写一份）。
+SWITCH_REPLAY_PARALLELISM_LIBRARY="$(cat <<'PY_SWITCH_REPLAY_PARALLELISM'
+import collections, contextlib, os, re, signal, subprocess, threading, time
+
+SAFE_SHARE_PERCENT = 75                    # jobs_for 按内存上限算并行时（只在弄坏开关 replay-jobs-by-memory、cells-alone-jobs-by-memory 下）可用内存给开关趟用的份额；其余留给门禁主进程、采样漏掉的短尖峰与开关趟比基准趟大的部分
+TRIP_STOP_GRACE_SECONDS = 3                # 对一趟的整组发 TERM 之后等它自己收尾的秒数，过了组里还有活的发 KILL；比 .claude/gate.d/lib/stage-cells.sh 收格的宽限（5 秒）短，门禁被停时这一层先把在跑的各趟收完
+TRIP_SETTLE_SECONDS = 1                    # 发 KILL 之后等组里退干净的秒数；过了还在的记「停不掉」，这一趟占的内存额度不还
+TRIP_EXIT_SETTLE_SECONDS = 2               # 一趟直接起的那一个退出之后，等组里别的进程自己退的秒数；过了还在的记「留下进程」，停整组
+TRIP_POLL_SECONDS = 0.5                    # 等一趟时每隔这么久醒一次：看到没到点、门禁收没收到停的信号、直接起的那一个退了没有
+TRIP_STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+COMMAND_LINE_SHOWN = 120                   # 留下的进程逐个写进失败信息时，命令行只写前这么多个字符
+JOBS_WITHOUT_MEMORY_LIMIT = 4              # 读不到内存上限、或上限是 max 时的并行条数（不超过登记的每台默认重活线程数）
+TRIP_MEMORY_FALLBACK_BYTES = 4 * 2 ** 30   # 基准趟没量到进程树峰值时一趟的内存：整份 task_server_lib.py 自证一趟的 Pss 合计量到约 3.8 GiB，取整到 4 GiB
+MIN_TRIP_BYTES = 64 * 2 ** 20              # 量到的一趟再小也按这个数占额度（一个解释器加几个子进程）
+METER_INTERVAL_SECONDS = 0.25              # 量进程树峰值的采样间隔
+MEBIBYTE = 2 ** 20
+SELECTION_VARIABLE = re.compile(r"\b([A-Z][A-Z0-9_]*_SELFTEST_CELLS)=<格名")
+CELL_IN_ITEM = re.compile(r"自证[：\s]([a-z0-9]+(?:-[a-z0-9]+)*)：")
+CELL_IN_ITEM_COLON_ONLY = re.compile(r"自证：([a-z0-9]+(?:-[a-z0-9]+)*)：")
+KNOB_FILE = ".break-switch-replay-jobs"
+
+
+def selection_variable(text):
+    """这份脚本有选格手段吗：文件里写着「<名字>_SELFTEST_CELLS=<格名…」的，交那个环境变量名（设成逗号隔开的格名，自证只跑点名的格）；没有交 None。"""
+    found = SELECTION_VARIABLE.search(text)
+    return found.group(1) if found else None
+
+
+def cells_in(item, broken=None):
+    """一条点名的项（失败行句首）里的格名：「自证：<格名>：」或「✗ 自证 <格名>：」里的那一段，一项里写几处取几处。
+    弄坏开关 replay-cell-name-colon-only 下只认冒号那一种，「✗ 自证 <格名>：」读不出格名（那条开关与基准趟整份起）。"""
+    return (CELL_IN_ITEM_COLON_ONLY if broken == "replay-cell-name-colon-only" else CELL_IN_ITEM).findall(item)
+
+
+def parse_knobs(text):
+    """样本根的 .break-switch-replay-jobs（一行一项「键=值」，空行与 # 开头的行不算）→ {键: 值}：memory-max 写字节数、max 或 unreadable，threads 写正整数。写错抛 ValueError。"""
+    knobs = {}
+    for row in text.split("\n"):
+        row = row.strip()
+        if not row or row.startswith("#"):
+            continue
+        key, _separator, value = row.partition("=")
+        number = value.isdigit() and int(value) > 0
+        if not (key == "memory-max" and (number or value in ("max", "unreadable")) or key == "threads" and number):
+            raise ValueError(f"{KNOB_FILE} 里的「{row}」读不出来（要写 memory-max=<字节数|max|unreadable> 或 threads=<正整数>）")
+        knobs[key] = value
+    return knobs
+
+
+def limiting_cgroup(cgroup_file="/proc/self/cgroup", cgroup_root="/sys/fs/cgroup"):
+    """→ (那一层的目录或 None, 字节数或 None, 说明)：本进程所在的 cgroup 一路到根，memory.max 里数字最小的那一层；
+    一层数字都没有：读成过的都是 max → (None, None, 是 max)，一层也没读成 → (None, None, 读不到)。"""
+    try:
+        with open(cgroup_file, encoding="utf-8") as handle:
+            relative = next(row.rstrip("\n")[3:] for row in handle if row.startswith("0::"))
+    except (OSError, StopIteration) as error:
+        return None, None, f"读不到（本进程的 cgroup 路径读不出：{error!r}）"
+    path, readable, numbers = relative.rstrip("/"), 0, []
+    while True:
+        try:
+            with open(f"{cgroup_root}{path}/memory.max", encoding="utf-8") as handle:
+                text = handle.read().strip()
+        except OSError:
+            text = None
+        if text is not None:
+            readable += 1
+            if text.isdigit():
+                numbers.append((int(text), f"{cgroup_root}{path}"))
+        if not path:
+            break
+        path = path.rsplit("/", 1)[0]
+    if numbers:
+        limit, directory = min(numbers)
+        return directory, limit, f"cgroup {relative} 一路到根的 memory.max 里最小的"
+    if readable:
+        return None, None, "是 max（沿 cgroup 往上都没设上限）"
+    return None, None, "读不到（memory.max 一层也没读成）"
+
+
+def cgroup_memory_limit(cgroup_file="/proc/self/cgroup", cgroup_root="/sys/fs/cgroup"):
+    """→ (字节数或 None, 说明)：limiting_cgroup 那一层的 memory.max。"""
+    return limiting_cgroup(cgroup_file, cgroup_root)[1:]
+
+
+def memory_limit_of(knobs):
+    """→ (字节数或 None, 说明)：样本根的 .break-switch-replay-jobs 写了 memory-max 就用它，否则读本进程的 cgroup。"""
+    value = knobs.get("memory-max")
+    if value is None:
+        return cgroup_memory_limit()
+    if value == "max":
+        return None, "是 max（没设上限）"
+    if value == "unreadable":
+        return None, f"读不到（样本根的 {KNOB_FILE} 写了 unreadable）"
+    return int(value), f"样本根的 {KNOB_FILE}"
+
+
+def budget_of(limit_bytes):
+    """这一趟可用内存里给开关趟用的那一份（字节）。"""
+    return limit_bytes * SAFE_SHARE_PERCENT // 100
+
+
+def jobs_for(threads, limit_bytes, trip_bytes):
+    """按内存上限算的并行条数 = min(登记的每台默认重活线程数, ⌊份额 ÷ 每趟内存⌋)，至少 1；内存上限读不到或是 max（limit_bytes 是 None）：不超过线程数的 JOBS_WITHOUT_MEMORY_LIMIT 条。
+    break-switch-replay、selftest-cells-alone 两格只在弄坏开关 replay-jobs-by-memory、cells-alone-jobs-by-memory 下用它（两格并行都取登记的线程数，各自文件头「并行度」「并行」）。"""
+    if limit_bytes is None:
+        return min(threads, JOBS_WITHOUT_MEMORY_LIMIT)
+    return min(threads, max(1, budget_of(limit_bytes) // trip_bytes))
+
+
+class TripHold:
+    """Admission.slot 交给调用方的那一个：keep 置真时出去不还这一趟的内存额度（组里还有停不掉的进程，内存还占着）。"""
+    __slots__ = ("keep",)
+
+    def __init__(self):
+        self.keep = False
+
+
+class Admission:
+    """起一趟自证之前过的关：同时在跑的不超过 max_running 趟，在跑的各趟内存估计之和加上要进来的这一趟不超过 budget_bytes（None 是不按内存限）；
+    一趟都没在跑时不看估计，放一趟进来（至少 1 条）。
+    内存估计：开跑前一份脚本的每一趟都是登记值（default_bytes）；基准趟跑完换成它量到的进程树峰值；这份脚本有一趟开关趟跑完之后，
+    每趟按「每个单位占的最大字节 × 这一趟的单位数」算（单位是只起点名的格：一趟起几格就几个单位，整份起的趟是一个单位；
+    每个单位占的是这份已跑完的开关趟里峰值除以单位数的最大值，比整份的基准趟小得多，起的格多的趟也不会被低估）。
+    还名额：slot 等调用方那一趟返回才还（TripLauncher.run 核完组里一个不剩才返回）；调用方把 slot 交的 TripHold.keep 置真的，位置还、内存额度不还（一直算在 reserved 里）。"""
+
+    def __init__(self, budget_bytes, max_running, paths, default_bytes):
+        self.condition = threading.Condition()
+        self.budget_bytes, self.max_running = budget_bytes, max_running
+        self.baseline_bytes = {path: default_bytes for path in paths}
+        self.per_unit = {}
+        self.running, self.reserved = 0, 0
+
+    def cost(self, path, units):
+        if path in self.per_unit:
+            return max(MIN_TRIP_BYTES, self.per_unit[path] * units)
+        return self.baseline_bytes[path]
+
+    def fits(self, path, units):
+        if self.running >= self.max_running:
+            return False
+        if self.budget_bytes is None or not self.running:
+            return True
+        return self.reserved + self.cost(path, units) <= self.budget_bytes
+
+    @contextlib.contextmanager
+    def slot(self, path, units=1):
+        """占一个位置跑一趟（这一趟起 units 个单位）：位置不够就等；占的是进来那一刻的估计，出去时按同一个数还（交出去的 TripHold.keep 置真的不还）。"""
+        with self.condition:
+            while not self.fits(path, units):
+                self.condition.wait()
+            cost = self.cost(path, units)
+            self.running += 1
+            self.reserved += cost
+        hold = TripHold()
+        try:
+            yield hold
+        finally:
+            with self.condition:
+                self.running -= 1
+                if not hold.keep:
+                    self.reserved -= cost
+                self.condition.notify_all()
+
+    def observe(self, path, is_baseline, units, peak_kib):
+        """一趟跑完，量到的进程树峰值（KiB，没量到是 None）换进这份脚本的估计。"""
+        if peak_kib is None:
+            return
+        measured = max(MIN_TRIP_BYTES, peak_kib * 1024)
+        with self.condition:
+            if is_baseline:
+                self.baseline_bytes[path] = measured
+            else:
+                self.per_unit[path] = max(self.per_unit.get(path, 0), measured // max(1, units))
+            self.condition.notify_all()
+
+
+def process_table():
+    """→ ({父进程号: [子进程号…]}, {进程组号: [进程号…]})：扫一遍 /proc/<进程号>/stat；读的时候已经退了的与僵尸不算。"""
+    children_of, members_of = collections.defaultdict(list), collections.defaultdict(list)
+    for name in os.listdir("/proc"):
+        if not name.isdigit():
+            continue
+        try:
+            with open(f"/proc/{name}/stat", "rb") as handle:
+                stat = handle.read()
+        except OSError:
+            continue
+        # 命令名在括号里、自己可以带空格与括号：取最后一个「)」之后的字段：状态、父进程号、进程组号
+        fields = stat[stat.rfind(b")") + 1:].split()
+        if len(fields) < 3 or fields[0] in (b"Z", b"X") or not (fields[1].isdigit() and fields[2].isdigit()):
+            continue
+        children_of[int(fields[1])].append(int(name))
+        members_of[int(fields[2])].append(int(name))
+    return children_of, members_of
+
+
+class TripMeter:
+    """起的每一趟自证的内存峰值：一条线程每隔 METER_INTERVAL_SECONDS 秒扫一遍 /proc，把在看的每个根进程底下整棵树与它那个进程组里的进程
+    （TripLauncher 起的每趟自成一组，组号就是根的进程号；父进程没了、被收养走的照算）的 Pss 加起来记最大。
+    采样量不到比间隔短的尖峰，峰值是下限（份额里留了余量）；一趟比一次采样间隔还短，release 交 None。progress 是开关复跑的逐条进度库（读 Pss 的函数在里面）。"""
+
+    def __init__(self, progress, interval_seconds=METER_INTERVAL_SECONDS):
+        self.progress, self.interval_seconds = progress, interval_seconds
+        self.lock = threading.Lock()
+        self.peaks = {}
+        self.stop = threading.Event()
+        self.thread = None
+
+    def watch(self, pid):
+        with self.lock:
+            self.peaks[pid] = 0
+            if self.thread is None:
+                self.thread = threading.Thread(target=self.loop, daemon=True)
+                self.thread.start()
+
+    def release(self, pid):
+        with self.lock:
+            peak = self.peaks.pop(pid, 0)
+        return peak or None
+
+    def loop(self):
+        while not self.stop.wait(self.interval_seconds):
+            self.sample()
+
+    def sample(self):
+        with self.lock:
+            roots = list(self.peaks)
+        if not roots:
+            return
+        try:
+            children_of, members_of = process_table()
+        except OSError:
+            return
+        for root in roots:
+            total, seen = 0, False
+            for pid in {root, *self.progress.subtree_of(children_of, root), *members_of.get(root, ())}:
+                kib = self.progress.proportional_kib(pid)
+                if kib is not None:
+                    total, seen = total + kib, True
+            with self.lock:
+                if seen and root in self.peaks and total > self.peaks[root]:
+                    self.peaks[root] = total
+
+    def close(self):
+        self.stop.set()
+        if self.thread is not None:
+            self.thread.join()
+
+
+def described(pid):
+    """「<进程号> <命令行前 COMMAND_LINE_SHOWN 个字符>」：留下的进程逐个写进失败信息用。"""
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as handle:
+            command_line = handle.read().replace(b"\0", b" ").decode("utf-8", errors="replace").strip()
+    except OSError:
+        command_line = "（读不到命令行）"
+    return f"{pid} {command_line[:COMMAND_LINE_SHOWN]}"
+
+
+def group_members(group_id):
+    """这个进程组里还没退出的进程号（僵尸不算），按 /proc 里的进程组号认。"""
+    return sorted(process_table()[1].get(group_id, ()))
+
+
+def wait_group_empty(group_id, seconds):
+    """等这个进程组退干净，至多 seconds 秒 → 到点还在的进程号（空列表是退干净了）。"""
+    deadline = time.monotonic() + seconds
+    members = group_members(group_id)
+    while members and time.monotonic() < deadline:
+        time.sleep(0.1)
+        members = group_members(group_id)
+    return members
+
+
+class TripLauncher:
+    """起一趟自证（命令、环境、限时由调用方给），.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」：
+    放进它自己的会话与进程组（start_new_session，组号就是直接起的那一个的进程号）；
+    到点：对整组先 TERM，过 TRIP_STOP_GRACE_SECONDS 秒组里还有活的（僵尸不算）再 KILL，打一行「到点停整组」；
+    直接起的那一个退出之后：等至多 TRIP_EXIT_SETTLE_SECONDS 秒，组里还有进程的逐个记进失败信息（「留下进程」），再照上面停整组；
+    门禁收到 TERM、INT、HUP（install_stop_on_signals 装的处理）：在跑的各趟至多 TRIP_POLL_SECONDS 秒后醒来照上面停自己那一组，还没起的不再起；
+    停完再等至多 TRIP_SETTLE_SECONDS 秒、按进程组号在 /proc 里核组里一个不剩，还在的记「停不掉」（stuck）。
+    run 等核完才返回：调用方在 Admission.slot 里调它，名额核清才还；stuck 不空时调用方把 TripHold.keep 置真，内存额度不还。
+    对组发信号之前先在 /proc 里核组里还有进程：组里一个都没有时组号可能已经不归这一趟，不发。
+    管不到的：自己换了会话或进程组的后代（不在这一组里，停不到也核不到）。
+    say 打「到点停整组」那一行。leader_only（弄坏开关 replay-trip-leader-only-stopped）：不开新会话，到点只 kill 直接起的那一个、不收组、不核，返回之后名额当场还。"""
+
+    def __init__(self, say, leader_only=False):
+        self.say, self.leader_only = say, leader_only
+        self.stop_requested = threading.Event()
+        self.stop_signal = []
+
+    def install_stop_on_signals(self):
+        """在主线程装 TERM、INT、HUP 的处理（开池之前调；不在主线程交 False、什么都不装）：记下收到了，在主线程抛 SystemExit(128 + 信号号)。"""
+        if threading.current_thread() is not threading.main_thread():
+            return False
+
+        def stop(signal_number, _frame):
+            self.stop_signal.append(signal_number)
+            self.stop_requested.set()
+            raise SystemExit(128 + signal_number)
+
+        for signal_number in TRIP_STOP_SIGNALS:
+            signal.signal(signal_number, stop)
+        return True
+
+    def stop_exit(self):
+        return SystemExit(128 + (self.stop_signal[0] if self.stop_signal else signal.SIGTERM))
+
+    def stop_group(self, group_id):
+        """对这一组先 TERM，过 TRIP_STOP_GRACE_SECONDS 秒还有活的再 KILL → (发 TERM 时组里几个, 发 KILL 时还有几个)。组里一个都没有就不发。"""
+        members = group_members(group_id)
+        if not members:
+            return 0, 0
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(group_id, signal.SIGTERM)
+        remaining = wait_group_empty(group_id, TRIP_STOP_GRACE_SECONDS)
+        if remaining:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(group_id, signal.SIGKILL)
+        return len(members), len(remaining)
+
+    def run(self, command, environment, seconds, label, meter=None, merge_stderr=False, **popen):
+        """起一趟 → {"timeout": 到点没跑完, "code": 直接起的那一个的退出码（到点是 None）, "stdout", "stderr"（merge_stderr 时是 None）,
+        "problem": 留下进程与停不掉的拼成的一句（都没有是空串）, "stuck": 停不掉的那几个, "peak_kib": meter 量到的峰值}。popen 照传给 Popen（text 这类）。"""
+        if self.stop_requested.is_set():
+            raise self.stop_exit()
+        error_stream = subprocess.STDOUT if merge_stderr else subprocess.PIPE
+        empty = "" if popen.get("text") else b""
+        if self.leader_only:
+            timed_out = False
+            with subprocess.Popen(command, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=error_stream, **popen) as process:
+                if meter is not None:
+                    meter.watch(process.pid)
+                try:
+                    stdout, stderr = process.communicate(timeout=seconds)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+                    stdout, stderr, timed_out = empty, empty, True
+            return {"timeout": timed_out, "code": None if timed_out else process.returncode, "stdout": stdout, "stderr": stderr,
+                    "problem": "", "stuck": [], "peak_kib": meter.release(process.pid) if meter is not None else None}
+        with subprocess.Popen(command, env=environment, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=error_stream,
+                              start_new_session=True, **popen) as process:
+            if meter is not None:
+                meter.watch(process.pid)
+            outputs, timed_out, left = None, False, []
+            deadline = time.monotonic() + seconds
+            try:
+                while True:
+                    if self.stop_requested.is_set():
+                        raise self.stop_exit()
+                    try:
+                        outputs = process.communicate(timeout=max(0.0, min(TRIP_POLL_SECONDS, deadline - time.monotonic())))
+                        break
+                    except subprocess.TimeoutExpired:
+                        if time.monotonic() >= deadline:
+                            timed_out = True
+                            break
+                        if process.poll() is not None:   # 直接起的那一个退了，管道还被组里别的进程拿着
+                            break
+            except BaseException:
+                self.stop_group(process.pid)
+                raise
+            if timed_out:
+                term_count, kill_count = self.stop_group(process.pid)
+            else:
+                remaining = wait_group_empty(process.pid, TRIP_EXIT_SETTLE_SECONDS)
+                if remaining:
+                    left = [described(pid) for pid in remaining]
+                    self.stop_group(process.pid)
+            if outputs is None:
+                try:
+                    outputs = process.communicate(timeout=TRIP_SETTLE_SECONDS)
+                except subprocess.TimeoutExpired:   # 管道还被组外的进程拿着：不再等，收到的不要了
+                    for stream in (process.stdout, process.stderr):
+                        if stream is not None:
+                            stream.close()
+                    process.wait()
+                    outputs = (empty, None if merge_stderr else empty)
+            stuck = [described(pid) for pid in wait_group_empty(process.pid, TRIP_SETTLE_SECONDS)]
+        if timed_out:
+            self.say(f"到点停整组：{label}，限时 {seconds} 秒；发 TERM 时组里 {term_count} 个，过 {TRIP_STOP_GRACE_SECONDS} 秒还有 {kill_count} 个"
+                     + ("、发了 KILL" if kill_count else "") + "；"
+                     + (f"组里还剩 {len(stuck)} 个停不掉，这一趟的内存额度不还" if stuck else "组里一个不剩之后才还这一趟的名额"))
+        parts = []
+        if left:
+            parts.append(f"退出之后它起的进程还留着 {len(left)} 个（等了 {TRIP_EXIT_SETTLE_SECONDS} 秒，已对整组 TERM、过 {TRIP_STOP_GRACE_SECONDS} 秒 KILL）：{'；'.join(left)}")
+        if stuck:
+            parts.append(f"收组之后组里还剩 {len(stuck)} 个停不掉的进程（这一趟的内存额度不还）：{'；'.join(stuck)}")
+        return {"timeout": timed_out, "code": None if timed_out else process.returncode, "stdout": outputs[0], "stderr": outputs[1],
+                "problem": "，".join(parts), "stuck": stuck, "peak_kib": meter.release(process.pid) if meter is not None else None}
+PY_SWITCH_REPLAY_PARALLELISM
+)"
+
 # ── 格 stage-break-switch-replay：还 checks-owed.md C639（门禁阶段的弄坏开关没有复跑方）。
 # 判据：被判的根里 .claude/gate.d/ 顶层每道有样本目录的阶段，文件头开关表（mutate.sh 写法，读法在 BREAK_SWITCH_TABLE_LIBRARY；点名的项写样本目录名）逐条：
 #   在环境里设上那个开关，经这一道所在仓里的 .claude/singlefs-ai-sop/scripts/stage-selftest.sh <根>/.claude/gate.d --item <阶段> 喂这一道的全部样本，
 #   判错的样本集合（stage-selftest 报「✗ <阶段> <样本> …」的那几份）要与那一条点名的样本目录名集合相等；不等判红，逐条列多出与少了的。
 #   开关表一条都读不出、或有一条没写全的阶段判红。被喂的样本根里都有 .gate-cells 或 .gate-break-sample（C622：开关只在样本根上认）。
-#   各条互不依赖、各起各的 stage-selftest（样本各拷各的临时目录），按每台默认重活线程数并行，收回的条数与派出去的对不上整格红。
+#   头注读不出判红：注释行里 # 之后头一个词是 <名字以 _BREAK 结尾的变量>=，读法却不认它是一条开关（值写错、值后面只隔一个空格接着写字），那一条就悄悄不复跑，判红、点名文件:行。
+#   不算的：句中提到开关的（「弄坏开关 X_BREAK=值 下……」）、占位写法（X_BREAK=<项>）、不是注释的代码行。
+#   样本 stage-break-switch-replay-unread-row-red（小阶段头注里一行值后面只隔一个空格）、stage-break-switch-replay-unread-row-green（句中提到的、占位的与代码行都有，判绿）。
+#   弄坏开关 CODE_TOOLING_BREAK=stage-unread-rows-unchecked：不判这一条，stage-break-switch-replay-unread-row-red 判绿（期望退出 1，实测 0）。
+#   各条互不依赖、各起各的 stage-selftest（样本各拷各的临时目录），同时跑几条照下面「并行度」，收回的条数与派出去的对不上整格红。
+# 并行度（records/2026-10-29-subagent拆分提案.md「二百一十九、任务按核开满」：按核开满）：同时跑的条数取登记的每台默认重活线程数（.claude/heavy-thread-default），
+#   不按内存收，理由同 break-switch-replay 格「并行度」（准许按内存上限定并发的入口登记在 .claude/memory-bounded-parallelism.tsv，这一格不在里面）：
+#   内存上限由 task-server 照这条命令的记录给、照以往一路跑的峰值定，照它收并行就永远收在一路、也永远撞不上上限、服务也就不放大；
+#   撞了上限服务照乘 1.5 放大、重排这一条，第二趟只补没判的（下面「按条复用」：一条判完就记）。
+#   外层同时跑的条数 × 每条 stage-selftest 的 --jobs 不超过每台默认重活线程数：外层路数的上限 = min(每台默认重活线程数, 要现判的条数)，
+#   里层每条 stage-selftest 带 --jobs ⌊每台默认重活线程数 ÷ 外层路数的上限⌋（至少 1）；同时跑的条数就是外层路数的上限。
+#   stage-selftest 喂的每份样本里，阶段自己再开的并行不在这笔账里：样本的期望写着登记的线程数，不能经环境变量往下收，这一层收不住。
+#   内存只写进开跑前那一行：这一台能给的取 scripts/hosts/task_memory.py 的 host_slice_cap_bytes（多机配置 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项），
+#   这一条拿到的上限取同一份的 task_memory_cap_bytes（服务交的 TASK_SERVER_MEMORY_CAP_BYTES，再到多机配置那一项），取不到照写从哪没取到。
+#   打的行：开跑前「并行度：同时最多 N 条（登记的每台默认重活线程数 T 条；这一台能给的 …；这一条拿到的上限 …；由服务定、撞了服务照乘 1.5 放大重排，不按它收并行）；
+#   每条 stage-selftest --jobs M；外层 N 条 × 里层 M = P（不超过每台默认重活线程数 T）」；收尾「同时在跑最多 K 条（同时最多 N 条）」（K 是实测的）。
+#   样本根的 .stage-break-switch-replay-memory（一行一项 capacity=<字节>、hard-cap=<字节>、threads=<正整数>、peak:<阶段文件名>=<字节>）顶替这一台能给的、这一条拿到的上限、
+#   每台默认重活线程数与那一道阶段每条开关开满时的峰值（峰值只给弄坏开关 stage-replay-jobs-by-memory 用）；样本根上没有这份文件时内存两样都当取不到。写错一行判红、一条都不起。
+#   样本 stage-break-switch-replay-jobs-registered-green（这一台能给 1 TiB、这一条拿到的上限 2.5 GiB、峰值 1 GiB、线程 3；四条开关、每条的小阶段两份样本各睡 2 秒：
+#   同时最多 3 条、同时在跑最多 3 条、每条 --jobs 1，外层 3 条 × 里层 1 = 3）；stage-break-switch-replay-jobs-registered-red（同一组并行度、同一道小阶段，
+#   invert-all 那一条点名的样本少写了 slot-red：只那一条点名的与实测不等，1 处不对）；stage-break-switch-replay-threads-split-green（能给 1 TiB、峰值 1 GiB、线程 9：
+#   四条开关，外层 4 条 × 里层 --jobs 2 = 8，不超过 9）；stage-break-switch-replay-memory-knob-red（那份文件里一行读不出，判红）。
+#   弄坏开关 CODE_TOOLING_BREAK=stage-replay-jobs-by-memory：同时跑的条数再照份额（这一台能给的与这一条拿到的上限里小的，扣掉本进程此刻的用量）÷ 样本根写的那道阶段的峰值收，
+#   -jobs-registered-green 与 -jobs-registered-red 同时最多 2 条、判红；stage-replay-inner-jobs-unset：stage-selftest 不带 --jobs，
+#   -jobs-registered-green 里「每条 stage-selftest --jobs 1」与 threads-split-green 里「--jobs 2」那两条 want 找不到；stage-replay-inner-threads-uncapped：里层 --jobs 仍取每台默认重活线程数、
+#   不按外层路数分，-jobs-registered-green 与 -jobs-registered-red 里「外层 3 条 × 里层 1 = 3」、threads-split-green 里「外层 4 条 × 里层 2 = 8」那几条 want 找不到；
+#   stage-replay-memory-knob-unchecked：读不出的行悄悄跳过，memory-knob-red 退 77（期望 1）。
 # 不复跑的（逐条报本次未跑，往 $GATE_NOT_RUN_FILE 报一行）：
 #   .claude/hooks/selftest-registry.tsv 里这一道的样本档没登记成 samples 的（样本档在登记表里才复跑）；
 #   .claude/gate.d/stage-break-switch-replay-exempt.tsv 登记的（「<阶段文件名><TAB><开关=值，或 * 整道><TAB># 理由>」：头注还不是这种写法，
@@ -8245,7 +9590,7 @@ PY_SWITCH_REPLAY_PROGRESS
 # 一道有样本目录的阶段都没有：退 77。真仓上一趟约 700 条，每条把那一道的全部样本串着喂一遍；第二台跑完整格的两趟是 695 条 5409 秒、704 条 2392 秒
 #   （任务 3630、3922 的日志），整格要四十分钟到一个半小时。
 # 进度（.claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」的进度间隔 5 分钟；写法在 SWITCH_REPLAY_PROGRESS_LIBRARY）：开跑打一行「stage-break-switch-replay 开跑：」
-#   （条数、阶段数、并行度）；每条判完打一行「stage-break-switch-replay 第 k / N 条<对上、没对上（点名的样本与实测不符）或没跑成（stage-selftest.sh 退 c）>：<阶段> <开关>，用了 S 秒」；
+#   （条数、阶段数、同时最多几条）；每条判完打一行「stage-break-switch-replay 第 k / N 条<对上、没对上（点名的样本与实测不符）或没跑成（stage-selftest.sh 退 c）>：<阶段> <开关>，用了 S 秒」；
 #   另起一条线程每过 300 秒打一行总进度（判完几条、在跑几趟）、跑得最久的三趟与一行内存（后代进程数、Pss 合计、cgroup 记账、到此刻的峰值），
 #   每 5 秒采一次内存；收尾打一行「stage-break-switch-replay 逐条进度 R 行、派出去 N 条；」加内存峰值、峰值那一刻在跑的按阶段计数与单个最大的进程。
 #   样本根里的 .stage-break-switch-replay-progress-seconds（一个正整数秒数）顶替 300 秒；写的不是正整数判红、一条都不跑（switch_replay_progress_seconds）。
@@ -8270,9 +9615,12 @@ PY_SWITCH_REPLAY_PROGRESS
 #   ③ line:switch=<开关名>=<值>；④ line:named=<点名的样本，排好用逗号连>（文件头是注释，不进单元指纹，另进这一行）；
 #   ⑤ line:samples=<它喂的 fixtures/<阶段>/ 整棵的摘要：每个目录、每份文件的相对路径、执行位与内容、每个链接的指向>；
 #   ⑥ line:feeder=<喂样本的 stage-selftest.sh、它旁边的 lib.sh 与临时服务包装三份内容的摘要>。
-#   键相同、库里记着绿的不起（复用）；键对不上的、库里记着红的（原因以「上次判红」起头）现判；拒算的（闭包收不全）照起、不记库。
+#   键相同、库里记着绿的不起（复用）；键对不上的、库里记着红的（原因以「上次判红」起头）现判；拒算的（闭包收不全）照共用段开跑前判红、一条都不起（UNIT_VERDICT_ROUNDS_LIBRARY 的 ItemVerdicts.stop_on_refusals）。
 #   每趟开跑前 verdict-plan 抽复用哨兵、强制现判一条（种子打进日志；被判的根下有 .unit-verdict-sample/ 的样本不抽）；哨兵被现判、强制现判那一条与库里的不同，交 plan-failure 判红。
 #   一条判完就记：判绿记绿，判红照同一把键记红、撤掉原有的绿（verdict-record --red-names）；收尾把这一趟判完的整份再交一次（哨兵在那一趟比）。
+#   中途被打断，判完的那几条都在库里，同一条命令重跑就是续跑、只补没判的（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」）：
+#   样本 stage-break-switch-replay-interrupted-resume（同一份判定库上三趟，code_tooling_interrupted_rounds：判完一条就停，第二趟现判 2、复用 1，第三趟全部复用）。
+#   弄坏开关 CODE_TOOLING_BREAK=stage-replay-recorded-at-end：只在收尾记，第二趟现判 3，「现判 2、复用 1」那条 want 找不到。
 #   成功句报「按条复用：现判 N、复用 M、拒算 R」；全部复用时报「全部复用，这一格一条都没起」、退 0。算不出（verdict-plan 退非 0、没打 PLAN）照全部现判跑完、判红；
 #   prune-server 不可用（退 75）一条都不起、这一格退 75。
 #   逐项点名（这一道「逐项点名」一节）：项是 <阶段文件名> 或 <阶段文件名>:<开关名>=<值>，只算、只起点到的那几条，键与判法照整格。
@@ -8282,6 +9630,10 @@ PY_SWITCH_REPLAY_PROGRESS
 #     判红记红、撤绿，再算一次计划：复用 1 条、现判 1 条、原因「上次判红」）；stage-break-switch-replay-item-green、stage-break-switch-replay-item-unknown（逐项点名）。
 #   弄坏开关（文件头开关表）CODE_TOOLING_BREAK=replay-plan-ignored、replay-red-not-recorded、stage-replay-samples-unkeyed、stage-replay-key-whole-gate-directory、
 #     items-ignored、item-unknown-accepted，各红在开关表点名的样本。
+#   跑成了而点名的与实测不等的条，汇总前重算键（ItemVerdicts.key_changes，写法在共用段上方的注释）：与开跑前算的不同，那一条的失败行接「跑的过程中键变了（开跑前算的键、现在的键）：
+#     组成清单有 N 处不同：…；出路：在冻结快照树里重判…」，键没变的失败行不变；这一趟没有这样的条就一个进程都不多起。
+#   样本 stage-break-switch-replay-key-changed-red（那道小阶段每被喂一次，往这一棵树里自己的样本目录 fixtures/<阶段>/ 下追加一个文件：swallow-red 点错，键在跑的过程中变了）；
+#     键没变的在 stage-break-switch-replay-red 里报「键变了 0 条」。弄坏开关 CODE_TOOLING_BREAK=key-change-not-rechecked、key-change-noted-always，各红在开关表点名的样本。
 cell_stage_break_switch_replay() {
   [[ -d .claude/gate.d/fixtures ]] || { echo "  ! 没有 .claude/gate.d/fixtures，这一格无对象可判"; exit 77; }
   local jobs
@@ -8300,7 +9652,7 @@ cell_stage_break_switch_replay() {
   if [[ -f "$STAGE_REPOSITORY/scripts/prune-server/prune_server_client_selftest.py" && "${CODE_TOOLING_BREAK:-}" != stage-replay-binary-not-passed ]]; then
     stage_replay_scratch="$(mktemp -d)" || { echo "  ✗ 建不了放 prune-server 二进制的临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格；一条开关都没起。"; exit 1; }
     if ! stage_replay_binary="$(code_tooling_prune_server_binary "$stage_replay_scratch" 2>"$stage_replay_scratch/server-binary.err")"; then
-      echo "  ✗ 取不到 prune-server 二进制（$(tail -n 3 "$stage_replay_scratch/server-binary.err" | tr '\n' ' ' | cut -c1-400)），每条开关起的 stage-selftest.sh 要套在临时服务底下，一条开关都没起"
+      echo "  ✗ 取不到 prune-server 二进制（$(tail -n 3 "$stage_replay_scratch/server-binary.err" | tr '\n' ' ' | clip_text 400)），每条开关起的 stage-selftest.sh 要套在临时服务底下，一条开关都没起"
       echo "     → 怎么办：修好 prune-server/ 的编译（cargo build --release --offline --manifest-path prune-server/Cargo.toml --bin prune-server）再跑这一格；或设 PRUNE_SERVER_BINARY=<编好的二进制的绝对路径>。"
       rm -rf -- "$stage_replay_scratch"
       exit 1
@@ -8309,6 +9661,8 @@ cell_stage_break_switch_replay() {
   # 复用三问（这一格文件头「按条复用」的样本）：样本根带 .unit-verdict-sample/three-questions/ 的，同一份判定库上跑四趟、判三问
   if judged_root_is_sample && [[ -d .unit-verdict-sample/three-questions ]]; then
     code_tooling_three_question_rounds stage-break-switch-replay stage_break_switch_replay_pass; stage_replay_exit=$?
+  elif judged_root_is_sample && [[ -f .unit-verdict-sample/interrupted-resume/stop-after ]]; then
+    code_tooling_interrupted_rounds stage-break-switch-replay stage_break_switch_replay_pass; stage_replay_exit=$?
   else
     stage_break_switch_replay_pass ""; stage_replay_exit=$?
   fi
@@ -8322,7 +9676,7 @@ stage_break_switch_replay_pass() {
     "$ROOT" "$jobs" "$STAGE_NAME" "${CODE_TOOLING_BREAK:-}" "${GATE_NOT_RUN_FILE:-}" "$SWITCH_REPLAY_PROGRESS_LIBRARY" "$stage_replay_progress_seconds" "$STAGE_REPOSITORY" \
     "$UNIT_VERDICT_ROUNDS_LIBRARY" "$STAGE_REPOSITORY/scripts/gate/admission.py" "$STAGE_NAME:stage-break-switch-replay" "$STAGE_BREAK_SWITCH_REPLAY_JUDGE_TOKEN" "$STAGE_REPOSITORY" \
     "${CODE_TOOLING_PICKED[stage-break-switch-replay]:-}" "$(judged_root_is_sample && echo 1)" "$1" "$stage_replay_binary" <<'PY'
-import concurrent.futures, glob, hashlib, importlib.util, os, shutil, subprocess, sys, tempfile, time, types
+import concurrent.futures, glob, hashlib, importlib.util, os, re, shutil, subprocess, sys, tempfile, threading, time, types
 judge_library = types.ModuleType("lib_stage_break_switch_replay_judge")
 exec(compile(sys.argv[1], "stage-break-switch-replay-judge-library", "exec"), judge_library.__dict__)
 table = judge_library   # 开关表的读法与判法在同一个模块里（stage_break_switch_replay_judge_code 打的两段）
@@ -8337,6 +9691,11 @@ admission, kind, judge_token, judge_root = sys.argv[13], sys.argv[14], sys.argv[
 picked = [item for item in sys.argv[17].split("\n") if item]      # 逐项点名（这一道「逐项点名」一节）：空是整格
 sample, states_path = sys.argv[18] == "1", sys.argv[19]
 server_binary = sys.argv[20]     # 临时服务包装起的 prune-server 二进制（这一格开跑前取一次）；空是没取（只在弄坏开关 stage-replay-binary-not-passed 下）
+task_memory_spec = importlib.util.spec_from_file_location("task_memory", os.path.join(sys.argv[11], "scripts/hosts/task_memory.py"))
+task_memory = importlib.util.module_from_spec(task_memory_spec)   # 这一台能给的内存、这一条拿到的上限与本进程此刻的用量（只在那一份里写）
+task_memory_spec.loader.exec_module(task_memory)
+MEMORY_KNOB_FILE = ".stage-break-switch-replay-memory"   # 样本根造内存情形与线程数的那一份（这一格文件头「并行度」）
+UNREAD_ROW = re.compile(r"^\s*#\s*[A-Z][A-Z0-9_]*_BREAK=(?!<)")   # 注释行头一个词写了 X_BREAK=（这一格文件头「头注读不出判红」）
 picked_stages, picked_switches = set(), {}
 for item in picked:
     item_stage, separator, item_switch = item.partition(":")
@@ -8352,6 +9711,12 @@ def stage_picked(stage):
 
 def switch_picked(stage, switch):
     return not picked or stage in picked_stages or switch in picked_switches.get(stage, ())
+
+
+def unread_rows(text, entries):
+    """头注写了 X_BREAK= 而读法不认的行：[(行号, 那一行)]。"""
+    read = {entry["line"] for entry in entries}
+    return [(number, row.strip()) for number, row in enumerate(text.split("\n"), 1) if UNREAD_ROW.match(row) and number not in read]
 
 
 prune_wrapper = os.path.join(stage_repo, "scripts/prune-server/prune_server_client_selftest.py")
@@ -8395,7 +9760,11 @@ for stage in stages:
         not_run.append(f"{stage}：样本档{'没登记' if row is None else '登记成 ' + row.kind}（要登记成 samples 或 samples:<假工具目录>），复跑的范围不含它")
         continue
     samples = sorted(name for name in os.listdir(f".claude/gate.d/fixtures/{stage}") if os.path.isdir(f".claude/gate.d/fixtures/{stage}/{name}"))
-    entries = table.switch_entries(open(f".claude/gate.d/{stage}", encoding="utf-8", errors="replace").read())
+    stage_text = open(f".claude/gate.d/{stage}", encoding="utf-8", errors="replace").read()
+    entries = table.switch_entries(stage_text)
+    if broken != "stage-unread-rows-unchecked":
+        problems.extend(f"{stage}:{number} 头注写了 *_BREAK= 却读不出（{row[:100]}）：这一条不会被复跑；是一条开关就写成「<变量>=<值>  <弄坏哪一处>」（值后面两个以上空格，或接（…）注），"
+                        "只是提到开关的句子不把它放在 # 之后头一个词" for number, row in unread_rows(stage_text, entries))
     if not entries:
         problems.append(f"{stage}：文件头读不出一条「X_BREAK=<值>  <弄坏哪一处>」再下一行起点名样本的开关")
         continue
@@ -8445,7 +9814,11 @@ def samples_digest(stage):
     return digest.hexdigest()
 
 
-feeder_digest = hashlib.sha256("".join(file_digest(path) for path in (stage_selftest, os.path.join(os.path.dirname(stage_selftest), "lib.sh"), prune_wrapper)).encode()).hexdigest()
+def feeder_digest_now():
+    return hashlib.sha256("".join(file_digest(path) for path in (stage_selftest, os.path.join(os.path.dirname(stage_selftest), "lib.sh"), prune_wrapper)).encode()).hexdigest()
+
+
+feeder_digest = feeder_digest_now()
 digest_of = {stage: samples_digest(stage) for stage in sorted({run[0] for run in runs})}
 
 
@@ -8462,6 +9835,59 @@ def request_line(run):
         tokens += [f"file:.claude/gate.d/{other}" for other in stages]
     return "\t".join([item_name(stage, switch), f".claude/gate.d/{stage}", *tokens])
 
+
+def stage_replay_memory_knobs():
+    """样本根的 MEMORY_KNOB_FILE（这一格文件头「并行度」）→ ({键: 值}, 读不出的那一行或 None)：一行一项 capacity=<字节>、hard-cap=<字节>、threads=<正整数>、
+    peak:<阶段文件名>=<字节>，值都是正整数；空行与 # 开头的行不算。只在样本根上读；弄坏开关 stage-replay-memory-knob-unchecked：读不出的行悄悄跳过。"""
+    knobs = {"peaks": {}}
+    if not (sample and os.path.isfile(MEMORY_KNOB_FILE)):
+        return knobs, None
+    with open(MEMORY_KNOB_FILE, encoding="utf-8", errors="replace") as handle:
+        for row in handle.read().split("\n"):
+            row = row.strip()
+            if not row or row.startswith("#"):
+                continue
+            key, _separator, value = row.partition("=")
+            readable = value.isdigit() and int(value) > 0 and (key in ("capacity", "hard-cap", "threads") or key.startswith("peak:") and len(key) > len("peak:"))
+            if not readable:
+                if broken == "stage-replay-memory-knob-unchecked":
+                    continue
+                return knobs, row
+            if key.startswith("peak:"):
+                knobs["peaks"][key[len("peak:"):]] = int(value)
+            else:
+                knobs[key] = int(value)
+    return knobs, None
+
+
+def stage_replay_size(byte_count):
+    return "取不到" if byte_count is None else task_memory.format_size(byte_count)
+
+
+def stage_replay_memory_budget():
+    """→ (份额字节或 None, 说明)：说明写这一台能给的内存与这一条拿到的上限、各自从哪来（开跑前那一行照写，这一格文件头「并行度」）；
+    份额是两样里小的那一个扣掉本进程此刻的用量，两样都取不到交 None，只给弄坏开关 stage-replay-jobs-by-memory 收同时跑的条数用。
+    样本根只认 MEMORY_KNOB_FILE 写的（样本的结局不随跑它那台机器变）。"""
+    if sample:
+        capacity = (knobs["capacity"], f"样本根 {MEMORY_KNOB_FILE} 写的") if "capacity" in knobs else (None, f"样本根 {MEMORY_KNOB_FILE} 没写 capacity")
+        hard_cap = (knobs["hard-cap"], f"样本根 {MEMORY_KNOB_FILE} 写的") if "hard-cap" in knobs else (None, f"样本根 {MEMORY_KNOB_FILE} 没写 hard-cap")
+    else:
+        capacity = task_memory.host_slice_cap_bytes(os.environ)
+        hard_cap = task_memory.task_memory_cap_bytes(os.environ)
+    told = f"这一台能给的 {stage_replay_size(capacity[0])}（{capacity[1]}）；这一条拿到的上限 {stage_replay_size(hard_cap[0])}（{hard_cap[1]}）"
+    limits = [value for value in (capacity[0], hard_cap[0]) if value is not None]
+    if not limits:
+        return None, told
+    return max(1, min(limits) - (task_memory.process_usage_bytes(os.getpid()) or 0)), told
+
+
+knobs, unreadable_knob = stage_replay_memory_knobs()
+if unreadable_knob is not None:
+    print(f"  ✗ 样本根的 {MEMORY_KNOB_FILE} 里「{unreadable_knob}」读不出来，一条开关都没起")
+    print("     → 怎么办：一行一项：capacity=<字节>、hard-cap=<字节>、threads=<正整数>、peak:<阶段文件名>=<字节>，值都写正整数；判据在 code-tooling.sh 里这一格函数上方的注释「并行度」")
+    sys.exit(1)
+if "threads" in knobs:
+    jobs = knobs["threads"]
 
 requests = {}
 for run in runs:
@@ -8504,6 +9930,23 @@ if eligible:
                 print(f"    复用「{item_name(run[0], run[2])}」：{reason}")
 
 tracker = progress_library.ReplayProgress("stage-break-switch-replay", len(runs), progress_seconds, broken == "replay-progress-silent")
+stopper = rounds.SampleStop(sample, os.getcwd(), plan_scratch)     # 样本档造中途被停（code_tooling_interrupted_rounds）：那一趟只开一个线程
+
+# 并行度（这一格文件头「并行度」）：同时跑的条数取登记的每台默认重活线程数与要现判的条数里小的，里层 --jobs 取线程数除以它；
+# 外层路数 × 里层 --jobs 不超过线程数。内存只写进开跑前那一行，不按它收
+budget, limits_text = stage_replay_memory_budget()
+memory_text = f"{limits_text}；由服务定、撞了服务照乘 1.5 放大重排，不按它收并行"
+max_running = 1 if stopper.armed else max(1, min(jobs, len(runs)))
+stages_to_run = sorted({run[0] for run in runs})
+# 弄坏开关 stage-replay-jobs-by-memory：同时跑的条数再照份额 ÷ 样本根写的峰值收（几道阶段取最大的那个；没写峰值、两样都取不到的不收）
+known_peaks = [knobs["peaks"][stage] for stage in stages_to_run if stage in knobs["peaks"]]
+if broken == "stage-replay-jobs-by-memory" and budget is not None and known_peaks:
+    max_running = max(1, min(max_running, budget // max(known_peaks)))
+    memory_text = (f"{limits_text}；份额 {stage_replay_size(budget)}、每条开关开满时的峰值 {stage_replay_size(max(known_peaks))}，"
+                   f"份额容得下 {max_running} 条")
+inner_jobs = jobs if broken == "stage-replay-inner-threads-uncapped" else max(1, jobs // max_running)
+flight_lock = threading.Lock()
+flight = {"now": 0, "most": 0}   # 此刻在跑几条、最多同时在跑几条（收尾那一行照它写）
 
 
 def replay(run):
@@ -8511,15 +9954,23 @@ def replay(run):
     environment = {name: value for name, value in os.environ.items()
                    if not name.endswith("_BREAK") and name not in ("GATE_BASE", "GATE_STAGED_FROM", "GATE_DIFF_BASE", "GATE_NOT_RUN_FILE")}
     environment[entry["name"]] = entry["value"]
+    with flight_lock:
+        flight["now"] += 1
+        flight["most"] = max(flight["most"], flight["now"])
     started = time.monotonic()
     with tracker.running(stage, f"{stage} {switch}"):
         cmd = ["bash", stage_selftest, os.path.join(root, ".claude/gate.d"), "--item", stage]
+        if broken != "stage-replay-inner-jobs-unset":
+            cmd += ["--jobs", str(inner_jobs)]
         if os.path.isfile(prune_wrapper):
             # 二进制只经 --server-binary 交：环境里带来的 PRUNE_SERVER_BINARY 与任务服务给的编译目录不替它作保，这一格在哪台机器上都判同一个结局
             for ambient in ("PRUNE_SERVER_BINARY", "CARGO_TARGET_DIR"):
                 environment.pop(ambient, None)
             cmd = ["python3", prune_wrapper, "--with-temporary-service", *(["--server-binary", server_binary] if server_binary else []), "--"] + cmd
         done = process_group.run_in_own_session(cmd, cwd=root, env=environment, stdin=subprocess.DEVNULL)
+    seconds = time.monotonic() - started
+    with flight_lock:
+        flight["now"] -= 1
     output = done.stdout + done.stderr
     leftover = done.problem()
     if leftover:
@@ -8529,26 +9980,44 @@ def replay(run):
     result = (stage, entry, switch, named, wrong, finished, done.returncode, output)
     problem = judge_library.problem_of(*result, broken)
     verdict = ("对上" if problem is None else "没对上（点名的样本与实测不符）") if finished else f"没跑成（stage-selftest.sh 退 {done.returncode}）"
-    tracker.item_done(verdict, f"{stage} {switch}", time.monotonic() - started)
+    tracker.item_done(verdict, f"{stage} {switch}", seconds)
     # 一条判完就记（这一格文件头「按条复用」）：判绿记绿，判红记红、撤同一把键原有的绿；中途被停，判完的那几条都在库里
     name = item_name(stage, switch)
-    verdicts.record([] if problem or leftover else [name], [name] if problem or leftover else [])
+    if broken != "stage-replay-recorded-at-end":
+        verdicts.record([] if problem or leftover else [name], [name] if problem or leftover else [])
+    stopper.passed()
     return result
 
 collected = []
 if runs:
-    tracker.start(f"stage-break-switch-replay 开跑：{len(runs)} 条开关（{len({run[0] for run in runs})} 道阶段），并行 {max(jobs, 1)} 条；每条判完打一行，每过 {progress_seconds} 秒打一行总进度")
-with concurrent.futures.ThreadPoolExecutor(max_workers=max(jobs, 1)) as pool:
+    inner_text = f"--jobs {inner_jobs}" if broken != "stage-replay-inner-jobs-unset" else "不带 --jobs（照它自己的 STAGE_SELFTEST_JOBS 或核数）"
+    print(f"  · stage-break-switch-replay 并行度：同时最多 {max_running} 条（登记的每台默认重活线程数 {jobs} 条；{memory_text}）；每条 stage-selftest {inner_text}；"
+          f"外层 {max_running} 条 × 里层 {inner_jobs} = {max_running * inner_jobs}（不超过每台默认重活线程数 {jobs}）", flush=True)
+    tracker.start(f"stage-break-switch-replay 开跑：{len(runs)} 条开关（{len(stages_to_run)} 道阶段），同时最多 {max_running} 条；每条判完打一行，每过 {progress_seconds} 秒打一行总进度")
+with concurrent.futures.ThreadPoolExecutor(max_workers=max(max_running, 1)) as pool:
     collected = list(pool.map(replay, runs))
 tracker.close()
+if runs:
+    print(f"  · stage-break-switch-replay 同时在跑最多 {flight['most']} 条（同时最多 {max_running} 条）", flush=True)
 if len(collected) != len(runs):
     problems.append(f"派出去 {len(runs)} 条复跑，只收回 {len(collected)} 条")
 green_names, red_names = [], []
+# 点名的与实测不等（跑成了、判法判出不符）的那几条才重算键：跑的过程中键变了的，失败行里多一句（ItemVerdicts.key_changes）
+mismatched = [result for result in collected if result[5] and judge_library.problem_of(*result, broken) is not None]
+fresh_requests = {}
+if mismatched:
+    # 键里喂的样本目录与喂样本的程序的摘要是这一格自己算的、不在 verdict-plan 的闭包里，跑的过程中它们也会变：重算的请求按此刻的内容重拼
+    feeder_digest = feeder_digest_now()
+    digest_of = {stage: samples_digest(stage) for stage in sorted({result[0] for result in mismatched})}
+    run_of = {item_name(run[0], run[2]): run for run in runs}
+    fresh_requests = {item_name(result[0], result[2]): request_line(run_of[item_name(result[0], result[2])]) for result in mismatched}
+key_change_notes = verdicts.key_changes([item_name(result[0], result[2]) for result in mismatched], fresh_requests)
 for result in collected:
     problem = judge_library.problem_of(*result, broken)
-    (green_names if problem is None else red_names).append(item_name(result[0], result[2]))
+    name = item_name(result[0], result[2])
+    (green_names if problem is None else red_names).append(name)
     if problem is not None:
-        problems.append(problem)
+        problems.append(problem + (f"；{key_change_notes[name]}" if name in key_change_notes else ""))
 verdicts.record(green_names, red_names, final=True)
 if red_names:
     verdicts.reread_after_red()
@@ -8610,9 +10079,16 @@ PY
 # 弄坏开关 CODE_TOOLING_BREAK=guard-combination-unprobed：不起「关守卫项,第一个值」那一次探针，break-switch-outside-selftest-guard-combined-red 判绿（期望退出 1，实测 0），
 #   break-switch-outside-selftest-guard-combined-green 里「关守卫项与第一个值同写的探针 2 次」那条 want 找不到（探了 0 次）。
 cell_break_switch_outside_selftest() {
-  local pending=".claude/gate.d/break-switch-outside-selftest-pending.tsv"
-  python3 - "$BREAK_SWITCH_TABLE_LIBRARY" "$pending" "${CODE_TOOLING_BREAK:-}" "$STAGE_REPOSITORY/scripts/gate/lib_process_group.py" <<'PY'
-import glob, importlib.util, os, re, subprocess, sys, types
+  local pending=".claude/gate.d/break-switch-outside-selftest-pending.tsv" jobs
+  if ! jobs="$(heavy_thread_default)"; then
+    echo "  ✗ 取不了每台默认重活线程数（原因在上一行），探针的并行度定不了，一份都没探"
+    echo "     → 怎么办：照上一行的出路修 .claude/heavy-thread-default（线程固定取登记值，SINGLEFS_THREAD_CAP 由服务套的 capped.sh 设，不自己设），再跑这一格；不退回按核数算。"
+    exit 1
+  fi
+  python3 - "$BREAK_SWITCH_TABLE_LIBRARY" "$pending" "${CODE_TOOLING_BREAK:-}" "$STAGE_REPOSITORY/scripts/gate/lib_process_group.py" "$TREE_LISTING_LIBRARY" "$jobs" <<'PY'
+import concurrent.futures, glob, importlib.util, os, re, subprocess, sys, types
+tree = types.ModuleType("lib_tree_listing")
+exec(compile(sys.argv[5], "tree-listing-library", "exec"), tree.__dict__)
 table = types.ModuleType("lib_break_switch_table")
 exec(compile(sys.argv[1], "break-switch-table-library", "exec"), table.__dict__)
 pending_path, broken = sys.argv[2:4]
@@ -8634,12 +10110,12 @@ def guard_off_value(text, entry):
     return "平常跑" in rest and "不拒" in rest
 
 
-def probe(path, interpreter, name, value):
+def probe(path, interpreter, name, value, found):
     """起一次探针 → (退出码或「超时」, 输出)。经共用起法 scripts/gate/lib_process_group.py 起：放进它自己的会话，超时与退出之后收整组，
-    留下的进程另记一处问题（这一格照红）。"""
+    留下的进程另记一处问题（记进 found，这一格照红）。各份脚本的探针彼此独立，几份同时探，问题按脚本的次序汇总。"""
     done = process_group.run_in_own_session(["env", f"{name}={value}", *interpreter, path, *PROBE_ARGUMENTS], stdin=subprocess.DEVNULL, timeout=30)
     if done.problem():
-        problems.append(f"{path} 读了 {name}：探针（env {name}={value} … {' '.join(PROBE_ARGUMENTS)}）{done.problem()}")
+        found.append(f"{path} 读了 {name}：探针（env {name}={value} … {' '.join(PROBE_ARGUMENTS)}）{done.problem()}")
     return ("超时" if done.timed_out else done.returncode), done.stdout + done.stderr
 
 
@@ -8653,8 +10129,7 @@ def why_not(name, code_out, output):
     return "退 0，照常跑" if code_out == 0 else ("超过 30 秒没返回" if code_out == "超时" else f"退 {code_out} 但输出里没有点名 {name} 只在自证里认的一行（首行：{first}）")
 
 
-paths = sorted(path for directory in ("scripts", ".claude/hooks") for extension in ("sh", "py")
-               for path in glob.glob(f"{directory}/**/*.{extension}", recursive=True) if "/fixtures/" not in path)
+paths = sorted(path for directory in ("scripts", ".claude/hooks") for path in tree.files_under(directory, (".sh", ".py"), skipped=("target", "fixtures")))
 problems, pending = [], {}
 if os.path.isfile(pending_path):
     for number, line in enumerate(open(pending_path, encoding="utf-8"), 1):
@@ -8672,29 +10147,43 @@ for path in paths:
     names = sorted({name for found in READ.findall(code) for name in found if name})
     if names:
         readers[path] = (text, names)
-for path, (text, names) in readers.items():
-    if path in pending:
-        waiting.append(path)
-        continue
+def probe_reader(path, text, names):
+    """一份读了开关的脚本：逐个变量起探针（设值、关守卫项同写各一次）→ (这一份的问题们，同写探针的次数)。"""
+    found, combined_count = [], 0
     interpreter = ["python3", "-B"] if path.endswith(".py") else ["bash"]
     entries = table.switch_entries(text)
     for name in names:
         # 第一个值取表里第一条不是关守卫项的（关守卫项单独设时平常跑照认，拿它探守卫探不出东西），没有表或只有关守卫项写 probe
         guards = [entry["value"] for entry in entries if entry["name"] == name and guard_off_value(text, entry)]
         value = next((entry["value"] for entry in entries if entry["name"] == name and not guard_off_value(text, entry)), "probe")
-        code_out, output = probe(path, interpreter, name, value)
+        code_out, output = probe(path, interpreter, name, value, found)
         if broken != "outside-selftest-unchecked" and not refused(name, code_out, output):
-            problems.append(f"{path} 读了 {name}：平常跑时设上它（env {name}={value} … {' '.join(PROBE_ARGUMENTS)}）没被拒，{why_not(name, code_out, output)}")
+            found.append(f"{path} 读了 {name}：平常跑时设上它（env {name}={value} … {' '.join(PROBE_ARGUMENTS)}）没被拒，{why_not(name, code_out, output)}")
         # 关守卫项与别的项同写（这一格文件头「关守卫项」一段）：另起一次探针，照样要被拒
         if not guards or broken == "guard-combination-unprobed":
             continue
         combined = f"{guards[0]},{value}"
-        combined_probes += 1
-        code_out, output = probe(path, interpreter, name, combined)
+        combined_count += 1
+        code_out, output = probe(path, interpreter, name, combined, found)
         if broken != "outside-selftest-unchecked" and not refused(name, code_out, output):
-            problems.append(f"{path} 读了 {name}：关守卫项与别的项同写（env {name}={combined} … {' '.join(PROBE_ARGUMENTS)}）没被拒，{why_not(name, code_out, output)}"
-                            f"——关守卫项 {guards[0]} 只在它是唯一一项时认，与别的项同写要照拒并点名")
-    probed.append(path)
+            found.append(f"{path} 读了 {name}：关守卫项与别的项同写（env {name}={combined} … {' '.join(PROBE_ARGUMENTS)}）没被拒，{why_not(name, code_out, output)}"
+                         f"——关守卫项 {guards[0]} 只在它是唯一一项时认，与别的项同写要照拒并点名")
+    return found, combined_count
+to_probe = []
+for path, (text, names) in readers.items():
+    if path in pending:
+        waiting.append(path)
+        continue
+    to_probe.append((path, text, names))
+# 各份脚本的探针彼此独立（各自一个会话、各自的输出）：按每台默认重活线程数同时探，问题按脚本的次序汇总，次序与逐份串行探时相同
+process_group.install_stop_on_signals(only_defaults=True)   # 探针在池里的线程上，停止信号的处理要先在主线程装好
+if to_probe:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(int(sys.argv[6]), len(to_probe)))) as pool:
+        outcomes = list(pool.map(lambda task: probe_reader(*task), to_probe))
+    for (path, _text, _names), (found, combined_count) in zip(to_probe, outcomes):
+        problems.extend(found)
+        combined_probes += combined_count
+        probed.append(path)
 for path, number in sorted(pending.items(), key=lambda item: item[1]):
     if not os.path.isfile(path):
         problems.append(f"{pending_path}:{number} 指到的 {path} 不在，那一行删掉")
@@ -8731,8 +10220,27 @@ PY
 #   结局：点名的与实际红的逐格相同是对；退 2 并点名这个变量只在自证里认的是「自证自带开关轮」（C622 的守卫在外面设不进去，开关轮在自证里面，不在这里复跑）；
 #   退 0（开关没弄坏什么）、点名的项里没有可比的「…」原文、少红或多红、超时、有坏字节，都判红；基准趟退非 0 或超时，那一份判红、开关趟不起。
 #   不是对的先单独重跑一次再定，防并行下计时类自证偶然红。
-#   各条互不依赖，按每台默认重活线程数（至多 8）并行（基准趟先齐，再起开关趟；一份的开关趟齐了就当场判这一份、要重跑的另派，不等别的份），
+#   各条互不依赖，按每台默认重活线程数（至多 8）并行（基准趟先齐，再起开关趟；一份的开关趟齐了就当场判这一份、不等别的份），
 #   收回的条数与派出去的对不上整格红。
+# 重跑：要重跑的那几条先记下，别的趟（基准趟、全部开关趟）都收完之后一次一条地起（按开关在登记里的次序）；基准趟要重跑的同样等全部基准趟收完、一次一份。
+#   重跑时没有别的趟在跑：并行下超时的那一批不再一起起步、叠在一起撞内存上限，重跑的结局也不受并行拖慢。
+#   样本 break-switch-replay-reruns-serial-green（样本根 .break-switch-replay-jobs 给上限 100 GiB、线程 31：flaky.sh 两条开关头一趟都没红、要重跑，
+#   steady.sh 一条开关趟要跑 3 秒；每一趟起跑时在 running/ 下登一个文件、退出前删掉，重跑的那一趟起跑与睡 1 秒之后各看一次 running/ 里有没有别的趟，
+#   看到过就记下、此后每一趟都多打一行没点名的 ✗：必须判绿，成功句报复跑了 3 条开关、逐格相同 3 条）。
+#   弄坏开关 CODE_TOOLING_BREAK=replay-reruns-batched：一份的开关趟齐了、要重跑的当场派进池子（与还在跑的 steady.sh、同一批要重跑的另一条一起起），
+#   break-switch-replay-reruns-serial-green 判红（期望退出 0，实测 1：「scripts/gate/flaky.sh FLAKY_BREAK=prefix：不符」，失败行「✗ 自检：重跑时另有别的趟在跑」没被点名）。
+# 每趟的进程组（.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」；写法在 SWITCH_REPLAY_PARALLELISM_LIBRARY 的 TripLauncher，selftest-cells-alone 格同一份）：
+#   基准趟、开关趟与重跑的每一趟放进它自己的会话与进程组；到点对整组先 TERM，过 TRIP_STOP_GRACE_SECONDS（3）秒组里还有活的再 KILL，打一行「到点停整组」；
+#   直接起的那一个退出之后组里还有进程（等 TRIP_EXIT_SETTLE_SECONDS 秒还在）：逐个记进这一趟的失败信息，再照样停整组；门禁收到 TERM、INT、HUP 时在跑的各趟照样停整组。
+#   停完按进程组号在 /proc 里核组里一个不剩，那一趟才返回、名额才还；还剩停不掉的，记进失败信息，这一趟的内存额度不还（位置照还）。
+#   留下进程的趟：开关趟对上的也记「留下进程」、判红，别的结局在说明后面接上；基准趟照没过办（开关一条不起）；都先单独重跑一次再定，且不落盘（取回的都是收干净了的趟）。
+#   到点没跑完的趟量到的峰值是被停之前的，不换进每趟内存的估计。
+#   样本 break-switch-replay-trip-group-stopped-green（hangs.sh 一条开关，每条开关限时 3 秒：那条开关的头一趟派一个不理 TERM 的孙进程、自己睡 10 秒，到点；
+#   重跑那一趟起跑时看那个孙进程还活着没有，活着就多打一行没点名的 ✗：必须判绿，且输出里有「到点停整组：scripts/gate/hangs.sh HANGS_BREAK=prefix」
+#   与「发了 KILL；组里一个不剩之后才还这一趟的名额」。重跑那一趟一定在头一趟返回、名额还了之后才起，看到的就是还名额那一刻组里收没收干净）。
+#   弄坏开关 CODE_TOOLING_BREAK=replay-trip-leader-only-stopped：每趟不开新会话，到点只 kill 直接起的那一个、不收组、不核，名额当场还：
+#   重跑那一趟起跑时孙进程还活着，break-switch-replay-trip-group-stopped-green 判红（期望退出 0，实测 1：「scripts/gate/hangs.sh HANGS_BREAK=prefix：不符」，
+#   失败行「✗ 自检：前一趟派的孙进程到这一趟起跑时还活着」没被点名）。
 # 只在临时 prune-server 上跑的自证（要临时服务的表 .claude/hooks/selftest-temporary-service.tsv 里登记成 required：裸跑退 2、不写真服务，research-script-selftests 格同一个认法）：
 #   基准趟与开关趟都照「$SELFTEST_TEMPORARY_SERVICE_PREFIX」那一句包一层起（--server-binary 给这一格开跑前取的那一份，code_tooling_prune_server_binary；
 #   包装起的临时服务一趟一份，各趟互不串），开关照样设在环境里传进去；表里有这种的才取二进制，取不到的那几份判红、开关一条都不起。
@@ -8757,6 +10265,47 @@ PY
 #   每 5 秒采一次内存；收尾打一行「break-switch-replay 逐条进度 R 行、派出去 N 条；」加内存峰值、峰值那一刻在跑的按份计数与单个最大的进程。
 #   样本根（judged_root_is_sample）里的 .break-switch-replay-progress-seconds（一个正整数秒数）顶替 300 秒，样本不必等满 5 分钟；写的不是正整数判红、一条都不跑。
 #   真仓上一趟 58 份、1386 条开关；并行 8 时第二台 8689 秒跑完 854 趟（任务 3542 的日志，被取消前最后一次报的进度），照这个速度整格约四小时（推的）。
+# 机读进度：开跑时与每跑完一趟时，另打一行行首顶格的「TASK_SERVER_PROGRESS done=<跑完几趟> total=<要跑几趟>」（统一任务服务读它，不带 ✗；别的进度行照旧）。
+#   趟是基准趟、开关趟与要重跑的那一趟，取回的落盘趟当场算跑完；total 开跑时是这一趟要起的份数（基准趟）加开关趟数，要重跑的那一趟派出去之前加一，
+#   基准趟都跑完时改成「跑完的加还要跑的开关趟」（基准趟没过、开关一条没起的那几份扣掉）。按趟报，不按判完的条报：一份的开关趟齐了才集中判，
+#   按条报时 done 一阵一阵涨，服务照它推的预计用时远长于实际（ReplayProgress 文档串）。
+#   样本 break-switch-replay-progress-green（一份、两条开关，三趟）里有 done=0、1、2、3 四行，total 都是 3。
+#   弄坏开关 CODE_TOOLING_BREAK=replay-machine-progress-silent：不打这一行，break-switch-replay-progress-green 里四条 TASK_SERVER_PROGRESS 的 want 找不到。
+# 范围（.claude/rules/implementation-workflow.md「复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判」）：这一趟给了 --check 或 --item（样本根的 .gate-cells 与 .gate-items；
+#   范围声明种类 items）是指定范围，什么都没给（提交时的整轮门禁；种类 whole）是不指定范围；样本根的 .break-switch-replay-whole-scope 把 .gate-cells 点名的这一趟改按不指定范围判。
+#   指定范围：文件里写着「<名字>_SELFTEST_CELLS=<格名…」的自证（有选格手段：那个环境变量设成逗号隔开的格名，自证只跑点名的格，单跑一格与它在全部格里跑判定相同）
+#   每条开关趟只起那一条点名的格：点名的项（「…」里的失败行句首）里「自证：<格名>：」或「✗ 自证 <格名>：」里的那一段，一条开关写几处取几处；基准趟起这份每条开关点名的格的并集（开关趟的失败行减的是同一批格的）。
+#   判法一字不变：点名的每一项都要在失败行里照出来（点名的格没红判红），没点名的 ✗ 行判「失败行没被点名」；只是没点名的格不起，红不到它们。
+#   一条开关读不出格名的，它那一趟整份起，这份的基准趟也整份起；没有选格手段的自证整份起（scripts/mutation/broad-mutation.py 的 BROAD_MUTATION_SELFTEST_CELLS 选的是代码里的格组、
+#   名字写的是「<组名」，失败行里的格名对不到组，不算有选格手段）。不指定范围：每条开关趟与基准趟都起整份自证，逐格相同。
+#   两种范围的判定不共用单元键：只起点名的格的那几趟，键里另带 line:cell-scope=<选格变量名>:<格名的 sha256>，不指定范围的键里没有这一行（只起点名的格看不到点名之外的格红了什么，
+#   判的不是同一件事，指定范围判出的绿不许被不指定范围那一趟复用）；整份起的趟两种范围判的是同一件事，共用同一把键。成功句末尾写「范围：指定范围（…）」或「范围：不指定范围（…）」，开跑前另打一行。
+#   弄坏开关 CODE_TOOLING_BREAK=replay-scope-ignored：指定范围也整份起、键里不带选格那一行，break-switch-replay-scoped-cells-green 判红；
+#   =replay-whole-scoped：不指定范围也只起点名的格，break-switch-replay-whole-scope-red 判绿；=replay-scoped-key-shared：只起点名的格的那几趟不带选格那一行，
+#   break-switch-replay-scoped-key-separate-green 第二趟复用第一趟的。
+# 并行度：并行条数取登记的每台默认重活线程数（.claude/heavy-thread-default；样本根的 .break-switch-replay-jobs 写 threads 顶替），不按这一趟的内存上限收
+#   （准许按内存上限定并发的入口登记在 .claude/memory-bounded-parallelism.tsv，这一格不在里面）。内存上限由 task-server 照这条命令的记录给，这一格不自报要多少内存：
+#   照上限收并行时，上限又是照以往一路跑的峰值给的，只够一路，并行永远收在一路、也永远撞不上上限、服务也就不放大。撞了上限服务照乘 1.5 放大、重排这一条，
+#   第二趟只补没落盘的开关趟（下面「开关趟落盘」；样本 break-switch-replay-interrupted-resume）。
+#   内存上限只写进开跑那一行：这一趟所在的 cgroup 一路到根的 memory.max 里数字的最小值（读法 cgroup_memory_limit；样本根的 memory-max 顶替），读不到或是 max 照写原因。
+#   外层路数 × 里层线程数 ≤ 登记的线程数：外层路数的上限 = min(并行条数, 要起的趟数（每份一趟基准趟加全部开关趟）)，里层线程数 = ⌊线程数 ÷ 外层路数的上限⌋（至少 1），
+#   每一趟（基准趟与开关趟）起的自证都带环境变量 SINGLEFS_THREAD_CAP=<里层线程数>（自证里的并行度经登记位取，登记位认它）；只起点名的格的那几趟，格数的单位数也不超过里层线程数。
+#   同时在跑的趟数就是外层路数的上限（Admission 不带内存份额，只数在跑的趟；TripMeter 量的各趟峰值只进内存那一行进度）。
+#   开跑那一行写「并行 N 条（登记的每台默认重活线程数 T 条；内存上限 …）」与「外层 N 条 × 里层 M = P（不超过每台默认重活线程数 T）」。
+#   自证里不经登记位取并行度的（登记表 .claude/heavy-thread-exempt 点名的、自己读别的线程变量的）收不住这一层。
+#   样本：break-switch-replay-scoped-cells-green（.gate-cells 点名这一格是指定范围：一份有选格手段的脚本四格，两条开关各弄坏点名的一格与没点名的一格，只起点名的格所以绿，成功句写「范围：指定范围」）；
+#     break-switch-replay-scoped-cells-space-form-green（同一种脚本，失败行与点名的项写成「✗ 自证 <格名>：」，照样读出格名、只起点名的格）；
+#     break-switch-replay-whole-scope-red（同一份，样本根放 .break-switch-replay-whole-scope 按不指定范围判：没点名的两格红了，各点名「失败行没被点名」）；
+#     break-switch-replay-scoped-named-quiet-red（指定范围：脚本退 1，只在行中间转述一句不是点名的 ✗ 行，点名的格没红判红）；
+#     break-switch-replay-scoped-key-separate-green（样本根放 .break-switch-replay-second-pass 与 .break-switch-replay-second-pass-whole：同一份判定库上第一趟指定范围、第二趟不指定范围，第二趟三条判定全部现判）；
+#     break-switch-replay-jobs-registered-green（样本根的 .break-switch-replay-jobs 写 memory-max=1536 MiB、threads=8；一份脚本 32 条开关、各红一格，开关趟起跑时在 running/ 下登一个文件、
+#     等同时有 8 趟登着（哪一趟看到过就记下，之后的照放），等满 10 秒还没等到就记下、此后每一趟多打一行带自己开关值的没点名的 ✗：必须判绿，开跑那一行写并行 8 条，
+#     收尾逐条进度 32 行、派出去 32 条）、-jobs-registered-red（同一组并行度、同样 32 条开关，其中一条点名的项写的是另一格：只那一条判不符，1 处不对（复跑了 32 条、1 份））、
+#     -jobs-threads-capped-green（上限 100 GiB、线程 2：并行 2 条，外层 2 条 × 里层 1 = 2）、-jobs-inner-threads-green（上限 100 GiB、线程 8、一份两条开关三趟：外层 3 条 × 里层 2 = 6，
+#     样本自证在每一趟里核 SINGLEFS_THREAD_CAP 是 2、不是就退 1，基准趟没过判红）。
+#   弄坏开关 CODE_TOOLING_BREAK=replay-jobs-by-memory：并行条数照内存上限算（parallel_library.jobs_for：⌊上限的 SAFE_SHARE_PERCENT 份额 ÷ 每趟内存⌋、不超过线程数），
+#   Admission 带那一份份额，-registered-green、-registered-red、-threads-capped 三份判红；
+#   =replay-inner-threads-uncapped：不把里层线程数收到线程数 ÷ 外层路数的上限、不设 SINGLEFS_THREAD_CAP，-threads-capped 与 -inner-threads 判红。
 # 登记表空或不在：退 77。
 # 样本：break-switch-replay-red（登记表里四份：一份有一条开关点名的项没在失败行里，一份有一条开关设上之后自证照样退 0，一份点名的项里没有「…」原文；
 #   另一行指到不在的文件）；break-switch-replay-unnamed-red（一份开关弄红两格、点名一格；一份红的一格前面是单独的 \r 接着的进度行，没点名：两处多红）；
@@ -8764,10 +10313,21 @@ PY
 #   另有一份文件头写全却没登记，报「复跑了 6 条开关……没接复跑的 1 份」）；
 #   break-switch-replay-undecodable-red（一份两条开关、一条下自证吐坏字节，一份全对，一份退 0，一份吐坏字节而点名的项也不在失败行里：
 #   坏字节、退 0、坏字节加少红各记，报「4 处不对（复跑了 5 条、4 份）」）。
-# 弄坏开关 CODE_TOOLING_BREAK=replay-items-unchecked：不比点名的项，break-switch-replay-red、break-switch-replay-undecodable-red 里「点名的项没在失败行里」那条 want 找不到。
+# 开跑前预检登记的文件头开关表写没写全：与 break-switch-headers 格同一份取法（BREAK_SWITCH_HEADER_LIBRARY 的 header_gaps、gap_sentence），缺点名的项（点名行缩进不够读不出来的也算）、
+#   缺弄坏哪一处、一条开关都读不出的，逐条点名「复跑登记表:行号 路径:行 开关=值 缺…」，那一份不起；样本 break-switch-header-gap-red（与 break-switch-headers 格一起跑，那一格的说明里）。
+# 判红的明细：日志里每条「不符」只列前三项点名的项（各截 60 字）、前三行没被点名的失败行（各截 80 字），逐条对点名不够用。判红时把每条不符的开关完整的点名的项与这一趟全部多出来的失败行
+#   落到一份文件里（真仓上在工作根下新建 break-switch-replay-mismatches.<随机串>/mismatches.txt，工作根取 .claude/hooks/lib_work_root.py 不带参数打的那个，两台读得到；
+#   取不到或建不了时放本机临时目录并在回读那一行写明；样本根放本机临时目录、回读核过就删），路径与那一条开关的起始行接在「不符」行后面（「；完整的失败行与点名的项在 <文件>:<行>」），
+#   日志里照旧只列前几项、前几行。写完回读一遍：点名的项逐项、多出来的失败行逐行都得整段在文件里，缺了判红；核过打「不符明细回读核过：N 条开关、点名的项 A 项、失败行 B 行（其中没被点名的 C 行）都在文件里」。
+#   样本 break-switch-replay-mismatch-detail-red（一份开关红五格：文件头点名一格、另点名了一格没红，多红的四行每行都超过八十个字）。
+#   弄坏开关 CODE_TOOLING_BREAK=replay-mismatch-detail-truncated：明细文件照日志的样子截（失败行只写前三行、每行前八十个字，点名的项只写前三项、每项前六十个字），回读缺那几行，
+#   break-switch-replay-mismatch-detail-red 里「不符明细回读核过」那条 want 找不到。
+# 弄坏开关 CODE_TOOLING_BREAK=replay-header-gaps-unjudged：不做这一步预检（文件头缺点名的项也照样复跑），break-switch-header-gap-red 里复跑登记表那条 want 找不到。
+# 弄坏开关 CODE_TOOLING_BREAK=replay-items-unchecked：不比点名的项，break-switch-replay-red、break-switch-replay-undecodable-red、break-switch-replay-mismatch-detail-red 里「点名的项没在失败行里」那条 want 找不到。
 # 弄坏开关 CODE_TOOLING_BREAK=replay-output-strict-decode：按文本收输出、不容坏字节，break-switch-replay-undecodable-red 整格抛 UnicodeDecodeError，
 #   「坏字节，stdout 里有不合法的 UTF-8」与「4 处不对（复跑了 5 条、4 份）」那几条 want 找不到。
-# 弄坏开关 CODE_TOOLING_BREAK=replay-unnamed-rows-unchecked：不查多红（失败行比点名的多不判），break-switch-replay-unnamed-red 判绿（期望退出 1，实测 0）。
+# 弄坏开关 CODE_TOOLING_BREAK=replay-unnamed-rows-unchecked：不查多红（失败行比点名的多不判），break-switch-replay-unnamed-red 判绿（期望退出 1，实测 0），
+#   break-switch-replay-mismatch-detail-red 里「失败行没被点名」那条 want 找不到。
 # 弄坏开关 CODE_TOOLING_BREAK=replay-baseline-unsubtracted：不起基准趟、不减自证本来就有的失败行，break-switch-replay-green 判红（期望退出 0，实测 1：只有一条开关的那一份，基准趟那一行没被点名）。
 # 弄坏开关 CODE_TOOLING_BREAK=replay-summary-rows-required：汇总行也要点名，break-switch-replay-green 判红（期望退出 0，实测 1：「✗ 自检：… 格不对」没被点名）。
 # 弄坏开关 CODE_TOOLING_BREAK=replay-carriage-return-kept：单独的 \r 留在行里，break-switch-replay-unnamed-red 里「scripts/gate/carriage.py CARRIAGE_BREAK=progress」那条 want 找不到
@@ -8788,27 +10348,44 @@ PY
 #   种类 code-tooling.sh:break-switch-replay（prune-server 那一份库，unit-verdicts 族 singlefs-unit-verdicts/code-tooling.sh:break-switch-replay，库根不进键）。
 #   键（scripts/gate/admission.py verdict-plan 算，不带路径、行号与限时）由这几样组成：
 #   ① 那份脚本自证的单元闭包（入口就是那份脚本：python 的程序入口、shell 的 script-body，连同 import、source 到的模块与函数、读的数据文件、解释器版本，
-#      与 research-script-selftests 格算单元键的是同一路，admission.py 文件头「单元键」；python 的另带 program-argument:--selftest，只收 --selftest 真走到的那一支，
+#      与 research-script-selftests 格算单元键的是同一路，admission.py 文件头「单元键」；python 与 shell 的都另带 program-argument:--selftest，只收 --selftest 真走到的那一支，
 #      lib_function_units.py 文件头「程序入口带参数」）；
 #   ② 判法：这一道所在仓里 break_switch_replay_judge_code 的闭包（令牌 BREAK_SWITCH_REPLAY_JUDGE_TOKEN：开关表的读法与 BREAK_SWITCH_REPLAY_JUDGE_LIBRARY）；
 #   ③ line:command=<起它的命令样子>；④ line:switch=<开关名>=<值>（基准趟写「基准趟」）；
 #   ⑤ 开关那几条另加 line:named-sha256=<那一条点名的项原文的 sha256>（文件头是注释，不进单元指纹，另进这一行）；
 #   ⑥ 只在临时 prune-server 上跑的另加 file:scripts/prune-server/prune_server_client_selftest.py 与 line:temporary-service=wrapped。
-#   起哪几份：点到的条里有一条要现判（键对不上、库里记着红、拒算、复用哨兵强制现判）的整份照起——基准趟与全部开关趟，不是只起那几条：
+#   拒算的照共用段开跑前判红、一条都不起（UNIT_VERDICT_ROUNDS_LIBRARY 的 ItemVerdicts.stop_on_refusals；样本 break-switch-replay-refused-red）。
+#   起哪几份：点到的条里有一条要现判（键对不上、库里记着红、复用哨兵强制现判）的整份照起——基准趟与全部开关趟，不是只起那几条：
 #   汇总行要整份的开关趟，只起几条判出来的与整格里的不同；别的条这一趟陪跑，判完照记库、判红照报（成功句与按条复用那一行报陪跑几条）。点到的条都复用的整份跳过。
 #   键相同、库里记着绿的复用；每趟开跑前 verdict-plan 抽复用哨兵、强制现判一条（种子打进日志；被判的根下有 .unit-verdict-sample/ 的样本不抽），失灵交 plan-failure 判红。
-#   一份判完就记：基准趟判绿（没超时、退 0、没有坏字节）、开关对上（对、守卫，没有坏字节）记绿，别的照同一把键记红、撤掉原有的绿（verdict-record --red-names）；
-#   基准趟没过、开关一条没起的那一份只记基准趟；收尾把这一趟判完的整份再交一次（哨兵在那一趟比）。
-#   成功句报「按条复用：现判 N、复用 M、拒算 R、陪跑 C」；全部复用时报「全部复用，这一格一条都没起」、退 0。算不出（verdict-plan 退非 0、没打 PLAN）照全部现判跑完、判红；
+#   判完就记：一份的开关趟齐了当场判、当场记，要重跑的那几条判完各记一次。基准趟判绿（没超时、退 0、没有坏字节）、开关对上（对、守卫，没有坏字节）记绿，
+#   别的照同一把键记红、撤掉原有的绿（verdict-record --red-names）；基准趟没过、开关一条没起的那一份只记基准趟；收尾把这一趟判完的整份再交一次（哨兵在那一趟比）。
+#   开关趟落盘（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」：被打断后重跑同一条命令就是续跑，只补没判的）：一条开关的判定要这一份全部开关趟的汇总行，
+#   开关趟齐之前判不了，所以落盘的单位是一趟：基准趟与开关趟每跑完一趟，当场把这一趟的结局（超时、退出码、坏字节，与判法读的那几行：带 ✗ 的行、点到开关名的自证行）照这一条的键
+#   写进这一格种类底下的 trips/<键>.json（TripJournal，经 admission.py library-files，同一份判定库、不另开）。要起的那几份里键相同、落了盘的趟取回、不再起，只补没落盘的；
+#   取回的趟与现跑的趟一起算汇总行、一起判，判法读到的与一趟跑完的相同；判得不是对的照旧先单独重跑一次再定（重跑的结局盖掉落盘的那一份）。
+#   复用哨兵抽中强制现判的那一条不取回，照起。取回时 prune-server 不可用这一格退 75；别的取不回判红，要起的照全部起。「起哪几份」不变，取回了的不算陪跑。
+#   样本 break-switch-replay-interrupted-resume（两份脚本：alpha 一条守卫、两条各红一格加一句汇总行，beta 一条；stop-after 是 3：判完两份基准趟与守卫那一条就停，
+#   两份样本脚本同一趟起第二次就判错；第二趟取回 3 趟、现跑 3 趟，判绿；第三趟全部复用）；break-switch-replay-forced-trip-rerun-green（样本根的 .break-switch-replay-second-pass 写种子：
+#   一份脚本四条开关连基准趟五条判定，同一份判定库上跑两趟，第二趟复用哨兵照那个种子强制现判一条开关，取回 4 趟、现跑 1 趟）。
+#   成功句报「按条复用：现判 N、复用 M、拒算 R、陪跑 C」与「开关趟：现跑 A 趟、取回 B 趟」；全部复用时报「全部复用，这一格一条都没起」、退 0。算不出（verdict-plan 退非 0、没打 PLAN）照全部现判跑完、判红；
 #   prune-server 不可用（退 75）一份都不起、这一格退 75。
 #   逐项点名（这一道「逐项点名」一节）：项是 <脚本路径> 或 <脚本路径>:<开关名>=<值>；点一条开关时那一份的基准趟与那几条算点到的，起不起照上面「起哪几份」。
 #   样本：break-switch-replay-reuse-three-questions（两份脚本五条；复用三问：change.sh 改 alpha.py 的 expected_cells，affected 是 alpha 的三条；四趟都绿、三问都过）；
 #     break-switch-replay-named-in-key（同样两份；change.sh 只改 alpha.py 头注里一条开关点名的项的写法（照样照得出）：那一条现判，同一份别的两条陪跑、仍算复用）；
 #     break-switch-replay-red-over-green（.unit-verdict-sample/prior/ 照判绿记四条；red-over-green 下一律现判，样本根的 .red-switch 让 flaky.py 那条开关红在没点名的一格，
 #     判红记红、撤绿，再算一次计划：复用 3 条、现判 1 条、原因「上次判红」）；break-switch-replay-item-co-run-green（点 tally.py 的一条开关：那一份照整份起，
-#     另两条陪跑，汇总行认得出）、break-switch-replay-item-unknown（项写错）。
+#     另两条陪跑，汇总行认得出）、break-switch-replay-item-unknown（项写错）；
+#     break-switch-replay-record-skips-forwarded-green（一份一条开关，基准趟往它自己读的 rewritten.tsv 末尾加一行：收尾记库两条都「跑的过程中键变了」，
+#     .unit-verdict-sample/record-skip-lines-shown 写 1，转一行「!」、另一条报「另有 1 条」；共用段 ItemVerdicts.report_record_skips）。
 #   弄坏开关（文件头开关表）CODE_TOOLING_BREAK=replay-plan-ignored、replay-red-not-recorded、replay-key-whole-registry、replay-named-unkeyed、replay-siblings-not-co-run、
-#     items-ignored、item-unknown-accepted，各红在开关表点名的样本。
+#     items-ignored、item-unknown-accepted、replay-trips-not-stored、replay-trips-not-loaded、replay-forced-trip-loaded、replay-scope-ignored、replay-cell-name-colon-only、replay-whole-scoped、
+#     replay-scoped-key-shared、replay-jobs-by-memory、
+#     replay-machine-progress-silent、record-skip-lines-dropped、replay-trip-leader-only-stopped、replay-reruns-batched、replay-mismatch-detail-truncated，各红在开关表点名的样本。
+# 判成「不符」的开关，汇总前重算键（ItemVerdicts.key_changes，写法在共用段上方的注释）：与开跑前算的不同，那一条的失败行接「跑的过程中键变了（开跑前算的键、现在的键）：
+#   组成清单有 N 处不同：…；出路：在冻结快照树里重判…」，键没变的失败行不变（句子接在「完整的失败行与点名的项在 <文件>:<行>」之后）；这一趟没有「不符」的开关就一个进程都不多起。
+#   样本 break-switch-replay-key-changed-red（基准趟往自己读的 shifted.tsv 末尾加一行，开关那一条失败行没点名：键在跑的过程中变了）；键没变的在 break-switch-replay-mismatch-detail-red 里报「键变了 0 条」。
+#   弄坏开关 CODE_TOOLING_BREAK=key-change-not-rechecked、key-change-noted-always、replay-baseline-unsubtracted（基准趟不起，表没人改），各红在开关表点名的样本。
 cell_break_switch_replay() {
   local registry=".claude/gate.d/break-switch-replay-files.tsv" jobs
   [[ -f "$registry" ]] || { echo "  ! 没有 $registry，这一格无对象可判"; exit 77; }
@@ -8837,9 +10414,32 @@ cell_break_switch_replay() {
     [[ -z "$replay_scratch" ]] || rm -rf -- "$replay_scratch"
     exit 1
   fi
+  # 范围（这一格文件头「范围」）：给了 --check 或 --item（样本根是 .gate-cells 与 .gate-items）是指定范围，什么都没给是不指定范围；
+  # 样本根的 .break-switch-replay-whole-scope 把它改成不指定范围，.break-switch-replay-jobs 给并行度的输入（这一格文件头「并行度」）
+  local replay_scope=whole replay_knobs="" replay_work_root=""
+  [[ "$STAGE_CELLS_SELECTION_SOURCE" == "全部登记的格" ]] || replay_scope=named
+  # 判红的明细文件放工作根下（这一格文件头「判红的明细」）：真仓上取 lib_work_root.py 不带参数打的工作根，取不到留空（python 那一侧改放本机临时目录并写明）；样本根留空
+  if ! judged_root_is_sample; then
+    replay_work_root="$(python3 "$STAGE_REPOSITORY/.claude/hooks/lib_work_root.py" 2>/dev/null)" || replay_work_root=""
+  fi
+  if judged_root_is_sample; then
+    [[ ! -f .break-switch-replay-whole-scope ]] || replay_scope=whole
+    [[ ! -f .break-switch-replay-jobs ]] || replay_knobs="$(<.break-switch-replay-jobs)"
+  fi
   # 复用三问（这一格文件头「按条复用」的样本）：样本根带 .unit-verdict-sample/three-questions/ 的，同一份判定库上跑四趟、判三问
   if judged_root_is_sample && [[ -d .unit-verdict-sample/three-questions ]]; then
     code_tooling_three_question_rounds break-switch-replay break_switch_replay_pass; replay_exit=$?
+  elif judged_root_is_sample && [[ -f .unit-verdict-sample/interrupted-resume/stop-after ]]; then
+    code_tooling_interrupted_rounds break-switch-replay break_switch_replay_pass; replay_exit=$?
+  elif judged_root_is_sample && [[ -f .break-switch-replay-second-pass ]]; then
+    # 强制现判那一条不取回（这一格文件头「开关趟落盘」）：第二趟键都相同，复用哨兵照样本写的种子强制现判一条；
+    # 样本根另放 .break-switch-replay-second-pass-whole 的，第二趟改按不指定范围判（指定范围判出的不许被不指定范围那一趟复用）
+    break_switch_replay_pass ""; replay_exit=$?
+    if ((replay_exit == 0)); then
+      echo "── 第二趟（break-switch-replay）"
+      [[ ! -f .break-switch-replay-second-pass-whole ]] || replay_scope=whole
+      SINGLEFS_REUSE_SENTINEL_SEED="$(cat .break-switch-replay-second-pass)" break_switch_replay_pass ""; replay_exit=$?
+    fi
   else
     break_switch_replay_pass ""; replay_exit=$?
   fi
@@ -8853,12 +10453,14 @@ break_switch_replay_pass() {
   python3 - "$(break_switch_replay_judge_code)" "$STAGE_REPOSITORY/.claude/hooks/lib_project_code_runs.py" "$registry" "${CODE_TOOLING_BREAK:-}" "$jobs" "${GATE_NOT_RUN_FILE:-}" \
     "$replay_binary" "$replay_required" "$SELFTEST_TEMPORARY_SERVICE_PREFIX" "$replay_progress_seconds" "$SWITCH_REPLAY_PROGRESS_LIBRARY" \
     "$UNIT_VERDICT_ROUNDS_LIBRARY" "$STAGE_REPOSITORY/scripts/gate/admission.py" "$STAGE_NAME:break-switch-replay" "$BREAK_SWITCH_REPLAY_JUDGE_TOKEN" "$STAGE_REPOSITORY" \
-    "${CODE_TOOLING_PICKED[break-switch-replay]:-}" "$(judged_root_is_sample && echo 1)" "$1" <<'PY'
-import collections, concurrent.futures, glob, hashlib, importlib.util, os, re, shutil, subprocess, sys, tempfile, threading, time, types
+    "${CODE_TOOLING_PICKED[break-switch-replay]:-}" "$(judged_root_is_sample && echo 1)" "$1" "$replay_scope" "$replay_knobs" "$SWITCH_REPLAY_PARALLELISM_LIBRARY" \
+    "$BREAK_SWITCH_HEADER_LIBRARY" "$replay_work_root" "$TREE_LISTING_LIBRARY" <<'PY'
+import collections, concurrent.futures, glob, hashlib, importlib.util, os, re, shutil, sys, tempfile, threading, time, types
 judge_library = types.ModuleType("lib_break_switch_replay_judge")
 exec(compile(sys.argv[1], "break-switch-replay-judge-library", "exec"), judge_library.__dict__)
 table = judge_library   # 开关表的读法与判法在同一个模块里（break_switch_replay_judge_code 打的两段）
-runs_library_path, registry_path, broken, jobs, not_run_file = sys.argv[2], sys.argv[3], sys.argv[4], min(int(sys.argv[5]), 4), sys.argv[6]
+exec(compile(sys.argv[23], "break-switch-header-library", "exec"), table.__dict__)   # 读没读开关、写全没写全、复跑登记表的取法：与 break-switch-headers 格同一份（不进判定的键）
+runs_library_path, registry_path, broken, default_threads, not_run_file = sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]), sys.argv[6]
 server_binary, service_required, service_prefix = sys.argv[7], set(sys.argv[8].split("\n")) - {""}, sys.argv[9].split()
 progress_seconds = int(sys.argv[10])     # 进度间隔（这一格文件头「进度」）
 progress_library = types.ModuleType("lib_switch_replay_progress")
@@ -8868,14 +10470,27 @@ exec(compile(sys.argv[12], "unit-verdict-rounds-library", "exec"), rounds.__dict
 admission, kind, judge_token, judge_root = sys.argv[13], sys.argv[14], sys.argv[15], sys.argv[16]
 picked = [item for item in sys.argv[17].split("\n") if item]      # 逐项点名（这一道「逐项点名」一节）：空是整格
 sample, states_path = sys.argv[18] == "1", sys.argv[19]
+work_root_text = sys.argv[24]    # 判红的明细文件放在这个工作根下（这一格文件头「判红的明细」）：样本根与取不到时是空
+parallel_library = types.ModuleType("lib_switch_replay_parallelism")
+exec(compile(sys.argv[22], "switch-replay-parallelism-library", "exec"), parallel_library.__dict__)
+# 范围（这一格文件头「范围」）：scoped 是指定范围；selecting 是指定范围且有选格手段的自证只起点名的格（弄坏开关 replay-scope-ignored 下不选，replay-whole-scoped 下不指定范围也选）
+scoped = sys.argv[20] == "named" or broken == "replay-whole-scoped"
+selecting = scoped and broken != "replay-scope-ignored"
+try:
+    knobs = parallel_library.parse_knobs(sys.argv[21])
+except ValueError as error:
+    print(f"  ✗ {error}，一条都没跑")
+    print(f"     → 怎么办：样本根的 {parallel_library.KNOB_FILE} 一行一项，写 memory-max=<字节数|max|unreadable> 或 threads=<正整数>。")
+    sys.exit(1)
+threads = int(knobs.get("threads", default_threads))                           # 登记的每台默认重活线程数（样本根的 threads 顶替）
+memory_limit, memory_limit_source = parallel_library.memory_limit_of(knobs)    # 这一趟的内存上限（字节，读不到或是 max 是 None）与它的出处
 needs_service = set()   # 只在临时 prune-server 上跑的那几份（要临时服务的表里登记成 required，shell 一侧读好交进来的 service_required）：基准趟与开关趟都包一层起
 spec = importlib.util.spec_from_file_location("lib_project_code_runs", runs_library_path)
 runs_library = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runs_library)
-READ = re.compile(r"\$\{?[A-Z][A-Z0-9_]*_BREAK\b|environ(?:\.get)?\s*[\(\[]\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']|getenv\(\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']"
-                  r"|^\s*[A-Z_][A-Z0-9_]*\s*=\s*[\"'][A-Z][A-Z0-9_]*_BREAK[\"']", re.M)
 selftests, _ = runs_library.read_selftest_registry(".claude/hooks/selftest-registry.tsv")
 problems, registered, queue, baseline_seconds_of = [], {}, [], {}
+selection_of = {}   # 路径 → 选格的环境变量名（有选格手段的自证，指定范围时才记）
 BASELINE = "基准趟"
 picked_paths, picked_switches = set(), {}
 for item in picked:
@@ -8897,11 +10512,10 @@ def named_by_item(path, label):
 
 def reads_switch(path):
     text = open(path, encoding="utf-8", errors="replace").read()
-    code = "\n".join(row for row in text.split("\n") if not row.lstrip().startswith("#"))
-    return text, bool(READ.search(code))
+    return text, table.reads_break_switch(text)
 
 
-registry_rows = [line.rstrip("\n").split("\t")[0] for line in open(registry_path, encoding="utf-8") if line.strip() and not line.startswith("#")]
+registry_rows = table.replay_registry_paths(registry_path)
 for number, line in enumerate(open(registry_path, encoding="utf-8"), 1):
     if not line.strip() or line.startswith("#"):
         continue
@@ -8921,11 +10535,12 @@ for number, line in enumerate(open(registry_path, encoding="utf-8"), 1):
         continue
     text, reads = reads_switch(path)
     entries = table.switch_entries(text)
+    gaps = [] if broken == "replay-header-gaps-unjudged" else table.header_gaps(text)
     row = selftests.get(path)
     if not reads:
         problems.append(f"{registry_path}:{number} {path} 代码里不读弄坏开关了，那一行删掉")
-    elif not entries or any(table.incomplete(entry) for entry in entries):
-        problems.append(f"{registry_path}:{number} {path} 文件头开关表没写全（break-switch-headers 格会点名），先写全再复跑")
+    elif gaps:
+        problems.extend(f"{registry_path}:{number} {table.gap_sentence(path, gap)}；复跑要文件头开关表三样写全、点名的项里「」成对（break-switch-headers 格点名同一条），先改好再复跑" for gap in gaps)
     elif row is None or row.kind != runs_library.SELFTEST_KIND:
         problems.append(f"{registry_path}:{number} {path} 在 .claude/hooks/selftest-registry.tsv 里不是自证的登记（{'没登记' if row is None else row.kind}），先登记成 selftest 再复跑")
     elif path in service_required and broken != "replay-temporary-service-unwrapped" and not server_binary:
@@ -8933,6 +10548,9 @@ for number, line in enumerate(open(registry_path, encoding="utf-8"), 1):
     else:
         if path in service_required and broken != "replay-temporary-service-unwrapped":
             needs_service.add(path)
+        variable = parallel_library.selection_variable(text) if selecting else None
+        if variable:
+            selection_of[path] = variable
         queue.extend((path, seconds, entry) for entry in entries)
 
 
@@ -8958,13 +10576,33 @@ for path, _seconds, entry in queue:
         labels_of[path].append(label_of(entry))
     entry_of[(path, label_of(entry))] = entry
 all_paths = list(labels_of)
+# 指定范围（这一格文件头「范围」）：有选格手段的自证，每条开关起点名的格——点名的项（「…」里的失败行句首）里「自证：<格名>：」之间那一段；
+# 基准趟起这份每条开关点名的格的并集（开关趟的失败行减的是同一批格的）。一条开关读不出格名的，它那一趟整份起，这份的基准趟也整份起。
+named_cells_of = {}      # (路径, 开关标签) → 点名的格名，排好序
+for path, _seconds, entry in queue:
+    cells = sorted({cell for item in judge_library.quoted_items(entry["items"]) for cell in parallel_library.cells_in(item, broken)})
+    if path in selection_of and cells:
+        named_cells_of[(path, label_of(entry))] = cells
+baseline_cells_of = {}   # 路径 → 基准趟起的格名（并集）
+for path in all_paths:
+    switch_labels = [label for label in labels_of[path] if label != BASELINE]
+    if path in selection_of and all((path, label) in named_cells_of for label in switch_labels):
+        baseline_cells_of[path] = sorted({cell for label in switch_labels for cell in named_cells_of[(path, label)]})
+
+
+def cells_of_trip(path, label):
+    """这一趟（基准趟或一条开关）只起的格名；整份起的交 None。"""
+    return baseline_cells_of.get(path) if label == BASELINE else named_cells_of.get((path, label))
 
 
 def request_line(path, label):
     tokens = [judge_token, f"judge-root:{judge_root}", f"line:command={command_text(path)}", f"line:switch={label}"]
-    if path.endswith(".py"):
-        # 判的是「这份脚本带 --selftest 跑」：程序入口只收 --selftest 真走到的那一支（admission.py 文件头「判定请求」program-argument:）
-        tokens.append("program-argument:--selftest")
+    cells = cells_of_trip(path, label)
+    if cells and broken != "replay-scoped-key-shared":
+        # 只起点名的格判出的，与整份判出的不是同一件事：键里另带选格变量与格名，不指定范围那一趟的键里没有这一行，复用不到
+        tokens.append(f"line:cell-scope={selection_of[path]}:" + hashlib.sha256(",".join(cells).encode("utf-8")).hexdigest())
+    # 判的是「这份脚本带 --selftest 跑」：python 与 shell 的程序入口都只收 --selftest 真走到的那一支（admission.py 文件头「判定请求」program-argument:）
+    tokens.append("program-argument:--selftest")
     if path in needs_service:
         tokens += ["file:scripts/prune-server/prune_server_client_selftest.py", "line:temporary-service=wrapped"]
     if label != BASELINE and broken != "replay-named-unkeyed":
@@ -8997,13 +10635,31 @@ def needs_judging(path, label):
 # 起哪几份：点到的条里有一条要现判（或拒算）的整份照起（基准趟与全部开关趟：汇总行要整份的开关趟，点名单跑一条与整格里判的相同）；点到的条都复用的整份跳过
 run_paths = [path for path in all_paths
              if broken == "replay-plan-ignored" or any(needs_judging(path, label) for label in labels_of[path] if named_by_item(path, label))]
+# 开关趟落盘（这一格文件头「开关趟落盘」）：要起的那几份里键相同、落了盘的趟取回，不再起；强制现判那一条不取回
+trip_journal = rounds.TripJournal(verdicts, broken != "replay-trips-not-stored")
+stopper = rounds.SampleStop(sample, os.getcwd(), plan_scratch)     # 样本档造中途被停（code_tooling_interrupted_rounds）：那一趟只开一个线程
+if stopper.armed:
+    threads = 1
+trip_names = [item_name(path, label) for path in run_paths for label in labels_of[path]]
+loaded_trips = {}
+if verdicts.ok and broken not in ("replay-plan-ignored", "replay-trips-not-loaded"):
+    loaded_trips = trip_journal.load([name for name in trip_names if broken == "replay-forced-trip-loaded" or not verdicts.forced(name)])
+    if trip_journal.unavailable:
+        shutil.rmtree(plan_scratch, ignore_errors=True)
+        print(f"  ✗ 脚本与钩子的弄坏开关复跑这一格没判：取回落了盘的开关趟时 prune-server 不可用（{trip_journal.problem}），一条都没起，这一格退 75")
+        print("     → 怎么办：python3 prune-server/control check 看服务，起不来报给主 agent；修好再跑这一格：bash .claude/gate.d/code-tooling.sh --check break-switch-replay")
+        sys.exit(75)
+    if trip_journal.problem:
+        problems.append(f"落了盘的开关趟取不回（{trip_journal.problem}），这一趟要起的照全部起；照括号里那一句修 admission.py library-files 或判定库")
 decision_count = collections.Counter(verdicts.decision(item_name(path, label))[0] for path, label in named_items)
 judged_count, refused_count, reused_count = decision_count[rounds.JUDGE], decision_count[rounds.REFUSED], decision_count[rounds.REUSE]
-co_run_count = sum(1 for path in run_paths for label in labels_of[path] if not (named_by_item(path, label) and needs_judging(path, label)))
+co_run_count = sum(1 for path in run_paths for label in labels_of[path]
+                   if not (named_by_item(path, label) and needs_judging(path, label)) and item_name(path, label) not in loaded_trips)
 if request_lines:
     print(f"  · 按条复用：{len(all_paths)} 份脚本、{len(named_items)} 条判定（基准趟 {sum(1 for _path, label in named_items if label == BASELINE)} 条、"
           f"开关 {sum(1 for _path, label in named_items if label != BASELINE)} 条），现判 {judged_count}、复用 {reused_count}、拒算 {refused_count}；"
           f"起 {len(run_paths)} 份（陪跑 {co_run_count} 条：同一份里有条要现判就整份照起，汇总行要整份的开关趟）、跳过 {len(all_paths) - len(run_paths)} 份（点到的条都复用）", flush=True)
+    print(f"  · 开关趟落盘：取回 {len(loaded_trips)} 趟（键相同、跑完就落了盘，不再起），这一趟要起 {len(trip_names) - len(loaded_trips)} 趟", flush=True)
     shown = 0
     for path, label in named_items:
         decision, reason = verdicts.decision(item_name(path, label))
@@ -9022,14 +10678,34 @@ if request_lines:
 # 弄坏开关 replay-siblings-not-co-run：同一份只起要现判的那几条开关趟（改错的样子：汇总行少了陪跑的开关趟，点名单跑一条与整格里判的不同）
 queue = [job for job in queue if job[0] in run_paths
          and (broken != "replay-siblings-not-co-run" or (named_by_item(job[0], label_of(job[2])) and needs_judging(job[0], label_of(job[2]))))]
-green_of = {}            # 判完的条 → 判绿没有（记库用；一份判完就记，收尾再整份交一次）
+# 这一趟的范围（成功句与开跑前一行都写，这一格文件头「范围」）：指定范围写有几条开关趟、几份基准趟只起点名的格，几条整份起；不指定范围写每条整份起
+restricted_switches = sum(1 for path, _seconds, entry in queue if cells_of_trip(path, label_of(entry)))
+restricted_baselines = sum(1 for path in {job[0] for job in queue} if baseline_cells_of.get(path))
+if scoped:
+    scope_text = f"范围：指定范围（只起点名的格：开关趟 {restricted_switches} 条、基准趟 {restricted_baselines} 份；整份起：开关趟 {len(queue) - restricted_switches} 条）"
+else:
+    scope_text = "范围：不指定范围（每条开关趟与基准趟都起整份自证，逐格相同）"
+if queue:
+    print(f"  · {scope_text}" + (f"；选格变量：{'、'.join(sorted(set(selection_of.values())))}" if selection_of else ""), flush=True)
+green_of = {}            # 判完的条 → 判绿没有（记库用；判完就记，收尾再整份交一次）
+recorded_names = set()   # 这一趟当场记过的条
 
 
 def record_path(path):
-    """一份的基准趟与开关趟都判完（或基准趟没过、开关一条没起）：当场照键记这一份判完的条（这一格文件头「按条复用」一份判完就记）。"""
+    """这一份刚判完的条当场照键记（这一格文件头「按条复用」判完就记）：一份的开关趟齐了判完那一批记一次，要重跑的那几条判完各记一次。"""
     with progress_lock:
-        mine = [(name, green) for name, green in green_of.items() if name.startswith(path + " ")]
+        mine = [(name, green) for name, green in green_of.items() if name.startswith(path + " ") and name not in recorded_names]
+        recorded_names.update(name for name, _green in mine)
     verdicts.record([name for name, green in mine if green], [name for name, green in mine if not green])
+
+
+def journaled_trip(record, entry):
+    """一趟落盘的那一份（这一格文件头「开关趟落盘」）：判法读超时、退出码、坏字节、失败行与点到开关名的自证行，别的行不存。
+    留下进程或停不掉的趟（record["left"] 不空）不落盘：下一趟照起，取回的趟都是收干净了的。"""
+    switch = entry["name"] if entry is not None else None
+    rows = [row for row in record["output"].split("\n")
+            if "✗" in row or (switch and switch in row and ("自证" in row or "selftest" in row.lower()))]
+    return {"timeout": record["timeout"], "code": record["code"], "bad": record["bad"], "output": "\n".join(rows)}
 
 
 progress_lock = threading.Lock()         # 管下面几张按份记的表；拿着它不调 tracker（tracker 自己的锁在里面拿打印锁，不反过来）
@@ -9062,40 +10738,79 @@ def finish(path, text):
     tracker.say(text)
 
 
+def trip_units(path, label):
+    """这一趟占几个内存单位：只起点名的格的趟，起几格就几个（自证自己并行起格，至多每趟拿到的里层线程数个同时在跑）；整份起的趟一个。"""
+    cells = cells_of_trip(path, label)
+    return min(len(cells), inner_threads) if cells else 1
+
+
 def run_selftest(path, seconds, entry=None):
-    """起一趟这份的 --selftest（entry 是 None 时不设开关，是基准趟）：→ {timeout, code, output, bad, seconds}。"""
-    with progress_lock:
-        started_of.setdefault(path, time.monotonic())
-    started = time.monotonic()
-    try:
-        with tracker.running(path, f"{path} {'基准趟' if entry is None else entry['name'] + '=' + entry['value']}"):
-            record = run_selftest_once(path, seconds, entry)
-        record["seconds"] = time.monotonic() - started
-        return record
-    finally:
+    """起一趟这份的 --selftest（entry 是 None 时不设开关，是基准趟）：→ {timeout, code, output, bad, seconds, peak_kib, left}。
+    先过内存这一关（admission，这一格文件头「并行度」），占到位置才起；用的秒数从占到位置算起。
+    run_selftest_once 核完组里一个不剩才返回，名额在那之后还（这一格文件头「每趟的进程组」）；组里有停不掉的，内存额度不还。
+    到点没跑完的趟量到的峰值是被停之前的，不换进估计。"""
+    units = trip_units(path, BASELINE if entry is None else label_of(entry))
+    with admission.slot(path, units) as hold:
         with progress_lock:
-            trips_of[path] += 1
+            started_of.setdefault(path, time.monotonic())
+        started = time.monotonic()
+        try:
+            with tracker.running(path, f"{path} {'基准趟' if entry is None else entry['name'] + '=' + entry['value']}"):
+                record = run_selftest_once(path, seconds, entry, hold)
+            record["seconds"] = time.monotonic() - started
+            if not record["timeout"]:
+                admission.observe(path, entry is None, units, record["peak_kib"])
+            if not record["left"]:
+                trip_journal.store(item_name(path, BASELINE if entry is None else label_of(entry)), journaled_trip(record, entry))
+            stopper.passed()
+            return record
+        finally:
+            with progress_lock:
+                trips_of[path] += 1
+            tracker.trip_finished()
 
 
-def run_selftest_once(path, seconds, entry):
+def first_trip(path, seconds, entry=None):
+    """这一条这一趟的头一趟：落了盘、取回了的用取回的那一份（用了 0 秒、机读进度当场算跑完一趟），没有的现起。"""
+    loaded = loaded_trips.get(item_name(path, BASELINE if entry is None else label_of(entry)))
+    if loaded is None:
+        return run_selftest(path, seconds, entry)
+    tracker.trip_finished()
+    return dict(loaded, seconds=0.0, left="")   # 落盘的都是收干净了的趟（journaled_trip）
+
+
+def run_selftest_once(path, seconds, entry, hold):
     environment = {name: value for name, value in os.environ.items() if not name.endswith("_BREAK")}
+    if broken != "replay-inner-threads-uncapped":
+        environment["SINGLEFS_THREAD_CAP"] = str(inner_threads)   # 里层线程数：每一趟拿到的并行度上限
     if entry is not None:
         environment[entry["name"]] = entry["value"]
     interpreter = ["python3", "-B"] if path.endswith(".py") else ["bash"]
     strict = {"text": True} if broken == "replay-output-strict-decode" else {}
+    cells = cells_of_trip(path, BASELINE if entry is None else label_of(entry))
+    if cells:   # 指定范围、有选格手段的自证：只起点名的格（这一格文件头「范围」）
+        environment[selection_of[path]] = ",".join(cells)
     command = [*interpreter, path, "--selftest"]
     if path in needs_service:   # 包装写法：-- 前插 --server-binary <这一趟那一份>（这一格文件头「只在临时 prune-server 上跑的自证」）
         command = [*service_prefix[:-1], "--server-binary", server_binary, "--", *command]
-    try:
-        done = subprocess.run(command, env=environment, stdin=subprocess.DEVNULL, capture_output=True, timeout=seconds, **strict)
-    except subprocess.TimeoutExpired:
-        return {"timeout": True, "code": None, "output": "", "bad": []}
-    output, bad = judge_library.decoded_output((("stdout", done.stdout), ("stderr", done.stderr)), broken)
-    return {"timeout": False, "code": done.returncode, "output": output, "bad": bad}
+    # 每趟自成一组、到点与收尾停整组、核完组里一个不剩才返回（这一格文件头「每趟的进程组」）
+    trip = launcher.run(command, environment, seconds, f"{path} {BASELINE if entry is None else label_of(entry)}", meter, **strict)
+    if trip["stuck"]:
+        hold.keep = True
+    if trip["timeout"]:
+        return {"timeout": True, "code": None, "output": "", "bad": [], "peak_kib": trip["peak_kib"], "left": trip["problem"]}
+    output, bad = judge_library.decoded_output((("stdout", trip["stdout"]), ("stderr", trip["stderr"])), broken)
+    return {"timeout": False, "code": trip["code"], "output": output, "bad": bad, "peak_kib": trip["peak_kib"], "left": trip["problem"]}
 
 
 def judge(entry, record, baseline_rows, summary_keys):
-    return judge_library.judge(entry, record, baseline_rows, summary_keys, broken)
+    """判法照 judge_library.judge；这一趟没收干净的（record["left"] 不空，这一格文件头「每趟的进程组」）：对上的也记「留下进程」，别的结局在说明后面接上。"""
+    kind, why = judge_library.judge(entry, record, baseline_rows, summary_keys, broken)
+    if not record["left"]:
+        return kind, why
+    if kind in ("对", "守卫"):
+        return "留下进程", record["left"]
+    return kind, f"{why}；{record['left']}"
 
 
 def summary_keys_of(path, first):
@@ -9110,9 +10825,41 @@ seconds_of = {path: seconds for path, seconds, _entry in queue}
 baseline_limit_of = {path: seconds_of[path] if broken == "replay-baseline-shares-switch-limit" else baseline_seconds_of[path] for path in paths}
 baseline_rows_of, results = {}, []
 switch_count_of = collections.Counter(path for path, _seconds, _entry in queue)
-tracker = progress_library.ReplayProgress("break-switch-replay", len(queue), progress_seconds, broken == "replay-progress-silent", running_paths_lines)
+# 并行度（这一格文件头「并行度」）：并行条数取登记的每台默认重活线程数，内存上限只写进开跑那一行。
+#   弄坏开关 replay-jobs-by-memory：照内存上限算并行条数（jobs_for）、Admission 带上限的份额（上限读不到或是 max 时这个开关不起作用）
+fallback_trip_bytes = parallel_library.TRIP_MEMORY_FALLBACK_BYTES
+by_memory = broken == "replay-jobs-by-memory" and memory_limit is not None
+jobs = parallel_library.jobs_for(threads, memory_limit, fallback_trip_bytes) if by_memory else threads
+if by_memory:
+    plan_text = (f"内存上限 {memory_limit // parallel_library.MEBIBYTE} MiB、每趟 {fallback_trip_bytes // parallel_library.MEBIBYTE} MiB、"
+                 f"份额 {parallel_library.SAFE_SHARE_PERCENT}%")
+else:
+    limit_text = f"内存上限{memory_limit_source}" if memory_limit is None else f"内存上限 {memory_limit // parallel_library.MEBIBYTE} MiB（{memory_limit_source}）"
+    plan_text = f"登记的每台默认重活线程数 {threads} 条；{limit_text}，由服务定、撞了服务照乘 1.5 放大重排，不按它收并行"
+# 外层同时在跑的趟数 × 每趟里层的线程数不超过登记的线程数（这一格文件头「并行度」）：外层路数的上限取并行条数与要起的趟数里小的，
+# 里层线程数取线程数除以它，经环境变量 SINGLEFS_THREAD_CAP 交给每一趟起的自证（自证里的并行度都经登记位取，登记位认这个变量）；同时在跑的就是外层路数的上限
+outer_cap = max(1, min(jobs, len(queue) + len(paths)))
+inner_threads = threads if broken == "replay-inner-threads-uncapped" else max(1, threads // outer_cap)
+admission = parallel_library.Admission(parallel_library.budget_of(memory_limit) if by_memory else None, outer_cap, paths, fallback_trip_bytes)
+meter = parallel_library.TripMeter(progress_library)
+
+
+def stop_line(text):
+    """「到点停整组」那一行：不随进度一起关（弄坏开关 replay-progress-silent 只关进度），拿进度库的打印锁打。"""
+    with tracker.print_lock:
+        print(f"  · break-switch-replay {text}", flush=True)
+
+
+# 每趟自成一组、到点与收尾停整组（这一格文件头「每趟的进程组」）；门禁收到 TERM、INT、HUP 时各线程收自己那一组，处理在开池之前于主线程装上
+launcher = parallel_library.TripLauncher(stop_line, broken == "replay-trip-leader-only-stopped")
+launcher.install_stop_on_signals()
+# 机读进度按趟报（这一格文件头「机读进度」）：开跑时要跑的是每份一趟基准趟（不起基准趟的弄坏开关下没有）加全部开关趟
+tracker = progress_library.ReplayProgress("break-switch-replay", len(queue), progress_seconds, broken == "replay-progress-silent", running_paths_lines,
+                                          broken != "replay-machine-progress-silent",
+                                          (0 if broken == "replay-baseline-unsubtracted" else len(paths)) + len(queue))
 if queue:
-    tracker.start(f"break-switch-replay 开跑：{len(paths)} 份、{len(queue)} 条开关，并行 {jobs} 条；每条判完打一行、每份开关轮跑完打一行，"
+    tracker.start(f"break-switch-replay 开跑：{len(paths)} 份、{len(queue)} 条开关，并行 {jobs} 条（{plan_text}）；"
+                  f"外层 {outer_cap} 条 × 里层 {inner_threads} = {outer_cap * inner_threads}（不超过每台默认重活线程数 {threads}）；每条判完打一行、每份开关轮跑完打一行，"
                   f"每过 {progress_seconds} 秒打一行总进度并给还没跑完的每份打一行")
 
 
@@ -9121,6 +10868,7 @@ def settled(index, kind, why, record, seconds):
     path, _seconds, entry = queue[index]
     with progress_lock:
         outcome_of[index] = (kind, why, record["bad"])
+        outcome_record_of[index] = record
         settled_of[path] += 1
         matched_of[path] += kind in ("对", "守卫") and not record["bad"]
         last = settled_of[path] == switch_count_of[path]
@@ -9135,7 +10883,6 @@ def settled(index, kind, why, record, seconds):
     tracker.item_done(verdict, f"{path} {entry['name']}={entry['value']}", seconds)
     if last:
         finish(path, f"break-switch-replay 跑完一份：{path} 开关 {switch_count_of[path]} 条、对上 {matched} 条、用了 {seconds_since(path)} 秒")
-        record_path(path)
 
 
 def rerun_and_settle(index, first_record):
@@ -9144,21 +10891,25 @@ def rerun_and_settle(index, first_record):
     record = run_selftest(path, seconds, entry)
     kind, why = judge(entry, record, baseline_rows_of[path], summary_of[path])
     settled(index, kind, why, record, first_record["seconds"] + record["seconds"])
+    record_path(path)
 
 
-outcome_of, summary_of = {}, {}
-with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+outcome_of, outcome_record_of, summary_of = {}, {}, {}
+with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, min(admission.max_running, 2 * len(queue) + len(paths)))) as pool:
     # 基准趟：不设开关起一趟，退非 0 或超时的单独重跑一次再定
     if broken != "replay-baseline-unsubtracted":
-        baselines = dict(zip(paths, pool.map(lambda path: run_selftest(path, baseline_limit_of[path]), paths)))
+        baselines = dict(zip(paths, pool.map(lambda path: first_trip(path, baseline_limit_of[path]), paths)))
         for path in paths:
             record = baselines[path]
-            if record["timeout"] or record["code"] != 0:
+            if record["timeout"] or record["code"] != 0 or record["left"]:
+                tracker.trips_added(1)
                 record = run_selftest(path, baseline_limit_of[path])
             with progress_lock:
-                green_of[item_name(path, BASELINE)] = judge_library.baseline_green(record)
-            if record["timeout"] or record["code"] != 0:
-                problems.append(f"{path}：不设开关的 --selftest 就没过（{'超时：基准趟限时 ' + str(baseline_limit_of[path]) + ' 秒' if record['timeout'] else '退 ' + str(record['code'])}），开关下的失败行比不出哪些是开关弄红的，这一份的开关一条都没起")
+                green_of[item_name(path, BASELINE)] = judge_library.baseline_green(record) and not record["left"]
+            if record["timeout"] or record["code"] != 0 or record["left"]:
+                reason = "；".join(part for part in ("超时：基准趟限时 " + str(baseline_limit_of[path]) + " 秒" if record["timeout"] else
+                                                      "退 " + str(record["code"]) if record["code"] != 0 else "", record["left"]) if part)
+                problems.append(f"{path}：不设开关的 --selftest 就没过（{reason}），开关下的失败行比不出哪些是开关弄红的，这一份的开关一条都没起")
                 finish(path, f"break-switch-replay 跑完一份：{path} 开关 {switch_count_of[path]} 条、对上 0 条（基准趟没过，开关一条没起）、用了 {seconds_since(path)} 秒")
                 record_path(path)
                 continue
@@ -9169,6 +10920,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
         baseline_rows_of = {path: [] for path in paths}
     queue = [job for job in queue if job[0] in baseline_rows_of]
     tracker.total = len(queue)
+    tracker.trips_left(len(queue))
     # 开关趟全部派出去；一份的开关趟齐了就当场判这一份（汇总行要这一份的全部开关趟），不等别的份，逐条进度随判随打。
     # 同一把键（路径、限时、开关）只留表里排在后面的那一趟，汇总行与判定都读这一份；要重跑的另派出去。
     key_of = [(path, seconds, entry["name"] + "=" + entry["value"]) for path, seconds, entry in queue]
@@ -9176,8 +10928,9 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
     for index, (path, _seconds, _entry) in enumerate(queue):
         indexes_of[path].append(index)
     waiting_of = {path: len(indexes) for path, indexes in indexes_of.items()}
-    record_of, first, reruns = {}, {}, []
-    trips = {pool.submit(run_selftest, path, seconds, entry): index for index, (path, seconds, entry) in enumerate(queue)}
+    # 要重跑的（这一格文件头「判据」末尾「重跑」）：记下来，别的趟都收完之后一次一条地起；弄坏开关 replay-reruns-batched：当场派进池子，与还在跑的趟、同一批要重跑的一起起
+    record_of, first, reruns, rerun_later = {}, {}, [], []
+    trips = {pool.submit(first_trip, path, seconds, entry): index for index, (path, seconds, entry) in enumerate(queue)}
     for future in concurrent.futures.as_completed(trips):
         index = trips[future]
         record_of[index] = future.result()
@@ -9192,18 +10945,95 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
             record = first[key_of[sibling]]
             kind, why = judge(queue[sibling][2], record, baseline_rows_of[path], summary_of[path])
             if kind not in ("对", "守卫") or record["bad"]:
-                reruns.append(pool.submit(rerun_and_settle, sibling, record))
+                tracker.trips_added(1)
+                if broken == "replay-reruns-batched":
+                    reruns.append(pool.submit(rerun_and_settle, sibling, record))
+                else:
+                    rerun_later.append((sibling, record))
             else:
                 settled(sibling, kind, why, record, record["seconds"])
+        record_path(path)
     for future in concurrent.futures.as_completed(reruns):
         future.result()
+    for sibling, record in sorted(rerun_later, key=lambda pair: pair[0]):
+        rerun_and_settle(sibling, record)
     results = [outcome_of[index] for index in range(len(queue)) if index in outcome_of]
+meter.close()
 tracker.close()
 if len(results) != len(queue):
     problems.append(f"派出去 {len(queue)} 条、收回 {len(results)} 条，对不上，这一趟不算数")
-for (path, _seconds, entry), (kind, why, bad) in zip(queue, results):
+
+
+def mismatch_detail(index):
+    """一条判成「不符」的开关的完整明细 → (点名的项, 这一趟多出来的失败行, 点名的项里没在失败行里的, 多出来的失败行里没被点名的)，一个字都不截。
+    取法与 judge_library.judge 的「不符」那一支同一份：点名的项取 quoted_items，失败行取这一趟的减基准趟的，汇总行不要求点名；
+    弄坏开关 replay-items-unchecked、replay-unnamed-rows-unchecked 下照 judge 的样子少算。"""
+    path, _seconds, entry = queue[index]
+    items = judge_library.quoted_items(entry["items"])
+    extra = judge_library.extra_rows(judge_library.failure_rows(outcome_record_of[index]["output"]), baseline_rows_of[path])
+    missing = [item for item in items if broken != "replay-items-unchecked" and not any(judge_library.appears_in(item, row) for row in extra)]
+    unnamed = [] if broken == "replay-unnamed-rows-unchecked" else [
+        row for row in extra if row.startswith("✗") and judge_library.VOLATILE.sub("#", row) not in summary_of[path] and not any(judge_library.appears_in(item, row) for item in items)]
+    return items, extra, missing, unnamed
+
+
+def write_mismatch_file(indexes):
+    """判成「不符」的各条开关（queue 里的下标）的完整明细落到一份文件里（这一格文件头「判红的明细」）→ (文件路径, {下标: 它那一节在文件里的起始行})；没有不符的是 (None, {})。
+    写完回读：点名的项逐项、多出来的失败行逐行都得在文件里，缺了记一处不对；核过的打一行。真仓上放工作根下新建的目录（两台读得到），样本根放本机临时目录、核完就删。
+    弄坏开关 replay-mismatch-detail-truncated：照日志截（失败行只写前三行、每行前八十个字，点名的项只写前三项、每项前六十个字）。"""
+    if not indexes:
+        return None, {}
+    note, directory = "", None
+    if work_root_text and not sample:
+        try:
+            os.makedirs(work_root_text, exist_ok=True)
+            directory = tempfile.mkdtemp(prefix="break-switch-replay-mismatches.", dir=work_root_text)
+        except OSError as error:
+            note = f"（工作根 {work_root_text} 用不了：{error}；明细落在本机临时目录，第二台读不到）"
+    elif not sample:
+        note = "（取不到工作根；明细落在本机临时目录，第二台读不到）"
+    directory = directory or tempfile.mkdtemp(prefix="break-switch-replay-mismatches.")
+    truncated = broken == "replay-mismatch-detail-truncated"
+    lines, start_of, details = ["# break-switch-replay 判成「不符」的开关的完整明细（点名的项与失败行都不截断）"], {}, {}
+    for index in indexes:
+        path, _seconds, entry = queue[index]
+        items, extra, missing, unnamed = mismatch_detail(index)
+        details[index] = (items, extra, missing, unnamed)
+        start_of[index] = len(lines) + 1
+        written_items = [item[:60] for item in items[:3]] if truncated else items
+        written_rows = [row[:80] for row in extra[:3]] if truncated else extra
+        lines.append(f"## {path} {entry['name']}={entry['value']}")
+        lines.append(f"点名的项 {len(items)} 项（没在失败行里的标「没红」）：")
+        lines.extend(f"  [{'没红' if item in missing else '红了'}] {text}" for item, text in zip(items, written_items))
+        lines.append(f"这一趟多出来的失败行 {len(extra)} 行（没被点名的标「没点名」）：")
+        lines.extend(f"  [{'没点名' if row in unnamed else '已点名'}] {text}" for row, text in zip(extra, written_rows))
+    file_path = os.path.join(directory, "mismatches.txt")
+    with open(file_path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n")
+    with open(file_path, encoding="utf-8") as handle:
+        content = handle.read()
+    absent = [text for items, extra, _missing, _unnamed in details.values() for text in [*items, *extra] if text not in content]
+    if absent:
+        problems.append(f"不符明细文件 {file_path} 回读时缺 {len(absent)} 处完整的点名的项或失败行（比如：{absent[0][:80]}）{note}")
+    else:
+        print(f"  · 不符明细回读核过：{len(indexes)} 条开关、点名的项 {sum(len(detail[0]) for detail in details.values())} 项、"
+              f"失败行 {sum(len(detail[1]) for detail in details.values())} 行（其中没被点名的 {sum(len(detail[3]) for detail in details.values())} 行）都在文件里{note}"
+              f"{'（样本根：核完就删）' if sample else ''}", flush=True)
+    if sample and not absent:
+        shutil.rmtree(directory, ignore_errors=True)
+    return file_path, start_of
+
+
+result_indexes = [index for index in range(len(queue)) if index in outcome_of]
+mismatch_file, mismatch_start = write_mismatch_file([index for index in result_indexes if outcome_of[index][0] == "不符"])
+# 判成「不符」的那几条才重算键：跑的过程中键变了的，失败行里多一句（ItemVerdicts.key_changes）
+key_change_notes = verdicts.key_changes([item_name(queue[index][0], label_of(queue[index][2])) for index in result_indexes if outcome_of[index][0] == "不符"])
+for index, (kind, why, bad) in zip(result_indexes, results):
+    path, _seconds, entry = queue[index]
     if kind not in ("对", "守卫"):
-        problems.append(f"{path} {entry['name']}={entry['value']}：{kind}，{why}")
+        where = f"；完整的失败行与点名的项在 {mismatch_file}:{mismatch_start[index]}" if index in mismatch_start else ""
+        key_changed = key_change_notes.get(item_name(path, label_of(entry)))
+        problems.append(f"{path} {entry['name']}={entry['value']}：{kind}，{why}{where}" + (f"；{key_changed}" if key_changed else ""))
     problems.extend(f"{path} {entry['name']}={entry['value']}：坏字节，{reason}，改那份脚本让它在这条开关下只吐 UTF-8" for reason in bad)
 # 收尾把这一趟判完的条整份再交一次（同一把键写同样的内容），复用哨兵强制现判的那一条在这一趟比
 verdicts.record([name for name, green in green_of.items() if green], [name for name, green in green_of.items() if not green], final=True)
@@ -9212,15 +11042,15 @@ if any(not green for green in green_of.values()):
 verdicts.write_states(states_path, [item_name(path, label) for path, label in named_items])
 shutil.rmtree(plan_scratch, ignore_errors=True)
 unregistered = []
-selftest_files = [] if picked else sorted(path for directory in ("scripts", ".claude/hooks") for extension in ("sh", "py")
-                                          for path in glob.glob(f"{directory}/**/*.{extension}", recursive=True) if "/fixtures/" not in path)
+tree = types.ModuleType("lib_tree_listing")
+exec(compile(sys.argv[25], "tree-listing-library", "exec"), tree.__dict__)
+selftest_files = [] if picked else sorted(path for directory in ("scripts", ".claude/hooks") for path in tree.files_under(directory, (".sh", ".py"), skipped=("target", "fixtures")))
 for path in selftest_files:
     if path in registered:
         continue
     text, reads = reads_switch(path)
-    entries = table.switch_entries(text) if reads else []
     row = selftests.get(path)
-    if entries and not any(table.incomplete(entry) for entry in entries) and row is not None and row.kind == runs_library.SELFTEST_KIND:
+    if reads and not table.header_gaps(text) and row is not None and row.kind == runs_library.SELFTEST_KIND:
         unregistered.append(path)
 if unregistered and not_run_file:
     with open(not_run_file, "a", encoding="utf-8") as handle:
@@ -9233,7 +11063,8 @@ if problems:
     print("     → 怎么办：点名的项没在失败行里、失败行没被点名的，照实测改那份文件头那一条下面「」里的失败行原文，让点名的格与实际红的格逐格相同"
           "（实测是对的才改头注；自证判错是因为判法坏了就修判法）；"
           f"设上之后自证照样退 0 的，开关没弄坏它说的那一处，改开关或改头注；不设开关自证就没过的，先修那份自证；输出带不合法 UTF-8 的（坏字节），改那份脚本让它在那条开关下只吐 UTF-8"
-          f"（截断的多字节字符、原样转发的二进制都会这样）；基准趟超时的（自证自带开关轮的最常见），在 {registry_path} 那一行第三列写基准趟限时；"
+          f"（截断的多字节字符、原样转发的二进制都会这样）；留下进程或停不掉的，改那份自证让它起的进程在它退出之前都收干净"
+          f"（.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」）；基准趟超时的（自证自带开关轮的最常见），在 {registry_path} 那一行第三列写基准趟限时；"
           f"这份还接不进复跑的，从 {registry_path} 删掉那一行；判据在 code-tooling.sh 里这一格函数上方的注释")
     sys.exit(1)
 if verdicts.unavailable:
@@ -9247,13 +11078,14 @@ if verdicts.red:
 if not request_lines:
     print("  ! 登记表里没有一条可复跑的开关，这一格无对象可判")
     sys.exit(77)
-reuse_text = (f"按条复用：现判 {judged_count}、复用 {reused_count}、拒算 {refused_count}、陪跑 {co_run_count}" if verdicts.ok else "按条复用算不出、全部现判")
+reuse_text = (f"按条复用：现判 {judged_count}、复用 {reused_count}、拒算 {refused_count}、陪跑 {co_run_count}；开关趟：现跑 {sum(trips_of.values())} 趟、取回 {len(loaded_trips)} 趟"
+              if verdicts.ok else "按条复用算不出、全部现判")
 if not paths:
     print(f"  ✓ 脚本与钩子的弄坏开关复跑：点到的 {len(named_items)} 条都有键相同的判定，全部复用，这一格一条都没起（{reuse_text}）；"
-          f"没接复跑的 {len(unregistered)} 份文件头写全的脚本：{'、'.join(unregistered) or '（没有）'}")
+          f"没接复跑的 {len(unregistered)} 份文件头写全的脚本：{'、'.join(unregistered) or '（没有）'}；{scope_text}")
     sys.exit(0)
 print(f"  ✓ 脚本与钩子的弄坏开关复跑：复跑了 {len(queue)} 条开关（{len(paths)} 份），自证红且点名的格与实际红的格逐格相同 {len(queue) - guarded} 条、自证自带开关轮 {guarded} 条；"
-      f"没接复跑的 {len(unregistered)} 份文件头写全的脚本：{'、'.join(unregistered) or '（没有）'}；{reuse_text}")
+      f"没接复跑的 {len(unregistered)} 份文件头写全的脚本：{'、'.join(unregistered) or '（没有）'}；{reuse_text}；{scope_text}")
 PY
 }
 
@@ -9334,11 +11166,11 @@ PY
 #   prune-server-selftest-empty-red（末行 cells=0 passed=0 failed=0、退 0：一格都没跑）；
 #   prune-server-selftest-no-summary-red（只打各格的行、没有末行、退 0）；prune-server-selftest-exit-red（末行 failed=0，却退 1）。
 # 弄坏开关 CODE_TOOLING_BREAK=prune-server-failed-ignored：不看末行的 failed= 与退出码，failed-red、exit-red 判绿；
-#   CODE_TOOLING_BREAK=prune-server-empty-run-accepted：N 为 0 也算过，empty-red 判绿；
-#   CODE_TOOLING_BREAK=prune-server-last-line-unchecked：末行缺或不在最后不判（有末行照旧核，没有就只看退出码），no-summary-red 判绿；
-#   CODE_TOOLING_BREAK=prune-server-exit-unchecked：不核退出码与 failed= 对不对得上，exit-red 判绿。
+#   弄坏开关 CODE_TOOLING_BREAK=prune-server-empty-run-accepted：N 为 0 也算过，empty-red 判绿；
+#   弄坏开关 CODE_TOOLING_BREAK=prune-server-last-line-unchecked：末行缺或不在最后不判（有末行照旧核，没有就只看退出码），no-summary-red 判绿；
+#   弄坏开关 CODE_TOOLING_BREAK=prune-server-exit-unchecked：不核退出码与 failed= 对不对得上，exit-red 判绿。
 cell_prune_server_selftest() {
-local scratch program=() run_exit kept_build_log
+local scratch program=() run_exit kept_build_log program_binary build_log
 [[ -f prune-server/Cargo.toml ]] || { echo "  ! 被判的根里没有 prune-server/Cargo.toml（判定库服务），这一格无对象可判"; exit 77; }
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/code-tooling-prune-server-selftest.XXXXXX")" || { echo "  ✗ 建不了这一格的临时目录"; echo "     → 怎么办：看 \${TMPDIR:-/tmp} 满没满、有没有写权限，修好再跑。"; exit 1; }
 # shellcheck disable=SC2064  # 路径在这里就展开（%q 过）
@@ -9353,14 +11185,19 @@ else
     echo "     → 怎么办：照上面那几行的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再跑这一格。"
     exit 1
   fi
-  if ! CARGO_TARGET_DIR="$scratch/target" \
-      cargo build --release --offline --manifest-path "$ROOT/prune-server/Cargo.toml" --bin prune-server >"$scratch/build.log" 2>&1; then
-    kept_build_log="$(mktemp "${TMPDIR:-/tmp}/code-tooling-prune-server-selftest-build.XXXXXX.log")" && cp -- "$scratch/build.log" "$kept_build_log" || kept_build_log="（没留下：拷不出来）"
-    echo "  ✗ 编不出 prune-server（cargo build --release --manifest-path prune-server/Cargo.toml --bin prune-server，日志留在 $kept_build_log）：$(tail -n 3 "$scratch/build.log" | tr '\n' ' ' | cut -c1-300)"
+  # 这一格判的是编得出：不认环境里的 PRUNE_SERVER_BINARY（置空），照源码编；编的是本趟共用的那一份（code_tooling_prune_server_binary：别的格先编过就直接用，编译日志在共用目录里）
+  if ! program_binary="$(PRUNE_SERVER_BINARY="" code_tooling_prune_server_binary "$scratch" 2>"$scratch/build.err")"; then
+    build_log="$scratch/prune-server-build.log"
+    [[ -f "${CODE_TOOLING_RUN_SCRATCH:-}/prune-server-build/prune-server-build.log" ]] && build_log="$CODE_TOOLING_RUN_SCRATCH/prune-server-build/prune-server-build.log"
+    [[ -f "$build_log" ]] || { cp -- "$scratch/build.err" "$scratch/prune-server-build.log" && build_log="$scratch/prune-server-build.log"; }
+    kept_build_log="$(mktemp "${TMPDIR:-/tmp}/code-tooling-prune-server-selftest-build.XXXXXX.log")" && cp -- "$build_log" "$kept_build_log" || kept_build_log="（没留下：拷不出来）"
+    echo "  ✗ 编不出 prune-server（cargo build --release --manifest-path prune-server/Cargo.toml --bin prune-server，日志留在 $kept_build_log）：$(tail -n 3 "$build_log" | tr '\n' ' ' | clip_text 300)"
     echo "     → 怎么办：看那份日志，看完自己删；编译错照报错修 prune-server/（归工具实现员），别的会话正改着的就等它改完再跑这一格。"
     exit 1
   fi
-  program=("$scratch/target/release/prune-server")
+  # 拷到这一格自己的临时目录里再起：命令位置上的词要是闭包折得出的写法（「$目录/<不带脚本后缀的字面尾巴>」），直接起 "$program_binary" 这一格的键算不出
+  cp -- "$program_binary" "$scratch/prune-server-under-test" || { echo "  ✗ 拷不出编好的 prune-server（$program_binary）"; echo "     → 怎么办：看 \${TMPDIR:-/tmp} 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
+  program=("$scratch/prune-server-under-test")
 fi
 if (cd "$ROOT/prune-server" 2>/dev/null || cd "$ROOT" || { echo "进不去 $ROOT，自证一格都没起" >&2; exit 2; }; TMPDIR="$scratch/tmp" "${program[@]}" --selftest) >"$scratch/selftest.txt" 2>"$scratch/selftest.err"; then
   run_exit=0
@@ -9424,6 +11261,7 @@ PY
 #   规范副本的 preflight.py；拷什么只该由那份共用库的闭包现算，调用方要多拷的经 declared 逐条写为什么）
 # 扫哪些：被判的根下 scripts/、.claude/gate.d/、.claude/hooks/ 里的 *.sh、*.py；跳过 target/、__pycache__/、.git/、.claude/gate.d/fixtures/ 与 .claude/hooks/fixtures/
 #   （样本是造出来的输入），跳过 scripts/hosts/lib_repository_copy.py 自己（拷法只在它里面定义）。自证函数体里的照判：自证搭小树时手抄的那几份也是清单。
+# 逐份文件的扫描按每台默认重活线程数并行（map_in_processes，fork 的子进程，结果按文件次序合并）。
 # 只看代码：python 经共用库 SOURCE_CODE_LINES_LIBRARY 的 python_code_lines 去掉注释与带空白的字符串字面量（不带空白的字面量照代码判：路径就在这里头）；
 #   shell 经 shell_code_lines 去掉注释与出路文字，再把引号里带空白的那一段（出路文字、样本命令）去掉；shell 里嵌的 python 只按 shell 的写法认。
 # 算建仓副本的写法（每行一处，一行几条命令的说明以「；」连）：
@@ -9456,18 +11294,27 @@ PY
 #   repository-copy-closure-green 那一行排除表一处被判行都不命中、判红；repository-copy-hand-lists-unscanned（不认手抄清单常量）：repository-copy-closure-red 里
 #   hand_copy.py:8 那条 want 与「11 处」找不到；repository-copy-exempt-growth-unchecked（排除表不比基准）：repository-copy-closure-red 里「排除表涨了」那条 want 找不到。
 cell_repository_copy_closure() {
+local jobs
+if ! jobs="$(heavy_thread_default)"; then
+  echo "  ✗ 取不了每台默认重活线程数（原因在上一行），逐份扫描的并行度定不了，一份都没扫"
+  echo "     → 怎么办：照上一行的出路修 .claude/heavy-thread-default（线程固定取登记值，SINGLEFS_THREAD_CAP 由服务套的 capped.sh 设，不自己设），再跑这一格；不退回按核数算。"
+  exit 1
+fi
 base_table="$(mktemp)" || { echo "  ✗ 建不了放基准那一版排除表的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
 trap 'rm -f "${base_table:?}"' EXIT
 exempt_table_baseline .claude/gate.d/repository-copy-closure-exempt.tsv "$base_table"
 python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "$SOURCE_CODE_LINES_LIBRARY" "${CODE_TOOLING_BREAK:-}" "$base_state" "$base_name" "$base_table" \
-  "$STAGE_REPOSITORY/scripts/hosts/lib_repository_copy.py" <<'PY'
+  "$STAGE_REPOSITORY/scripts/hosts/lib_repository_copy.py" "$PARALLEL_MAP_LIBRARY" "$jobs" <<'PY'
 import collections, os, re, sys, types
 code_text = types.ModuleType("lib_code_without_text")
 exec(compile(sys.argv[1], "code-without-text-library", "exec"), code_text.__dict__)
 source_lines = types.ModuleType("lib_source_code_lines")
 exec(compile(sys.argv[2], "source-code-lines-library", "exec"), source_lines.__dict__)
+parallel = types.ModuleType("lib_parallel_map")
+exec(compile(sys.argv[8], "parallel-map-library", "exec"), parallel.__dict__)
 OUTPUT_TEXT = code_text.OUTPUT_TEXT
 broken, base_state, base_name, base_table, repository_copy_library = sys.argv[3:8]
+jobs = int(sys.argv[9])
 
 EXEMPT_TABLE = ".claude/gate.d/repository-copy-closure-exempt.tsv"
 SCAN_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/hooks")
@@ -9697,23 +11544,34 @@ problems = []
 hits = {}                      # 路径 → [(行号, 说明, 原行)]
 scanned_by_directory = collections.Counter()
 scanned = 0
-for directory, path, language in scanned_files():
+def scan_file(item):
+    """一份文件 → (目录, 路径, 读不了的原因或 None, [(行号, 说明, 原行)])；各份文件互不依赖，在子进程里并行跑。"""
+    directory, path, language = item
     try:
         text = open(path, encoding="utf-8", errors="replace").read()
     except OSError as error:
-        problems.append(f"读不了 {path}：{error}")
-        continue
-    scanned += 1
-    scanned_by_directory[directory] += 1
+        return directory, path, f"读不了 {path}：{error}", []
     if not sources_scanned:
-        continue
+        return directory, path, None, []
     original = text.split("\n")
+    entries = []
     for number, code in enumerate(code_lines_of(language, text), 1):
         if not code.strip():
             continue
         found = (python_copies(code) if language == "python" else shell_copies(code)) + hand_lists(code)
         if found:
-            hits.setdefault(path, []).append((number, "；".join(found), original[number - 1] if number <= len(original) else code))
+            entries.append((number, "；".join(found), original[number - 1] if number <= len(original) else code))
+    return directory, path, None, entries
+
+
+for directory, path, read_problem, entries in parallel.map_in_processes(scan_file, list(scanned_files()), jobs):
+    if read_problem:
+        problems.append(read_problem)
+        continue
+    scanned += 1
+    scanned_by_directory[directory] += 1
+    if entries:
+        hits.setdefault(path, []).extend(entries)
 
 exempt_rows, exempt_problems = [], []
 if os.path.isfile(EXEMPT_TABLE):
@@ -9792,7 +11650,643 @@ print(f"  ✓ 建仓副本的写法都经 scripts/hosts/lib_repository_copy.py�
 PY
 }
 
-# ── 逐项点名（.claude/rules/verification.md「门禁的结构」的 --list-items 与 --item）：四十格里只有三格分项，别的格只能整格跑（--check）
+# ── 格 selftest-cells-alone：有选格手段的自证逐格单跑与整份跑判定相同（.claude/rules/test-script-discipline.md「测试脚本自己也要被测试证明有效」末条：
+#   自证同样守「用例原子化：每一条都能单独跑」）。
+# 对象：被判的根里 .claude/hooks/selftest-registry.tsv 登记成 selftest、文件里写着「<名字>_SELFTEST_CELLS=<格名…」的自证（有选格手段，读法同 break-switch-replay 格的
+#   selection_variable：那个环境变量设成逗号隔开的格名，自证只跑点名的格）。一份都没有：退 77。
+# 列格名：先起一趟那份的 --selftest，选格变量设成哪份自证都没有的 selftest-cells-alone-probe：要退 2，并有一行在「逗号隔开：」之后或「（有 …）」里列出认得的格名
+#   （admission.py、crash-point-replay.sh、task_server_lib.py 写错格名的那一句就是这样；格名之间空白、顿号或逗号隔开）。没退 2、或一个格名都列不出：那一份判红、不往下起。
+# 判据：每一格起两种趟比：整份那一趟（选格变量设成列出的全部格，次序照自证自己的；自证自带的开关轮不跑，判的是格与格之间）里这一格红没红
+#   （带 ✗ 的行里有「自证：<格名>：」或「自证 <格名>：」），与单跑那一趟（选格变量只设这一格）退不退 0。两边相同判绿；单跑红、整份里绿判红
+#   （这一格读了前面的格留下的变量、文件或环境），单跑绿、整份里红也判红（前面的格留下的状态弄红了它）。整份那一趟超时、或退非 0 而失败行里一格都认不出：
+#   那一份要判的格都判红（比不了）。两边都红照判绿：那一格自己坏了，归 research-script-selftests 格判。
+#   起法同 break-switch-replay 格：python 的 python3 -B <路径> --selftest、别的 bash <路径> --selftest，环境里去掉 *_BREAK 与 *_SELFTEST_CELLS 再设选格变量；
+#   要临时服务的表里登记成 required 的照「$SELFTEST_TEMPORARY_SERVICE_PREFIX」那一句包一层起（--server-binary 给这一格开跑前取的那一份，取不到那几份判红）。
+#   每一趟的起法同 break-switch-replay 格「每趟的进程组」（SWITCH_REPLAY_PARALLELISM_LIBRARY 的 TripLauncher）：自成一组，到点（SELFTEST_CELLS_ALONE_TRIP_SECONDS 秒）
+#   与直接起的那一个退出之后组里还有进程时，对整组先 TERM、过宽限再 KILL，核完组里一个不剩那一趟才返回、池子里的位置才空出来。
+#   整份那一趟或单跑那一趟留下进程、停不掉的，这一格判红、留下的接在说明后面；列格名那一趟留下的，那一份另记一处不对。
+#   弄坏开关 CODE_TOOLING_BREAK=replay-trip-leader-only-stopped 同样作用在这一格（同一份起法）；这一格的样本里没有到点与留下进程的趟，打开后判错的样本在 break-switch-replay 格。
+# 按条复用（.claude/rules/implementation-workflow.md「复用门禁的判定：按每条判定的单元键判」；共用段在 UNIT_VERDICT_ROUNDS_LIBRARY）：
+#   一格一条判定（名字「<路径> 格 <格名>」），种类 code-tooling.sh:selftest-cells-alone（prune-server 那一份库，unit-verdicts 族）。
+#   键（scripts/gate/admission.py verdict-plan 算，不带路径、行号与限时）：那份自证的单元闭包（入口就是那份脚本，带 program-argument:--selftest，同 break-switch-replay 格①）、
+#   判法（令牌 SELFTEST_CELLS_ALONE_JUDGE_TOKEN：selftest_cells_alone_judge_code 打的 SELFTEST_CELLS_ALONE_JUDGE_LIBRARY）、line:command=<起它的命令样子>、
+#   line:cell=<选格变量>=<格名>，要临时服务的另加 file:scripts/prune-server/prune_server_client_selftest.py 与 line:temporary-service=wrapped。
+#   一份里有一格要现判（键对不上、库里记着红、复用哨兵强制现判）：起它的整份那一趟与要现判的那几格的单跑，别的格照复用；全部复用的那一份一趟都不起（列格名那一趟照起：
+#   请求要格名）。一份的趟齐了当场判、当场记（判绿记绿、判红记红撤绿），收尾整份再交一次（哨兵在那一趟比）。拒算的照共用段开跑前判红（ItemVerdicts.stop_on_refusals）。
+#   成功句报「按条复用：现判 J、复用 M、拒算 0」与起了几趟。
+# 并行：各趟互不依赖；并行条数取登记的每台默认重活线程数（.claude/heavy-thread-default），不按这一趟的内存上限收，理由同 break-switch-replay 格「并行度」：
+#   内存上限由 task-server 照这条命令的记录给、照以往一路跑的峰值定，照它收并行就永远收在一路、也永远撞不上上限、服务也就不放大；
+#   撞了上限服务照乘 1.5 放大、重排这一条，第二趟只补没记库的（下面「按条复用」：一份的趟齐了当场记）。
+#   内存上限只写进开跑那一行（读法 cgroup_memory_limit；样本根的 memory-max 顶替），读不到或是 max 照写原因。
+#   外层同时跑的趟数 × 每趟里层的线程数不超过每台默认重活线程数：外层路数的上限 = min(并行条数, 要起的趟数)，
+#   里层线程数 = ⌊每台默认重活线程数 ÷ 外层路数的上限⌋（至少 1），经环境变量 SINGLEFS_THREAD_CAP 交给每一趟起的自证（列格名那几趟同样，外层路数取份数）；
+#   开跑那一行写「并行 N 趟（登记的每台默认重活线程数 T 条；内存上限 …）」与「外层 N 条 × 里层 M = P（不超过每台默认重活线程数 T）」。
+#   自证里不经登记位取并行度的（登记表 .claude/heavy-thread-exempt 点名的、读自己别的线程变量的）收不住这一层。
+#   样本根的 .break-switch-replay-jobs（写法同 break-switch-replay 格：threads=<正整数>、memory-max=<字节数|max|unreadable>）顶替线程数与内存上限。
+#   收回的趟数与派出去的对不上整格红。
+# 进度（.claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」的进度间隔 5 分钟；写法在 SWITCH_REPLAY_PROGRESS_LIBRARY）：开跑打一行，每格判完打一行，
+#   每过 300 秒打一行总进度；机读进度 TASK_SERVER_PROGRESS 按趟报（同 break-switch-replay 格「机读进度」）。样本根里的 .selftest-cells-alone-progress-seconds 顶替 300 秒。
+# 管不到的：格与格之间经别的进程、别的机器传的状态（单跑那一趟也看得到它们）；单跑时退非 0 却不是这一格的毛病（列格名之外的用法错这类）照单跑红记。
+# 样本：selftest-cells-alone-red（一份两格的小自证 scripts/gate/twocells.py：consume 那一格读 prepare 那一格留下的全局变量，整份两格都绿、单跑 consume 红：
+#   判红并点名「scripts/gate/twocells.py 格 consume：单跑红」）；selftest-cells-alone-green（同一份，consume 自己先调 prepare：判绿，报 1 份自证、2 格）；
+#   selftest-cells-alone-reuse-three-questions（两份、各两格：复用三问，change.sh 改 alpha.py 闭包里的一个函数，affected 是 alpha 的两格）；
+#   selftest-cells-alone-threads-split-green（样本根的 .break-switch-replay-jobs 写 memory-max 与 threads：上限 100 GiB、线程 8；一份两格的自证三趟：外层 3 条 × 里层 2 = 6，
+#   样本自证在每一趟（列格名那一趟除外）里核 SINGLEFS_THREAD_CAP 是 2、不是就退 1，整份那一趟比不了、每格判红）；
+#   selftest-cells-alone-jobs-registered-green（样本根的 .break-switch-replay-jobs 写 memory-max=1536 MiB、threads=8，自证同 threads-split 那一份：
+#   开跑那一行写并行 8 趟（登记的线程数）、外层 3 条 × 里层 2 = 6，判绿）；selftest-cells-alone-jobs-registered-red（同一组并行度，自证是 selftest-cells-alone-red 那一份
+#   再加核里层线程数：并行 8 趟、外层 3 条 × 里层 2 = 6，consume 单跑红、整份里绿，1 处不对）。
+# 弄坏开关 CODE_TOOLING_BREAK=cells-alone-whole-only：不单跑，每格照整份那一趟里红没红记，selftest-cells-alone-red 判绿（期望退出 1，实测 0），
+#   selftest-cells-alone-threads-split-green、-jobs-registered-green、-jobs-registered-red 判红（只起整份那一趟、外层 1 条，里层拿满线程数 8、样本自证核到的不是 2）；
+#   =cells-alone-inner-threads-uncapped：里层线程数不按外层路数分、每趟都拿满每台默认重活线程数，selftest-cells-alone-threads-split-green、-jobs-registered-green、-jobs-registered-red
+#   里「外层 3 条 × 里层 2 = 6」那条 want 找不到、每趟拿到的 SINGLEFS_THREAD_CAP 不是 2 而判红；
+#   =cells-alone-jobs-by-memory：并行条数照内存上限算（parallel_library.jobs_for：⌊上限的 SAFE_SHARE_PERCENT 份额 ÷ TRIP_MEMORY_FALLBACK_BYTES⌋、不超过线程数），
+#   -jobs-registered-green、-jobs-registered-red 并行 1 趟、外层 1 条 × 里层 8，样本自证核到的 SINGLEFS_THREAD_CAP 不是 2、开跑那一行写的是内存上限、每趟与份额，判红。
+SELFTEST_CELLS_ALONE_TRIP_SECONDS=1800   # 一趟（列格名、整份、单跑一格）最多几秒；推的：真仓上最慢的整份自证几分钟，留几倍余量
+SELFTEST_CELLS_ALONE_JUDGE_LIBRARY="$(cat <<'PY_SELFTEST_CELLS_ALONE_JUDGE'
+import re
+
+PROBE_CELL = "selftest-cells-alone-probe"   # 列格名那一趟设进选格变量的名字：哪份自证都没有这一格
+CELL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+LISTING_MARKERS = (re.compile(r"逗号隔开：(.*)$"), re.compile(r"（有 ([^）]*)）"))
+
+
+def listed_cells(record):
+    """列格名那一趟（选格变量设成 PROBE_CELL）→ (格名的列表, 列不出时的一句)：要退 2，并有一行在「逗号隔开：」之后或「（有 …）」里列出认得的格名。"""
+    if record["timeout"] or record["code"] != 2:
+        return [], f"选格变量设成认不得的 {PROBE_CELL} 时要退 2 并列出认得的格，实际{'超时' if record['timeout'] else '退 ' + str(record['code'])}"
+    cells = []
+    for line in record["output"].splitlines():
+        for marker in LISTING_MARKERS:
+            found = marker.search(line)
+            if found:
+                cells += [word for word in re.split(r"[\s、,，]+", found.group(1)) if CELL_NAME.fullmatch(word) and word != PROBE_CELL]
+    cells = list(dict.fromkeys(cells))
+    if not cells:
+        return [], "退了 2，但没有一行在「逗号隔开：」之后或「（有 …）」里列出格名"
+    return cells, ""
+
+
+def named_red(output, cell):
+    """这一格在这一趟的失败行里红了没有：带 ✗ 的行里有「自证：<格名>：」或「自证 <格名>：」。"""
+    pattern = re.compile(rf"自证[：\s]{re.escape(cell)}：")
+    return any("✗" in line and pattern.search(line) for line in output.splitlines())
+
+
+def first_failure(record):
+    """一趟的头一行失败行（带 ✗ 的），没有写「（没有带 ✗ 的行）」。"""
+    return next((line.strip() for line in record["output"].splitlines() if "✗" in line), "（没有带 ✗ 的行）")[:200]
+
+
+def whole_problem(record, cells):
+    """整份那一趟比得了吗：超时、或退非 0 而失败行里一格都认不出 → 比不了的那一句；比得了 → None。"""
+    if record["timeout"]:
+        return "整份那一趟超时，比不了"
+    if record["code"] != 0 and not any(named_red(record["output"], cell) for cell in cells):
+        return f"整份那一趟退 {record['code']}，失败行里一格都认不出（{first_failure(record)}），比不了"
+    return None
+
+
+def cell_verdict(cell, alone, whole, broken=""):
+    """一格单跑那一趟与整份那一趟比 → (绿没有, 一句)。整份那一趟看失败行点不点名这一格，单跑那一趟看退不退 0。
+    弄坏开关 cells-alone-whole-only：不比单跑（alone 是 None），照整份那一趟里红没红记。"""
+    whole_red = named_red(whole["output"], cell)
+    if broken == "cells-alone-whole-only":
+        return not whole_red, "只看整份那一趟"
+    alone_red = alone["timeout"] or alone["code"] != 0
+    if alone_red == whole_red:
+        return True, "单跑与整份判定相同（都红：归 research-script-selftests 格判）" if alone_red else "单跑与整份判定相同"
+    if alone_red:
+        return False, (f"单跑红（{'超时' if alone['timeout'] else '退 ' + str(alone['code'])}）、整份里绿：这一格读了前面的格留下的变量、文件或环境；"
+                       f"单跑那一趟的失败行：{first_failure(alone)}")
+    return False, "单跑绿、整份里红：前面的格留下的状态弄红了它"
+PY_SELFTEST_CELLS_ALONE_JUDGE
+)"
+# 这一格的判法入口（单元键里的 judge，这一格文件头「按条复用」）：单元键收这个函数的闭包，格里也照它打的文本装判法
+selftest_cells_alone_judge_code() { printf '%s\n' "$SELFTEST_CELLS_ALONE_JUDGE_LIBRARY"; }
+cell_selftest_cells_alone() {
+  local registry=".claude/hooks/selftest-registry.tsv" jobs alone_path alone_kind alone_needs_binary=0 alone_binary="" alone_required="" alone_scratch="" alone_exit alone_knobs=""
+  [[ -f "$registry" ]] || { echo "  ! 没有 $registry，这一格无对象可判"; exit 77; }
+  if ! jobs="$(heavy_thread_default)"; then
+    echo "  ✗ 取不了每台默认重活线程数（原因在上一行），逐格单跑的并行度定不了，一趟都没跑"
+    echo "     → 怎么办：照上一行的出路修 .claude/heavy-thread-default（线程固定取登记值），再跑这一格；不退回按核数算。"
+    exit 1
+  fi
+  # 只在临时 prune-server 上跑的自证（这一格文件头「判据」末尾）：有选格手段的里有就开跑前取一次二进制，取不到留空（python 那一侧把那几份判红）
+  temporary_service_table_load || exit 1
+  # 登记成 selftest、文件在的先收齐，再一次 grep -l 挑出写着选格手段的（逐份起 grep 要起二百来次）；grep -l 按给的次序打名字
+  local -a alone_candidates=()
+  while IFS=$'\t' read -r alone_path alone_kind _; do
+    [[ -n "$alone_path" && "$alone_path" != \#* && "$alone_kind" == selftest && -f "$alone_path" ]] && alone_candidates+=("$alone_path")
+  done < "$registry"
+  if ((${#alone_candidates[@]})); then
+    while IFS= read -r alone_path; do
+      if temporary_service_is_required "$alone_path"; then
+        alone_needs_binary=1
+        alone_required+="$alone_path"$'\n'
+      fi
+    done < <(grep -lE '[A-Z][A-Z0-9_]*_SELFTEST_CELLS=<格名' -- "${alone_candidates[@]}")
+  fi
+  if (( alone_needs_binary )); then
+    alone_scratch="$(mktemp -d)"
+    alone_binary="$(code_tooling_prune_server_binary "$alone_scratch")" || alone_binary=""
+  fi
+  local alone_progress_seconds
+  if ! alone_progress_seconds="$(switch_replay_progress_seconds .selftest-cells-alone-progress-seconds)"; then
+    printf '%s\n' "$alone_progress_seconds"
+    [[ -z "$alone_scratch" ]] || rm -rf -- "$alone_scratch"
+    exit 1
+  fi
+  # 样本根的 .break-switch-replay-jobs（写法同 break-switch-replay 格：threads=、memory-max=）顶替线程数与内存上限：样本的判定不随跑它那台机器变
+  if judged_root_is_sample && [[ -f .break-switch-replay-jobs ]]; then
+    alone_knobs="$(<.break-switch-replay-jobs)"
+  fi
+  # 复用三问（这一格文件头「样本」）：样本根带 .unit-verdict-sample/three-questions/ 的，同一份判定库上跑四趟、判三问
+  if judged_root_is_sample && [[ -d .unit-verdict-sample/three-questions ]]; then
+    code_tooling_three_question_rounds selftest-cells-alone selftest_cells_alone_pass; alone_exit=$?
+  else
+    selftest_cells_alone_pass ""; alone_exit=$?
+  fi
+  [[ -z "$alone_scratch" ]] || rm -rf -- "$alone_scratch"
+  return "$alone_exit"
+}
+
+# selftest_cells_alone_pass <各条结局写到哪，空是不写>：这一格的一趟（列格名、算键、查库、起要现判的、记库、判）；
+# registry、jobs、alone_binary、alone_required、alone_progress_seconds 取调用它的那一格的
+selftest_cells_alone_pass() {
+  python3 - "$(selftest_cells_alone_judge_code)" "$STAGE_REPOSITORY/.claude/hooks/lib_project_code_runs.py" "$registry" "${CODE_TOOLING_BREAK:-}" "$jobs" \
+    "$alone_binary" "$alone_required" "$SELFTEST_TEMPORARY_SERVICE_PREFIX" "$alone_progress_seconds" "$SWITCH_REPLAY_PROGRESS_LIBRARY" \
+    "$UNIT_VERDICT_ROUNDS_LIBRARY" "$STAGE_REPOSITORY/scripts/gate/admission.py" "$STAGE_NAME:selftest-cells-alone" "$SELFTEST_CELLS_ALONE_JUDGE_TOKEN" "$STAGE_REPOSITORY" \
+    "$(judged_root_is_sample && echo 1)" "$1" "$SWITCH_REPLAY_PARALLELISM_LIBRARY" "$SELFTEST_CELLS_ALONE_TRIP_SECONDS" "$alone_knobs" <<'PY'
+import collections, concurrent.futures, importlib.util, os, shutil, sys, tempfile, types
+judge = types.ModuleType("lib_selftest_cells_alone_judge")
+exec(compile(sys.argv[1], "selftest-cells-alone-judge-library", "exec"), judge.__dict__)
+runs_library_path, registry_path, broken, default_threads = sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5])
+server_binary, service_required, service_prefix = sys.argv[6], set(sys.argv[7].split("\n")) - {""}, sys.argv[8].split()
+progress_seconds = int(sys.argv[9])
+progress_library = types.ModuleType("lib_switch_replay_progress")
+exec(compile(sys.argv[10], "switch-replay-progress-library", "exec"), progress_library.__dict__)
+rounds = types.ModuleType("lib_unit_verdict_rounds")
+exec(compile(sys.argv[11], "unit-verdict-rounds-library", "exec"), rounds.__dict__)
+admission, kind, judge_token, judge_root = sys.argv[12], sys.argv[13], sys.argv[14], sys.argv[15]
+sample, states_path = sys.argv[16] == "1", sys.argv[17]
+parallel_library = types.ModuleType("lib_switch_replay_parallelism")
+exec(compile(sys.argv[18], "switch-replay-parallelism-library", "exec"), parallel_library.__dict__)
+trip_seconds = int(sys.argv[19])
+try:
+    knobs = parallel_library.parse_knobs(sys.argv[20])
+except ValueError as error:
+    print(f"  ✗ {error}，一趟都没起")
+    print(f"     → 怎么办：改样本根的 {parallel_library.KNOB_FILE}（写法在上一行）。")
+    sys.exit(1)
+default_threads = int(knobs.get("threads", default_threads))   # 登记的每台默认重活线程数（样本根的 threads 顶替）
+spec = importlib.util.spec_from_file_location("lib_project_code_runs", runs_library_path)
+runs_library = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runs_library)
+HOW = "bash .claude/gate.d/code-tooling.sh --check selftest-cells-alone（有选格手段的自证逐格单跑、与整份跑比）"
+problems = []
+
+# 对象（这一格文件头「对象」）：登记成 selftest、有选格手段的自证 → 选格变量名
+selftests, _ = runs_library.read_selftest_registry(registry_path)   # 登记表写坏的行归读它的钩子与 agent-write-scope 格判，这里不另判
+variable_of = {}
+for path in sorted(selftests):
+    if selftests[path].kind != runs_library.SELFTEST_KIND or not os.path.isfile(path):
+        continue
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        variable = parallel_library.selection_variable(handle.read())
+    if not variable:
+        continue
+    if path in service_required and not server_binary:
+        problems.append(f"{path} 只在临时 prune-server 上跑（要临时服务的表里登记成 required），这一趟取不到 prune-server 二进制（原因在上面一行），一趟都没起")
+        continue
+    variable_of[path] = variable
+if not variable_of and not problems:
+    print(f"  ! {registry_path} 里登记成 selftest 的自证没有一份有选格手段（文件里写着「<名字>_SELFTEST_CELLS=<格名…」的），这一格无对象可判")
+    sys.exit(77)
+needs_service = set(variable_of) & service_required
+
+
+def command_text(path):
+    return f"{'python3 -B' if path.endswith('.py') else 'bash'} {path} --selftest"
+
+
+def stop_line(text):
+    """「到点停整组」那一行。"""
+    print(f"  · selftest-cells-alone {text}", flush=True)
+
+
+# 每趟的起法同 break-switch-replay 格（parallel_library.TripLauncher，这一格文件头「判据」末尾）；门禁收到 TERM、INT、HUP 时各线程收自己那一组，处理在开池之前于主线程装上
+launcher = parallel_library.TripLauncher(stop_line, broken == "replay-trip-leader-only-stopped")
+launcher.install_stop_on_signals()
+
+
+def inner_threads_of(outer):
+    """外层同时跑 outer 趟时，每一趟里层的线程数 = ⌊每台默认重活线程数 ÷ outer⌋（至少 1）（这一格文件头「并行」）。
+    弄坏开关 cells-alone-inner-threads-uncapped：每一趟都拿满每台默认重活线程数、不按外层路数分。"""
+    return default_threads if broken == "cells-alone-inner-threads-uncapped" else max(1, default_threads // outer)
+
+
+def run_trip(path, cells, inner_threads):
+    """起一趟 path 的 --selftest，选格变量设成 cells（逗号连），环境变量 SINGLEFS_THREAD_CAP 设成 inner_threads（自证里的并行度经登记位取，登记位认它）→ {timeout, code, output, left}。
+    经 launcher 起：自成一组，到点与收尾停整组、核完组里一个不剩才返回；left 是留下进程与停不掉的那一句（都没有是空串）。"""
+    environment = {name: value for name, value in os.environ.items() if not name.endswith("_BREAK") and not name.endswith("_SELFTEST_CELLS")}
+    environment[variable_of[path]] = ",".join(cells)
+    environment["SINGLEFS_THREAD_CAP"] = str(inner_threads)
+    command = ["python3", "-B", path, "--selftest"] if path.endswith(".py") else ["bash", path, "--selftest"]
+    if path in needs_service:   # 包装写法：-- 前插 --server-binary <这一趟那一份>（这一格文件头「判据」）
+        command = [*service_prefix[:-1], "--server-binary", server_binary, "--", *command]
+    trip = launcher.run(command, environment, trip_seconds, f"{path} {variable_of[path]}={','.join(cells)}", merge_stderr=True)
+    if trip["timeout"]:
+        return {"timeout": True, "code": None, "output": "", "left": trip["problem"]}
+    return {"timeout": False, "code": trip["code"], "output": trip["stdout"].decode("utf-8", "replace"), "left": trip["problem"]}
+
+
+# 并行（这一格文件头「并行」）：并行条数取登记的每台默认重活线程数，内存上限只写进开跑那一行。
+#   弄坏开关 cells-alone-jobs-by-memory：照内存上限算并行条数（jobs_for；上限读不到或是 max 时这个开关不起作用）
+memory_limit, memory_limit_source = parallel_library.memory_limit_of(knobs)
+by_memory = broken == "cells-alone-jobs-by-memory" and memory_limit is not None
+jobs = parallel_library.jobs_for(default_threads, memory_limit, parallel_library.TRIP_MEMORY_FALLBACK_BYTES) if by_memory else default_threads
+if by_memory:
+    plan_text = (f"内存上限 {memory_limit // parallel_library.MEBIBYTE} MiB、每趟 {parallel_library.TRIP_MEMORY_FALLBACK_BYTES // parallel_library.MEBIBYTE} MiB、"
+                 f"份额 {parallel_library.SAFE_SHARE_PERCENT}%")
+else:
+    limit_text = f"内存上限{memory_limit_source}" if memory_limit is None else f"内存上限 {memory_limit // parallel_library.MEBIBYTE} MiB（{memory_limit_source}）"
+    plan_text = f"登记的每台默认重活线程数 {default_threads} 条；{limit_text}，由服务定、撞了服务照乘 1.5 放大重排，不按它收并行"
+# 列格名（这一格文件头「列格名」）：每份一趟，各份并行；外层路数的上限 = min(并行条数, 份数)，里层线程数照 inner_threads_of
+cells_of = {}
+listing_outer = max(1, min(jobs, len(variable_of)))
+with concurrent.futures.ThreadPoolExecutor(max_workers=listing_outer) as pool:
+    listings = dict(zip(variable_of, pool.map(lambda path: run_trip(path, [judge.PROBE_CELL], inner_threads_of(listing_outer)), variable_of)))
+for path, record in listings.items():
+    cells, why = judge.listed_cells(record)
+    if record["left"]:
+        problems.append(f"{path}：列格名那一趟{record['left']}")
+    if not cells:
+        problems.append(f"{path}：列不出格名：{why}；照 admission.py、crash-point-replay.sh 的写法，{variable_of[path]} 写错格名时退 2 并在一行里「逗号隔开：」之后列出认得的格")
+        continue
+    cells_of[path] = cells
+
+
+def item_name(path, cell):
+    return f"{path} 格 {cell}"
+
+
+def request_line(path, cell):
+    tokens = [judge_token, f"judge-root:{judge_root}", f"line:command={command_text(path)}", f"line:cell={variable_of[path]}={cell}", "program-argument:--selftest"]
+    if path in needs_service:
+        tokens += ["file:scripts/prune-server/prune_server_client_selftest.py", "line:temporary-service=wrapped"]
+    return "\t".join([item_name(path, cell), path, *tokens])
+
+
+names = [item_name(path, cell) for path in cells_of for cell in cells_of[path]]
+plan_scratch = tempfile.mkdtemp(prefix="selftest-cells-alone-plan.")
+verdicts = rounds.ItemVerdicts(admission, os.getcwd(), kind, plan_scratch, "code-tooling.sh 的 selftest-cells-alone 格", sample, HOW)
+if names:
+    verdicts.plan([request_line(path, cell) for path in cells_of for cell in cells_of[path]])
+    if verdicts.unavailable:
+        shutil.rmtree(plan_scratch, ignore_errors=True)
+        print("  ✗ 有选格手段的自证逐格单跑这一格没判：prune-server 不可用（上面那一句），一趟都没起，这一格退 75")
+        print("     → 怎么办：python3 prune-server/control check 看服务，起不来报给主 agent；修好再跑这一格：bash .claude/gate.d/code-tooling.sh --check selftest-cells-alone")
+        sys.exit(75)
+    if not verdicts.ok:
+        print(f"  ! 按条复用算不出（{verdicts.problem}）：这一趟每一格都起、一条都不记库")
+    judged, reused, refused = verdicts.report_plan(names, "（有选格手段的自证，一格一条）")
+else:
+    judged = reused = refused = 0
+to_judge = {path: [cell for cell in cells if verdicts.decision(item_name(path, cell))[0] != rounds.REUSE] for path, cells in cells_of.items()}
+to_judge = {path: cells for path, cells in to_judge.items() if cells}
+# 一份要起的趟：整份一趟加要现判的那几格各一趟（弄坏开关 cells-alone-whole-only 下不单跑）
+trips = [(path, None) for path in to_judge] + ([] if broken == "cells-alone-whole-only" else [(path, cell) for path, cells in to_judge.items() for cell in cells])
+tracker = progress_library.ReplayProgress("selftest-cells-alone", sum(len(cells) for cells in to_judge.values()), progress_seconds, False, None, True, len(trips))
+# 外层同时跑的趟数 × 每趟里层的线程数不超过每台默认重活线程数（这一格文件头「并行」）：外层路数的上限取并行条数与要起的趟数里小的
+outer_cap = max(1, min(jobs, len(trips)))
+inner_threads = inner_threads_of(outer_cap)
+if trips:
+    tracker.start(f"selftest-cells-alone 开跑：{len(to_judge)} 份自证、要现判 {sum(len(cells) for cells in to_judge.values())} 格，{len(trips)} 趟，并行 {jobs} 趟（{plan_text}）；"
+                  f"外层 {outer_cap} 条 × 里层 {inner_threads} = {outer_cap * inner_threads}（不超过每台默认重活线程数 {default_threads}）；"
+                  f"每格判完打一行，每过 {progress_seconds} 秒打一行总进度")
+green_of = {}
+records = collections.defaultdict(dict)    # 路径 → {None: 整份那一趟, 格名: 单跑那一趟}
+waiting = collections.Counter(path for path, _cell in trips)
+
+
+def settle(path):
+    """一份的趟齐了：逐格判、当场记库（这一格文件头「按条复用」）。"""
+    whole = records[path][None]
+    whole_why = judge.whole_problem(whole, cells_of[path])
+    green, red = [], []
+    for cell in to_judge[path]:
+        if whole_why:
+            ok, why = False, whole_why
+        else:
+            ok, why = judge.cell_verdict(cell, records[path].get(cell), whole, broken)
+        # 这一格起的两趟里有没收干净的（这一格文件头「判据」末尾）：判红，留下的接在说明后面
+        left = [f"{which}{trip['left']}" for which, trip in (("整份那一趟", whole), ("单跑那一趟", records[path].get(cell))) if trip is not None and trip["left"]]
+        if left:
+            ok, why = False, "；".join(([] if ok else [why]) + left)
+        green_of[item_name(path, cell)] = ok
+        (green if ok else red).append(item_name(path, cell))
+        if not ok:
+            problems.append(f"{item_name(path, cell)}：{why}")
+        tracker.item_done("判绿" if ok else "判红", item_name(path, cell), 0)
+    verdicts.record(green, red)
+
+
+def one(job):
+    path, cell = job
+    record = run_trip(path, cells_of[path] if cell is None else [cell], inner_threads)
+    tracker.trip_finished()
+    return job, record
+
+
+collected = 0
+with concurrent.futures.ThreadPoolExecutor(max_workers=outer_cap) as pool:
+    for future in concurrent.futures.as_completed([pool.submit(one, job) for job in trips]):
+        (path, cell), record = future.result()
+        collected += 1
+        records[path][cell] = record
+        waiting[path] -= 1
+        if not waiting[path]:
+            settle(path)
+tracker.close()
+if collected != len(trips):
+    problems.append(f"派出去 {len(trips)} 趟、收回 {collected} 趟，对不上，这一趟不算数")
+verdicts.record([name for name, ok in green_of.items() if ok], [name for name, ok in green_of.items() if not ok], final=True)
+if any(not ok for ok in green_of.values()):
+    verdicts.reread_after_red()
+verdicts.write_states(states_path, names)
+shutil.rmtree(plan_scratch, ignore_errors=True)
+if problems:
+    for problem in problems:
+        print(f"  ✗ {problem}")  # gate-lint:detail
+    print(f"  ✗ 有选格手段的自证逐格单跑：{len(problems)} 处不对（{len(cells_of)} 份自证、{len(names)} 格；起了 {len(trips)} 趟）")  # gate-lint:summary
+    print("     → 怎么办：单跑红、整份里绿的那一格，让它自己建它要读的状态（变量、文件、环境），不读前面的格留下的（.claude/rules/test-script-discipline.md「用例原子化：每一条都能单独跑」）；"
+          "单跑绿、整份里红的，让前面的格收拾干净自己留下的状态；列不出格名的，照出路改那份自证写错格名时的输出；"
+          "留下进程或停不掉的，改那份自证让它起的进程在它退出之前都收干净（.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」）；"
+          "判据在 code-tooling.sh 里这一格函数上方的注释")
+    sys.exit(1)
+if verdicts.unavailable:
+    print("  ✗ 有选格手段的自证逐格单跑：判完记库时 prune-server 不可用（上面那一句），这一趟的判定没记下，这一格退 75")
+    print("     → 怎么办：python3 prune-server/control check 看服务，起不来报给主 agent；修好再跑这一格：bash .claude/gate.d/code-tooling.sh --check selftest-cells-alone")
+    sys.exit(75)
+if verdicts.red:
+    print("  ✗ 有选格手段的自证逐格单跑判红：按条复用失灵（上面「按条复用失灵」那一句点名了哪一条哨兵、或 admission.py 退了几）")
+    print("     → 怎么办：照那一句的出路修 scripts/gate/admission.py 点名的那一段，再跑这一格：bash .claude/gate.d/code-tooling.sh --check selftest-cells-alone；不能复用就判红，不退回全部现判当绿")
+    sys.exit(1)
+reuse_text = f"按条复用：现判 {judged}、复用 {reused}、拒算 {refused}" if verdicts.ok else "按条复用算不出、全部现判"
+if not trips:
+    print(f"  ✓ 逐格单跑与整份跑判定相同：{len(cells_of)} 份自证、{len(names)} 格都有键相同的判定，全部复用，这一格只起了列格名那 {len(listings)} 趟（{reuse_text}）")
+    sys.exit(0)
+print(f"  ✓ 逐格单跑与整份跑判定相同：{len(cells_of)} 份自证、{len(names)} 格（{reuse_text}；起了 {len(trips)} 趟，另有列格名 {len(listings)} 趟）")
+PY
+}
+
+# ── 格 selftest-parallelism：.claude/hooks/selftest-registry.tsv 登记成 selftest 的每份脚本，自证的成功句报并行度，或文件头写明为什么不能并行
+#   （.claude/rules/test-script-discipline.md「编译与算法都要快」：互不依赖的单位按区间切片并行，不能并行的写明为什么）
+# 只读文本，不跑自证。判哪些：被判的根里那张登记表第二列正好是 selftest 的行（samples、samples:<目录> 是门禁阶段的样本档，不判）。
+# 一份算报了并行度：它的哪一行不以 # 起头（整行注释不算），而这一行里有 PARALLELISM_REPORTED 那种写法——「并行」（或「并行度」）后面隔着空白、冒号、等号接一个数、
+#   或接 f 串的 {、shell 的 $、printf 的 %（「并行 {jobs} 路」「并行度：$jobs」）。
+# 一份算写明不能并行：文件头（从第一行起，一直到第一行既不是空行、也不以 # 起头的那一行之前；python 的文档串不算文件头）有一行
+#   「# selftest-serial: <为什么不能并行>」，理由去掉空白至少 8 个字。理由不到 8 个字的照没写判红。
+# 两样都没有的判红，逐份点名；登记表点名的文件不在的同样判红（读不到就判不了）。
+# 排除表 .claude/gate.d/selftest-parallelism-exempt.tsv：一行「<路径>  # 理由」（路径与 # 之间至少两个空格，理由至少 4 个字），那一份不判。
+#   写不对、指向不存在的文件、指向登记表里不是 selftest 行的路径、指向的那一份已经报了并行度或写明了不能并行（达标了还留着就是白放行），都判红；
+#   只缩不涨：与改动范围的基准那一版比（exempt_table_baseline），基准里没有的路径判红；基准里还没有这张表时这一条没比，成功句写明。
+# 判不到的：成功句由别的库代打的（这一份里没有那一行）、写在一行代码尾注里的「并行 N」也算报了、并行度报的是不是真的并行，靠 review。
+# 样本：selftest-parallelism-red（scripts/gate/silent.py 两样都没有、scripts/gate/commented.py 的「并行 4 路」只在整行注释里、scripts/gate/short.sh 的理由不到 8 个字，
+#   排除表一行指向不存在的 scripts/gate/gone.py、一行指向已经报了并行度的 scripts/gate/fine.py：五处逐处点名、退 1）；
+#   selftest-parallelism-green（scripts/gate/parallel.py 成功句报「并行 {jobs} 路」、scripts/gate/serial.sh 文件头写明不能并行、scripts/gate/legacy.py 登在排除表里、
+#   一行 samples 不判：判绿，报 3 份、报并行度 1、写明不能并行 1、排除 1）。
+# 弄坏开关（CODE_TOOLING_BREAK）：selftest-parallelism-report-anywhere（整行注释里的「并行 N」也算报了）：selftest-parallelism-red 里 commented.py 那一条 want 找不到；
+#   selftest-parallelism-serial-reason-unchecked（selftest-serial 的理由不看长短）：selftest-parallelism-red 里 short.sh 那一条 want 找不到；
+#   selftest-parallelism-exempt-unchecked（排除表的行不核指向）：selftest-parallelism-red 里 gone.py、fine.py 两条 want 找不到。
+cell_selftest_parallelism() {
+base_table="$(mktemp)" || { echo "  ✗ 建不了放基准那一版排除表的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
+trap 'rm -f "${base_table:?}"' EXIT
+exempt_table_baseline .claude/gate.d/selftest-parallelism-exempt.tsv "$base_table"
+python3 - "${CODE_TOOLING_BREAK:-}" "$base_state" "$base_name" "$base_table" <<'PY'
+import os, re, sys
+broken, base_state, base_name, base_table = sys.argv[1:5]
+
+REGISTRY = ".claude/hooks/selftest-registry.tsv"
+EXEMPT_TABLE = ".claude/gate.d/selftest-parallelism-exempt.tsv"
+JUDGED_KIND = "selftest"
+PARALLELISM_REPORTED = re.compile(r"并行度?[ \t]*[:：=]?[ \t]*(?:\{|\$|%|\d)")
+SERIAL_HEADER = re.compile(r"#[ \t]*selftest-serial:[ \t]*(?P<reason>.*?)\s*$")
+SERIAL_REASON_MINIMUM = 8
+EXEMPT_ROW = re.compile(r"(?P<path>[^\s#]+)[ \t]{2,}#[ \t]*(?P<reason>\S.*?)\s*$")
+EXEMPT_REASON_MINIMUM = 4
+HOWTO = ("照 .claude/rules/test-script-discipline.md「编译与算法都要快」：互不依赖的格与开关轮按每台默认重活线程数并行跑（python 经 scripts/hosts/heavy_threads.py 的 "
+         "default_heavy_threads 取，shell 经 scripts/hosts/heavy-threads.sh 的 heavy_thread_default 取），成功句报「并行 N 路」；确实不能并行的（共享状态、次序本身是被测对象），"
+         "在文件头写一行「# selftest-serial: <为什么不能并行，至少 8 个字>」")
+
+
+def visible_length(text):
+    return len("".join(text.split()))
+
+
+def judged_rows():
+    """登记表里第二列正好是 selftest 的行 → [(行号, 路径)]；登记表读不了交 None。"""
+    try:
+        lines = open(REGISTRY, encoding="utf-8").read().split("\n")
+    except OSError:
+        return None
+    rows = []
+    for number, line in enumerate(lines, start=1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) >= 2 and fields[1].strip() == JUDGED_KIND:
+            rows.append((number, fields[0].strip()))
+    return rows
+
+
+def parallelism_standing(path):
+    """一份自证的现状 → ("reported" 报了并行度 | "serial" 写明了不能并行 | "short" 理由不到 8 个字 | "silent" 两样都没有, 说明)。"""
+    lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+    report_anywhere = broken == "selftest-parallelism-report-anywhere"
+    for number, line in enumerate(lines, start=1):
+        if (report_anywhere or not line.lstrip().startswith("#")) and PARALLELISM_REPORTED.search(line):
+            return "reported", f"第 {number} 行报了并行度"
+    for line in lines:
+        if line.strip() and not line.lstrip().startswith("#"):
+            break
+        found = SERIAL_HEADER.match(line.strip())
+        if found:
+            reason = found.group("reason")
+            if broken == "selftest-parallelism-serial-reason-unchecked" or visible_length(reason) >= SERIAL_REASON_MINIMUM:
+                return "serial", f"文件头写明不能并行：{reason}"
+            return "short", f"文件头 selftest-serial 的理由「{reason}」不到 {SERIAL_REASON_MINIMUM} 个字"
+    return "silent", "成功句没报并行度，文件头也没写 # selftest-serial: <为什么不能并行>"
+
+
+rows = judged_rows()
+if rows is None:
+    print(f"  ⊘ 本次无对象可判：{REGISTRY} 不在")
+    sys.exit(77)
+registered = {path for _number, path in rows}
+exempt_rows, exempt_problems = [], []
+if os.path.isfile(EXEMPT_TABLE):
+    for number, line in enumerate(open(EXEMPT_TABLE, encoding="utf-8").read().split("\n"), start=1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        found = EXEMPT_ROW.fullmatch(line)
+        if not found or visible_length(found.group("reason")) < EXEMPT_REASON_MINIMUM:
+            exempt_problems.append(f"第 {number} 行写不对（要「<路径>  # 理由」，路径与 # 之间至少两个空格，理由至少 {EXEMPT_REASON_MINIMUM} 个字）：{line.strip()[:160]}")
+            continue
+        exempt_rows.append((number, found.group("path")))
+exempted_paths = {path for _number, path in exempt_rows}
+
+counts = {"reported": 0, "serial": 0, "exempted": 0}
+offenders = []
+for number, path in rows:
+    if not os.path.isfile(path):
+        offenders.append(f"{REGISTRY} 第 {number} 行点名的 {path} 不在（读不到就判不了：文件搬了改登记行，删了删登记行）")
+        continue
+    if path in exempted_paths:
+        counts["exempted"] += 1
+        continue
+    standing, said = parallelism_standing(path)
+    if standing in ("reported", "serial"):
+        counts[standing] += 1
+    else:
+        offenders.append(f"{path}：{said}")
+if broken != "selftest-parallelism-exempt-unchecked":
+    for number, path in exempt_rows:
+        if not os.path.isfile(path):
+            exempt_problems.append(f"第 {number} 行指向不存在的文件：{path}")
+        elif path not in registered:
+            exempt_problems.append(f"第 {number} 行的 {path} 在 {REGISTRY} 里不是 selftest 行，这一格不判它，留着没用")
+        elif parallelism_standing(path)[0] in ("reported", "serial"):
+            exempt_problems.append(f"第 {number} 行的 {path} 已经达标（{parallelism_standing(path)[1]}），删掉这一行")
+
+grown, growth_note = [], ""
+if base_state == "table":
+    base_paths = set()
+    for line in open(base_table, encoding="utf-8").read().split("\n"):
+        found = EXEMPT_ROW.fullmatch(line)
+        if found and not line.lstrip().startswith("#"):
+            base_paths.add(found.group("path"))
+    grown = [(number, path) for number, path in exempt_rows if path not in base_paths]
+    growth_note = f"排除表与基准 {base_name[:12]} 那一版比没涨"
+elif base_state.startswith("unreadable:"):
+    exempt_problems.append(f"{base_state[len('unreadable:'):][:200]}，只缩不涨没比")
+else:
+    growth_note = "基准里还没有这张表（或不在 git 仓里），只缩不涨这一条没比"
+
+failed = False
+if offenders:
+    failed = True
+    print(f"  ✗ {len(offenders)} 份登记的自证既没报并行度、也没写明为什么不能并行：")  # gate-lint:summary
+    for offender in offenders:
+        print(f"     {offender}")  # gate-lint:detail
+    print(f"     → 怎么办：{HOWTO}；一时改不完的存量登记进 {EXEMPT_TABLE}（「<路径>  # 理由」，只缩不涨），改完就删那一行")
+if exempt_problems:
+    failed = True
+    print(f"  ✗ 排除表 {EXEMPT_TABLE} 有 {len(exempt_problems)} 处不对：")  # gate-lint:summary
+    for problem in exempt_problems:
+        print(f"     {problem}")  # gate-lint:detail
+    print("     → 怎么办：指向的文件搬了就改路径，已经达标或不再是登记的自证就删掉这一行；写法见文件头")
+if grown:
+    failed = True
+    print(f"  ✗ 排除表涨了：这几行基准 {base_name[:12]} 那一版里没有：")  # gate-lint:summary
+    for number, path in grown:
+        print(f"     第 {number} 行 {path}")  # gate-lint:detail
+    print(f"     → 怎么办：排除只缩不涨。新登记的自证照这一条做：{HOWTO}")
+if failed:
+    sys.exit(1)
+print(f"  ✓ 登记的自证都报了并行度或写明了不能并行：判了 {len(rows)} 份（报并行度 {counts['reported']}、写明不能并行 {counts['serial']}、"
+      f"排除 {counts['exempted']}，排除表 {len(exempt_rows)} 行都指得到、都还没达标）；{growth_note}")
+PY
+}
+
+# ── 格 long-run-split-exempt：跑过两小时也不拆的豁免表 .claude/long-run-split-exempt 的每一行写对
+#
+# 规则：.claude/rules/long-run-split.md「豁免」：一行 `<项名>  # <理由，至少 8 个字>`，理由里写用户那句话的出处（`records/<文件>.md:<行>`），一项一行，不按目录、不按整道门禁豁免。
+# 判据：表里每一行非注释行（空行与 # 起头的行不算）逐条判，任一条不成立判红，逐行点名「文件:行号」：
+#   ① 形态：行里有 #，# 左边有项名；
+#   ② 理由：# 右边去掉全部空白之后至少 8 个字；
+#   ③ 出处：理由里至少一处 records/<文件>.md:<行>，每一处的文件在被判的根里存在、行号在 1 到那份文件的行数之间（行数按换行切出来的行算）；
+#   ④ 项名不重复（点名第二次出现那一行与第一次出现的行号）；
+#   ⑤ 项名不是目录（带结尾 / 的，或在被判的根里是目录）、不是整道门禁的文件名（.claude/gate.d/ 顶层每个 *.sh 的文件名，带或不带 .sh、带或不带 .claude/gate.d/ 前缀）。
+# 表不在、或一行登记行都没有（只有注释与空行）：退 77，这一格无对象可判，不报绿（.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）；
+#   成功句报查了多少行、多少个项名。
+# 不判：项名在不在该项所属入口的 --list-items 里——要起各入口的 --list-items（门禁、变异、崩溃枚举各有自己的入口，有的要编译、要起服务、要算单元键），是重活，
+#   这一格只读文本、不起任何进程；用户有没有说过那句话、出处那一行是不是那句话，靠 review。
+# 样本：long-run-split-exempt-red（十一行登记行：没有 #、理由三个字、理由里没有出处、出处的文件不在、出处的行号超过文件行数、项名重复、项名是 scripts/、项名是 records 目录、
+#   项名是门禁文件名，另有一行全对，逐行点名判红，报「查了 11 行，10 处不对」）；long-run-split-exempt-green（三行都写对，其中一行带两处出处，报「查了 3 行、3 个项名」）；
+#   long-run-split-exempt-empty（只有两行注释，退 77）。
+# 弄坏开关 CODE_TOOLING_BREAK=long-run-exempt-form-unchecked：不判①，red 里「不是「<项名>  # <理由>」（没有 #）」那条 want 找不到；
+#   =long-run-exempt-reason-unchecked：不判②，red 里「理由去掉空白只有 3 个字」那条 want 找不到；
+#   =long-run-exempt-citation-unchecked：不判③，red 里第 4、5、6 行的出处那几条 want 找不到；
+#   =long-run-exempt-duplicate-unchecked：不判④，red 里「与第 7 行重复」那条 want 找不到；
+#   =long-run-exempt-scope-unchecked：不判⑤，red 里目录与门禁文件名那三条 want 找不到；
+#   =long-run-exempt-empty-accepted：没有登记行也往下报绿，empty 判错（期望退出 77，实测 0）。
+cell_long_run_split_exempt() {
+python3 - "${CODE_TOOLING_BREAK:-}" <<'PY'
+import glob, os, re, sys
+TABLE = ".claude/long-run-split-exempt"
+MINIMUM_REASON_CHARACTERS = 8
+CITATION = re.compile(r"records/([^\s:：]+\.md):(\d+)")   # 出处 records/<文件>.md:<行>
+broken = sys.argv[1]
+if not os.path.isfile(TABLE):
+    print(f"  ! 没有 {TABLE}，这一格无对象可判")
+    sys.exit(77)
+with open(TABLE, encoding="utf-8", errors="replace") as handle:
+    rows = [(number, line) for number, line in enumerate(handle.read().split("\n"), 1) if line.strip() and not line.lstrip().startswith("#")]
+if not rows and broken != "long-run-exempt-empty-accepted":
+    print(f"  ! {TABLE} 里没有登记行（只有注释与空行），这一格无对象可判")
+    sys.exit(77)
+# 整道门禁的名字：.claude/gate.d/ 顶层每个 *.sh，带或不带 .sh、带或不带目录前缀
+gate_names = set()
+for stage in glob.glob(".claude/gate.d/*.sh"):
+    file_name = os.path.basename(stage)
+    gate_names |= {file_name, file_name[:-len(".sh")], f".claude/gate.d/{file_name}"}
+problems, first_row_of = [], {}
+for number, line in rows:
+    where = f"{TABLE}:{number}"
+    item, separator, reason = line.partition("#")
+    item, reason = item.strip(), reason.strip()
+    if not separator or not item:
+        if broken != "long-run-exempt-form-unchecked":
+            problems.append(f"{where} 不是「<项名>  # <理由>」（{'没有 #' if not separator else '# 前面没有项名'}）")
+            continue
+        item = item or line.strip()
+    characters = len(re.sub(r"\s+", "", reason))
+    if characters < MINIMUM_REASON_CHARACTERS and broken != "long-run-exempt-reason-unchecked":
+        problems.append(f"{where} {item} 的理由去掉空白只有 {characters} 个字（至少 {MINIMUM_REASON_CHARACTERS}）")
+    citations = CITATION.findall(reason)
+    if broken != "long-run-exempt-citation-unchecked":
+        if not citations:
+            problems.append(f"{where} {item} 的理由里没有用户那句话的出处（写 records/<文件>.md:<行>）")
+        for name, digits in citations:
+            cited = f"records/{name}"
+            if not os.path.isfile(cited):
+                problems.append(f"{where} {item} 的出处 {cited}:{digits} 指到的文件不在")
+                continue
+            with open(cited, encoding="utf-8", errors="replace") as handle:
+                total = len(handle.read().splitlines())
+            if not 1 <= int(digits) <= total:
+                problems.append(f"{where} {item} 的出处 {cited}:{digits} 行号不在 1 到 {total} 之间（那份文件 {total} 行）")
+    if item in first_row_of and broken != "long-run-exempt-duplicate-unchecked":
+        problems.append(f"{where} {item} 与第 {first_row_of[item]} 行重复（一项一行）")
+    first_row_of.setdefault(item, number)
+    if broken != "long-run-exempt-scope-unchecked":
+        if item.endswith("/") or os.path.isdir(item):
+            problems.append(f"{where} {item} 是目录（豁免不按目录）")
+        elif item in gate_names:
+            problems.append(f"{where} {item} 是整道门禁的文件名（豁免不按整道门禁）")
+if problems:
+    for problem in problems:
+        print(f"  ✗ {problem}")  # gate-lint:detail
+    print(f"  ✗ 豁免表 {TABLE}：查了 {len(rows)} 行，{len(problems)} 处不对")  # gate-lint:summary
+    print("     → 怎么办：每行写成「<项名>  # <理由，至少 8 个字，带用户那句话的出处 records/<文件>.md:<行>>」：# 左边是入口 --list-items 列的那一个项名，一项一行、不写目录与门禁文件名；"
+          "出处的文件要在、行号不超过那份文件的行数；项拆开或不再超时的，那一行同一次删掉（.claude/rules/long-run-split.md「豁免」）")
+    sys.exit(1)
+print(f"  ✓ 豁免表 {TABLE}：查了 {len(rows)} 行、{len(first_row_of)} 个项名，都有 #、理由够长、出处的文件在且行号在文件行数以内、项名不重复、不是目录也不是整道门禁；项名在不在入口的 --list-items 里这一格不判")
+PY
+}
+
+# ── 逐项点名（.claude/rules/verification-reference.md「门禁的结构」的 --list-items 与 --item）：四十三格里只有三格分项，别的格只能整格跑（--check）
 #   research-script-selftests   <脚本路径>：runner 表里起这份脚本的那几条自证（按包装 -- 后面那条原命令的第二个词认）
 #   stage-break-switch-replay   <阶段文件名>，或 <阶段文件名>:<开关名>=<值>：有样本目录的那几道阶段，与它文件头开关表里的各条
 #   break-switch-replay         <脚本路径>，或 <脚本路径>:<开关名>=<值>：复跑登记表里在的那几份，与它文件头开关表里的各条
@@ -9836,7 +12330,7 @@ code_tooling_items_of() {
     research-script-selftests)
       selftest_runner_table_load
       for runner in "${runners[@]}"; do
-        read -r -a words <<<"$(selftest_inner_command "$runner")"
+        selftest_inner_into "$runner"; read -r -a words <<<"$selftest_inner"
         [[ -n "${words[1]:-}" && -z "${seen[${words[1]:-}]+set}" ]] || continue
         seen[${words[1]}]=1
         printf '%s\n' "${words[1]}"
@@ -9957,4 +12451,12 @@ code_tooling_sample_service_check() {
 
 code_tooling_resolve_items
 code_tooling_sample_service_check
+# 本趟各格共用的临时目录：prune-server 二进制只编一次（code_tooling_prune_server_binary）、要临时服务的自证登记表只读一次（temporary_service_table_load）、
+# gate 基准只算一次（exempt_table_baseline）；格是各自的子 shell，经这个目录里的文件共用。建不成就不设，各格照自己的办法取。收尾随这一道删
+if CODE_TOOLING_RUN_SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/code-tooling-run.XXXXXX")"; then
+  export CODE_TOOLING_RUN_SCRATCH
+  trap 'rm -rf -- "${CODE_TOOLING_RUN_SCRATCH:?}"' EXIT
+else
+  CODE_TOOLING_RUN_SCRATCH=""
+fi
 stage_cells_run "$ROOT"

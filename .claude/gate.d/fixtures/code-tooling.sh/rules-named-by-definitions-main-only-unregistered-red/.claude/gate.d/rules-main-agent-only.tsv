@@ -1,0 +1,2 @@
+# 只管主 agent 的规则登记：一行「规则路径<TAB>理由」
+.claude/rules/not-in-claude.md	只管主 agent 收尾写回的做法，子 agent 不收尾

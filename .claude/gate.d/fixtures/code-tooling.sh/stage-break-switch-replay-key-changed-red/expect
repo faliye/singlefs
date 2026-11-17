@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=· 重算键：没对上的 1 条照开跑前同一份请求重算，键变了 1 条
+want=sample-stage.sh:6 SAMPLE_STAGE_BREAK=swallow-red：点名的与实测判错的不等（点了没错：sample-green；错了没点：sample-red）；跑的过程中键变了（开跑前算的键
+want=组成清单有
+want=出路：在冻结快照树里重判这一条
+want=门禁阶段的弄坏开关复跑：1 处不对（复跑了 2 条、1 道阶段；本次未跑 0 项）
+want=stage-break-switch-replay：红（退出 1）

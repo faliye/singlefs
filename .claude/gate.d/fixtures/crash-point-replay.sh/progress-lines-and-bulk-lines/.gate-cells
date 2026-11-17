@@ -1,0 +1,3 @@
+# 不带特性那一趟：六种进度行都转出来，cargo 有输出而没有进度行时报一行还在出；逐提交的行不进日志、只留计数与末尾现场；夹着 NOT_RUN_ 的那一行与打散的结果行照认。判的是 crash-case-replay 格，样本档退 3（expect 里写了按设计不绿的理由）
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

@@ -1,0 +1,4 @@
+exit=1
+want=research/prompts/_c992-code-r1-body.md：「### 检查单：测试优先多线程」底下没写答案（到下一个标题为止一行字都没有）
+want=代码轮正文的检查单没写全（1 处，查了 1 份）
+want=code-round-checklist：红

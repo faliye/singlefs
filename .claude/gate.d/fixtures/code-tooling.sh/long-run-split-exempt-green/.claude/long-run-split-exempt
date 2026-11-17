@@ -1,0 +1,4 @@
+# 样本：豁免表的行都写对（一行：项名  # 理由，理由里带 records 出处）
+crash-case:alpha-one  # 用户点名这一项不拆，见 records/said.md:2
+batch-item  # 用户点名 records/said.md:5
+scripts/mutation/row-alpha  # 用户点名 records/said.md:1，records/said.md:3

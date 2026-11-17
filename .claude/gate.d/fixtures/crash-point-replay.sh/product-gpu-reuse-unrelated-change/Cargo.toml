@@ -1,2 +1,2 @@
 [workspace]
-members = ["crates/singlefs-verification", "crates/singlefs-background-gpu"]
+members = ["crates/singlefs-verification", "crates/singlefs-background-gpu-tests"]

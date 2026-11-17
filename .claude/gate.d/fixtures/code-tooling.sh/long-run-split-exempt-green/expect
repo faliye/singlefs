@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：long-run-split-exempt
+want=豁免表 .claude/long-run-split-exempt：查了 3 行、3 个项名，都有 #
+want=long-run-split-exempt：绿

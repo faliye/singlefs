@@ -1,0 +1,9 @@
+exit=3
+want=样本档：
+want=第 1 节（stream=plain-stream states=112）：signatures=1 red_states=9 states=112
+want=问题：第 1 节 red_states=9：有状态判红
+want=crash-case:plain-stream：登记了 red-blocks=judged-by-test，发现表只打印
+want=✓ crash-case:plain-stream 判绿（
+want=✓ crash-case:other-stream 判绿（
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

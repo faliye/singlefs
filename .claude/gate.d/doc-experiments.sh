@@ -63,6 +63,8 @@
 # experiment-orphans-model-directory-green / -sibling-red：三方腿的模型目录（research/prompts/ 直接底下名字以 -model 结尾的目录）里的假 e990 样本不算用过的号，只有 kb 页的 E99 一个号，判绿 /
 #   模型目录外同名形态的照算（research/prompts/ 底下的、research/results/ 底下的 -model 目录里的、research/prompts/ 更深一层的 -model 目录里的），红行点名这三处，模型目录里的假样本同在样本里。
 # experiment-orphans-page-directory-red / -page-binary-red / -empty-page-red：E42 有产物，kb/experiments/ 里同号的只有目录、只有 .bin、只有只含换行的 .md，都不算正文，判 E42 没有正文。
+# experiment-orphans-blank-beside-body-red：同 -empty-page-red，kb/experiments/ 里另有一页有正文的 99（E99 有产物）：有正文的页不替只含换行的 42 作保，判 E42 没有正文。
+# quoted-result-lines-normalized-green：产物三行，一行前后带空格、一行的回车隔在 E7RESULT 与空格之间（行尾也有回车）、一行原样，页里整行抄的三行都找得到（setup.sh 造产物）。
 # 按编号取实验页的四份（实验页有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文的索引与产物取中文原文，判法 lib-item-ref-status.py 的 numbered_files）：
 # index-sync-translation-green / -red（索引结论列的数在中文原文里、译文里没有 / 只在英语译文里有），
 # verdict-false-named-translation-green（E174 的中文原文没有「## 历史版本」、正文点了 false 字段的名，两份译文排在前面：绿）、
@@ -86,7 +88,7 @@
 #     decision-links-moved-and-switch-red、decision-links-pending-base-unreadable-red、decision-links-progress-mark-red、decision-links-red
 #     decision-links-switch-inserted-red、evidence-in-repo-red、evidence-in-repo-worktree-red、experiment-orphans-red
 #     experiment-orphans-registry-red、experiment-orphans-model-directory-sibling-red、experiment-orphans-page-directory-red、experiment-orphans-page-binary-red
-#     experiment-orphans-empty-page-red、index-sync-red、index-sync-translation-red、multipath-registry-red
+#     experiment-orphans-empty-page-red、experiment-orphans-blank-beside-body-red、index-sync-red、index-sync-translation-red、multipath-registry-red
 #     preregistration-parallelism-red、preregistration-parallelism-wallclock-red、quoted-result-lines-archived-gz-red、quoted-result-lines-gz-red
 #     preregistration-parallelism-quantities-section-red、preregistration-judge-features-red
 #     preregistration-judge-features-continued-red、preregistration-judge-features-alias-red
@@ -111,7 +113,7 @@
 #     decision-links-translation-green、evidence-in-repo-green、evidence-in-repo-red、evidence-in-repo-worktree-green
 #     evidence-in-repo-worktree-red、experiment-orphans-green、experiment-orphans-red、experiment-orphans-registry-red
 #     experiment-orphans-model-directory-green、experiment-orphans-model-directory-sibling-red
-#     experiment-orphans-page-directory-red、experiment-orphans-page-binary-red、experiment-orphans-empty-page-red
+#     experiment-orphans-page-directory-red、experiment-orphans-page-binary-red、experiment-orphans-empty-page-red、experiment-orphans-blank-beside-body-red
 #     index-sync-green、index-sync-red、index-sync-translation-green、index-sync-translation-red
 #     multipath-registry-green、multipath-registry-red、preregistration-parallelism-green、preregistration-parallelism-red
 #     preregistration-parallelism-wallclock-green、preregistration-parallelism-wallclock-red、quoted-result-lines-archived-gz-green、quoted-result-lines-archived-gz-red
@@ -123,7 +125,7 @@
 #     preregistration-judge-features-test-target-red、judge-entries-in-sync-green、judge-entries-in-sync-red、judge-entries-in-sync-stale-red
 #     judge-entries-in-sync-array-parameter-new-entry-red、judge-entries-in-sync-array-parameter-on-the-path-green、judge-entries-in-sync-cycle-new-entry-after-red
 #     preregistration-judge-features-list-item-trailing-comment-red、preregistration-judge-features-table-cell-trailing-comment-red
-#     quoted-result-lines-green、quoted-result-lines-gz-green、quoted-result-lines-gz-red、quoted-result-lines-history-added-red
+#     quoted-result-lines-green、quoted-result-lines-normalized-green、quoted-result-lines-gz-green、quoted-result-lines-gz-red、quoted-result-lines-history-added-red
 #     quoted-result-lines-history-old-green、quoted-result-lines-moved-and-edited-red、quoted-result-lines-moved-history-green、quoted-result-lines-moved-unregistered-red
 #     quoted-result-lines-unreplayable-green、quoted-result-lines-unreplayable-mistyped-red、quoted-result-lines-unreplayable-product-missing-red
 #     quoted-result-lines-unreplayable-reason-empty-red、quoted-result-lines-unreplayable-unlisted-red
@@ -271,6 +273,21 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=archived-gz-not-searched  quoted-result-lines 去历史里找归档产物时只认 .out 收尾的路径
 #     quoted-result-lines-archived-gz-green
 #     quoted-result-lines-archived-gz-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=archived-blob-batch-unread  quoted-result-lines 从历史里批量取归档产物时（git cat-file --batch 那一路）取到的字节读成空：取得到的份数不变、里面一行都没有
+#     quoted-result-lines-archived-gz-green
+#     quoted-result-lines-archived-gz-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=result-lines-raw-prefix  quoted-result-lines 收产物行时不去首尾空白就筛 E7RESULT 前缀（缩进的产物行收不进来）
+#     quoted-result-lines-normalized-green
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=result-lines-prefilter-ignores-carriage-return  quoted-result-lines 产物里有回车也先筛含「E7RESULT 加一个空格」的行（回车隔在 E7RESULT 与空格之间的行收不进来）
+#     quoted-result-lines-normalized-green
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=repro-command-batch-unattributed  repro-command 批量 grep 的命中不分页：有一页写明了原始输出未留存（或写了复跑入口），就当每一页都写了
+#     repro-command-green
+#     repro-command-unreproducible-green
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=tmp-prefilter-skips-all  evidence-in-repo 判据二的整份预筛一律说文本里没有 /tmp/，所有 .md 都不扫
+#     evidence-in-repo-green
+#     evidence-in-repo-red
+#     evidence-in-repo-worktree-green
+#     evidence-in-repo-worktree-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=unreplayable-registry-ignored  quoted-result-lines 不读 .claude/gate.d/quoted-product-unreplayable.tsv，登记了的产物照旧只认 replay.sh
 #     quoted-result-lines-unreplayable-green
 #     quoted-result-lines-unreplayable-mistyped-red
@@ -334,9 +351,12 @@
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-registry-ignored  experiment-orphans 不读目录登记，用写死的四个目录（不看 kb 索引行，也不认登记里新加的一处）
 #     experiment-orphans-registry-red
 #   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-page-shape-ignored  experiment-orphans 的「有正文」只看 kb/experiments/ 底下条目名的数字前缀（同号的目录、.bin、空 .md 都算有正文）
+#     experiment-orphans-blank-beside-body-red
 #     experiment-orphans-empty-page-red
 #     experiment-orphans-page-binary-red
 #     experiment-orphans-page-directory-red
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=orphans-batch-any-body  experiment-orphans 批量找有正文的页时只要有一页有非空白字符，就当每一页都有正文
+#     experiment-orphans-blank-beside-body-red
 #   滞后表、豁免表与基准比的取法与复跑表的读法在 lib-lag-baseline.py（decision-links、multipath-registry、replay-comparison-units 三格取基准那一版，
 #   results-cited、verdict-false-named、quoted-result-lines、replay-comparison-units 四格读复跑表）；它的开关在这一道会红的样本：
 #   LAG_BASELINE_BREAK=unreadable-as-absent  归 lib-lag-baseline.py：git 取不到基准那一版当成「基准里没有这张表」，decision-links 把待回填清单整张算新加
@@ -611,7 +631,7 @@ cell_results_cited() {
   round_named_skipped=()
   while IFS= read -r f; do
     relative="${f#"$RES"/}"
-    b="$(basename "$f")"
+    b="${f##*/}"
     # 三类不算产物：本地腿的问答、逐轮复跑的中间件（replay.sh 登记了的除外）、确认目录
     case "$relative" in
       *local*|*.round*|confirm*) not_products+=("$relative"); continue ;;
@@ -707,12 +727,13 @@ cell_results_cited() {
   fi
   missing=0; checked=0; skipped=0
   declare -A skipped_names_by_owner=()
+  # $touched 是换行分隔的名字，前面补一个换行（只补一次），点名的名字前面也补一个换行，用 case 比整段，不用管道接 grep -q（pipefail 下退出码会被后一段盖掉）。
+  touched_padded=$'\n'"$touched"
   while read -r _ name owner; do   # 字段是 NAMED、文件名、实验号，都不含空格，默认分隔够用
     [[ -n "$name" ]] || continue
-    # 不用管道接 grep -q（pipefail 下退出码会被后一段盖掉）：$touched 是换行分隔的名字，两端各补一个换行再用 case 比整段。
     if [[ -n "$BASE" ]]; then
-      case "$(printf "\n%s\n" "$touched")" in
-        *"$(printf "\n%s\n" "$name")"*) : ;;
+      case "$touched_padded" in
+        *$'\n'"$name"*) : ;;
         *) skipped=$((skipped+1))
            skipped_names_by_owner["${owner:-（不在任何实验节里）}"]+=" $name"
            continue ;;
@@ -1009,9 +1030,14 @@ tmp_mentions = 0
 history_lines_kept = 0
 for path in sorted(set(scanned_files)):
     try:
-        lines = open(path, encoding="utf-8", errors="replace").read().split("\n")
+        text = open(path, encoding="utf-8", errors="replace").read()
     except OSError:
         continue
+    # 两条正则（tmp_form、citation_form）都要文本里有 /tmp/：没有它的文件对 tmp_mentions 与引用的贡献都是 0，整份跳过，不逐行跑正则、也不取变更史的基准版。
+    # 弄坏开关 tmp-prefilter-skips-all：预筛一律说没有 /tmp/，所有文件都跳过。
+    if "/tmp/" not in text or os.environ.get("EXPERIMENT_PAGES_AND_PRODUCTS_BREAK", "") == "tmp-prefilter-skips-all":
+        continue
+    lines = text.split("\n")
     lines_at_base = set()
     if path in HISTORY_CARRIERS and base and os.environ.get("EXPERIMENT_PAGES_AND_PRODUCTS_BREAK", "") != "history-lines-judged":
         shown = subprocess.run(["git", "-c", "core.quotepath=false", "show", f"{base}:{os.path.relpath(path)}"], capture_output=True, text=True)
@@ -2007,17 +2033,53 @@ cell_repro_command() {
     exit 1
   fi
 
+  # 逐页的三种判据（点了产物、写明原始输出未留存、写了复跑入口）：普通文件、读得了、名字里没有换行的页，各种判据对这些页一次 grep -l 取齐、按页名查命中；
+  # 别的页（读不了、不是普通文件）与批量 grep 没跑成（退 2 以上）时，这一趟所有页退回逐页 grep（退 2 的记成读不了的页）。
+  # 弄坏开关 repro-command-batch-unattributed：命中不分页，写明未留存或写了复跑入口的页只要有一页，就当每一页都有。
+  declare -A batch_covered=() batch_product_hit=() batch_exempt_hit=() batch_repro_hit=()
+  batch_pages=()
+  for f in "$EXP_DIR"/*.md; do
+    [[ -f "$f" && -r "$f" && "$f" != *$'\n'* ]] && batch_pages+=("$f")
+  done
+  if ((${#batch_pages[@]})); then
+    batch_ok=1
+    product_hits="$(grep -lE "$PRODUCT_RE" -- "${batch_pages[@]}")"; (($? <= 1)) || batch_ok=0
+    exempt_hits="$(grep -lF '原始输出未留存' -- "${batch_pages[@]}")"; (($? <= 1)) || batch_ok=0
+    repro_hits="$(grep -lE "$REPRO_RE" -- "${batch_pages[@]}")"; (($? <= 1)) || batch_ok=0
+    if ((batch_ok)); then
+      for f in "${batch_pages[@]}"; do batch_covered["$f"]=1; done
+      while IFS= read -r hit; do [[ -n "$hit" ]] && batch_product_hit["$hit"]=1; done <<<"$product_hits"
+      while IFS= read -r hit; do [[ -n "$hit" ]] && batch_exempt_hit["$hit"]=1; done <<<"$exempt_hits"
+      while IFS= read -r hit; do [[ -n "$hit" ]] && batch_repro_hit["$hit"]=1; done <<<"$repro_hits"
+      if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" == repro-command-batch-unattributed ]]; then
+        if ((${#batch_exempt_hit[@]})); then for f in "${batch_pages[@]}"; do batch_exempt_hit["$f"]=1; done; fi
+        if ((${#batch_repro_hit[@]})); then for f in "${batch_pages[@]}"; do batch_repro_hit["$f"]=1; done; fi
+      fi
+    fi
+  fi
+
   bad=(); unreadable=(); exempt=(); registry_exempt=(); apparatus_ok=(); apparatus_missing=(); pointing=0
   for f in "$EXP_DIR"/*.md; do
     # 一页 .md 都没有时通配原样留下，grep 找不到它会退 2、被当成「读不了的页」：那是无对象可判，不是读不了
     [[ -e "$f" || -L "$f" ]] || continue
-    grep -qE "$PRODUCT_RE" "$f"; rc=$?
-    if ((rc == 2)); then unreadable+=("$(basename "$f")"); continue; fi
+    page_name="${f##*/}"
+    if [[ -n "${batch_covered[$f]:-}" ]]; then
+      if [[ -n "${batch_product_hit[$f]:-}" ]]; then rc=0; else rc=1; fi
+    else
+      grep -qE "$PRODUCT_RE" "$f"; rc=$?
+    fi
+    if ((rc == 2)); then unreadable+=("$page_name"); continue; fi
     ((rc == 0)) || continue
     pointing=$((pointing + 1))
-    if grep -qF '原始输出未留存' "$f"; then exempt+=("$(basename "$f")"); continue; fi
-    grep -qE "$REPRO_RE" "$f" && continue
-    page_name="$(basename "$f")"
+    if [[ -n "${batch_covered[$f]:-}" ]]; then
+      [[ -n "${batch_exempt_hit[$f]:-}" ]] && page_exempt=1 || page_exempt=0
+      [[ -n "${batch_repro_hit[$f]:-}" ]] && page_repro=1 || page_repro=0
+    else
+      grep -qF '原始输出未留存' "$f" && page_exempt=1 || page_exempt=0
+      grep -qE "$REPRO_RE" "$f" && page_repro=1 || page_repro=0
+    fi
+    if ((page_exempt)); then exempt+=("$page_name"); continue; fi
+    ((page_repro)) && continue
     if [[ -n "${registered[$page_name]:-}" ]]; then registry_exempt+=("$page_name"); continue; fi
     # 起 scripts/experiment-apparatus/ 下脚本的复跑行：点名的脚本文件、装置目录都要在
     found_files=0; missing_paths=()
@@ -2087,7 +2149,7 @@ cell_repro_command() {
 # ── 格 experiment-orphans：目录登记列的各处出现过的实验号在 kb 里有没有正文
 #
 # 判据：目录登记 .claude/gate.d/experiment-number-directories.tsv 列的每一处（research/、scripts/、入库装置的两处 crates/singlefs-verification/src/bin/ 与
-# 产品 GPU 包的 crates/singlefs-background-gpu/src/bin/、kb 实验页与索引行；名字形态写在登记文件头，以登记为准）出现过的实验号，kb/experiments/ 里都要有对应编号的正文：
+# 产品 GPU 测试包的 crates/singlefs-background-gpu-tests/src/bin/、kb 实验页与索引行；名字形态写在登记文件头，以登记为准）出现过的实验号，kb/experiments/ 里都要有对应编号的正文：
 # 跑过的东西没入库，会以「我们量过」的形式活在对话里，谁也复核不了。results-cited 格按名字排除的（*local* 这类）也在这里判到。
 # 「有正文」只认 kb/experiments/ 这一层名字是「<号>-<简称>.md」的普通文件（号可带前导 0，译文 .en.md / .ja.md 也算），且有一个非空白字符：
 # 同号的目录、别的后缀（.bin 这类）、符号链接、空的或只有空白的 .md 都不算。正文写得全不全不归这一格（各节的判法在别的格）。
@@ -2109,10 +2171,28 @@ cell_experiment_orphans() {
   if [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" == orphans-page-shape-ignored ]]; then   # 弄坏开关：只看条目名的数字前缀
     have=$(ls "$EXP_DIR" | grep -oE '^[0-9]+' | sed 's/^0*//' | sort -un)
   else
-    have=$(for page in "$EXP_DIR"/*; do
-             [[ "${page##*/}" =~ ^([0-9]+)-.*\.md$ && -f "$page" && ! -L "$page" ]] || continue
-             number="${BASH_REMATCH[1]}"
-             if grep -q '[^[:space:]]' -- "$page"; then echo "$((10#$number))"; fi
+    # 有正文的页：名字是「<号>-<简称>.md」的普通文件（不是符号链接），里面有一个非空白字符。这些页一次 grep -l 取出有非空白字符的（读不了的页不在输出里，
+    # 与逐页 grep -q 退 2 当「没有正文」同义），按页名查；名字里带换行的页逐页 grep -q。
+    # 弄坏开关 orphans-batch-any-body：只要有一页有非空白字符，就当每一页都有正文。
+    body_candidates=(); body_listed=(); declare -A body_number=() nonblank_page=()
+    for page in "$EXP_DIR"/*; do
+      [[ "${page##*/}" =~ ^([0-9]+)-.*\.md$ && -f "$page" && ! -L "$page" ]] || continue
+      body_candidates+=("$page"); body_number["$page"]="${BASH_REMATCH[1]}"
+      [[ "$page" == *$'\n'* ]] || body_listed+=("$page")
+    done
+    if ((${#body_listed[@]})); then
+      nonblank_pages="$(grep -l '[^[:space:]]' -- "${body_listed[@]}")" || true
+      while IFS= read -r hit; do [[ -n "$hit" ]] && nonblank_page["$hit"]=1; done <<<"$nonblank_pages"
+    fi
+    have=$(for page in "${body_candidates[@]}"; do
+             if [[ "$page" == *$'\n'* ]]; then
+               grep -q '[^[:space:]]' -- "$page" || continue
+             elif [[ "${EXPERIMENT_PAGES_AND_PRODUCTS_BREAK:-}" == orphans-batch-any-body ]]; then
+               ((${#nonblank_page[@]})) || continue
+             else
+               [[ -n "${nonblank_page[$page]:-}" ]] || continue
+             fi
+             echo "$((10#${body_number[$page]}))"
            done | sort -un)
   fi
   listing_file="$(mktemp)"; errors_file="$(mktemp)"
@@ -2137,7 +2217,9 @@ cell_experiment_orphans() {
   want=$(awk -F'\t' '$1 == "number" { print $2 }' "$listing_file" | sort -un)
 
   orphan=()
-  for n in $want; do grep -qx "$n" <<<"$have" || orphan+=("$n"); done
+  declare -A have_number=()
+  for n in $have; do have_number["$n"]=1; done
+  for n in $want; do [[ -n "${have_number[$n]:-}" ]] || orphan+=("$n"); done
 
   if ((${#orphan[@]})); then
     echo "  ✗ $registry_label 列的各处有这些实验号的东西，kb/experiments/ 里却没有正文："
@@ -2352,6 +2434,26 @@ def product_text(name, raw_bytes):
     return raw_bytes.decode('utf-8', errors='ignore')
 
 
+RESULT_PREFIX = 'E7RESULT '
+
+
+def result_lines(content):
+    """产物正文里去掉首尾空白、去掉 \\r 之后以 E7RESULT 起头的行的集合。比对的另一边（整行抄的引文）一定以 E7RESULT 起头，
+    不以它起头的产物行永远命中不了，所以只收这一类（产物逐份可达上百 MB，逐行建集合与字典是这一格的大头）。
+    正文里没有 \\r 时先按「含 E7RESULT 加一个空格」筛一遍再去空白：去空白只去两端的空白、去 \\r 才可能让一行变成以它起头，没有 \\r 时筛掉的行去空白之后也不以它起头；
+    正文里有 \\r 的逐行照去空白、去 \\r 之后再筛。
+    弄坏开关 result-lines-raw-prefix：不去空白就筛前缀（缩进的产物行收不进来）；result-lines-prefilter-ignores-carriage-return：有 \\r 也走先筛一遍那一支（\\r 隔在 E7RESULT 与空格之间的行收不进来）。"""
+    if BREAK == 'result-lines-raw-prefix':
+        return {line.strip().replace('\r', '') for line in content.split('\n') if line.startswith(RESULT_PREFIX)}
+    if '\r' in content and BREAK != 'result-lines-prefilter-ignores-carriage-return':
+        stripped_lines = (line.strip().replace('\r', '') for line in content.split('\n'))
+        return {text for text in stripped_lines if text.startswith(RESULT_PREFIX)}
+    if RESULT_PREFIX not in content:
+        return set()
+    candidates = (line.strip().replace('\r', '') for line in content.split('\n') if RESULT_PREFIX in line)
+    return {text for text in candidates if text.startswith(RESULT_PREFIX)}
+
+
 # 进不了 replay.sh 复跑表的产物登记表（一行一份产物：产物名、怎么跑出的、为什么进不了复跑表）：这里登记的产物里也逐字找整行抄的行。
 # 表不在当没有登记；弄坏开关 unreplayable-registry-ignored 不读它。
 UNREPLAYABLE = '.claude/gate.d/quoted-product-unreplayable.tsv'
@@ -2387,8 +2489,7 @@ for product in products:
         is_registered = True
     with open(product, 'rb') as handle:
         product_content = product_text(product, handle.read())
-    for line in product_content.split('\n'):
-        text = line.strip().replace('\r', '')
+    for text in result_lines(product_content):
         product_lines.add(text)
         line_sources.setdefault(text, set()).add(base_prod)
         if is_registered:
@@ -2402,20 +2503,61 @@ archived_found_names = set()   # 在版本库历史里取到字节的产物文�
 ARCHIVED_SUFFIXES = ('.out',) if BREAK == 'archived-gz-not-searched' else ('.out', '.out.gz')
 
 
+blob_reader = None
+
+
+def read_blob(revision_path):
+    """git 里 <提交>:<路径> 那一份的字节；取不出（提交不在、路径不在）返回 None，与 git show 同义。
+    归档的产物逐份取，常驻一个 git cat-file --batch 进程按名字一份份问，省掉每份一个 git show 子进程；
+    读不出标准的三行应答、取到的不是 blob、进程起不来或中途断了，这一份退回 git show 取。
+    弄坏开关 archived-blob-batch-unread：批量那一路取到的字节读成空（取得到的份数不变、内容全空）。"""
+    global blob_reader
+    try:
+        if blob_reader is None:
+            blob_reader = subprocess.Popen(['git', 'cat-file', '--batch'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        blob_reader.stdin.write(revision_path.encode('utf-8') + b'\n')
+        blob_reader.stdin.flush()
+        header = blob_reader.stdout.readline()
+        if header.endswith(b' missing\n'):
+            return None
+        fields = header.split()
+        if len(fields) == 3 and fields[1] == b'blob':
+            size = int(fields[2])
+            content = blob_reader.stdout.read(size)
+            blob_reader.stdout.read(1)
+            if len(content) == size:
+                return b'' if BREAK == 'archived-blob-batch-unread' else content
+    except (OSError, ValueError):
+        pass
+    # 应答认不出、进程断了：这个进程与下一份的应答可能已错位，丢掉它、这一份走 git show
+    if blob_reader is not None:
+        blob_reader.kill()
+        blob_reader.wait()
+        blob_reader = None
+    shown = subprocess.run(['git', 'show', revision_path], capture_output=True)
+    return shown.stdout if shown.returncode == 0 else None
+
+
 def blob_lines(entry, revision_path):
-    """git show 取出的归档产物字节，按文件名解压（若压过）后逐行去首尾空白；取不出返回 None。"""
-    blob = subprocess.run(['git', 'show', revision_path], capture_output=True)
-    if blob.returncode != 0:
+    """归档产物的字节（read_blob），按文件名解压（若压过）后逐行去首尾空白、只收 E7RESULT 行（result_lines）；取不出返回 None。"""
+    blob = read_blob(revision_path)
+    if blob is None:
         return None
-    return {one.strip().replace('\r', '') for one in product_text(entry, blob.stdout).split('\n')}
+    return result_lines(product_text(entry, blob))
+
+
+deleted_products_log = None
 
 
 def archived_product_lines(only_names=None):
     """归档进版本库的产物的行；only_names 给了就只取这些文件名的（登记着、却已出了树的那几份）。"""
-    global archived_count
+    global archived_count, deleted_products_log
     lines = set()
-    log = subprocess.run(['git', '-c', 'core.quotepath=false', 'log', '--all', '--diff-filter=D', '--format=%H', '--name-only',
-                          '--', 'research/results'], capture_output=True, text=True).stdout
+    if deleted_products_log is None:
+        # 删除清单整趟只取一次（这个函数一趟最多调两次，两次问的是同一份历史）
+        deleted_products_log = subprocess.run(['git', '-c', 'core.quotepath=false', 'log', '--all', '--diff-filter=D', '--format=%H', '--name-only',
+                                               '--', 'research/results'], capture_output=True, text=True).stdout
+    log = deleted_products_log
     commit = None
     for entry in log.split('\n'):
         entry = entry.strip()
@@ -2512,7 +2654,7 @@ PY
 
 # ── 格 archive-past-rounds：上一轮及更早的实验记录已经归档进版本库，工作区里不留
 #
-# 规则：.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」之下那三段；判法与保留哪几类在 scripts/kb/archive-past-rounds.py。
+# 规则：.claude/rules/evidence-discipline.md「原样保存的证据不许事后改」之下那三段；判法与保留哪几类在 scripts/kb/archive-past-rounds.py。
 # 基准是这一道开头取的 gate_diff_base gate（与 doc-process-records.sh 的 knowledge-sync 格同一个），经 GATE_BASE 交给脚本，出路里打出的基准就是这个提交。
 # 判别力：fixtures/doc-experiments.sh/archive-past-rounds-red 是一个留着上一轮产物的小仓，必须判红；
 # archive-past-rounds-green 只有本轮的，必须判绿。
@@ -2789,15 +2931,38 @@ if in_git:
         sys.exit(1)
     tracked = set(listed.stdout.decode('utf-8', 'replace').split('\0'))
 
+# 产物类路径的存放名一次问齐（一个 bash 进程逐个调 product_stored_forms，每个路径一段：「@@ <退出码> <路径>」接着它打的每个名字）。
+STORED_FORMS_SCRIPT = r'''
+while IFS= read -r stored_path; do
+  stored_forms="$(product_stored_forms "$stored_path")"; stored_status=$?
+  printf '@@ %s %s\n' "$stored_status" "$stored_path"
+  printf '%s\n' "$stored_forms"
+done
+'''
+batched_forms = {}   # 路径 -> [product_stored_forms 的退出码, 它打的名字]
+batched_stderr = ''
+if break_switch != 'cited-path-gz-unmatched':
+    product_paths = [path for path in sorted(places) if kind_of[path] == 0]
+    if product_paths:
+        batched = subprocess.run(['bash', '-c', STORED_FORMS_SCRIPT, '_'], input=''.join(path + '\n' for path in product_paths), capture_output=True, text=True)
+        batched_stderr = batched.stderr.strip()[:80]
+        current_path = None
+        for batched_line in batched.stdout.split('\n'):
+            if batched_line.startswith('@@ '):
+                _marker, status_text, current_path = batched_line.split(' ', 2)
+                batched_forms[current_path] = [int(status_text), []]
+            elif batched_line and current_path is not None:
+                batched_forms[current_path][1].append(batched_line)
+
+
 def stored_forms(path):
     """点名的路径在树里、历史里可能的存放名：.out 产物压成 .out.gz 入库之后只剩后者。
-    判法是 results-cited 格的 product_stored_forms（同一份，bash 函数经 export -f 递过来），这里不抄第二份；其余两类路径只认原样。"""
+    判法是 results-cited 格的 product_stored_forms（同一份，bash 函数经 export -f 递过来，上面一个进程问齐所有产物类路径），这里不抄第二份；其余两类路径只认原样。"""
     if kind_of[path] != 0 or break_switch == 'cited-path-gz-unmatched':
         return [path]
-    listed_forms = subprocess.run(['bash', '-c', 'product_stored_forms "$1"', '_', path], capture_output=True, text=True)
-    forms = [form for form in listed_forms.stdout.split('\n') if form]
-    if listed_forms.returncode != 0 or path not in forms:
-        print(f"  ✗ product_stored_forms 查 {path} 的存放名退 {listed_forms.returncode}（{listed_forms.stderr.strip()[:80]}），这一个没判成")   # gate-lint:summary
+    status, forms = batched_forms.get(path, [127, []])
+    if status != 0 or path not in forms:
+        print(f"  ✗ product_stored_forms 查 {path} 的存放名退 {status}（{batched_stderr}），这一个没判成")   # gate-lint:summary
         print("     → 怎么办：它是 doc-experiments.sh 里 results-cited 格用的同一个函数，看这一份脚本有没有被改坏；不许把没判成当成在。")   # gate-lint:detail
         sys.exit(1)
     return forms
@@ -4118,4 +4283,6 @@ print(f"  ✓ 比对对象 {len(registered)} 行（{'、'.join(experiments)}）�
 PY
 }
 
+# 这一道的格互不依赖、都只读被判的树：并行跑（.claude/gate.d/lib/stage-cells.sh 文件头「格并行」）
+STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"
 stage_cells_run "$ROOT"

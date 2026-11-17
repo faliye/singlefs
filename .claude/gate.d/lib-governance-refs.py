@@ -35,7 +35,7 @@ decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；r
      「门禁 <名>」（名是小写字母、数字与连字符、至少带一个连字符，可带 .sh、可套反引号）里的名要是门禁目录顶层的一道门禁，
      或上游规范副本 .claude/singlefs-ai-sop/scripts/ 下的一份脚本（共享门禁的阶段，「门禁 doc-lint」这类）；
      「<门禁名> 的 <格名> 格」（「那一格」「这一格」同）与反引号里「gate.d/<门禁名>.sh … --check <格名>[,<格名>…]」里的格名，
-     要在那道门禁文件头的格名表里（`# gate-cell:` 行，经 scripts/gate/gate-structure-check.py 的 header_cells 读）。
+     要在那道门禁文件头的格名表里（`# gate-cell:` 行，经 scripts/gate/lib_stage_header.py 的 header_cells 读）。
      「<名> 的 <x> 格」里 <名> 不是门禁目录里的门禁的不判（分不清是不是在说门禁）。
   ⑤ 用旧编号称呼门禁：「NN 号」（排除与 ① 相同）、「门禁 NN」、「gate.d/NN-…」（含 gate.d/fixtures/NN-…），NN 是下面 OLD_GATES 里的旧号。出路给那个旧号今天在哪道门禁、哪几格。
      「NN 号」「门禁 NN」两种写法先把带目录的文件路径与「日期-」起头的记录文件名遮掉再找（`records/2026-09-28-门禁59号提速与双机分片.md`
@@ -131,6 +131,7 @@ python 起不来时退 2（打不开脚本），参数认不出也退 2。调用
   （doc-registries.sh 文件头的开关清单逐条点名每个开关下判错的样本，以那一份为准）
 """
 import difflib
+import functools
 import glob
 import importlib.util
 import os
@@ -143,7 +144,7 @@ sys.dont_write_bytecode = True
 GATE_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 REPOSITORY_OF_GATES = os.path.dirname(os.path.dirname(GATE_DIRECTORY))
 UPSTREAM_SCRIPTS = os.path.join(REPOSITORY_OF_GATES, ".claude", "singlefs-ai-sop", "scripts")
-STRUCTURE_CHECK = os.path.join(REPOSITORY_OF_GATES, "scripts", "gate", "gate-structure-check.py")
+STAGE_HEADER = os.path.join(REPOSITORY_OF_GATES, "scripts", "gate", "lib_stage_header.py")
 BROKEN = os.environ.get("GOVERNANCE_REFS_BREAK", "")
 CARRIER_PATTERNS = ["CLAUDE.md", ".claude/main-agent.md", ".claude/agent-common.md",
                     ".claude/agents/*.md", ".claude/rules/*.md", ".claude/skills/*/SKILL.md"]
@@ -284,7 +285,6 @@ OLD_GATES = {
     87: ("research-build-and-replay", ("experiment-replay",)),
     88: ("doc-experiments", ("quoted-result-lines",)),
     89: ("doc-registries", ("closeout-row27-preconditions",)),
-    90: ("doc-text", ("term-renames",)),
     91: ("doc-experiments", ("archive-past-rounds",)),
     92: ("checker-independence-and-sync", ("layout-checker-sync",)),
     93: ("code-source-discipline", ("feature-bits",)),
@@ -312,8 +312,8 @@ def existing_gate_numbers():
     return numbers
 
 
-def load_structure_check():
-    specification = importlib.util.spec_from_file_location("gate_structure_check", STRUCTURE_CHECK)
+def load_stage_header():
+    specification = importlib.util.spec_from_file_location("lib_stage_header", STAGE_HEADER)
     module = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(module)
     return module
@@ -471,13 +471,13 @@ def is_section_key(written):
     return "「" in written
 
 
-def local_gates(structure):
+def local_gates(stage_header):
     """门禁目录顶层每道门禁的全名（文件名去掉 .sh）→ 它文件头格名表里的格名集合。"""
     gates = {}
     for name in sorted(os.listdir(GATE_DIRECTORY)):
         path = os.path.join(GATE_DIRECTORY, name)
         if name.endswith(".sh") and os.path.isfile(path):
-            gates[name[:-len(".sh")]] = {cell for _number, cell, _title in structure.header_cells(path)}
+            gates[name[:-len(".sh")]] = {cell for _number, cell, _title in stage_header.header_cells(path)}
     return gates
 
 
@@ -509,6 +509,7 @@ def mapping_problems(gates):
     return problems
 
 
+@functools.lru_cache(maxsize=None)   # 同一条路径在几十处被引，一个进程里只问 git 一次（被判的树这一趟里不变）
 def ignored_by_git(path):
     result = subprocess.run(["git", "check-ignore", "-q", "--no-index", path],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -761,6 +762,7 @@ def ignored_among(paths):
     return {item for item in result.stdout.split("\0") if item} if result.returncode in (0, 1) else set()
 
 
+@functools.lru_cache(maxsize=None)   # 同上：全历史的 git log 一条路径只跑一次
 def archived_in_git(path):
     """research/ 下这条路径进没进过 git：git log --all -1 -- <路径> 有输出。"""
     result = subprocess.run(["git", "--literal-pathspecs", "log", "--all", "-1", "--format=%h", "--", path],
@@ -969,8 +971,8 @@ def main():
         print("  ✗ 一份治理文档都没扫到（CLAUDE.md、.claude/main-agent.md、.claude/agent-common.md、agents、rules、skills）")
         print("     → 怎么办：在仓库根上跑；治理文档搬了家的话，改本文件的 CARRIER_PATTERNS。")
         return 3
-    structure = load_structure_check()
-    gates = local_gates(structure)
+    stage_header = load_stage_header()
+    gates = local_gates(stage_header)
     problems, unjudged = [], []
     counts = {"gate": 0, "path": 0, "section": 0, "name": 0, "cell": 0, "old": 0}
     skipped = {"ignored": 0, "not_repo_path": 0, "outside": 0, "git_history": 0, "move_line": 0, "kept": 0}

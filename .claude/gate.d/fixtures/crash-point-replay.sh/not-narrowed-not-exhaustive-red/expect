@@ -1,0 +1,4 @@
+exit=1
+want=CRASH_POINT_REPLAY 那一行不带 exhaustive=true，不是全量
+want=✗ crash-case:plain-stream 的用例跑过了，日志却判不绿
+want=✗ 1 条崩溃枚举用例判红：crash-case:plain-stream（这一趟判绿 0 条

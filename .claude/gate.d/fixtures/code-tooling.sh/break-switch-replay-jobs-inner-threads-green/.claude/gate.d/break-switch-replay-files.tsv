@@ -1,0 +1,2 @@
+# 样本复跑登记表：scripts/gate/layout.py 一份
+scripts/gate/layout.py	60	# 样本：内存装得下很多，线程 8、一份两条开关三趟：外层 3 条 × 里层 2 = 6，每趟起的自证拿到 SINGLEFS_THREAD_CAP=2

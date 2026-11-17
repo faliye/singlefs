@@ -1,0 +1,3 @@
+src/lib.rs	tests::one_is_one	ok
+tests/plain_stream.rs	plain_stream_quick	ok
+tests/plain_stream.rs	plain_stream_full	ok

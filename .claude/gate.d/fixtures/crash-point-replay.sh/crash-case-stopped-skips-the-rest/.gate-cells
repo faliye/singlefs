@@ -1,0 +1,3 @@
+# 登记的头一条用例被停（cargo 退 143）：后面那条不接着起、ITEM_DONE 报 77，判的是 crash-case-replay 格
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

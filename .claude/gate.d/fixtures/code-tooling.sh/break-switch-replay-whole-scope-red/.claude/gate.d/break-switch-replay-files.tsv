@@ -1,0 +1,2 @@
+# 样本复跑登记表：scripts/gate/cells.py 一份
+scripts/gate/cells.py	60	# 样本：不指定范围起整份，两条开关各带的那一格没点名的也红了，逐条判红

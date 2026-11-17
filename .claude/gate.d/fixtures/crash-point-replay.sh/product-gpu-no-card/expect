@@ -1,6 +1,8 @@
 exit=3
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=record cards=[unset]
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=judge cards=[192.0.2.1:0:8G]
 want=样本档：
-want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu-tests --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture
 want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
 want=本次未跑（这不是通过）：产品 GPU 包真显卡对拍没跑（tests/checksum_kernels_agree.rs；这台机器找不到 GPU 适配器）：NOT_RUN_NO_GPU_ADAPTER test=the_bitwise_kernel_agrees_with_the_cpu reason=本机的 Vulkan 适配器里一张独立显卡都没有（样本：跟在 test 行后面）
 want=本次未跑（这不是通过）：产品 GPU 包真显卡对拍没跑（tests/checksum_kernels_agree.rs；这台机器找不到 GPU 适配器）：NOT_RUN_NO_GPU_ADAPTER test=the_table_kernel_agrees_with_the_cpu reason=本机的 Vulkan 适配器里一张独立显卡都没有（样本：跟在 test 行后面）

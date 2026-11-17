@@ -1,5 +1,5 @@
 exit=1
-want=改过的定义与共用约束里 2 份没有三方判决点名
+want=改过的治理文件里 2 份没有三方判决点名
 want=      .claude/agent-common.md（demo-r1-main-verification.md 只在正文别处提到了它，没列在「## 这一轮被判过的文件」一节里）
 want=      .claude/main-agent.md（demo-r1-main-verification.md 只在正文别处提到了它，没列在「## 这一轮被判过的文件」一节里）
 want=样本只跑 .gate-cells 点名的格：agent-def-adversarial-review

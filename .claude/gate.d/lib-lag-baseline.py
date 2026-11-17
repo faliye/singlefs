@@ -653,7 +653,7 @@ def index_entries(cwd=None):
     """索引里的全部条目：({路径: [(TreeEntry, 合并阶段)]}, None)；git 取不到 (None, BaselineProblem)。"""
     listed = git_run(["ls-files", "--stage", "-z"], cwd)
     if listed.returncode != 0:
-        return None, BaselineProblem("索引", "（全部条目）", "ls-files", listed.returncode, listed.stderr.decode("utf-8", "replace"))
+        return None, BaselineProblem("索引", "（全部条目）", "ls-files", listed.returncode, listed.stderr.decode("utf-8", "replace"))  # change-range:exempt 报错里点名失败的是哪条子命令，这一行不跑 git
     entries = {}
     for record in listed.stdout.split(b"\0"):
         if record:
@@ -947,6 +947,9 @@ def moved_line_numbers(before, current_path, moves, relocated, cwd=None):
         return {number for number, (old, new) in enumerate(zip(before_lines, after_lines), 1) if relocated or old != new}, current_lines, None
     if current == before:
         return (set(range(1, len(current_lines) + 1)) if relocated else set()), current_lines, None
+    if after == before and not relocated:
+        # 基准那一版里一处登记的旧前缀都没有、文件也没搬家：可剔的行要「换算前后不同」，这里一行都没有，不起 git
+        return set(), current_lines, None
     with tempfile.TemporaryDirectory() as directory:
         before_file = os.path.join(directory, "before")
         with open(before_file, "wb") as handle:
@@ -1031,7 +1034,7 @@ def untracked_unignored(root, prefixes):
         return set(), None
     listed = git_run(["--literal-pathspecs", "ls-files", "-z", "--others", "--exclude-standard", "--", *sorted(set(prefixes))], root)
     if listed.returncode != 0:
-        return set(), BaselineProblem("工作区", "（没跟踪的文件）", "ls-files", listed.returncode, listed.stderr.decode("utf-8", "replace"))
+        return set(), BaselineProblem("工作区", "（没跟踪的文件）", "ls-files", listed.returncode, listed.stderr.decode("utf-8", "replace"))  # change-range:exempt 报错里点名失败的是哪条子命令，这一行不跑 git
     return {name.decode("utf-8", "surrogateescape") for name in listed.stdout.split(b"\0") if name}, None
 
 

@@ -1,0 +1,3 @@
+# cargo 退 101 而日志里测试二进制死于 SIGTERM（逐个停进程、撞内存上限都是这样）：登记的用例不接着跑，判的是 crash-case-replay 格
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

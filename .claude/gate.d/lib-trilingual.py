@@ -47,9 +47,9 @@
         英语一侧不加词边界：English 列的串后面带词形变化（replay 对 replayed、artifact 对 artifacts）是正常译法，加了右边界，已经对的译文会判红；
         日本語一侧按原样子串认。
         改名登记表那一组（.claude/kb/term-renames.md，路径取 scripts/kb/sweep-term.py 的 RENAMES_PATH）：登记表数据行的旧名、新名两列不算用到术语，
-        这两列是门禁 doc-text 的 term-renames 格拿去全仓搜的字面，规定三份里都照中文原串写、不译；同一份里别处（表上方的正文、「是什么」那一列）用到的照核。
+        这两列是新旧对照的字面，规定三份里都照中文原串写、不译；同一份里别处（表上方的正文、「是什么」那一列）用到的照核。
         哪几行是数据行、怎么切格照 sweep-term.py 的 load_renames 与 table_cells（标记 <!-- term-renames:table --> 之后以 | 起头的行，表头与分隔行不算），
-        不另写一份；load_renames 读不出这张表时一行不换、整份照核（表的毛病归 term-renames 格报）。成功那句报换了几行。
+        不另写一份；load_renames 读不出这张表时一行不换、整份照核（表的毛病由 sweep-term.py 报）。成功那句报换了几行。
   untranslated：对象同另外几格从登记表取组；每组在的英语、日语译文逐行判（缺份的组在的那几份照判，缺的归 files）。
         射程是全仓此刻的样子，同 files、structure、glossary，不按这次改动划窗：伪译文是文件的状态，哪一次改动碰没碰它都是错的，
         这一次漏网的 checks-owed 日语那份正是早先写进、之后的改动没再碰到的行。
@@ -150,6 +150,7 @@
   omission-ratio-ignored      omission 不比内容量（配对照做，只报配不上的）
   omission-keys-ignored       omission 的表格行不按首列编号配对，一律按节内次序
   omission-unpaired-ignored   omission 配不上的段（段数不同的节、编号行缺一边）不报
+  comment-open-in-code-counted  反引号段里的 <!-- 也当 HTML 注释的开头（omission 的切节与 untranslated 的逐行去注释都退回去）
   下面六项由门禁 doc-text 的同名开关 GATE_TEXT_NOTATIONS_BREAK=<项> 转进来（那一道文件头的开关表逐条点名样本），直接设 LIB_TRILINGUAL_BREAK 也认：
   trilingual-untranslated-quotes-kept      不去掉「」『』与英语直弯引号里的引文
   trilingual-untranslated-code-kept        不去掉反引号段、围栏代码块、链接目标、路径与 HTML 注释
@@ -179,7 +180,7 @@ REGISTRY = ".claude/trilingual-documents"
 GLOSSARY = ".claude/kb/translation-glossary.md"
 GLOSSARY_MARKER = "<!-- trilingual-glossary -->"
 LONGER_WORDS = ".claude/gate.d/trilingual-glossary-longer-words.tsv"
-# 门禁 doc-text 的 term-renames 格读改名登记表的那一份脚本；glossary 判改名登记那一组时照它读表（读法不另写一份）
+# 读改名登记表的那一份脚本；glossary 判改名登记那一组时照它读表（读法不另写一份）
 TERM_RENAMES_SCRIPT = os.path.join(REPOSITORY_OF_GATES, "scripts", "kb", "sweep-term.py")
 GLOSSARY_HEADER = ["中文", "English", "日本語", "说明 / Note / 注"]
 GLOSSARY_COLUMN_NAMES = ["中文", "English", "日本語"]
@@ -629,7 +630,7 @@ def term_used(text, term, longer_words):
 
 @lru_cache(maxsize=1)
 def sweep_term():
-    """把 scripts/kb/sweep-term.py 载成模块：改名登记表在哪、标记、怎么切格、哪几行是一对旧名新名，都照它（门禁 doc-text 的 term-renames 格调的就是它）。"""
+    """把 scripts/kb/sweep-term.py 载成模块：改名登记表在哪、标记、怎么切格、哪几行是一对旧名新名，都照它。"""
     directory = os.path.dirname(TERM_RENAMES_SCRIPT)
     if directory not in sys.path:
         sys.path.insert(0, directory)
@@ -641,9 +642,9 @@ def sweep_term():
 
 def renames_columns_blanked(text):
     """改名登记表中文那一份：登记表数据行的旧名、新名两列换成空的，别的列与表外的正文原样 → (换过的文本, 换了几行)。
-    这两列是 term-renames 格拿去全仓搜的字面，规定不译不改，在 zh 里出现不算用到术语。
+    这两列是新旧对照的字面，规定不译不改，在 zh 里出现不算用到术语。
     哪几行是数据行照 sweep-term.py 的 load_renames（标记之后以 | 起头、表头与分隔行不算），切格照它的 table_cells；
-    load_renames 读不出这张表（它打出错再退出）时一行不换，整份照核，表的毛病归 term-renames 格报。"""
+    load_renames 读不出这张表（它打出错再退出）时一行不换，整份照核，表的毛病由 sweep-term.py 报。"""
     module = sweep_term()
     if module.TABLE_MARK not in text:
         return text, 0
@@ -813,6 +814,36 @@ def fenced_line_indexes(rows):
     return inside
 
 
+def comment_open_outside_code(text, position):
+    """从 position 起找下一处不在反引号段里的 <!-- → 下标，没有 → -1。在不在反引号段里按它所在的那一行判（INLINE_CODE）：
+    正文里引标记写法的 `<!-- 名字:` 这类不是注释的开头，当成开头会一直吞到后面随便哪一处 -->。"""
+    while True:
+        start = text.find("<!--", position)
+        if start < 0 or BROKEN == "comment-open-in-code-counted":
+            return start
+        line_start = text.rfind("\n", 0, start) + 1
+        line_end = text.find("\n", start)
+        line = text[line_start:len(text) if line_end < 0 else line_end]
+        offset = start - line_start
+        if not any(found.start() <= offset < found.end() for found in INLINE_CODE.finditer(line)):
+            return start
+        position = start + 4
+
+
+def without_html_comments(text):
+    """去掉 HTML 注释（可跨行），每一处换成同样多的换行，行号不变；没闭合的那一处原样留着。"""
+    pieces, position = [], 0
+    while True:
+        start = comment_open_outside_code(text, position)
+        end = text.find("-->", start + 4) if start >= 0 else -1
+        if end < 0:
+            pieces.append(text[position:])
+            return "".join(pieces)
+        pieces.append(text[position:start])
+        pieces.append("\n" * text.count("\n", start, end + 3))
+        position = end + 3
+
+
 def untranslated_remainder(line, in_comment):
     """一行去掉该照中文原样留的段之后剩下的部分 → (剩下的正文, 行尾是否还在 HTML 注释里)。
     去掉的：HTML 注释（可跨行）、反引号段、Markdown 链接目标 ](…)、「」『』与英语直弯引号里的引文（由里往外反复去，套着的引号整段去净）、
@@ -828,7 +859,7 @@ def untranslated_remainder(line, in_comment):
                     break
                 rest, in_comment = rest[end + 3:], False
             else:
-                start = rest.find("<!--")
+                start = comment_open_outside_code(rest, 0)
                 if start < 0:
                     visible.append(rest)
                     break
@@ -956,7 +987,6 @@ OMISSION_LANGUAGE_NAMES = {"en": "英语", "ja": "日语"}
 KANA_CHARACTER = re.compile(r"[぀-ヿㇰ-ㇿｦ-ﾟ]")
 ASCII_WORD = re.compile(r"[A-Za-z0-9]+(?:['’.\-][A-Za-z0-9]+)*")
 LIST_ITEM_START = re.compile(r"^[ \t>]*(?:[-*+]|[0-9]+[.)])[ \t]+")
-HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
 
 
 def is_language_switch_line(line):
@@ -988,9 +1018,9 @@ def omission_units(text):
     """一份文件切成节与段 → (节列表, 按编号配对的表格行, 各节标题所在行号)。
     节：围栏外的 ATX 标题（判法同 structure 的 HEADING）把文件切开，第一个标题之前算一节（标题行号记 1）。
     段：节里的一段是空行隔开的连续几行，列表项（行首可带空白与 >）另起一段；表格行一行一段（分隔行不算）；
-    闭合了的围栏代码块整块不算（判法同 untranslated 的 fenced_line_indexes，块前后断开）；HTML 注释先去掉（换成同样多的换行，行号不变）；
+    闭合了的围栏代码块整块不算（判法同 untranslated 的 fenced_line_indexes，块前后断开）；HTML 注释先去掉（换成同样多的换行，行号不变；反引号段里的 <!-- 不当注释的开头，判法在 comment_open_outside_code）；
     三语切换行不算一段、前后断开。节内的段 [行号, 文本] 按出现次序放；首列带编号的表格行另放进 {(编号, 这个编号第几次出现): (行号, 文本)}。"""
-    rows = HTML_COMMENT.sub(lambda found: "\n" * found.group(0).count("\n"), text).split("\n")
+    rows = without_html_comments(text).split("\n")
     fenced = fenced_line_indexes(rows)
     sections, headings, keyed, seen = [[]], [1], {}, {}
     current = None

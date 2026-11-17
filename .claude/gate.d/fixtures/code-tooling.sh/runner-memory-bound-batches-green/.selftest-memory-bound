@@ -1,0 +1,3 @@
+# 样本登记的大自证（换掉这一道的 SELFTEST_RUNNERS_MEMORY_BOUND）
+bash scripts/gate/sample-heavy-first.sh --selftest
+bash scripts/gate/sample-heavy-second.sh --selftest

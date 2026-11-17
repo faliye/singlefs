@@ -4,4 +4,3 @@ want=proof:singlefs_replay_prefix::Ordinal::FIRST	verus-proof	带值的 const cr
 want=proof:singlefs_replay_prefix::Ordinal::LAST_SLOT	verus-proof	带值的 const crates/singlefs-replay-prefix/src/lib.rs:14
 want=proof:singlefs_replay_prefix::FIRST_COUNTER	verus-proof	带值的 const crates/singlefs-replay-prefix/src/lib.rs:17
 want=proof:singlefs_replay_prefix::LAST	verus-proof	带值的 const crates/singlefs-replay-prefix/src/lib.rs:19
-want=键对不上共

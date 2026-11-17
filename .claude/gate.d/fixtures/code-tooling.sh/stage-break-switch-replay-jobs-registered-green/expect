@@ -1,0 +1,8 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=stage-break-switch-replay 并行度：同时最多 3 条（登记的每台默认重活线程数 3 条；
+want=这一条拿到的上限 2.5 GiB（样本根 .stage-break-switch-replay-memory 写的）；由服务定、撞了服务照乘 1.5 放大重排，不按它收并行）
+want=每条 stage-selftest --jobs 1；外层 3 条 × 里层 1 = 3（不超过每台默认重活线程数 3）
+want=stage-break-switch-replay 同时在跑最多 3 条（同时最多 3 条）
+want=门禁阶段的弄坏开关复跑：复跑了 4 条开关（1 道阶段：slot-stage.sh），判错的样本与文件头点名的逐条相等；本次未跑 0 项
+want=stage-break-switch-replay：绿

@@ -1,0 +1,2 @@
+# 样本复跑登记表：scripts/gate/fanout.sh 一份
+scripts/gate/fanout.sh	60	# 样本：32 条开关、并行取线程数 8，其中 ca 那一条点名的项写成了另一格：只那一条判不符

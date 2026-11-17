@@ -43,7 +43,7 @@ judge-self-test	crates/singlefs-verification/tests/record_checker_reuse_exemptio
 judge-self-test	crates/singlefs-verification/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs::the_record_checker_bounds_the_effective_floor_by_the_floor_written_into_the_system_configuration	# 判器自测：手改写表里的系统配置槽写，断言记录核对器的复用豁免按系统配置里的回滚下界收放
 excluded	crates/singlefs-verification/tests/checker_*.rs	# 池级 checker 自己的单测：手造一张镜像、断言判器的结论，判的是判器本身，不是产出再判（验证包随时跑）
 excluded	crates/singlefs-verification/tests/pool_checker_*.rs	# 池级 checker 自己的单测：手造一张镜像、断言判器的结论，判的是判器本身，不是产出再判（验证包随时跑）
-judge-self-test	crates/singlefs-verification/src/device_log.rs::a_stream_without_any_discard_has_no_discardable_range_after_any_publish	# 判器自测：手写一条没有 discard 的录制流交设备日志判器算可发区间，断言每次发布一项、区间都空（判器自己的契约）
+judge-self-test	crates/singlefs-verification/src/device_log.rs::stream_without_any_discard_has_no_discardable_range_after_any_publish	# 判器自测：手写一条没有 discard 的录制流交设备日志判器算可发区间，断言每次发布一项、区间都空（判器自己的契约）
 judge-self-test	crates/singlefs-verification/tests/crash_enumeration_compaction_relocation_stream.rs::a_discard_of_the_region_right_after_the_final_batch_is_judged_outside_the_discardable_ranges	# 判器自测：往录制流里插一段已知落错的 discard（刚搬空、仍被近几代根引用的 R），断言设备日志判器判它落在不可发的槽上
 judge-self-test	crates/singlefs-verification/tests/crash_enumeration_compaction_relocation_stream.rs::the_device_log_of_the_compaction_relocation_stream_holds_no_discard_and_is_judged_clean	# 判器自测：上一条必红世界的阳性对照，同一条录制流不插 discard 时设备日志判器判过 0 条、不假红；设备日志判器没有 GPU 那一份，判的是录制流不是崩溃状态
 judge-self-test	crates/singlefs-verification/tests/crash_enumeration_lifecycle_closure_stream.rs::device_log_verdicts	# 判器自测：设备日志判器的两条必红世界（discard 挪到根槽写之前、挪到流尾每一版的根都指着的实例表所在的段上）与它们的阳性对照（原样的录制流各判过一条）共用的帮手；判的是录制流不是崩溃状态，设备日志判器没有 GPU 那一份

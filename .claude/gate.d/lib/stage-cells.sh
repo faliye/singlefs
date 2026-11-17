@@ -9,7 +9,7 @@
 # gate-similar: doc-decisions.sh 它是第一道改用这份库的阶段，只留格的判法
 #
 # 门禁阶段共用的格结构：登记格、解析 --list / --check、样本只跑点名的格、每格一个子 shell（放进它自己的进程组）、逐格汇总。
-# 规则：.claude/rules/verification.md「门禁的结构」。这份库只管格，不判整道要不要跑。
+# 规则：.claude/rules/verification-reference.md「门禁的结构」。这份库只管格，不判整道要不要跑。
 #
 # 阶段里的写法（preflight 那一行之后）：
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
@@ -46,7 +46,7 @@
 #   门禁在 wait 里等它；标准输入是终端时格的标准输入换成 /dev/null（后台的组读终端会被 SIGTTIN 停住）。
 #   门禁收到 TERM、INT、HUP（stage_cells_stop_on_signal）：对正在跑的那一格整组先 TERM，过 STAGE_CELLS_TERM_GRACE_SECONDS 秒组里还有没退出的（僵尸不算）再 KILL，
 #   再在 /proc 里核组里没有留下进程（留下的逐个列进那一行 ✗），之后退 128 加信号号（TERM 143、INT 130、HUP 129）；阶段自己的 EXIT trap 照跑。
-#   规则：.claude/singlefs-ai-sop/rules/command-safety.md「装置起的样本进程，放进它自己的进程组」。SIGKILL 收不到，那一种靠起门禁的一方收它的会话
+#   规则：.claude/rules/command-safety-by-review.md「装置起的样本进程，放进它自己的进程组」。SIGKILL 收不到，那一种靠起门禁的一方收它的会话
 #   （scripts/gate/lib_process_group.py 的 run_in_own_session）与外层的 scope。格正常退出时不收它丢下的进程，判法与汇总照旧。
 #   汇总逐格一行「<格名>：绿 / 红（退出 N）/ 本次未跑」。
 #   有一格红（退出码不是 0、77、75）⇒ 整道退 1，红格逐格接它登记的出路，末了给只重跑红格的 --check 命令；
@@ -58,6 +58,11 @@
 #   写法、原子写与 SINGLEFS_LAST_RUNS_DIRECTORY 照 scripts/gate/lib_reuse_checks.py 文件头「三」；.claude/hooks/run-scope-guard.sh 的拒绝说明读它）。
 #   给了 --check 或样本根 .gate-cells 点名的，只换这一趟跑到的格、别的格上一次的照留；被判的根是样本（与 .gate-cells 同一条判据）时不写，
 #   除非显式设了 SINGLEFS_LAST_RUNS_DIRECTORY（自证用）。写不成只 warn 一句，不改这一道的判定。
+#
+# 格并行：阶段在 stage_cells_run 之前设 STAGE_CELLS_JOBS=<路数>（大于 1）时，选中的格至多这么多路同时跑（第 i 格等第 i-路数 格收完再起），
+#   各格的标准输出与标准错误写进各自的临时文件、各自记用时，全部收回后按登记次序回放（先打「── 格名：判什么」再打那一格的输出），逐格退出码照旧按次序收、份数对不上判红。
+#   每格照旧在它自己的进程组里；门禁收到信号时对还没收回的每一格的进程组先 TERM、过宽限 KILL。不设或设 1 照旧一格接一格跑。
+#   只给互不依赖、不起编译与重活的格用：各格不许写同一份文件、不许读别的格留下的东西。弄坏开关 shared-shell、term-leaves-cell 下不并行。
 #
 # 直接执行只跑自证（gate.sh 只取门禁目录顶层的 *.sh，不把它当阶段跑；code-tooling 的 runner 表跑它的 --selftest）：
 #   bash .claude/gate.d/lib/stage-cells.sh [项目根] [--force] [--selftest]
@@ -81,12 +86,15 @@
 #   own-repository-refused     阶段所在的仓一律不认（自证搭的小仓也拒）               break-own-repository-marked 判错
 #   unavailable-as-red  格退 75 照红记、整道退 1                                       unavailable 判错
 #   term-leaves-cell    格在前台子 shell 里跑、不装 trap：门禁被 TERM 时自己退出，格里的进程不收   term-collects-cell 判错
+#   parallel-first-exit-for-all  格并行时每一格都记第一格的退出码                         parallel-mixed 判错
+#   parallel-term-leaves-cells   格并行时门禁被 TERM 不收各格的进程组                      parallel-term-collects-cells 判错
 
 declare -ga STAGE_CELLS_NAMES=()
 declare -gA STAGE_CELLS_FUNCTION=() STAGE_CELLS_TITLE=() STAGE_CELLS_HOWTO=()
 declare -ga STAGE_CELLS_SELECTED=() STAGE_CELLS_REST=()
 STAGE_CELLS_CHECK_GIVEN=0
 STAGE_CELLS_SELECTION_SOURCE="全部登记的格"
+declare -ga STAGE_CELLS_PARALLEL_PIDS=() STAGE_CELLS_PARALLEL_GROUPS=() STAGE_CELLS_PARALLEL_NAMES=()
 STAGE_CELLS_STAGE_FILE="${BASH_SOURCE[1]:-$0}"
 STAGE_CELLS_STAGE_NAME="${STAGE_CELLS_STAGE_FILE##*/}"
 STAGE_CELLS_STAGE_REPOSITORY=""
@@ -98,6 +106,8 @@ STAGE_CELLS_TERM_GRACE_SECONDS=5
 STAGE_CELLS_RUNNING_GROUP=""
 STAGE_CELLS_RUNNING_PID=""
 STAGE_CELLS_RUNNING_NAME=""
+# clip_text <字节数>：给人看的输出按字节截，再丢掉截出的半个字（与上游 .claude/singlefs-ai-sop/scripts/lib.sh 的 clip_text 同一定义：cut -c 截完经 iconv -c 去掉不成字的尾巴）
+clip_text() { cut -c "1-$1" | iconv -c -f UTF-8 -t UTF-8 2>/dev/null; }
 if [[ "$STAGE_CELLS_STAGE_FILE" == */* ]]; then
   STAGE_CELLS_STAGE_REPOSITORY="$(cd "${STAGE_CELLS_STAGE_FILE%/*}/../.." 2>/dev/null && pwd -P)"
 else
@@ -289,6 +299,15 @@ stage_cells_write_last_run() {
   return 0
 }
 
+# stage_cells_default_jobs：格并行的缺省路数，取每台默认重活线程数（.claude/heavy-thread-default 第一行行首的数）；取不出交 1（不并行）。
+#   阶段要并行就在 stage_cells_run 之前写 STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"（环境里给了就照给的，给 1 是一格接一格跑）。
+stage_cells_default_jobs() {
+  local registered
+  registered="$(sed -n 's/^\([0-9][0-9]*\).*/\1/p' "$(dirname "${BASH_SOURCE[0]}")/../../heavy-thread-default" 2>/dev/null | head -n 1)"
+  [[ "$registered" =~ ^[1-9][0-9]*$ ]] || registered=1
+  printf '%s\n' "$registered"
+}
+
 # stage_cells_group_members <进程组号>：/proc 里这个组还没退出的进程号（僵尸不算），一行一个。只读，不发信号。
 stage_cells_group_members() {
   local stat_file line rest state group
@@ -307,6 +326,42 @@ stage_cells_group_members() {
 stage_cells_stop_on_signal() {
   local signal_name="$1" signal_number="$2" group="$STAGE_CELLS_RUNNING_GROUP" cell_pid="$STAGE_CELLS_RUNNING_PID" deadline left=""
   trap '' TERM INT HUP
+  # 格并行时：还没收回的每一格的进程组先 TERM、过宽限 KILL，再核各组里没有留下进程
+  if ((${#STAGE_CELLS_PARALLEL_PIDS[@]})) && [[ "${STAGE_CELLS_BREAK:-}" != parallel-term-leaves-cells ]]; then
+    local parallel_index parallel_group parallel_left="" parallel_names=""
+    for parallel_index in "${!STAGE_CELLS_PARALLEL_PIDS[@]}"; do
+      parallel_group="${STAGE_CELLS_PARALLEL_GROUPS[parallel_index]:-}"
+      parallel_names+="${parallel_names:+ }${STAGE_CELLS_PARALLEL_NAMES[parallel_index]:-}"
+      if [[ -n "$parallel_group" ]]; then kill -TERM -- -"$parallel_group" 2>/dev/null; else kill -TERM "${STAGE_CELLS_PARALLEL_PIDS[parallel_index]}" 2>/dev/null; fi
+    done
+    deadline=$((SECONDS + STAGE_CELLS_TERM_GRACE_SECONDS))
+    while ((SECONDS < deadline)); do
+      parallel_left=""
+      for parallel_group in "${STAGE_CELLS_PARALLEL_GROUPS[@]}"; do [[ -z "$parallel_group" ]] || parallel_left+="$(stage_cells_group_members "$parallel_group")"; done
+      [[ -n "$parallel_left" ]] || break
+      sleep 0.1
+    done
+    for parallel_index in "${!STAGE_CELLS_PARALLEL_PIDS[@]}"; do
+      parallel_group="${STAGE_CELLS_PARALLEL_GROUPS[parallel_index]:-}"
+      [[ -z "$parallel_group" ]] || kill -KILL -- -"$parallel_group" 2>/dev/null
+      wait "${STAGE_CELLS_PARALLEL_PIDS[parallel_index]}" 2>/dev/null
+    done
+    deadline=$((SECONDS + 2)); parallel_left=""
+    while ((SECONDS < deadline)); do
+      parallel_left=""
+      for parallel_group in "${STAGE_CELLS_PARALLEL_GROUPS[@]}"; do [[ -z "$parallel_group" ]] || parallel_left+="$(stage_cells_group_members "$parallel_group" | tr '\n' ' ')"; done
+      [[ -n "$parallel_left" ]] || break
+      sleep 0.1
+    done
+    if [[ -n "$parallel_left" ]]; then
+      printf '  ✗ %s：收到 SIG%s，并行在跑的格（%s）没跑完；对各格的进程组先 TERM、过宽限 KILL 之后还留着：%s\n' "$STAGE_CELLS_STAGE_NAME" "$signal_name" "$parallel_names" "$parallel_left"
+      printf '     → 怎么办：这一道是被停掉的，不算判过；上面那几个进程停不掉（多半卡在内核里），报给主 agent，别的照常重跑：bash .claude/gate.d/%s\n' "$STAGE_CELLS_STAGE_NAME"
+    else
+      printf '  ✗ %s：收到 SIG%s，并行在跑的格（%s）没跑完；已对各格的进程组先 TERM、过宽限 KILL，组里一个不剩，这一道退 %s\n' "$STAGE_CELLS_STAGE_NAME" "$signal_name" "$parallel_names" "$((128 + signal_number))"
+      printf '     → 怎么办：这一道是被停掉的，不算判过；要结果就重跑：bash .claude/gate.d/%s\n' "$STAGE_CELLS_STAGE_NAME"
+    fi
+    exit $((128 + signal_number))
+  fi
   if [[ -n "$group" ]]; then
     kill -TERM -- -"$group" 2>/dev/null
     deadline=$((SECONDS + STAGE_CELLS_TERM_GRACE_SECONDS))
@@ -368,7 +423,8 @@ stage_cells_run_cell() {
 stage_cells_run() {
   local root="${1:-.}" scratch name function_name cell_exit index=0 collected=0
   local green=() red=() not_run=() unavailable=()
-  local -A verdict_of=()
+  local -A verdict_of=() seconds_of=()
+  local cell_started cell_elapsed total_elapsed=0 timing_line=""
   stage_cells_refuse_unsampled_break_switches "$root"
   stage_cells_apply_sample_marker "$root"
   scratch="$(mktemp -d)" || { printf '  ✗ %s：建不了放逐格退出码的临时目录\n' "$STAGE_CELLS_STAGE_NAME"; printf '     → 怎么办：看 $TMPDIR 满没满、有没有写权限，修好再跑；这一道一格都没跑。\n'; exit 1; }
@@ -378,9 +434,62 @@ stage_cells_run() {
     trap 'stage_cells_stop_on_signal INT 2' INT
     trap 'stage_cells_stop_on_signal HUP 1' HUP
   fi
+  local parallel_jobs="${STAGE_CELLS_JOBS:-1}"
+  [[ "$parallel_jobs" =~ ^[1-9][0-9]*$ ]] || parallel_jobs=1
+  if [[ "${STAGE_CELLS_BREAK:-}" == shared-shell || "${STAGE_CELLS_BREAK:-}" == term-leaves-cell ]]; then parallel_jobs=1; fi
+  if ((parallel_jobs > 1 && ${#STAGE_CELLS_SELECTED[@]} > 1)); then
+    # 格并行（文件头「格并行」）：先逐格起（至多 parallel_jobs 路同时在跑），再按登记次序收退出码、回放输出
+    local -a parallel_exits=() parallel_waited=()
+    local parallel_count="${#STAGE_CELLS_SELECTED[@]}" parallel_monitor parallel_stat parallel_group_read first_exit=""
+    for ((index = 0; index < parallel_count; index++)); do
+      name="${STAGE_CELLS_SELECTED[index]}"; function_name="${STAGE_CELLS_FUNCTION[$name]}"
+      if ((index >= parallel_jobs)); then
+        if wait "${STAGE_CELLS_PARALLEL_PIDS[index - parallel_jobs]}"; then parallel_exits[index - parallel_jobs]=0; else parallel_exits[index - parallel_jobs]=$?; fi
+        parallel_waited[index - parallel_jobs]=1
+      fi
+      parallel_monitor=0; [[ $- == *m* ]] && parallel_monitor=1
+      set -m
+      (
+        cell_started="${EPOCHREALTIME/[.,]/}"
+        if declare -F "$function_name" >/dev/null; then
+          ( "$function_name" ); cell_exit=$?
+        else
+          printf '  ✗ 格 %s 登记的函数 %s 没有定义\n' "$name" "$function_name"
+          printf '     → 怎么办：stage_cell 第二个参数写实现这一格的函数名，函数要在 stage_cells_run 之前定义。\n'
+          cell_exit=1
+        fi
+        printf '%s\n' "$(( (${EPOCHREALTIME/[.,]/} - cell_started) / 100000 ))" > "$scratch/$index.tenths"
+        exit "$cell_exit"
+      ) > "$scratch/$index.out" 2>&1 < /dev/null &
+      STAGE_CELLS_PARALLEL_PIDS[index]=$!; STAGE_CELLS_PARALLEL_NAMES[index]="$name"; STAGE_CELLS_PARALLEL_GROUPS[index]=""
+      ((parallel_monitor)) || set +m
+      if { read -r parallel_stat < "/proc/${STAGE_CELLS_PARALLEL_PIDS[index]}/stat"; } 2>/dev/null; then
+        parallel_stat="${parallel_stat##*) }"; parallel_stat="${parallel_stat#* }"; parallel_stat="${parallel_stat#* }"; parallel_group_read="${parallel_stat%% *}"
+        [[ "$parallel_group_read" != "${STAGE_CELLS_PARALLEL_PIDS[index]}" ]] || STAGE_CELLS_PARALLEL_GROUPS[index]="$parallel_group_read"
+      fi
+    done
+    for ((index = 0; index < parallel_count; index++)); do
+      name="${STAGE_CELLS_SELECTED[index]}"
+      if [[ -z "${parallel_waited[index]:-}" ]]; then
+        if wait "${STAGE_CELLS_PARALLEL_PIDS[index]}"; then parallel_exits[index]=0; else parallel_exits[index]=$?; fi
+      fi
+      unset "STAGE_CELLS_PARALLEL_PIDS[$index]" "STAGE_CELLS_PARALLEL_GROUPS[$index]" "STAGE_CELLS_PARALLEL_NAMES[$index]"
+      cell_exit="${parallel_exits[index]}"
+      [[ -n "$first_exit" ]] || first_exit="$cell_exit"
+      [[ "${STAGE_CELLS_BREAK:-}" != parallel-first-exit-for-all ]] || cell_exit="$first_exit"
+      printf '── %s：%s\n' "$name" "${STAGE_CELLS_TITLE[$name]}"
+      cat -- "$scratch/$index.out" 2>/dev/null
+      printf '%s\n' "$cell_exit" > "$scratch/$index.exit"
+      cell_elapsed="$(cat -- "$scratch/$index.tenths" 2>/dev/null)"; [[ "$cell_elapsed" =~ ^[0-9]+$ ]] || cell_elapsed=0
+      seconds_of[$name]="$((cell_elapsed / 10)).$((cell_elapsed % 10))"
+      total_elapsed=$((total_elapsed + cell_elapsed))
+    done
+    STAGE_CELLS_PARALLEL_PIDS=(); STAGE_CELLS_PARALLEL_GROUPS=(); STAGE_CELLS_PARALLEL_NAMES=()
+  else
   for name in "${STAGE_CELLS_SELECTED[@]}"; do
     function_name="${STAGE_CELLS_FUNCTION[$name]}"
     printf '── %s：%s\n' "$name" "${STAGE_CELLS_TITLE[$name]}"
+    cell_started="${EPOCHREALTIME/[.,]/}"
     if ! declare -F "$function_name" >/dev/null; then
       printf '  ✗ 格 %s 登记的函数 %s 没有定义\n' "$name" "$function_name"
       printf '     → 怎么办：stage_cell 第二个参数写实现这一格的函数名，函数要在 stage_cells_run 之前定义。\n'
@@ -395,8 +504,12 @@ stage_cells_run() {
       cell_exit=$?
     fi
     printf '%s\n' "$cell_exit" > "$scratch/$index.exit"
+    cell_elapsed=$(( (${EPOCHREALTIME/[.,]/} - cell_started) / 100000 ))
+    seconds_of[$name]="$((cell_elapsed / 10)).$((cell_elapsed % 10))"
+    total_elapsed=$((total_elapsed + cell_elapsed))
     index=$((index + 1))
   done
+  fi
   index=0
   for name in "${STAGE_CELLS_SELECTED[@]}"; do
     if [[ ! -f "$scratch/$index.exit" ]]; then
@@ -422,6 +535,9 @@ stage_cells_run() {
   for name in "${STAGE_CELLS_SELECTED[@]}"; do
     printf '  %s：%s\n' "$name" "${verdict_of[$name]}"
   done
+  # 逐格墙钟（秒）：哪一格慢从每一趟的输出里就读得到，不用另起计时
+  for name in "${STAGE_CELLS_SELECTED[@]}"; do timing_line+="${timing_line:+、}$name ${seconds_of[$name]:-?}"; done
+  printf '  各格用时（秒）：%s；合计 %s.%s%s\n' "$timing_line" "$((total_elapsed / 10))" "$((total_elapsed % 10))" "$( ((parallel_jobs > 1 && ${#STAGE_CELLS_SELECTED[@]} > 1)) && printf '（各格用时之和；至多 %s 路并行）' "$parallel_jobs")"
 
   if [[ -n "${GATE_NOT_RUN_FILE:-}" && "${STAGE_CELLS_BREAK:-}" != not-run-unreported ]]; then
     for name in ${not_run[@]+"${not_run[@]}"}; do
@@ -498,7 +614,7 @@ stage_cells_selftest() {
   # 这一趟的 STAGE_CELLS_BREAK 经 SAMPLE_CELLS_BROKEN 交进合成阶段、在里面当不导出的变量用：只证这份库的格结构，不让「弄坏开关只在样本根上认」
   # 那一判把每一条都拦成退 2；那一判自己由 break-* 那几条用环境里的 SAMPLE_SWITCH_BREAK 证。
   printf '%s\n' '#!/usr/bin/env bash' 'set -uo pipefail' 'STAGE_CELLS_BREAK="${SAMPLE_CELLS_BROKEN:-}"; unset SAMPLE_CELLS_BROKEN' "source $(printf '%q' "$library_under_test")" \
-      'cell_alpha() { printf "alpha\n" >> "$SAMPLE_TRACE"; if [[ -n "${SAMPLE_SLEEPER:-}" ]]; then sleep 293 & printf "%s\n" "$!" > "$SAMPLE_SLEEPER"; wait "$!"; fi; echo "  alpha 格判完"; exit "${OUTCOME_ALPHA:-0}"; }' \
+      'cell_alpha() { printf "alpha\n" >> "$SAMPLE_TRACE"; [[ -z "${SAMPLE_ALPHA_SLEEP:-}" ]] || sleep "$SAMPLE_ALPHA_SLEEP"; if [[ -n "${SAMPLE_SLEEPER:-}" ]]; then sleep 293 & printf "%s\n" "$!" > "$SAMPLE_SLEEPER"; wait "$!"; fi; echo "  alpha 格判完"; exit "${OUTCOME_ALPHA:-0}"; }' \
       'cell_beta()  { printf "beta\n"  >> "$SAMPLE_TRACE"; echo "  beta 格判完";  exit "${OUTCOME_BETA:-0}"; }' \
       'cell_gamma() { printf "gamma\n" >> "$SAMPLE_TRACE"; echo "  gamma 格判完"; exit "${OUTCOME_GAMMA:-0}"; }' \
       'stage_cell alpha cell_alpha "判甲" "甲的出路：改甲"' \
@@ -632,6 +748,46 @@ stage_cells_selftest() {
   fi
   rm -f "$own_root/.gate-break-sample"
   sample_case break-empty-value 0 "alpha beta gamma" SAMPLE_SWITCH_BREAK= -- "$bare_root"
+  # 格并行（文件头「格并行」）：alpha 先睡 1 秒，三格同时起；输出照登记次序回放、逐格退出码各归各的、汇总写并行路数
+  if sample_case parallel-order 0 "*" STAGE_CELLS_JOBS=3 SAMPLE_ALPHA_SLEEP=1 -- "$sample_root"; then
+    if [[ "$(grep -E '^(── |  (alpha|beta|gamma) 格判完)' "$scratch/out" | grep -v '汇总' | tr '\n' '|')" != '── alpha：判甲|  alpha 格判完|── beta：判乙|  beta 格判完|── gamma：判丙|  gamma 格判完|' ]]; then case_wrong "格并行时输出没照登记次序回放（每格先标题、再它自己的输出）"; fi
+    [[ "$(sort "$scratch/trace" | tr '\n' ' ')" == 'alpha beta gamma ' ]] || case_wrong "格并行时三格该各跑一次，实测「$(tr '\n' ' ' < "$scratch/trace")」"
+    output_has "至多 3 路并行"
+  fi
+  if sample_case parallel-mixed 1 "*" STAGE_CELLS_JOBS=2 OUTCOME_BETA=1 OUTCOME_GAMMA=77 -- "$sample_root"; then
+    output_has "alpha：绿"; output_has "beta：红（退出 1）"; output_has "gamma：本次未跑"; output_has "--check beta"
+  fi
+  # 格并行时门禁被 TERM：alpha 格里睡着的孙进程要跟着没了，门禁退 143
+  label=parallel-term-collects-cells; cases=$((cases + 1))
+  local parallel_stage_pid parallel_sleeper="" parallel_waited_ticks=0 parallel_switches=() parallel_switch_name
+  while IFS= read -r parallel_switch_name; do
+    [[ "$parallel_switch_name" == *_BREAK ]] && parallel_switches+=(-u "$parallel_switch_name")
+  done < <(compgen -e)
+  : > "$scratch/trace"; rm -f "$scratch/sleeper"
+  env -u GATE_NOT_RUN_FILE -u GATE_STAGED_FROM ${parallel_switches[@]+"${parallel_switches[@]}"} SAMPLE_CELLS_BROKEN="${STAGE_CELLS_BREAK:-}" STAGE_CELLS_JOBS=3 \
+    SAMPLE_TRACE="$scratch/trace" SAMPLE_REST="$scratch/rest" SAMPLE_SLEEPER="$scratch/sleeper" \
+    setsid --wait bash "$stage_file" "$sample_root" > "$scratch/out" 2>&1 < /dev/null &
+  parallel_stage_pid=$!
+  while [[ ! -s "$scratch/sleeper" ]] && ((parallel_waited_ticks < 100)); do sleep 0.1; parallel_waited_ticks=$((parallel_waited_ticks + 1)); done
+  parallel_sleeper="$(cat "$scratch/sleeper" 2>/dev/null)"
+  kill -TERM "$parallel_stage_pid" 2>/dev/null
+  got_exit=0
+  wait "$parallel_stage_pid" || got_exit=$?
+  if [[ -z "$parallel_sleeper" ]]; then
+    case_wrong "格并行：alpha 格里的孙进程等了 10 秒没起来"
+  elif stage_cells_process_alive "$parallel_sleeper" sleep; then
+    case_wrong "格并行：门禁 bash 被 TERM 之后，alpha 格里睡着的孙进程还在（pid $parallel_sleeper）"
+  fi
+  [[ "$got_exit" == 143 ]] || case_wrong "格并行：门禁 bash 被 TERM 之后退 $got_exit，该退 143"
+  output_has "收到 SIGTERM，并行在跑的格"
+  kill -KILL -- -"$parallel_stage_pid" 2>/dev/null
+  # 开关 parallel-term-leaves-cells 下各格留在各自的进程组里：照会话号（setsid 起的，会话号就是合成阶段的进程号）把还在的逐个 KILL，不留给外层收
+  local leftover_stat leftover_line leftover_rest leftover_session
+  for leftover_stat in /proc/[0-9]*/stat; do
+    { read -r leftover_line < "$leftover_stat"; } 2>/dev/null || continue
+    leftover_rest="${leftover_line##*) }"; leftover_rest="${leftover_rest#* }"; leftover_rest="${leftover_rest#* }"; leftover_rest="${leftover_rest#* }"; leftover_session="${leftover_rest%% *}"
+    [[ "$leftover_session" != "$parallel_stage_pid" ]] || kill -KILL "${leftover_stat//[!0-9]/}" 2>/dev/null
+  done
   # 门禁被 TERM（文件头「stage_cells_run」）：alpha 格里放一个睡着的孙进程（SAMPLE_SLEEPER 记下它的进程号），等它起来再只给门禁 bash 发 TERM；
   # 门禁要退 143、打出「收到 SIGTERM」，孙进程跟着没了。合成阶段用 setsid 起在它自己的会话里，开关 term-leaves-cell 下留下的进程都在那一组里，判完对那一组 KILL 收尾。
   label=term-collects-cell; cases=$((cases + 1))
@@ -661,7 +817,7 @@ stage_cells_selftest() {
   local breaks_proven=0 breaks_missed=() break_name
   if ((wrong == 0)) && [[ -z "$nested" && -z "${STAGE_CELLS_BREAK:-}" ]]; then
     for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto last-run-unwritten break-honored-everywhere \
-        own-repository-any-marker own-repository-refused unavailable-as-red term-leaves-cell; do
+        own-repository-any-marker own-repository-refused unavailable-as-red term-leaves-cell parallel-first-exit-for-all parallel-term-leaves-cells; do
       if STAGE_CELLS_BREAK="$break_name" bash "$library_under_test" --selftest-nested >/dev/null 2>&1; then
         breaks_missed+=("$break_name")
       else

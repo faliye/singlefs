@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：selftest-cells-alone
+want=  ✗ scripts/gate/twocells.py 格 consume：单跑红（退 1）、整份里绿：这一格读了前面的格留下的变量、文件或环境；单跑那一趟的失败行：✗ 自证：consume：应当读到 甲，实际没读到
+want=有选格手段的自证逐格单跑：1 处不对（1 份自证、2 格；起了 3 趟）
+want=selftest-cells-alone：红

@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-headers
+want=.claude/hooks/stray.sh:3 STRAY_BREAK=skip 点名的项里「」没配平：第 4 行多一个收尾的括号，补上它对应的起头括号，或删掉这个
+want=scripts/gate/unclosed.py:3 UNCLOSED_BREAK=skip 点名的项里「」没配平：第 4 行起头的括号没有收尾，在该收住的地方补上收尾的括号
+want=弄坏开关文件头：2 处不对（读开关的 3 份：写全 1 份、豁免 0 份）
+want=break-switch-headers：红（退出 1）

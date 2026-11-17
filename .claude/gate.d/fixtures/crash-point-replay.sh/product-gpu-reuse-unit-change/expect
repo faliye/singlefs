@@ -1,10 +1,13 @@
 exit=3
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=record cards=[unset]
+want=· product-gpu-real-card-tests：只录那一趟录完了（不持卡，1 条打了 RECORDED_ONLY），接着只判
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=judge cards=[192.0.2.1:0:8G]
 want=样本档：
-want=· product-gpu-real-card-tests 按条复用：singlefs-background-gpu 的 2 个对拍测试目标里 3 条编得进的测试函数，现判 1、复用 2、拒算 0
-want=现判 crates/singlefs-background-gpu/tests/two_kernels_reconcile.rs::the_two_kernels_confirm_every_entry（
-want=复用 crates/singlefs-background-gpu/tests/checksum_kernels_agree.rs::the_bitwise_kernel_agrees_with_the_cpu
-want=复用 crates/singlefs-background-gpu/tests/checksum_kernels_agree.rs::the_table_kernel_agrees_with_the_cpu
-want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1 --exact --skip the_bitwise_kernel_agrees_with_the_cpu --skip the_table_kernel_agrees_with_the_cpu
+want=· product-gpu-real-card-tests 按条复用：singlefs-background-gpu-tests 的 2 个对拍测试目标里 3 条编得进的测试函数，现判 1、复用 2、拒算 0
+want=现判 crates/singlefs-background-gpu-tests/tests/two_kernels_reconcile.rs::the_two_kernels_confirm_every_entry（
+want=复用 crates/singlefs-background-gpu-tests/tests/checksum_kernels_agree.rs::the_bitwise_kernel_agrees_with_the_cpu
+want=复用 crates/singlefs-background-gpu-tests/tests/checksum_kernels_agree.rs::the_table_kernel_agrees_with_the_cpu
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: test --release --no-fail-fast -p singlefs-background-gpu-tests --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --exact --skip the_bitwise_kernel_agrees_with_the_cpu --skip the_table_kernel_agrees_with_the_cpu
 want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
 want=· 判绿记库：RECORD recorded=1 changed=0 refused=0
 want=✓ product-gpu-real-card-tests：2 个对拍测试目标（特性 tests-on-a-real-gpu）每个都跑到了用例，共 3 条（含复用；按条：现判 1、复用 2、拒算 0、本次未跑 0）

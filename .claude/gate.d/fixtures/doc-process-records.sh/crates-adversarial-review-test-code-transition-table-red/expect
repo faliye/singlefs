@@ -1,0 +1,8 @@
+exit=1
+want=过渡挂账表 .claude/gate.d/review-test-code-pending.tsv 有 4 处不合规
+want=第 1 行不是「路径<制表符>理由」两段，或理由不到 8 个字：crates/singlefs-verification/tests/workload.rs
+want=第 2 行的路径不是验证包、池级 checker、函数单元图的 src、各包 tests 里的 .rs 或 crates/mutations.tsv：crates/demo/src/lib.rs
+want=第 4 行重复登记了 crates/mutations.tsv（第 3 行已经有）
+want=第 5 行不是「路径<制表符>理由」两段，或理由不到 8 个字：crates/singlefs-checker/tests/pool.rs
+want=样本只跑 .gate-cells 点名的格：crates-adversarial-review
+want=doc-process-records.sh：1 格里 1 格红（crates-adversarial-review）

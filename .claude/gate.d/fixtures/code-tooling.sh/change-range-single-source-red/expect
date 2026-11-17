@@ -4,8 +4,9 @@ want=.claude/gate.d/50-样本自己算基准.sh:3
 want=.claude/gate.d/52-样本攻方的八种写法.sh:3
 want=.claude/gate.d/52-样本攻方的八种写法.sh:4
 want=.claude/gate.d/52-样本攻方的八种写法.sh:5
-want=6 行列路径的 git 调用没带 -c core.quotepath=false
+want=7 行列路径的 git 调用没带 -c core.quotepath=false
 want=.claude/gate.d/51-样本列路径不带选项.sh:3
+want=.claude/gate.d/51-样本列路径不带选项.sh:4
 want=.claude/gate.d/52-样本攻方的八种写法.sh:6
 want=.claude/gate.d/52-样本攻方的八种写法.sh:7
 want=.claude/gate.d/52-样本攻方的八种写法.sh:8

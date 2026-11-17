@@ -1,0 +1,3 @@
+# 登记的那一条用例的日志里有观察者交回的盘取不到卡那一行、cargo 退 101：单片与合并都记本次未跑、不判红，ITEM_DONE exit=78，整道退 78，判的是 crash-case-replay 格
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

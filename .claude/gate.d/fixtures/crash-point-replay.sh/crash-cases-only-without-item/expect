@@ -1,0 +1,4 @@
+exit=2
+want=· 样本带 .gate-crash-cases-only：当作 --crash-cases-only
+want=✗ 带了 --crash-cases-only 却没点崩溃枚举用例：它只走按块那一路、只跑 --item 点名的用例，一条都没点就没有要跑的
+want=→ 怎么办：加 --item crash-case:<用例名>

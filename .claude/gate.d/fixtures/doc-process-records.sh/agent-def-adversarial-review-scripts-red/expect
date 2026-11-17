@@ -1,0 +1,7 @@
+exit=1
+want=改过的治理文件里 3 份没有三方判决点名
+want=      scripts/demo/engine.rs
+want=      scripts/demo/lib_demo.py
+want=      scripts/demo/run.sh
+want=样本只跑 .gate-cells 点名的格：agent-def-adversarial-review
+want=doc-process-records.sh：1 格里 1 格红（agent-def-adversarial-review）

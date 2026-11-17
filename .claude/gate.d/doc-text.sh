@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改了中文就三份同进同出（只改译文的放行）、译文照翻译术语表用词、译文里不残留超量没译的中文、译文与中文逐段比内容量不漏段不压成摘要；这次改动新加到记录、kb 页、三方判决正文与代码治理文件的行里不写账号与额度方面的运营细节和解析限额通知的正则；这次改动新加的行里不写不归本项目的目录名与根下系统目录的占用；这次改动里的文本文件（工作区与暂存区里的版本）是合法 UTF-8；登记的 kb 目录里的中文页在历史节之前不写带日期的现状句（滞后表登记的存量放过，滞后表只缩不涨）；代码与脚本的注释、文件头、文档串与 README 里不写历史（日期、出处、改动经过；特殊缘由写 history-kept 标记，存量登记在滞后表，滞后表只缩不涨）
+# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）；改动碰到的记录与 kb 页日期只写在标题上；登记的三语文件（仓根 README 与 briefs/）三份齐全、结构对得上、改了中文就三份同进同出（只改译文的放行）、译文照翻译术语表用词、译文里不残留超量没译的中文、译文与中文逐段比内容量不漏段不压成摘要；这次改动新加到记录、kb 页、三方判决正文与代码治理文件的行里不写账号与额度方面的运营细节和解析限额通知的正则；这次改动新加的行里不写不归本项目的目录名与根下系统目录的占用；这次改动里的文本文件（工作区与暂存区里的版本）是合法 UTF-8；登记的 kb 目录里的中文页在历史节之前不写带日期的现状句（滞后表登记的存量放过，滞后表只缩不涨）；代码与脚本的注释、文件头、文档串与 README 里不写历史（日期、出处、改动经过；特殊缘由写 history-kept 标记，存量登记在滞后表，滞后表只缩不涨）
 # gate-fixture: yes
 # gate-category: 文档类
 # 不声明 gate-covers：.claude/gate-not-implemented.tsv 的两项判被测代码的行为，这一道只判文本写法。
@@ -15,7 +15,6 @@
 # gate-cell: prime-marks 撇号类角标
 # gate-cell: clock-times 描述里的钟点、时区词与时间戳
 # gate-cell: session-names 会话号（ListAgents 列的会话名）
-# gate-cell: term-renames 登记过改名的术语不再出现旧名
 # gate-cell: date-once 这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节
 # gate-cell: trilingual-files 登记的三语文件三份齐全：中文 <名>.md 的 <名>.en.md、<名>.ja.md 都在，登记目录里单有 .en.md 或 .ja.md 的也要三份齐全；登记表写对了
 # gate-cell: trilingual-structure 三语文件每组三份的结构对得上（编号集合、链接目标集合、各级标题个数、表格行个数、围栏代码块个数），抓只改了一份
@@ -30,25 +29,23 @@
 # gate-cell: dated-status 登记的 kb 目录里的中文页在「## 历史版本」之前不写带日期的现状句（「现状（日期」与「日期 现状」两种）；滞后表 dated-status-lag.tsv 登记的放过，滞后表写对了、与 gate 基准那一版比只缩不涨
 # gate-cell: comment-history 代码与脚本的注释、文件头、文档串与 README 里不写历史（日期、出处、改动经过）；特殊缘由在那一行写 history-kept 标记，存量登记在滞后表 comment-history-lag.tsv，滞后表写对了、与 gate 基准那一版比只缩不涨
 # 格结构经 lib/stage-cells.sh。
+# 预取：各格在自己的子 shell 里跑，取了也传不给别的格，所以改动范围与新加行的取法在父进程里按选中的格取一次：date-once、trilingual-changed-together、private-values、account-quota、
+#   out-of-project-names、utf8-valid 六格共用一份改动路径（text_changed_paths），private-values、account-quota、out-of-project-names 三格另共用一份整份 git diff -U0
+#   （PRIVATE_VALUES_LIBRARY 的 load_diff_segments 按文件切开、added_lines 取；预取里没有的文件退回逐份 git diff；预取取不到的各格照旧各自判红）。
 #
 # ── prime-marks、clock-times、session-names ──
 # 格名就是同目录 lib-forbidden-notations.py 里 FORMS 的形态键。git ls-files --cached --others --exclude-standard 列出的每份文本文件
 # （不在 git 仓里时走目录树）逐行交那一形态判，违例报「文件:行」。判据行、上下文放行规则、放行标记、排除前缀、成功行与出路都在那份库里；
 # 加一种禁用写法就是往 FORMS 加一项、再在格名表里加一格。.claude/hooks/write-guard.sh 写入时读同一份库。
 # 射程是全仓，冻结证据（research/prompts/、records/、变更史、research/results/）也在内。
+# 扫法：各份文件互不依赖，分给 fork 出来的子进程各扫各的，进程数取每台默认重活线程数（scripts/hosts/heavy_threads.py 的 default_heavy_threads；取不到往标准错误打一行、一个进程扫），
+#   结果按文件次序收回（派出多少份、收回多少份对不上判红），输出与进程数无关；每份文件逐行判用 lib-forbidden-notations.py 的 hits_per_line：
+#   形态此刻要判的判据行连成一条正则先筛掉没有候选的行，有候选的行才走上下文规则与放行标记，与逐行 first_hit 逐项相同（first_hit 留作对拍的参照）。
 # 没扫的：二进制文件（前 8 KiB 里有 NUL）、列出了却不是普通文件的与读不了的（权限这一类，不让异常回溯打出原路径），逐个列名。一份文本文件都没扫到：退 77。
 # 打印的路径（红行、「二进制：」「不是普通文件」「读不了」三个清单）与红行里的行文片段都经 private-values 那一格的取词和打码（下面「private-values」一段的 PRIVATE_VALUES_LIBRARY，同一份共用函数）：
 #   路径里含私有值的那一段打成「〔文件名含私有值〕」，片段里的值打成「〔私有值〕」；没有 multi-host.env（别人的克隆、第二台）就没有词可打，原样打。
 #   片段取命中位置前 20 个字到后 10 个字，两头落在私有值中间的挪到值的边上（整值进片段再打码，snippet_bounds），不打出半截值。
 # 管不到的：ASCII 单引号当角标（与代码里的引号分不开）；改过标题的会话。
-#
-# ── term-renames ──
-# 判法在 scripts/kb/sweep-term.py --check：按 .claude/kb/term-renames.md 查（「匹配」认整串、词边界、正则三种），
-# 在 git 工作树里查 git 跟踪的与未跟踪而未忽略的文件、git 忽略的不查，不在 git 工作树里查整棵目录树；
-# 排除表 .claude/term-rename-exempt 认整份豁免与按行豁免（<路径>:「<行内锚>」只豁免那一行），写法都在那份脚本文件头。
-# 排除表指向不存在的路径、行内锚命中不是恰好一行、正则写不对，也判红。没有登记表：退 77。规则：.claude/rules/path-moves.md「改一个全仓术语：正文之外还有五处会红」。
-# sweep-term 的输出（逐份列的路径与处数）经 private-values 那一份打码再打：按空白切开，带 / 的一段当路径（shown_path），别的当行文（shown_text）；shown_lines_main 判。
-# 管不到的：登记表里没登记的改名。
 #
 # ── date-once ──
 # 这次改动碰到的（含未跟踪的）records/*.md 与 .claude/kb/ 下的 .md 逐份交
@@ -73,7 +70,7 @@
 # glossary：翻译术语表 .claude/kb/translation-glossary.md，表上方单独一行 <!-- trilingual-glossary --> 紧挨着表，表头
 #   | 中文 | English | 日本語 | 说明 / Note / 注 |。表本身：每行四列、前三列不空、中文列不重复、说明列空着或恰好三段（用 <br> 分隔、每段不空）。
 #   译文：每组三份齐全的，中文列的串在 zh 那份里原样出现，则 English 列的串要在 en 那份里出现（不分大小写），日本語列的串要在 ja 那份里原样出现。
-#   改名登记表 .claude/kb/term-renames.md 那一组，登记表的旧名、新名两列（term-renames 格拿去全仓搜的字面，三份照中文原串写）不算用到术语，
+#   改名登记表 .claude/kb/term-renames.md 那一组，登记表的旧名、新名两列（新旧对照，三份照中文原串写、不译）不算用到术语，
 #   表与读法照 scripts/kb/sweep-term.py 的 load_renames、table_cells；同一份里别处用到的照核。
 #   术语表文件不在：判红，不是 77，出路写建它。
 # untranslated：每组在的英语、日语译文逐行判，射程是全仓此刻的样子（同 files、structure、glossary，不按这次改动划窗：伪译文是文件的状态，checks-owed 日语那份约 793 行
@@ -119,7 +116,7 @@
 #   逐段比哪一段都不含整串，红行会把值原样打出来。命中的那一段是从值开头所在的那一级目录到结尾所在的那一级，重叠或相连的命中并成一段，整段打成「〔文件名含私有值〕」，值不打印。
 #   出路：换成「第二台」「本机」这类说法；文件名含值的，改名。
 #   取词与路径打码是同一道里的共用函数（PRIVATE_VALUES_LIBRARY：load_private_targets、shown_path、shown_text、snippet_bounds、shown_lines_main；配置在哪由 private_value_sources 解），
-#   prime-marks / clock-times / session-names 三格打路径与片段、date-once 打红行路径、term-renames 打 sweep-term 的输出都调同一份，不各抄一份。
+#   prime-marks / clock-times / session-names 三格打路径与片段、date-once 打红行路径、utf8-valid 打红行都调同一份，不各抄一份。
 # 没有 multi-host.env（别人的克隆、第二台）、取不到够长的词、不在 git 仓里、这次改动没有新加的行：退 77，不判绿。
 # 管不到的：换了写法的值（大小写、拆开写、换成别称）、用户原话里的别称（不在配置里）、commit message（提交之后才有，要另挂 commit-msg 钩子）、不足 8 个字的值。
 #   词源只有 multi-host.env 与 hostname：~/.config/singlefs/ 下的清场脚本里的词没并进来（并入前要在真树上整仓逐行量新增命中，新增为 0 才并；上一次量出来不是 0，没并）。
@@ -189,6 +186,76 @@
 #     utf8-valid-staged-red
 #   GATE_TEXT_NOTATIONS_BREAK=utf8-valid-chunk-carry-dropped  块尾被切开的多字节序列不带到下一块、当坏字节报
 #     utf8-valid-chunk-green
+#   GATE_TEXT_NOTATIONS_BREAK=scan-prefilter-rejects-all  prime-marks、clock-times、session-names 三格逐行扫时，先筛一律说没有候选（转成 LIB_FORBIDDEN_NOTATIONS_BREAK 的 candidate-prefilter-rejects-all 交给 lib-forbidden-notations.py）
+#     clock-times-mountinfo-red
+#     clock-times-red
+#     prime-marks-red
+#     private-values-clock-snippet-red
+#     private-values-siblings-red
+#     session-names-red
+#   GATE_TEXT_NOTATIONS_BREAK=changed-paths-prefetch-empty  阶段在父进程里预取的改动路径一律交空表（用改动范围的六格拿到空的改动范围）
+#     account-quota-code-green
+#     account-quota-code-red
+#     account-quota-green
+#     account-quota-red
+#     date-once-green
+#     date-once-history-translations-green
+#     date-once-history-translations-red
+#     date-once-red
+#     date-once-unjudgeable-red
+#     out-of-project-names-allowed-red
+#     out-of-project-names-deep-green
+#     out-of-project-names-deep-red
+#     out-of-project-names-forms-green
+#     out-of-project-names-forms-red
+#     out-of-project-names-green
+#     out-of-project-names-no-private-list
+#     out-of-project-names-private-red
+#     out-of-project-names-red
+#     out-of-project-names-root-red
+#     private-values-big-untracked-red
+#     private-values-cross-segment-red
+#     private-values-date-once-path-red
+#     private-values-filename-and-content-red
+#     private-values-filename-only-red
+#     private-values-green
+#     private-values-nul-head-green
+#     private-values-red
+#     private-values-shared-root-address-red
+#     private-values-shared-root-green
+#     private-values-siblings-red
+#     private-values-symlink-dangling-red
+#     private-values-symlink-mount-red
+#     private-values-too-big-red
+#     private-values-unreadable-red
+#     trilingual-changed-together-green
+#     trilingual-changed-together-red
+#     trilingual-changed-together-translation-only-green
+#     utf8-valid-chunk-green
+#     utf8-valid-chunk-red
+#     utf8-valid-green
+#     utf8-valid-red
+#     utf8-valid-staged-red
+#   GATE_TEXT_NOTATIONS_BREAK=diff-cache-hunks-dropped  阶段预取的整份 diff 里每份文件都说没有新加的行（读新加行的三格对预取到的文件拿到空）
+#     account-quota-code-green
+#     account-quota-code-red
+#     account-quota-green
+#     account-quota-red
+#     out-of-project-names-allowed-red
+#     out-of-project-names-deep-green
+#     out-of-project-names-deep-red
+#     out-of-project-names-forms-green
+#     out-of-project-names-forms-red
+#     out-of-project-names-green
+#     out-of-project-names-no-private-list
+#     out-of-project-names-private-red
+#     out-of-project-names-red
+#     out-of-project-names-root-red
+#     private-values-green
+#     private-values-nul-head-green
+#     private-values-red
+#     private-values-shared-root-address-red
+#     private-values-shared-root-green
 #   GATE_TEXT_NOTATIONS_BREAK=date-once-unjudged  date-once 不干跑、记无对象可判
 #     date-once-green
 #     date-once-history-translations-green
@@ -201,11 +268,6 @@
 #   GATE_TEXT_NOTATIONS_BREAK=date-once-history-translations-judged  date-once 只排除中文那三份（两份变更史与 INDEX.md），英日译文照判
 #     date-once-history-translations-green
 #     date-once-history-translations-red
-#   GATE_TEXT_NOTATIONS_BREAK=term-renames-unjudged  term-renames 不调 sweep-term、记无对象可判
-#     term-renames-green
-#     term-renames-line-exempt-green
-#     term-renames-line-exempt-red
-#     term-renames-red
 #   GATE_TEXT_NOTATIONS_BREAK=trilingual-files-unjudged  trilingual-files 不判、记无对象可判
 #     trilingual-files-green
 #     trilingual-files-no-registry-red
@@ -335,6 +397,9 @@
 #     trilingual-omission-green
 #   LIB_TRILINGUAL_BREAK=omission-unpaired-ignored  trilingual-omission 配不上的段（段数不同的节、编号行缺一边）不报
 #     trilingual-omission-english-red
+#   LIB_TRILINGUAL_BREAK=comment-open-in-code-counted  反引号段里的 <!-- 也当 HTML 注释的开头（trilingual-omission 的切节与 trilingual-untranslated 的逐行去注释都退回去）
+#     trilingual-omission-comment-open-in-code-red
+#     trilingual-untranslated-comment-open-in-code-red
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-unjudged  private-values 不比对、记无对象可判
 #     private-values-big-untracked-red
 #     private-values-cross-segment-red
@@ -391,7 +456,7 @@
 #     private-values-unreadable-red
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-snippet-cut  三格的行文片段照命中位置前 20 后 10 个字直接截，不挪到私有值的边上
 #     private-values-clock-snippet-red
-#   GATE_TEXT_NOTATIONS_BREAK=private-values-date-once-term-renames-unmasked  date-once 的红行与 term-renames 转出的 sweep-term 输出原样打路径
+#   GATE_TEXT_NOTATIONS_BREAK=private-values-date-once-unmasked  date-once 的红行路径与 utf8-valid 的红行原样打路径
 #     private-values-date-once-path-red
 #   GATE_TEXT_NOTATIONS_BREAK=private-values-path-by-segment  路径打码逐段比（哪一段含整个值才打码，值带 / 跨几段时一段都不含）
 #     private-values-cross-segment-red
@@ -679,12 +744,12 @@
 #     out-of-project-names-table-red、prime-marks-red、private-values-big-untracked-red、private-values-clock-snippet-red
 #     private-values-cross-segment-red、private-values-date-once-path-red、private-values-filename-and-content-red、private-values-filename-only-red
 #     private-values-red、private-values-shared-root-address-red、private-values-siblings-red、private-values-symlink-dangling-red、private-values-symlink-mount-red
-#     private-values-too-big-red、private-values-unreadable-red、session-names-red、term-renames-line-exempt-red
-#     term-renames-red、trilingual-changed-together-red、trilingual-files-no-registry-red、trilingual-files-red
+#     private-values-too-big-red、private-values-unreadable-red、session-names-red
+#     trilingual-changed-together-red、trilingual-files-no-registry-red、trilingual-files-red
 #     trilingual-files-registry-red、trilingual-glossary-longer-word-red、trilingual-glossary-longer-words-table-red、trilingual-glossary-marker-red
 #     trilingual-glossary-missing-red、trilingual-glossary-not-table-red、trilingual-glossary-red、trilingual-glossary-renames-columns-red
-#     trilingual-glossary-table-red、trilingual-omission-english-red、trilingual-omission-japanese-red
-#     trilingual-structure-link-target-red、trilingual-structure-red、trilingual-untranslated-english-red
+#     trilingual-glossary-table-red、trilingual-omission-comment-open-in-code-red、trilingual-omission-english-red、trilingual-omission-japanese-red
+#     trilingual-structure-link-target-red、trilingual-structure-red、trilingual-untranslated-comment-open-in-code-red、trilingual-untranslated-english-red
 #     trilingual-untranslated-exempt-table-red、trilingual-untranslated-identical-red、trilingual-untranslated-japanese-red、utf8-valid-chunk-red
 #     utf8-valid-red、utf8-valid-staged-red
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
@@ -703,14 +768,13 @@
 #     private-values-filename-only-red、private-values-green、private-values-no-config、private-values-nul-head-green
 #     private-values-red、private-values-shared-root-address-red、private-values-shared-root-green、private-values-siblings-red、private-values-symlink-dangling-red、private-values-symlink-mount-red
 #     private-values-too-big-red、private-values-unreadable-red、session-names-green、session-names-red
-#     term-renames-green、term-renames-line-exempt-green、term-renames-line-exempt-red、term-renames-red
 #     trilingual-changed-together-green、trilingual-changed-together-red、trilingual-changed-together-translation-only-green、trilingual-changed-together-unrun
 #     trilingual-files-green、trilingual-files-no-registry-red、trilingual-files-red、trilingual-files-registry-red、trilingual-glossary-green
 #     trilingual-glossary-longer-word-green、trilingual-glossary-longer-word-red、trilingual-glossary-longer-words-table-red、trilingual-glossary-marker-red
 #     trilingual-glossary-missing-red、trilingual-glossary-not-table-red、trilingual-glossary-red、trilingual-glossary-renames-columns-red
-#     trilingual-glossary-table-red、trilingual-omission-english-red、trilingual-omission-green、trilingual-omission-japanese-red
+#     trilingual-glossary-table-red、trilingual-omission-comment-open-in-code-red、trilingual-omission-english-red、trilingual-omission-green、trilingual-omission-japanese-red
 #     trilingual-structure-green、trilingual-structure-link-target-red、trilingual-structure-red
-#     trilingual-untranslated-english-red、trilingual-untranslated-exempt-table-red、trilingual-untranslated-green、trilingual-untranslated-identical-green
+#     trilingual-untranslated-comment-open-in-code-red、trilingual-untranslated-english-red、trilingual-untranslated-exempt-table-red、trilingual-untranslated-green、trilingual-untranslated-identical-green
 #     trilingual-untranslated-identical-red、trilingual-untranslated-japanese-red、utf8-valid-chunk-green、utf8-valid-chunk-red、utf8-valid-green、utf8-valid-red
 #     utf8-valid-staged-red
 #
@@ -786,12 +850,6 @@
 #                       会话号排除前缀下的门禁样本 .claude/gate.d/fixtures/x/red/expect 一份；research/prompts/ 下登记了会话号排除前缀的七轮三方材料各一份
 #                       （_m4-batch2-code-r1-appendix、_m4-c860-r1-background、_m4-gc-r1-appendix、_m4-segment-code-r1-background、_m4-snapshot-r1-appendix、
 #                       _m4-trunc-r1-background、_m4-trunc-r2-appendix）；判绿
-#   term-renames-red    一份改名登记表与一份还用着旧名的 rs（旧名由几段拼出来，样本目录里不出现旧名的字面），判红
-#   term-renames-green  同一张登记表，rs 里只有新名，判绿
-#   term-renames-line-exempt-green  setup.sh 建 git 仓；登记表带一行「正则」，记录里只有树层、外层那一行与按行豁免的一句用户原话带旧名，
-#                       git 忽略的 multi-host.env 里有旧名，判绿（正则去掉断言、扫了 git 忽略的文件都红；旧名同样由几段拼出来）
-#   term-renames-line-exempt-red  同一现场，按行豁免的那份记录里另有一行没豁免的旧名：只报那一行（1 份文件、1 处），判红
-#                       （按行豁免当成整份豁免就判绿，正则去掉断言、扫了 git 忽略的文件报的处数就不是 1）
 #   trilingual-files-red          登记 README.md 与 briefs/*.md：README 缺日语、一组缺英语、一组只有英语、一组有英语和日语而中文不在，逐份点名缺哪份判红
 #                       （reverse-ignored 抓不到后两组）
 #   trilingual-files-registry-red 登记表三处不对（模式指不到文件、行没写理由、模式写成了 .en.md），逐行点名判红
@@ -827,6 +885,8 @@
 #   trilingual-untranslated-identical-green  英语、日语两份各有六行与中文逐字相同：只有数和拉丁字母的表格行与分隔行，中文只在反引号、「」、链接目标、HTML 注释里的四行；
 #                       日语另有照抄的标题「概要」（只用日语也用的汉字）；判绿，报放过 13 行
 #   trilingual-untranslated-exempt-table-red  排除登记表五处写错（页不在、只有一列、理由太短、同一份登记两次、登记了译文那一份），译文都已译好，逐行点名判红
+#   trilingual-omission-comment-open-in-code-red  中文、英语、日语三份第一段的反引号里都带一个没有闭合的 <!--；英语那份后面一段压成一句（比值 0.13），点名那一段判红
+#   trilingual-untranslated-comment-open-in-code-red  英语那份一行反引号里带没有闭合的 <!--，同一行后面留着 22 个汉字的中文原句，点名那一行判红
 #   trilingual-omission-english-red    英语那份「背景」一节漏了中文第二段（中文 3 段、英语 2 段）、「回看」表 D4 那一行漏了其中一个日期的那一块（比值 0.41，门槛那一档）、
 #                       「欠账」表首列编号 C12 那一行整行没有，三类各点名一处判红；日语那份译全
 #   trilingual-omission-japanese-red   日语那份段数、列表项、表格行都与中文相同，两段与两个列表项压成一句大意（比值 0.19–0.31）、一个表格行比值 0.89（门槛那一档），逐段点名判红；英语那份译全
@@ -940,15 +1000,16 @@ REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 source "$STAGE_DIR/lib/stage-cells.sh"
 LIBRARY="$STAGE_DIR/lib-forbidden-notations.py"
 TRILINGUAL="$STAGE_DIR/lib-trilingual.py"
-SWEEP_TERM="$REPO_ROOT/scripts/kb/sweep-term.py"
 DOC_CONSOLIDATE="$REPO_ROOT/scripts/kb/doc-consolidate.py"
 source "$REPO_ROOT/scripts/gate/changed-paths.sh"
 text_notations_break="${GATE_TEXT_NOTATIONS_BREAK:-}"
+# 阶段在父进程里预取的改动范围与整份 diff（文件末尾「预取」一段赋值；各格在自己的子 shell 里跑，取了也传不给别的格，所以只能在父进程里取、子 shell 继承）。调用方环境里的同名变量不认：这里先清空
+text_prefetched_base="" text_prefetched_changed="" text_prefetched_status=1 text_diff_cache=""
 
 # 私有值的取词与路径、行文片段的打码：private-values 一格与 prime-marks / clock-times / session-names 三格打印路径时共用（同一份，不各抄一份）。
 # python 代码放进变量，各格的 python 用 exec 载入；取词的规则写在 private-values 一格的注释里（文件头「private-values」一段）。
 PRIVATE_VALUES_LIBRARY="$(cat <<'PY_PRIVATE_VALUES'
-import re, shlex, socket
+import io, re, shlex, socket
 
 FILE_NAME_MASK = "〔文件名含私有值〕"          # 红行里路径的哪一段含私有值，那一段打成这个，值不打印
 VALUE_MASK = "〔私有值〕"                     # 行文片段里的私有值打成这个
@@ -1113,11 +1174,11 @@ def shown_line(line, targets, broken):
 
 
 def shown_lines_main(arguments, stream_in, stream_out):
-    """date-once 的红行路径、term-renames 转出的 sweep-term 输出经这里打码：arguments = [配置, 主机名, 弄坏开关, path 或 lines]，
+    """date-once 的红行路径、utf8-valid 的红行经这里打码：arguments = [配置, 主机名, 弄坏开关, path 或 lines]，
     stdin 逐行打码打到 stdout（path：整行是一个路径；lines：shown_line）。没有配置、读不了配置时原样打。"""
     configuration_path, hostname_path, broken, mode = arguments
     targets = []
-    if configuration_path and broken != "private-values-date-once-term-renames-unmasked":
+    if configuration_path and broken != "private-values-date-once-unmasked":
         try:
             targets = load_private_targets(configuration_path, hostname_path, broken)[0]
         except OSError:
@@ -1129,15 +1190,93 @@ def shown_lines_main(arguments, stream_in, stream_out):
 ADDED_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
-def added_lines(path, whole_file, base, git, fail, shown_path):
-    """这份文件这一次新加的 (行号, 行文)：已跟踪的取相对基准 git diff -U0 的新加行，未跟踪的（新文件整份都算新加）整份逐行读。
-    out-of-project-names 一格用它；git、fail、shown_path 由调用的格给（各格自己的 git 起法、红行写法与路径打码）。"""
+DIFF_HEADER_PREFIX = "diff --git a/"
+
+
+DIFF_HEADER_PREFIX_LINE = "diff --git "      # 整份 diff 里一份文件那一段的头行都以它起头（认不认得出路径另由 diff_header_path 判）
+
+
+def diff_header_path(header):
+    """整份 diff 里一个文件那一段的头行 `diff --git a/<路径> b/<路径>` 的路径（--no-renames，两边同一路径，所以按长度对半切再核一遍）；
+    路径带引号（含制表符、引号、反斜杠）或两半对不上的交 None。"""
+    if not header.startswith(DIFF_HEADER_PREFIX):
+        return None
+    rest = header[len(DIFF_HEADER_PREFIX):]
+    path = rest[:(len(rest) - 3) // 2]
+    return path if rest == f"{path} b/{path}" else None
+
+
+class DiffSegments:
+    """整份预取 diff 按文件切开之后的表：只记每份文件那一段在预取文件里的字节区间，`get(路径)` 时才读那一段、解码、切行。
+    整份 diff 可以有几百万行；一次解码成一个字符串再切成逐行的列表，内存是 diff 字节数的好几倍，而一格只用到改动范围里的那几份。"""
+
+    def __init__(self, handle, spans, hunks_dropped):
+        self.handle, self.spans, self.hunks_dropped = handle, spans, hunks_dropped
+
+    def __bool__(self):
+        return bool(self.spans)
+
+    def __len__(self):
+        return len(self.spans)
+
+    def __iter__(self):
+        return iter(self.spans)
+
+    def __contains__(self, path):
+        return path in self.spans
+
+    def get(self, path, default=None):
+        span = self.spans.get(path)
+        if span is None:
+            return default
+        if self.hunks_dropped:
+            return []
+        self.handle.seek(span[0])
+        return self.handle.read(span[1] - span[0]).decode("utf-8", "replace").split("\n")
+
+
+def load_diff_segments(cache_path, base, broken):
+    """阶段在父进程里预取的整份 `git diff -U0 --no-renames <基准>` 按文件切开：{路径: 这份文件那一段的行}（段的行与 `git diff -U0 <基准> -- <路径>` 的输出逐行相同）。
+    预取文件的第一行是预取时的基准；cache_path 空、读不了、基准与这一格取的不同，交空表，added_lines 对每份文件退回逐份 git diff。头行认不出路径的那一段不收。
+    交回的是 DiffSegments（按字节区间记，`get` 时才读）：逐行扫一遍预取文件只认头行，不把整份留在内存里；同一路径出现两段的取后一段。
+    弄坏开关 diff-cache-hunks-dropped：收下的每份文件都说没有新加的行。"""
+    if not cache_path:
+        return {}
+    try:
+        handle = open(cache_path, "rb")
+        recorded_base = handle.readline().decode("utf-8", "replace").rstrip("\n")
+        if recorded_base != base:
+            handle.close()
+            return {}
+        spans, current, current_start, offset = {}, None, 0, handle.tell()
+        header_prefix = DIFF_HEADER_PREFIX_LINE.encode("utf-8")
+        for raw in handle:
+            if raw.startswith(header_prefix):
+                if current is not None:
+                    spans[current] = (current_start, offset - 1)        # 段尾不含下一段头行之前的那个换行：切行之后与整份切行时这一段的行逐行相同
+                current = diff_header_path((raw[:-1] if raw.endswith(b"\n") else raw).decode("utf-8", "replace"))
+                current_start = offset
+            offset += len(raw)
+        if current is not None:
+            spans[current] = (current_start, offset)
+    except OSError:
+        return {}
+    return DiffSegments(handle, spans, broken == "diff-cache-hunks-dropped")
+
+
+def added_lines(path, whole_file, base, git, fail, shown_path, segments=None, whole_file_limit=None):
+    """这份文件这一次新加的 (行号, 行文)：已跟踪的取相对基准 git diff -U0 的新加行（segments 里有这份文件的那一段就用它，没有就逐份起 git diff），
+    未跟踪的（新文件整份都算新加）整份逐行读（whole_file_limit 给了字节数就只读前这么多）。
+    private-values、account-quota、out-of-project-names 三格共用；git、fail、shown_path 由调用的格给（各格自己的 git 起法、红行写法与路径打码）。"""
     if not whole_file:
-        difference = git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", base, "--", path)
-        if difference.returncode != 0:
-            fail(f"取不到 {shown_path(path)} 相对基准 {base[:12]} 的改动（git diff 退 {difference.returncode}）", "看基准提交在不在、git 是不是可用；改动范围的基准只经 scripts/gate/changed-paths.sh 的 gate_diff_base 取。")
+        diff_lines = segments.get(path) if segments else None
+        if diff_lines is None:
+            difference = git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", base, "--", path)
+            if difference.returncode != 0:
+                fail(f"取不到 {shown_path(path)} 相对基准 {base[:12]} 的改动（git diff 退 {difference.returncode}）", "看基准提交在不在、git 是不是可用；改动范围的基准只经 scripts/gate/changed-paths.sh 的 gate_diff_base 取。")
+            diff_lines = difference.stdout.decode("utf-8", "replace").split("\n")
         number, in_hunk = 0, False
-        for line in difference.stdout.decode("utf-8", "replace").split("\n"):
+        for line in diff_lines:
             found = ADDED_HUNK.match(line)
             if found:
                 number, in_hunk = int(found.group(1)), True
@@ -1146,7 +1285,8 @@ def added_lines(path, whole_file, base, git, fail, shown_path):
                 number += 1
         return
     with open(path, "rb") as handle:
-        for number, raw in enumerate(handle, 1):
+        source = io.BytesIO(handle.read(whole_file_limit)) if whole_file_limit else handle
+        for number, raw in enumerate(source, 1):
             yield number, raw.decode("utf-8", "replace").rstrip("\n")
 PY_PRIVATE_VALUES
 )"
@@ -1177,8 +1317,6 @@ stage_cell clock-times cell_clock_times "描述里的钟点、时区词与时间
   "时间只写到日期，钟点、时区词、时间戳连同「前后」一起删；代码真要用这些字面的那一行写「# clock-times:allow <理由>」，整份是被测输入的登记进 lib-forbidden-notations.py 的 excluded_prefixes"
 stage_cell session-names cell_session_names "会话号（ListAgents 列的会话名）" \
   "会话号不写进仓：标签式的「（会话 <号>，<日期>）」只留日期，当主语用的写成「别的会话」这类不带号的说法；代码真要用的那一行写「# session-names:allow <理由>」"
-stage_cell term-renames cell_term_renames "登记过改名的术语不再出现旧名" \
-  "python3 scripts/kb/sweep-term.py --apply 一次换完（跑不出来的产物一个字节都不许动，连同引它的正文留旧名）；确实该留旧名的登记进 .claude/term-rename-exempt 并写明为什么"
 stage_cell date-once cell_date_once "这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节" \
   "python3 scripts/kb/doc-consolidate.py migrate <那一份> --out <临时文件> 看它删了哪些、并了哪些，照着改；红行列的是每份删了几个日期、并了几个小节"
 stage_cell trilingual-files cell_trilingual_files "登记的三语文件三份齐全：中文 <名>.md 的 <名>.en.md、<名>.ja.md 都在，登记目录里单有 .en.md 或 .ja.md 的也要三份齐全；登记表写对了" \
@@ -1231,10 +1369,12 @@ ROOT="$PWD"
 # scan_form <形态键>：按 lib-forbidden-notations.py 里那一形态扫全仓文本，退出码 0 没有违例、1 有违例（或读不到库）、77 一份文本文件都没扫到
 scan_form() {
   private_value_sources
-  python3 - "$LIBRARY" "$1" "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" "$text_notations_break" <<'PY'
-import errno, importlib.util, os, subprocess, sys, types
+  python3 - "$LIBRARY" "$1" "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" "$text_notations_break" "$REPO_ROOT" <<'PY'
+import errno, importlib.util, multiprocessing, os, subprocess, sys, types
 
-library_path, form_key, private_values_source, configuration_path, hostname_path, broken = sys.argv[1:7]
+library_path, form_key, private_values_source, configuration_path, hostname_path, broken, repository_root = sys.argv[1:8]
+if broken == 'scan-prefilter-rejects-all':   # 弄坏：库里的逐行先筛一律说没有候选（LIB_FORBIDDEN_NOTATIONS_BREAK 的 candidate-prefilter-rejects-all），库在下面 fork 之前读环境
+    os.environ['LIB_FORBIDDEN_NOTATIONS_BREAK'] = ','.join(filter(None, [os.environ.get('LIB_FORBIDDEN_NOTATIONS_BREAK', ''), 'candidate-prefilter-rejects-all']))
 try:
     spec = importlib.util.spec_from_file_location('lib_forbidden_notations', library_path)
     notations = importlib.util.module_from_spec(spec)
@@ -1275,38 +1415,70 @@ def shown_path(path):
 
 
 form = notations.FORMS_BY_KEY[form_key]
-findings = []
-scanned_paths = []
-excluded_count = 0
-binary_files, irregular_files, unreadable_files = [], [], []   # unreadable_files：(路径, 错误)，读不了的（权限这一类）不让异常回溯把原路径打出来，路径经打码列进「没扫的」
-for relative_path in candidate_paths:
+
+
+def scan_one(relative_path):
+    """一份文件的判法，交 (状态, 内容)：excluded、irregular、binary，unreadable（内容是 errno），scanned（内容是 [(行号, 判据行名字, 片段)]）。
+    各份文件互不依赖，下面按派出的次序收回；每行的判法是 notations.hits_per_line（与逐行 first_hit 逐项相同）。"""
     if notations.is_excluded(form_key, relative_path):
-        excluded_count += 1
-        continue
+        return 'excluded', None
     if not os.path.isfile(relative_path):
-        irregular_files.append(relative_path)
-        continue
+        return 'irregular', None
     try:
         with open(relative_path, 'rb') as handle:
             content = handle.read()
     except OSError as error:
         if broken == 'private-values-unreadable-raises':   # 弄坏：读不了就让格崩
             raise
-        unreadable_files.append((relative_path, error))
-        continue
+        return 'unreadable', error.errno
     if b'\0' in content[:8192]:
+        return 'binary', None
+    found = []
+    for line_number, line, position, pattern_name, matched in notations.hits_per_line(form_key, content.decode('utf-8', 'replace'), relative_path):
+        anchor = position + len(matched) if form['snippet_to_match_end'] else position
+        start, end = max(0, position - 20), anchor + 10
+        if broken != 'private-values-snippet-cut':   # 两头落在私有值中间的挪到值的边上，整值进片段再打码
+            start, end = private_values.snippet_bounds(line, start, end, masking_targets)
+        found.append((line_number, pattern_name, line[start:end].strip()))
+    return 'scanned', found
+
+
+# 扫文件的进程数：每台默认重活线程数（SINGLEFS_THREAD_CAP 设了照它，不然 .claude/heavy-thread-default）；取不到往标准错误打一行、一个进程扫
+sys.path.insert(0, os.path.join(repository_root, 'scripts', 'hosts'))
+try:
+    import heavy_threads
+    scan_processes = max(1, int(heavy_threads.default_heavy_threads()))
+except (ImportError, ValueError) as error:   # HeavyThreadDefaultError 是 ValueError
+    print(f'  ! 取不到每台默认重活线程数（{error}），一个进程扫', file=sys.stderr)
+    scan_processes = 1
+scan_processes = min(scan_processes, len(candidate_paths))
+if scan_processes > 1:
+    sys.stdout.flush()
+    sys.stderr.flush()
+    with multiprocessing.get_context('fork').Pool(processes=scan_processes) as pool:
+        scan_results = pool.map(scan_one, candidate_paths, chunksize=1)
+else:
+    scan_results = [scan_one(relative_path) for relative_path in candidate_paths]
+if len(scan_results) != len(candidate_paths):
+    print(f'  ✗ 派出 {len(candidate_paths)} 份文件、收回 {len(scan_results)} 份结果，这一格没判完')
+    print('     → 怎么办：再跑一次；还是对不上就查扫文件的子进程为什么丢了结果（内存不够被杀、磁盘满）。')
+    sys.exit(1)
+findings = []
+scanned_paths = []
+excluded_count = 0
+binary_files, irregular_files, unreadable_files = [], [], []   # unreadable_files：(路径, errno)，读不了的（权限这一类）不让异常回溯把原路径打出来，路径经打码列进「没扫的」
+for relative_path, (state, detail) in zip(candidate_paths, scan_results):
+    if state == 'excluded':
+        excluded_count += 1
+    elif state == 'irregular':
+        irregular_files.append(relative_path)
+    elif state == 'unreadable':
+        unreadable_files.append((relative_path, detail))
+    elif state == 'binary':
         binary_files.append(relative_path)
-        continue
-    scanned_paths.append(relative_path)
-    for line_number, line in enumerate(content.decode('utf-8', 'replace').split('\n'), 1):
-        found = notations.first_hit(form_key, line, relative_path)
-        if found:
-            position, pattern_name, matched = found
-            anchor = position + len(matched) if form['snippet_to_match_end'] else position
-            start, end = max(0, position - 20), anchor + 10
-            if broken != 'private-values-snippet-cut':   # 两头落在私有值中间的挪到值的边上，整值进片段再打码
-                start, end = private_values.snippet_bounds(line, start, end, masking_targets)
-            findings.append((relative_path, line_number, pattern_name, line[start:end].strip()))
+    else:
+        scanned_paths.append(relative_path)
+        findings.extend((relative_path, line_number, pattern_name, snippet) for line_number, pattern_name, snippet in detail)
 
 if findings:
     finding_files = sorted({path for path, _, _, _ in findings})
@@ -1333,8 +1505,8 @@ for path in binary_files:
     print(f'       二进制：{shown_path(path)}')
 for path in irregular_files:
     print(f'       不是普通文件（工作区里删掉还没暂存的）：{shown_path(path)}')
-for path, error in unreadable_files:
-    print(f'       读不了（{errno.errorcode.get(error.errno, error.errno)}，补上读权限再跑才扫得到）：{shown_path(path)}')
+for path, error_number in unreadable_files:
+    print(f'       读不了（{errno.errorcode.get(error_number, error_number)}，补上读权限再跑才扫得到）：{shown_path(path)}')
 PY
 }
 
@@ -1348,38 +1520,6 @@ cell_clock_times() {
 
 cell_session_names() {
   scan_form session-names
-}
-
-cell_term_renames() {
-  if [[ "$text_notations_break" == term-renames-unjudged ]]; then
-    echo "  ! 弄坏开关 term-renames-unjudged：这一格不调 sweep-term，记本次无对象可判"
-    exit 77
-  fi
-  if [[ ! -f "$ROOT/.claude/kb/term-renames.md" ]]; then
-    echo "  ! 没有 .claude/kb/term-renames.md，这一格本次无对象可判"
-    exit 77
-  fi
-  local sweep_output sweep_status
-  private_value_sources
-  # sweep-term 逐份打的路径经 private-values 那一份打码再打（shown_lines_main 的 lines：带 / 的一段当路径，别的当行文）
-  if sweep_output="$(python3 "$SWEEP_TERM" --check "$ROOT" 2>&1)"; then sweep_status=0; else sweep_status=$?; fi
-  if [[ -n "$sweep_output" ]]; then
-    printf '%s\n' "$sweep_output" | python3 -c 'import sys, types; library = types.ModuleType("lib_private_values"); exec(compile(sys.argv[1], "private-values-library", "exec"), library.__dict__); library.shown_lines_main(sys.argv[2:], sys.stdin, sys.stdout)' \
-      "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" "$text_notations_break" lines
-  fi
-  if ((sweep_status == 0)); then
-    exit 0
-  fi
-  echo "  ✗ 登记过的术语改名，仓里还有地方用着旧名（上面逐份列出份数与处数），或排除表指向不存在的路径"
-  echo "     → 怎么办：python3 scripts/kb/sweep-term.py --apply 一次换完。"
-  echo "               产物分两类，别一把梭：**跑得出来的**（装置源码在树里、replay.sh 判 exact）跟着源码一起换，"
-  echo "               换完跑 cargo test --workspace 与 bash scripts/experiment-apparatus/replay.sh，同一份源码要仍然吐出逐字节相同的产物——"
-  echo "               那是重新生成，不是改证据；**跑不出来的**（已归档、要虚机或真设备、别人的产物）一个字节都不许动，"
-  echo "               连同引它的正文整段留旧名（evidence-discipline「原样保存的证据不许事后改」）。"
-  echo "               确实该留旧名的（别家术语、冻结证据目录、历史类文件里换了就成假话的那一句、引文块、对照表自己），"
-  echo "               登记进 .claude/term-rename-exempt 并写明为什么；历史类文件里只有一句该留的写 <路径>:「<那一行里的一段原文>」只豁免那一行，"
-  echo "               整份都该留的逐文件登记，不整个目录豁免；指向不存在路径、行内锚命中不是恰好一行的那一条改掉或删掉。"
-  exit 1
 }
 
 # date-once 红行里的路径经 private-values 那一份打码（shown_lines_main 的 path）
@@ -1398,7 +1538,7 @@ cell_date_once() {
   private_value_sources
   if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     base="$(gate_diff_base gate)"
-    changed="$(gate_changed_paths "$base" untracked)" || { echo "  ✗ 取不到这次改动碰了哪些路径（基准 ${base:-空}）"; echo "     → 怎么办：在 git 仓里跑；基准与路径的取法只在 scripts/gate/changed-paths.sh 里有一份，它报了什么先照它的输出处理。"; exit 1; }
+    changed="$(text_changed_paths "$base")" || { echo "  ✗ 取不到这次改动碰了哪些路径（基准 ${base:-空}）"; echo "     → 怎么办：在 git 仓里跑；基准与路径的取法只在 scripts/gate/changed-paths.sh 里有一份，它报了什么先照它的输出处理。"; exit 1; }
   else
     changed="$(find records .claude/kb -name '*.md' 2>/dev/null)"
   fi
@@ -1420,7 +1560,12 @@ PY
     echo "     → 怎么办：照上面的报错修 lib-trilingual.py 或 .claude/kb/translation-paths.json，再跑这一格；不退回只排除中文那三份。"
     exit 1
   fi
-  scratch="$(mktemp "${TMPDIR:-/tmp}/date-once.XXXXXX")"
+  scratch="$(mktemp -d "${TMPDIR:-/tmp}/date-once.XXXXXX")"
+  # 各份文件的干跑互不依赖：并行起（至多每台默认重活线程数那么多路同时在跑），输出与退出码各写各的文件，下面按原来的次序逐份收
+  local jobs index=0 selected_count
+  local -a selected=() pids=()
+  jobs="$(sed -n 's/^\([0-9][0-9]*\).*/\1/p' "$REPO_ROOT/.claude/heavy-thread-default" 2>/dev/null | head -n 1)"
+  [[ "$jobs" =~ ^[1-9][0-9]*$ ]] || jobs="$(nproc)"
   while IFS= read -r path; do
     [[ -n "$path" ]] || continue
     case "$path" in
@@ -1430,15 +1575,30 @@ PY
     esac
     [[ $'\n'"$excluded"$'\n' == *$'\n'"$path"$'\n'* ]] && continue
     [[ -f "$path" ]] || continue
+    selected+=("$path")
+  done <<<"$changed"
+  selected_count="${#selected[@]}"
+  for ((index = 0; index < selected_count; index++)); do
+    if ((index >= jobs)); then wait "${pids[index - jobs]}" || true; fi
+    (
+      rc=0
+      DOC_CONSOLIDATE_LEDGER=off python3 "$DOC_CONSOLIDATE" migrate "${selected[index]}" --out "$scratch/$index.migrated" --force > "$scratch/$index.out" 2>&1 || rc=$?
+      echo "$rc" > "$scratch/$index.rc"
+    ) &
+    pids+=("$!")
+  done
+  for ((index = 0; index < selected_count; index++)); do
+    path="${selected[index]}"
+    wait "${pids[index]}" || true
     count=$((count + 1))
     # 干跑的退出码要收：0 与 3（丢失核对找不到东西）才有那一行摘要；别的（5 认不出历史节、1 读不了那一份这类）是没判，不当干跑 0 处
-    rc=0
-    DOC_CONSOLIDATE_LEDGER=off python3 "$DOC_CONSOLIDATE" migrate "$path" --out "$scratch" --force > "$scratch.out" 2>&1 || rc=$?
-    summary="$(head -1 "$scratch.out")"
+    rc=1
+    [[ -f "$scratch/$index.rc" ]] && rc="$(<"$scratch/$index.rc")"
+    summary="$(head -1 "$scratch/$index.out" 2>/dev/null)"
     if ((rc != 0 && rc != 3)) && [[ "$text_notations_break" != date-once-exit-ignored ]]; then
       unjudged=$((unjudged + 1))
       shown="$(date_once_shown_path "$path")"
-      reason="$(grep -m1 -E '✗|Error' "$scratch.out" || true)"
+      reason="$(grep -m1 -E '✗|Error' "$scratch/$index.out" 2>/dev/null || true)"
       echo "  ✗ ${shown:-〔路径打码没打出来〕}：doc-consolidate.py 干跑退 $rc，这一份没判（${reason:0:200}）"   # gate-lint:detail
       continue
     fi
@@ -1449,8 +1609,8 @@ PY
       shown="$(date_once_shown_path "$path")"
       echo "  ✗ ${shown:-〔路径打码没打出来〕}：正文里重复所属日期 ${dates:-0} 处、同一天的第二个小节 ${merges:-0} 个"   # gate-lint:detail
     fi
-  done <<<"$changed"
-  rm -f "$scratch" "$scratch.out"
+  done
+  rm -rf "${scratch:?}"
   if ((unjudged)); then
     echo "  ✗ 这次改动碰到的 $count 份记录与 kb 页里 $unjudged 份干跑出错、没判（scripts/kb/doc-consolidate.py 退的不是 0 也不是 3）"   # gate-lint:summary
     echo "     → 怎么办：照上面每一份括号里的报错修：退 5 是认不出历史节（翻译术语表读不到，或没有中文列是「历史版本」的那一行，补那一行）；"
@@ -1499,7 +1659,7 @@ cell_trilingual_changed_together() {
     exit 77
   fi
   base="$(gate_diff_base gate)"
-  if ! changed="$(gate_changed_paths "$base" untracked)"; then
+  if ! changed="$(text_changed_paths "$base")"; then
     echo "  ✗ 取不到这次改动碰了哪些路径（基准 ${base:-空}）"   # gate-lint:summary
     echo "     → 怎么办：在 git 仓里跑；基准与路径的取法只在 scripts/gate/changed-paths.sh 里有一份，它报了什么先照它的输出处理。"
     exit 1
@@ -1551,20 +1711,19 @@ cell_private_values() {
     exit 77
   fi
   base="$(gate_diff_base gate)"
-  changed="$(gate_changed_paths "$base" untracked)" || { echo "  ✗ 取不到这一轮碰了哪些文件（基准 $base）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
+  changed="$(text_changed_paths "$base")" || { echo "  ✗ 取不到这一轮碰了哪些文件（基准 $base）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
   changed_file="$(mktemp "${TMPDIR:-/tmp}/private-values.XXXXXX")" || { echo "  ✗ 建不了放改动文件清单的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
   printf '%s\n' "$changed" > "$changed_file"
-  python3 - "$base" "$configuration_file" "$hostname_file" "$changed_file" "$text_notations_break" "$size_limit_file" "$PRIVATE_VALUES_LIBRARY" <<'PY' || python_rc=$?
-import errno, io, os, re, subprocess, sys, types
+  python3 - "$base" "$configuration_file" "$hostname_file" "$changed_file" "$text_notations_break" "$size_limit_file" "$PRIVATE_VALUES_LIBRARY" "$text_diff_cache" <<'PY' || python_rc=$?
+import errno, os, re, subprocess, sys, types
 
-base, configuration_path, hostname_path, changed_path, broken, size_limit_path, private_values_source = sys.argv[1:8]
+base, configuration_path, hostname_path, changed_path, broken, size_limit_path, private_values_source, diff_cache_path = sys.argv[1:9]
 private_values = types.ModuleType("lib_private_values")      # 取词与路径打码的共用函数（doc-text.sh 的 PRIVATE_VALUES_LIBRARY；prime-marks / clock-times / session-names 三格打路径时用同一份）
 exec(compile(private_values_source, "private-values-library", "exec"), private_values.__dict__)
 HOSTNAME_KEY = private_values.HOSTNAME_KEY
 FILE_NAME_MASK = private_values.FILE_NAME_MASK
 HEAD_BYTES = 8192                           # 前 8 KiB 里有 NUL 的文件按二进制整份跳过
 TRUNCATED_BYTES = 8 * 1024 * 1024           # 只有弄坏开关 private-values-big-file-truncated 才用：未跟踪文件只读前 8 MiB
-HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
 def fail(what, howto):
@@ -1606,26 +1765,8 @@ def shown_path(path):
     return private_values.shown_path(path, targets, broken)
 
 
-def added_lines(path, tracked_diff):
-    """这份文件新加的 (行号, 行文)：已跟踪的取 git diff -U0 的新加行；未跟踪的整份逐行读（不整份进内存）。"""
-    if tracked_diff:
-        difference = git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", base, "--", path)
-        if difference.returncode != 0:
-            fail(f"取不到 {shown_path(path)} 相对基准 {base[:12]} 的改动（git diff 退 {difference.returncode}）", "看基准提交在不在、git 是不是可用；改动范围的基准只经 scripts/gate/changed-paths.sh 的 gate_diff_base 取。")
-        number, in_hunk = 0, False
-        for line in difference.stdout.decode("utf-8", "replace").split("\n"):
-            found = HUNK.match(line)
-            if found:
-                number, in_hunk = int(found.group(1)), True
-            elif in_hunk and line.startswith("+"):
-                yield number, line[1:]
-                number += 1
-        return
-    with open(path, "rb") as handle:
-        source = io.BytesIO(handle.read(TRUNCATED_BYTES)) if broken == "private-values-big-file-truncated" else handle
-        for number, raw in enumerate(source, 1):
-            yield number, raw.decode("utf-8", "replace").rstrip("\n")
-
+diff_segments = private_values.load_diff_segments(diff_cache_path, base, broken)   # 阶段预取的整份 diff 按文件切开；没预取到的文件 added_lines 退回逐份 git diff
+whole_file_limit = TRUNCATED_BYTES if broken == "private-values-big-file-truncated" else None
 
 findings = []             # (路径, 行号, 键名列表, 词)
 name_findings = []        # (路径, 键名列表)：文件名本身含私有值
@@ -1666,7 +1807,7 @@ for path in changed_paths:
             too_big.append((path, size))
             continue
         files_judged += 1
-        for number, text in added_lines(path, tracked_diff=not whole_file):
+        for number, text in private_values.added_lines(path, whole_file, base, git, fail, shown_path, diff_segments, whole_file_limit):
             lines_judged += 1
             keys = sorted({key for key, word in targets if word in text})
             if keys:
@@ -1734,13 +1875,13 @@ cell_account_quota() {
     exit 77
   fi
   base="$(gate_diff_base gate)"
-  changed="$(gate_changed_paths "$base" untracked)" || { echo "  ✗ 取不到这一轮碰了哪些文件（基准 ${base:-空}）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
+  changed="$(text_changed_paths "$base")" || { echo "  ✗ 取不到这一轮碰了哪些文件（基准 ${base:-空}）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
   changed_file="$(mktemp "${TMPDIR:-/tmp}/account-quota.XXXXXX")" || { echo "  ✗ 建不了放改动文件清单的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
   printf '%s\n' "$changed" > "$changed_file"
-  python3 - "$base" "$changed_file" "$text_notations_break" "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" <<'PY' || python_rc=$?
+  python3 - "$base" "$changed_file" "$text_notations_break" "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" "$text_diff_cache" <<'PY' || python_rc=$?
 import errno, os, re, subprocess, sys, types
 
-base, changed_path, broken, private_values_source, configuration_path, hostname_path = sys.argv[1:7]
+base, changed_path, broken, private_values_source, configuration_path, hostname_path, diff_cache_path = sys.argv[1:8]
 private_values = types.ModuleType("lib_private_values")      # 路径与片段打码的共用函数（doc-text.sh 的 PRIVATE_VALUES_LIBRARY，与别的格同一份）
 exec(compile(private_values_source, "private-values-library", "exec"), private_values.__dict__)
 masking_targets = []
@@ -1749,7 +1890,6 @@ if configuration_path:
         masking_targets = private_values.load_private_targets(configuration_path, hostname_path, broken)[0]
     except OSError:
         masking_targets = []
-HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 HEAD_BYTES = 8192
 
 # ── 词表（唯一一处）：逐条写明拦什么 ──
@@ -1850,24 +1990,7 @@ untracked = {name for name in untracked_listing.stdout.decode("utf-8", "replace"
 changed_paths = [name for name in open(changed_path, encoding="utf-8").read().split("\n") if name]
 
 
-def added_lines(path, whole_file):
-    """这份文件新加的 (行号, 行文)：已跟踪的取 git diff -U0 的新加行；未跟踪的整份逐行读（新文件整份都算新加）。"""
-    if not whole_file:
-        difference = git("diff", "-U0", "--no-color", "--no-ext-diff", "--no-renames", base, "--", path)
-        if difference.returncode != 0:
-            fail(f"取不到 {shown_path(path)} 相对基准 {base[:12]} 的改动（git diff 退 {difference.returncode}）", "看基准提交在不在、git 是不是可用；改动范围的基准只经 scripts/gate/changed-paths.sh 的 gate_diff_base 取。")
-        number, in_hunk = 0, False
-        for line in difference.stdout.decode("utf-8", "replace").split("\n"):
-            found = HUNK.match(line)
-            if found:
-                number, in_hunk = int(found.group(1)), True
-            elif in_hunk and line.startswith("+"):
-                yield number, line[1:]
-                number += 1
-        return
-    with open(path, "rb") as handle:
-        for number, raw in enumerate(handle, 1):
-            yield number, raw.decode("utf-8", "replace").rstrip("\n")
+diff_segments = private_values.load_diff_segments(diff_cache_path, base, broken)   # 阶段预取的整份 diff 按文件切开；没预取到的文件 added_lines 退回逐份 git diff
 
 
 def judge(line):
@@ -1906,7 +2029,7 @@ for path in changed_paths:
             continue
         files_judged += 1
         whole_file = path in untracked or broken == "account-quota-whole-tree"
-        for number, text in added_lines(path, whole_file):
+        for number, text in private_values.added_lines(path, whole_file, base, git, fail, shown_path, diff_segments):
             lines_judged += 1
             marker_state, hit = judge(text)
             if marker_state == "reasonless":
@@ -1977,15 +2100,15 @@ cell_out_of_project_names() {
   changed_file="$(mktemp "${TMPDIR:-/tmp}/out-of-project-names.XXXXXX")" || { echo "  ✗ 建不了放改动文件清单的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
   if (( ! out_of_project_all_lines )); then
     base="$(gate_diff_base gate)"
-    changed="$(gate_changed_paths "$base" untracked)" || { rm -f "$changed_file"; echo "  ✗ 取不到这一轮碰了哪些文件（基准 ${base:-空}）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
+    changed="$(text_changed_paths "$base")" || { rm -f "$changed_file"; echo "  ✗ 取不到这一轮碰了哪些文件（基准 ${base:-空}）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
     printf '%s\n' "$changed" > "$changed_file"
   fi
   python3 - "$base" "$changed_file" "$text_notations_break" "$PRIVATE_VALUES_LIBRARY" "$PRIVATE_CONFIGURATION_FILE" "$PRIVATE_HOSTNAME_FILE" \
-    "$PRIVATE_IN_SAMPLE" "$out_of_project_all_lines" "${GATE_NOT_RUN_FILE:-}" "${GATE_OUT_OF_PROJECT_PARENT:-}" "$main_root" <<'PY' || python_rc=$?
+    "$PRIVATE_IN_SAMPLE" "$out_of_project_all_lines" "${GATE_NOT_RUN_FILE:-}" "${GATE_OUT_OF_PROJECT_PARENT:-}" "$main_root" "$text_diff_cache" <<'PY' || python_rc=$?
 import errno, os, re, subprocess, sys, types
 
 (base, changed_path, broken, private_values_source, configuration_path, hostname_path,
- in_sample, all_lines, not_run_file, parent_override, main_root) = sys.argv[1:12]
+ in_sample, all_lines, not_run_file, parent_override, main_root, diff_cache_path) = sys.argv[1:13]
 in_sample, all_lines = in_sample == "1", all_lines == "1"
 private_values = types.ModuleType("lib_private_values")      # 读改动的新加行与路径打码的共用函数（doc-text.sh 的 PRIVATE_VALUES_LIBRARY，与别的格同一份）
 exec(compile(private_values_source, "private-values-library", "exec"), private_values.__dict__)
@@ -2368,11 +2491,12 @@ untracked = {name for name in untracked_listing.stdout.decode("utf-8", "replace"
 if all_lines:
     tracked_listing = git("ls-files", "-z")
     if tracked_listing.returncode != 0:
-        fail("列不出 git 跟踪的文件", "看 git 是不是可用；--all-lines 逐行判的是 git ls-files 列出的每一份。")
+        fail("列不出 git 跟踪的文件", "看 git 是不是可用；--all-lines 逐行判的是 git ls-files 列出的每一份。")  # change-range:exempt 出路文字点名逐行判的文件从哪条命令列出，这一行不跑 git
     judged_paths = [name for name in tracked_listing.stdout.decode("utf-8", "replace").split("\0") if name]
 else:
     judged_paths = [name for name in open(changed_path, encoding="utf-8").read().split("\n") if name]
 
+diff_segments = private_values.load_diff_segments(diff_cache_path, base, broken)   # 阶段预取的整份 diff 按文件切开；没预取到的文件 added_lines 退回逐份 git diff
 findings, per_file, unreadable = [], {}, []     # (路径, 行号, 命中) / 路径 → 处数 / (路径, 错误)
 files_judged, lines_judged, allowed_total, binary_files, links_skipped = 0, 0, 0, [], 0
 for path in judged_paths:
@@ -2397,7 +2521,7 @@ for path in judged_paths:
                 per_file[path] = len({(start, end) for start, end, _context, _name in hits})
             continue
         whole_file = path in untracked or broken == "out-of-project-names-whole-file"
-        for number, line in private_values.added_lines(path, whole_file, base, git, fail, shown_path):
+        for number, line in private_values.added_lines(path, whole_file, base, git, fail, shown_path, diff_segments):
             lines_judged += 1
             hits, allowed = judge(line)
             allowed_total += allowed
@@ -2475,7 +2599,7 @@ cell_utf8_valid() {
     exit 77
   fi
   base="$(gate_diff_base gate)"
-  changed="$(gate_changed_paths "$base" untracked)" || { echo "  ✗ 取不到这一轮碰了哪些文件（基准 $base）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
+  changed="$(text_changed_paths "$base")" || { echo "  ✗ 取不到这一轮碰了哪些文件（基准 $base）"; echo "     → 怎么办：看 git 是不是可用、基准提交在不在；改动范围只经 scripts/gate/changed-paths.sh 取。"; exit 1; }
   changed_file="$(mktemp "${TMPDIR:-/tmp}/utf8-valid.XXXXXX")" || { echo "  ✗ 建不了放改动文件清单的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
   printf '%s\n' "$changed" > "$changed_file"
   python_output="$(python3 - "$changed_file" "$utf8_break" "$base" <<'PY'
@@ -2787,7 +2911,7 @@ if findings:
         print(f"      {shown_path(path)}:{number}  {form_name}  …{shown_snippet(line, start - 10, end + 24)}…")   # gate-lint:detail
     if len(findings) > LISTED_FINDINGS:
         print(f"      （另有 {len(findings) - LISTED_FINDINGS} 行没列出）")   # gate-lint:detail
-    print("     → 怎么办：删掉日期，把那一句的事实现查一次（verify-before-claiming.md）改成现值；那一天的样子要留就写进「## 历史版本」（只有登记在 .claude/history-carriers 的文件有这一节），")
+    print("     → 怎么办：删掉日期，把那一句的事实现查一次（evidence-discipline.md）改成现值；那一天的样子要留就写进「## 历史版本」（只有登记在 .claude/history-carriers 的文件有这一节），")
     print("               没登记的文件不留历史，经过靠 git。规则：.claude/singlefs-ai-sop/rules/kb-discipline.md「带日期的现状快照也是历史，会停在那一天」。")
 if table_problems:
     failed = True
@@ -2831,4 +2955,48 @@ cell_comment_history() {
   exit "$python_rc"
 }
 
+# text_changed_paths <基准>：交 gate_changed_paths <基准> untracked 的结果。下面「预取」一段在父进程里取过同一个基准的，直接给取好的（各格各取一遍要起两条 git diff --name-only）；没取过的现取。
+# 取不到的退 1，各格照旧各自判红。弄坏开关 changed-paths-prefetch-empty：预取过的一律交空表。
+text_changed_paths() {
+  if [[ -n "$text_prefetched_base" && "$1" == "$text_prefetched_base" ]]; then
+    ((text_prefetched_status == 0)) || return 1
+    [[ "$text_notations_break" == changed-paths-prefetch-empty ]] && return 0
+    [[ -z "$text_prefetched_changed" ]] || printf '%s\n' "$text_prefetched_changed"
+    return 0
+  fi
+  gate_changed_paths "$1" untracked || return 1
+}
+
+# ── 预取：改动范围与整份 diff 在父进程里按选中的格取一次 ──
+# 用改动范围的六格（date-once、trilingual-changed-together、private-values、account-quota、out-of-project-names、utf8-valid）共用同一份改动路径；
+# 读新加行的三格（private-values、account-quota、out-of-project-names）另共用一份整份 git diff -U0（预取文件第一行是基准，其余是 diff；各格切出自己那份文件的一段，切不出的文件退回逐份 git diff）。
+# 取不到的不在这里判红：状态留在 text_prefetched_status 与空的 text_diff_cache 里，用它的格照样拿到失败或退回逐份取，各自判红、各报各的出路。
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  text_prefetch_changed=0 text_prefetch_diff=0
+  for text_prefetch_cell in "${STAGE_CELLS_SELECTED[@]}"; do
+    case "$text_prefetch_cell" in
+      date-once|trilingual-changed-together|private-values|account-quota|out-of-project-names|utf8-valid) text_prefetch_changed=1 ;;
+    esac
+    case "$text_prefetch_cell" in
+      private-values|account-quota|out-of-project-names) text_prefetch_diff=1 ;;
+    esac
+  done
+  if ((text_prefetch_changed)); then
+    text_prefetched_base="$(gate_diff_base gate)"
+    if text_prefetched_changed="$(gate_changed_paths "$text_prefetched_base" untracked)"; then text_prefetched_status=0; else text_prefetched_status=1; fi
+  fi
+  if ((text_prefetch_diff && text_prefetched_status == 0 && ! out_of_project_all_lines)) && [[ -n "$text_prefetched_base" ]]; then
+    if text_diff_cache="$(mktemp "${TMPDIR:-/tmp}/text-diff-cache.XXXXXX")"; then
+      trap 'rm -f "$text_diff_cache"' EXIT
+      if ! { printf '%s\n' "$text_prefetched_base"; git -c core.quotepath=false diff -U0 --no-color --no-ext-diff --no-renames --src-prefix=a/ --dst-prefix=b/ "$text_prefetched_base"; } > "$text_diff_cache"; then
+        rm -f "$text_diff_cache"; text_diff_cache=""
+      fi
+    else
+      text_diff_cache=""
+    fi
+  fi
+fi
+
+# 这一道的格互不依赖、都只读被判的树：并行跑（.claude/gate.d/lib/stage-cells.sh 文件头「格并行」）
+# 这一道的格不并行（不设 STAGE_CELLS_JOBS 的缺省）：读新增行的那几格各自把整份 diff 装进内存，17 格同时起时内存按格数叠加。
 stage_cells_run "$ROOT"

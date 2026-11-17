@@ -7,10 +7,12 @@
 认的子命令（别的退 101）：
   cargo -V | --version                 打一行版本
   cargo build [--release]              每个包的源码里有 SAMPLE_BUILD_ERROR 的退 101（打 error: 行），否则打 Finished 退 0
-  cargo test [--release] [--all-features] [--bin <名>] [--no-fail-fast] [-p 包] [-- [--exact] [--skip <名>…] [--test-threads <n>] [<名>…]]
+  cargo test [--release] [--all-features] [-p 包] [--lib] [--bin <名>]… [--test <名>]… [--doc] [--no-run] [--no-fail-fast] [-- [--exact] [--skip <名>…] [--test-threads <n>] [<名>…]]
         每个包按 cargo 的次序：lib 的单测、Cargo.toml 的 [[bin]] 写了 path 的、src/bin 的单测、tests/ 下各集成测试、Doc-tests（带 lib 且 [lib] doctest 不是 false 的包才有）；打 libtest 形态的输出（Running 行的源文件路径相对包根、成员包也写 src/lib.rs，running N tests、
         test <全名> ... ok|FAILED、failures: 名单、test result 汇总行）。没有 --no-fail-fast 时一个二进制红了，后面的不跑（打 error: test failed）。
-        --exact 按全名相等、不带按子串：--skip 点名的跳过，位置参数里给了名字的只留对得上的。--bin <名> 只跑那一个 [[bin]]（不跑 lib、集成测试与 Doc-tests）。
+        --exact 按全名相等、不带按子串：--skip 点名的跳过，位置参数里给了名字的只留对得上的。
+        选目标的参数（--lib、--bin <名>、--test <名>、--doc，可给几个）一个都没给是全部目标；给了只跑点名的那几样（--doc 是 Doc-tests）。-p <包> 只跑那一个包。
+        --no-run 只编：[[bin]] 照下面先判编不编得过，编得过退 0、一条测试都不跑。
         [[bin]] 编不过的两种（样本里变异表的替换文造的）：先于一切测试，打 error 退 101：用了以 missing_ 起头的名字（error[E0425]: cannot find value `…` in this scope）；
         Cargo.toml 的 [lints.rust] 写了 warnings = "deny" 而收到的 RUSTFLAGS / CARGO_ENCODED_RUSTFLAGS 里没有 --cap-lints，源码里有没人调用的函数（error: function `…` is never used；main 与紧跟在 #[test] 后面的函数不算）。
 
@@ -206,14 +208,31 @@ def compile_problems(manifest, source):
     return problems
 
 
+def target_selection(before):
+    """-- 之前选目标的参数 → (-p 点名的包或 None, {"lib": 给没给, "doc": 给没给, "bin": 点名的集合, "test": 点名的集合})；四样都空是全部目标。"""
+    selection = {"lib": "--lib" in before, "doc": "--doc" in before, "bin": set(), "test": set()}
+    package = None
+    for index, word in enumerate(before[:-1]):
+        if word in ("--bin", "--test"):
+            selection[word[2:]].add(before[index + 1])
+        elif word == "-p":
+            package = before[index + 1]
+    return package, selection
+
+
 def command_test(arguments):
     no_fail_fast = "--no-fail-fast" in arguments
     before = arguments[:arguments.index("--")] if "--" in arguments else arguments
     after = arguments[arguments.index("--") + 1:] if "--" in arguments else []
-    only_bin = before[before.index("--bin") + 1] if "--bin" in before[:-1] else None
+    only_package, selection = target_selection(before)
+    everything = not (selection["lib"] or selection["doc"] or selection["bin"] or selection["test"])
+    chosen = lambda kind, target_name=None: everything or (selection[kind] if target_name is None else target_name in selection[kind])
+    no_run = "--no-run" in before
     exact, skipped, filters = libtest_arguments(after)
     exit_code = 0
     for name, directory in packages():
+        if only_package is not None and name != only_package:
+            continue
         functions = {}
         for path in source_files(directory):
             functions.update(parse_functions(open(path, encoding="utf-8").read()))
@@ -221,13 +240,13 @@ def command_test(arguments):
         # cargo 打的源文件路径相对这个包的根（成员包也写 src/lib.rs，不带成员目录）；门禁靠它对上计划里的目标根文件
         package_relative = lambda path: os.path.relpath(path, directory)
         lib = os.path.join(directory, "src", "lib.rs")
-        if os.path.isfile(lib) and only_bin is None:
+        if os.path.isfile(lib) and chosen("lib"):
             targets.append((f"unittests {package_relative(lib)} (target/release/deps/{name.replace('-', '_')}-0000000000000000)", discover_tests(lib), "--lib"))
         # Cargo.toml 的 [[bin]] 写了 path 的（不在 src/bin 底下的）：先照编，编不过打 error 退 101，一条测试都不跑（照真 cargo 先编再跑）
         manifest = read_manifest(directory)
         for entry in manifest.get("bin", []):
             path = os.path.join(directory, entry.get("path", ""))
-            if not entry.get("path") or not os.path.isfile(path) or (only_bin is not None and entry.get("name") != only_bin):
+            if not entry.get("path") or not os.path.isfile(path) or not chosen("bin", entry.get("name")):
                 continue
             problems = compile_problems(manifest, path)
             if problems:
@@ -238,17 +257,19 @@ def command_test(arguments):
             bin_name = entry.get("name", "bin")
             targets.append((f"unittests {package_relative(path)} (target/release/deps/{bin_name.replace('-', '_')}-0000000000000000)", discover_tests(path), f"--bin {bin_name}"))
         bin_directory = os.path.join(directory, "src", "bin")
-        if os.path.isdir(bin_directory) and only_bin is None:
+        if os.path.isdir(bin_directory):
             for bin_name in sorted(os.listdir(bin_directory)):
-                if bin_name.endswith(".rs"):
+                if bin_name.endswith(".rs") and chosen("bin", bin_name[:-3]):
                     path = os.path.join(bin_directory, bin_name)
                     targets.append((f"unittests {package_relative(path)} (target/release/deps/{bin_name[:-3]}-0000000000000000)", discover_tests(path), f"--bin {bin_name[:-3]}"))
         tests_directory = os.path.join(directory, "tests")
-        if os.path.isdir(tests_directory) and only_bin is None:
+        if os.path.isdir(tests_directory):
             for test_name in sorted(os.listdir(tests_directory)):
-                if test_name.endswith(".rs"):
+                if test_name.endswith(".rs") and chosen("test", test_name[:-3]):
                     path = os.path.join(tests_directory, test_name)
                     targets.append((f"{package_relative(path)} (target/release/deps/{test_name[:-3]}-0000000000000000)", discover_tests(path), f"--test {test_name[:-3]}"))
+        if no_run:
+            continue
         for label, tests, rerun in targets:
             if not tests:
                 continue
@@ -261,7 +282,7 @@ def command_test(arguments):
                     return exit_code
         # Doc-tests 只有带 lib 目标、且 [lib] doctest 没写 false 的包才有（样本的小包都写了 doctest = false，批次数定成测试二进制的个数）
         has_doc_tests = os.path.isfile(lib) and (manifest.get("lib") or {}).get("doctest", True)
-        if only_bin is None and has_doc_tests:
+        if chosen("doc") and has_doc_tests:
             sys.stdout.write(f"   Doc-tests {name.replace('-', '_')}\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n")
     return exit_code
 

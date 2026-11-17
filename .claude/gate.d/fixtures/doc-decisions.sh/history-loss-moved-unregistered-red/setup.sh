@@ -16,7 +16,7 @@ cat > .claude/kb/decisions-history.md <<'X'
 
 - 已定项 1 定案：节点 32 KiB
   - **改前**：`git show 31e47115:tools/old-rig/run.sh` 里是 16 KiB，产物 `e5-sample.out`。
-  - **依据**：`tools/old-rig/run.sh` 的产物 `e5-sample.out` 量到 1.7 倍。
+  - **依据**：`tools/old-rig/run.sh` 的产物 `e5-sample.out` 量到 1.7 倍，RESULT name=speedup value=1.7。
 
 ## 历史版本
 X

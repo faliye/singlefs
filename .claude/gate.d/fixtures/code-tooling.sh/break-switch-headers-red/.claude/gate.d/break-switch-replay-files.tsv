@@ -1,0 +1,3 @@
+# 样本复跑登记表：两份都在 scripts/ 与 .claude/hooks/ 之外
+task-server/same-depth-items.py	60	# 样本：点名行与开关行一样深
+task-server/registered-exempt.py	60	# 样本：也登在豁免表里

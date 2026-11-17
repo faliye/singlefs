@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：code-round-checklist
+want=✓ 代码轮正文的检查单 8 格都点名并写了答案（检查了 1 份，其中标题没有日期、照要查的算的 0 份）
+want=没查 1 份（标题日期早于 2026-11-07，规范落地之前写的）：research/prompts/_c989-code-r1-body.md（2026-10-01）
+want=code-round-checklist：绿

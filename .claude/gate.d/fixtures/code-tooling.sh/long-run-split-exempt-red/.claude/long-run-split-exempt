@@ -1,0 +1,12 @@
+# 样本：豁免表的行写错的各种样子（一行：项名  # 理由，理由里带 records 出处）
+no-separator-item
+short-reason-item  # 太短了
+no-citation-item  # 用户点名这一项不拆但没有写出处
+missing-file-item  # 用户点名 records/absent.md:3
+beyond-line-item  # 用户点名 records/said.md:99
+duplicated-item  # 用户点名 records/said.md:2
+duplicated-item  # 用户又点名 records/said.md:3
+scripts/  # 用户点名 records/said.md:1
+records  # 用户点名 records/said.md:1
+sample-gate.sh  # 用户点名 records/said.md:4
+good-item  # 用户点名 records/said.md:5

@@ -1,0 +1,4 @@
+exit=0
+want=查了 .claude/gate.d/ 下 4 份：没有阶段自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false，调共用取法都判了退出码；python 的文档串与自证函数体（名字带 selftest）不判
+want=行内豁免 2 行（行尾 # change-range:exempt 写了理由）：.claude/gate.d/52-样本报错里点名子命令.py:13（报错里点名失败的是哪条子命令，这一行不跑 git）
+want=.claude/gate.d/53-样本内嵌python的出路文字.sh:8（出路文字点名文件从哪条命令列出，这一行不跑 git）

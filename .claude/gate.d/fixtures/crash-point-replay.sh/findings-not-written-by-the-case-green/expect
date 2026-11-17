@@ -1,0 +1,8 @@
+exit=3
+want=样本档：
+want=这条用例登记了 findings=not-written-by-the-case
+want=✓ crash-case:plain-stream 判绿（
+want=第 1 节（stream=other-stream states=25）：signatures=0 red_states=0 states=25
+want=✓ crash-case:other-stream 判绿（
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

@@ -1,0 +1,3 @@
+# 样本登记表
+scripts/gate/flaky.sh	selftest	# 样本：自证只睡几秒，只在样本树里读写几份小文件
+scripts/gate/steady.sh	selftest	# 样本：自证只睡几秒，只在样本树里读写几份小文件

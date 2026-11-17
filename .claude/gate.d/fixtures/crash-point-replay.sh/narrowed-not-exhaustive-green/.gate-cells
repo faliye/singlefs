@@ -1,0 +1,2 @@
+# 调用方环境里设了 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=5（.crash-point-replay-sample-tools/caller-environment）：登记了 exhaustive= 的计数行 exhaustive=false 不判、判绿，成功句写缩过域、不算门禁通过；样本档判绿退 3（expect 里写了按设计不绿的理由）， 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

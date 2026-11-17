@@ -1,0 +1,2 @@
+# 没有分片阶段自己走计划、单片、合并三步，标记目录里的假 python3 数 admission.py test-plan 起了几遍（计划一遍、单片不起、合并一遍），样本档判绿退 3（expect 里写了按设计不绿的理由），判的是崩溃枚举用例那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

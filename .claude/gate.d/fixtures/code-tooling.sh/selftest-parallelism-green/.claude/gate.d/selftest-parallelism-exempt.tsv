@@ -1,0 +1,2 @@
+# 样本排除表：一行指向还没达标的那一份
+scripts/gate/legacy.py  # 存量待改

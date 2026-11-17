@@ -1,0 +1,4 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：两条都读 scripts/gate/sample-table.tsv（进两条的键），改表的那一条读完往表末尾加一行，
+# 收尾记库时两条都「跑的过程中键变了」；样本根的 .unit-verdict-sample/record-skip-lines-shown 写 1：转一行「!」、另一条报「另有 1 条」
+python3 scripts/gate/sample-rewrites-table.py --selftest
+python3 scripts/gate/sample-reads-table.py --selftest

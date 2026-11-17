@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
+# task-server-shards: *
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要 cargo：缺了就在单测那一格判红、复跑那一格由它调的 scripts/experiment-apparatus/replay.sh 编实验二进制时判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
-# task-server-gpu-arguments: *   experiment-replay 格起 replay.sh，含点到 CHECKER_TIER_FEATURES 的行，由服务在最外层清场、分卡（task-server/task_server_lib.py 文件头「GPU」）
+# 显卡（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：卡只归 GPU 批处理验证服务，这一道不领卡、不挑卡、不清场，文件头不写要卡的声明；
+#   环境里有 GPU_CARDS_BY_PRIORITY 就原样留给各格起的 cargo test、replay.sh 与 mutate.sh，没有照起（文件头 research-unit-tests 那一段「显卡」）。
+#   replay.sh 跑要卡的行、mutate.sh 跑上卡的表时怎么办，照它们各自的文件头。
+# task-server-compiles: yes
 # gate-stage: research 工作区的构建与单测；入库的实验数今天还复现得出来吗
 # gate-fixture: yes
 # gate-category: checker-tier 类
@@ -42,6 +46,9 @@
 #                        随后在同一格里另起一趟单线程跑这几条：cargo test --release --all-features --no-fail-fast -- [--exact] <名…> --test-threads=1，红判红；
 #                        登记名在那一趟的输出里没有「test … ok」行（那一趟没起或没跑到）也判红。第一趟的输出里找 ^test .*<函数名> ... 行：登记的名字出现了判红（登记了却跑了：--skip 没生效）。
 #                        这几条每趟都量，不记进判定库；成功句报「挂钟断言 K 条在单线程那一趟跑了」。登记位写坏时判法 --list 退 1，这一格不数、不传 --skip、不起那一趟，那一错归 wallclock-asserts-registered 格。
+#                        显卡（文件头「显卡」）：这一格不领卡、不挑卡、不清场，第一趟与挂钟断言单线程那一趟都照整个工作区起；环境里有 GPU_CARDS_BY_PRIORITY 就原样留给
+#                        这两趟 cargo test、打一行是哪一串，没有打一行、照起。起真卡的单测（required-features 点到 scripts/mutation/mutate.sh 的 CARD_FEATURES 里的特性，
+#                        今天是 e163-gpu）拿不到卡就打 NOT_RUN_NO_GPU_ADAPTER，照下面 NOT_RUN 那一条判红。
 #   wallclock-asserts-registered  python3 scripts/gate/wallclock-assert-lint.py：scripts/experiment-apparatus/*.rs 的 #[test] 里按挂钟判的断言要带 // wallclock-assert: 登记位
 #                        （或怕不着负载的 // wallclock-assert-load-safe:），缺了判红、点名文件:行号；带了而断言里没有挂钟量也判红；登记名是别的未登记测试名的子串
 #                        （--skip 是子串匹配，会连那一条一起跳过）也判红。判法、登记位写法在判法脚本文件头；
@@ -50,7 +57,7 @@
 #                        replay.sh 退 77（C350：整趟全是计时行的负载关，本次不判）不当红：这一格报「复跑整趟本次不判（负载高）」、往 $GATE_NOT_RUN_FILE 报一行、退 77；
 #                        退 75（它的判定库在 prune-server 里，服务不可用）不当红也不当绿：这一格报「复跑没判：prune-server 不可用」、退 75（整道由 stage-cells 汇总成 75）；
 #                        别的退出码照旧（非 0 判红）。
-#                        不指定范围时派给 scripts/experiment-apparatus/replay.sh 的是表里的全部行（exact 与 timing 都派，timing 行照 replay.sh 自己的判法：负载关等写在它文件头）。
+#                        不指定范围时派给 scripts/experiment-apparatus/replay.sh 的是表里的全部 exact 行（逐行 --item 点名）；timing 行要机器空闲才量得准，有执行条件，不进门禁，成功前逐个列出。
 #                        对不上不一定是代码坏了，也可能是产物该更新，两种都要人判，所以判红。
 #                        replay.sh 按行复用（它文件头「按行复用」：每一行的行键是装置入口的单元闭包、参数、GPU 开关与特性集、期望产物内容、工具链、
 #                        解析出的依赖版本，算法在 scripts/gate/admission.py 文件头「复跑表每一行的行键」；键相同、判过的那一行不跑，全部行都复用的一趟不起编译、不清场）：
@@ -72,7 +79,24 @@
 #                        （自己用完自己删，不跨轮复用）。
 #                        挂了 required-features 的 bin 由 mutate.sh 带上 --features；E162 的 rocksdb 要的 BINDGEN_EXTRA_CLANG_ARGS 没设时取
 #                        scripts/crash/crash-amplification-lib.sh 的 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS（与 门禁 crash-point-replay 带特性那一趟同一处）。
+#                        bin 是上卡的目标的表（今天 e163_gpu_multicard_crc32c.tsv）照 mutate.sh 文件头「上卡的表」跑；这一道不领卡，环境里有 GPU_CARDS_BY_PRIORITY 照原样留给它。
 # 格结构经 lib/stage-cells.sh。
+# 分片（task-server/task_server_lib.py 文件头「分片」；文件头第二行「# task-server-shards: *」让服务把经它交的每一种跑法——不带参数、--check、--item——拆成计划、各片、合并）：
+#   这一道照环境里的 TASK_SERVER_SHARD_PHASE 只做其中一步；这几个 TASK_SERVER_SHARD_* 变量读完就从环境里清掉。认不出的一步退 2。
+#   件是复跑表里有 exact 行的每个实验号（experiment-replay 格；只有 timing 行的实验不进门禁、不成件；点了 --item 只算点名的）与 scripts/mutation/tables/ 下的每张表
+#   （mutation-tables 格），只算这一趟选到的格。
+#   plan   参数照常认；带 --list 的写 0 片。件按次序轮流分到 N 片，N = min(件数, 服务交的 TASK_SERVER_SHARD_MAXIMUM)（不是正整数退 2）；一件都没有写 0 片。
+#          往计划目录写 plan.json、shards（片数一行）与 items-<片号>（一行「experiment<TAB><实验号>」或「mutation-table<TAB><表文件名>」）。不编、不跑。
+#   shard  只跑归这一片的件：experiment-replay 格照 --item 那一路只复跑这几个实验，mutation-tables 格只判这几张表；判的都经 replay.sh 与 mutate.sh 写进 prune-server 那一份库。
+#          research-unit-tests 与 wallclock-asserts-registered 两格不在片里跑。有红退 1（兄弟片照跑到底，都收齐了服务记红、不起合并）。
+#          各片的工作进程数归 replay.sh 与 mutate.sh 自己（它们文件头的并行一段），这一道不另给。
+#   merge  与不经服务分片起的那一趟（gate.sh 整轮、--staged）同一路，叫核账：四格照常跑；experiment-replay 格先照此刻的行键比库（admission.py replay-row-inputs，
+#          GPU 开关照多机配置 ENABLE_GPU），点到的行里有键对不上的就判红、不起 replay.sh（行键拒算的照跑）；mutation-tables 格每张表跑完数 mutate.sh 逐条写的
+#          「现判：[<名>] <原因>」，除去复用哨兵抽中的「强制现判」还有现判的条就判红（各片判过的按此刻的键在服务里读不到）。
+#          服务交的 TASK_SERVER_SHARD_MISSING 不空（人手取消了一片）：一格都不判，退 77、点名缺的片。
+#   样本根（被判的根不是这道阶段所在的仓、也不是 --staged）不经服务时照常跑、不核账：样本用假 cargo 与假 replay.sh，判法与一片相同。
+#   样本根放了 .gate-shard-plan（一行「maximum=<正整数>」）、环境里没有 TASK_SERVER_SHARD_PHASE 的，当成服务起的计划那一步、服务交的上限是那个数：
+#   计划写进样本根下的 .gate-shard-plan-output/，打完「✓ 分片的计划」那一句就退（stage-selftest.sh 起样本只给根，样本要证计划那一步就靠它）；真仓与 --staged 下不认它。
 #
 # 读的环境变量：
 #   内存上限不在这里定：这一道整条一个任务经 task-server/task submit 交，上限由服务按记录给、撞了放大重排（records/2026-10-30-编译绕过内存总上限.md 收尾批 M03），
@@ -85,14 +109,21 @@
 #   bash .claude/gate.d/research-build-and-replay.sh --list-items [项目根]                    逐行打 replay.sh 表里的实验号、exact 还是 timing，不编、不跑；
 #                                                                                                         末尾另打一行复跑表行键对不上的行数（admission.py replay-row-inputs，只算键）
 #   bash .claude/gate.d/research-build-and-replay.sh --check experiment-replay --item E142 [项目根]   只复跑点名的实验
-#     --item 给几次取并集，timing 行也照跑；成功行写明只跑了点名的几个，不是整格结论；实验号不在表里退 2
+#     --item 给几次取并集，只派点名实验的 exact 行（timing 行不进门禁）；成功行写明只跑了点名的几个，不是整格结论；实验号不在表里退 2；
+#     点名的实验只有 timing 行的，这一格报本次未跑、往 $GATE_NOT_RUN_FILE 报一行、退 77，replay.sh 不起
+#     样本根的 .gate-items（一行一个实验号，# 之后与空白不算）当作命令行上的 --item：只在被判的根是样本（不是本阶段所在的仓，也没设 GATE_STAGED_FROM）、命令行没给 --item 时认
+#     （stage-selftest.sh 起样本只给根，样本要点名就靠它；同门禁 crash-point-replay 的 .gate-items）
 #   bash .claude/gate.d/research-build-and-replay.sh --check mutation-tables [项目根]  只跑变异表那一格
 #
 # 样本：fixtures/research-build-and-replay.sh/ 下各份，各放 .gate-cells 只点名它判的那一格：
 #   research-unit-tests-red    research 工作区里有一条单测红着的小仓，判红
 #   research-unit-tests-green  一条单测全绿、scripts/ 下一份脚本都没有，判绿，成功行报一个测试批次（setup.sh git init：按条复用的判定库名取 git common-dir，
 #                              不是 git 工作树的样本根算不出库名，这一格会判成按条复用失灵；plan-sentinel-red 同理）
-#   green                      带假 replay.sh 的小仓，表里两行 exact、一行 timing：不指定范围，三行都派给 replay.sh（假 replay.sh 打收到的参数：一个都没有，表里 3 行）
+#   green                      带假 replay.sh 的小仓，表里两行 exact、一行 timing：不指定范围，只把两行 exact 逐行 --item 派给 replay.sh（假 replay.sh 打收到的参数：--item E1.1 --item E9.1，表里 3 行），
+#                              timing 那一行逐个列出不跑（「timing 行不进门禁 1 行：E17|e17-sample|」）
+#   experiment-replay-timing-only-item  同形的小仓，样本根的 .gate-items 点名只有 timing 行的 E17：这一格报「点名的实验 E17 只有 timing 行」、replay.sh 不起，整道退 77
+#   shard-plan-capped          同形的小仓，表里三个实验各一行 exact、另一个实验只有一行 timing，样本根的 .gate-shard-plan 写 maximum=2（当成服务起的计划那一步）：
+#                              有 exact 行的 3 件按次序轮流分到 min(3, 2) = 2 片，打「✓ 分片的计划：2 片（3 件…服务给的上限 2 片）」、退 0
 #   red                        表一行都没有，判红
 #   mutation-tables-red-uncompilable  最小 research 工作区（一个 bin、warnings = "deny"，bin 里带一条会被抓的单测），一张两条的表里一条替换文编不过（引了没有的名字）、另一条被单测抓到，判红、点名表与那一条
 #   mutation-tables-red-not-caught    同形的工作区，一张两条的表里一条替换文编得过但没有任何测试抓到（加改成乘：2×2 与 2+2 一样），判红、点名那一条「没红」
@@ -145,7 +176,7 @@
 #     research-unit-tests-red-record-failed、research-unit-tests-red-records-green、wallclock-asserts-registered-red、wallclock-single-thread-red
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的四格都跑（汇总那句「跑了 1 格（样本根的 .gate-cells 点名）」与红句「1 格里 1 格红」找不到；
 #     树里没有 replay.sh 表的样本，复跑那一格读不到一行实验而判红，期望退 0 或 75 的实得退 1）
-#     experiment-replay-unavailable、green、mutation-tables-deny-green、mutation-tables-green、mutation-tables-red-not-caught、mutation-tables-red-uncompilable、
+#     experiment-replay-timing-only-item、experiment-replay-unavailable、green、mutation-tables-deny-green、mutation-tables-green、mutation-tables-red-not-caught、mutation-tables-red-uncompilable、
 #     mutation-tables-row-key、red、replay-load-skipped、research-unit-tests-archived-retrieved、research-unit-tests-archived-unrecoverable、research-unit-tests-green、
 #     research-unit-tests-plan-unavailable、research-unit-tests-red、research-unit-tests-red-over-green、research-unit-tests-red-record-failed、research-unit-tests-red-records-green、
 #     research-unit-tests-unit-key、wallclock-asserts-registered-green、wallclock-asserts-registered-red、wallclock-single-thread-green、wallclock-single-thread-red
@@ -161,7 +192,7 @@
 #       wallclock-single-thread-green（期望退 0，实得退 1、输出里有「登记了却跑了」：第一趟没跳过小仓里登记了的那条挂钟断言，它在第一趟里照跑）、
 #       wallclock-single-thread-red（输出里找不到「在单线程那一趟里红了」：那条断言在第一趟里先红，退 1、红句是「research 的构建或单测没过」）。
 #       别的 research-unit-tests 样本的小仓没有登记位，登记数是 0、没有 --skip 可丢，判不出这一项；真仓真跑：
-#       RESEARCH_BUILD_AND_REPLAY_BREAK=skip-filter-dropped bash .claude/gate.d/research-build-and-replay.sh --check research-unit-tests
+#       起法：RESEARCH_BUILD_AND_REPLAY_BREAK=skip-filter-dropped bash .claude/gate.d/research-build-and-replay.sh --check research-unit-tests
 #       退 1、输出里有「登记了却跑了」。wallclock-asserts-registered 格不起 cargo，不受影响。
 #   RESEARCH_BUILD_AND_REPLAY_BREAK=archived-restore-skipped  research-unit-tests 不从 git 历史取回单测读的留存产物（读不到就记本次未跑）
 #       research-unit-tests-archived-retrieved（期望退 0，实得退 1：单测读不到 sample-product.out）、research-unit-tests-archived-unrecoverable（退出码仍是 1：单测读不到文件红了，但没有「✗ 单测要读的 … 取不回」那一句）
@@ -193,6 +224,11 @@
 #       experiment-replay-rocksdb-entry-refused（期望退 1、输出里有「rocksdb-prebuilt entry：」，实得退 0：假 replay.sh 照起了）
 #   RESEARCH_BUILD_AND_REPLAY_BREAK=replay-unavailable-as-red  experiment-replay 把 replay.sh 退 75 照别的非 0 判红（服务不可用当成复跑红了）
 #       experiment-replay-unavailable（期望退 75，实得退 1）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=timing-rows-dispatched  replay_exact_row_items 连 timing 行也打（timing 行照派给 replay.sh）
+#       green（输出里找不到「样本 replay.sh 收到：--item E1.1 --item E9.1（表里 3 行）」：实得多派一个 --item E17.1）、
+#       experiment-replay-timing-only-item（期望退 77，实得退 0：只有 timing 行的 E17 也派给了假 replay.sh）
+#   RESEARCH_BUILD_AND_REPLAY_BREAK=shard-maximum-ignored  计划那一步片数取件数，不跟服务交的 TASK_SERVER_SHARD_MAXIMUM 取小（只在样本根认）
+#       shard-plan-capped（输出里找不到「✓ 分片的计划：2 片（3 件」：实得 3 片）
 #   ADMISSION_BREAK=plan-unavailable-as-failure  归 scripts/gate/admission.py：计划退 75 照复用失灵判红
 #       research-unit-tests-plan-unavailable（期望退 75，实得退 1）
 #   ADMISSION_BREAK=plan-failure-not-red  归 scripts/gate/admission.py：按条复用失灵也不判红（退回全部现判）
@@ -220,6 +256,55 @@ stage_cell experiment-replay cell_experiment_replay "入库的纯模型实验重
   "对不上先判是代码坏了还是产物该更新（两种都要人判）；只重跑红的那几个实验：bash .claude/gate.d/research-build-and-replay.sh --check experiment-replay --item <实验号>"
 stage_cell mutation-tables cell_mutation_tables "研究侧每张变异表逐条施加替换文、照跑测试，没被测试抓到或编不过的一条就红" \
   "改那一行替换文（编得过、能被测试抓到）或补测试，或装置改回能编；表归实验执行员改。单张核：在 scripts/experiment-apparatus/ 里 bash ../mutation/mutate.sh <bin> <源文件> ../mutation/tables/<表>；改完只重跑这一格：bash .claude/gate.d/research-build-and-replay.sh --check mutation-tables"
+# 弄坏开关（文件头「弄坏开关」）：RESEARCH_BUILD_AND_REPLAY_BREAK 里逗号隔开的项有没有点名的这一项
+research_build_broken() { [[ ",${RESEARCH_BUILD_AND_REPLAY_BREAK:-}," == *",$1,"* ]]; }
+# 分片（文件头「分片」）：服务给的这一步、片号与几个目录读完就从环境里清掉，不传给 cargo、replay.sh 与 mutate.sh
+research_shard_phase="${TASK_SERVER_SHARD_PHASE:-}"
+research_shard_position="${TASK_SERVER_SHARD:-}"
+research_shard_plan_directory="${TASK_SERVER_SHARD_PLAN_DIRECTORY:-}"
+research_shard_output_directory="${TASK_SERVER_SHARD_OUTPUT_DIRECTORY:-}"
+research_shard_missing="${TASK_SERVER_SHARD_MISSING:-}"
+research_shard_maximum="${TASK_SERVER_SHARD_MAXIMUM:-}"
+unset TASK_SERVER_SHARD_PHASE TASK_SERVER_SHARD TASK_SERVER_SHARD_PLAN_DIRECTORY TASK_SERVER_SHARD_OUTPUT_DIRECTORY TASK_SERVER_SHARD_OUTPUTS \
+  TASK_SERVER_SHARD_MISSING TASK_SERVER_SHARD_HOST TASK_SERVER_SHARD_MAXIMUM
+# research_shard_refuse <卡在哪> <下一步> <退出码>
+research_shard_refuse() {
+  echo "  ✗ 分片的 ${research_shard_phase} 那一步：$1"
+  echo "     → 怎么办：$2"
+  exit "$3"
+}
+# research_write_shard_plan <片数> <一句说明>：往计划目录写 plan.json（每片只有 label）与 shards（片数一行），退 0；各片的 items-<片号> 由调用方先写好
+research_write_shard_plan() {
+  [[ -n "$research_shard_plan_directory" ]] \
+    || research_shard_refuse "环境里没有 TASK_SERVER_SHARD_PLAN_DIRECTORY" "这一步只由 task-server 照分片协议起（task-server/task_server_lib.py 文件头「分片」）" 2
+  mkdir -p -- "$research_shard_plan_directory" || research_shard_refuse "建不了计划目录 $research_shard_plan_directory" "看共享工作根可不可写" 78
+  python3 - "$research_shard_plan_directory" "$1" "$2" <<'PY_RESEARCH_SHARD_PLAN' || research_shard_refuse "写不成 plan.json（上面是 python 的报错）" "看计划目录 $research_shard_plan_directory 可不可写" 1
+import json, os, sys
+directory, count, note = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+labels = []
+for index in range(count):
+    with open(os.path.join(directory, f"items-{index}"), encoding="utf-8") as handle:
+        names = [line.rstrip("\n").split("\t")[-1] for line in handle if line.strip()]
+    labels.append(f"研究侧构建与复跑第 {index} 片（共 {count} 片）：{'、'.join(names[:6])}{'…' if len(names) > 6 else ''}")
+temporary = os.path.join(directory, "plan.json.partial")
+with open(temporary, "w", encoding="utf-8") as handle:
+    json.dump({"shards": [{"label": label} for label in labels], "note": note}, handle, ensure_ascii=False)
+os.replace(temporary, os.path.join(directory, "plan.json"))
+with open(os.path.join(directory, "shards"), "w", encoding="utf-8") as handle:
+    handle.write(f"{count}\n")
+PY_RESEARCH_SHARD_PLAN
+  echo "  ✓ 分片的计划：$1 片（$2），写进 $research_shard_plan_directory"
+  exit 0
+}
+case "$research_shard_phase" in
+  ""|plan|shard|merge) ;;
+  *) research_shard_refuse "TASK_SERVER_SHARD_PHASE=$research_shard_phase 认不得（只认 plan、shard、merge）" "照 task-server/task_server_lib.py 文件头「分片」的协议起" 2 ;;
+esac
+if [[ "$research_shard_phase" == plan ]]; then
+  for research_argument in "$@"; do
+    [[ "$research_argument" == --list ]] && research_write_shard_plan 0 "--list 只打格名表，在合并那一步打"
+  done
+fi
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 list_items=0; root_argument=""; named_experiments=()
@@ -262,6 +347,29 @@ REPLAY_ROW_LIBRARY_NAME=singlefs-unit-verdicts/replay-row
 
 # replay.sh 表里的行：编号|二进制|参数|产物|exact 或 timing。门禁靠这个形状取行，改表格式要同时改这里。
 replay_rows_of_kind() { sed -n "s/^\(E[0-9]*\)|[^|]*|[^|]*|[^|]*|$1\$/\1/p" "$REPLAY_SCRIPT" 2>/dev/null; }
+# replay_exact_row_items [实验号…]：表里 exact 行的行级项「<实验号>.<行序号>」（行序号照 replay.sh --item 的数法：这个实验号的行在表里从 1 数，timing 行也占号），
+#   给了实验号只打那几个实验的；timing 行要等机器空闲才量得准，有执行条件，不进门禁，一行都不打。弄坏开关 timing-rows-dispatched：timing 行也打
+replay_exact_row_items() {
+  local kept_kind=exact
+  research_build_broken timing-rows-dispatched && kept_kind=any
+  awk -F'|' -v wanted="$*" -v kept_kind="$kept_kind" 'BEGIN { count = split(wanted, list, " "); for (i = 1; i <= count; i++) pick[list[i]] = 1 }
+    /^E[0-9]+\|[^|]*\|[^|]*\|[^|]*\|(exact|timing)$/ { index_of[$1]++; if (($5 == "exact" || kept_kind == "any") && (count == 0 || ($1 in pick))) print $1 "." index_of[$1] }' "$REPLAY_SCRIPT" 2>/dev/null
+}
+# replay_timing_row_identities：timing 行的前三列「<实验号>|<二进制>|<参数>」（admission.py replay-row-inputs 打的行身份），核账照它剔掉
+replay_timing_row_identities() { sed -n "s/^\(E[0-9]*|[^|]*|[^|]*\)|[^|]*|timing\$/\1/p" "$REPLAY_SCRIPT" 2>/dev/null; }
+
+# 样本根的 .gate-items（文件头 --item 那一段）：命令行没给 --item、被判的根是样本时，一行一个实验号当作命令行上的 --item
+if ((${#named_experiments[@]} == 0)) && [[ -f .gate-items ]]; then
+  if [[ "$(pwd -P)" == "$(cd "$STAGE_REPOSITORY" && pwd -P)" || -n "${GATE_STAGED_FROM:-}" ]]; then
+    echo "  · $ROOT 里有 .gate-items，但这里是本阶段所在的仓或 --staged 的临时树，不认它"
+  else
+    while IFS= read -r research_item_line || [[ -n "$research_item_line" ]]; do
+      research_item_line="${research_item_line%%#*}"; research_item_line="${research_item_line//[[:space:]]/}"
+      [[ -n "$research_item_line" ]] && named_experiments+=("$research_item_line")
+    done < .gate-items
+    ((${#named_experiments[@]})) && echo "  · 样本点名 .gate-items 里的实验：${named_experiments[*]}（$ROOT 是样本，不是本阶段所在的仓）"
+  fi
+fi
 
 if ((list_items)); then
   if [[ ! -f "$REPLAY_SCRIPT" ]]; then
@@ -316,6 +424,114 @@ if ((${#named_experiments[@]})); then
     echo "     → 怎么办：实验号照 bash .claude/gate.d/${STAGE_NAME} --list-items 列的写（表里有 ${#known_experiments[@]} 个）。"
     exit 2
   fi
+fi
+
+# ── 分片的计划、一片与核账（文件头「分片」）──
+research_cell_selected() { [[ " ${STAGE_CELLS_SELECTED[*]-} " == *" $1 "* ]]; }
+research_shard_tables=()   # 分片的一片只判的变异表（表文件名）；空是全部
+research_reconcile=0       # 核账（合并那一步与不经服务分片起的那一趟，样本根除外）
+research_sample_root=0
+if [[ "$(pwd -P)" != "$(cd "$STAGE_REPOSITORY" && pwd -P)" && -z "${GATE_STAGED_FROM:-}" ]]; then research_sample_root=1; fi
+# 样本根的 .gate-shard-plan（文件头「分片」样本根那一段）：环境里没有分片的这一步时，当成服务起的计划那一步、上限取文件里写的数，计划写进样本根
+if ((research_sample_root)) && [[ -z "$research_shard_phase" && -f .gate-shard-plan ]]; then
+  research_shard_phase=plan
+  research_shard_maximum="$(sed -n 's/^maximum=//p' .gate-shard-plan | head -n 1)"
+  research_shard_plan_directory="$ROOT/.gate-shard-plan-output"
+  echo "  · 样本根的 .gate-shard-plan：当成计划那一步，服务交的上限 ${research_shard_maximum:-（没写）}（$ROOT 是样本，不是本阶段所在的仓）"
+fi
+case "$research_shard_phase" in
+  plan)
+    # 件只取有 exact 行的实验（文件头「分片」）：只有 timing 行的实验不进门禁，点名了也不成件（合并那一步那一格照报本次未跑）
+    research_plan_units="$(
+      if research_cell_selected experiment-replay; then
+        if ((${#named_experiments[@]})); then replay_exact_row_items "${named_experiments[@]}" | sed 's/\.[0-9]*$//' | awk '!seen[$0]++ { print "experiment\t" $0 }'
+        else replay_rows_of_kind exact | awk '!seen[$0]++ { print "experiment\t" $0 }'; fi
+      fi
+      if research_cell_selected mutation-tables; then
+        for research_table in scripts/mutation/tables/*.tsv; do [[ -f "$research_table" ]] && printf 'mutation-table\t%s\n' "$(basename "$research_table")"; done
+      fi
+    )"
+    research_plan_count="$(grep -c . <<<"$research_plan_units")"
+    if ((research_plan_count == 0)); then
+      research_write_shard_plan 0 "这一趟没点 experiment-replay、mutation-tables 两格（或它们一件都没有），点了的格在合并那一步跑"
+    fi
+    [[ "$research_shard_maximum" =~ ^[1-9][0-9]*$ ]] \
+      || research_shard_refuse "环境里的 TASK_SERVER_SHARD_MAXIMUM 不是正整数（${research_shard_maximum:-（没给）}）" "这一步只由 task-server 照分片协议起（task-server/task_server_lib.py 文件头「分片」①）" 2
+    research_shard_total=$((research_plan_count < research_shard_maximum ? research_plan_count : research_shard_maximum))
+    # 弄坏开关 shard-maximum-ignored（只在样本根认）：片数取件数，不跟服务交的上限取小
+    if ((research_sample_root)) && research_build_broken shard-maximum-ignored; then research_shard_total="$research_plan_count"; fi
+    mkdir -p -- "$research_shard_plan_directory" || research_shard_refuse "建不了计划目录 $research_shard_plan_directory" "看共享工作根可不可写" 78
+    awk -F'\t' -v directory="$research_shard_plan_directory" -v total="$research_shard_total" \
+      'BEGIN { for (number = 0; number < total; number++) printf "" > (directory "/items-" number) }
+       { print > (directory "/items-" ((NR - 1) % total)) }' <<<"$research_plan_units" \
+      || research_shard_refuse "写不成各片的 items-<片号>" "看计划目录 $research_shard_plan_directory 可不可写" 1
+    research_write_shard_plan "$research_shard_total" "$research_plan_count 件（实验与变异表）按次序轮流分到 $research_shard_total 片（服务给的上限 $research_shard_maximum 片），由服务按余量铺到各台" ;;
+  shard)
+    if [[ ! "$research_shard_position" =~ ^([0-9]+)/([1-9][0-9]*)$ ]] || (( BASH_REMATCH[1] >= BASH_REMATCH[2] )) \
+       || [[ "$(head -n 1 -- "$research_shard_plan_directory/shards" 2>/dev/null)" != "${BASH_REMATCH[2]}" ]] \
+       || [[ ! -f "$research_shard_plan_directory/items-${BASH_REMATCH[1]}" ]]; then
+      research_shard_refuse "片号 TASK_SERVER_SHARD=${research_shard_position:-（没给）} 对不上计划目录 ${research_shard_plan_directory:-（没给）} 里的片数或各片的件" \
+        "这一步只由 task-server 照计划那一步写的 plan.json 起" 2
+    fi
+    research_shard_index="${BASH_REMATCH[1]}"; research_shard_total="${BASH_REMATCH[2]}"
+    # 片退 0 就要有产物目录（task-server/task_server_lib.py 文件头「分片」②）；这一道的结论不经它交（判定在服务里），只建、空着
+    [[ -n "$research_shard_output_directory" ]] && mkdir -p -- "$research_shard_output_directory" \
+      || research_shard_refuse "建不了产物目录 ${research_shard_output_directory:-（没给）}" "看共享工作根可不可写" 78
+    named_experiments=()
+    while IFS=$'\t' read -r research_unit_kind research_unit_name; do
+      case "$research_unit_kind" in
+        experiment) named_experiments+=("$research_unit_name") ;;
+        mutation-table) research_shard_tables+=("$research_unit_name") ;;
+      esac
+    done < "$research_shard_plan_directory/items-$research_shard_index"
+    STAGE_CELLS_SELECTED=()
+    ((${#named_experiments[@]})) && STAGE_CELLS_SELECTED+=(experiment-replay)
+    ((${#research_shard_tables[@]})) && STAGE_CELLS_SELECTED+=(mutation-tables)
+    STAGE_CELLS_CHECK_GIVEN=1
+    STAGE_CELLS_SELECTION_SOURCE="分片第 $research_shard_index/$research_shard_total 片：实验 ${#named_experiments[@]} 个、变异表 ${#research_shard_tables[@]} 张"
+    echo "  · 分片：第 $research_shard_index/$research_shard_total 片，实验 ${named_experiments[*]-（无）}；变异表 ${research_shard_tables[*]-（无）}" ;;
+  merge)
+    if [[ -n "$research_shard_missing" ]]; then
+      echo "  ! 本次未跑（这不是通过）：分片的合并那一步缺片 $research_shard_missing（人手取消了那几片），一格都不判"
+      echo "     → 怎么办：重交整件（同一条命令），各片判过的照单元键复用"
+      exit 77
+    fi
+    research_reconcile=1 ;;
+  "") ((research_sample_root)) || research_reconcile=1 ;;
+esac
+# 核账（文件头「分片」merge）：experiment-replay 格点到的行此刻的行键在库里都要有判过的记录，键对不上的一行都没有才起 replay.sh
+if ((research_reconcile)) && research_cell_selected experiment-replay; then
+  research_gpu="$(source "$STAGE_REPOSITORY/scripts/crash/crash-amplification-lib.sh" >/dev/null 2>&1; crash_amplification_configuration_value "$(crash_amplification_multi_host_configuration_file "$ROOT")" ENABLE_GPU)"
+  [[ "$research_gpu" == 1 ]] || research_gpu=0
+  if ! research_row_keys="$(python3 "$ADMISSION" replay-row-inputs . --gpu "$research_gpu" ${named_experiments[@]+"${named_experiments[@]}"})"; then
+    echo "  ✗ 核账：复跑表的行键算不出（admission.py replay-row-inputs 退非 0，原因在上面），一格都没跑"
+    echo "     → 怎么办：照上面的出路修（服务连不上先 python3 prune-server/control check），再经 task-server/task submit 交这一道"
+    exit 1
+  fi
+  research_row_verdicts=()
+  while IFS=$'\t' read -r _research_identity research_row_key _research_rest; do
+    [[ -n "${research_row_key:-}" && "$research_row_key" != refused ]] && research_row_verdicts+=("keys/$research_row_key/verdict")
+  done <<<"$research_row_keys"
+  research_present=""
+  if ((${#research_row_verdicts[@]})) && ! research_present="$(python3 "$ADMISSION" library-files has "$REPLAY_ROW_LIBRARY_NAME" "${research_row_verdicts[@]}")"; then
+    echo "  ✗ 核账：库里有哪几把行键问不出（admission.py library-files has 没成：prune-server 不可用或库名不对；库名 $REPLAY_ROW_LIBRARY_NAME），一格都没跑"
+    echo "     → 怎么办：python3 prune-server/control check 看服务，修好再经 task-server/task submit 交这一道"
+    exit 75
+  fi
+  research_timing_identities="$(replay_timing_row_identities)"
+  research_unjudged=()
+  while IFS=$'\t' read -r research_identity research_row_key _research_rest; do
+    [[ -n "${research_row_key:-}" && "$research_row_key" != refused ]] || continue
+    grep -qxF -- "$research_identity" <<<"$research_timing_identities" && continue   # timing 行不进门禁（replay_exact_row_items）
+    grep -qxF "keys/$research_row_key/verdict" <<<"$research_present" || research_unjudged+=("$research_identity")
+  done <<<"$research_row_keys"
+  if ((${#research_unjudged[@]})); then
+    echo "  ✗ 核账：复跑表点到的行里 ${#research_unjudged[@]} 行此刻的行键在 prune-server 那一份库里没有判过的记录，一格都没跑、没起 replay.sh；头几行："
+    printf '       %s\n' "${research_unjudged[@]:0:20}"   # gate-lint:detail
+    echo "     → 怎么办：经 task-server/task submit 交这一道（服务照文件头「分片」拆成各片现判、合并核账）；已经是合并那一步的，是各片判过之后源码变了或片连的不是同一份服务：等树里的改动停下再重交整件，判过的照键复用"
+    exit 1
+  fi
+  echo "  · 核账：复跑表点到的行此刻的行键在库里都有判过的记录（行键拒算的照跑）"
 fi
 
 # ── research-unit-tests ──
@@ -577,7 +793,7 @@ PY
       echo "  ! 判红记库（$package）：admission.py verdict-record 没成（$(tail -n 2 "$scratch/red-record.$package.out" | tr '\n' ' ')），红的没记下、同一把键原有的绿还在"
     else
       # 记红没成（admission.py 文件头「按条复用失灵」）：带 --red 交 plan-failure，它判失灵、撤掉这几把键原有的绿（撤不掉说整道判红）；这一格已经判红
-      echo "  · 判红记库（$package）：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$scratch/red-record.$package.out" | tr '\n' ' ' | cut -c1-300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
+      echo "  · 判红记库（$package）：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$scratch/red-record.$package.out" | tr '\n' ' ' | clip_text 300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
       research_unit_plan_failure_verdict verdict-record "$record_exit" --red "$ROOT" "$STAGE_NAME:research-unit-tests" "$scratch/plan.$package" "$scratch/red.$package" \
         "$scratch/red-record.$package.out" || :
     fi
@@ -692,13 +908,32 @@ cell_research_unit_tests() {
       first_pass_needed=0
     fi
   fi
-  output_file="$scratch/cargo-test.out"
+  local -a fail_fast_option=(--no-fail-fast)
+  # --no-fail-fast：一个测试二进制红了，后面的二进制照跑，判完的照键记（文件头「有红照记」）；弄坏开关 fail-fast 下不带
+  research_build_broken fail-fast && fail_fast_option=()
+  local wallclock_single_wanted=0
+  ((${#registered_wallclock[@]} > 0)) && ! research_build_broken wallclock-single-run-dropped && wallclock_single_wanted=1
+  if ((plan_ok)); then single_names=(${wallclock_exact[@]+"${wallclock_exact[@]}"}); single_exact=(--exact); else single_names=(${registered_wallclock[@]+"${registered_wallclock[@]}"}); fi
+  # 显卡（文件头 research-unit-tests 那一段「显卡」）：这一格不领卡、不挑卡、不清场；环境里有 GPU_CARDS_BY_PRIORITY 就原样留给下面两趟 cargo test，没有照起
+  if ((first_pass_needed || wallclock_single_wanted)); then
+    if [[ -n "${GPU_CARDS_BY_PRIORITY:-}" ]]; then
+      echo "  · research-unit-tests：环境里有 GPU_CARDS_BY_PRIORITY=$GPU_CARDS_BY_PRIORITY，原样交给 cargo test（这一格不领卡、不挑卡、不另套清场包装）"
+    else
+      echo "  · research-unit-tests：环境里没有 GPU_CARDS_BY_PRIORITY，照起（卡归 GPU 批处理验证服务，这一格不领卡）"
+    fi
+  fi
+  output_file="$scratch/cargo-test.out"; : >"$output_file"
+  single_output="$scratch/wallclock-single-thread.out"
+  rc=0; single_rc=0
+  # 第一趟：整个工作区
   if ((first_pass_needed)); then
-    # --no-fail-fast：一个测试二进制红了，后面的二进制照跑，判完的照键记（文件头「有红照记」）；弄坏开关 fail-fast 下不带
-    local -a fail_fast_option=(--no-fail-fast)
-    research_build_broken fail-fast && fail_fast_option=()
-    (cd "$R" && cargo test --release --all-features ${fail_fast_option[@]+"${fail_fast_option[@]}"} ${skip_arguments[@]+"${skip_arguments[@]}"}) >"$output_file" 2>&1
-    rc=$?
+    (cd "$R" && cargo test --release --all-features ${fail_fast_option[@]+"${fail_fast_option[@]}"} ${skip_arguments[@]+"${skip_arguments[@]}"}) >"$output_file" 2>&1 || rc=$?
+  fi
+  # 登记了的挂钟断言单线程那一趟（下面判它的结果）
+  if ((wallclock_single_wanted)); then
+    (cd "$R" && cargo test --release --all-features --no-fail-fast -- ${single_exact[@]+"${single_exact[@]}"} "${single_names[@]}" --test-threads=1) >"$single_output" 2>&1 || single_rc=$?
+  fi
+  if ((first_pass_needed)); then
     out="$(cat "$output_file")"
     if (( rc != 0 )); then
       echo "  ✗ research 的构建或单测没过（cargo test 退出码 $rc）"
@@ -737,19 +972,16 @@ cell_research_unit_tests() {
     if grep -Eq 'NOT_RUN_[A-Z_]+ test=' "$output_file"; then
       echo "  ✗ 单测的输出里有 NOT_RUN_<原因> test=… 行（读不到输入却照常返回）："
       grep -E 'NOT_RUN_[A-Z_]+ test=' "$output_file" | head -8 | sed 's/^/     /'   # gate-lint:detail
-      echo "     → 怎么办：它读的留存产物要在版本库里有（删它的那次提交的上一版），或重录进 research/results/；上面开 test-plan 之前的取回只认 concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../research/results/<名>\") 写的字面路径"
+      echo "     → 怎么办：它读的留存产物要在版本库里有（删它的那次提交的上一版），或重录进 research/results/；上面开 test-plan 之前的取回只认 concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/../../research/results/<名>\") 写的字面路径；"
+      echo "               NOT_RUN_NO_GPU_ADAPTER 是开卡的单测没拿到卡：卡归 GPU 批处理验证服务，这一格不领卡，只把环境里的 GPU_CARDS_BY_PRIORITY 原样交给 cargo test；崩溃判段之外用卡的测试交 GPU 服务代跑（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）"
       exit 1
     fi
   else
     : >"$output_file"; b=0; n=0
   fi
-  # 登记了的挂钟断言另起一趟单线程跑（文件头 research-unit-tests 那一段）：红判红；登记名在那一趟的输出里没有 test … ok 行（那一趟没起或没跑到）也判红。
+  # 登记了的挂钟断言另起的单线程那一趟（上面跑过，文件头 research-unit-tests 那一段）：红判红；登记名在那一趟的输出里没有 test … ok 行（那一趟没起或没跑到）也判红。
   # 它们每趟都量，不记进判定库。弄坏开关 wallclock-single-run-dropped：这一趟不起（记本次未跑）。
-  if ((${#registered_wallclock[@]} > 0)) && ! research_build_broken wallclock-single-run-dropped; then
-    single_output="$scratch/wallclock-single-thread.out"
-    if ((plan_ok)); then single_names=("${wallclock_exact[@]}"); single_exact=(--exact); else single_names=("${registered_wallclock[@]}"); fi
-    (cd "$R" && cargo test --release --all-features --no-fail-fast -- ${single_exact[@]+"${single_exact[@]}"} "${single_names[@]}" --test-threads=1) >"$single_output" 2>&1
-    single_rc=$?
+  if ((wallclock_single_wanted)); then
     if (( single_rc != 0 )); then
       echo "  ✗ 登记了的挂钟断言 ${#registered_wallclock[@]} 条（${registered_wallclock[*]}）在单线程那一趟里红了（cargo test 退出码 $single_rc）"
       grep -E '^error|FAILED|panicked at' "$single_output" | head -8 | sed 's/^/     /'   # gate-lint:detail
@@ -860,8 +1092,15 @@ run_replay() {
 cell_experiment_replay() {
   local ALL_EXACT=()
   if ((${#named_experiments[@]})); then
-    # 点名的实验：replay.sh 照样按行复用（键相同、判过的那一行不跑）
-    run_replay "${named_experiments[@]}"
+    # 点名的实验：只派它们的 exact 行（replay_exact_row_items），replay.sh 照样按行复用（键相同、判过的那一行不跑）
+    local -a named_rows=()
+    mapfile -t named_rows < <(replay_exact_row_items "${named_experiments[@]}")
+    if ((${#named_rows[@]} == 0)); then
+      echo "  ! 本次未跑（这不是通过）：点名的实验 ${named_experiments[*]} 只有 timing 行，timing 行有执行条件、不进门禁"
+      [[ -n "${GATE_NOT_RUN_FILE:-}" ]] && printf '%s\n' "$STAGE_NAME 的 experiment-replay 格：点名的实验只有 timing 行" >> "$GATE_NOT_RUN_FILE"
+      exit 77
+    fi
+    run_replay $(printf -- '--item %s ' "${named_rows[@]}")
     echo "  ✓ 只复跑了点名的 ${#named_experiments[@]} 个实验：${named_experiments[*]}（其中准入判「输入没变」而没跑的，见上面 replay.sh 汇总里那一行）；这不是整格结论"
     exit 0
   fi
@@ -874,12 +1113,15 @@ cell_experiment_replay() {
     echo "    → 本阶段靠 '编号|二进制|参数|产物|exact' 这个形状取行，改表格式要同时改这里。"
     exit 1
   fi
-  # 不指定范围：表里全部行（exact 与 timing）都交给 replay.sh，一个都不剔；timing 行照 replay.sh 自己的判法（它文件头「本次未跑」：负载过高的计时行记本次不判）
-  run_replay
+  # 不指定范围：表里全部 exact 行逐行点名交给 replay.sh；timing 行有执行条件（要机器空闲才量得准），不进门禁，逐个列出
+  local -a exact_rows=() timing_rows=()
+  mapfile -t exact_rows < <(replay_exact_row_items)
+  mapfile -t timing_rows < <(replay_timing_row_identities)
+  echo "  · timing 行不进门禁 ${#timing_rows[@]} 行：${timing_rows[*]-（无）}"
+  run_replay $(printf -- '--item %s ' "${exact_rows[@]}")
 }
 
 # ── mutation-tables ──
-research_build_broken() { [[ ",${RESEARCH_BUILD_AND_REPLAY_BREAK:-}," == *",$1,"* ]]; }
 
 # mutation_counts_of_log <mutate.sh 的输出>：它末尾「计数：」那一行里的现判、复用、拒算条数，打成「<现判> <复用> <拒算>」；取不出打空串
 mutation_counts_of_log() {
@@ -892,7 +1134,8 @@ cell_mutation_tables() {
   local table stem binary rc log rows line counts fresh reused refused table_library first_lines
   local fresh_total reused_total refused_total tables_judged tables_all_reused caught_rows red_total
   local -a table_library=()
-  local -a not_run=() red_lines=() red_tables=() red_rows=() broken_environment=() library_setting=()
+  local -a not_run=() red_lines=() red_tables=() red_rows=() broken_environment=() library_setting=() reconcile_lines=()
+  local judged_entries forced_entries
   [[ -d "$R" && -d "$tables_directory" ]] || { echo "  ! 没有 $R 或 $tables_directory，这一格无对象可判"; exit 77; }
   if ! command -v cargo >/dev/null; then
     echo "  ✗ 没有 cargo：变异表的替换文编不编得过、测试抓不抓得到判不了"
@@ -943,10 +1186,12 @@ cell_mutation_tables() {
       fi
       echo "  ── 第 $round 趟（样本 .mutation-tables-sample/run-twice：按条判定库 $library，第二趟没改的条应当复用）"
     fi
-    not_run=(); red_lines=(); red_tables=(); fresh_total=0; reused_total=0; refused_total=0; tables_judged=0; tables_all_reused=0; caught_rows=0; red_total=0
+    not_run=(); red_lines=(); red_tables=(); reconcile_lines=(); fresh_total=0; reused_total=0; refused_total=0; tables_judged=0; tables_all_reused=0; caught_rows=0; red_total=0
     for table in "$tables_directory"/*.tsv; do
       [[ -f "$table" ]] || continue
       stem="$(basename "$table" .tsv)"
+      # 分片的一片只判归它的表（文件头「分片」shard）
+      if ((${#research_shard_tables[@]})) && [[ " ${research_shard_tables[*]} " != *" $stem.tsv "* ]]; then continue; fi
       if [[ ! -f "$R/$stem.rs" ]]; then
         not_run+=("$table（$R/ 下没有同名的 $stem.rs，取不出 bin、源文件、表三元组）")
         continue
@@ -961,6 +1206,12 @@ cell_mutation_tables() {
       if (cd "$R" && env ${broken_environment[@]+"${broken_environment[@]}"} ${table_library[@]+"${table_library[@]}"} MUTATE_TARGET_DIR="$target_directory" \
             bash "$mutate_script" "$binary" "$stem.rs" "../mutation/tables/$stem.tsv") >"$log" 2>&1; then rc=0; else rc=$?; fi
       tables_judged=$((tables_judged + 1))
+      # 核账（文件头「分片」merge）：mutate.sh 逐条写的「现判：[<名>] <原因>」除去复用哨兵抽中的「强制现判」还有的，是各片判过而此刻的键在服务里读不到的条
+      if ((research_reconcile)); then
+        judged_entries="$(grep -c '^mutate: 现判：\[' "$log")"
+        forced_entries="$(grep -c '^mutate: 现判：\[[^]]*\] 强制现判' "$log")"
+        ((judged_entries > forced_entries)) && reconcile_lines+=("$table：$((judged_entries - forced_entries)) 条现判（头一条：$(grep '^mutate: 现判：\[' "$log" | grep -v '\] 强制现判' | head -n 1 | sed 's/^mutate: 现判：//')）")
+      fi
       # 弄坏开关 not-caught-ignored：退 1（没红、没跑完、盲区）也当绿，❌ 💥 ⚠️ 行不收
       research_build_broken not-caught-ignored && ((rc == 1)) && rc=0
       counts="$(mutation_counts_of_log "$log")"
@@ -1002,10 +1253,18 @@ cell_mutation_tables() {
           fi
           ;;
         *)
-          red_tables+=("$table：mutate.sh $binary $stem.rs 退 $rc（2 基线红或用法错、3 锚点没命中、4 还原之后没回到全绿、5 跑的时候源文件被改、6 bin 与源文件对不上、8 收回的判定对不上、75 判定库服务不可用）；输出末尾：$(tail -n 4 "$log" | tr '\n' ' ')")
+          red_tables+=("$table：mutate.sh $binary $stem.rs 退 $rc（2 基线红或用法错、3 锚点没命中、4 还原之后没回到全绿、5 跑的时候源文件被改、6 bin 与源文件对不上、8 收回的判定对不上、9 上卡的表领卡被拒：等卡或看 task-server/task status 再重交、75 判定库服务不可用）；输出末尾：$(tail -n 4 "$log" | tr '\n' ' ')")
           ;;
       esac
     done
+    if ((${#reconcile_lines[@]})); then
+      for line in "${reconcile_lines[@]}"; do
+        echo "  ✗ 核账：$line"   # gate-lint:detail
+      done
+      echo "  ✗ 核账：${#reconcile_lines[@]} 张表里有条此刻的键在 prune-server 那一份库里没有判定，在这一趟现判了（复用哨兵抽中的强制现判不算）"
+      echo "     → 怎么办：经 task-server/task submit 交这一道（服务照文件头「分片」拆成各片现判、合并核账）；已经是合并那一步的，是各片判过之后源码变了或片连的不是同一份服务：等树里的改动停下再重交整件，判过的照键复用"
+      exit 1
+    fi
     if ((${#red_lines[@]} + ${#red_tables[@]})); then
       for line in ${red_lines[@]+"${red_lines[@]}"}; do
         echo "  ✗ $line"   # gate-lint:detail

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# task-server-cargo-family: -p singlefs-verification --release --target x86_64-unknown-linux-gnu
+# task-server-compiles: yes
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 scripts/gate/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: QEMU 真设备上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
@@ -116,6 +116,9 @@
 #       tier-key-samples-three-questions（期望退出 77，实测 1；REUSE_SELFTEST 那一行找不到）
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=guest-key-without-main  让来宾程序单元只从这一档的入口起算、不收 main
 #       tier-key-samples-guest-dispatch（只改 main 的参数解析，六档都报复用：「· direct：现判」「· 按档：现判 6、复用 0」找不到）
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=unit-key-batch-exclusions-unread  让批算单元键（flush_unit_keys 一个 python 进程算完全部）不展开 --exclude-units-from：来宾各档的键不去掉只有别的档走到的单元
+#       tier-key-samples-guest-function（只改 raise-rollback-floor 的入口走到的函数，direct 那一档也报现判：「· direct：复用」「· 按档：现判 1、复用 5」找不到）
+#       tier-key-samples-three-questions（复用三问「闭包内改一个单元」那一问多现判了别的档：期望退出 77，实测不是 77）
 #   GATE_QEMU_DEVICE_STREAMS_BREAK=manifest-with-listing-lines  让开跑前的清单取成带抬头行的样子（vm-bench.sh 标准输出里抬头那几行留在清单里）
 #       tier-key-samples-manifest-recorded（头一趟六档都报「清单不同……没记」，第二趟「现判 6、复用 0」：「· 头一趟记下 6 档」找不到）
 #       tier-key-samples-manifest-differs（「· 头一趟记下 5 档」「· direct：复用」「· 按档：现判 1、复用 5」找不到）
@@ -497,46 +500,90 @@ load_registered_expectations() {
   fi
   EXPECTED_SEGMENTS_LINES="$registered_output"
 }
-# 单元键（lib_verdict_library.py unit-key）写进文件；拒算（退 4）照写，lookup 读到拒算行就不复用
-unit_key_into() { # unit_key_into <输出文件> <unit-key 的参数…>
-  local output="$1"; shift
-  python3 "$VERDICT_LIBRARY_MODULE" unit-key "$@" > "$output"
-  local status=$?
-  ((status == 0 || status == 4)) || fail "算不出单元键（lib_verdict_library.py unit-key $* 退 $status）" "先让 python3 scripts/crash/lib_verdict_library.py unit-key 在这棵树上跑通（单元切法在 scripts/gate/lib_function_units.py）。"
-  return 0
+# 单元键（lib_verdict_library.py unit-key）写进文件；拒算（退 4）照写，lookup 读到拒算行就不复用。
+# 一把一个 python 进程，每个进程都要把 Rust 工作区载入一次（来宾各档与宿主检查程序的键都要）：这里只把要算的排进 $unit_key_batch_file，
+# compute_shared_keys 末了 flush_unit_keys 起一个 python 进程全算，同一个根共用一份单元索引。批文件的每一项：「种类 NUL 字段个数 NUL 各字段（各以 NUL 收尾，可以是空串）」
+unit_key_into() { # unit_key_into <输出文件> <unit-key 的参数…>：排进批里；参数里写「--exclude-units-from <文件>」的，算的时候展开成文件里每一行一个 --exclude-unit
+  printf '%s\0' unit-key "$#" "$@" >> "$unit_key_batch_file"
+}
+# flush_unit_keys：把 $unit_key_batch_file 里排好的各项算完。unit-key 项等于 python3 lib_verdict_library.py unit-key <参数…> > <输出文件>（同一个函数 unit_key_command，退 0 与退 4 照写，别的判红）；
+# guest-closures 项是来宾各档入口的闭包（guest_keys_by_mode 排的），先于它后面的 unit-key 项算、写出 guest-excluded-<档>.txt。
+# 弄坏开关 unit-key-batch-exclusions-unread：unit-key 项里的 --exclude-units-from 不展开（来宾各档的键不去掉只有别的档走到的单元）
+flush_unit_keys() {
+  python3 - "$VERDICT_LIBRARY_MODULE" "$unit_key_batch_file" <<'PY' \
+    || fail "算不出单元键（lib_verdict_library.py unit-key 批算，上面 python 打的 ✗ 行点名哪一把；来宾程序各档入口的闭包算不出报回溯）" "先让 python3 scripts/crash/lib_verdict_library.py unit-key 在这棵树上跑通（单元切法在 scripts/gate/lib_function_units.py）；来宾入口改了名就照「run_the_<档，- 换成 _>_mode」改回，或改 guest_keys_by_mode 里的入口名。"
+import contextlib, os, sys
+sys.dont_write_bytecode = True
+module_path, batch_path = sys.argv[1:3]
+sys.path.insert(0, os.path.dirname(module_path))
+import lib_verdict_library as library
+# 同一个根共用一份单元索引：unit_key_command 在函数里取全局名 FunctionUnitIndex，换成按根只建一份的
+indexes = {}
+index_class = library.FunctionUnitIndex
+def shared_index(root):
+    if root not in indexes:
+        indexes[root] = index_class(root)
+    return indexes[root]
+library.FunctionUnitIndex = shared_index
+with open(batch_path, "rb") as handle:
+    words = [word.decode("utf-8", "surrogateescape") for word in handle.read().split(b"\0")[:-1]]
+position = 0
+while position < len(words):
+    kind, count = words[position], int(words[position + 1])
+    fields = words[position + 2:position + 2 + count]
+    position += 2 + count
+    if kind == "guest-closures":
+        root, guest_program, keys_directory, *modes = fields
+        index = shared_index(root)
+        members = {}
+        for mode in modes:
+            closure = index.closure(f"{guest_program}::run_the_{mode.replace('-', '_')}_mode")
+            # 与 FunctionUnitIndex.key 的 excluded_units 同一种写法：<文件>::<限定名>
+            members[mode] = {f"{unit.file}::{unit.name}" for unit in closure.order}
+        for mode in modes:
+            only_elsewhere = set().union(*(members[other] for other in modes if other != mode)) - members[mode]
+            with open(os.path.join(keys_directory, f"guest-excluded-{mode}.txt"), "w", encoding="utf-8") as handle:
+                handle.write("".join(f"{name}\n" for name in sorted(only_elsewhere)))
+        continue
+    output, *arguments = fields
+    key_arguments, at = [], 0
+    while at < len(arguments):
+        if arguments[at] == "--exclude-units-from":
+            if os.environ.get("GATE_QEMU_DEVICE_STREAMS_BREAK") != "unit-key-batch-exclusions-unread":
+                with open(arguments[at + 1], encoding="utf-8") as handle:
+                    key_arguments += [word for name in handle.read().split("\n") if name for word in ("--exclude-unit", name)]
+            at += 2
+        else:
+            key_arguments.append(arguments[at])
+            at += 1
+    try:
+        with open(output, "w", encoding="utf-8") as handle, contextlib.redirect_stdout(handle):
+            status = library.unit_key_command(key_arguments, False)
+    except ValueError as error:
+        print(f"  ✗ 算不出 {output} 的单元键：{error}", file=sys.stderr)
+        print("    → 怎么办：照上面那一句改调用的参数（入口、根、档）；参数没错的，跑 python3 scripts/gate/lib_function_units.py --selftest 查算键库", file=sys.stderr)
+        sys.exit(1)
+    if status not in (library.EXIT_DONE, library.EXIT_REFUSED):
+        print(f"  ✗ 算不出 {output} 的单元键：unit-key 退 {status}", file=sys.stderr)
+        print("    → 怎么办：照 scripts/gate/lib_function_units.py 文件头的退出码表查这个退出码，修好再只重跑这一道（带 --item 点这一档）", file=sys.stderr)
+        sys.exit(1)
+PY
 }
 # 来宾程序单元按档算（文件头「复用」一段）：每档一份 $keys_directory/guest-<档>.txt。先一次算出六档入口各自的闭包，
 # 把「别的档入口闭包里有、这一档入口闭包里没有」的单元写进 guest-excluded-<档>.txt；再逐档从 main 与这一档的入口起算、去掉那几样
 GUEST_PROGRAM=crates/singlefs-verification/src/bin/new_pool_file_creation_on_device.rs
 guest_keys_by_mode() {
-  local mode excluded entries exclusions
+  local mode entries exclusions
   if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != guest-key-from-main ]]; then
-    python3 - "$VERDICT_LIBRARY_MODULE" "$ROOT" "$GUEST_PROGRAM" "$keys_directory" "${ALL_MODES[@]}" <<'PY' \
-      || fail "算不出来宾程序各档入口的闭包（$GUEST_PROGRAM 的 run_the_<档>_mode）" "看上面 python 的报错：入口改了名就照「run_the_<档，- 换成 _>_mode」改回，或改这里的入口名；单元切法在 scripts/gate/lib_function_units.py。"
-import os, sys
-sys.dont_write_bytecode = True
-module_path, root, guest_program, keys_directory = sys.argv[1:5]
-modes = sys.argv[5:]
-sys.path.insert(0, os.path.dirname(module_path))
-from lib_verdict_library import FunctionUnitIndex
-index = FunctionUnitIndex(root)
-members = {}
-for mode in modes:
-    closure = index.closure(f"{guest_program}::run_the_{mode.replace('-', '_')}_mode")
-    # 与 FunctionUnitIndex.key 的 excluded_units 同一种写法：<文件>::<限定名>
-    members[mode] = {f"{unit.file}::{unit.name}" for unit in closure.order}
-for mode in modes:
-    only_elsewhere = set().union(*(members[other] for other in modes if other != mode)) - members[mode]
-    with open(os.path.join(keys_directory, f"guest-excluded-{mode}.txt"), "w", encoding="utf-8") as handle:
-        handle.write("".join(f"{name}\n" for name in sorted(only_elsewhere)))
-PY
+    # 六档入口各自的闭包：排进批里、先于下面六把键算（flush_unit_keys 的 guest-closures 项）
+    printf '%s\0' guest-closures "$((3 + ${#ALL_MODES[@]}))" "$ROOT" "$GUEST_PROGRAM" "$keys_directory" "${ALL_MODES[@]}" >> "$unit_key_batch_file"
   fi
   for mode in "${ALL_MODES[@]}"; do
     entries=("$GUEST_PROGRAM::main"); exclusions=()
     if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != guest-key-from-main ]]; then
       entries+=("$GUEST_PROGRAM::run_the_${mode//-/_}_mode")
       [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == guest-key-without-main ]] && entries=("${entries[@]:1}")
-      while IFS= read -r excluded; do exclusions+=(--exclude-unit "$excluded"); done < "$keys_directory/guest-excluded-$mode.txt"
+      exclusions=(--exclude-units-from "$keys_directory/guest-excluded-$mode.txt")
     fi
     unit_key_into "$keys_directory/guest-$mode.txt" "$ROOT" "${entries[@]}" ${exclusions[@]+"${exclusions[@]}"} \
       "${TOOLCHAIN_OPTIONS[@]}" --toolchain "build: --release --target x86_64-unknown-linux-gnu rustflags=-C target-feature=+crt-static -L /usr/lib/gcc/x86_64-linux-gnu/13 -L /usr/lib/gcc/x86_64-linux-gnu/14 -l static=stdc++ -C link-arg=-fuse-ld=bfd" --dependency-of singlefs-verification
@@ -544,7 +591,8 @@ PY
 }
 # 共用的几样单元键与外部输入（宿主脚本、来宾与宿主检查两个程序、判法、内核、QEMU、E142），写进 $keys_directory；每一档的组成表另由 write_tier_table 写
 compute_shared_keys() {
-  local exclusions=() function_name
+  local exclusions=() function_name unit_key_batch_file="$keys_directory/unit-key-batch.bin"
+  : > "$unit_key_batch_file"
   for function_name in "${TIER_TABLE_FUNCTIONS[@]}"; do exclusions+=(--exclude-unit "$STAGE_RELATIVE::$function_name"); done
   unit_key_into "$keys_directory/host.txt" "$ROOT" scripts/devices/vm-bench.sh --external "busybox=$BUSYBOX_IDENTITY" --external "qemu-system-x86_64=$QEMU_SYSTEM_IDENTITY"
   guest_keys_by_mode
@@ -552,6 +600,7 @@ compute_shared_keys() {
     "${TOOLCHAIN_OPTIONS[@]}" --toolchain "build: dev profile" --dependency-of singlefs-verification
   unit_key_into "$keys_directory/judging.txt" "$STAGE_REPOSITORY" "$STAGE_RELATIVE::judge_mode_outputs" "$STAGE_RELATIVE::judge_mode_device_log" \
     --exclude-file scripts/crash/lib_verdict_library.py --exclude-file scripts/gate/lib_function_units.py "${exclusions[@]}" --programs-keyed-elsewhere
+  flush_unit_keys
   REGISTERED_DIGEST="$(digest_text "$(registered_reading_text)")"
 }
 # 一档的组成表（lib_verdict_library.py lookup / record 读的）。弄坏开关 tier-key-is-the-whole-stage 下按档的那几样换成六档合起来的一份（整道一把键）

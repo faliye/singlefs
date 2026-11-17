@@ -1,0 +1,2 @@
+# 两条都没带标记：一条用例日志有 CRASH_POINT_REPLAY_FINDINGS 行而发现日志缺节、一条发现日志 red_states=9，两条都判红。 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

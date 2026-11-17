@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=· 范围：不指定范围（每条开关趟与基准趟都起整份自证，逐格相同）
+want=scripts/gate/cells.py CELLS_BREAK=alpha：不符，失败行没被点名：「✗ 自证：gamma：判长度那一格：应当 1，实际 0」
+want=scripts/gate/cells.py CELLS_BREAK=beta：不符，失败行没被点名：「✗ 自证：delta：判大小写那一格：应当 1，实际 0」
+want=脚本与钩子的弄坏开关复跑：2 处不对（复跑了 2 条、1 份）
+want=break-switch-replay：红（退出 1）

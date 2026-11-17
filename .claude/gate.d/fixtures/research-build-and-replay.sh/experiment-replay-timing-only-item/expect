@@ -1,0 +1,5 @@
+exit=77
+want=样本点名 .gate-items 里的实验：E17
+want=本次未跑（这不是通过）：点名的实验 E17 只有 timing 行，timing 行有执行条件、不进门禁
+want=experiment-replay：本次未跑
+want=── 汇总：research-build-and-replay.sh 跑了 1 格（样本根的 .gate-cells 点名）

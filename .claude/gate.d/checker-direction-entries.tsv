@@ -1,4 +1,4 @@
-# 池级 checker 遍历式与扫描式两个方向的入口、切点、局部绑定与允许共享的格式解析单元（C410（checker 两个方向共享什么没有检查））。
+# 池级 checker 遍历式与扫描式两个方向的入口、切点与允许共享的格式解析单元（C410（checker 两个方向共享什么没有检查））。
 # 读它的判法是 scripts/gate/checker-direction-overlap.py（判法、分类与核法在它文件头），门禁 checker-independence-and-sync 的 checker-direction-overlap 格调它。
 # 一行四列，制表符分隔：角色、单元（<文件>::<限定名>，限定名是 python3 scripts/gate/lib_function_units.py dump 打的文件里的嵌套路径）、点名的名字（不用的写 -）、# 理由（至少 8 个字）。
 # 角色：
@@ -6,7 +6,6 @@
 #   scan-entry       扫描式方向的根：从它收闭包
 #   comparison       比对点：拿两个方向的结果比，不属哪一个方向；它调两个方向入口的那几处自动摘掉，它自己的闭包不判、逐个列出；要有一行 traversal-cut 把它从遍历式里切出来
 #   traversal-cut    收遍历式方向的闭包时，这个单元里点到这个名字的那几处不往下连；名字只许是某个 scan-entry 或 comparison 单元的名字（编排函数调扫描式方向与比对点的那几处）
-#   local-binding    这个单元里这个名字是 let 绑定的局部量，不是调同名函数：两个方向收闭包时都不按它连
 #   shared-format    允许两边共享的格式解析单元，只许登 crates/singlefs-checker/src/lib.rs 里的（singlefs-format 整个包本来就许共享，不用登）
 #   reporting-channel  允许两边共享的报告通道：往同一个判定累加器报判定的方法，只许登 crates/singlefs-checker/src/image.rs 里 impl Judgements 的方法（传的是判定结果，不是判定逻辑，不算判定共享）
 # 扫描式方向的边界照用户 2026-10-26 定的「连 walk.rs 扫单元头那几个函数一起算，另建调用图」。
@@ -24,7 +23,6 @@ comparison	crates/singlefs-checker/src/walk.rs::judge_scan_rebuild_agrees_with_t
 traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image_given_the_container_capacity_knobs	scanned_content_units	# 编排函数在走读之后起扫描式方向那一遍
 traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image_given_the_container_capacity_knobs	judge_merged_version_total_order	# 编排函数在扫描结果上起 I-1.8（归并后版本全序）
 traversal-cut	crates/singlefs-checker/src/walk.rs::judge_pool_image_given_the_container_capacity_knobs	judge_scan_rebuild_agrees_with_the_walked_index	# 编排函数调比对点 I-1.13（扫描重建与遍历方向的索引相同）
-local-binding	crates/singlefs-checker/src/walk.rs::judge_the_appearance_rule_of_adjacent_candidate_versions	birth_txg_of	# 函数里 let birth_txg_of = |unit| … 是局部闭包，库按名字连到了 rebuild.rs 的同名函数
 shared-format	crates/singlefs-checker/src/lib.rs::read_u16	-	# 按小端读 2 字节
 shared-format	crates/singlefs-checker/src/lib.rs::read_six_byte_unsigned	-	# 按小端读 6 字节（写序里的事务号）
 shared-format	crates/singlefs-checker/src/lib.rs::read_u32	-	# 按小端读 4 字节

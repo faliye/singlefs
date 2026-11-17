@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录；外部引用那一格调的 scripts/kb/verify-citations.sh 要共享数据根下固定下来的外部文献树（fs-refs、kernel-tree，两台同一个绝对路径），缺了在那一格判红，不交给 gate.sh 预判
-# gate-stage: 登记表与引用（三十格：字段与布局登记表之间的账；单元头字段表与 D18 逐项比；欠账表与收口表的形状与去向；实验号、决策号、门禁名、路径、小节与外部引用指得到；不变量条数与字段落点；kb 正文里的内联算式左右相等；未实现的不变量写了编号前置；字段频率「每 X 一份」的 X 指得到已定条款给出的大小；字段行的宽度写在被指的分项里；删除写出的字节三处挂钩；挂载透明字段表与 kb 对账；kb 新增的「不可达」类断言带用例名或写推的；CLAUDE.md 与仓根三份 README 里登记的能数的数与命令现数相等）
+# gate-stage: 登记表与引用（三十一格：字段与布局登记表之间的账；单元头字段表与 D18 逐项比；欠账表与收口表的形状与去向；实验号、决策号、门禁名、路径、小节与外部引用指得到；不变量条数与字段落点；kb 正文里的内联算式左右相等；未实现的不变量写了编号前置；字段频率「每 X 一份」的 X 指得到已定条款给出的大小；字段行的宽度写在被指的分项里；删除写出的字节三处挂钩；挂载透明字段表与 kb 对账；kb 新增的「不可达」类断言带用例名或写推的；CLAUDE.md 与仓根三份 README 里登记的能数的数与命令现数相等）
 # gate-fixture: yes
 # gate-category: 文档类
 # gate-similar: link-targets.py 它只解析 ](相对路径) 链接与「第 N 节」，不看反引号里的路径、「门禁 N 号」与「小节」名；这三类与 experiment-refs、decision-refs 两格同是「引用了不存在的东西」，并在这里
@@ -9,10 +9,10 @@
 # gate-similar: checker-independence-and-sync.sh 它的 layout-checker-sync 格判 layouts.tsv 登记的布局常量变了 checker 跟没跟，对象是布局清单与 checker 源码；这一道只对 kb 各表之间、kb 与 E142 产物和钉住的用例之间的账
 # gate-similar: code-source-discipline.sh 它的 reading-discipline、mutation-tables、format-constants、clause-enums、feature-bits 几格方向是 kb 到代码，拿登记值核 crates 源码；这一道的 field-table-sums 与它共用 lib-format-const.py 读标记但只判 kb 里的加和与登记，format-const-placeholders 只核代码注释里的编号指得到 kb，closeout-row27-preconditions 只数几段写死的原文命中几次，都不拿 kb 的值比代码
 # gate-similar: doc-experiments.sh 它的 multipath-registry 格判实验页登记表的形状，quoted-result-lines 格判 kb 整行抄的产物行在 research/results/ 里找得到（kb 到产物）；这一道 audit-contradictions 格判总审核处置列引的原文在 kb 今天的正文里找得到（记录到 kb），另判欠账号还开着
-# gate-similar: doc-text.sh 它判 kb 与全仓文本的写法（角标、钟点、旧名），不核数；这一道的 inline-sums 格核 kb 正文里写出来的「整数 = 项 + 项」算式左右两边的数相等，field-table-sums 只看表后合计，两者都不并进 doc-text；counted-claims 格核 CLAUDE.md 与仓根三份 README 里登记的数与登记的命令此刻数出来的相等，同样是核数、不判写法，doc-text 判那三份 README 的结构对齐与同进同出，不看里面的数
+# gate-similar: doc-text.sh 它判 kb 与全仓文本的写法（角标、钟点、会话号），不核数；这一道的 inline-sums 格核 kb 正文里写出来的「整数 = 项 + 项」算式左右两边的数相等，field-table-sums 只看表后合计，两者都不并进 doc-text；counted-claims 格核 CLAUDE.md 与仓根三份 README 里登记的数与登记的命令此刻数出来的相等，同样是核数、不判写法，doc-text 判那三份 README 的结构对齐与同进同出，不看里面的数
 #
 # 三组格：字段与布局组十三格（kb 字段表、字节布局表、段序列登记表与里程碑各步对账，单元头字段表与 D18 逐项比，连同 harness 挂载透明字段表与 kb 的对账）、欠账与收口组五格（checks-owed.md 与里程碑收口表）、
-# 引用与不变量组十二格（引用指得到、不变量条数与字段落点、内联算式左右相等、未实现的不变量的前置、字段频率的大小、kb 新增的「不可达」类断言钉没钉用例、CLAUDE.md 与仓根 README 里登记的能数的数；governance-refs 的判据在 lib-governance-refs.py 文件头）。
+# 引用与不变量组十三格（搬迁留下的旧路径、引用指得到、不变量条数与字段落点、内联算式左右相等、未实现的不变量的前置、字段频率的大小、kb 新增的「不可达」类断言钉没钉用例、CLAUDE.md 与仓根 README 里登记的能数的数；governance-refs 的判据在 lib-governance-refs.py 文件头）。
 # 实验改成已跑后引用它的决策有没有回看、已跑的实验有没有对应的决策，不在这里判，归 doc-experiments.sh 的 decision-links 格。
 # 格名表（--list 打它；--check <格名>[,<格名>…] 只跑点名的格，不给就按下面的次序全跑）：
 # gate-cell: field-refs 新池新建文件的字段表，每个「指向」都指到一条真实存在的分项；预留字段指向的 D9 已定项 12 第几项与所属单元类一致
@@ -174,7 +174,7 @@
 #   DOC_REGISTRIES_BREAK=field-refs  field-refs 格不跑、按判过了记
 #       field-refs-red（期望退出 1，实测 0）；field-refs-reservation-owner-red（期望退出 1，实测 0）；field-refs-reservation-owner-green（输出里找不到「新池新建文件的字段表指向都成立…」）；
 #       field-registry-green（输出里找不到「新池新建文件的字段表指向都成立（查了 7 处引用）」）；field-refs-translation-red（期望退出 1，实测 0）；
-#       field-refs-translation-green（输出里找不到「新池新建文件的字段表指向都成立（查了 3 处引用）」）；field-refs-blank-red（期望退出 1，实测 0）
+#       field-refs-translation-green（输出里找不到「新池新建文件的字段表指向都成立（查了 3 处引用）」）；field-refs-blank-red（期望退出 1，实测 0）；field-refs-unit-header-red（期望退出 1，实测 0）
 #   KB_NUMBERED_FILE_BREAK=first-match  归 lib-item-ref-status.py（设进环境，被各格起的 python 继承）：按编号取文件不分语言，取排序后的第一个命中（取到 <号>-<名>.en.md），
 #                               求并集的连译文一起并进来；same_language_files 不筛语言（不变量在用条数把译文里的表行一并数进去）
 #       field-refs-translation-green、format-const-placeholders-translation-green（期望退出 0，实测 1）；field-refs-translation-red、format-const-placeholders-translation-red、
@@ -213,6 +213,12 @@
 #       checks-owed-green（输出里找不到「判了 2 份；02-sample.md：全文点名 3 个 C…」）；checks-owed-red（输出里找不到「02-sample.md 点名了这些还开着的欠账号，收口表里…」）
 #   DOC_REGISTRIES_BREAK=paid-cited-tests  paid-cited-tests 格不跑、按判过了记
 #       checks-owed-green（输出里找不到「查了 1 个标识符」）；checks-owed-red（输出里找不到「C902 引的 `the_sample_test_that_…」）
+#   DOC_REGISTRIES_BREAK=paid-cited-batch-names-dropped  paid-cited-tests 格一次交给 grep 的名单少最后一个名字（那个名字当成仓里找不到）
+#       checks-owed-green（期望退出 0，实测 1）
+#   DOC_REGISTRIES_BREAK=citations-exit-ignored  citations 格读到复核脚本的退出码也不判，退非 0 当过了
+#       citations-fake-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=defined-numbers-empty  experiment-refs、decision-refs 取到的「已定义的编号」集合是空的，被引用的编号一个都找不到定义
+#       references-green、decision-refs-not-decisions-green（期望退出 0，实测 1）
 #   DOC_REGISTRIES_BREAK=audit-contradictions  audit-contradictions 格不跑、按判过了记
 #       checks-owed-green、audit-contradictions-translation-green（输出里找不到「每一行都有去向」）；checks-owed-red（输出里找不到「有行没有去向」）；
 #       audit-contradictions-translation-red、audit-contradictions-unnamed-translation-red、audit-contradictions-kb-directories-unreadable-red（期望退出 1，实测 0）
@@ -288,7 +294,7 @@
 #       field-frequency-sizes-green（期望退出 0，实测 1）；field-frequency-sizes-red（输出里找不到「10 处字段频率的大小指不到已定条款…」）；
 #       field-frequency-sizes-registration-red（输出里找不到「7 处字段频率的大小…」）；field-frequency-sizes-unit-registration-removed-red（输出里找不到「5 处字段频率的大小…」）
 #   DOC_REGISTRIES_BREAK=pointer-blanks-unchecked  field-refs 格里指向列空着、根槽那一节指未定项那一半不判（C66 收紧的那一半）
-#       field-refs-blank-red（期望退出 1，实测 0）；field-registry-green（输出里找不到「指向列 7 行都写了分项（登记豁免的格式级空白 1 行」）
+#       field-refs-blank-red（期望退出 1，实测 0）；field-refs-unit-header-red（期望退出 1，实测 0）；field-registry-green（输出里找不到「指向列 7 行都写了分项（登记豁免的格式级空白 1 行」）
 #   DOC_REGISTRIES_BREAK=third-txn-hooks  third-txn-hooks 格不跑、按判过了记
 #       third-txn-hooks-red（期望退出 1，实测 0）；third-txn-hooks-green（输出里找不到「删除写出的字节三处互相挂钩（字节那一步 三·6；…」）
 #   DOC_REGISTRIES_BREAK=third-txn-bytes-step-unchecked  third-txn-hooks 格里「一、」表的行不点名字节那一步也放过
@@ -414,13 +420,14 @@
 #       field-frequency-sizes-unit-registration-removed-red、kb-directories-unreadable-red、audit-contradictions-kb-directories-unreadable-red、declared-counts-kb-directories-unreadable-red、
 #       invariant-anchors-kb-directories-unreadable-red、invariant-prerequisites-kb-directories-unreadable-red、unreachable-claims-red、unreachable-claims-stock-grown-red、counted-claims-red、
 #       governance-refs-old-gate-path-red、governance-refs-kb-red、governance-refs-kb-lag-red、governance-refs-kb-kept-red、governance-refs-kb-skips-red、
-#       governance-refs-kb-sections-red、governance-refs-kb-sections-lag-red（期望退出 1，实测 0）
+#       governance-refs-kb-sections-red、governance-refs-kb-sections-lag-red、field-refs-unit-header-red、unit-header-fields-five-tuple-removed-red、unit-header-fields-missing-red、
+#       unit-header-fields-offsets-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=check-ignored  共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
 #       admission-terms-fullwidth-d-green、checks-owed-green、decision-refs-not-decisions-green、field-frequency-sizes-green、field-refs-reservation-owner-green、field-registry-green、
 #       field-registry-translation-green、governance-refs-green、inline-sums-green、invariant-prerequisites-green、references-green、tree-table-reserve-wide-number-green、
 #       field-refs-translation-green、format-const-placeholders-translation-green、audit-contradictions-translation-green、invariant-counts-translation-green、
 #       third-txn-hooks-green、field-widths-green、mount-transparency-fields-green、unreachable-claims-test-name-green、unreachable-claims-inferred-green、
-#       governance-refs-kb-green、governance-refs-kb-kept-green、governance-refs-governance-skips-green、governance-refs-kb-sections-green、governance-refs-kb-gz-green（期望退出 0，实测 1）；
+#       governance-refs-kb-green、governance-refs-kb-kept-green、governance-refs-governance-skips-green、governance-refs-kb-sections-green、governance-refs-kb-gz-green、unit-header-fields-green（期望退出 0，实测 1）；
 #       segment-registry-product-absent（期望退出 77，实测 1）；
 #       admission-terms-red、field-projection-red、field-refs-red、field-refs-reservation-owner-red、field-table-sums-red、first-txn-hooks-red、format-const-placeholders-red、
 #       inline-sums-red、second-txn-hooks-red、segment-registry-red、segment-registry-paths-red、tree-table-reserve-red、field-refs-translation-red、
@@ -433,12 +440,14 @@
 #       audit-contradictions-kb-directories-unreadable-red、declared-counts-kb-directories-unreadable-red、invariant-anchors-kb-directories-unreadable-red、
 #       invariant-prerequisites-kb-directories-unreadable-red（输出里找不到「doc-registries.sh：1 格里 1 格红…」）；
 #       counted-claims-green（期望退出 0，实测 1）；counted-claims-registry-empty、counted-claims-registry-absent（期望退出 77，实测 1）；counted-claims-red（输出里找不到「样本只跑 .gate-cells 点名的格：counted-claims」）；
+#       field-refs-unit-header-red（输出里找不到「样本只跑 .gate-cells 点名的格：field-refs」）；unit-header-fields-five-tuple-removed-red、unit-header-fields-missing-red、
+#       unit-header-fields-offsets-red（输出里找不到「样本只跑 .gate-cells 点名的格：unit-header-fields」）；
 #       以 governance-refs 起头的八份红样本照判得对（它们的 expect 不写汇总行，照跑全部格时 governance-refs 那几行照样在；
 #       名字不在这一条里逐个写，开关复跑按名字认点名）
 #   LIB_CHANGED_PATHS_BREAK=untracked  scripts/gate/changed-paths.sh 丢掉未跟踪文件：invariant-anchors 看不见未跟踪的清单
 #       （references 那一份红样本在这个开关下照判得对，这一条在样本上没有判错的，证红欠着）
 #
-#   bash .claude/gate.d/doc-registries.sh [项目根]                                   三十格都跑
+#   bash .claude/gate.d/doc-registries.sh [项目根]                                   三十一格都跑
 #   bash .claude/gate.d/doc-registries.sh --list                                     逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-registries.sh --check <格名>[,<格名>…] [项目根]          只跑点名的格
 set -uo pipefail
@@ -500,7 +509,7 @@ stage_cell field-widths judge_field_widths "新池新建文件字段表里写了
 stage_cell unit-header-fields judge_unit_header_fields "单元头字段表（数据单元与树表单元两张）与 D18 逐项比：五元组对已定项 3，偏移与名字对已定项 7 的共同前缀加已定项 18 那一类的偏移表" \
   "表写错了改 .claude/kb/layout/01-first-txn.md 那张表（漏的字段补一行、宽度与偏移照 D18 已定项 18），D18 改了定案就照新定案改表；缺表的照红行写的标记在表前一行补上（判据在这一格函数上方的注释）"
 stage_cell mount-transparency-fields judge_mount_transparency_fields "挂载透明字段表的 kb 一侧对账（D13 逐字段表的行名、根记录与系统配置的名与区间）" \
-  "D13 逐字段表改了行名或 kb 字段表改了名、宽：crates/singlefs-verification/src/mount_transparency.rs 的 D13_* 行名常量与三张 *_FIELD_BYTE_RANGES 跟着改（交实现员）；不按字节比的 D13 行登记进 .claude/gate.d/mount-transparency-d13-rows-without-bytes.tsv（判据在这一格函数上方的注释）"
+  "D13 逐字段表改了行名或 kb 字段表改了名、宽：crates/singlefs-verification/src/mount_transparency.rs 的 MOUNT_TRANSPARENCY_TABLE_* 行名常量与三张 *_FIELD_BYTE_RANGES 跟着改（交实现员）；不按字节比的 D13 行登记进 .claude/gate.d/mount-transparency-d13-rows-without-bytes.tsv（判据在这一格函数上方的注释）"
 stage_cell table-shape judge_table_shape "欠账表两张登记表的行形状（格数对得上表头、欠着的那张里不留写着已还的行、表不被空行断开、两张表都在）" \
   "六列的欠账行挪回欠着的那张表、表中间的空行删掉；真还清的按已还清那张的四列改写再挪过去，只还了一部分的把开头改成写明还欠什么"
 stage_cell closeout-collects-open judge_closeout_collects_open "里程碑收口表收全了文件里点名、还开着的欠账号，行号只许是顺序号" \
@@ -1324,7 +1333,7 @@ if bad:
     print("  → 怎么办：加错了就改那个数；若是刚加了一行字段，那么**同一轮要一起改的还有**——")
     print("    该决策索引表那一行里的合计、这一节的 format-const 标记、表前说明句里的「+M 字节 ⇒ 共 N 字节」、")
     print("    [layout/01-first-txn.md] 对应那一节，以及全仓引过这个数的地方")
-    print("    （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`：撤回一个数要当场回扫谁在引它）。")
+    print("    （`.claude/rules/evidence-discipline.md`：撤回一个数要当场回扫谁在引它）。")
 if marker_problems:
     print(f"  ✗ format-const 标记读不出来或在同一份文件里重复登记 {len(marker_problems)} 处：")  # gate-lint:summary
     for problem in marker_problems:
@@ -2573,9 +2582,9 @@ PY
 # ── 格 mount-transparency-fields：挂载透明字段表的 kb 一侧对账（C736（挂载透明字段表的 kb 一侧对账门禁格没做））
 # harness 一侧（crates/singlefs-verification/src/mount_transparency.rs）有三张按字节区间的字段表 ROOT_RECORD_FIELD_BYTE_RANGES、
 # SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES、TREE_TABLE_ENTRY_FIELD_BYTE_RANGES，每段带名字、区间与它引的 D13（验证路线） 已定项 1 逐字段表行名
-# （D13_* 字符串常量）。这一格只读那份源码的文本，不编译。
+# （MOUNT_TRANSPARENCY_TABLE_* 字符串常量，值折到下一行的也认）。这一格只读那份源码的文本，不编译。
 # 判据：
-#   ① 行名：三张表引的 D13 行名与 D13_ROWS_OF_TODAY 里的，每一个都是 D13 中文原文「#### 已定项 1」里表头「| 字段 | 判法 |」那张表某一行的首格；
+#   ① 行名：三张表引的 D13 行名与 MOUNT_TRANSPARENCY_TABLE_ROWS_OF_TODAY 里的，每一个都是 D13 中文原文「#### 已定项 1」里表头「| 字段 | 判法 |」那张表某一行的首格；
 #      反过来那张表每一行都被引到，或登记在 .claude/gate.d/mount-transparency-d13-rows-without-bytes.tsv（行名<TAB># 理由，理由至少 8 个字；
 #      登记了而表里已经没有的判红）。比名字时两边都去掉全角括号里的注、粗体与反引号。
 #   ② 名与宽：根记录那张表对 D22 中文原文「#### 已定项 7」的「| 字段 | 宽 |」表（偏移按行累加），系统配置那张表对
@@ -2617,7 +2626,9 @@ if not os.path.isfile(SOURCE):
     print(f"  ! {SOURCE} 不在，这一格无对象可判")
     sys.exit(77)
 code = re.sub(r"//[^\n]*", "", open(SOURCE, encoding="utf-8").read())
-strings = dict(re.findall(r'const (D13_\w+): &str = "((?:\\.|[^"\\])*)";', code))
+ROW_NAME_CONSTANT = r"MOUNT_TRANSPARENCY_TABLE_\w+"   # 行名常量的前缀；cargo fmt 把长名字的值折到下一行，= 后面认任意空白
+IMMUTABLE_ROW_CONSTANT = "MOUNT_TRANSPARENCY_TABLE_IMMUTABLE_CONFIGURATION"   # immutable_and_the_same 不写行名参数，引的就是这一行
+strings = dict(re.findall(rf'const ({ROW_NAME_CONSTANT}): &str =\s*"((?:\\.|[^"\\])*)";', code))
 ranges = {name: (int(a), int(b)) for name, a, b in re.findall(r"const (\w+): std::ops::Range<usize> = (\d+)\.\.(\d+);", code)}
 CALL = re.compile(r'\b(must_be_the_same|not_compared|determined_relation|immutable_and_the_same)\(\s*"((?:\\.|[^"\\])*)"\s*,\s*(?:(\d+)\.\.(\d+)|(\w+))\s*(?:,([^()]*?))?\)', re.S)
 TABLES = {"ROOT_RECORD_FIELD_BYTE_RANGES": "根记录", "SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES": "系统配置",
@@ -2635,7 +2646,7 @@ for constant, label in TABLES.items():
         if span is None:
             bad.append(f"{SOURCE} {constant} 的「{field}」字节区间写成 {named_range}，读不出它的值")
             continue
-        row_constants = ["D13_IMMUTABLE_CONFIGURATION"] if kind == "immutable_and_the_same" else re.findall(r"\b(D13_\w+)\b", rest or "")
+        row_constants = [IMMUTABLE_ROW_CONSTANT] if kind == "immutable_and_the_same" else re.findall(rf"\b({ROW_NAME_CONSTANT})\b", rest or "")
         row = strings.get(row_constants[-1]) if row_constants else None
         if row is None:
             bad.append(f"{SOURCE} {constant} 的「{field}」读不出它引的 D13 逐字段表行名")
@@ -2643,10 +2654,10 @@ for constant, label in TABLES.items():
     if not entries:
         bad.append(f"{SOURCE} {constant} 一段都读不出")
     harness[label] = entries
-today = re.search(r"pub const D13_ROWS_OF_TODAY: \[&str; \d+\] = \[(.*?)\];", code, re.S)
+today = re.search(r"pub const MOUNT_TRANSPARENCY_TABLE_ROWS_OF_TODAY: \[&str; \d+\] = \[(.*?)\];", code, re.S)
 referenced = {row for entries in harness.values() for _, _, row in entries if row}
 if today:
-    referenced |= {strings[name] for name in re.findall(r"\bD13_\w+\b", today.group(1)) if name in strings}
+    referenced |= {strings[name] for name in re.findall(rf"\b{ROW_NAME_CONSTANT}\b", today.group(1)) if name in strings}
 
 # ── ① D13 已定项 1 挂载透明逐字段表的行名
 d13_path = decision_file(13)
@@ -2777,7 +2788,7 @@ if bad:
     for item in bad:
         print(f"  ✗ {item}")      # gate-lint:detail
     print(f"  ✗ 挂载透明字段表的 kb 一侧对账有 {len(bad)} 处不对")    # gate-lint:summary
-    print("  → 怎么办：D13 逐字段表改了行名，harness 那几个 D13_* 行名常量跟着改（crates/singlefs-verification/src/mount_transparency.rs，交实现员）；")
+    print("  → 怎么办：D13 逐字段表改了行名，harness 那几个 MOUNT_TRANSPARENCY_TABLE_* 行名常量跟着改（crates/singlefs-verification/src/mount_transparency.rs，交实现员）；")
     print("    kb 字段表改名或改宽，harness 三张 *_FIELD_BYTE_RANGES 那一段的名字与区间跟着改；不按字节比的 D13 行登记进 " + EXEMPT + "（行名<TAB># 理由）。")
     sys.exit(1)
 print(f"  ✓ 挂载透明字段表与 kb 对得上：D13 逐字段表 {len(d13_rows)} 行（harness 引 {len(referenced_clean)} 行、不按字节比登记 {len(exempt)} 行），"
@@ -3039,6 +3050,8 @@ PY
 # 已还清的行里点名的单测常是那条决策唯一的记录位，它被改名或删掉时没有别的东西会说话。
 # 欠着的那张表不查：那里点名一个还不存在的测试名是它应有的样子。
 # 至少三段：放宽到两段会把 `log_append`、`write_cache` 这类词组也扫进来。
+# 找法：点名的全部标识符一次交给 grep（-f - 读名单）：一趟 -o 取每处整词命中属于哪个名字，一趟取命中行的行文，名字归属照 grep 自己的整词判法；
+#   某个名字有没有「在注释之外的整词命中」仍逐个名字、逐行判（成不成立与逐个名字各起一趟 grep 的写法逐项相同）。
 # 注释里不写被拦的那个标识符的整串字面量，搜索也排掉 `.claude/gate.d/`：否则 grep 扫到这个阶段自己，把该红的那一条判成「还在」。
 # 不扫 `research/prompts/`：原样发给模型的材料是冻结证据，里面的旧名字不跟着改（evidence-discipline.md「原样保存的证据不许事后改」）。
 # 样本：checks-owed-red 的已还清表里一行引的单测改了名、一行引的旧名只剩在注释里、一行引的名字只剩加了后缀的，三个都要点名；
@@ -3050,7 +3063,7 @@ cell_paid_cited_tests() {
     exit 77
   fi
 
-  python3 - "$OWED" <<'PY'
+  python3 - "$OWED" "$BREAK_SWITCH" <<'PY'
 import pathlib, re, subprocess, sys
 
 owed = pathlib.Path(sys.argv[1])
@@ -3104,26 +3117,45 @@ def code_part(line, suffix):
         return line.split("//", 1)[0]
     return re.split(r"(?:^|\s)#", line, maxsplit=1)[0]
 
-def is_in_the_repository(name):
-    # grep 只用来缩小候选（按字面、按整词）；注释里的命中在下面逐行剔掉
+def grep_with_names(names, only_matching):
+    """点名的全部标识符一次交给 grep（-f - 从标准输入读名单），按字面、按整词找：only_matching 为真时每处整词命中交 `路径:行号:名字`（名字归哪一行按 grep 自己的整词判法），
+    否则交 `路径:行号:行文`。grep 只用来缩小候选，注释里的命中在 names_in_the_repository 里逐行剔掉。"""
     found = subprocess.run(
-        ["grep", "-rnwF", "--include=*.rs", "--include=*.py", "--include=*.sh",
+        ["grep", "-rnwF" + ("o" if only_matching else ""), "--include=*.rs", "--include=*.py", "--include=*.sh",
          "--exclude-dir=prompts", "--exclude-dir=target", "--exclude-dir=.git",
-         "--exclude-dir=gate.d", "--", name, "."],
-        capture_output=True, text=True)
+         "--exclude-dir=gate.d", "-f", "-", "--", "."],
+        input="".join(f"{name}\n" for name in names), capture_output=True, text=True)
     if found.returncode not in (0, 1):
-        print(f"  ✗ grep 找 `{name}` 时出错（退 {found.returncode}）：{found.stderr.strip()[:120]}")
+        print(f"  ✗ grep 找已还清的行点名的 {len(names)} 个标识符时出错（退 {found.returncode}）：{found.stderr.strip()[:120]}")
         print("     → 怎么办：按 grep 的报错修好（读不了的目录、权限），再跑；找的时候出错不等于没找到，也不等于找到了。")
         raise SystemExit(1)
-    word = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(name) + r"(?![A-Za-z0-9_])")
-    for hit in found.stdout.splitlines():
-        path, _, rest = hit.partition(":")
-        _, _, text = rest.partition(":")
-        if word.search(code_part(text, pathlib.Path(path).suffix)):
-            return True
-    return False
+    return found.stdout.split("\n")
 
-missing = [(number, name) for number, name in cited if not is_in_the_repository(name)]
+def names_in_the_repository(names):
+    """names 里在仓里的 .rs / .py / .sh 的代码里按整词找得到的那几个（集合）：grep 整词命中的行里，名字落在注释之外才算。
+    弄坏开关 paid-cited-batch-names-dropped：交给 grep 的名单少最后一个名字。"""
+    searched = names[:-1] if sys.argv[2] == "paid-cited-batch-names-dropped" else names
+    if not searched:
+        return set()
+    hit_texts = {}
+    for hit in filter(None, grep_with_names(searched, only_matching=False)):
+        path, _, rest = hit.partition(":")
+        number, _, text = rest.partition(":")
+        hit_texts[(path, number)] = text
+    present = set()
+    for hit in filter(None, grep_with_names(searched, only_matching=True)):
+        path, _, rest = hit.partition(":")
+        number, _, name = rest.partition(":")
+        text = hit_texts.get((path, number))
+        if text is None or name in present:
+            continue
+        word = re.compile(r"(?<![A-Za-z0-9_])" + re.escape(name) + r"(?![A-Za-z0-9_])")
+        if word.search(code_part(text, pathlib.Path(path).suffix)):
+            present.add(name)
+    return present
+
+present_names = names_in_the_repository(list(dict.fromkeys(name for _, name in cited)))
+missing = [(number, name) for number, name in cited if name not in present_names]
 
 if missing:
     for number, name in missing:
@@ -3562,15 +3594,30 @@ extract_numbered_references() {
   mapfile -t extracted_references < <(printf '%s\n' "$raw_matches" | grep -oE "${letter}[0-9]{1,3}" | sort -u)
 }
 
+# 用法：defined_numbers <字母> <目录> <关联数组名>：目录下（递归）每份文件里以「## <字母><1–3 位数字> 」起头的标题，编号放进关联数组。一次 grep 取全部，
+# 不对每个被引用的编号各扫一遍整个目录；读不了的文件（或目录不在）当没有定义，与逐个编号 grep -q 2>/dev/null 同一处置。
+# 弄坏开关 DOC_REGISTRIES_BREAK=defined-numbers-empty：交空集合，被引用的编号一个都找不到定义。
+defined_numbers() {
+  local letter="$1" directory="$2" heading_marker defined_number
+  local -n defined_set="$3"
+  defined_set=()
+  [[ "$BREAK_SWITCH" == defined-numbers-empty ]] && return 0
+  while read -r heading_marker defined_number _; do
+    defined_set[$defined_number]=1
+  done < <(grep -rhoE "^## ${letter}[0-9]{1,3} " "$directory" 2>/dev/null)
+}
+
 cell_experiment_refs() {
   cell_failed=0
   collect_scanned_files
   local missing=0 e
   local experiment_refs=()
+  local -A defined_experiments=()
   # 不能用 \bE[0-9]+\b：它会把 URL 里的 E19253-01 当成实验号
   extract_numbered_references E experiment_refs
+  defined_numbers E "$KB/experiments" defined_experiments
   for e in "${experiment_refs[@]}"; do
-    grep -rqE "^## $e " "$KB/experiments" 2>/dev/null || { bad "$e 被引用但 experiments/ 下没有它"
+    [[ -n "${defined_experiments[$e]+set}" ]] || { bad "$e 被引用但 experiments/ 下没有它"
       howto "要么在 experiments/ 下给它建正文（\`## $e <简称>\` 起头），" \
             "要么把引用它的那处改成真实存在的实验号——编号引用悬空，检索到的人会自己补一个。"
       missing=1; }
@@ -3719,10 +3766,12 @@ cell_decision_refs() {
   collect_scanned_files
   local missing=0 d
   local decision_refs=()
+  local -A defined_decisions=()
   extract_numbered_references D decision_refs
   apply_not_decisions_markers decision_refs
+  defined_numbers D "$KB/decisions" defined_decisions
   for d in "${decision_refs[@]}"; do
-    grep -rqE "^## $d " "$KB/decisions" 2>/dev/null || { bad "$d 被引用但 decisions/ 下没有它"
+    [[ -n "${defined_decisions[$d]+set}" ]] || { bad "$d 被引用但 decisions/ 下没有它"
       howto "要么在 decisions/ 下给它建正文（\`## $d <简称>\` 起头），" \
             "要么把引用它的那处改成真实存在的决策号。"
       missing=1; }
@@ -4066,11 +4115,13 @@ PY
 # 源码树不在也判红，不当跳过：跳过正是让上一批文献无声蒸发的那个行为。
 # 真 verify-citations.sh 的判别力不在这里测：它读共享数据根下的两棵源码树（.claude/hooks/lib_work_root.py 的 fs-refs、kernel-tree，FS_REFS、KERNEL_TREE 设了照它们），装不进密封的样本目录；
 # 它自己的 --selftest 合成两棵假树测，由 code-tooling 跑。
+# 复核最慢（本机内核树整棵 grep），阶段在父进程里、各格开始之前起到后台（文件末尾「提前起 citations」一段），别的格跑的时候它也在跑；
+# 格在自己的子 shell 里，等不到父进程起的后台作业（wait 报不是自己的子进程），所以后台作业把退出码写进 citations.rc，格用 tail --pid 等它退出再读那个文件。
 CITATIONS_SCRIPT=scripts/kb/verify-citations.sh
 citations_pid=""
 start_citations() {
   [[ -f "$CITATIONS_SCRIPT" ]] || return 0
-  bash "$CITATIONS_SCRIPT" > "$work_directory/citations.out" 2>&1 &
+  { bash "$CITATIONS_SCRIPT" > "$work_directory/citations.out" 2>&1; echo "$?" > "$work_directory/citations.rc.tmp"; mv "$work_directory/citations.rc.tmp" "$work_directory/citations.rc"; } &
   citations_pid=$!
 }
 cell_citations() {
@@ -4081,9 +4132,20 @@ cell_citations() {
     echo "               还没写就先写它——缺了它，引文一条都没被验过。"
     return 1
   fi
-  start_citations
   local citations_rc=0
-  wait "$citations_pid" || citations_rc=$?
+  if [[ -n "$citations_pid" ]]; then
+    tail --pid="$citations_pid" -s 0.2 -f /dev/null
+    if [[ -f "$work_directory/citations.rc" ]]; then
+      citations_rc="$(<"$work_directory/citations.rc")"
+    else
+      citations_rc=1
+      bad "外部引用复核没写出退出码：$CITATIONS_SCRIPT 起在后台、退出时没留下 citations.rc（被信号杀掉、临时目录没了都会这样）"
+      howto "再跑一次这一格；还是没有就单独跑 bash $CITATIONS_SCRIPT 看它自己打印的报错。"
+    fi
+  else
+    bash "$CITATIONS_SCRIPT" > "$work_directory/citations.out" 2>&1 || citations_rc=$?
+  fi
+  [[ "$BREAK_SWITCH" == citations-exit-ignored ]] && citations_rc=0      # 弄坏：复核退非 0 也不判红
   cat "$work_directory/citations.out"
   if [[ $citations_rc -ne 0 ]]; then
     bad "外部引用复核没过：$CITATIONS_SCRIPT 退 $citations_rc"
@@ -4785,7 +4847,7 @@ PY
 #   断言词之外的说法（「到不了」「不会发生」「不可能」）不认；新增行在代码围栏里、「## 历史版本」之后的照判（按行取，不知道它落在哪一节）；
 #   存量清单里登的是不是真是这一格立起来时就有的（只靠只缩不涨守）；kb 之外（crates/singlefs-checker/invariants/ 这类登记的 kb 目录、records/）不判。
 # 样本与弄坏开关见文件头（unreachable-claims-red、unreachable-claims-test-name-green、unreachable-claims-inferred-green、unreachable-claims-stock-grown-red；
-# DOC_REGISTRIES_BREAK=unreachable-claims、unreachable-claims-names-unresolved、unreachable-claims-names-ignored、unreachable-claims-inferred-ignored、unreachable-claims-stock-growth-unchecked）。
+# 弄坏开关 DOC_REGISTRIES_BREAK=unreachable-claims、unreachable-claims-names-unresolved、unreachable-claims-names-ignored、unreachable-claims-inferred-ignored、unreachable-claims-stock-growth-unchecked）。
 # 退役判据：kb 里不再有这类断言词（存量清单删空、连续四周没有新增句判红）时删掉这一格与清单。
 cell_unreachable_claims() {
   cell_failed=0
@@ -5146,4 +5208,11 @@ judge_field_frequency_sizes()        { break_skips field-frequency-sizes;       
 judge_unreachable_claims()           { break_skips unreachable-claims;           cell_unreachable_claims; }
 judge_counted_claims()               { break_skips counted-claims;               cell_counted_claims; }
 
+# ── 提前起 citations：选中了这一格，就在各格开始之前把外部引用复核起到后台（格在子 shell 里，起不了、也等不到父进程的后台作业；起法与等法在 start_citations 与 cell_citations 上面的说明）──
+if [[ " ${STAGE_CELLS_SELECTED[*]} " == *" citations "* ]]; then
+  start_citations
+fi
+
+# 这一道的格互不依赖、都只读被判的树：并行跑（.claude/gate.d/lib/stage-cells.sh 文件头「格并行」）
+STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"
 stage_cells_run "$ROOT"

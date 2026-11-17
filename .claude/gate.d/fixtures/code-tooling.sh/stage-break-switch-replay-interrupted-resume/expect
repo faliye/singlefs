@@ -1,0 +1,9 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=── 打断与续跑：被打断的那一趟（stage-break-switch-replay）
+want=· 样本档：判完第 1 趟、落了盘，照 .unit-verdict-sample/interrupted-resume/stop-after 停掉这一趟
+want=── 打断与续跑：第二趟（stage-break-switch-replay）
+want=· 按条复用：3 条开关（2 道阶段），现判 2、复用 1、拒算 0
+want=── 打断与续跑：第三趟（stage-break-switch-replay）
+want=全部复用，这一格一条都没起
+want=stage-break-switch-replay：绿

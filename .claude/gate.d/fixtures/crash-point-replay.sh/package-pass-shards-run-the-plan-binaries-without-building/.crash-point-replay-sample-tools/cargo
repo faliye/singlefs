@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# crash-point-replay「按条复用那一趟照计划那一步编好的清单直接起」样本的假 cargo（样本档）：
+#   -V 打版本；metadata 打一个包 singlefs-verification（库单测与 tests/plain_stream.rs 两个测试目标）的 JSON。
+#   test 每起一遍往同目录的 cargo-calls 追加一行收到的参数（门禁照它打「到哪一步为止 cargo test 起了几遍」），同目录 binaries/ 里的假测试二进制转过来的那几遍
+#   （环境里有 SAMPLE_BINARY_RUN）不记。
+#   带 --no-run 与 --message-format=json…（计划那一步经 test-targets-parallel.py --prebuild-into 编按条复用那一趟）：打两个测试产物的 compiler-artifact JSON，
+#     产物指到 binaries/ 里的假测试二进制（库单测那一个叫 singlefs_verification），退 0。
+#   带 --no-run、不带 JSON（计划那一步编登记的崩溃枚举用例）：每个 --test 目标打一行进度，binaries/<目标> 在且可执行才照真 cargo 打「Executable tests/<目标>.rs (<路径>)」，退 0。
+#   登记的崩溃枚举用例那一趟（不带 --lib、-- 之后没有 --skip、最后一个 --test 的目标有 cases/<目标>.log）：打一行进度再打那一份日志（case_log），退 0。
+#   别的（按条复用那一趟）照 cases/tests.tsv（一行「<源文件><TAB><libtest 名><TAB><ok|FAILED>」）逐个测试二进制打 libtest 的输出：-- 之后的 --skip <名>（带 --exact 时整名相同才跳）
+#     跳过的不打、计进 filtered out；经 cargo 起的先打一行 sample-cargo-arguments 与每段的 Running 行，假测试二进制转过来的不打 Running 行（那一行由 test-targets-parallel.py 写）。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+root="$(dirname "$here")"
+package_id="path+file://$root/crates/singlefs-verification#0.0.0"
+# case_log <日志> <测试目标>：库里的块用 $here/.judged-blocks/<测试目标> 这个记号模拟。环境里有 SINGLEFS_CRASH_AMPLIFICATION_SHARE 的是一片（引擎判这一片领的块、写进库）：
+#   日志原样打、留下记号；没有的是核账（整份 0/1）：记号在就是各片判过的块都从库里读到，CRASH_CASE_BLOCKS 那一行的 fresh 并进 reused、fresh 写 0；记号不在原样打
+case_log() {
+  if [[ -n "${SINGLEFS_CRASH_AMPLIFICATION_SHARE:-}" ]]; then
+    mkdir -p "$here/.judged-blocks" && : > "$here/.judged-blocks/$2"
+    cat "$1"
+  elif [[ -f "$here/.judged-blocks/$2" ]]; then
+    awk '/^CRASH_CASE_BLOCKS / { reused = fresh = 0; for (i = 1; i <= NF; i++) { if ($i ~ /^reused=/) { reused = substr($i, 8) + 0; reused_at = i } else if ($i ~ /^fresh=/) { fresh = substr($i, 7) + 0; fresh_at = i } } $reused_at = "reused=" (reused + fresh); $fresh_at = "fresh=0" } { print }' "$1"
+  else
+    cat "$1"
+  fi
+}
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+if [[ "${1:-}" == metadata ]]; then
+  printf '{"packages":[{"id":"%s","name":"singlefs-verification","targets":[{"kind":["lib"],"name":"singlefs_verification","doctest":true},{"kind":["test"],"name":"plain_stream","doctest":false}]}],"workspace_members":["%s"],"workspace_default_members":["%s"],"target_directory":"%s/target"}\n' \
+    "$package_id" "$package_id" "$package_id" "$here"
+  exit 0
+fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V、metadata 与 test：$*"; exit 101; }
+[[ -n "${SAMPLE_BINARY_RUN:-}" ]] || printf '%s\n' "$*" >>"$here/cargo-calls"
+if [[ " $* " == *" --no-run "* && " $* " == *" --message-format=json"* ]]; then
+  echo "   Compiling singlefs-verification v0.0.0 (样本)" >&2
+  printf '{"reason":"compiler-artifact","package_id":"%s","manifest_path":"%s","target":{"kind":["lib"],"name":"singlefs_verification","src_path":"%s"},"profile":{"test":true},"executable":"%s"}\n' \
+    "$package_id" "$root/crates/singlefs-verification/Cargo.toml" "$root/crates/singlefs-verification/src/lib.rs" "$here/binaries/singlefs_verification"
+  printf '{"reason":"compiler-artifact","package_id":"%s","manifest_path":"%s","target":{"kind":["test"],"name":"plain_stream","src_path":"%s"},"profile":{"test":true},"executable":"%s"}\n' \
+    "$package_id" "$root/crates/singlefs-verification/Cargo.toml" "$root/crates/singlefs-verification/tests/plain_stream.rs" "$here/binaries/plain_stream"
+  exit 0
+fi
+if [[ " $* " == *" --no-run "* ]]; then
+  previous_word=""
+  for word in "$@"; do
+    if [[ "$previous_word" == --test ]]; then
+      echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-build: target=$word"
+      [[ ! -x "$here/binaries/$word" ]] || echo "  Executable tests/$word.rs ($here/binaries/$word)"
+    fi
+    previous_word="$word"
+  done
+  exit 0
+fi
+last_test="" previous="" after=0 exact=0 all_sources=0 skips=() sources=()
+for word in "$@"; do
+  if ((after)); then
+    [[ "$word" == --exact ]] && exact=1
+    [[ "$previous" == --skip ]] && skips+=("$word")
+  else
+    [[ "$previous" == --test ]] && { last_test="$word"; sources+=("tests/$word.rs"); }
+    [[ "$word" == --tests ]] && all_sources=1
+    [[ "$word" == --lib ]] && sources=(src/lib.rs ${sources[@]+"${sources[@]}"})
+  fi
+  [[ "$word" == -- ]] && after=1
+  previous="$word"
+done
+if [[ -n "$last_test" && " $* " != *" --lib "* && ${#skips[@]} -eq 0 && -f "$here/cases/$last_test.log" ]]; then
+  echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-case: target=$last_test share=[${SINGLEFS_CRASH_AMPLIFICATION_SHARE-unset}] through-binary=[${SAMPLE_BINARY_RUN:-no}]"
+  case_log "$here/cases/$last_test.log" "$last_test"
+  exit 0
+fi
+if ((all_sources)); then
+  mapfile -t sources < <(printf '%s\n' ${sources[@]+"${sources[@]}"}; cut -f1 "$here/cases/tests.tsv")
+fi
+mapfile -t sources < <(printf '%s\n' ${sources[@]+"${sources[@]}"} | awk 'NF && !seen[$0]++')
+[[ -n "${SAMPLE_BINARY_RUN:-}" ]] || echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+skipped() {
+  local skip
+  for skip in ${skips[@]+"${skips[@]}"}; do
+    if ((exact)); then [[ "$1" == "$skip" ]] && return 0; else [[ "$1" == *"$skip"* ]] && return 0; fi
+  done
+  return 1
+}
+status=0 number=0
+for source in ${sources[@]+"${sources[@]}"}; do
+  number=$((number + 1))
+  if [[ -z "${SAMPLE_BINARY_RUN:-}" ]]; then
+    if [[ "$source" == src/lib.rs ]]; then echo "     Running unittests src/lib.rs (target/release/deps/singlefs_verification-000000000000000$number)"
+    else echo "     Running $source (target/release/deps/$(basename "$source" .rs)-000000000000000$number)"; fi
+  fi
+  passed=0 failed=0 filtered=0 lines=()
+  while IFS=$'\t' read -r row_source name outcome; do
+    [[ "$row_source" == "$source" ]] || continue
+    if skipped "$name"; then filtered=$((filtered + 1)); continue; fi
+    lines+=("test $name ... $outcome")
+    if [[ "$outcome" == FAILED ]]; then failed=$((failed + 1)); else passed=$((passed + 1)); fi
+  done < "$here/cases/tests.tsv"
+  echo
+  echo "running $((passed + failed)) tests"
+  printf '%s\n' ${lines[@]+"${lines[@]}"}
+  echo
+  if ((failed)); then
+    echo "test result: FAILED. $passed passed; $failed failed; 0 ignored; 0 measured; $filtered filtered out; finished in 0.00s"
+    status=101
+  else
+    echo "test result: ok. $passed passed; 0 failed; 0 ignored; 0 measured; $filtered filtered out; finished in 0.00s"
+  fi
+  echo
+done
+exit "$status"

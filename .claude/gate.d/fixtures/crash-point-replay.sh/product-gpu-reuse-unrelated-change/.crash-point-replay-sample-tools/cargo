@@ -2,11 +2,28 @@
 # crash-point-replay 按条记库与补判样本的假 cargo（样本档）：-V 打版本；test 照 cases/tests.tsv 逐个测试二进制打 libtest 的输出。
 # tests.tsv 一行一条：<哪一趟：plain|feature|both><TAB><源文件><TAB><libtest 名，- 是这个二进制这一趟一条都没有><TAB><ok|FAILED|ignored><TAB><样子><TAB><测试自己打的一行，- 是不打>
 #   样子：line（自己打的那一行先单独一行，结果行在它后面：几条同时跑时的样子）、scattered（「test <名> ... 」后面接自己打的那一行，结局另起一行：
-#   --test-threads 1 的样子）、glued（结局粘在自己打的那一行后面，认不出结局）。
+#   别的测试打的字夹进起头与结局之间时的样子）、glued（结局粘在自己打的那一行后面，认不出结局）。
 # 不带 --features 是 plain 那一趟，带了是 feature 那一趟。带 --tests 打这一趟的全部源文件；不带的 --lib 打 src/lib.rs、--test <名> 打 tests/<名>.rs、
 # --bin <名> 打 src/bin/<名>.rs（点了而这一趟没有它的行，打 running 0 tests）。-- 之后的 --skip <名>（带 --exact 时整名相同才跳）跳过的不打、计进 filtered out。
-# 有 FAILED 的二进制汇总行写 FAILED、整趟退 101。每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>，expect 靠它核阶段交了哪几个目标与 --skip。
+# 有 FAILED 的二进制汇总行写 FAILED、整趟退 101。
+# 环境里设了 SINGLEFS_CRASH_AMPLIFICATION_STAGE 的（产品 GPU 包的测试包那一格的两段）另打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=<值> cards=[<GPU_CARDS_BY_PRIORITY，没设写 unset>]；
+#   只录那一趟（stage=record）每条不标 ignored 的测试自己打的那一行换成 RECORDED_ONLY test=<名>、结局一律 ok（对拍还没做，红不在这一段）；
+#   cases/record.exit 在时只录那一趟打一行 panicked、照它写的码退（演造输入或写库那一侧红）。
+每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>，expect 靠它核阶段交了哪几个目标与 --skip。
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# case_log <日志> <测试目标>：登记的崩溃枚举用例那一趟打的日志；库里的块用 $here/.judged-blocks/<测试目标> 这个记号模拟。
+#   环境里有 SINGLEFS_CRASH_AMPLIFICATION_SHARE 的是单片（引擎判这一片领的块、写进库）：日志原样打、留下记号；
+#   没有的是核账（整份 0/1）：记号在就是各片判过的块都从库里读到，CRASH_CASE_BLOCKS 那一行的 fresh 并进 reused、fresh 写 0；记号不在（库里没有）原样打
+case_log() {
+  if [[ -n "${SINGLEFS_CRASH_AMPLIFICATION_SHARE:-}" ]]; then
+    mkdir -p "$here/.judged-blocks" && : > "$here/.judged-blocks/$2"
+    cat "$1"
+  elif [[ -f "$here/.judged-blocks/$2" ]]; then
+    awk '/^CRASH_CASE_BLOCKS / { reused = fresh = 0; for (i = 1; i <= NF; i++) { if ($i ~ /^reused=/) { reused = substr($i, 8) + 0; reused_at = i } else if ($i ~ /^fresh=/) { fresh = substr($i, 7) + 0; fresh_at = i } } $reused_at = "reused=" (reused + fresh); $fresh_at = "fresh=0" } { print }' "$1"
+  else
+    cat "$1"
+  fi
+}
 if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
 [[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
 # 登记的崩溃枚举用例那一趟（不带 --lib、最后一个 --test 的目标有 cases/<目标>.log）：先打收到的参数，再打那一份日志、退出码照同名 .exit（没有就 0）；
@@ -22,13 +39,19 @@ if [[ -n "$last_test" && " $* " != *" --lib "* && -f "$here/cases/$last_test.log
   if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE:-}" && -f "$here/cases/$last_test.findings.tsv" ]]; then
     cat "$here/cases/$last_test.findings.tsv" >> "$SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE" || exit 101
   fi
-  cat "$here/cases/$last_test.log"
+  case_log "$here/cases/$last_test.log" "$last_test"
   exit "$(cat "$here/cases/$last_test.exit" 2>/dev/null || echo 0)"
 fi
 echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
 # 带 gpu 特性（gpu、tests-on-a-real-gpu）的那一趟另打一行：收到的 task-server 显卡与在不在清场包装底下（expect 靠它核阶段把卡交给了 cargo、没自己套清场包装）
 gpu_features_pattern=' --features [^ ]*gpu'
 [[ " $* " =~ $gpu_features_pattern ]] && echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[${GPU_CARDS_BY_PRIORITY-unset}] quiesced-by-the-stage=[${GPU_QUIESCE_HOLDER:+yes}]"
+sample_stage="${SINGLEFS_CRASH_AMPLIFICATION_STAGE-}"
+[[ -n "$sample_stage" ]] && echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=$sample_stage cards=[${GPU_CARDS_BY_PRIORITY-unset}]"
+if [[ "$sample_stage" == record && -f "$here/cases/record.exit" ]]; then
+  echo "thread 'sample' panicked at tests/sample.rs:1:1: 样本：只录那一趟写不进判定库"
+  exit "$(cat "$here/cases/record.exit")"
+fi
 pass=plain all_sources=0 skips=() exact=0 after=0 previous="" sources=()
 for word in "$@"; do
   if ((after)); then
@@ -68,6 +91,7 @@ for source in ${sources[@]+"${sources[@]}"}; do
     [[ "$name" == - ]] && continue
     if skipped "$name"; then filtered=$((filtered + 1)); continue; fi
     count=$((count + 1))
+    if [[ "$sample_stage" == record && "$outcome" != ignored ]]; then outcome=ok form=line printed="RECORDED_ONLY test=$name"; fi
     case "$form" in
       scattered) lines+=("test $name ... $printed" "$outcome") ;;
       glued) lines+=("test $name ... $printed$outcome") ;;

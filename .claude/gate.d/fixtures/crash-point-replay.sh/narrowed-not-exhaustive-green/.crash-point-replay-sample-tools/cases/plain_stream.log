@@ -1,0 +1,6 @@
+running 1 test
+CRASH_POINT_REPLAY states=53 closed_form=16777268 violations=0 exhaustive=false
+CRASH_CASE_BLOCKS blocks=2 reused=2 fresh=0 red=0 refused=0 states=53 expand_up_to=5
+test plain_stream_full ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s

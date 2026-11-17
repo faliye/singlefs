@@ -1,0 +1,3 @@
+# 样本点名的项（门禁文件头「逐项点名」）：两条登记的崩溃枚举用例都点
+crash-case:plain-stream
+crash-case:other-stream

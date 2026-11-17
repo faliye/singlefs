@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# task-server-shards: *
+# task-server-compiles: yes
 # admission: always 判的是此刻被判的仓、此刻的 Verus 安装与 cargo 缓存，上一次的结论不替这一次作保
 # run-condition: none 要的 Verus、cargo 与装置由各格的判法自己判，缺了判红；核还没进仓时 Verus 那四格报本次未跑
 # gate-stage: 形式化验证（Verus 证明恢复重放取前缀的核，版本钉住、空真与必红世界按落点判；E165 的红例钉进门禁；两条本该独立的腿的同源性计数器）
@@ -25,9 +27,9 @@
 #   Verus 四格：scripts/gate/verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根>，登记表 .claude/gate.d/verus-pins.tsv（crate 行可以多条：
 #     replay-prefix 直接起 verus，singlefs-core 这一种第四段写 cargo、经 cargo verus focus 验），信任清单 .claude/gate.d/verus-trust-list.tsv（verus-proof 格判）。
 #     核没进仓（登记的核不在、crate 不依赖 vstd、src 里没有 verus!）时四格都退 77；核不在而 crate 已经接了 Verus 判红。
-#     读的环境变量：GATE_VERUS_JOBS（几处同时验，没设照判法文件头 --jobs 的默认）、
+#     读的环境变量：GATE_VERUS_JOBS（几处同时验；分片的一片由这一道照下面「分片」shard 一段算好设上，别的跑法没设照判法文件头 --jobs 的默认）、
 #     SINGLEFS_THREAD_CAP（线程，没设取登记的重活默认并行度 .claude/heavy-thread-default）、SINGLEFS_VERUS_ROOT（Verus 安装目录，盖过登记表）。
-#     判法直接起 Verus，不套内存包装、不设每个进程的内存上限，也不按内存收几处同时验：整条命令的内存额度与线程上限由 task-server 给（task-server/README.md「提交写法」）。
+#     判法直接起 Verus，不套内存包装、不设每个进程的内存上限；几处同时验只在分片的一片里按这一台 slice 能给的内存收（下面「分片」），整条命令的内存额度由 task-server 给（task-server/README.md「提交写法」）。
 #     不限时：卡住由 task-server 判、停掉记 stalled，Verus 没出结局就没有判定，不当通过。
 #   红例两格：scripts/experiment-apparatus/e165-pin-red-examples.py --check-table / --replay，表的格式写在 .claude/gate.d/e165-pinned-red-examples.tsv 表头；
 #     table 格只读钉表与变异表，不读红例账、kill-bounds 产物与 research/ 下任何文件（钉全由 E165 第二段驱动 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh
@@ -45,7 +47,7 @@
 #     判红的那一项照同一把键记红、撤掉原有的绿，下一趟现判（判法两份脚本文件头「逐项点名与按条复用」的记红撤绿）。
 #     整道、--check、--item 都读（键相同就复用），现判的照键写回同一份库。
 #   每项一行「· <项>：绿|红，现判（<原因>：<变了的单元>）|复用」，每格一行「· 按条：现判 N、复用 M（现判的原因：…）」，整道末了一行「── 按条（…）：现判 N、复用 M」。
-# 逐项点名（.claude/rules/verification.md「门禁的结构」里门禁按项点名的 --list-items / --item）：
+# 逐项点名（.claude/rules/verification-reference.md「门禁的结构」里门禁按项点名的 --list-items / --item）：
 #   --list-items 逐行打「项<TAB>格[<TAB>说明]」：toolchain、proof（整格）、table 各一项，证明每个有证明义务的单元一项 proof:<fn 名或 <类型>::clone>，空真每处 requires 一项
 #     vacuity:<所属 fn>#<函数内第几处>，必红世界每行一项 must-red:<变异名>，红例钉表每行一项 pinned:<钉表行号>；只读登记表、核与两张表，不编、不起 Verus 与装置。
 #   --list-items --with-keys 另逐项照现在的键比 prune-server 那一份库（只读库、不写库、不起 Verus 与装置、不编 cargo；Verus 要装着，键里的工具链读它的安装）：
@@ -70,6 +72,22 @@
 #     与 --check、--list-items 不一起用（退 2）。
 #     证明那一格同时收到 proof 与 proof:<名> 时照整格判（点名的加在整格之上，各项之和、完整 crate 证明与 MIR 比对照跑；verus-proof-check.py 的 check_proof，
 #     弄坏开关 VERUS_PROOF_CHECK_BREAK=proof-item-narrows 下只验点名的那一个）。
+# 分片（task-server/task_server_lib.py 文件头「分片」；文件头第二行「# task-server-shards: *」让服务把经它交的每一种跑法——不带参数、--check、--item——拆成计划、各片、合并）：
+#   这一道照环境里的 TASK_SERVER_SHARD_PHASE 只做其中一步；这几个 TASK_SERVER_SHARD_* 变量读完就从环境里清掉。认不出的一步退 2。
+#   逐项入库的是证明、空真、必红世界、红例重放四格的项（proof:*、vacuity:*、must-red:*、pinned:*，下称逐项格）；toolchain、proof（整格那一项）、table 与 same-origin-counter
+#   每趟现判、不入库，只在合并那一步跑。
+#   plan   参数照常认；带 --list 的写 0 片。逐项格照这一趟的选格与 --item 列项、照 prune-server 那一份库比键（同 --list-items --with-keys），
+#          键相同之外的项（键对不上、无记录、拒算）按列项的次序轮流分到 N 片，N = min(要现判的项数, 多机配置 HOSTS 的台数)（读不出退 78）；一项都不要现判写 0 片。
+#          往计划目录写 plan.json、shards（片数一行）与 items-<片号>（一行「项<TAB>格」）。不起 Verus、不编装置。
+#   shard  只跑逐项格里归这一片的项（照 --item 那一路交给两份判法），判的都写进 prune-server 那一份库；有红退 1（服务撤掉还在排的兄弟片、不起合并），
+#          prune-server 不可用照判法退 75。几处同时验（GATE_VERUS_JOBS）= min(每台默认重活线程数, 这一台 slice 能给的内存 ÷ 每处的实测峰值)，
+#          每处的实测峰值取运行记录 <工作根>/formal-verification-process-peaks/ 里最新 5 份的最大（一份是一片整棵进程树的峰值 ÷ 那一片开的处数，偏大）；
+#          没有记录或这一台的 slice 取不到时按线程数开满，内存额度由服务按记录给、撞了放大重排。这一台 slice 取的是多机配置 SLICE_MEMORY_CAP_BY_HOST 里这一台那一项
+#          （scripts/hosts/task_memory.py 的 host_slice_cap_bytes）。片跑完把这一片的峰值 ÷ 处数记一份。样本根不记。
+#   merge  与不经服务分片起的那一趟（gate.sh 整轮、--staged）同一路，叫核账：先照此刻的键比库，逐项格里点到的项有一条键对不上或无记录就判红退 1、不起 Verus
+#          （各片判过的按此刻的键在服务里读不到：源码中途变了，或片连的不是同一份服务）；都对得上再照常跑七格，逐项格全复用（复用哨兵抽中的那一条与拒算的照判）。
+#          服务交的 TASK_SERVER_SHARD_MISSING 不空（人手取消了一片）：一格都不判，退 77、点名缺的片。
+#   样本根（被判的根不是这道阶段所在的仓、也没设 GATE_STAGED_FROM）不经服务时照常跑七格、不核账：样本用假工具判，判法与一片相同。
 # 样本（fixtures/formal-verification.sh/<格名>-<情形>/，各放 .gate-cells 点名一格；共享门禁的 stage-selftest.sh 跑）。名字读不出判法的几份：
 #   verus-toolchain-pinned-*：假的 Verus 安装与假的 cargo 缓存放在样本的 .formal-sample/ 下
 #   verus-must-red-worlds-list-items：只列项；-list-items-key-counts：列项照临时服务里空的那一份比键（.formal-sample/with-keys），每格「无记录」几条、末了「键对不上共 0 条」
@@ -216,7 +234,7 @@
 #   E165_PIN_RED_EXAMPLES_BREAK=row-columns-unchecked  段数不是 22 的行不报，当表里没有这一行
 #       pinned-red-examples-replay-columns-red（判绿：桩照 ⑦ 打）
 #
-#   bash .claude/gate.d/formal-verification.sh [项目根]
+#   bash .claude/gate.d/formal-verification.sh [项目根]                七格都跑；经 task-server/task submit 交的由服务照上面「分片」拆，gate.sh 整轮起的那一趟是核账
 #   bash .claude/gate.d/formal-verification.sh --list        逐行打格名与判什么，不起 Verus、不编
 #   bash .claude/gate.d/formal-verification.sh --list-items  逐行打可点名的项与它属于哪一格，不起 Verus、不编
 #   bash .claude/gate.d/formal-verification.sh --item <项> [--item <项>…] [项目根]   只跑点名的项
@@ -250,6 +268,54 @@ stage_cell pinned-red-examples-replay cell_pinned_red_examples_replay "钉住的
   "段数不是 22、抄来的账行与自己的段对不上是手改坏了，从 git 找回再钉；变异行不在了就找回那一行；装置逐行对不上是今天的实现在钉住的输入上与原实现不同，按回归修实现；装置报指纹漂了先查它的枚举次序与状态编码；✗ 行写「被信号停了」的是外面停了它：查是谁在那一刻停了它（同一时刻的 ps、journalctl --user、看门狗的记录），这一次的输出不算判定，不改变异行或实现（整条命令撞了内存上限由 task-server 放大重排，不在这一道判）"
 stage_cell same-origin-counter cell_same_origin_counter "同源性计数器：不一致事件表 divergence-events.tsv 里每个已立的对累计 ≥ 5 次不一致而判「spec 错」0 次即判红；未立的对报未立、不计入，条款欠一句不计入累计" \
   "红的那一对累计 ≥ 5 次不一致而 spec 错 0 次，说明两条腿实际同源：D13 已定项 13 定的处置是把它们合并、预算移给穷举，这是设计决定，交主 agent 问用户，不靠改表销账；表里确有一次判错了（该是 spec 错）就改那一行的判谁错、出处写重判的记录；表写坏了（日期、对名、判谁错、出处，或未立的对收了事件）照红行点名的那一行改，格式在 .claude/gate.d/divergence-events.tsv 文件头"
+# 分片（文件头「分片」）：服务给的这一步、片号与几个目录读完就从环境里清掉，不传给两份判法、Verus 与装置
+formal_shard_phase="${TASK_SERVER_SHARD_PHASE:-}"
+formal_shard_position="${TASK_SERVER_SHARD:-}"
+formal_shard_plan_directory="${TASK_SERVER_SHARD_PLAN_DIRECTORY:-}"
+formal_shard_output_directory="${TASK_SERVER_SHARD_OUTPUT_DIRECTORY:-}"
+formal_shard_missing="${TASK_SERVER_SHARD_MISSING:-}"
+unset TASK_SERVER_SHARD_PHASE TASK_SERVER_SHARD TASK_SERVER_SHARD_PLAN_DIRECTORY TASK_SERVER_SHARD_OUTPUT_DIRECTORY TASK_SERVER_SHARD_OUTPUTS \
+  TASK_SERVER_SHARD_MISSING TASK_SERVER_SHARD_HOST
+# formal_shard_refuse <卡在哪> <下一步> <退出码>
+formal_shard_refuse() {
+  echo "  ✗ 分片的 ${formal_shard_phase} 那一步：$1"
+  echo "     → 怎么办：$2"
+  exit "$3"
+}
+# formal_write_shard_plan <片数> <一句说明>：往计划目录写 plan.json（每片只有 label）与 shards（片数一行），退 0；各片的 items-<片号> 由调用方先写好
+formal_write_shard_plan() {
+  [[ -n "$formal_shard_plan_directory" ]] \
+    || formal_shard_refuse "环境里没有 TASK_SERVER_SHARD_PLAN_DIRECTORY" "这一步只由 task-server 照分片协议起（task-server/task_server_lib.py 文件头「分片」）" 2
+  mkdir -p -- "$formal_shard_plan_directory" || formal_shard_refuse "建不了计划目录 $formal_shard_plan_directory" "看共享工作根可不可写" 78
+  python3 - "$formal_shard_plan_directory" "$1" "$2" <<'PY_FORMAL_SHARD_PLAN' || formal_shard_refuse "写不成 plan.json（上面是 python 的报错）" "看计划目录 $formal_shard_plan_directory 可不可写" 1
+import json, os, sys
+directory, count, note = sys.argv[1], int(sys.argv[2]), sys.argv[3]
+labels = []
+for index in range(count):
+    with open(os.path.join(directory, f"items-{index}"), encoding="utf-8") as handle:
+        labels.append(f"形式化验证第 {index} 片（共 {count} 片，{sum(1 for line in handle if line.strip())} 项）")
+temporary = os.path.join(directory, "plan.json.partial")
+with open(temporary, "w", encoding="utf-8") as handle:
+    json.dump({"shards": [{"label": label} for label in labels], "note": note}, handle, ensure_ascii=False)
+os.replace(temporary, os.path.join(directory, "plan.json"))
+with open(os.path.join(directory, "shards"), "w", encoding="utf-8") as handle:
+    handle.write(f"{count}\n")
+PY_FORMAL_SHARD_PLAN
+  formal_shard_plan_item_count="$(cat -- "$formal_shard_plan_directory"/items-* | grep -c .)" || formal_shard_plan_item_count=0
+  echo "  ✓ 分片的计划：$1 片（$2），共 $formal_shard_plan_item_count 项，写进 $formal_shard_plan_directory"
+  exit 0
+}
+case "$formal_shard_phase" in
+  ""|plan|shard|merge) ;;
+  *) formal_shard_refuse "TASK_SERVER_SHARD_PHASE=$formal_shard_phase 认不得（只认 plan、shard、merge）" "照 task-server/task_server_lib.py 文件头「分片」的协议起" 2 ;;
+esac
+if [[ "$formal_shard_phase" == plan ]]; then
+  for formal_argument in "$@"; do
+    case "$formal_argument" in
+      --list|--tool-versions) formal_write_shard_plan 0 "$formal_argument 只打表、不判，在合并那一步打" ;;
+    esac
+  done
+fi
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 root_argument=""
 tool_versions_requested=0
@@ -437,7 +503,7 @@ if ((list_items_requested)); then
     with_keys_requested="$saved_with_keys"
     unknown_listed=()
     for wanted_item in "${requested_items[@]}"; do
-      cut -f1 "$formal_items_file" | grep -qxF -- "$wanted_item" || unknown_listed+=("$wanted_item")
+      grep -qxF -- "$wanted_item" <<<"$(cut -f1 "$formal_items_file")" || unknown_listed+=("$wanted_item")
     done
     if ((${#unknown_listed[@]})); then
       echo "  ✗ 没有这些项：${unknown_listed[*]}"
@@ -512,6 +578,166 @@ if ((${#requested_items[@]})); then
   done
   STAGE_CELLS_CHECK_GIVEN=1
   STAGE_CELLS_SELECTION_SOURCE="--item 点名 ${#requested_items[@]} 项"
+fi
+
+# 分片的计划、一片与核账（文件头「分片」）。逐项格的项照这一趟的选格（STAGE_CELLS_SELECTED）与 --item 列出、比键：
+#   formal_items_by_key <输出文件> <要的状态> [<要的状态>…]：往输出文件写逐项格里点到的、键状态是其中之一的项，一行「项<TAB>格」，次序照列项；
+#   比键照 list_formal_items（--with-keys 那一路；列不出时它自己打红句、整道退 1）
+FORMAL_PER_ITEM_CELLS="verus-proof verus-vacuity verus-must-red-worlds pinned-red-examples-replay"
+formal_items_by_key() {
+  local output_file="$1"
+  shift
+  with_keys_requested=1
+  list_formal_items
+  python3 - "$formal_items_file" "$formal_items_report_file" "${STAGE_CELLS_SELECTED[*]-}" "$FORMAL_PER_ITEM_CELLS" "$(printf '%s\n' ${requested_items[@]+"${requested_items[@]}"})" "$@" >"$output_file" <<'PY_FORMAL_ITEMS_BY_KEY'
+import re, sys
+items_file, report_file, selected, per_item, requested_text, *wanted = sys.argv[1:]
+cells = set(selected.split()) & set(per_item.split())
+requested = {line for line in requested_text.split("\n") if line}
+states = {}
+for line in open(report_file, encoding="utf-8"):
+    matched = re.match(r"^ITEM_KEY item=(.+) state=(\S+)$", line.rstrip("\n"))
+    if matched:
+        states[matched.group(1)] = matched.group(2)
+for line in open(items_file, encoding="utf-8"):
+    fields = line.rstrip("\n").split("\t")
+    if len(fields) < 2 or fields[1] not in cells or not re.match(r"^(proof|vacuity|must-red|pinned):", fields[0]):
+        continue
+    if requested and fields[0] not in requested:
+        continue
+    if states.get(fields[0], "没比出") in wanted:
+        print(f"{fields[0]}\t{fields[1]}")
+PY_FORMAL_ITEMS_BY_KEY
+  local listing_exit=$?
+  rm -f "${formal_items_file:?}" "${formal_items_report_file:?}"
+  with_keys_requested=0
+  return "$listing_exit"
+}
+if [[ "$formal_shard_phase" == plan ]]; then
+  formal_plan_items="$(mktemp)" || formal_shard_refuse "建不了临时文件" "看 \$TMPDIR 满没满、有没有写权限" 1
+  formal_items_by_key "$formal_plan_items" 键对不上 无记录 拒算 没比出 || { rm -f "$formal_plan_items"; formal_shard_refuse "列项比键没成（上面是判法的红句）" "照红句修登记表、核或钉表，再交" 1; }
+  formal_plan_count="$(grep -c . "$formal_plan_items")"
+  if ((formal_plan_count == 0)); then
+    rm -f "$formal_plan_items"
+    formal_write_shard_plan 0 "逐项格点到的项键都相同（或这一趟没点逐项格），合并那一步照键复用"
+  fi
+  formal_configuration_file="$(source "$STAGE_REPOSITORY/scripts/crash/crash-amplification-lib.sh" >/dev/null 2>&1; crash_amplification_multi_host_configuration_file "$ROOT")"
+  formal_hosts_value="$(source "$STAGE_REPOSITORY/scripts/crash/crash-amplification-lib.sh" >/dev/null 2>&1; crash_amplification_configuration_value "$formal_configuration_file" HOSTS)"
+  formal_hosts=()
+  read -r -a formal_hosts <<<"$formal_hosts_value"
+  if ((${#formal_hosts[@]} == 0)); then
+    rm -f "$formal_plan_items"
+    formal_shard_refuse "多机配置 ${formal_configuration_file:-（没找到）} 的 HOSTS 是空的：定不了分几片" "照仓根 multi-host.env.example 写好多机配置的 HOSTS 再交" 78
+  fi
+  formal_shard_total=$((formal_plan_count < ${#formal_hosts[@]} ? formal_plan_count : ${#formal_hosts[@]}))
+  mkdir -p -- "$formal_shard_plan_directory" || formal_shard_refuse "建不了计划目录 $formal_shard_plan_directory" "看共享工作根可不可写" 78
+  awk -F'\t' -v directory="$formal_shard_plan_directory" -v total="$formal_shard_total" \
+    'BEGIN { for (index_ = 0; index_ < total; index_++) printf "" > (directory "/items-" index_) }
+     { print > (directory "/items-" ((NR - 1) % total)) }' "$formal_plan_items" \
+    || { rm -f "$formal_plan_items"; formal_shard_refuse "写不成各片的 items-<片号>" "看计划目录 $formal_shard_plan_directory 可不可写" 1; }
+  rm -f "$formal_plan_items"
+  formal_write_shard_plan "$formal_shard_total" "逐项格要现判 $formal_plan_count 项，按列项次序轮流分到 $formal_shard_total 片（多机配置 HOSTS ${#formal_hosts[@]} 台）"
+fi
+formal_peak_sampler_pid=""
+if [[ "$formal_shard_phase" == shard ]]; then
+  if [[ ! "$formal_shard_position" =~ ^([0-9]+)/([1-9][0-9]*)$ ]] || (( BASH_REMATCH[1] >= BASH_REMATCH[2] )) \
+     || [[ "$(head -n 1 -- "$formal_shard_plan_directory/shards" 2>/dev/null)" != "${BASH_REMATCH[2]}" ]] \
+     || [[ ! -f "$formal_shard_plan_directory/items-${BASH_REMATCH[1]}" ]]; then
+    formal_shard_refuse "片号 TASK_SERVER_SHARD=${formal_shard_position:-（没给）} 对不上计划目录 ${formal_shard_plan_directory:-（没给）} 里的片数或各片的项" \
+      "这一步只由 task-server 照计划那一步写的 plan.json 起" 2
+  fi
+  formal_shard_index="${BASH_REMATCH[1]}"
+  formal_shard_total="${BASH_REMATCH[2]}"
+  # 片退 0 就要有产物目录（task-server/task_server_lib.py 文件头「分片」②）；这一道的结论不经它交（判定在服务里），只建、空着
+  [[ -n "$formal_shard_output_directory" ]] && mkdir -p -- "$formal_shard_output_directory" \
+    || formal_shard_refuse "建不了产物目录 ${formal_shard_output_directory:-（没给）}" "看共享工作根可不可写" 78
+  item_options_of_cell=()
+  declare -A formal_shard_cells=()
+  formal_shard_item_count=0
+  while IFS=$'\t' read -r formal_shard_item formal_shard_cell; do
+    [[ -n "$formal_shard_item" ]] || continue
+    item_options_of_cell[$formal_shard_cell]+="$formal_shard_item"$'\n'
+    formal_shard_cells[$formal_shard_cell]=1
+    formal_shard_item_count=$((formal_shard_item_count + 1))
+  done < "$formal_shard_plan_directory/items-$formal_shard_index"
+  STAGE_CELLS_SELECTED=()
+  for cell_name in "${STAGE_CELLS_NAMES[@]}"; do
+    [[ -n "${formal_shard_cells[$cell_name]+set}" ]] && STAGE_CELLS_SELECTED+=("$cell_name")
+  done
+  STAGE_CELLS_CHECK_GIVEN=1
+  STAGE_CELLS_SELECTION_SOURCE="分片第 $formal_shard_index/$formal_shard_total 片的 $formal_shard_item_count 项"
+  # 几处同时验（文件头「分片」shard）：min(每台默认重活线程数, 这一台 slice 能给的内存 ÷ 每处的实测峰值)；第一行是处数，第二行是一句依据
+  formal_peak_records="$(python3 "$STAGE_REPOSITORY/.claude/hooks/lib_work_root.py")/formal-verification-process-peaks"
+  formal_jobs_text="$(python3 - "$STAGE_REPOSITORY/scripts/hosts" "$formal_peak_records" <<'PY_FORMAL_CONCURRENT_RUNS'
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import task_memory
+from heavy_threads import default_heavy_threads
+records = sys.argv[2]
+threads = int(default_heavy_threads())
+cap, cap_text = task_memory.host_slice_cap_bytes(os.environ)
+names = sorted(name for name in os.listdir(records) if not name.startswith(".")) if os.path.isdir(records) else []
+peaks = []
+for name in names[-5:]:
+    text = open(os.path.join(records, name), encoding="utf-8").read().strip()
+    if text.isdigit() and int(text) > 0:
+        peaks.append(int(text))
+peak = max(peaks) if peaks else None
+if cap is None or peak is None:
+    print(threads)
+    why = cap_text if cap is None else f"运行记录 {records} 里还没有每处的实测峰值"
+    print(f"按线程数开满 {threads} 处（{why}；内存额度由服务按记录给、撞了放大重排）")
+else:
+    jobs = max(1, min(threads, cap // peak))
+    print(jobs)
+    print(f"{jobs} 处 = min(线程数 {threads}, 这一台 slice {task_memory.format_size(cap)} ÷ 每处实测峰值 {task_memory.format_size(peak)}（{records} 最新 {len(peaks)} 份的最大）)")
+PY_FORMAL_CONCURRENT_RUNS
+)" || formal_shard_refuse "算不出几处同时验（上面是 python 的报错）" "看 .claude/heavy-thread-default 与多机配置 SLICE_MEMORY_CAP_BY_HOST 读不读得了" 1
+  export GATE_VERUS_JOBS="${formal_jobs_text%%$'\n'*}"
+  echo "  · 分片：第 $formal_shard_index/$formal_shard_total 片，逐项格 $formal_shard_item_count 项（${STAGE_CELLS_SELECTED[*]-}）；几处同时验：${formal_jobs_text#*$'\n'}"
+  # 这一片整棵进程树的峰值：采样进程每秒量一次（scripts/hosts/task_memory.py 的 process_tree_usage），收尾记一份「峰值 ÷ 处数」进运行记录
+  formal_peak_file="$(mktemp)" && formal_peak_stop="$(mktemp)" && rm -f -- "$formal_peak_stop" \
+    || formal_shard_refuse "建不了临时文件" "看 \$TMPDIR 满没满、有没有写权限" 1
+  python3 - "$$" "$formal_peak_file" "$formal_peak_stop" "$STAGE_REPOSITORY/scripts/hosts" <<'PY_FORMAL_PEAK_SAMPLER' &
+import os, sys, time
+sys.path.insert(0, sys.argv[4])
+import task_memory
+root, output, stop = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+peak = 0
+while not os.path.exists(stop) and os.path.exists(f"/proc/{root}"):
+    usage = task_memory.process_tree_usage(root)
+    if usage and usage > peak:
+        peak = usage
+        with open(output + ".partial", "w", encoding="utf-8") as handle:
+            handle.write(f"{peak}\n")
+        os.replace(output + ".partial", output)
+    time.sleep(1)
+PY_FORMAL_PEAK_SAMPLER
+  formal_peak_sampler_pid=$!
+fi
+if [[ "$formal_shard_phase" == merge && -n "$formal_shard_missing" ]]; then
+  echo "  ! 本次未跑（这不是通过）：分片的合并那一步缺片 $formal_shard_missing（人手取消了那几片），一格都不判"
+  echo "     → 怎么办：重交整件（同一条命令），各片判过的照单元键复用"
+  exit 77
+fi
+# 核账（文件头「分片」merge）：合并那一步与不经服务分片起的那一趟（样本根除外）先照此刻的键比库，逐项格点到的项有键对不上或无记录的就判红、不起 Verus
+if [[ "$formal_shard_phase" == merge ]] || { [[ -z "$formal_shard_phase" ]] && ((! sample_mode)); }; then
+  formal_unjudged="$(mktemp)" || { echo "  ✗ 建不了临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
+  if ! formal_items_by_key "$formal_unjudged" 键对不上 无记录; then
+    rm -f "$formal_unjudged"
+    echo "  ✗ 核账：列项比键没成（上面是判法的红句），一格都没跑"
+    echo "     → 怎么办：照红句修登记表、核或钉表，再经 task-server/task submit 交这一道"
+    exit 1
+  fi
+  if [[ -s "$formal_unjudged" ]]; then
+    echo "  ✗ 核账：逐项格点到的项里 $(grep -c . "$formal_unjudged") 项此刻的键在 prune-server 那一份库里没有判定（键对不上或无记录），一格都没跑、没起 Verus；头几项："
+    head -n 20 "$formal_unjudged" | sed 's/^/       /'   # gate-lint:detail
+    echo "     → 怎么办：经 task-server/task submit 交这一道（服务照文件头「分片」拆成各片现判、合并核账）；已经是合并那一步的，是各片判过之后源码变了或片连的不是同一份服务：等树里的改动停下再重交整件，判过的照键复用"
+    rm -f "$formal_unjudged"
+    exit 1
+  fi
+  rm -f "$formal_unjudged"
+  echo "  · 核账：逐项格点到的项此刻的键在库里都有判定，七格照常跑、逐项格照键复用（复用哨兵抽中的那一条与拒算的照判）"
 fi
 # 把这一格点名的项交成判法的 --item 参数（一项一对），交到 item_arguments 数组里
 item_arguments_of() {
@@ -705,4 +931,26 @@ fi
 rm -f "${item_done_record:?}"
 if [[ -n "${GATE_NOT_RUN_FILE:-}" && -s "$not_run_record" ]]; then cat "$not_run_record" >> "$GATE_NOT_RUN_FILE"; fi
 rm -f "${not_run_record:?}"
+# 分片的一片（文件头「分片」shard）：停采样，把这一片整棵进程树的峰值 ÷ 处数记一份进运行记录（样本根不记）；记不成只打一行，不改退出码
+if [[ -n "$formal_peak_sampler_pid" ]]; then
+  : > "$formal_peak_stop"
+  wait "$formal_peak_sampler_pid"
+  formal_shard_peak="$(head -n 1 -- "$formal_peak_file" 2>/dev/null)"
+  rm -f -- "$formal_peak_file" "$formal_peak_file.partial" "$formal_peak_stop"
+  if ((! sample_mode)) && [[ "$formal_shard_peak" =~ ^[1-9][0-9]*$ ]]; then
+    python3 - "$STAGE_REPOSITORY/scripts/hosts" "$formal_peak_records" "$formal_shard_peak" "$GATE_VERUS_JOBS" <<'PY_FORMAL_PEAK_RECORD' \
+      || echo "  ! 每处的实测峰值没记成（$formal_peak_records），下一片照没有记录开"
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import task_memory
+records, peak, jobs = sys.argv[2], int(sys.argv[3]), max(1, int(sys.argv[4]))
+os.makedirs(records, exist_ok=True)
+name = os.path.join(records, task_memory.new_worker_peak_record_name())
+with open(name + ".partial", "w", encoding="utf-8") as handle:
+    handle.write(f"{peak // jobs}\n")
+os.replace(name + ".partial", name)
+print(f"  · 这一片整棵进程树的峰值 {task_memory.format_size(peak)}，{jobs} 处，每处记 {task_memory.format_size(peak // jobs)}（{name}）")
+PY_FORMAL_PEAK_RECORD
+  fi
+fi
 exit "$stage_exit"

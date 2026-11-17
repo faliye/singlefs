@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：selftest-cells-alone
+want=· 按条复用：2 条（有选格手段的自证，一格一条），现判 2、复用 0、拒算 0
+want=逐格单跑与整份跑判定相同：1 份自证、2 格（按条复用：现判 2、复用 0、拒算 0；起了 3 趟，另有列格名 1 趟）
+want=selftest-cells-alone：绿

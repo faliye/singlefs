@@ -1,0 +1,4 @@
+# 不带特性那一趟被停（cargo 退 143）：登记的用例与带特性那一格都不接着跑，判的是 crash-case-replay 格
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay
+feature-gated-tests

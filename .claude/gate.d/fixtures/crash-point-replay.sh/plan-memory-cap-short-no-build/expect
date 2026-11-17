@@ -1,0 +1,3 @@
+exit=250
+want=· 样本带 .gate-shard-phase：当作服务交的 TASK_SERVER_SHARD_PHASE=plan
+want=✗ 计划：这一条拿到的内存上限 1073741824 字节（1024 MiB）低于编一次验证包要的 10737418240 字节（10240 MiB，CRASH_POINT_REPLAY_PLAN_BUILD_MEMORY_BYTES），一回都没编；按撞内存上限退出（退 250

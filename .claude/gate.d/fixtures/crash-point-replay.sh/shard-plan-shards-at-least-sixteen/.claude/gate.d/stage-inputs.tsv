@@ -1,0 +1,3 @@
+crash-point-replay.sh	tests-of:singlefs-verification	command=cargo command=rustc	# 样本：本阶段那一行（入口是 验证包的测试函数）
+crash-case:plain-stream	-	test=singlefs-verification:plain_stream:plain_stream_full shards-at-least=16	# 样本：状态多、照卡数分的片一片跑不完，登记至少分 16 片
+crash-case:other-stream	-	test=singlefs-verification:other_stream:other_stream_full	# 样本：假 cargo 打 cases/other_stream.log

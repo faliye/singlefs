@@ -42,13 +42,20 @@ package	verus_prettyplease	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929f
 # 同批继续补字节定位：unit_containing_byte 与其中的区间包含 nonlinear_arith 子证明再加 2 条，148 + 2 = 150（整 crate 实测）。
 # 单元地址换算与写交集组合：新增两个 exec fn、一个地址界限引理及其 nonlinear_arith 子证明，150 → 154。
 # 2026-10-31 G7 整理那一步加门（D 簇）：gc_ring_interval_proofs 新引理 lemma_a_compaction_publish_is_refused_while_the_head_is_ahead_of_the_last_root，154 + 1 = 155（推的，合入后以形式化验证的现量为准）。
-crate	crates/singlefs-replay-prefix	155
+# 2026-11-10 固定长度覆盖写字节模型：四个规律引理与一个非空/重叠反例见证，155 + 5 = 160（整 crate --no-cheating --rlimit 10 实测，0 errors）。
+# 2026-11-10 GPU GC：G01–G20 二十项核心性质，另三条常量、记录求和递归终止与两个见证，160 + 26 = 186（整 crate --no-cheating --rlimit 10 实测，0 errors）。
+# GPU GC G21–G30：十个产品核与一个边界见证；模块现量 11 条义务、0 errors。
+# 固定长度覆盖写组合：分段等价、包含写折入请求与构造见证共三条，整 crate 实测 211 verified、0 errors。
+crate	crates/singlefs-replay-prefix	211
 kernel	crates/singlefs-replay-prefix/src/lib.rs
 kernel	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs
 kernel	crates/singlefs-replay-prefix/src/gc_crash_proofs.rs
 kernel	crates/singlefs-replay-prefix/src/file_range_proofs.rs
 kernel	crates/singlefs-replay-prefix/src/partial_write_proofs.rs
 kernel	crates/singlefs-replay-prefix/src/gc_ring_interval_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs
+kernel	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs
 kernel	crates/singlefs-replay-prefix/src/unlink_proofs.rs
 must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
 # 2026-10-29 里程碑四出口 5 规格底座：singlefs-core 接 vstd、经 cargo verus focus 验它的被验区域（用户 2026-10-26 定「core 直验，连胶水一起证」）。

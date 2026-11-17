@@ -1,0 +1,2 @@
+# 样本登记表
+scripts/gate/twocells.py	selftest	# 样本：自证两格，每一趟核里层线程数，consume 读 prepare 留下的全局变量

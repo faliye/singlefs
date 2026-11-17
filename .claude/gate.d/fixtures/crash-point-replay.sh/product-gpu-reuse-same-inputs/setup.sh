@@ -14,7 +14,7 @@ path, old, new = sys.argv[1:4]
 text = open(path, encoding="utf-8").read()
 if text.count(old) != 1:
     sys.exit(f"样本坏了：{path} 里「{old}」命中 {text.count(old)} 次（要恰好 1 次）")
-open(path, "w", encoding="utf-8").write(text.replace(old, new))' "$prior/crates/singlefs-background-gpu/src/lib.rs" 'pub fn spare_function() -> u32 {
+open(path, "w", encoding="utf-8").write(text.replace(old, new))' "$prior/crates/singlefs-background-gpu-tests/src/lib.rs" 'pub fn spare_function() -> u32 {
     7
 }' 'pub fn spare_function() -> u32 {
     7

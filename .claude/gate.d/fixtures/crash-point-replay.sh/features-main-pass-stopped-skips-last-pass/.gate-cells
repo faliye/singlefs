@@ -1,0 +1,2 @@
+# 带特性那一趟被停（cargo 退 143）：排在最后的目标不接着起，判的是带特性那一格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+feature-gated-tests

@@ -3,14 +3,14 @@
 # 派给谁照合并之前那一道的归属（旧名到今天门禁的对照：records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」）；合并之后新加的格写明没有旧归属。
 # 表与门禁目录、格名表、定义逐格一致由 code-tooling 的 stage-owners 格判。
 crash-point-replay.sh	crash-case-replay	investigator	崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条用例按崩溃状态块的单元键复用）：提交时在 HEAD 加暂存区的 worktree 里跑，红了归主 agent看
-crash-point-replay.sh	feature-gated-tests	investigator	带特性那一趟（tests/ 里 cfg 点到的 gpu 这类）：挂特性的测试文件跑到 0 条与没卡的 GPU 对拍报本次未跑，cargo 退非 0 判红；提交时跑，红了归主 agent看
-crash-point-replay.sh	product-gpu-real-card-tests	investigator	产品 GPU 包（singlefs-background-gpu）带 tests-on-a-real-gpu 特性才编的真显卡对拍测试（经清场、--test-threads 1，每条按单元键复用）：对拍判红、清场回读没过、特性名对不上包都判红，没卡的 NOT_RUN_NO_GPU_ADAPTER 与跑到 0 条的目标报本次未跑；提交时跑，红了归主 agent看；对拍判红的修 GPU 核或 CPU 参照归改 crates/ 的实现员，判法与样本归工具实现员。2026-10-26 新立，没有合并之前的旧归属
-crash-point-replay.sh	crash-flow-coverage	implementation-writer,tooling-writer	崩溃流覆盖表（出口 4、六·1）：补流、改入口设点在 crates/（实现员），入口登记表 .claude/gate.d/crash-entries.tsv 与判法 scripts/crash/crash-flow-coverage.py 归工具实现员。2026-10-20 新立，没有合并之前的旧归属
-crash-point-replay.sh	crash-ignored-nodes	implementation-writer,tooling-writer	ignore 开着的节点只减不增（出口 4、六·2）：把多出来的段展开在 crates/（实现员），基准 .claude/gate.d/crash-ignored-nodes.tsv 归工具实现员、加行先问用户。2026-10-20 新立，没有合并之前的旧归属
-crash-point-replay.sh	invariant-zero-evaluations	implementation-writer,tooling-writer	评估 0 次的（流，不变量）对不许涨（六·3）：判器漏判、流没走到在 crates/（实现员），基准 .claude/gate.d/invariant-zero-evaluations.tsv 连理由归工具实现员。2026-10-20 新立，没有合并之前的旧归属
+crash-point-replay.sh	product-gpu-real-card-tests	investigator	产品 GPU 包的测试包（singlefs-background-gpu-tests）带 tests-on-a-real-gpu 特性才编的真显卡对拍测试（经清场，每条按单元键复用）：对拍判红、清场回读没过、特性名对不上包都判红，没卡的 NOT_RUN_NO_GPU_ADAPTER 与跑到 0 条的目标报本次未跑；提交时跑，红了归主 agent看；对拍判红的修 GPU 核或 CPU 参照归改 crates/ 的实现员，判法与样本归工具实现员。2026-10-26 新立，没有合并之前的旧归属
 crash-point-replay.sh	crash-case-must-red	implementation-writer	每条崩溃枚举用例至少一行必红变异（出口 4、六·3）：crates/mutations.tsv 只追加，归改 crates/ 的实现员，证红由主 agent 跑。2026-10-20 新立，没有合并之前的旧归属
 crash-point-replay.sh	crash-knobs	tooling-writer	旋钮登记表 .claude/gate.d/crash-knobs.tsv 取值、依据与出处（出口 4、六·4）归工具实现员。2026-10-20 新立，没有合并之前的旧归属
 crash-point-replay.sh	crash-case-provenance	implementation-writer,tooling-writer	崩溃点重放合表里调 enumerate_crash_states 的崩溃枚举项与放量分项，在来历表 crash_point_replay_provenance.rs 里都要有一行（只读树，起 scripts/crash/crash-case-check.py --only provenance）：缺的来历行、来历与项对不上由改 crates/ 的实现员补，合表登记与判法归工具实现员。2026-11-05 新立，没有合并之前的旧归属
+crash-point-replay.sh	feature-gated-tests	investigator	带特性那一趟（tests/ 里 cfg 点到的 gpu 这类）：挂特性的测试文件跑到 0 条与没卡的 GPU 对拍报本次未跑，cargo 退非 0 判红；提交时跑，红了归主 agent看
+crash-point-replay.sh	crash-flow-coverage	implementation-writer,tooling-writer	崩溃流覆盖表（出口 4、六·1）：补流、改入口设点在 crates/（实现员），入口登记表 .claude/gate.d/crash-entries.tsv 与判法 scripts/crash/crash-flow-coverage.py 归工具实现员。2026-10-20 新立，没有合并之前的旧归属
+crash-point-replay.sh	crash-ignored-nodes	implementation-writer,tooling-writer	ignore 开着的节点只减不增（出口 4、六·2）：把多出来的段展开在 crates/（实现员），基准 .claude/gate.d/crash-ignored-nodes.tsv 归工具实现员、加行先问用户。2026-10-20 新立，没有合并之前的旧归属
+crash-point-replay.sh	invariant-zero-evaluations	implementation-writer,tooling-writer	评估 0 次的（流，不变量）对不许涨（六·3）：判器漏判、流没走到在 crates/（实现员），基准 .claude/gate.d/invariant-zero-evaluations.tsv 连理由归工具实现员。2026-10-20 新立，没有合并之前的旧归属
 checker-independence-and-sync.sh	checker-implementation-disjoint	implementation-writer,investigator	checker 与实现只许共享常量模块：两边的代码都由实现员改，记账对账那一处归主 agent
 checker-independence-and-sync.sh	layout-checker-sync	implementation-writer,kb-scribe	布局的格式常量变了 checker 判定路径要跟：格式定义一边是 crates/singlefs-format（实现员改），一边是 kb 的字节布局表（书记员改）
 checker-independence-and-sync.sh	cpu-judging-sites	implementation-writer,tooling-writer	判器调用点没落在判定段、也没带标记：标记写在 crates/ 里那一截的函数上一行，由改 crates/ 的实现员加（豁免表 .claude/gate.d/gpu-exemptions.tsv 每加一行先问用户点头）；判定段与判器本体的登记表 .claude/gate.d/cpu-judging-sites.tsv 在 gate.d 下，由工具实现员改。新立，没有合并之前的旧归属
@@ -51,7 +51,7 @@ code-tooling.sh	research-script-selftests	three-way-materials	材料员用的抽
 code-tooling.sh	research-script-selftest-coverage	three-way-materials	研究脚本实现了 --selftest 就要有门禁在跑它，材料员的抽取脚本与本地腿脚本最常新加
 code-tooling.sh	reuse-selftests	tooling-writer	带判定库的脚本的自证与登记表 .claude/gate.d/verdict-library-scripts.tsv 归工具实现员改。2026-10-15 新立
 code-tooling.sh	rules-manifest	investigator	看 CLAUDE.md 的规则引用，收尾跑整轮门禁时一并判
-code-tooling.sh	rules-named-by-definitions	tooling-writer	CLAUDE.md 登记的规则没有一份定义点名：在用得到它的定义或共用约束里点名它是改定义，照判决或用户定案归工具实现员改、走定义三方。2026-11-02 新立
+code-tooling.sh	rules-named-by-definitions	tooling-writer	CLAUDE.md 登记的规则没有一份定义点名：在用得到它的定义或共用约束里点名它是改定义，照判决或用户定案归工具实现员改、走定义三方；只管主 agent 的规则登在 .claude/gate.d/rules-main-agent-only.tsv（路径加理由，登记的路径要在 CLAUDE.md 登记里、已被定义点名的行判红）。2026-11-02 新立
 code-tooling.sh	stage-owners	investigator	本表与门禁目录、格名表、agent 定义，收尾跑整轮门禁时一并判
 code-tooling.sh	agent-write-scope	investigator	看项目 settings 里的写范围闸与写范围表，收尾跑整轮门禁时一并判
 code-tooling.sh	agent-definition-shape	tooling-writer	定义、共用约束与主 agent 调度表由工具实现员照判决改（拆分提案第五节「新门禁阶段」、第七节 ①），改了要走定义三方或用户逐份豁免。2026-10-26 新立，没有旧归属
@@ -67,7 +67,7 @@ code-tooling.sh	committed-file-size	tooling-writer	2026-10-21 新立，没有旧
 code-tooling.sh	stage-location-before-cd	tooling-writer	2026-10-13 新立，没有旧归属：阶段 cd 之后不再找自己旁边的文件（欠账 C525），门禁阶段由工具实现员改
 code-tooling.sh	heavy-thread-defaults	tooling-writer	合并之后新加的格，没有旧归属：门禁、钩子与脚本里的默认并行度与排除表由工具实现员改；红在 crates/ 里的交实现员走代码批
 code-tooling.sh	hardcoded-quota	tooling-writer	跑法里写死的内存上限与台数、排除表 .claude/gate.d/hardcoded-quota-exempt.tsv 与判法由工具实现员改；红在别的会话正改着的脚本里的，交那个会话照「改成 auto 或登记理由」改
-code-tooling.sh	memory-bounded-parallelism	tooling-writer	2026-11-06 新立的格，没有旧归属：登记表 .claude/memory-bounded-parallelism.tsv 的写法与判法由工具实现员改；红在 crates/ 里按内存定并发的写法交实现员走代码批，表里登记新入口要量到的峰值，交主 agent 定
+code-tooling.sh	memory-bounded-parallelism	tooling-writer	2026-11-06 新立的格，没有旧归属：登记表 .claude/memory-bounded-parallelism.tsv 的写法与判法由工具实现员改；红在 crates/ 里按内存定并发的写法交实现员走代码批，表里登记新入口交主 agent 定
 code-tooling.sh	function-units-two-implementations-agree	tooling-writer,implementation-writer	python 那一份（scripts/gate/lib_function_units.py）照 Rust 那一份改由工具实现员改；口径要动 crates/singlefs-unit-graph 时由改 crates/ 的实现员改。2026-10-15 新立
 code-tooling.sh	rust-name-collisions	implementation-writer,tooling-writer	撞名的条目在 crates/ 与 prune-server/ 里，改名归改它们的实现员；判法 scripts/gate/rust-name-collisions.py 与样本归工具实现员（用户 2026-11-06 定不得撞名，不设豁免表）。2026-11-06 新立，没有合并之前的旧归属
 code-tooling.sh	mutation-list-items	tooling-writer,implementation-writer	--list-items 的脚本 scripts/mutation/crates-mutation-rows.py 归工具实现员；红在变异表某一行点名的测试特性不对的，交改 crates/mutations.tsv 的实现员（03 待优化第 57 行）。2026-10-22 新立，没有旧归属
@@ -82,11 +82,13 @@ code-tooling.sh	prune-server-selftest	tooling-writer	判定库服务 prune-serve
 code-tooling.sh	shared-data-root-literals	tooling-writer	脚本、钩子、门禁与服务里经 ~ 或 $HOME 取数据根下共享的那几项、排除表 .claude/gate.d/shared-data-root-literals-exempt.tsv 与判法由工具实现员改；名单在 .claude/hooks/lib_work_root.py 文件头「数据根」表。2026-11-01 新立（records/2026-10-31-task-server巡检.md 问题 73），没有旧归属
 code-tooling.sh	cp-preserve-mode	tooling-writer	脚本、钩子、门禁、样本根的搭建脚本与服务里带保留权限的 cp（-a、-p、--archive、不带值或带 mode / all 的 --preserve）与判法由工具实现员改：改成 --preserve=timestamps（要链接的加 links）或 cp -R；2026-11-02 新立（records/2026-10-31-task-server巡检.md 问题 82），没有旧归属
 code-tooling.sh	peer-launch-direct	tooling-writer	项目脚本与门禁里直接起 multi-host-run.sh --peer 往第二台起活的写法与判法由工具实现员改：改成照服务的分片协议（文件头写 task-server-shards，计划、各片、合并）；2026-11-02 新立（records/2026-10-31-task-server巡检.md 问题 90、94），没有旧归属
-code-tooling.sh	retired-names	tooling-writer,implementation-writer	退役名单 .claude/gate.d/retired-names.tsv 与判法由工具实现员改（没有放行表）；红在 crates/ 里的归实现员；2026-11-02 新立（records/2026-11-01-判定库服务化.md 批次 22），没有旧归属
 code-tooling.sh	verdict-library-code	tooling-writer	登记表 .claude/gate.d/verdict-library-scripts.tsv、写法表 verdict-library-code-forms.tsv、带判定库的脚本里取不到库照跑与本地库读写的写法由工具实现员改；第三列翻 prune-server 由主 agent 在一族接完之后翻；2026-11-02 新立（records/2026-11-01-判定库服务化.md 批次 22，欠账 C948（判定另存别处的库）），没有旧归属
 code-tooling.sh	temporary-service-runners	tooling-writer	runner 表（code-tooling.sh 的 SELFTEST_RUNNERS）与要临时服务的表 .claude/hooks/selftest-temporary-service.tsv 两边对齐的判法与样本由工具实现员改；新写了调 selftest_service_problem 的自证，先在 selftest-registry.tsv 登记、往要临时服务的表加一行，再把 runner 表里那一条写成包装写法；2026-11-05 新立（账本第一百八十三节仍欠的①），没有旧归属
 code-tooling.sh	temporary-service-wrapper-form	tooling-writer	要临时服务的自证的整条写法在登记表文件头、拒绝说明、骨架、客户端文件头、自证登记表、runner 表、包装前缀常量这七处逐字相同、包装的解析收得下的判法与样本由工具实现员改；包装改了用法（scripts/prune-server/prune_server_client_selftest.py 文件头那一行）就各处一起改；2026-11-05 新立（账本第一百九十七节①），没有旧归属
 code-tooling.sh	repository-copy-closure	tooling-writer	脚本、门禁与钩子里建仓副本的写法（改成经 scripts/hosts/lib_repository_copy.py 的 copy_closure / copy_entries，shell 经 minimal-copy.py）、排除表 .claude/gate.d/repository-copy-closure-exempt.tsv 与判法由工具实现员改；2026-11-06 新立（task-server 巡检批 73），没有旧归属
+code-tooling.sh	selftest-cells-alone	tooling-writer	点名的那一份有选格手段的自证（scripts/ 下的脚本、task-server/ 的自证）里格与格之间的依赖、写错格名时列格的那一句，与这一格的判法和样本，由工具实现员改；新立的格，没有合并之前的旧归属
+code-tooling.sh	selftest-parallelism	tooling-writer	点名的那一份自证的并行（成功句报并行度）或文件头 # selftest-serial: 的理由、排除表与这一格的判法和样本，由工具实现员改；新立的格，没有合并之前的旧归属
+code-tooling.sh	long-run-split-exempt	tooling-writer	跑过两小时也不拆的豁免表 .claude/long-run-split-exempt 的行写法（有 #、理由至少 8 个字、出处 records/<文件>.md:<行> 的文件在且行号在行数以内、项名不重复、不是目录与整道门禁）的判法和样本，由工具实现员改；表里的行是用户点名的项、由主 agent 登记，行写错了回主 agent 照出路改那一行；新立的格，没有合并之前的旧归属
 doc-decisions.sh	kb-shape	kb-scribe	kb 用词、指代、链接、条数与标题，归写 kb 的书记员
 doc-decisions.sh	item-ref-status	kb-scribe	分项引用写的状态与正文分项表相符，归写 kb 的书记员
 doc-decisions.sh	status-redundancy	kb-scribe	分项状态别重复标注，归写 kb 的书记员
@@ -136,6 +138,7 @@ doc-process-records.sh	owed-destination-form	kb-scribe,tooling-writer	欠账表 
 doc-process-records.sh	deferred-items-registered	investigator,tooling-writer	调度记录（records/）由主 agent 写，提交前核延后行写没写指得到的登记（C 号、拆分提案节号与行首序号、文件:行），补登记与改写那一行归主 agent；判法、词表 DEFERRAL_WORDS 与样本归工具实现员。2026-10-23 新立，没有合并之前的旧归属（还拆分提案第九十节 ③）
 doc-process-records.sh	ledger-section-numbers	investigator,tooling-writer	现行账本（.claude/gate.d/split-proposal-ledgers.tsv 里 current 那一份，今天是 records/2026-10-29-subagent拆分提案.md）由主 agent 与各会话追加，撞号、索引缺行由主 agent 照红行改号、补索引行；判法与样本归工具实现员。2026-10-26 新立，没有合并之前的旧归属（还 2026-10-23 那份第一百一十节）
 doc-process-records.sh	sealed-ledgers-unchanged	investigator,tooling-writer	封存的拆分提案（登记表里 sealed 那几份）被改了：主 agent 把那份恢复成封存时那一版、新内容挪进现行账本；登记表 .claude/gate.d/split-proposal-ledgers.tsv 的换代（新建现行、旧的改封存、记 sha256）照用户定案由主 agent 改；判法与样本归工具实现员。2026-10-31 新立，没有合并之前的旧归属（用户 2026-10-31 定两版封存）
+doc-process-records.sh	code-round-checklist	implementation-writer,tooling-writer	代码轮正文的检查单八格没写全：正文是主 agent 写的、research/prompts 目录下名为「_<题>-code-r<数字>-body.md」的文件，缺的格由主 agent 照 .claude/rules/implementation-workflow.md「代码轮正文的检查单」的格名、.claude/skills/three-way/SKILL.md 同名节的逐格写法补；某一格要对着改动补证据、改动本身有毛病（读活树、旧格式兼容、新判定库）的，派实现员改；这一格的判法与八个格名的登记在 doc-process-records.sh 里，归工具实现员。新立，没有合并之前的旧归属
 doc-registries.sh	field-refs	kb-scribe	字节表字段指向真实分项，归写 kb 的书记员
 doc-registries.sh	field-projection	kb-scribe	决策里定的字段投影进字节表，归写 kb 的书记员
 doc-registries.sh	field-table-sums	kb-scribe	字段表合计、表前说明句里的总宽与增量、字节布局表里结构总宽的登记：都是 kb 正文里的数，归写回的书记员
@@ -170,7 +173,6 @@ doc-text.sh	prime-marks	investigator	全仓不许用撇号类角标给变体起�
 doc-text.sh	clock-times	investigator	全仓描述里不许写钟点：谁写文件都可能写进时分，收尾跑整轮门禁时一并判
 doc-text.sh	session-names	investigator	全仓不许写会话号：谁写文件都可能写进会话名，收尾跑整轮门禁时一并判
 doc-text.sh	date-once	kb-scribe	记录与 kb 页里日期只在标题上，归写 kb 与记录的书记员
-doc-text.sh	term-renames	sweep	全仓术语改名的残余归回扫员：它本来就是「撤回一个数、改一个格式常量、新立一条判据之后全仓找还在引旧值的地方」那类活
 doc-text.sh	trilingual-files	kb-scribe	登记的三语文件（仓根 README 与 briefs/）英语、中文、日语三份齐全、登记表写对了：缺的那份由写这批文档的书记员补译。没有合并之前的旧归属，2026-10-13 新立
 doc-text.sh	trilingual-structure	kb-scribe	三份结构对不上（编号、链接、标题、表格行、围栏）说明只改了一份：补译或恢复由写这批文档的书记员做。没有合并之前的旧归属，2026-10-13 新立
 doc-text.sh	trilingual-changed-together	kb-scribe	改了三语文件的一份而另两份没同步：同步译文归写这批文档的书记员。没有合并之前的旧归属，2026-10-13 新立

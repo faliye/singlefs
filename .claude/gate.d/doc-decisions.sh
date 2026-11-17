@@ -62,6 +62,9 @@
 #   entry-added-moved-and-edited-red        现场同 entry-added-moved-only-not-run（搬迁登记了），另把一行正文改了：决策正文改了 14 行，entry-added 红
 #   settled-same-file-item-heading-red / -green  settled-same-file 的已定项分项标题样本：本次提交在未定项一节之前新增 `#### 已定项 2：丙问题`；
 #                                           红的那份未定项一字未动、索引页待议节补了复核注，红在那条未定项上；绿的那份未定项与待议节都补了复核注，绿
+#   settled-same-file-two-files-green       本次提交里两份决策都改了：D982 新增 `### 已定项 2 —— 已定` 并在它的未定项与索引页待议节补了复核注，D983 只改了历史版本下一句话、它的未定项没动：
+#                                           新增已定小节的只算 D982，D983 不算，绿（报「新增已定小节的决策 1 份，查了 1 条未定项、1 节待议」）
+#   stale-open-items-translation-red        D95 的未定项点名 D96，D96 的中文原文新增了已定小节，D96 另有一份译文 96-样本.zz.md 排在中文原文之后：只读中文原文，D95 那一条判红
 #   settled-same-file-bare-settled-heading-not-run  本次提交只新增了光秃秃的 `### 已定（2026-10-13）：丙问题`（history-kept: 样本标题里的日期是数据）（不是首行登记标题的 `—— 已定`，也不是 `已定项 N：…`）：格不认它，退 77「本次 diff 没有新增「已定」小节」
 #   history-loss-red / history-loss-green   基准里一块带一个数：整理时弄丢了判红；整理成一条结论、数都在判绿
 #   history-loss-moved-commit-ref-green     tools/old-rig 搬到 tools/new-rig 并登记，变更史一块里「改前」行（history-kept: 变更史条目的字段名）留着 `git show 31e47115:tools/old-rig/run.sh`、「依据」行换成新路径：
@@ -90,6 +93,7 @@
 #                                           三格都红在「读不出基准 HEAD 里的 .claude/gate.d/decision-evidence-lag.tsv（git show 退 128…），这张表只缩不涨没比」
 #                                           （取法 lib-lag-baseline.py 的 baseline_text；取不到不当成基准里没有这张表）
 #   evidence-pointer-history-green          setup.sh 造 git 仓：判决与材料先提交、后整批删掉（归档出了树，git 历史里取得回来）：inference-needs-verdict、three-way-leg-record 绿
+#   evidence-pointer-renamed-history-green  现场同上，判决文件在被整批删掉之前改过一次名，决策点名的是改名前的名字（名字集合不依赖 git 的改名检测）：两格绿，报「只在 git 历史里取得回来的 4 个」
 #   按编号取文件的三份（决策有中文原文 <号>-<名>.md 与译文 <号>-<名>.en.md / .ja.md，中文的登记表取中文原文，判法 lib-item-ref-status.py 的 numbered_files 与 heads_for_referrer）：
 #   freeze-layer-membership-translation-green  D15、D18 各有两份译文，首行写成 `## D15 (…) — Settled` 读不出、里面也没有「#### 已定项 7 / 11」：
 #                                           freeze-layer-membership 绿（只取中文原文，读不出首行的译文不拖垮这一格，报得出 COUNT）
@@ -144,12 +148,13 @@
 #       item-ref-status-history-section-red、item-ref-status-orphan-translation-red、history-loss-base-unreadable-red（期望退出 1，实测 0）
 #       entry-added-moved-unregistered-red、entry-added-moved-and-edited-red、history-loss-moved-unregistered-red、history-loss-moved-and-edited-red、shape-moved-unregistered-red、shape-moved-and-edited-red（期望退出 1，实测 0）
 #       owed-refs-paid-red、owed-refs-paid-heading-missing-red、owed-refs-paid-same-line-unmarked-red、owed-refs-paid-lag-growth-red、owed-refs-paid-lag-anchor-wrong-red、
-#       owed-refs-paid-lag-table-red（期望退出 1，实测 0）
+#       owed-refs-paid-lag-table-red、owed-refs-paid-status-sentence-red、stale-open-items-translation-red（期望退出 1，实测 0）
 #   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
+#       settled-same-file-bare-settled-heading-not-run（期望退出 77，实测不是 77）
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
 #       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red、
-#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、history-loss-base-unreadable-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、history-loss-base-unreadable-red、stale-open-items-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
 #       evidence-ledger-red、evidence-ledger-base-unreadable-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
@@ -163,16 +168,17 @@
 #       history-loss-moved-unregistered-red、history-loss-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；history-loss-moved-commit-ref-green、history-loss-moved-registered-in-base-green（期望退出 0，实测 1）
 #       shape-moved-unregistered-red、shape-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；shape-moved-only-green（期望退出 0，实测 1）
 #       cross-decision-status-ledger-green、cross-decision-status-relaxed-green、decision-items-sync-translation-green、evidence-pointer-history-green、
-#       inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）
+#       evidence-pointer-renamed-history-green、inference-needs-verdict-green、three-way-leg-record-green、settled-same-file-two-files-green（期望退出 0，实测 1）
 #       owed-refs-paid-red、owed-refs-paid-heading-missing-red、owed-refs-paid-same-line-unmarked-red、owed-refs-paid-lag-growth-red、owed-refs-paid-lag-anchor-wrong-red、
 #       owed-refs-paid-lag-table-red（输出里找不到「样本只跑 .gate-cells 点名的格：owed-refs-paid」）；
 #       owed-refs-paid-green、owed-refs-paid-abbreviation-parenthesis-green、owed-refs-paid-same-line-mark-green、owed-refs-paid-lag-green、owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
 #       owed-refs-paid-status-sentence-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）
 #   STAGE_CELLS_BREAK=check-ignored  归共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
+#       settled-same-file-bare-settled-heading-not-run（期望退出 77，实测不是 77）
 #       blocking-verdict-red、candidate-codes-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
 #       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-item-heading-red、settled-same-file-red、shape-red、
 #       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red、
-#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、history-loss-base-unreadable-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       cross-decision-status-noun-phrase-red、cross-decision-status-quoted-red、evidence-ledger-grew-red、inference-needs-verdict-red、three-way-leg-record-red、history-loss-base-unreadable-red、stale-open-items-translation-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
 #       evidence-ledger-red、evidence-ledger-base-unreadable-red（输出里找不到「doc-decisions.sh：3 格里 3 格红…」）；
 #       candidate-codes-green、decision-documents-green、decision-history-green、history-loss-green、settled-same-file-item-heading-green、shape-green（期望退出 0，实测 1）；
 #       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
@@ -186,7 +192,7 @@
 #       history-loss-moved-unregistered-red、history-loss-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；history-loss-moved-commit-ref-green、history-loss-moved-registered-in-base-green（期望退出 0，实测 1）
 #       shape-moved-unregistered-red、shape-moved-and-edited-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；shape-moved-only-green（期望退出 0，实测 1）
 #       cross-decision-status-ledger-green、cross-decision-status-relaxed-green、decision-items-sync-translation-green、evidence-pointer-history-green、
-#       inference-needs-verdict-green、three-way-leg-record-green（期望退出 0，实测 1）
+#       evidence-pointer-renamed-history-green、inference-needs-verdict-green、three-way-leg-record-green、settled-same-file-two-files-green（期望退出 0，实测 1）
 #       owed-refs-paid-red、owed-refs-paid-heading-missing-red、owed-refs-paid-same-line-unmarked-red、owed-refs-paid-lag-growth-red、owed-refs-paid-lag-anchor-wrong-red、
 #       owed-refs-paid-lag-table-red、owed-refs-paid-status-sentence-red（输出里找不到「样本只跑 .gate-cells 点名的格：owed-refs-paid」）；
 #       owed-refs-paid-green、owed-refs-paid-abbreviation-parenthesis-green、owed-refs-paid-same-line-mark-green、owed-refs-paid-lag-green、owed-refs-paid-status-sentence-green（期望退出 0，实测 1）
@@ -231,11 +237,16 @@
 #       settled-ref-says-open-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=stale-open-items  stale-open-items 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「没有未定项被别处的更新甩在后面…」）；decision-documents-some-cells-not-run（输出里找不到「  stale-open-items：本次未跑」）；
-#       stale-open-items-red（期望退出 1，实测 0）
+#       stale-open-items-red、stale-open-items-translation-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=stale-open-items-translations-read  stale-open-items 两遍都连译文一起读：译文与中文原文同一个决策号，后读到的译文把那条决策的「—— 已定」小节时间盖成 0，点名它的未定项不比
+#       stale-open-items-translation-red（期望退出 1，实测 77：没有一条点名定过东西的别的决策）
 #   DOC_DECISIONS_BREAK=settled-same-file  settled-same-file 格不跑、按判过了记
 #       decision-documents-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」）；decision-documents-some-cells-not-run（输出里找不到「  settled-same-file：本次未跑」）；
-#       settled-same-file-item-heading-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」）；
+#       settled-same-file-item-heading-green、settled-same-file-two-files-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」）；
 #       settled-same-file-item-heading-red、settled-same-file-red（期望退出 1，实测 0）
+#       settled-same-file-bare-settled-heading-not-run（期望退出 77，实测不是 77）
+#   DOC_DECISIONS_BREAK=settled-same-file-added-lines-pooled  settled-same-file 把几份改过的决策的新增行并成一堆看：有一份新增了已定小节，每一份改过的决策都算新增了
+#       settled-same-file-two-files-green（期望退出 0，实测 1：D983 那条没动的未定项判红）
 #   DOC_DECISIONS_BREAK=settled-item-heading-unrecognised  settled-same-file 退回只认 `—— 已定` 的小节标题正则，不认 `#### 已定项 N：…` 与 `#### 已定项 N（…）`
 #       settled-same-file-item-heading-red（期望退出 1，实测 77：本次 diff 没有新增「已定」小节）；settled-same-file-item-heading-green（期望退出 0，实测 77）；decision-documents-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」与「14 格里 13 格绿…」）
 #   DOC_DECISIONS_BREAK=freeze-layer-membership  freeze-layer-membership 格不跑、按判过了记
@@ -298,12 +309,12 @@
 #   DOC_DECISIONS_BREAK=inference-needs-verdict  inference-needs-verdict 格不跑、按判过了记
 #       inference-needs-verdict-red（期望退出 1，实测 0）；inference-needs-verdict-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、5 条依据条目，带推论记号的 2 条…」）；
 #       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 5 处不对」）；
-#       evidence-pointer-history-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、2 条依据条目，带推论记号的 1 条…」）；
+#       evidence-pointer-history-green、evidence-pointer-renamed-history-green（输出里找不到「自陈是推论的依据条目都指到了存在的判决：扫 1 份决策、2 条依据条目，带推论记号的 1 条…」）；
 #       evidence-ledger-base-unreadable-red（输出里找不到「  inference-needs-verdict：红（退出 1）」）
 #   DOC_DECISIONS_BREAK=three-way-leg-record  three-way-leg-record 格不跑、按判过了记
 #       three-way-leg-record-red、evidence-ledger-grew-red（期望退出 1，实测 0）；three-way-leg-record-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、6 条依据条目，写了「三方」的 4 条…」）；
 #       evidence-ledger-red（输出里找不到「挂账表 .claude/gate.d/decision-evidence-lag.tsv 有 3 处不对」）；
-#       evidence-pointer-history-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、2 条依据条目，写了「三方」的 1 条…」）；
+#       evidence-pointer-history-green、evidence-pointer-renamed-history-green（输出里找不到「依据里写了「三方」的条目都有腿况记录：扫 1 份决策、2 条依据条目，写了「三方」的 1 条…」）；
 #       evidence-ledger-base-unreadable-red（输出里找不到「  three-way-leg-record：红（退出 1）」）
 #   DOC_DECISIONS_BREAK=cross-decision-status-tight-only  cross-decision-status 只认紧贴的写法
 #       cross-decision-status-noun-phrase-red（期望退出 1，实测 0）；cross-decision-status-ledger-green（期望退出 0，实测 1：挂账行罩的那一句不红了）；
@@ -322,7 +333,7 @@
 #   DOC_DECISIONS_BREAK=evidence-pointer-unchecked  点名了判决 / 材料就算指到，不查存在（inference-needs-verdict、three-way-leg-record 共用）
 #       inference-needs-verdict-red（输出里找不到「自陈是推论的依据条目没有指到存在的判决：2 条」）；three-way-leg-record-red（输出里找不到「依据里写了「三方」而没有腿况记录：3 条」）
 #   DOC_DECISIONS_BREAK=evidence-history-ignored  判决 / 材料只认树里的，不读 git 历史（两格共用）
-#       evidence-pointer-history-green（期望退出 0，实测 1）
+#       evidence-pointer-history-green（期望退出 0，实测 1）；evidence-pointer-renamed-history-green（期望退出 0，实测 1）
 #   DOC_DECISIONS_BREAK=evidence-ledger-unjudged  挂账表的行不核罩没罩住、写得对不对（三格共用）
 #       evidence-ledger-red（期望退出 1，实测 0）
 #   DOC_DECISIONS_BREAK=evidence-ledger-growth-unjudged  挂账表相对基准涨了不判、基准那一版也不取（三格共用）
@@ -437,7 +448,7 @@ stage_cell settled-ref-says-open judge_settled_ref_says_open "引用写着「已
   "那条分项已经定了：把句子改成它定下来之后的说法（定成了什么、这一处按它重算了没有），别只改标签"
 stage_cell stale-open-items judge_stale_open_items "未定项点名的决策，状态行在这条未定项最近一次复核之后又变过" \
   "逐条复核：已被别处定掉的改写成「已定，权威记录在 XX」，仍然开着的把点名改成不构成依赖的写法"
-stage_cell settled-same-file judge_settled_same_file "这次在一份决策里新增了「已定」小节（含「已定项 N：…」分项定案节），同文件开着的未定项与索引页的待议节一个字没动" \
+stage_cell settled-same-file judge_settled_same_file "这次在一份决策里新增了「已定」小节（含「已定项 N：…」分项小节），同文件开着的未定项与索引页的待议节一个字没动" \
   "被顺带定掉的改写成「已定，权威记录在 XX」或收摊，仍然开着的在条目里补一行「YYYY-MM-DD 复核过，仍然开着，因为 …」；decisions.md 的待议节同样回看"
 stage_cell freeze-layer-membership judge_freeze_layer_membership "冻结层归属登记表：每层每个结构都有行、写「退出」的必是派生态、依据指得到已定分项" \
   "照红行给缺的层与结构补一行（态别按 D21 已定项 10 的判据推，推不出写「判不动」）、写「退出」的行核态别、依据写成指得到的「D<n>（简称） 已定项 k」"
@@ -1576,16 +1587,27 @@ PY
 # 按时间比、不按文本依赖图：陈旧的未定项多半没写「前置是某某」这种标记。
 # git 取不到时间或条目块历史判红，不当「从没定过 / 复核过了」。没有一条未定项点名定过东西的别的决策退 77。
 # 判不了：决策文档拆分之前的历史（逐行历史在拆分处断了），欠账 C36（未定项检查的第三个盲区）。
-# 样本：stale-open-items-red 另造缺旧版本对象的仓：一份决策的 git log -G、一份条目块的 git log -L 读不到，两处都要报。
+# 只读中文原文：译文（<名>.<两位语言>.md）与中文原文同一个决策号，没有「—— 已定」标题；连译文一起记每条决策的「—— 已定」小节时间，后读到的译文会把中文原文那一条盖成 0，点名它的未定项就一条不比。
+# 通配次序按字节排（LC_COLLATE=C），不随 LANG 变：红行的先后在哪台机器上都一样。
+# 样本：stale-open-items-red 另造缺旧版本对象的仓：一份决策的 git log -G、一份条目块的 git log -L 读不到，两处都要报；
+#   stale-open-items-translation-red 是 D96 的中文原文新增了已定小节、D96 的译文排在它后面，D95 点名 D96 的未定项判红。
+# 弄坏开关 DOC_DECISIONS_BREAK=stale-open-items-translations-read：两遍都连译文一起读，stale-open-items-translation-red 那条未定项不比（退 77）。
 grid_stale_open_items() (
   DEC=.claude/kb/decisions
   [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，这一格无对象可判"; exit 77; }
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，这一格跳过"; exit 77; }
 
+  export LC_COLLATE=C
+  decision_files=()
+  for f in "$DEC"/*.md; do
+    if [[ "$BREAK_SWITCH" != stale-open-items-translations-read && "$f" =~ \.[a-z]{2}\.md$ ]]; then continue; fi
+    decision_files+=("$f")
+  done
+
   # 每个决策状态行最后一次变动的提交时间；取不到（git 失败）记 -1，点名它的未定项逐条报「没比过」
   declare -A st_time
   time_unavailable=()
-  for f in "$DEC"/*.md; do
+  for f in "${decision_files[@]}"; do
     n=$(grep -m1 -oE '^## (D[0-9]+)' "$f" | awk '{print $2}') || continue
     [[ -n "$n" ]] || continue
     # 「定了新东西」取这个文件最近一次新增「—— 已定」小节标题的提交：决策首行几乎不变；-G 加行首锚定只认标题行，正文里的「已定」二字会造成假阳性。
@@ -1609,7 +1631,7 @@ grid_stale_open_items() (
   fi
   open_items=0     # 扫到的未定项条数
   judged_items=0   # 其中点名了「定过东西的别的决策」、真拿去比过复核时间的条数
-  for f in "$DEC"/*.md; do
+  for f in "${decision_files[@]}"; do
     self=$(grep -m1 -oE '^## (D[0-9]+)' "$f" | awk '{print $2}')
     while IFS=: read -r ln text; do
       [[ -n "$ln" ]] || continue
@@ -1677,6 +1699,8 @@ grid_stale_open_items() (
 # 新增了已定小节的几份里一条未定项都没有、索引页也没有待议节时退 77。
 # 样本：settled-same-file-red 另放一份两行表格的决策（只改了第 2 行，第 1 行要报）与一节没动的待议（同一次只改了索引表那一行）。
 # settled-same-file-item-heading-red / -green 新增的是现行写法 `#### 已定项 N：名字`：红的那份只有未定项没动，绿的那份未定项与待议节都补了复核注。
+# 改过的几份决策的新增行一次取齐（行首带路径）、按路径分回各文件，新增了已定小节的只算那一份自己：settled-same-file-two-files-green 里 D982 新增了已定小节、D983 只改了无关的一句话，D983 不算。
+# 弄坏开关 DOC_DECISIONS_BREAK=settled-same-file-added-lines-pooled：把几份的新增行并成一堆看，D983 也算新增了已定小节，它没动的未定项判红。
 grid_settled_same_file() (
   DEC=.claude/kb/decisions
   IDX=.claude/kb/decisions.md
@@ -1696,27 +1720,41 @@ grid_settled_same_file() (
   }
   changed_names="$(grep "^\.claude/kb/decisions/" <<<"$all_changed" || true)"
 
-  settled_files=()
+  # 只认新增行里的小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `#### 已定项 12：名字` / `#### 已定项 12（名字）`；未跟踪的文件整份算新增
+  # 决策文件首行的登记标题写作 `## D<n> 简称 —— 已定`，新分项的标题写作 `#### 已定项 N：名字`（format-evolution.md「决策正文只写现状」），两种都认
+  # 开关 settled-item-heading-unrecognised 退回不认「已定项 N」（样本自检用）
+  settled_heading_pattern='^#{2,4} .*—— 已定|^#{2,4} 已定项[[:space:]]*[0-9]+[[:space:]]*(：|:|（|\()'
+  if [[ "$BREAK_SWITCH" == settled-item-heading-unrecognised ]]; then
+    settled_heading_pattern='^#{2,4} .*—— 已定'
+  fi
+  changed_name_list=()
   while IFS= read -r f; do
-    [[ -n "$f" ]] || continue
-    # 只认新增行里的小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `#### 已定项 12：名字` / `#### 已定项 12（名字）`；未跟踪的文件整份算新增
+    [[ -n "$f" ]] && changed_name_list+=("$f")
+  done <<<"$changed_names"
+  settled_files=()
+  if ((${#changed_name_list[@]})); then
+    # 改过的决策文件的新增行一次取齐（行首是路径，剔搬迁行按路径各算各的，合起来取与逐份取结果相同），再按行首的路径分回各文件：第 k 行的路径与正文是同一行的两半。
     # 不接 `| grep -q`：pipefail 下前段吃 SIGPIPE，命中会被读成没命中
-    added_out="$(gate_added_lines "$BASE" "$f")" || {
-      echo "  ✗ 取不到 $f 这次新增了哪些行（基准 $BASE）"
+    added_out="$(gate_added_lines "$BASE" "${changed_name_list[@]}")" || {
+      echo "  ✗ 取不到这次改动的决策文件新增了哪些行（基准 $BASE）"
       echo "     → 按上面 git 的报错修好仓库状态再跑；取不到新增行时这一格什么都没比，不是通过。"
       exit 1
     }
-    added_text="$(cut -f2- <<<"$added_out")"
-    # 决策文件首行的登记标题写作 `## D<n> 简称 —— 已定`，新分项的标题写作 `#### 已定项 N：名字`（format-evolution.md「决策正文只写现状」），两种都认
-    # 开关 settled-item-heading-unrecognised 退回不认「已定项 N」（样本自检用）
-    settled_heading_pattern='^#{2,4} .*—— 已定|^#{2,4} 已定项[[:space:]]*[0-9]+[[:space:]]*(：|:|（|\()'
-    if [[ "$BREAK_SWITCH" == settled-item-heading-unrecognised ]]; then
-      settled_heading_pattern='^#{2,4} .*—— 已定'
+    added_paths="$(cut -f1 <<<"$added_out")"
+    added_texts="$(cut -f2- <<<"$added_out")"
+    heading_line_numbers="$(grep -nE "$settled_heading_pattern" <<<"$added_texts" | cut -d: -f1)" || true
+    declare -A has_settled_heading=()
+    while IFS= read -r heading_path; do
+      [[ -n "$heading_path" ]] && has_settled_heading["$heading_path"]=1
+    done < <(awk 'NR == FNR { hit[$1] = 1; next } FNR in hit { print }' <(printf '%s\n' "$heading_line_numbers") <(printf '%s\n' "$added_paths"))
+    # 弄坏开关 settled-same-file-added-lines-pooled：几份改过的决策的新增行并成一堆看，有一份新增了已定小节就当每一份都新增了
+    if [[ "$BREAK_SWITCH" == settled-same-file-added-lines-pooled ]] && ((${#has_settled_heading[@]})); then
+      for f in "${changed_name_list[@]}"; do has_settled_heading["$f"]=1; done
     fi
-    if grep -qE "$settled_heading_pattern" <<<"$added_text"; then
-      settled_files+=("$f")
-    fi
-  done <<<"$changed_names"
+    for f in "${changed_name_list[@]}"; do
+      [[ -n "${has_settled_heading[$f]:-}" ]] && settled_files+=("$f")
+    done
+  fi
 
   if ((${#settled_files[@]} == 0)); then
     echo "  ! 本次 diff 没有新增「已定」小节，这一格无对象可判"
@@ -3469,7 +3507,9 @@ def artifact_names(history=True):
                 here.update(files)
     if history:
         try:
-            done = subprocess.run(['git', '-c', 'core.quotepath=false', 'log', '--all', '--name-only', '--format=', '--', 'research/prompts', 'research/results'],
+            # --no-renames：改名检测对整批加删的提交要两两比内容；关掉它名字集合不变（改名前的旧名在它被加进来的那个提交里已经列过）。
+            # 样本 evidence-pointer-renamed-history-green（判决文件改过名、被点名的是改名前的名字）。
+            done = subprocess.run(['git', '-c', 'core.quotepath=false', 'log', '--all', '--no-renames', '--name-only', '--format=', '--', 'research/prompts', 'research/results'],
                                   capture_output=True, text=True)
         except OSError:
             done = subprocess.CompletedProcess([], 127, '', '')
@@ -4222,4 +4262,6 @@ if ((write_mode)); then
 fi
 
 
+# 这一道的格互不依赖、都只读被判的树：并行跑（.claude/gate.d/lib/stage-cells.sh 文件头「格并行」）
+STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"
 stage_cells_run "$ROOT"

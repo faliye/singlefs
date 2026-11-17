@@ -1,0 +1,8 @@
+exit=1
+want=E42   .claude/kb/experiments/42-空白.md research/results/e42-orphan-page-sample.out
+want=kb/experiments/ 里却没有正文
+want=样本只跑 .gate-cells 点名的格：experiment-orphans
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（experiment-orphans）
+want=→ experiment-orphans：给这个实验号建正文
+want=bash .claude/gate.d/doc-experiments.sh --check experiment-orphans

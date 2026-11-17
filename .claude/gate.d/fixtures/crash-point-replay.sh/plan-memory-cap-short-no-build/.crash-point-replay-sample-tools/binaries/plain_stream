@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# 样本里的假测试二进制（文件名就是测试目标名；假 cargo 的 --no-run 打 Executable 行点名它，计划那一步把它硬链接进计划目录，各片与合并直接起放进去的那一份）：
+#   先打一行 CRASH_POINT_REPLAY_PROGRESS sample-binary-run: target=<目标> share=[<SINGLEFS_CRASH_AMPLIFICATION_SHARE，没设写 unset>] directory=[<起它时的工作目录名>]，
+#   再把活交给 PATH 上的假 cargo（样本档把标记目录放在 PATH 最前面），带 SAMPLE_BINARY_RUN：假 cargo 不把这一遍记进 cargo-calls。
+#   样本现场（setup.sh）在 exec 之后附一份判器键表（真二进制里键表也编在里面）
+target="$(basename "${BASH_SOURCE[0]}")"
+echo "CRASH_POINT_REPLAY_PROGRESS sample-binary-run: target=$target share=[${SINGLEFS_CRASH_AMPLIFICATION_SHARE-unset}] directory=[$(basename "$PWD")]"
+SAMPLE_BINARY_RUN=1 exec cargo test --release -p singlefs-verification --test "$target" -- "$@"

@@ -1,0 +1,4 @@
+exit=1
+want=✗ crash-case:plain-stream 第 0/1 片判红：cargo test 退 143（上面是它的尾部）
+want=本次未跑（这不是通过）：crash-case-replay：这一趟 crash-case:plain-stream 那一趟被停了（cargo 退 143），后面 1 条崩溃枚举用例不接着跑：crash-case:other-stream
+want=✗ 第 0/1 片判红：崩溃枚举用例（这一趟 crash-case:plain-stream 那一趟被停了（cargo 退 143））（各自的出路在上面）

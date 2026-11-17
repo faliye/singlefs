@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=到点停整组：scripts/gate/hangs.sh HANGS_BREAK=prefix，限时 3 秒
+want=发了 KILL；组里一个不剩之后才还这一趟的名额
+want=脚本与钩子的弄坏开关复跑：复跑了 1 条开关（1 份），自证红且点名的格与实际红的格逐格相同 1 条
+want=break-switch-replay：绿

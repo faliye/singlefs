@@ -1,0 +1,2 @@
+# 计划那一步（.gate-shard-phase）不点名用例的整轮：两条用例上一趟都只记下 8 块，照旧取卡数（5 台 5 片），样本档写完计划退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

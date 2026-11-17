@@ -1,0 +1,2 @@
+# 样本复跑登记表：scripts/gate/drift.py 一份
+scripts/gate/drift.py	60	# 样本：指定范围，点名的格没红判红：脚本退 1，只在行中间转述一句不一样的 ✗ 行

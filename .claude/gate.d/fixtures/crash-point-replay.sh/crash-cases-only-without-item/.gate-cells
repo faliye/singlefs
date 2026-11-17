@@ -1,0 +1,2 @@
+# --crash-cases-only 而没点崩溃枚举用例（没有 .gate-items）：用法错退 2，判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

@@ -1,0 +1,5 @@
+exit=1
+want=95-样本.md:7 的未定项点名了 D96，而 D96 的状态行在它之后变过
+want=复核这一项是不是已经被 D96 定掉了
+want=  stale-open-items：红（退出 1）
+want=doc-decisions.sh：1 格里 1 格红（stale-open-items）

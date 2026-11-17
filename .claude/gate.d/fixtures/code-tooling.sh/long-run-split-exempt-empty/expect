@@ -1,0 +1,4 @@
+exit=77
+want=样本只跑 .gate-cells 点名的格：long-run-split-exempt
+want=.claude/long-run-split-exempt 里没有登记行（只有注释与空行），这一格无对象可判
+want=long-run-split-exempt：本次未跑

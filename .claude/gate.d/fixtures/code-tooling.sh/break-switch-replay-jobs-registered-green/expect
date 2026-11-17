@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=并行 8 条（登记的每台默认重活线程数 8 条；内存上限 1536 MiB
+want=break-switch-replay 逐条进度 32 行、派出去 32 条；
+want=脚本与钩子的弄坏开关复跑：复跑了 32 条开关（1 份），自证红且点名的格与实际红的格逐格相同 32 条
+want=break-switch-replay：绿

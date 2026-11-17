@@ -1,0 +1,3 @@
+# 同 shards-run-the-plan-binaries-without-building，另假 ln 一律退 1（造出计划目录与编译目录不在同一个文件系统）、假 objcopy 写出去了调试段的一份：放进计划目录的两个二进制都是拷的、都去了调试段，核判器输入照样认得出键表；
+# 没有分片阶段那一路照服务分片走 2 片（.gate-shard-count）：计划那一步编一回、放进计划目录，两片与合并都直接起放进去的测试二进制、一回都不编，样本档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

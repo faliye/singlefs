@@ -1,0 +1,3 @@
+exit=1
+want=本次未跑（这不是通过）：crash-case-replay 第 0 片：这一趟 crash-case-replay 不带特性那一趟被停了（cargo 退 143），登记的崩溃枚举用例不接着跑
+want=✗ 第 0/1 片判红：按条复用那一趟（这一趟 crash-case-replay 不带特性那一趟被停了（cargo 退 143））（各自的出路在上面）

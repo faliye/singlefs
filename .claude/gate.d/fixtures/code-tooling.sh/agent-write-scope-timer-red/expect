@@ -3,3 +3,4 @@ want=定时唯一办法闸没挂全工具
 want=matcher 合起来没覆盖：Monitor
 want=把 timer-only-remind-guard.sh 那一条的 matcher 写成
 want=没注册提醒自启动的停止钩子
+want=会话检测钩子没挂全 source：命令指向 singlefs-ai-sop/scripts/claude-hooks/session-checks.sh 的注册，matcher 合起来没覆盖：clear

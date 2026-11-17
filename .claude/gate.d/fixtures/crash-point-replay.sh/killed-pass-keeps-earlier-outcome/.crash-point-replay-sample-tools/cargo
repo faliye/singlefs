@@ -5,6 +5,19 @@
 #   照内存包装撞顶时 systemd 停整个 scope 的样子，阶段跟着被停；发之前核父进程的命令行里有这一道阶段的文件名，不是就一个信号都不发、退 101。
 # 每次起都先打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: <收到的全部参数>。
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# case_log <日志> <测试目标>：登记的崩溃枚举用例那一趟打的日志；库里的块用 $here/.judged-blocks/<测试目标> 这个记号模拟。
+#   环境里有 SINGLEFS_CRASH_AMPLIFICATION_SHARE 的是单片（引擎判这一片领的块、写进库）：日志原样打、留下记号；
+#   没有的是核账（整份 0/1）：记号在就是各片判过的块都从库里读到，CRASH_CASE_BLOCKS 那一行的 fresh 并进 reused、fresh 写 0；记号不在（库里没有）原样打
+case_log() {
+  if [[ -n "${SINGLEFS_CRASH_AMPLIFICATION_SHARE:-}" ]]; then
+    mkdir -p "$here/.judged-blocks" && : > "$here/.judged-blocks/$2"
+    cat "$1"
+  elif [[ -f "$here/.judged-blocks/$2" ]]; then
+    awk '/^CRASH_CASE_BLOCKS / { reused = fresh = 0; for (i = 1; i <= NF; i++) { if ($i ~ /^reused=/) { reused = substr($i, 8) + 0; reused_at = i } else if ($i ~ /^fresh=/) { fresh = substr($i, 7) + 0; fresh_at = i } } $reused_at = "reused=" (reused + fresh); $fresh_at = "fresh=0" } { print }' "$1"
+  else
+    cat "$1"
+  fi
+}
 if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
 [[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
 # 登记的崩溃枚举用例那一趟（不带 --lib、最后一个 --test 的目标有 cases/<目标>.log）：先打收到的参数，再打那一份日志、退出码照同名 .exit（没有就 0）；
@@ -20,7 +33,7 @@ if [[ -n "$last_test" && " $* " != *" --lib "* && -f "$here/cases/$last_test.log
   if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE:-}" && -f "$here/cases/$last_test.findings.tsv" ]]; then
     cat "$here/cases/$last_test.findings.tsv" >> "$SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE" || exit 101
   fi
-  cat "$here/cases/$last_test.log"
+  case_log "$here/cases/$last_test.log" "$last_test"
   exit "$(cat "$here/cases/$last_test.exit" 2>/dev/null || echo 0)"
 fi
 features=""
@@ -34,13 +47,37 @@ if [[ -n "$features" ]]; then log="$here/cases/feature-pass.${features//,/+}.log
 [[ -f "$log" ]] || { echo "样本里没有这组特性的日志：${log##*/}（参数：$*）"; exit 101; }
 # 收到的参数打成一行 CRASH_POINT_REPLAY_PROGRESS（阶段只转出这一类行），expect 靠它核阶段真的把哪些参数交给了 cargo
 echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
-cat "$log"
+case_log "$log" "${log##*/}"
 if [[ -f "${log%.log}.term-parent" && "${SINGLEFS_CRASH_CASE_BLOCKS_QUERY:-}" != 1 ]]; then
   parent_command="$(tr '\0' ' ' < "/proc/$PPID/cmdline" 2>/dev/null)"
   if [[ "$parent_command" != *crash-point-replay.sh* ]]; then
     echo "样本的假 cargo：父进程 $PPID 不是这一道阶段（命令行：${parent_command:-读不到}），不发 TERM、退 101"
     exit 101
   fi
+  # 发 TERM 之前等接输出的那一段（python3 -c 起的）接上手（至多 10 秒）：它装好忽略 TERM、打开了这一趟的日志（忽略 TERM 的进程开着 3 号以上指向普通文件的描述符）。
+  #   阶段一死，调用方就删样本的临时目录；接输出的那一段在那之前还没打开日志，这一趟的行就进不了日志和标准输出，判的就不是「被停之后已打的行照转」，
+  #   机器忙（样本同时喂）时 python 起得慢就会这样。不等它读到程序：程序经 -c 交，这一道被停时先删草稿目录，接输出的那一段读不读得到程序正是这份样本判的
+  #   （弄坏开关 pass-output-program-in-scratch 下它这时还没起，等满 10 秒才发）
+  consumer_ready() {
+    local pending=("$PPID") process child mask descriptor
+    while (( ${#pending[@]} )); do
+      process="${pending[0]}"; pending=("${pending[@]:1}")
+      for child in $(cat "/proc/$process/task/$process/children" 2>/dev/null); do
+        pending+=("$child")
+        [[ "$child" != "$$" ]] || continue
+        mask="$(awk '/^SigIgn:/ { print $2 }' "/proc/$child/status" 2>/dev/null)"
+        [[ -n "$mask" ]] && (( (0x$mask & 0x4000) != 0 )) || continue
+        for descriptor in /proc/$child/fd/*; do
+          [[ "${descriptor##*/}" =~ ^[0-9]+$ ]] && (( ${descriptor##*/} >= 3 )) && [[ "$(readlink "$descriptor" 2>/dev/null)" == /* ]] && return 0
+        done
+      done
+    done
+    return 1
+  }
+  for (( waited = 0; waited < 100; waited++ )); do
+    consumer_ready && break
+    sleep 0.1
+  done
   kill -s TERM "$PPID"
   exit 143
 fi

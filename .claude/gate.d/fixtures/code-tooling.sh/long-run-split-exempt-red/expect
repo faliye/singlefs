@@ -1,0 +1,14 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：long-run-split-exempt
+want=.claude/long-run-split-exempt:2 不是「<项名>  # <理由>」（没有 #）
+want=.claude/long-run-split-exempt:3 short-reason-item 的理由去掉空白只有 3 个字（至少 8）
+want=.claude/long-run-split-exempt:3 short-reason-item 的理由里没有用户那句话的出处
+want=.claude/long-run-split-exempt:4 no-citation-item 的理由里没有用户那句话的出处
+want=.claude/long-run-split-exempt:5 missing-file-item 的出处 records/absent.md:3 指到的文件不在
+want=.claude/long-run-split-exempt:6 beyond-line-item 的出处 records/said.md:99 行号不在 1 到 5 之间（那份文件 5 行）
+want=.claude/long-run-split-exempt:8 duplicated-item 与第 7 行重复（一项一行）
+want=.claude/long-run-split-exempt:9 scripts/ 是目录（豁免不按目录）
+want=.claude/long-run-split-exempt:10 records 是目录（豁免不按目录）
+want=.claude/long-run-split-exempt:11 sample-gate.sh 是整道门禁的文件名（豁免不按整道门禁）
+want=豁免表 .claude/long-run-split-exempt：查了 11 行，10 处不对
+want=long-run-split-exempt：红（退出 1）

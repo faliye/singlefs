@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=脚本与钩子的弄坏开关复跑：复跑了 1 条开关（1 份）
+want=· 判绿记库：RECORD recorded=0 changed=2
+want=：跑的过程中键变了（开跑
+want=  ! 记库没记的另有 1 条没转进日志（verdict-record 这一趟共打 2 条「!」行）
+want=break-switch-replay：绿

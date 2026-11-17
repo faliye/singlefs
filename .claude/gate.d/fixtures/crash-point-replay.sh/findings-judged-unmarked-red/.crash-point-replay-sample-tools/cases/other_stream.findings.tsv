@@ -1,0 +1,3 @@
+crash_point_replay_findings_begin	format=1	stream=other-stream	states=112
+crash_point_replay_finding	finding=1	pass=record_checker	violated=root_without_record	segment=2	publish=after_the_last_root	states=9	sample_states=17,18	sample_violation_1=根在案而记录不在
+crash_point_replay_findings_summary	signatures=1	red_states=9	states=112	states_by_finding=1:9

@@ -1,0 +1,2 @@
+crash-point-replay.sh	tests-of:singlefs-verification	command=cargo command=rustc	# 样本：本阶段那一行（入口是 验证包的测试函数）
+crash-case:plain-stream	-	test=singlefs-verification:plain_stream:plain_stream_full	# 样本：登记的崩溃枚举用例，假 cargo 照 .crash-point-replay-sample-tools/cases/ 打日志

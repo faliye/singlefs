@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=code-tooling.sh 的 break-switch-replay 格：开跑前算键，2 条里拒算 2 条
+want=scripts/gate/refusing.py:12
+want=（2 条，头一条「scripts/gate/refusing.py 基准趟」）
+want=这一格只认拒算 0
+want=break-switch-replay：红

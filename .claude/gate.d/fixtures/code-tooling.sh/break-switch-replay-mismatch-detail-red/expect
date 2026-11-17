@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=scripts/gate/crowded.py CROWDED_BREAK=five：不符，点名的项没在失败行里：「✗ 自检：点了没红的那一格」；失败行没被点名：
+want=等 4 行；完整的失败行与点名的项在
+want=· 重算键：没对上的 1 条照开跑前同一份请求重算，键变了 0 条
+want=不符明细回读核过：1 条开关、点名的项 2 项、失败行 5 行（其中没被点名的 4 行）都在文件里
+want=脚本与钩子的弄坏开关复跑：1 处不对（复跑了 1 条、1 份）
+want=break-switch-replay：红（退出 1）

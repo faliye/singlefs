@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# crash-point-replay 判别力样本的假 python3：admission.py 的 test-plan 每起一遍往同目录的 test-plan-calls 追加一行，门禁据此在计划、单片、合并三步结束时打 test-plan 一共起了几遍；
+# 别的调用原样交给 PATH 上排在它后面的 python3（把标记目录从 PATH 里摘掉再 exec，不会再解到自己）
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == */admission.py && "${2:-}" == test-plan ]]; then
+  printf 'test-plan\n' >>"$here/test-plan-calls"
+fi
+clean_path=""
+IFS=: read -r -a path_parts <<<"$PATH"
+for path_part in "${path_parts[@]}"; do
+  [[ "$path_part" == "$here" ]] || clean_path+="${clean_path:+:}$path_part"
+done
+PATH="$clean_path" exec python3 "$@"

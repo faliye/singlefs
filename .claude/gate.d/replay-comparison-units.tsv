@@ -16,6 +16,8 @@
 #   或在这里点名不登记：一行一条，行首写「# 不登记的比对对象：<登记出处> #<表的 # 列>：<理由>」（理由至少 4 个字），
 #   理由里写「欠在 C<号>（简称）」，号要在 .claude/kb/checks-owed.md 开着的那张表里（没写、号不在、号已还清，格都判红）；没有欠账号的先在那里登记，同一行写上。
 # E165 r5 #15 到 #19 与 r7 #1 到 #3 这八条「不登记的比对对象」就是 .claude/kb/checks-owed.md 的 C879（E165 根选择与杀伤界正式跑没有单元）：那几条正式跑在 formal_run_units 里补了单元，就删掉这八行、改登记成正式行。
+# 不登记的比对对象：research/prompts/e183-r1-prereg.md #1：这一行由 research/prompts/e183-r3-prereg.md #1 取代，产物只差改名换了名字；欠在 C980（被后继登记取代的比对对象没有形态）
+# 不登记的比对对象：research/prompts/e183-r1-prereg.md #2：这一行由 research/prompts/e183-r3-prereg.md #2 取代，产物只差改名换了名字；欠在 C980（被后继登记取代的比对对象没有形态）
 # 不登记的比对对象：research/prompts/e165-r5-prereg.md #15：r3 档择根，单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
 # 不登记的比对对象：research/prompts/e165-r5-prereg.md #16：r4 档带故障的择根，单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
 # 不登记的比对对象：research/prompts/e165-r5-prereg.md #17：r2 模式的变异杀伤界（3-乙），单元表 formal_run_units 里没有这条正式跑的单元；欠在 C879（E165 根选择与杀伤界正式跑没有单元）
@@ -40,6 +42,50 @@
 # 不登记的比对对象：research/prompts/e171-r2-prereg.md #5：r1 第一段比对器产物，现状整表段逐格比；E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e171-r2-prereg.md #6：r1 第二段比对器产物，现状整表段逐格比；E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
 # 不登记的比对对象：research/prompts/e171-r2-prereg.md #7：r1 第二段逐行驱动产物，现状整表段逐行归因；E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #1：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #2：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #3：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #4：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #5：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #6：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #7：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #8：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #9：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #10：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #11：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #12：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #13：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #14：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #15：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #16：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #17：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #18：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #19：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #20：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #21：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #22：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #23：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #24：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #25：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #26：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #27：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #28：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e171-r3-prereg.md #29：第 3 次重跑重出这一行产物，E171 没有单元表，没有单元可登记；欠在 C951（E171 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #1：r5 枚举 G0 档 today 臂（连判定库、31 线程）：产物里 name=r5_run_parameters 行带 judgements_fresh 与 judgements_reused，复跑时库里已有判定，这一行必不同，逐字节比不成立；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #2：r5 枚举 G0 档 skip 臂（连判定库、31 线程）：skip 臂要先建仓副本再套臂改动才能跑，复跑表没有这样的驱动先例；产物里 r5_run_parameters 行带 judgements_fresh 与 judgements_reused，复跑必不同；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #3：r5 枚举 G0 档一线程对拍趟（不连库）：复跑表要不要加这一行留给用户定，这一趟用了 6169 秒（任务 12582）、要不要进复跑表不由执行员定；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #4：r5 枚举 S16 档 today 臂（连判定库、31 线程）：产物里 name=r5_run_parameters 行带 judgements_fresh 与 judgements_reused，复跑必不同，逐字节比不成立；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #5：r5 枚举 S16 档 skip 臂（连判定库、31 线程）：skip 臂要先建仓副本再套臂改动才能跑，复跑表没有这样的驱动先例；r5_run_parameters 行复跑必不同；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #6：r5 枚举小环档 today 臂（连判定库、31 线程）：产物里 name=r5_run_parameters 行带 judgements_fresh 与 judgements_reused，复跑必不同，逐字节比不成立；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #7：r5 枚举小环档 skip 臂（连判定库、31 线程）：skip 臂要先建仓副本再套臂改动才能跑，复跑表没有这样的驱动先例；r5_run_parameters 行复跑必不同；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #8：r5 枚举 S4 档 today 臂（8 片连判定库加 1 次只取库的合并，31 线程）：产物里 name=r5_run_parameters 行带 judgements_fresh 与 judgements_reused，复跑时库里已有判定，这一行必不同，逐字节比不成立；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e158-r5-prereg.md #9：r5 枚举 S4 档 skip 臂（8 片连判定库加 1 次只取库的合并，31 线程）：skip 臂要先建仓副本再套臂改动才能跑，复跑表没有这样的驱动先例；r5_run_parameters 行复跑必不同；E158 没有单元表，没有单元可登记；欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）
+# 不登记的比对对象：research/prompts/e142-r26-prereg.md #1：第 26 次重跑的执行段还没跑，重跑产物 e142-new-pool-file-creation-dry-run-r26-main-2026-11-10.out 还不存在；E142 没有单元表，没有单元可登记；欠在 C1014（E142 与 E168 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e142-r26-prereg.md #2：第 26 次重跑的执行段还没跑，重跑产物 e142-r26-p8g-crates-dump-2026-11-10.out 还不存在；E142 没有单元表，没有单元可登记；欠在 C1014（E142 与 E168 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e168-r1-prereg.md #1：第 1 次重跑的执行段还没跑，重跑产物 e168-delete-ring-window-borrow-s1-history-2026-11-10-r1.out 还不存在；E168 没有单元表，没有单元可登记；欠在 C1014（E142 与 E168 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e168-r1-prereg.md #2：第 1 次重跑的执行段还没跑，重跑产物 e168-delete-ring-window-borrow-positive-controls-2026-11-10-r1.out 还不存在；E168 没有单元表，没有单元可登记；欠在 C1014（E142 与 E168 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e168-r1-prereg.md #3：第 1 次重跑的执行段还没跑，重跑产物 e168-delete-ring-window-borrow-segment1-2026-11-10-r1.out 还不存在，原件也不在复跑表里（约 9 小时）；E168 没有单元表，没有单元可登记；欠在 C1014（E142 与 E168 重跑的比对对象没有单元表）
+# 不登记的比对对象：research/prompts/e173-r2-prereg.md #1：第 1 次重跑第一段的留存产物 e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out，装置没有正式跑单元表，没有单元可登记；比的是 R1 的差，由 e173_r2_compare.py 做，复跑由 replay.sh 的 driver_e173_checkpoint_cost 逐字节比；欠在 C1027（E173 重跑的比对对象没有单元表）
 # r1 至 r4 四份登记的比对对象表已被 r5 那份取代（r5 的比对对象表把它们的正式跑都重列了一遍），不再登记；那四份的表头不是固定形态，格看不见它们。
 # 单元表里有、这里不登记的 6 个单元（对着 research/prompts/e165-r5-prereg.md 第十一节末尾那张比对对象表 19 行逐个判过，都不是比对对象，一个一行）：
 #   「r3 合法」：比对对象表里 r3 档只有第 14 行对抗一族与第 15 行择根，没有合法一族；这个单元对的是 replay.sh 的 driver_e165_r6_r3_legal，产物 e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out 是之后 r6 那一次新跑的。
@@ -62,5 +108,5 @@ E165	research/prompts/e165-r5-prereg.md	两份表都取、盘次序反报的 r2 
 E165	research/prompts/e165-r5-prereg.md	两份表都取、盘次序反报的 r2 多盘	crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out	driver_e165_r2_segment4_reversed_disk_order_multi_disk
 E165	research/prompts/e165-r5-prereg.md	r3 对抗	crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs	e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out	driver_e165_r3_segment1_adversarial
 E139	research/prompts/e139-r3-prereg.md	第 2 次重跑那一族与更早的全部行	scripts/experiment-apparatus/replay.sh	e139-tightened-floor-2026-10-05.out	driver_e139
-E183	research/prompts/e183-r1-prereg.md	all	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30.out	driver_e183
-E183	research/prompts/e183-r1-prereg.md	all	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-30-anchor-check.out	driver_e183_anchor_check
+E183	research/prompts/e183-r3-prereg.md	all	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08.out	driver_e183
+E183	research/prompts/e183-r3-prereg.md	all	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08-anchor-check.out	driver_e183_anchor_check

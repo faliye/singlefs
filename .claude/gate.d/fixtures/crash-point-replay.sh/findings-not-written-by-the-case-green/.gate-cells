@@ -1,0 +1,2 @@
+# 登记了 findings=not-written-by-the-case 的用例日志里有 CRASH_POINT_REPLAY_FINDINGS 行、发现日志空着：不判，判绿；同一趟没带标记的那条发现日志一节 0 个签名，判绿。样本档退 3（expect 里写了按设计不绿的理由）， 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

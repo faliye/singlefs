@@ -1,0 +1,3 @@
+# 样本排除表：一行指向不存在的文件，一行指向已经达标的那一份
+scripts/gate/gone.py  # 存量待改
+scripts/gate/fine.py  # 存量待改

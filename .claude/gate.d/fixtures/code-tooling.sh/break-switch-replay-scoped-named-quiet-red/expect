@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=· 范围：指定范围（只起点名的格：开关趟 1 条、基准趟 1 份；整份起：开关趟 0 条）；选格变量：DRIFT_SELFTEST_CELLS
+want=scripts/gate/drift.py DRIFT_BREAK=relay：不符，点名的项没在失败行里：「✗ 自证：alpha：判前缀」
+want=脚本与钩子的弄坏开关复跑：1 处不对（复跑了 1 条、1 份）
+want=break-switch-replay：红（退出 1）

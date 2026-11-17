@@ -1,0 +1,7 @@
+# 门禁 doc-process-records 的 crates-adversarial-review 格的过渡挂账表：存量没补完三方的测试代码。登记的路径这一格不要求点名。
+# 一行一条，两段用制表符分隔：路径、为什么这一份还没补三方（8 个字以上）。
+# 路径只认这几类：验证包 crates/singlefs-verification/、池级 checker crates/singlefs-checker/、函数单元图 crates/singlefs-unit-graph/ 的 src 里的 .rs，
+# 各包 crates/*/tests/ 下的 .rs，crates/mutations.tsv。同一路径不登两次；删掉的文件也可以登记。
+# 只缩不涨：基准里有这张表时，表里不许出现基准里没有的路径；新改的测试代码一律在判决「## 这一轮被判过的文件」一节里按路径点名，不往表里加行。
+# 补完一轮三方（判决点名了它），或那一份不再有改动，把那一行删掉；表里没有行时这一格照旧要求每一份都点名。
+# 判据与弄坏开关见 .claude/gate.d/doc-process-records.sh 文件头「豁免表与过渡挂账表」。

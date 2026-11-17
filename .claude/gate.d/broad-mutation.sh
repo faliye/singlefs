@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的那棵工作树上每条变异的单元键与广谱变异判定库（prune-server 里那一份），判定库不在 git 树里，上一次的结论不替这一次作保
 # run-condition: command python3
-# task-server-gpu-arguments: *   不指定范围的一趟先起驱动剪枝跑，驱动末尾补带 gpu 特性的那一趟，清场与分卡由服务在最外层办（task-server/task_server_lib.py 文件头「GPU」）；--check gate-verdict 只读库、不起驱动
+# 显卡（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：卡只归 GPU 批处理验证服务，这一道不领卡、不挑卡、不清场，文件头不写要卡的声明；
+#   环境里有 GPU_CARDS_BY_PRIORITY 就原样留给起的驱动，驱动末尾带 gpu 特性的那一趟怎么上卡照它的文件头；--check gate-verdict 只读库、不起驱动
+# task-server-shards: *   经统一任务服务交的一律分片：计划、两片、合并各起这一道一次，照转给驱动的同一步（下面「判什么」）；--selftest、--list-items、--help、-h 服务不分
+# task-server-compiles: yes
 # gate-stage: 广谱变异（提交门禁：此刻源码上每一条变异都有单元键相同的结论、没有一条没红）
 # gate-fixture: yes
 # gate-category: checker-tier 类
@@ -10,7 +13,7 @@
 # gate-similar: formal-verification.sh 它起 Verus 判证明，每条判定按单元键在它自己的库里复用；这里只读广谱变异驱动的判定，并进去会让两件不相干的事共用一份判法
 # gate-similar: crash-point-replay.sh 它逐条核崩溃枚举用例的崩溃状态块、缺块报本次未跑；这里有没结论的判红不报本次未跑（提交前要跑完才能提交）
 #
-# gate-cell: gate-verdict 先起驱动剪枝跑（按单元键沿用、沿用不了的现判，判到此刻清单的全部条；--check gate-verdict 指定范围时不起、只读库），再读驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论（要 GPU 那一趟的条两趟合起来有结论）、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上；驱动没跑成判红；判定库服务不可用退 75
+# gate-cell: gate-verdict 经服务分片起的一趟先在两片里起驱动剪枝跑、合并那一步驱动核账（按单元键沿用、沿用不了的在片里现判，判到此刻清单的全部条；不是服务分片起的与 --check gate-verdict 不起驱动、只读库），再读驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论（要 GPU 那一趟的条两趟合起来有结论）、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上；驱动没跑成判红；判定库服务不可用退 75
 # 参数解析、每格一个子 shell、汇总与退出码经共用库 lib/stage-cells.sh。
 #
 # 判什么：此刻源码上每一条变异都有单元键相同的结论、没有一条没红（gate-verdict 格）；结论键是被变异的函数单元与它调到的单元各自的指纹、原文、替换文、
@@ -19,10 +22,13 @@
 #   判定库里没有「一版」：不比暂存树、不比提交，没有 library-version-is-staged-tree 格，没有 --marker-check；也没有整道标记，不问 stage-must-run.sh，每趟照判。
 #   记红、撤绿、下趟现判（驱动文件头「判定行」末段）：这一道判红的是没红（missed > 0）与没结论；没红的条在驱动的剪枝跑里不沿用，每趟现判（同一把键更早的抓到、无效撤掉，
 #   单独一行没红、先抓到后判没红都一样；要 GPU 那一趟的条看合起来的状态）；抓到、无效照键沿用。这一道只读 --summary：状态本来就取最后一个定论，没红照没红数，不另设格，红的这一支照抄 MISSED 明细。
-#   不指定范围（不带 --check）：这一道自己先起驱动 scripts/mutation/broad-mutation.py --source <被判的根>，不带选条参数（剪枝跑：每条按单元键沿用、沿用不了的现判，判到此刻清单的全部条，
-#   末尾补 GPU 那一趟，没卡的机器上那几条是本次未跑），驱动退非 0（跑不成、基线红、锁被占、环境坏了……）这一格判红、不往下读 --summary；退 75（判定库服务不可用）这一格退 75。
-#   驱动不设内存上限、不限时，整条门禁是统一任务服务的一个任务，撞上限、卡住由服务停；中断后重跑同一条命令就是续跑。
-#   指定范围（--check gate-verdict）：不起驱动，只读 --summary，判库里此刻有没有全部条的结论；开关 driver-not-run 让不指定范围的一趟也不起驱动。
+#   不指定范围（不带 --check）经统一任务服务交：服务照文件头「# task-server-shards: *」拆成计划、两片、合并，每步起这一道一次，环境里 TASK_SERVER_SHARD_PHASE 说是哪一步；
+#   这一道起驱动 scripts/mutation/broad-mutation.py --source <被判的根>（不带选条参数），驱动照同一个变量只跑那一步（驱动文件头「分片」）：计划分两堆、各片在自己那一堆里剪枝跑
+#   （按单元键沿用、沿用不了的现判，末尾补 GPU 那一趟，这一道不领卡（文件头「显卡」）；没卡的那几条是本次未跑），计划与各片照驱动的退出码退、不读 --summary；
+#   合并那一步驱动核账（分片没判到的条判红、一条不现判），退非 0 这一格判红、不往下读 --summary，退 0 再读 --summary 判；退 75（判定库服务不可用）这一格退 75。
+#   --list、--check、--tool-versions 的一趟服务照样分，计划那一步写 0 片，合并那一步照常跑。
+#   不是服务分片起的这一道（gate.sh 整轮、手跑）与指定范围（--check gate-verdict）：不起驱动，只读 --summary，判库里此刻有没有全部条的结论（整轮里照键复用先跑那一趟写下的判定）。
+#   驱动不设内存上限、不限时，每一步是统一任务服务的一个子任务，撞上限、卡住由服务停；中断后重交同一条命令就是续跑。
 #   被判的那棵工作树就是第一个参数（主工作区，或 gate.sh --staged 的临时 worktree：内容是 HEAD 加暂存区）。
 # gate-verdict：驱动 --summary --source <被判的根>（不给 --home：判定库只有服务里那一份，库目录取驱动的缺省）在此刻的源码上照清单按单元存的那张表复原清单、现算每条的单元键、查判定库，
 #   打恰好一行 BROAD_MUTATION_SUMMARY、一行 BROAD_MUTATION_GATE；verdict=green、missed=0、without_conclusion=0、unlisted_units=0、concluded=total、total>0，退出码 0；
@@ -52,8 +58,7 @@
 #   只有调它的那一条要现判（NO_CONCLUSION 带「变了：改了 helper」）、helper 自己那个单元没记清单（UNLISTED），别的条照样有结论；
 #   -comment-only-green 只加注释，零条要现判；-unlisted-red 新加一个函数，那个单元没记清单；
 #   -driver-error-red 一条只有 driver-error 行（没结论），驱动判红退 8。
-#   gate-verdict-driver-* 两份（样本根放 .broad-sample/driver.sh 当驱动、summary.sh 当 --summary，标记里不写 scenario）：-driver-not-run-red 驱动退 1（没跑成）而 summary.sh 录的是全绿，
-#   这一格判红、不往下读；-driver-run-green 驱动退 0、summary.sh 全绿，判绿、输出里有驱动那一趟的一句。没放 driver.sh 的样本（上面几族）不起驱动，只读 summary。
+#   样本不是服务分片起的，都不起驱动，只读 summary。
 #   gate-verdict-* 录好输出的那几份：-green 全有结论；-missed-red 一条没红、退 8；-no-conclusion-red 三条没结论、退 8；-silent-driver-red 判定行写 green、退 0，而 missed=1；
 #   -line-missing-red 只有汇总行、退 0；-red-exit-zero-red 判定行写 red、计数与明细一致、退 0；-detail-count-red 判定行 green、计数全零，却列了 2 行 NO_CONCLUSION；
 #   -empty-list-red 清单 0 条、判定行 green；-unknown-verdict-red verdict=pending、退 8；-totals-mismatch-red 汇总行 total=5091、not_run=5085，判定行 total=6 写 green；
@@ -93,8 +98,6 @@
 #       gate-verdict-gpu-silent-driver-red（判绿）
 #   CHECKER_TIER_BROAD_MUTATION_BREAK=gpu-totals-unchecked  不核汇总行的 GPU 趟计数与判定行的相同
 #       gate-verdict-gpu-summary-mismatch-red（判绿）
-#   CHECKER_TIER_BROAD_MUTATION_BREAK=driver-not-run  不起驱动，只读库、不判到全部条
-#       gate-verdict-driver-not-run-red（判绿）
 #   CHECKER_TIER_BROAD_MUTATION_BREAK=summary-unavailable-as-red  驱动 --summary 退 75（判定库服务不可用）也照「退了 0、8 之外的码」判红、退 1
 #       gate-verdict-service-unavailable（判红，退 1 不是期望的 75）
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库：每份红样本的格按绿记、整道退 0（汇总与 --check 归共用库）
@@ -104,7 +107,7 @@
 #       gate-verdict-gpu-counts-red、gate-verdict-gpu-fields-missing-red、gate-verdict-gpu-no-conclusion-red、gate-verdict-gpu-silent-driver-red、
 #       gate-verdict-gpu-summary-mismatch-red、gate-verdict-gpu-driver-error-red、
 #       gate-verdict-units-callee-changed-red、gate-verdict-units-gpu-no-conclusion-red、gate-verdict-units-driver-error-red、
-#       gate-verdict-units-unlisted-red、gate-verdict-driver-not-run-red（判绿）
+#       gate-verdict-units-unlisted-red（判绿）
 #
 #   bash .claude/gate.d/broad-mutation.sh [项目根]
 #   bash .claude/gate.d/broad-mutation.sh --list              逐行打格名与判什么，不起驱动、不起 rustc
@@ -123,10 +126,22 @@ DRIVER="$STAGE_REPOSITORY/scripts/mutation/broad-mutation.py"
 SAMPLE_BUILDER="$STAGE_REPOSITORY/.claude/gate.d/lib/broad-mutation-samples.py"
 SAMPLE_MARKER=".broad-mutation-sample"
 SAMPLE_DIRECTORY=".broad-sample"
-RUN_DRIVER_HOWTO="重跑同一条命令（这一道自己先起驱动剪枝跑，中断后重跑就是续跑；没卡的机器上要 GPU 那一趟的条是本次未跑，到有卡的机器上重跑）"
+RUN_DRIVER_HOWTO="经服务重交这一道（task-server/task submit -- bash .claude/gate.d/broad-mutation.sh：服务分两片起驱动剪枝跑，中断后重交就是续跑；没卡的那一片上要 GPU 那一趟的条是本次未跑，卡归 GPU 批处理验证服务，这一道不领卡）"
 source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
-stage_cell gate-verdict cell_gate_verdict "先起驱动剪枝跑（按单元键沿用、沿用不了的现判，判到此刻清单的全部条；--check gate-verdict 指定范围时不起、只读库），再读驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论（要 GPU 那一趟的条两趟合起来有结论）、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上；驱动没跑成判红；判定库服务不可用退 75" \
+stage_cell gate-verdict cell_gate_verdict "经服务分片起的一趟先在两片里起驱动剪枝跑、合并那一步驱动核账（按单元键沿用、沿用不了的在片里现判，判到此刻清单的全部条；不是服务分片起的与 --check gate-verdict 不起驱动、只读库），再读驱动 --summary 的 BROAD_MUTATION_GATE 判绿：此刻源码上每一条变异都有单元键相同的结论（要 GPU 那一趟的条两趟合起来有结论）、没有一条没红、没有单元缺清单，判定行、汇总行、明细与退出码互相对得上；驱动没跑成判红；判定库服务不可用退 75" \
   "驱动没跑成的：照上面驱动打的 ✗ 与 → 修（退 6 基线不绿或环境坏了、退 4 锁被占着、退 2 用法或环境不对）；没有结论的、有单元没记清单的：$RUN_DRIVER_HOWTO（整条经 task-server 交，内存上限与卡住由服务管，撞了上限服务放大重排）；没红的：加一条能杀它的测试（改 crates/ 归实现员）再让驱动判那一条，确是等价变异的可写进 .cargo/mutants.toml 的 exclude_re（只那几条不再判）；--summary 退 1（判定库或清单表对不上，含认不出的结局）照驱动打的 → 修"
+# 分片（文件头「判什么」）：--list、--check、--tool-versions 的一趟不起驱动，服务照样分时计划那一步写 0 片，合并那一步照常跑
+shard_phase="${TASK_SERVER_SHARD_PHASE:-}"
+case "$shard_phase" in
+  ""|plan|shard|merge) ;;
+  *) echo "  ✗ TASK_SERVER_SHARD_PHASE=$shard_phase 认不出（只认 plan、shard、merge）"; echo "     → 怎么办：这个变量只由 task-server 设；手跑时去掉它"; exit 2 ;;
+esac
+if [[ "$shard_phase" == plan ]] && grep -qx -e '--list' -e '--check' -e '--check=.*' -e '--tool-versions' <<<"$(printf '%s\n' "$@")"; then
+  python3 -c 'import json, os, sys; temporary = os.path.join(sys.argv[1], "plan.json.partial"); json.dump({"shards": [], "note": "不起驱动的一趟，不分"}, open(temporary, "w")); os.replace(temporary, os.path.join(sys.argv[1], "plan.json"))' \
+    "${TASK_SERVER_SHARD_PLAN_DIRECTORY:?计划那一步要有 TASK_SERVER_SHARD_PLAN_DIRECTORY}" || exit 1
+  echo "  · 不起驱动的一趟：计划写 0 片，合并那一步照常跑"
+  exit 0
+fi
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 root_argument=""
 tool_versions_requested=0
@@ -171,11 +186,9 @@ sample_mode=0
 if [[ "$(pwd -P)" != "$(cd "$STAGE_REPOSITORY" && pwd -P)" && -z "${GATE_STAGED_FROM:-}" && -f "$SAMPLE_MARKER" ]]; then sample_mode=1; fi
 # 判定库只有 prune-server 里那一份（驱动文件头「判定库」）：不给 --home，库目录取驱动的缺省；样本根下面换样本自己的库目录（只放运行目录，判定的命名空间由临时 prune-server 给）
 summary_command=(python3 "$DRIVER" --summary --source "$ROOT")
-# 不指定范围的一趟先起的驱动：不带选条参数的剪枝跑（驱动文件头第一条），判到此刻清单的全部条；样本里换成样本自己的 driver.sh，没放的不起
+# 服务分片起的一趟起的驱动：不带选条参数的剪枝跑（驱动文件头第一条），驱动照 TASK_SERVER_SHARD_PHASE 只跑那一步（驱动文件头「分片」）
 driver_command=(python3 "$DRIVER" --source "$ROOT")
 if ((sample_mode)); then
-  driver_command=()
-  if [[ -f "$SAMPLE_DIRECTORY/driver.sh" ]]; then driver_command=(bash "$ROOT/$SAMPLE_DIRECTORY/driver.sh"); fi
   LIBRARY_HOME="$ROOT/$SAMPLE_DIRECTORY/home"
   scenario="$(sed -n 's/^scenario=//p' "$SAMPLE_MARKER" | head -n 1)"
   if [[ -n "$scenario" ]] && ! env -u BROAD_MUTATION_BREAK python3 "$SAMPLE_BUILDER" "$DRIVER" "$ROOT" "$scenario"; then
@@ -196,12 +209,14 @@ fi
 cell_gate_verdict() {
 local output driver_output driver_exit
 output="$(mktemp)" || { echo "  ✗ 建不了临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; exit 1; }
-# 不指定范围：先起驱动剪枝跑，判到全部条再读 --summary。--check 指定范围、弄坏开关 driver-not-run、样本没放 driver.sh 时不起
+# 合并那一步（文件头「判什么」）：先起驱动核账（分片没判到的条判红、一条不现判），过了再读 --summary。--check 指定范围、不是服务分片起的不起
 if ((STAGE_CELLS_CHECK_GIVEN)); then
   echo "  · 指定了 --check：不起驱动，只读判定库里此刻有没有全部条的结论（不判到全部条）"
-elif [[ ",${CHECKER_TIER_BROAD_MUTATION_BREAK:-}," != *,driver-not-run,* ]] && ((${#driver_command[@]})); then
+elif [[ "$shard_phase" != merge ]]; then
+  echo "  · 不是服务分片起的这一趟：不起驱动，只读判定库里此刻有没有全部条的结论（要判的经服务交这一道，服务分两片判）"
+else
   driver_output="$(mktemp)" || { echo "  ✗ 建不了临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑。"; rm -f "${output:?}"; exit 1; }
-  echo "  · 先起驱动剪枝跑（按单元键沿用、沿用不了的现判，判到此刻清单的全部条）：${driver_command[*]}"
+  echo "  · 合并那一步先起驱动核账（各片判过的照键沿用，分片没判到的条判红、一条不现判）：${driver_command[*]}"
   if env -u BROAD_MUTATION_BREAK "${driver_command[@]}" > "$driver_output" 2>&1; then driver_exit=0; else driver_exit=$?; fi
   if ((driver_exit == 75)); then
     echo "  ✗ 驱动退 75：prune-server 不可用（判定库服务连不上、停了或忙到上限），这一格没判；它的输出末几行："
@@ -211,13 +226,13 @@ elif [[ ",${CHECKER_TIER_BROAD_MUTATION_BREAK:-}," != *,driver-not-run,* ]] && (
     exit 75
   fi
   if ((driver_exit != 0)); then
-    echo "  ✗ 驱动剪枝跑退 $driver_exit（不是 0）：没判到此刻清单的全部条，不往下读 --summary；它的输出末几行："
+    echo "  ✗ 驱动核账退 $driver_exit（不是 0）：分片没判到此刻清单的全部条，不往下读 --summary；它的输出末几行："
     tail -n 12 "$driver_output" | sed 's/^/       | /'
     echo "     → 怎么办：照上面驱动打的 ✗ 与 → 修（退 6 基线不绿或疑似环境坏了、退 4 库目录的锁被占着、退 2 用法或环境不对、退 9 运行目录没删掉、退 143 被停）；修好之后$RUN_DRIVER_HOWTO。"
     rm -f "${output:?}" "${driver_output:?}"
     exit 1
   fi
-  echo "  · 驱动剪枝跑退 0：$(grep -E '^  ✓ ' "$driver_output" | tail -n 1 | sed 's/^  //')"
+  echo "  · 驱动核账退 0：$(grep -E '^  ✓ ' "$driver_output" | tail -n 1 | sed 's/^  //')"
   rm -f "${driver_output:?}"
 fi
 if env -u BROAD_MUTATION_BREAK "${summary_command[@]}" > "$output" 2>&1; then summary_exit=0; else summary_exit=$?; fi
@@ -284,8 +299,8 @@ if verdict == "red" and summary_exit == 8 and "summary-red-passes" not in broken
         print("     " + line.replace("\t", " "))  # gate-lint:detail
     if len(missed_lines) + len(no_conclusion) + len(unlisted_lines) > 30:
         print(f"     ……另有 {len(missed_lines) + len(no_conclusion) + len(unlisted_lines) - 30} 行，全文在驱动 --summary 的输出里")  # gate-lint:detail
-    print(f"     → 怎么办：没有结论的、有单元没记清单的：{howto_run}（整条经 task-server 交，内存上限与卡住由服务管，撞了上限服务放大重排；理由写 gpu-… 的是 CPU 那一趟没红又要 GPU 那一趟的条：在有卡的机器上重跑同一条命令，"
-          "GPU 趟接在最后自己清场再跑，没卡的机器上它们是本次未跑，不算没红也不算通过）；"
+    print(f"     → 怎么办：没有结论的、有单元没记清单的：{howto_run}（整条经 task-server 交，内存上限与卡住由服务管，撞了上限服务放大重排；理由写 gpu-… 的是 CPU 那一趟没红又要 GPU 那一趟的条：卡归 GPU 批处理验证服务，这一道不领卡、不清场，"
+          "环境里没有卡时它们是本次未跑，不算没红也不算通过，GPU 那一趟交 GPU 服务代跑（接口待定，.claude/skills/crash-test/commit-stages.md 第 2b 步②那一条））；"
           "没红的：加一条能杀它的测试（改 crates/ 归实现员）再让驱动判那一条，确是等价变异的可写进 .cargo/mutants.toml 的 exclude_re（只那几条不再判）。")
     sys.exit(1)
 expected_exit = 0 if verdict == "green" else 8
@@ -348,5 +363,10 @@ rm -f "${output:?}"
 exit "$python_exit"
 }
 
+# 计划与各片（文件头「判什么」）：起驱动的那一步、照驱动的退出码退，不读 --summary、不经格汇总
+if [[ "$shard_phase" == plan || "$shard_phase" == shard ]]; then
+  env -u BROAD_MUTATION_BREAK "${driver_command[@]}"
+  exit $?
+fi
 if ( stage_cells_run "$ROOT" ); then stage_exit=0; else stage_exit=$?; fi
 exit "$stage_exit"

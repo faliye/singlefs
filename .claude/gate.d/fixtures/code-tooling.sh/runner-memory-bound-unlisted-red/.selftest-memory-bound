@@ -1,0 +1,2 @@
+# 样本登记的大自证：这一条不在样本的 runner 表里
+bash scripts/gate/sample-renamed.sh --selftest

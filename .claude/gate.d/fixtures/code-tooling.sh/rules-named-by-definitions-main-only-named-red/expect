@@ -1,0 +1,4 @@
+exit=1
+want=✗ .claude/gate.d/rules-main-agent-only.tsv 第 2 行：.claude/rules/named-by-common.md 登记成只管主 agent，可 .claude/agent-common.md 已按路径点名它，这一行多余
+want=✗ 只管主 agent 的登记表 .claude/gate.d/rules-main-agent-only.tsv 有 1 处不对
+want=rules-named-by-definitions：红

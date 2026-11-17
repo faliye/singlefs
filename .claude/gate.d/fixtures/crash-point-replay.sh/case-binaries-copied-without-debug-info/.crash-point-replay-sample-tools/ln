@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# 样本里的假 ln（门禁 crash-point-replay 样本档把标记目录放在 PATH 最前面）：一律退 1，造出「计划目录与编译目录不在同一个文件系统、硬链接放不成」；
+# 计划那一步只在放测试二进制时调 ln（crash_point_replay_prebuild_case_binaries），放不成的改拷、拷的时候去掉调试段
+exit 1

@@ -1,0 +1,2 @@
+# 样本登记表
+scripts/gate/fanout.sh	selftest	# 样本：开关趟至多等 10 秒，只在样本树里读写几份小文件

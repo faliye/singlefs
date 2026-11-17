@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# 样本的假编译（只在样本根认，顶替 cargo build）：把 <目标目录>/release/prune-server 造成一个什么都不做的可执行文件。
+# 这一趟只许被起一次：第二次起（各格没有共用同一份二进制）就退 1、说出来，用到它的那一格跟着判红。
+set -euo pipefail
+counter="$(dirname "$0")/.prune-server-build-count"
+if [[ -e "$counter" ]]; then
+  echo "假编译被起了第二次：这一趟里 prune-server 二进制该只编一次、各格共用" >&2
+  exit 1
+fi
+: >"$counter"
+mkdir -p "$1/release"
+printf '%s\n' '#!/bin/sh' 'exit 0' >"$1/release/prune-server"
+chmod +x "$1/release/prune-server"

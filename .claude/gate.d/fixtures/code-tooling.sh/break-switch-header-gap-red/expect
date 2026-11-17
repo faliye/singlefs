@@ -1,0 +1,7 @@
+exit=1
+want=✗ task-server/shallow-items.py:3 SHALLOW_BREAK=skip 缺点名的项
+want=✗ .claude/gate.d/break-switch-replay-files.tsv:3 task-server/shallow-items.py:3 SHALLOW_BREAK=skip 缺点名的项
+want=弄坏开关文件头：1 处不对（读开关的 2 份：写全 1 份、豁免 0 份）
+want=脚本与钩子的弄坏开关复跑：1 处不对（复跑了 1 条、1 份）
+want=break-switch-headers：红（退出 1）
+want=break-switch-replay：红（退出 1）

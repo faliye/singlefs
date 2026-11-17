@@ -1,0 +1,8 @@
+exit=3
+want=样本档：
+want=! 本次未跑（独立验证，separate-run=样本：CPU判器参照全域跑得久，单独交）：crash-case:other-stream
+want=✓ crash-case:plain-stream 判绿（
+want=✓ 崩溃状态块：现判 0、复用 2、拒算 0、本次未跑 0
+want=✓ 登记的 1 条崩溃枚举用例（登了 separate-run= 的 1 条拆出来单独验证，这一趟没跑）这一趟都判绿（crash-case:plain-stream）
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

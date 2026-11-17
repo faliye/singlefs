@@ -1,0 +1,5 @@
+exit=1
+want=research/prompts/_c991-code-r1-body.md：没有「### 检查单：不新建判定库」这一格
+want=research/prompts/_c991-code-r1-body.md：没有「### 检查单：所有任务多机可用」这一格
+want=代码轮正文的检查单没写全（2 处，查了 1 份）
+want=code-round-checklist：红

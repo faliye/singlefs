@@ -2,4 +2,3 @@
 name = "singlefs-reference-filesystem"
 
 [dependencies]
-singlefs-format = { path = "../singlefs-format" }

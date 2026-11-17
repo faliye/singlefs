@@ -1,0 +1,5 @@
+exit=1
+want=✗ 验证包判红
+want=· crash-case:plain-stream 开跑（
+want=✓ crash-case:plain-stream 第 0/1 片判完它领的块
+want=✗ 第 0/1 片判红：按条复用那一趟（各自的出路在上面）

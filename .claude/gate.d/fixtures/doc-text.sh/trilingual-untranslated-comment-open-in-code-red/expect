@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：trilingual-untranslated
+want=三语译文里残留没译的中文超量：1 行（英语 1 行、日语 0 行，在 1 份译文里）
+want=README.en.md:7  英语，剩 22 个汉字（门槛 15）
+want=doc-text.sh：1 格里 1 格红（trilingual-untranslated）

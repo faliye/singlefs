@@ -1,5 +1,8 @@
 exit=1
-want=── product-gpu-real-card-tests：cargo test --release -p singlefs-background-gpu --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture --test-threads 1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=record cards=[unset]
+want=· product-gpu-real-card-tests：只录那一趟录完了（不持卡，3 条打了 RECORDED_ONLY），接着只判
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=judge cards=[192.0.2.1:0:8G]
+want=── product-gpu-real-card-tests：cargo test --release -p singlefs-background-gpu-tests --features tests-on-a-real-gpu --test checksum_kernels_agree --test two_kernels_reconcile -- --nocapture
 want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-gpu: cards=[192.0.2.1:0:8G] quiesced-by-the-stage=[]
 want=test the_table_kernel_agrees_with_the_cpu ... FAILED
 want=· product-gpu-real-card-tests：红的测试目标 1 个、FAILED 的测试函数 1 条

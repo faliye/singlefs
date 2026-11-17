@@ -1,0 +1,7 @@
+exit=1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=record cards=[unset]
+want=样本：只录那一趟写不进判定库
+want=✗ product-gpu-real-card-tests：真显卡对拍只录那一趟（SINGLEFS_CRASH_AMPLIFICATION_STAGE=record，不持卡）退 101（上面是它的尾部），只判那一趟没起
+want=→ 怎么办：看日志
+want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判；product-gpu-real-card-tests：红
+want=product-gpu-real-card-tests：红

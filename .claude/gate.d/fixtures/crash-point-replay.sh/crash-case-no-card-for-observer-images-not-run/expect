@@ -1,0 +1,7 @@
+exit=78
+want=本次未跑（这不是通过）：crash-case-replay：crash-case:plain-stream 那一趟（cargo 退 101）这条用例的观察者交回了盘、要上卡判，任务不拿卡；等 GPU 批处理服务收这一族待判行
+want=ITEM_DONE item=crash-case:plain-stream seconds=
+want=judged=0 reused=0 exit=78
+want=本次未跑 1 条（crash-case:plain-stream：观察者交回的盘取不到卡），不是都判绿
+want=✗ 1 条崩溃枚举用例本次未跑（不是红，也不算通过）：crash-case:plain-stream
+want=--check crash-case-replay --crash-cases-only --item crash-case:plain-stream

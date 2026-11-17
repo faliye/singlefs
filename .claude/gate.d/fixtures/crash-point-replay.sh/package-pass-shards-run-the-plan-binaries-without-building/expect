@@ -1,0 +1,23 @@
+exit=3
+want=样本档：
+want=── 没有 TASK_SERVER_SHARD_PHASE：这一件里自己走计划、单片、合并三步
+want=· 计划：2 片（样本根的 .gate-shard-count 点名；照服务分片的计划那一步预先编登记的崩溃枚举用例的测试二进制，各片与合并直接起）
+want=· 计划：环境里没有 TASK_SERVER_MEMORY_CAP_BYTES（不是经统一任务服务起的），起编之前不判内存够不够
+want=✓ 计划：登记的崩溃枚举用例要用的测试二进制按命令分 1 组各编一回（cargo test … --no-run，不持卡），1 个放进
+want=· 计划：预先编按条复用那一趟的测试二进制（不持卡，只编不跑）：
+want=✓ 计划：按条复用那一趟的测试二进制编了一回（test-targets-parallel.py --prebuild-into，不持卡；targets=2 placed=2 missing=0
+want=· 样本档：到计划结束为止 cargo test 起了 2 遍（其中只编不跑 2 遍）
+want=· 分片：第 0/2 片读计划那一步算好的 test-plan
+want=· 第 0/2 片的按条复用那一趟直接起计划那一步编好的测试二进制（
+want=：判器键所读的文件没变 1 个、核不出照用 0 个（源码在计划之后没改）、变了改经 cargo 0 个、计划那一步没放的 0 个经 cargo；别的片领的 1 个测试目标这一片不起、不核
+want=· 按条复用：别的片领的 1 个测试目标这一片不起（--drop-sources
+want=CRASH_POINT_REPLAY_PROGRESS sample-binary-run: target=singlefs_verification share=[unset] directory=[singlefs-verification]
+want=· 样本档：到第 0/2 片结束为止 cargo test 起了 2 遍（其中只编不跑 2 遍）
+want=· 分片：第 1/2 片读计划那一步算好的 test-plan
+want=· 第 1/2 片的按条复用那一趟直接起计划那一步编好的测试二进制（
+want=· 样本档：到第 1/2 片结束为止 cargo test 起了 2 遍（其中只编不跑 2 遍）
+want=── 合并：九格照常判，crash-case-replay 格核账、一块不现判
+want=· 样本档：到合并结束为止 cargo test 起了 2 遍（其中只编不跑 2 遍）
+want=逐格：crash-case-replay：绿
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

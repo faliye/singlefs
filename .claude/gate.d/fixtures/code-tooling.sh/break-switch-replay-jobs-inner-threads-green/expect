@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=外层 3 条 × 里层 2 = 6（不超过每台默认重活线程数 8）
+want=break-switch-replay：绿

@@ -1,0 +1,6 @@
+exit=1
+want=样本档：
+want=✓ crash-case:plain-stream 判绿（
+want=crash-case:fault-injection-given-states：登记了 red-blocks=judged-by-test，按 cargo test 的退出码判（已退 0），块那一行只核在不在、数对不对得上，红块不判
+want=✗ crash-case:fault-injection-given-states 核账那一趟现判了 3 块（块 5：复用 2、现判 3、红 2、拒算 0；记着红、每趟重判的块许 2 块）：各片判的块有按此刻的键在判定库里读不到的
+want=✗ 1 条崩溃枚举用例判红：crash-case:fault-injection-given-states（这一趟判绿 1 条

@@ -1,0 +1,2 @@
+# 登记了 blocks-line=not-printed-by-the-case 的用例日志里一行 CRASH_CASE_BLOCKS 都没有、cargo test 退 0：不判，判绿；同一趟没带标记的那条块那一行照判，判绿。样本档退 3（expect 里写了按设计不绿的理由）， 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

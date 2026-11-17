@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=并行 8 条（登记的每台默认重活线程数 8 条；内存上限 1536 MiB
+want=scripts/gate/fanout.sh FANOUT_BREAK=ca：不符
+want=脚本与钩子的弄坏开关复跑：1 处不对（复跑了 32 条、1 份）
+want=break-switch-replay：红（退出 1）

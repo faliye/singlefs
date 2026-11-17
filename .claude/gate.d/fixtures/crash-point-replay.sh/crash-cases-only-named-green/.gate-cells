@@ -1,0 +1,3 @@
+# --crash-cases-only 点一条崩溃枚举用例：按块那一路只起它、判绿，按条复用那一趟不起，样本档退 3（expect 里写了按设计不绿的理由），
+# 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

@@ -1,0 +1,17 @@
+exit=3
+want=样本档：
+want=· 计划：1 片（样本根的 .gate-shard-count 点名；照服务分片的计划那一步预先编登记的崩溃枚举用例的测试二进制，各片与合并直接起）
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-build: target=plain_stream
+want=里没有它的 Executable 行（或文件不在），不放：各片自己经 cargo test 起
+want=✓ 计划：登记的崩溃枚举用例要用的测试二进制按命令分 1 组各编一回（cargo test … --no-run，不持卡），0 个放进
+want=没放的 1 个由各片自己经 cargo test 起
+want=· 样本档：到计划结束为止 cargo test 起了 1 遍（其中只编不跑 1 遍）
+want=! crash-case:plain-stream：计划那一步没留下它的测试二进制（
+want=里没有「singlefs-verification - plain_stream」那一行：那一组只编没成，或日志里没有它的 Executable 行）：第 0/1 片自己经 cargo test 编
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-case: target=plain_stream share=[0/1] through-binary=[no]
+want=· 样本档：到单片结束为止 cargo test 起了 2 遍（其中只编不跑 1 遍）
+want=那一行：那一组只编没成，或日志里没有它的 Executable 行）：合并那一步自己经 cargo test 编
+want=· 样本档：到合并结束为止 cargo test 起了 3 遍（其中只编不跑 1 遍）
+want=✓ 崩溃状态块：现判 0、复用 2、拒算 0、本次未跑 0
+want=样本档（.crash-point-replay-sample-tools，假 cargo）：流程判绿，退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

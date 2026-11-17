@@ -1,0 +1,2 @@
+# 样本复跑登记表：scripts/gate/layout.py 一份
+scripts/gate/layout.py	60	# 样本：内存上限 100 GiB、登记的线程数 2：并行取线程数 2 条，外层 2 条 × 里层 1

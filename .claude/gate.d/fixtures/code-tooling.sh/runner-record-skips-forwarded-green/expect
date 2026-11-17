@@ -1,0 +1,6 @@
+exit=0
+want=· 按条复用：表里 2 条自证，现判 2、复用 0、拒算 0
+want=· 判绿记库：RECORD recorded=0 changed=2
+want=--selftest：跑的过程中键变了（开跑
+want=  ! 记库没记的另有 1 条没转进日志（verdict-record 这一趟共打 2 条「!」行）
+want=research 脚本的自证都通过（这一格跑了 2 条，表取自 样本根的 .selftest-runners

@@ -1,0 +1,11 @@
+exit=143
+want=样本档：
+want=· 这一格先出结局：crash-case-replay：绿
+want=· product-gpu-real-card-tests：crates/singlefs-background-gpu-tests/Cargo.toml 不在（没有产品 GPU 包），无对象可判
+want=· 这一格先出结局：product-gpu-real-card-tests：无对象可判
+want=── crash-case-must-red（只读树）
+want=── crash-knobs（只读树）
+want=── crash-case-provenance（只读树）
+want=· feature-gated-tests：要跑得久的目标排在最后，带特性那一趟的判定先记：
+want=· 判绿记库：RECORD recorded=1
+want=── feature-gated-tests：要跑得久的 GPU 测试目标另起一趟，排在最后

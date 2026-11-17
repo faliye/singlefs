@@ -29,7 +29,7 @@
 #      罩不到外部 crate 之间的传递依赖（要真跑 cargo tree）。
 #   ② checker 源码零处引 singlefs_core，经 `package =` 改名引进来的别名（`别名::`）同样算。
 #   ③ crates/singlefs-format/src/**/*.rs 正文不许有 if / match / for / while / loop；`#[cfg(test)]` 只豁免紧跟它的那一个 item。
-#   ⑤ singlefs-reference-filesystem（RefFS）的传递闭包（dev-dependencies 也算）⊆ {它自己, singlefs-format}：外部 crate 也不许有。
+#   ⑤ singlefs-reference-filesystem（RefFS）的传递闭包（dev-dependencies 也算）⊆ {它自己}：只用 std，singlefs-format 与外部 crate 都不许有。
 #   ⑥ RefFS 的源码（包目录下全部 .rs，target/ 除外）零处引 singlefs_core、singlefs_checker、singlefs_verification
 #      （真名按标识符认，`singlefs_checker_x` 这类更长的标识符不算一处 `singlefs_checker`）；经 `package =` 改名引进来的别名照 ② 的认法（`别名::`）同样算。
 #   ⑦ singlefs-core 与 singlefs-checker 的传递闭包（dev-dependencies 也算）里没有 RefFS。
@@ -82,9 +82,10 @@
 #   layout-checker-sync-first-registration-changed-value       源值这次也变了：红
 #   layout-checker-sync-base-unreadable-red                    两份格式定义都没改，基准那一版布局.md 的对象从对象库里删掉（ls-tree 认得出、show 读不出）：
 #                                                              红、点名「读不出基准 HEAD 里的 format/布局.md」（不当成基准里没有、不报首次登记判绿）
-#   checker-implementation-disjoint-red 与 -green 都带 RefFS 包与产品 GPU 包；-green 的 RefFS 包（dev-dependencies 里用别名引 singlefs-format，
-#                                          测试引 singlefs_reference_filesystem 自己；验证包依赖它，方向对）：⑤⑥⑦ 绿
-#   checker-implementation-disjoint-reference-closure-red          RefFS 依赖一个外部 crate，dev-dependencies 经中间包够到 singlefs-core：⑤ 红
+#   checker-implementation-disjoint-red 与 -green 都带 RefFS 包与产品 GPU 包；-green 的 RefFS 包（[dependencies] 是空的，常量与测试都引它自己；
+#                                          验证包依赖它，方向对）：⑤⑥⑦ 绿
+#   checker-implementation-disjoint-reference-format-red           RefFS 的 [dependencies] 依赖 singlefs-format、dev-dependencies 里另用别名引它，闭包只有这一个：⑤ 红
+#   checker-implementation-disjoint-reference-closure-red          RefFS 依赖 singlefs-format 与一个外部 crate，dev-dependencies 经中间包够到 singlefs-core：⑤ 红（4 个）
 #   checker-implementation-disjoint-reference-sources-red          RefFS 源码引 singlefs_checker 与 singlefs_verification，测试用 dev-dependencies
 #                                                                  里的别名 `oracle`（package = "singlefs-core"）：⑥ 红（⑤ 跟着红）
 #   checker-implementation-disjoint-reference-dependents-red       singlefs-core 的 dev-dependencies 用别名依赖 RefFS，singlefs-checker 经中间包依赖它：
@@ -106,7 +107,7 @@
 #   checker-implementation-disjoint-gpu-package-without-sources-red  产品 GPU 包只有 Cargo.toml、一个 .rs 都没有：判红
 # 弄坏开关（打开后样本判错；每条下面逐行点名判错的样本，括号里是那一份出不来的那一句）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0
-#     checker-implementation-disjoint-red、checker-implementation-disjoint-reference-closure-red
+#     checker-implementation-disjoint-red、checker-implementation-disjoint-reference-closure-red、checker-implementation-disjoint-reference-format-red
 #     checker-implementation-disjoint-reference-dependents-red、checker-implementation-disjoint-reference-moved-red
 #     checker-implementation-disjoint-reference-package-absent
 #     checker-implementation-disjoint-reference-sources-red、checker-implementation-disjoint-reference-without-sources-red
@@ -121,7 +122,11 @@
 #     layout-checker-sync-base-unreadable-red（退 0）
 #   CHECKER_INDEPENDENCE_BREAK=reference-closure-unchecked  ⑤ 不判
 #     checker-implementation-disjoint-reference-closure-red（退 0）
+#     checker-implementation-disjoint-reference-format-red（退 0）
 #     checker-implementation-disjoint-reference-sources-red（⑤ 跟着红的那一句「singlefs-reference-filesystem → singlefs-core（…写成别名 `oracle`）」）
+#   CHECKER_INDEPENDENCE_BREAK=reference-format-allowed  ⑤ 的闭包里 singlefs-format 不算在外
+#     checker-implementation-disjoint-reference-format-red（退 0）
+#     checker-implementation-disjoint-reference-closure-red（「有 4 个不在 {它自己} 里」那一句出不来：少算一个，是 3 个）
 #   CHECKER_INDEPENDENCE_BREAK=reference-direct-names-unchecked  ⑥ 的真名不判
 #     checker-implementation-disjoint-reference-sources-red（「源码里有 2 处引」）
 #   CHECKER_INDEPENDENCE_BREAK=reference-aliases-unchecked  ⑥ 的别名不判
@@ -163,7 +168,7 @@
 # 依据：D13（验证路线） 已定项 12「两者对同一条不变量独立判断，共享的只有格式解析」与 checks-owed.md C410（checker 两个方向共享什么没有检查）；
 # 扫描式方向的边界：「连 walk.rs 扫单元头那几个函数一起算，另建调用图」。checker-implementation-disjoint 格是 crate 粒度，罩不到同一个 crate 里的两个方向。
 # 判法只在 scripts/gate/checker-direction-overlap.py check（两个方向的闭包怎么收、切点与比对点、交集里各类单元怎么分、登记表核法与射程都在它文件头）；
-# 闭包由 scripts/gate/lib_function_units.py 收，入口、切点、比对点、局部绑定与允许共享的格式解析单元登记在 .claude/gate.d/checker-direction-entries.tsv。
+# 闭包由 scripts/gate/lib_function_units.py 收，入口、切点、比对点与允许共享的格式解析单元登记在 .claude/gate.d/checker-direction-entries.tsv。
 # 交集里格式解析之外的函数单元越界判红，取不到调用图（表不在、入口找不到、闭包里有拒算）判红；crates/ 不在退 77。
 # 判法自己的自证在 scripts/gate/checker-direction-overlap.py --selftest（弄坏开关 CHECKER_DIRECTION_OVERLAP_BREAK 的表在它文件头，只在自证里认）。
 # 样本（fixtures/checker-independence-and-sync.sh/）：
@@ -191,13 +196,13 @@ STAGE_NAME="$(basename "$0")"
 source "$STAGE_DIR/lib/stage-cells.sh"
 
 stage_cell checker-implementation-disjoint cell_checker_implementation_disjoint "checker 与实现只共享常量模块，验证包与产品 GPU 包不共用代码" \
-  "照上面各条的出路改：checker 要用的逻辑在 checker 里自己写一份，只有格式常量从 singlefs_format 取；共享模块只发射标量（D13（验证路线） 已定项 5）；RefFS 只依赖 singlefs-format、不引那三个包，实现与池级 checker 不依赖它（用户 2026-10-02 定 F4）；验证包与产品 GPU 包 singlefs-background-gpu 互不依赖、互不引，只共用 singlefs-format、singlefs-core 与 wgpu、naga 一族（用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」）"
+  "照上面各条的出路改：checker 要用的逻辑在 checker 里自己写一份，只有格式常量从 singlefs_format 取；共享模块只发射标量（D13（验证路线） 已定项 5）；RefFS 只用 std、不依赖 singlefs-format 与别的包、不引那三个包，实现与池级 checker 不依赖它（D13（验证路线） 已定项 3）；验证包与产品 GPU 包 singlefs-background-gpu 互不依赖、互不引，只共用 singlefs-format、singlefs-core 与 wgpu、naga 一族（用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」）"
 stage_cell layout-checker-sync cell_layout_checker_sync "布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟" \
   "在同一次改动里改这套布局的 checker 判定路径；checker 今天确实判不了的，把常量名登记进 .claude/gate.d/layouts-checker-lag.tsv 并挂一条开着的欠账；布局清单与位号登记照上面那一条的出路改"
 stage_cell cpu-judging-sites cell_cpu_judging_sites "验证包里每一处调判器的地方，要么在判定段里，要么包住它的函数带豁免或 CPU 参照的标记" \
   "照上面逐处列的改：真跑实现、只能在 CPU 上判的那一截在函数上一行写 // gpu-exempt: <截名>、豁免表 .claude/gate.d/gpu-exemptions.tsv 登记同名一行（每加一行先问用户）；GPU 对拍的 CPU 参照那一侧写 // cpu-reference-for-gpu-comparison；能走两段的搬进判定段（从库里读回再判）；判定段与判器本体登记在 .claude/gate.d/cpu-judging-sites.tsv；改完单跑 python3 scripts/crash/cpu-judging-sites-check.py check 到它退 0，再只重跑这一格：bash .claude/gate.d/checker-independence-and-sync.sh --check cpu-judging-sites"
 stage_cell checker-direction-overlap cell_checker_direction_overlap "池级 checker 遍历式与扫描式两个方向调用的函数单元，交集只许落在格式解析与常量里，取不到调用图也判红" \
-  "照上面逐个列的改：越界的单元属格式解析的搬进 crates/singlefs-checker/src/lib.rs、在 .claude/gate.d/checker-direction-entries.tsv 加一行 shared-format（认不认它属格式解析由用户定，D13（验证路线） 已定项 12 只许共享格式解析），不属的在扫描式那一侧自己写一份（改 crates/ 归实现员）；库按名字误连的同名局部量登 local-binding；取不到调用图的照点名的那一行改登记表；改完单跑 python3 scripts/gate/checker-direction-overlap.py check 到它退 0，再只重跑这一格：bash .claude/gate.d/checker-independence-and-sync.sh --check checker-direction-overlap"
+  "照上面逐个列的改：越界的单元属格式解析的搬进 crates/singlefs-checker/src/lib.rs、在 .claude/gate.d/checker-direction-entries.tsv 加一行 shared-format（认不认它属格式解析由用户定，D13（验证路线） 已定项 12 只许共享格式解析），不属的在扫描式那一侧自己写一份（改 crates/ 归实现员）；取不到调用图的照点名的那一行改登记表；改完单跑 python3 scripts/gate/checker-direction-overlap.py check 到它退 0，再只重跑这一格：bash .claude/gate.d/checker-independence-and-sync.sh --check checker-direction-overlap"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -433,8 +438,8 @@ if branches:
          "        而前两条一个字都不会说——把那段逻辑搬回各自的 crate，两边各写一份。"],
     ))
 
-# ⑤⑥⑦ RefFS 单独一个包：它只依赖 singlefs-format，不引实现、池级 checker、验证包，实现与池级 checker 不依赖它
-REFERENCE_DECISION = "用户 2026-10-02 定 F4：RefFS 单独一个包，依赖只有 std 与 `singlefs-format`（research/prompts/m3-formal-r5-main-verification.md 第二节 U4 一行）"
+# ⑤⑥⑦ RefFS 单独一个包：它的依赖闭包只有它自己（只用 std），不引实现、池级 checker、验证包，实现与池级 checker 不依赖它
+REFERENCE_DECISION = "RefFS 单独一个包，依赖只有 std、不依赖 `singlefs-format` 与别的 crate（D13（验证路线） 已定项 3：RefFS 与实现不共用代码）"
 
 def dependency_chain(start, target):
     """start 到 target 的一条依赖路径（按本仓内部依赖图走，最短的那条），每一跳写成别名的另注一句。"""
@@ -464,14 +469,15 @@ reference_present = os.path.isdir(REFERENCE)
 reference_name = manifest_of(REFERENCE)[0] if reference_present else REFERENCE_CRATE_NAME
 reference_closure, reference_sources, reference_forbidden_aliases = set(), [], []
 if reference_present:
-    # ⑤ 闭包 ⊆ {自己, singlefs-format}
+    # ⑤ 闭包 ⊆ {自己}
     reference_closure = closure_of(REFERENCE)
-    outside = sorted(reference_closure - {reference_name, SHARED_CRATE_NAME})
+    reference_allowed = {reference_name, SHARED_CRATE_NAME} if BREAK == "reference-format-allowed" else {reference_name}
+    outside = sorted(reference_closure - reference_allowed)
     if outside and BREAK != "reference-closure-unchecked":
         problems.append((
-            f"RefFS 包 `{reference_name}` 的依赖闭包（dev-dependencies 也算）里有 {len(outside)} 个不在 {{它自己, `{SHARED_CRATE_NAME}`}} 里：",
+            f"RefFS 包 `{reference_name}` 的依赖闭包（dev-dependencies 也算）里有 {len(outside)} 个不在 {{它自己}} 里：",
             [dependency_chain(reference_name, name) for name in outside],
-            [f"怎么办：{REFERENCE_DECISION}。外部 crate 也不许有。",
+            [f"怎么办：{REFERENCE_DECISION}。`{SHARED_CRATE_NAME}` 与外部 crate 都不许有。",
              "        RefFS 要用的东西在它自己的包里写一份；它与实现共用一段代码，就会与实现一起错（D13（验证路线） 已定项 3）。",
              "        要拿实现或池级 checker 与 RefFS 对拍的用例写进 验证包，不写进 RefFS 包的 dev-dependencies。"],
         ))
@@ -504,7 +510,7 @@ if reference_present:
             f"RefFS 包的源码里有 {len(direct_references)} 处引 `{'` / `'.join(forbidden_identifiers)}`：",
             direct_references,
             [f"怎么办：{REFERENCE_DECISION}。RefFS 是独立的参照实现，不与实现、池级 checker、验证包共用代码",
-             "        （D13（验证路线） 已定项 3：RefFS 与实现不许共用崩溃点枚举的那段代码）。要用的逻辑在 RefFS 里自己写一份；格式常量从 `singlefs_format` 取。"],
+             "        （D13（验证路线） 已定项 3：RefFS 与实现不许共用崩溃点枚举的那段代码）。要用的逻辑与常量都在 RefFS 里自己写一份。"],
         ))
     if alias_references_in_reference and BREAK != "reference-aliases-unchecked":
         renamed_to = sorted({reference_aliases[alias] for alias in reference_aliases if alias.replace("-", "_") in reference_forbidden_aliases})
@@ -686,7 +692,7 @@ if not gpu_judged:
     gpu_summary = f"弄坏开关 gpu-packages-unchecked：⑧ 没判（{gpu_summary}）"
 
 if reference_present:
-    reference_summary = (f"RefFS 包 `{reference_name}` 的依赖闭包 {len(reference_closure)} 个都在 {{它自己, `{SHARED_CRATE_NAME}`}} 里，"
+    reference_summary = (f"RefFS 包 `{reference_name}` 的依赖闭包 {len(reference_closure)} 个都在 {{它自己}} 里，"
                          f"它的 {len(reference_sources)} 份源码零处引实现、池级 checker、验证包（别名引进来的 {len(reference_forbidden_aliases)} 个）")
 else:
     reference_summary = f"弄坏开关 reference-absent-unchecked：RefFS 包 {REFERENCE} 不在，⑤ ⑥ 没判"
@@ -1052,4 +1058,6 @@ cell_checker_direction_overlap() {
   python3 "$REPO_ROOT/scripts/gate/checker-direction-overlap.py" check "$ROOT"
 }
 
+# 这一道的格互不依赖、都只读被判的树：并行跑（.claude/gate.d/lib/stage-cells.sh 文件头「格并行」）
+STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"
 stage_cells_run "$ROOT"

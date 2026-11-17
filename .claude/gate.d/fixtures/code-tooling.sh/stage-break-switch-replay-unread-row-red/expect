@@ -1,0 +1,4 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=sample-stage.sh:8 头注写了 *_BREAK= 却读不出（#   SAMPLE_STAGE_BREAK=one-space 值后面只隔一个空格
+want=stage-break-switch-replay：红（退出 1）

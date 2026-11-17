@@ -1,0 +1,6 @@
+exit=0
+want=✓ 改过的治理文件 2 份都有去向（钩子 1 份、脚本 1 份；新写的判决文件 0 份，另有 0 份按 .claude/agent-def-review-exempt 豁免，另有 2 份按 .claude/gate.d/governance-review-pending.tsv 挂账、不要求点名，基准 HEAD）
+want=      .claude/hooks/demo-guard.sh：存量钩子还没补三方
+want=      scripts/demo/run.sh：存量脚本还没补三方
+want=样本只跑 .gate-cells 点名的格：agent-def-adversarial-review
+want=doc-process-records.sh：1 格里 1 格绿（agent-def-adversarial-review），0 格本次未跑（无）

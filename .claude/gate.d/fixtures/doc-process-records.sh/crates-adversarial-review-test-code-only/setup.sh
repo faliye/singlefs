@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 只改了测试代码：验证包 crates/singlefs-verification/ 的 src 三个（含 src/bin/ 下的入库装置）、
 # 池级 checker crates/singlefs-checker/ 的 src 一个，
-# 另改了 crates/singlefs-verification/tests/ 下一个测试与 crates/mutations.tsv；没有任何三方判决 ⇒ 这一格无对象可判、退 77，
-# 逐个报出不判的四个 src 文件（tests/ 与 mutations.tsv 不是 crates/*/src/*.rs，不列）。把测试代码也算进对象就会判红（期望 77，实测 1）。
+# 另改了 crates/singlefs-verification/tests/ 下一个测试与 crates/mutations.tsv；没有任何三方判决 ⇒ 测试代码同样是这一格的对象，
+# 六份都没人点名，判红逐个列出（同一份改动有判决点名时判绿：crates-adversarial-review-test-code-green）。
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .

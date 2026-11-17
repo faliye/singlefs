@@ -1,0 +1,8 @@
+exit=3
+want=样本档：
+want=· 只看 --item 点名的 1 条崩溃枚举用例（登记表里共 2 条
+want=✓ crash-case:other-stream 判绿（
+want=✓ 崩溃状态块：现判 0、复用 2、拒算 0、本次未跑 0
+want=✓ 登记的 1 条崩溃枚举用例这一趟都判绿（crash-case:other-stream）
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

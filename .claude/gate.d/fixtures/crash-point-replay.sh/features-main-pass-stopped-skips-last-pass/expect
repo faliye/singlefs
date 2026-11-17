@@ -1,0 +1,4 @@
+exit=1
+want=· feature-gated-tests：feature-gated-tests 带特性那一趟被停了（cargo 退 143）：排在最后的目标（--test crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state）不接着跑
+want=✗ feature-gated-tests：带特性那一趟 cargo test 退 143
+want=feature-gated-tests：红

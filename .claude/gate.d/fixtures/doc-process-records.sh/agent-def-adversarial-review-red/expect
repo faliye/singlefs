@@ -1,5 +1,5 @@
 exit=1
-want=改过的定义与共用约束里 3 份没有三方判决点名
+want=改过的治理文件里 3 份没有三方判决点名
 want=      .claude/agent-common.md
 want=      .claude/agents/gone.md
 want=      .claude/main-agent.md

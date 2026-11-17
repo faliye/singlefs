@@ -250,7 +250,7 @@ def candidate_files():
 
 
 def is_excluded_prompt_file(path):
-    # research/prompts/ 显式排除，理由是 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」
+    # research/prompts/ 显式排除，理由是 `.claude/rules/evidence-discipline.md`「原样保存的证据不许事后改」
     # （`.claude/doc-lint-exclude` 排除它也是这一条）：那是原样发给模型的提示与模型的原样输出，
     # 与 research/results/ 里的产物一一对应，事后改它等于让产物对不上输入。
     # 例：反推腿的输出里有一条复现命令 `grep -n "已定项 8" …`，
@@ -292,7 +292,7 @@ def references(path, item_map, self_map, skipped_fenced_lines=None):
     for ln, line in enumerate(lines, 1):
         # 代码围栏里是逐字照抄的东西——变更史里抄录的原行、实验的产物行、源码片段。
         # 按今天的状态判它们，等于要求「原样保存的证据」跟着现状改
-        # （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」）。
+        # （`.claude/rules/evidence-discipline.md`「原样保存的证据不许事后改」）。
         # 例：D17（实现分层与第三方管道） 的旧正文抄进变更史围栏之后，
         # 围栏里的「未定项 6」按今天的状态判会红——那几行说的是抄下来那天的状态，而第 6 条此刻是已定。
         if line.lstrip().startswith('```') and ln != unclosed_fence_line_number:

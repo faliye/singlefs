@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：selftest-cells-alone
+want=── 复用三问：first 那一趟（selftest-cells-alone）
+want=· 按条复用：4 条（有选格手段的自证，一格一条），现判 4、复用 0、拒算 0
+want=REUSE_SELFTEST script=.claude/gate.d/code-tooling.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=4 affected=2
+want=selftest-cells-alone：绿

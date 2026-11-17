@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=· 范围：指定范围（只起点名的格：开关趟 2 条、基准趟 1 份；整份起：开关趟 0 条）；选格变量：CELLS_SELFTEST_CELLS
+want=脚本与钩子的弄坏开关复跑：复跑了 2 条开关（1 份），自证红且点名的格与实际红的格逐格相同 2 条、自证自带开关轮 0 条
+want=；范围：指定范围（只起点名的格：开关趟 2 条、基准趟 1 份；整份起：开关趟 0 条）
+want=break-switch-replay：绿

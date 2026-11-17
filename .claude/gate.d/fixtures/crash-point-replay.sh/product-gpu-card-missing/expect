@@ -1,5 +1,8 @@
-exit=1
-want=✗ product-gpu-real-card-tests：真显卡对拍那一趟要上卡，环境里却没有 task-server 交的显卡（GPU_CARDS_BY_PRIORITY），这一趟没起
-want=→ 怎么办：这道门禁经 task-server/task submit -- bash .claude/gate.d/crash-point-replay.sh … 交
-want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判；product-gpu-real-card-tests：红
-want=product-gpu-real-card-tests：红
+exit=3
+want=· product-gpu-real-card-tests：真显卡对拍那一趟：环境里没有 GPU_CARDS_BY_PRIORITY，照起、不领卡（卡归 GPU 批处理验证服务）
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=record cards=[unset]
+want=· product-gpu-real-card-tests：只录那一趟录完了（不持卡，3 条打了 RECORDED_ONLY），接着只判
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=judge cards=[unset]
+want=✓ product-gpu-real-card-tests：2 个对拍测试目标（特性 tests-on-a-real-gpu）每个都跑到了用例，共 3 条（含复用；按条：现判 3、复用 0、拒算 0、本次未跑 0）
+want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判；product-gpu-real-card-tests：绿
+not-green-by-design=product-gpu-real-card-tests 样本档用假 cargo 走流程，判绿也退 3（这一趟没跑过真的显卡，不许记成通过）

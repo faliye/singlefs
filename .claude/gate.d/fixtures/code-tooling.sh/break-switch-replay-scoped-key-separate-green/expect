@@ -1,0 +1,6 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=── 第二趟（break-switch-replay）
+want=开关趟：现跑 3 趟、取回 0 趟；范围：指定范围（只起点名的格：开关趟 2 条、基准趟 1 份；整份起：开关趟 0 条）
+want=开关趟：现跑 3 趟、取回 0 趟；范围：不指定范围（每条开关趟与基准趟都起整份自证，逐格相同）
+want=break-switch-replay：绿

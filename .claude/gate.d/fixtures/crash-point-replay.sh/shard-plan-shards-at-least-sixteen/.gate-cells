@@ -1,0 +1,2 @@
+# 计划那一步（.gate-shard-phase）点名一条登记了 shards-at-least=16 的用例：上一趟整份记下 4096 块要 64 片，不超过上界 16 片（shards-at-least 与 5 台的大者），样本档写完计划退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

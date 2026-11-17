@@ -31,7 +31,6 @@
 .claude/kb/experiments/200-修订6近似树重跑.md	crates/singlefs-harness/src/mount_transparency.rs	# 相对仓外副本的路径：E200（修订6近似树重跑） 逐份比的是修订 6 冻结树与并包之前主工作区的文件，换成验证包的路径就成假话
 .claude/kb/experiments/200-修订6近似树重跑.md	crates/singlefs-harness/src/reference_filesystem_translation.rs	# 相对仓外副本的路径：E200（修订6近似树重跑） 逐份比的是修订 6 冻结树与并包之前主工作区的文件，换成验证包的路径就成假话
 .claude/kb/experiments/200-修订6近似树重跑.md	crates/singlefs-harness/tests/common/mod.rs	# 相对仓外副本的路径：E200（修订6近似树重跑） 逐份比的是修订 6 冻结树与并包之前主工作区的文件，换成验证包的路径就成假话
-.claude/kb/milestone/01-first-txn.md	.claude/gate.d/checker-tier-crash-point-replay.sh	# 抄下来的当时的做法：已结束里程碑页记的是并包之前那两个包里的路径，换成验证包的路径就成假话
 .claude/kb/milestone/02-second-txn.md	.claude/gate.d/checker-tier-crash-point-replay.sh	# 抄下来的当时的做法：已结束里程碑页记的是并包之前那两个包里的路径，换成验证包的路径就成假话
 .claude/kb/milestone/02-second-txn.md	.claude/gate.d/checker-tier-qemu-device-streams.sh	# 抄下来的当时的做法：已结束里程碑页记的是并包之前那两个包里的路径，换成验证包的路径就成假话
 .claude/kb/milestone/03-third-txn.md	.claude/gate.d/checker-tier-crash-point-replay.sh	# 抄下来的当时的做法：已结束里程碑页记的是并包之前那两个包里的路径，换成验证包的路径就成假话
@@ -40,3 +39,7 @@
 .claude/kb/experiments/200-修订6近似树重跑.md	crates/singlefs-checker-tier/src/bin	# 相对仓外副本的路径：E200（修订6近似树重跑） 逐份比的是修订 6 冻结树与并包之前主工作区的文件，装置一类按并包之前的目录归，换成验证包的路径就成假话
 .claude/kb/term-renames.md	crates/singlefs-harness	# 说搬迁的那一行：改名表这一行登的是并包之前那个包的叫法，同一行写着并进 crates/singlefs-verification，换成新路径就成假话
 .claude/kb/term-renames.md	crates/singlefs-checker-tier	# 说搬迁的那一行：改名表这一行登的是并包之前那个包的叫法，同一行写着并进 crates/singlefs-verification，换成新路径就成假话
+.claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md	scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs	# 抄下来的当时的位置：登记那次装置还不是 bin，同一行写了现在的 bin，改成后继就成假话
+.claude/kb/checks-owed.md	scripts/crash/crash-point-replay-shard-run.sh	# 抄下来的当时的做法：C796、C640、C793 三行已关，记的是关账那天它的自证与登记，脚本 2026-11-10 整份删了（门禁 crash-point-replay 自己分片），改成后继就成假话
+.claude/skills/merge-verify/SKILL.md	a/.claude/gate.d/refused-tests.tsv	# 抄下来的命令：git diff --no-index 在草稿目录里对 a、b 两份拷贝出补丁，路径相对那个草稿目录，仓根下没有
+.claude/skills/merge-verify/SKILL.md	b/.claude/gate.d/refused-tests.tsv	# 抄下来的命令：git diff --no-index 在草稿目录里对 a、b 两份拷贝出补丁，路径相对那个草稿目录，仓根下没有

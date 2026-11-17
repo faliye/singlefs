@@ -1,0 +1,6 @@
+exit=1
+want=问题：用例日志里有 1 行 CRASH_POINT_REPLAY_FINDINGS
+want=✗ crash-case:plain-stream 的用例跑过了、日志也判得绿，发现日志却判红
+want=问题：第 1 节 red_states=9：有状态判红
+want=✗ crash-case:other-stream 的用例跑过了、日志也判得绿，发现日志却判红
+want=2 条崩溃枚举用例判红

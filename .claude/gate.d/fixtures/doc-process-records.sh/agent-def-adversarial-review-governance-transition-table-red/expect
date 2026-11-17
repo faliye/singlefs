@@ -1,0 +1,8 @@
+exit=1
+want=过渡挂账表 .claude/gate.d/governance-review-pending.tsv 有 4 处不合规
+want=第 1 行不是「路径<制表符>理由」两段，或理由不到 8 个字：.claude/hooks/demo-guard.sh
+want=第 2 行的路径不是项目规则、技能、钩子、门禁、判定库服务、统一任务服务、脚本这几类新扩进来的被管文件（定义与共用约束已在管，不进这张表）：.claude/agents/demo.md
+want=第 4 行重复登记了 scripts/demo/run.sh（第 3 行已经有）
+want=第 5 行不是「路径<制表符>理由」两段，或理由不到 8 个字：.claude/rules/demo.md
+want=样本只跑 .gate-cells 点名的格：agent-def-adversarial-review
+want=doc-process-records.sh：1 格里 1 格红（agent-def-adversarial-review）

@@ -1,0 +1,5 @@
+# 样本的 runner 表（换掉这一道的 SELFTEST_RUNNERS）：四条，大、小相间
+bash scripts/gate/sample-small-first.sh --selftest
+bash scripts/gate/sample-heavy-first.sh --selftest
+bash scripts/gate/sample-small-second.sh --selftest
+bash scripts/gate/sample-heavy-second.sh --selftest

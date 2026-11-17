@@ -1,0 +1,4 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：stage-break-switch-replay
+want=样本根的 .stage-break-switch-replay-memory 里「capacity=两个吉字节」读不出来，一条开关都没起
+want=stage-break-switch-replay：红（退出 1）

@@ -13,7 +13,7 @@ set -e
 colon=:
 jst="J""ST"
 utc="U""TC"
-mkdir -p .claude/kb records .claude/singlefs-ai-sop/rules .claude/gate.d/fixtures/x/red .claude/hooks .claude/scripts crates/demo/src research/prompts
+mkdir -p .claude/kb records .claude/singlefs-ai-sop/rules .claude/gate.d/fixtures/x/red .claude/hooks .claude/session-checks .claude/scripts crates/demo/src research/prompts
 printf '%s\n' '## 候选' '' "取 K13（K9 的收严版），不取 K9。引号 '甲' 与 don't 这类写法不管。" > .claude/kb/候选.md
 printf '# 记录\n\n用户 2026-09-26 弹窗定甲二。\n' > records/记录.md
 printf '%s\n' '第 3 点前后两句' '3 点意见' '1000 个崩溃点' '全量由用户要求或夜间跑' '用户 2026-09-28 定' '同一天下午续跑' '用户原话「东京时间7点前」' \
@@ -40,5 +40,5 @@ printf '%s\n' "RESETS = re.compile(r\"resets (\\d+)(am|pm) \\(${utc}\\)\")  # cl
 printf '%s\n' "let stamp = \"2026-09-27T09${colon}55${colon}07Z\"; // clock-times:allow 造时间戳格式的自检输入" > crates/demo/src/stamp.rs
 printf '取 K9\342\200\262 的读法（上游的样本）\n' > .claude/singlefs-ai-sop/rules/变体.md
 printf '%s\n' "改于 2026-09-05 00${colon}00" > .claude/gate.d/fixtures/x/red/expect
-printf '%s\n' "# 自检的假日志：2026-09-25 07${colon}58${colon}02 ${utc}" > .claude/hooks/session-start.sh
+printf '%s\n' "# 自检的假日志：2026-09-25 07${colon}58${colon}02 ${utc}" > .claude/session-checks/kernel-memory-kills
 printf '%s\n' "本机时钟是 ${utc}、人在东京时，东京 00${colon}00–09${colon}00 写下的当天日期比 ${utc} 的今天晚一天" > research/prompts/_c510-date-gate-r1-appendix.md

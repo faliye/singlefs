@@ -1,0 +1,3 @@
+# 样本登记表
+scripts/gate/okay.py	selftest	# 样本：自证只在内存里判
+task-server/shallow-items.py	selftest	# 样本：自证只在内存里判

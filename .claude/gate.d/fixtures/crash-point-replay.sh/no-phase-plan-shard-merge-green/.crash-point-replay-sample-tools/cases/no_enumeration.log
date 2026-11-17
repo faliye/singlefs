@@ -1,0 +1,3 @@
+SAMPLE_OTHER_ENUMERATION states=8
+CRASH_CASE_BLOCKS blocks=1 reused=0 fresh=1 red=0 refused=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.01s

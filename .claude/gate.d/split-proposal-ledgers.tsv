@@ -3,6 +3,7 @@
 # 一行一份，四段用制表符分隔：角色（current 或 sealed）、从仓根起的路径（records/ 下的 .md）、封存时内容的 sha256（current 那一行写 -）、为什么（8 个字以上）。
 # current 恰好一行；sealed 行的次序就是 deferred-items-registered 找节号时在现行那份之后挨个找的次序（新封存的写在前面）。
 # 封存那几份的 sha256 由 sealed-ledgers-unchanged 逐份比；对不上就是封存之后又被改了，照它的出路把那份恢复成封存时那一版，新内容往现行那一份追加。
-current	records/2026-10-29-subagent拆分提案.md	-	用户 2026-10-31 定「新建一份 没做完的都放到新的里面。 以后过去的两版作为历史封存」，新欠账往这一份末尾追加
+current	records/2026-11-17-subagent账本自上而下清欠.md	-	用户 2026-11-17 定「今后的 subagent优化项 写在你创建的新的 11-17的subaget文档」，新欠账与优化项往这一份末尾追加
+sealed	records/2026-10-29-subagent拆分提案.md	72169b2f94f58e8977d04f9041d5f5a2c48111ee36b1d5f1c4aaea9596e879f3	用户 2026-11-17 定今后写进新的那一份；判为做完、不做之外的 25 节已照原节号抄进现行那一份
 sealed	records/2026-10-23-subagent拆分提案.md	943ba3e7358b25f303c47e1d744005e903a296f306897b8c41a1e82386c7fe7c	用户 2026-10-31 定两版封存当历史；判为做完之外的 59 节已照原节号抄进现行那一份
 sealed	records/2026-09-16-subagent拆分提案.md	8ffa5c1260c421e9f03e644f569813c19bba41a0a860643afd7bb2225d1848da	用户 2026-10-31 定两版封存当历史；它是 2026-10-23 那份拆出来之前的登记处

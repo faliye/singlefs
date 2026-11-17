@@ -1,0 +1,2 @@
+# 计划那一步（.gate-shard-phase）点名一条小用例，caller-environment 交的内存上限 10 GiB：起编之前判出装得下，照编、写完计划退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

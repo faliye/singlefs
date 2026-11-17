@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# task-server-cargo-family: -p singlefs-verification --release
+# task-server-compiles: yes
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 模型对拍那几格要 cargo：缺了就在格里那一步 cargo test 判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
 # gate-stage: harness 类：验证包一条用例一个场景；模型对拍（随机历史与五个取样点，每一步拿实现的结局与只住内存的理想模型比，每段一格、各点名一条用例）
@@ -285,7 +285,7 @@ model_record_red() {
   elif [[ "${GATE_MODEL_DIFFERENTIAL_BREAK:-}" == red-record-failure-kept-green ]]; then
     echo "  ! 判红记库：admission.py verdict-record 没成（$(tail -n 2 "$scratch/red.record" | tr '\n' ' ')），同一把键原有的绿还在"
   else
-    echo "  · 判红记库：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$scratch/red.record" | tr '\n' ' ' | cut -c1-300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
+    echo "  · 判红记库：admission.py verdict-record 退 $record_exit（$(tail -n 2 "$scratch/red.record" | tr '\n' ' ' | clip_text 300)），记红没成，交 plan-failure 判、撤同一把键原有的绿"
     if python3 "$ADMISSION" plan-failure "$STAGE_NAME 的 $cell 格" verdict-record "$record_exit" --red "$ROOT" "$kind" "$scratch/plan" "$scratch/red.names" "$scratch/red.record"; then
       failure_exit=0
     else

@@ -1,0 +1,8 @@
+# 排在最后的那一趟的假 cargo 把阶段停了（退 143，整道没收尾）：别的格的结局与带特性那一趟的判定都已经落下；判的是格的次序，
+# 不算这几格的红样本也不算绿样本；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay
+product-gpu-real-card-tests
+crash-case-must-red
+crash-knobs
+crash-case-provenance
+feature-gated-tests

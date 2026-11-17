@@ -62,7 +62,7 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
 - 紧挨在前面的是 = [ { , > " ' + - . 之一或「, 」：产物行的「名字=值」、切片、字典与逗号列表、「0->1:10」、引号里的代码字面、
   时区偏移、小数；前面是反引号而小时只有一位的，是反引号里的键（`3:10`）；
 - 紧跟在后面的是 %、「.数字」或「-字母」：百分比、「分:秒.百分之一秒」（time -v 的格式）、带编号的阶段文件名（「20:09-sample-stage.sh」这类）；
-- 紧跟在后面的是 = 或 /、或紧挨在前面的是 @ 或 ;：产物行里「槽:代=ok@槽:代」「rows=槽:代/…;槽:代/…」这类键值对与分隔列表；
+- 紧跟在后面的是 = 或 /、或紧挨在前面的是 @、; 或 #：产物行里「槽:代=ok@槽:代」「rows=槽:代/…;槽:代/…」这类键值对与分隔列表，与「操作名#序号:数」这类带序号的字段值；
 - mountinfo 一行里的主:次设备号（`/proc/<进程>/mountinfo` 的「挂载号 父挂载号 主:次设备号 根路径 挂载点 …」，Rust 多行字符串里的续行加不了放行标记）：
   冒号对前面是「数字 空格 数字 空格」（挂载号与父挂载号），后面是「 /根路径 /挂载点」。只认这一个形态，缺一头的（只有一个挂载号、后面不是路径）照判；
 - 同一句里（句的边界是 。！？，没有这几个就是整行；「；」不算）有取值出了钟点范围的冒号对（时大于 23、分大于 59、一边三位或分只有一位）或「文件:行号」（「.md:42」这类）的，
@@ -87,6 +87,9 @@ ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（
   打开时 doc-text.sh 的 clock-times-green、session-names-green 样本与 write-guard.sh --selftest 里带放行标记的格必须判红。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=<形态键>：那几种形态的 excluded_prefixes 不生效。
   打开时 doc-text.sh 那一形态的绿样本（prime-marks-green、clock-times-green、session-names-green）里落在排除前缀下的放行格必须判红，证排除前缀只放过登记的那几处。
+- 同一个变量另认一项 candidate-prefilter-rejects-all：hits_per_line（doc-text.sh 的 prime-marks、clock-times、session-names 三格逐份文件逐行扫时用它）先筛一律说没有候选；
+  doc-text.sh 的 GATE_TEXT_NOTATIONS_BREAK=scan-prefilter-rejects-all 把它转进来，打开时三格的红样本（prime-marks-red、clock-times-red、clock-times-mountinfo-red、session-names-red、
+  private-values-clock-snippet-red、private-values-siblings-red）必须判红，证先筛没有吞掉真违例；first_hit 不经先筛，留作 hits_per_line 逐项对拍的参照。
 - 批次代号一形态（还没有 doc-text.sh 的格，判红的格在 write-guard.sh --selftest 与 bash-command-detector.sh --selftest 里）：
   LIB_FORBIDDEN_NOTATIONS_BREAK=batch-codes 关掉整形态、=batch-code-suffixed / batch-code-lettered / batch-code-labeled / batch-code-stem 关掉一条判据行，
   write-guard.sh --selftest 里点名那一条的「批次代号:」拒绝格必须判红；LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=batch-codes 时「批次代号上下文:」几格必须判红；
@@ -225,7 +228,7 @@ def bare_clock_is_not_clock(line, match):
         return True
     if after.startswith('%') or re.match(r'\.\d|-[A-Za-z]', after):
         return True
-    if after.startswith(('=', '/')) or before.endswith(('@', ';')):
+    if after.startswith(('=', '/')) or before.endswith(('@', ';', '#')):
         return True
     if is_mountinfo_device_number(line, match):
         return True
@@ -319,7 +322,7 @@ FORMS = (
             ('zone-word', '时区词', re.compile(ZONE_WORD), None),
         ),
         'excluded_prefixes': (
-            ('.claude/hooks/session-start.sh', '自检用的假 journalctl 行与它打出来的期望输出，钟点是被测输入'),
+            ('.claude/session-checks/kernel-memory-kills', '自检用的假 journalctl 行与它打出来的期望输出，钟点是被测输入'),
             ('research/prompts/_gate-shrink-r1-diff.md', '冻结证据：那一轮改动前后的 diff，旧文里的时区词是被改掉的原文'),
             ('research/prompts/gate-shrink-r2-sync-evidence/changes-scoped.md', '冻结证据：逐条抄录改前旧文（「旧：」行），钟点与时区词是被改掉的原文'),
             ('research/prompts/abandoned-floor-r1-opus-model/', '冻结证据：腿的模型目录，diff 头带 diff 工具写的机器时间'),
@@ -374,6 +377,9 @@ FORMS = (
             ('research/prompts/m4-publish-lookup-code-r1-snapshot/reversal/b6-c860/', '冻结证据：那一轮回滚核对留的 diff 与说明，diff 头与说明里是拷贝时的机器时间'),
             ('research/prompts/m4-publish-lookup-code-r2-opus-model/out/runs-logs/', '冻结证据：腿的运行日志，内存包装报的上一次峰值带量的时间戳，是原样输出'),
             ('research/prompts/m4-publish-lookup-followup-code-r1-opus-model/tools/probe.patch', '冻结证据：腿的探针补丁，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/rules-compress-r2-merged/diff-from-r1.patch', '冻结证据：规则压缩相邻两棵合稿树的 diff，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/rules-compress-r3-merged/diff-from-r2.patch', '冻结证据：规则压缩相邻两棵合稿树的 diff，diff 头带 diff 工具写的机器时间'),
+            ('research/prompts/rules-compress-r4-merged/diff-from-r3.patch', '冻结证据：规则压缩相邻两棵合稿树的 diff，diff 头带 diff 工具写的机器时间'),
             ('research/prompts/subagent-landing-audit-2026-10-22/', '冻结证据：那一次落地审计的逐组记录，抄了会话记录里的钟点、运行目录名与按时区切天的原文'),
             ('research/prompts/apparatus-rename-r3-opus-model/attack_samples.py', '冻结证据：腿的探针，造样本提交的 GIT_AUTHOR_DATE 是被测输入'),
             ('research/prompts/landing-audit-r7-snapshot/', '冻结证据：那一轮开工快照的 diff，抄了被判脚本里的时区词、运行目录名与真派发提示'),
@@ -593,6 +599,44 @@ def first_hit(form_key, text, relative_path=''):
             return offset + position, name, matched
         offset += len(line) + 1
     return None
+
+
+_CANDIDATE_SEARCHES = {}
+
+
+def candidate_search(patterns):
+    """一形态此刻要判的判据行合成一个先筛：返回 f(行) → 这一行里有没有哪一条判据行的候选（上下文规则与放行标记之前）；没有候选的行 line_hits 一定交空表。
+    判据行的正则各包进 (?:…) 用 | 连成一条：一条正则在某个位置上能中，当且仅当连成的那一条在这个位置上能中，所以 search 交 None 当且仅当每一条各自在这一行里都没有命中。
+    正则带着 re.UNICODE 之外的标志（连起来标志会串）的，退回逐条 search。弄坏开关 LIB_FORBIDDEN_NOTATIONS_BREAK=candidate-prefilter-rejects-all：
+    先筛一律说没有候选，有违例的行也不再交给 line_hits。"""
+    if 'candidate-prefilter-rejects-all' in environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK'):
+        return lambda line: None
+    regexes = tuple(pattern for _, _, _, pattern, _ in patterns)
+    if regexes not in _CANDIDATE_SEARCHES:
+        if any(regex.flags != re.UNICODE for regex in regexes):
+            searches = tuple(regex.search for regex in regexes)
+            _CANDIDATE_SEARCHES[regexes] = lambda line: next((found for found in (search(line) for search in searches) if found), None)
+        else:
+            _CANDIDATE_SEARCHES[regexes] = re.compile('|'.join(f'(?:{regex.pattern})' for regex in regexes)).search
+    return _CANDIDATE_SEARCHES[regexes]
+
+
+def hits_per_line(form_key, text, relative_path=''):
+    """text 按 \\n 切成行，每一行里这一形态最靠前的一处：[(行号（从 1 起）, 行文, 位置, 判据行名字, 命中的串)]，没有违例的行不列。
+    与对每一行各调一次 first_hit 逐项相同（first_hit 留着当参照）；差别只在先用 candidate_search 筛掉没有候选的行，形态此刻要判的判据行与后缀判断只取一次。"""
+    patterns = judged_patterns(form_key)
+    if patterns is None or outside_judged_suffixes(form_key, relative_path):
+        return []
+    has_candidate = candidate_search(patterns)
+    found = []
+    for number, line in enumerate(text.split('\n'), 1):
+        if has_candidate(line) is None:
+            continue
+        hits = line_hits(form_key, line, relative_path, patterns)
+        if hits:
+            position, name, matched = hits[0]
+            found.append((number, line, position, name, matched))
+    return found
 
 
 def all_hits(form_key, text, relative_path=''):

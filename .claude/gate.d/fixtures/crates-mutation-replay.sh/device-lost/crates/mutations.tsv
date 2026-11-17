@@ -1,0 +1,5 @@
+# 门禁 crates-mutation-replay 的判别力样本（设备丢失）：一条正常变异、一条点名的测试红了且它自己那一段里有行首 GPU_DEVICE_LOST 的行、一条点名的测试红了而 GPU_DEVICE_LOST 行在别的用例的那一段里、一条点名的测试红了而 GPU_DEVICE_LOST 行在所有段之外
+add-becomes-sub	crates/tiny/src/lib.rs	    left + right	    left - right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+card-scaling-device-lost	crates/tiny/src/lib.rs	    value * 3	    value * 4	-p tiny --lib -- scaling_on_the_card_matches_the_cpu	scaling_on_the_card_matches_the_cpu
+card-offset-other-test-lost	crates/tiny/src/lib.rs	    value + 7	    value + 8	-p tiny --lib -- offset_on_the_card_matches_the_cpu	offset_on_the_card_matches_the_cpu
+card-shift-outside-sections-lost	crates/tiny/src/lib.rs	    value + 11	    value + 12	-p tiny --lib -- shift_on_the_card_matches_the_cpu	shift_on_the_card_matches_the_cpu

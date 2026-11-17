@@ -1,0 +1,6 @@
+# 只管主 agent 的规则登记（门禁 code-tooling 的 rules-named-by-definitions 格读它）。
+# 一行一条：<规则路径><TAB><理由，至少 8 个字，写它为什么只管主 agent>。路径要在 CLAUDE.md 的 @ 引用或 read-once 登记里；登了的规则不要求定义点名。
+# 登了、可 .claude/agents/*.md 或 .claude/agent-common.md 已按路径点名它的，这一行多余，那一格判红：删那一行。
+.claude/rules/session-wrapup.md	每轮收尾的报进度、收归脚本与写回 kb 是主 agent 的事，子 agent 不收尾、不读它
+.claude/rules/long-run-split.md	跑过两小时的项拆不拆，是提交任务的主 agent 收到提醒后判、在调度记录里记；子 agent 不交任务
+.claude/singlefs-ai-sop/rules/pushback-discipline.md	异议与警告记录只发生在主 agent 与用户的对话里，子 agent 不与用户对话

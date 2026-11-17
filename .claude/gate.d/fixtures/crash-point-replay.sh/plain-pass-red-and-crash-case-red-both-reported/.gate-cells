@@ -1,0 +1,3 @@
+# 不带特性那一趟红、登记的用例也红：两部分的红都报；判的是 crash-case-replay 格
+# 门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

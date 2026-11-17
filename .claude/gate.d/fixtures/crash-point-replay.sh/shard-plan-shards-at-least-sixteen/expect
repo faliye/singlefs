@@ -1,0 +1,7 @@
+exit=3
+want=· 样本带 .gate-shard-phase：当作服务交的 TASK_SERVER_SHARD_PHASE=plan
+want=· 计划：预先编登记的崩溃枚举用例的测试二进制（不持卡，只编不跑）：
+want=✓ 计划：登记的崩溃枚举用例要用的测试二进制按命令分 1 组各编一回（cargo test … --no-run，不持卡），1 个放进
+want=✓ 分片的计划：16 片（取上界 16 片：点名的用例登记了 shards-at-least=16，多于多机配置 HOSTS 点名的 5 项，照登记的分；这一趟要现判的量（点名的 1 条用例上一趟整份记下的块共 4096 个（一片担 64 个））要 64 片，不少于上界；1 条点名的崩溃枚举用例（0 是全部登记的））
+want=样本根的 .gate-shard-phase 只演计划那一步，写完计划退 3 不退 0
+not-green-by-design=crash-case-replay 样本只演服务交的计划那一步，写完计划退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

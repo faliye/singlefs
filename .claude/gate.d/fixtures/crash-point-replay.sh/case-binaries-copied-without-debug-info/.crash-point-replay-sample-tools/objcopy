@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# 样本里的假 objcopy：objcopy --strip-debug <源> <目标>，目标 = 源的内容（假测试二进制是 bash 脚本，后面附着判器键表）再加一行「# 去掉了调试段」，权限同源；
+# 键表仍整份在目标里，门禁核判器输入照样认得出
+[[ "$1" == --strip-debug && $# -eq 3 ]] || { echo "样本的假 objcopy 只认 --strip-debug <源> <目标>：$*" >&2; exit 2; }
+{ cat -- "$2"; echo "# 去掉了调试段"; } >"$3"
+chmod --reference="$2" "$3"

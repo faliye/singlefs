@@ -155,6 +155,7 @@ def build_units(driver_path, root, variant):
     gpu_case = variant.startswith("gpu-")
     for path, text in {**UNITS_TREE, **(UNITS_GPU_FILES if gpu_case else {})}.items():
         write(os.path.join(root, path), text)
+    write(os.path.join(root, ".claude", "gate.d", "stage-inputs.tsv"), "# 样本：一条登记的崩溃枚举用例都没有（驱动读这张表定第二段排掉哪几条）\n")
     sample = os.path.join(root, ".broad-sample")
     write(os.path.join(sample, "rustc-vv.txt"), "rustc 1.0.0-sample (样本)\nhost: x86_64-unknown-linux-gnu\n")
     write(os.path.join(sample, "tool-versions.txt"), "cargo-nextest 0.0.0-sample\ncargo-mutants 0.0.0-sample\nllvm-profdata 0.0.0-sample\n")
@@ -167,7 +168,7 @@ def build_units(driver_path, root, variant):
         toolchain = handle.read().strip() + "\n"
     with open(os.path.join(sample, "tool-versions.txt"), encoding="utf-8") as handle:
         tools = [line.strip() for line in handle if line.strip()]
-    judgement = driver.Judgement(library, root, arguments, for_run=False, exclusions=[], toolchain=toolchain, tools=tools)
+    judgement = driver.Judgement(library, root, arguments, for_run=False, registered=(), toolchain=toolchain, tools=tools)
     items = [{"package": package, "file": path, "start": list(start), "end": list(end), "replacement": replacement,
               "name": f"{path}:{start[0]}:{start[1]}: {description}"} for package, path, start, end, replacement, description in UNITS_MUTANTS]
     items = driver.canonical_items(items)

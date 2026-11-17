@@ -4,7 +4,7 @@
 # gate-stage: 三方论证与阶段同步有没有留下该留的记录：批次范围、判决点名、正文前提、轮次收尾、同步记录、里程碑收口时的欠账、欠账去向的写法、调度记录里延后项的登记、现行账本的节号、封存账本没被改
 # gate-fixture: yes
 # gate-category: 文档类
-# gate-similar: doc-experiments.sh 它的 evidence-in-repo 格也用 gate 取法的改动范围、也读 research/prompts/，但判产物与依据落没落进仓（/tmp 路径、产物新不新），不判三方与同步留下的记录；并进来会让八格之外多一种对象（research/results/ 的产物）
+# gate-similar: doc-experiments.sh 它的 evidence-in-repo 格也用 gate 取法的改动范围、也读 research/prompts/，但判产物与依据落没落进仓（/tmp 路径、产物新不新），不判三方与同步留下的记录；并进来会让这道阶段各格判的对象之外多一种对象（research/results/ 的产物）
 # gate-similar: doc-experiments.sh 它的 archive-past-rounds 格按与 knowledge-sync 格同一个基准删上一轮的实验记录，保留判决与 abandoned-rounds.tsv 供这里读；它判工作区里还留没留旧记录，不判记录写没写、写得全不全
 # gate-similar: doc-experiments.sh 它的 verdict-false-named 格名字里也有 verdict，但判的是实验产物判决行里的 false 字段有没有被实验页点名，对象是 research/results/ 与实验页，不是三方判决
 # gate-similar: code-tooling.sh 它的 change-range-single-source 格判各阶段取改动范围只经 changed-paths.sh 一份取法；这里是那份取法的使用者之一，不判别的阶段
@@ -12,20 +12,21 @@
 #
 # gate-cell: batch-scope 这一批要碰的触发文件有没有登记进范围
 # gate-cell: verdict-names-local-samples 新写的三方判决有没有按路径点名那一轮本地腿的每一份样本（含作废副本）
-# gate-cell: crates-adversarial-review crates 里产品代码的实现改动有没有走过三方正反对抗推理
+# gate-cell: crates-adversarial-review crates/ 下全部代码（各包 src 与 tests 里的 .rs、crates/mutations.tsv）的改动有没有走过三方正反对抗推理
 # gate-cell: code-round-snapshot 按路径点名了产品代码 crates 文件的新判决，有没有点名开工快照、快照有没有罩住点名的每份文件
 # gate-cell: implementation-premise 三方论证材料有没有「实现今天的样子」
 # gate-cell: abandoned-rounds 发过腿的三方轮次，要么有判决，要么登记撂下
 # gate-cell: knowledge-sync 改了规则、agent、hook、门禁、脚本或实现之后，有没有写阶段同步记录
-# gate-cell: agent-def-adversarial-review 改过的 agent 定义与共用约束有没有走过三方审核
+# gate-cell: agent-def-adversarial-review 改过的治理文件（定义与共用约束、规则、技能、钩子、门禁、scripts/ 下的脚本、两个服务）有没有走过三方审核
 # gate-cell: milestone-close-owed 段表写了收口的里程碑，欠账表开着的那张表里没有一行的前置点名它
 # gate-cell: owed-destination-form 欠账表开着的行，「去向：」之后开头是三种落点之一（里程碑文件、「里程碑<号>」、「未排」），落点点名的里程碑文件都在
 # gate-cell: deferred-items-registered records/ 下这次新增的带延后类词的行，同一行写着指得到的登记（C 号、拆分提案的节号与行首序号、文件:行或登记处表里的流程文件）
 # gate-cell: ledger-section-numbers 现行账本（拆分提案账本登记表里 current 那一份）的「## <节号>、」标题不重号，每个节号在「## 索引」表里恰好一行
 # gate-cell: sealed-ledgers-unchanged 拆分提案账本登记表里封存的那几份，内容与登记的 sha256 相同（封存之后没被改）
+# gate-cell: code-round-checklist 代码轮正文逐格点名了检查单的八格，每格底下写了答案
 # 格结构经 lib/stage-cells.sh；每格的成功行报它查了多少项。
 #
-#   bash .claude/gate.d/doc-process-records.sh [项目根]                              十三格都跑
+#   bash .claude/gate.d/doc-process-records.sh [项目根]                              十四格都跑
 #   bash .claude/gate.d/doc-process-records.sh --list                                逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-process-records.sh --check <格名>[,<格名>…] [项目根]     只跑点名的格（例：材料员开工只跑 implementation-premise）
 #
@@ -75,21 +76,26 @@
 #
 # ── crates-adversarial-review ──
 # 规则：.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」的第 2 步（三方正反对抗推理，.claude/rules/three-way-inference.md）。
-# 这次改动里每个产品代码的 crates/*/src/*.rs 文件，都要在这一次改动新写的某份 research/prompts/*-main-verification.md 里按路径点名；
+# 对象是 crates/ 下的全部代码（CRATES_REVIEW_OBJECTS）：各包 crates/*/src/ 里的 .rs（验证包 crates/singlefs-verification/、池级 checker crates/singlefs-checker/、
+#   函数单元图 crates/singlefs-unit-graph/ 的 src 同样在内）、各包 crates/*/tests/ 下的 .rs、crates/mutations.tsv。这次改动里每一份都要在这一次改动新写的某份
+#   research/prompts/*-main-verification.md 里按路径点名；
 #   「点名」只认判决里「## 这一轮被判过的文件」一节底下的路径，正文别处提到同一个路径不算（判据与写法见下面「点名一节」）；
 #   点名了而那一轮开工快照记的哈希与此刻的内容对不上的（判决之后又改过）也不算，判据在「点名一节」⑥。
-# 测试代码不判：TEST_CODE_SOURCES 那三个包（验证包 crates/singlefs-verification/、池级 checker crates/singlefs-checker/、函数单元图 crates/singlefs-unit-graph/）的 src 从对象里去掉，
-#   成功行与无对象那一行逐个报出去掉的；crates/*/tests/ 与 crates/mutations.tsv 不是 crates/*/src/*.rs，本来就不在对象里。
-# 只改了注释的产品代码文件不走三方：判法是规范副本的 scripts/comment-only-change.py（去掉注释与空白之后代码词元与基准逐个相同，
-#   文档注释里会编成 doctest 的代码块、文档注释与 // SAFETY: 注释的增删照代码算；上游 show-me-test 用同一份），摘出去的逐个报出来；判法判不了就红。
-# 没有产品代码的 crates/*/src 改动（或都只改了注释）：退 77。管不到的：点名了判得对不对；产品代码包 src 里的 #[cfg(test)] 模块按路径分不出来，照判。
+# 只改了注释的 .rs 文件不走三方：判法是规范副本的 scripts/comment-only-change.py（去掉注释与空白之后代码词元与基准逐个相同，
+#   文档注释里会编成 doctest 的代码块、文档注释与 // SAFETY: 注释的增删照代码算；上游 show-me-test 用同一份），摘出去的逐个报出来；判法判不了就红；crates/mutations.tsv 不是 .rs，照判。
+# 存量没补完三方的测试代码（验证包、池级 checker、函数单元图的 src，各包 tests，crates/mutations.tsv）登记在过渡挂账表 CRATES_TRANSITION_TABLE，登记的路径这一格不要求点名；
+#   豁免表只缩不涨、过渡挂账表的判据与弄坏开关见下面「豁免表与过渡挂账表」。
+# 没有 crates/ 下要判的代码（或都只改了注释）：退 77。管不到的：点名了判得对不对；各包 src 里的 #[cfg(test)] 模块按路径分不出来，照判。
 # 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
-#   CRATES_ADVERSARIAL_REVIEW_BREAK=test-code-counted  测试代码那三个包的 src 也算对象、要点名
-#       crates-adversarial-review-test-code-only（期望退出 77，实测 1）
+#   CRATES_ADVERSARIAL_REVIEW_BREAK=test-code-skipped  测试代码（验证包、池级 checker、函数单元图的 src，各包 tests，crates/mutations.tsv）不算对象
+#       crates-adversarial-review-test-code-only、crates-adversarial-review-test-code-green（期望退出 1，实测 77；期望退出 0，实测 77）；
+#       crates-adversarial-review-test-code-transition-green（期望退出 0，实测 77）；
+#       crates-adversarial-review-test-code-comment-only（输出里找不到「只改了注释的 2 个不走三方」）
 #   CRATES_ADVERSARIAL_REVIEW_BREAK=exempt-hash-ignored  user_exemption_reason 不核内容哈希，豁免表里有这条路径就算豁免
 #       crates-adversarial-review-exempt-stale-red（期望退出 1，实测 0）
-#   CRATES_ADVERSARIAL_REVIEW_BREAK=comments-count-as-code  不摘只改注释的文件，照产品代码改动要点名
-#       crates-adversarial-review-comment-only（期望退出 77，实测 1）；crates-adversarial-review-comment-and-code-red（输出里找不到「crates 改动里 2 个文件没有三方判决点名」）
+#   CRATES_ADVERSARIAL_REVIEW_BREAK=comments-count-as-code  不摘只改注释的文件，照代码改动要点名
+#       crates-adversarial-review-comment-only、crates-adversarial-review-test-code-comment-only（期望退出 77，实测 1）；
+#       crates-adversarial-review-comment-and-code-red（输出里找不到「crates 改动里 2 个文件没有三方判决点名」）
 #
 # ── 点名一节（crates-adversarial-review 与 agent-def-adversarial-review 两格共用） ──
 # 为什么：旧判据是整份判决里的字面子串，判决里任何一次提到这个路径都算点名，连「这份文件里没有那一句」这种提到也算；闸判的是「出现过」，不是「被判过」。
@@ -112,7 +118,7 @@
 #   ⑥ 判决之后又改过不算（用户 2026-10-26 定「比快照与暂存」）：点名它的判决那一轮开工快照 research/prompts/<轮>-snapshot/ 下任一份 *sha256*.txt 清单里
 #      有这份文件的行（sha256sum 格式，二进制模式的 * 与开头的 ./ 不碍）时，拿记的哈希比此刻被判的树里的内容（--staged 时那棵树就是暂存进来的那一份）：
 #      某份点名它的判决那一轮有一行对得上才算有去向；有行而都对不上的照红，红行写哪份判决、哪份清单记的哈希与此刻的哈希，
-#      出路是再开一轮，或照两格各自的豁免表（.claude/crates-review-exempt、.claude/agent-def-review-exempt）按此刻的内容哈希登记豁免（豁免表照判）。
+#      出路是再开一轮（两张豁免表不再加行，见下面「豁免表与过渡挂账表」）。
 #      那一轮没有快照目录、清单里没有它的行的，没有哈希可比：照算有去向，成功行之后逐个列「没比」（crates 那一格的开工快照立没立住归 code-round-snapshot 格判；
 #      定义轮今天不要求快照）；文件此刻已删的没有内容可比，照算有去向。
 # 管不到的：节里的路径是不是真判过（不带否定词的转述「这一轮放过了它」「留给下一轮」照算点名）；快照里的哈希是不是派腿那一刻记的（事后照改后的内容补一份同形的清单也过）；
@@ -132,6 +138,39 @@
 #       crates-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-stale-red（期望退出 1，实测 0）；
 #       crates-adversarial-review-snapshot-green、agent-def-adversarial-review-snapshot-green（输出里找不到「判决之后改没改过（拿那一轮开工快照清单里的 sha256 比此刻的内容）：1 个对得上，1 个没比」）；
 #       crates-adversarial-review-snapshot-stale-exempt-green（输出里找不到「✓ crates 改动 2 个文件都有去向（新写的判决文件 1 份，另有 1 个按 .claude/crates-review-exempt 豁免，基准 HEAD）」）
+#   REVIEW_SECTION_BREAK=lists-path-never  没有一份判决点名任何路径（review_lists_path 一律说没点名）
+#       crates-adversarial-review-green、crates-adversarial-review-pending-green、crates-adversarial-review-section-green、crates-adversarial-review-snapshot-green、
+#       crates-adversarial-review-exempt-green、crates-adversarial-review-snapshot-stale-exempt-green、agent-def-adversarial-review-green、agent-def-adversarial-review-pending-green、
+#       agent-def-adversarial-review-section-green、agent-def-adversarial-review-snapshot-green、crates-adversarial-review-test-code-green、
+#       agent-def-adversarial-review-rules-green、agent-def-adversarial-review-skills-green、agent-def-adversarial-review-hooks-green、agent-def-adversarial-review-gate-green、
+#       agent-def-adversarial-review-scripts-green、agent-def-adversarial-review-task-server-green、agent-def-adversarial-review-prune-server-green（期望退出 0，实测 1）；
+#       crates-adversarial-review-red（输出里找不到「crates 改动里 2 个文件没有三方判决点名」）；agent-def-adversarial-review-red（输出里找不到「改过的治理文件里 3 份没有三方判决点名」）；
+#       crates-adversarial-review-snapshot-stale-red（输出里找不到「crates 改动里 1 个在判决之后又改过」）；agent-def-adversarial-review-snapshot-stale-red（输出里找不到「改过的治理文件里 1 个在判决之后又改过」）；
+#       crates-adversarial-review-section-edges-red、crates-adversarial-review-section-moved-red、crates-adversarial-review-section-negated-red、
+#       agent-def-adversarial-review-section-moved-red、agent-def-adversarial-review-section-negated-red（照旧判红，红句换成一律没点名的那一句：样本要的那一句找不到）
+#
+# ── 豁免表与过渡挂账表（crates-adversarial-review 与 agent-def-adversarial-review 两格共用） ──
+# 规则：.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」「改 agent 定义与共用约束，走同一条三步」：三方不再豁免。两格各在开头判这几张表，没有对象可判的那一趟也判。
+# ① 豁免表 .claude/crates-review-exempt（crates 那一格）与 .claude/agent-def-review-exempt（治理文件那一格）只缩不涨：
+#    基准（gate 取法的基准）里有这张表时，表里不许出现基准里没有的行（按「路径、sha256」两列认，只改理由的字不算新行）；基准里还没有这张表时不比；表不存在不算红。
+#    判法与点名一节的挂账表同一种（check_review_exempt_frozen，经 lib-lag-baseline.py 的 baseline_rows 取基准那一版）；红句的出路是删掉新加的行、改走一轮三方。
+#    表里已有的行照旧按内容哈希生效（user_exemption_reason），补完一轮三方就删一行。
+# ② 过渡挂账表：存量没补完三方的文件登记在这里，登记的路径这一格不要求点名（点没点名、快照对不对得上都不看）。
+#    crates 那一格读 .claude/gate.d/review-test-code-pending.tsv，路径是验证包、池级 checker、函数单元图的 src 里的 .rs，各包 tests 里的 .rs，或 crates/mutations.tsv；
+#    治理文件那一格读 .claude/gate.d/governance-review-pending.tsv，路径是项目规则、技能、钩子、门禁、判定库服务、统一任务服务、脚本这几类（定义与共用约束已在管，不进这张表）。
+#    形态同点名一节的挂账表：一行「路径<制表符>理由」，理由 8 个字以上，同一路径不登两次，路径要对得上这张表认的那几类（文件在不在不管：删掉的也是对象）；
+#    只缩不涨：基准里有这张表时，表里不许出现基准里没有的路径；基准里还没有这张表时不比；表不存在不算红；不合规的逐行列出，判红（check_review_transition_table）。
+#    登记的路径在成功句里报「另有 N … 按 <表> 挂账、不要求点名」并逐个列出理由；没用上的行不判红。补完一轮三方（判决点名了它）或那一份不再有改动，把那一行删掉。
+#    表里先登什么由主 agent 定；表头只写注释、一行都没有时，两格照旧要求每一份都点名。
+# 弄坏开关 REVIEW_SECTION_BREAK=<项>（认法与「点名一节」那一组相同）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本：
+#   REVIEW_SECTION_BREAK=exempt-growth-ignored  两张豁免表不和基准比，新加的行放过
+#       crates-adversarial-review-exempt-grown-red、agent-def-adversarial-review-exempt-grown-red（期望退出 1，实测 0）
+#   REVIEW_SECTION_BREAK=transition-growth-ignored  两张过渡挂账表不和基准比，新加的行放过
+#       crates-adversarial-review-test-code-transition-grown-red、agent-def-adversarial-review-governance-transition-grown-red（期望退出 1，实测 0）
+#   REVIEW_SECTION_BREAK=transition-rows-unchecked  两张过渡挂账表的行不核（格式、理由、路径形态、重复）
+#       crates-adversarial-review-test-code-transition-table-red、agent-def-adversarial-review-governance-transition-table-red（期望退出 1，实测 0）
+#   REVIEW_SECTION_BREAK=transition-ignored  过渡挂账表不起作用：登记的路径照旧要点名
+#       crates-adversarial-review-test-code-transition-green、agent-def-adversarial-review-governance-transition-green（期望退出 0，实测 1）
 #
 # ── code-round-snapshot ──
 # 规则：.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」。快照形态：research/prompts/<轮>-snapshot/ 目录，
@@ -243,11 +282,28 @@
 #     绿的那份记录整份是这一轮新写的，没有旧行可错判。
 #
 # ── agent-def-adversarial-review ──
-# 规则：.claude/rules/implementation-workflow.md「改 agent 定义与共用约束，走同一条三步」。改动范围里每个被管文件
-# （.claude/agents/、.claude/agent-common.md、.claude/main-agent.md；删掉的也算）都要在这一次改动新写的某份判决里按路径点名，
-# 形态照 crates-adversarial-review 格；「点名」同样只认判决里「## 这一轮被判过的文件」一节底下的路径（判据、挂账表与弄坏开关见上面「点名一节」）。
-# 没有被管文件的改动：退 77。豁免表的格式在 check_agent_def_adversarial_review 里。
-# 管不到的：点名了判得对不对；节里不带否定词的转述（「这一轮放过了它」）照算点名（判据在「点名一节」⑤）。
+# 规则：.claude/rules/implementation-workflow.md「改 agent 定义与共用约束，走同一条三步」「治理文件同规矩」。改动范围里每个被管文件（删掉的也算）
+# 都要在这一次改动新写的某份判决里按路径点名，形态照 crates-adversarial-review 格；「点名」同样只认判决里「## 这一轮被判过的文件」一节底下的路径（判据、挂账表与弄坏开关见上面「点名一节」）。
+# 被管集合分八类（GOVERNANCE_CLASS_PATTERNS；一个路径算头一个对上的类，成功句逐类报几份）：
+#   定义与共用约束  .claude/agents/ 下的 .md、.claude/agent-common.md、.claude/main-agent.md
+#   项目规则        .claude/rules/ 顶层的 .md
+#   技能            .claude/skills/ 下的 .md
+#   钩子            .claude/hooks/ 顶层的 .sh 与 .py（钩子与库；样本目录 fixtures、登记表 .tsv 不算）
+#   门禁            .claude/gate.d/ 顶层的 .sh 与 .py、.claude/gate.d/lib/ 下的 .sh 与 .py（样本目录 fixtures、登记表 .tsv 不算）
+#   判定库服务      prune-server/ 与 scripts/prune-server/ 下的文件（.md、.lock、target/、__pycache__/ 不算）
+#   统一任务服务    task-server/ 下的文件（.md、__pycache__/ 不算）
+#   脚本            scripts/ 下的 .sh、.py、.rs（scripts/prune-server/ 先归判定库服务）
+# 存量没补完三方的新扩进来的那七类登记在过渡挂账表 GOVERNANCE_TRANSITION_TABLE，登记的路径这一格不要求点名；两张豁免表只缩不涨（判据见「豁免表与过渡挂账表」），
+#   豁免表 .claude/agent-def-review-exempt 的格式在 user_exemption_reason 里。
+# 没有被管文件的改动：退 77。管不到的：点名了判得对不对；节里不带否定词的转述（「这一轮放过了它」）照算点名（判据在「点名一节」⑤）；
+#   上面没列的文件（各目录里的 .tsv 登记表、说明、样本目录、.json）不归这一格管。
+# 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   AGENT_DEF_ADVERSARIAL_REVIEW_BREAK=definitions-only  被管集合只剩头一类（定义与共用约束），别的类的改动不算对象
+#       agent-def-adversarial-review-rules-red、agent-def-adversarial-review-skills-red、agent-def-adversarial-review-hooks-red、agent-def-adversarial-review-gate-red、
+#       agent-def-adversarial-review-scripts-red、agent-def-adversarial-review-task-server-red、agent-def-adversarial-review-prune-server-red（期望退出 1，实测 77）；
+#       agent-def-adversarial-review-rules-green、agent-def-adversarial-review-skills-green、agent-def-adversarial-review-hooks-green、agent-def-adversarial-review-gate-green、
+#       agent-def-adversarial-review-scripts-green、agent-def-adversarial-review-task-server-green、agent-def-adversarial-review-prune-server-green、
+#       agent-def-adversarial-review-governance-transition-green（期望退出 0，实测 77）
 #
 # ── milestone-close-owed ──
 # 为什么：用户 2026-10-22 指出里程碑三带着出口里还开着的欠账收了口；收口那一刻没有东西核欠账表里还有没有指着它的账。
@@ -416,6 +472,21 @@
 #       sealed-ledgers-unchanged-registry-red（期望退出 1，实测 0）
 # 退役判据：封存的几份整份删出仓（只留在 git 历史里）时删掉这一格。
 #
+# ── code-round-checklist ──
+# 规则：.claude/rules/implementation-workflow.md「代码轮正文的检查单」。对象：research/prompts/_<题>-code-r<数字>-body.md（轮名以 -code-r<数字> 收尾的三方论证正文，代码轮的约定写法），
+#   标题（首行）里第一个 YYYY-MM-DD 在 CODE_ROUND_CHECKLIST_CUTOFF 及以后的；标题没有日期的照要查的算；更早的不查（规范落地之前写的，证据不回改）。
+# 判据，每份正文每一格两条，缺一样红：
+#   ① 有一行逐字是「### 检查单：<格名>」的小节标题（行尾空白不算），八个格名是 CODE_ROUND_CHECKLIST_CELLS；
+#   ② 标题底下、下一个标题之前至少有一行非空的字（答案与证据写在这里）。
+# 红句逐份逐格点名，出路指到规则那一节。没有任何一份代码轮正文，或都早于截止日：退 77。
+# 管不到的：答案写得对不对、腿有没有对每一格回「成立 / 不成立 / 推不出」（靠主 agent 核腿的报告）；不叫 -code-r<数字> 的正文这一格不认。
+# 弄坏开关 DOC_PROCESS_RECORDS_BREAK=<项>，一次设一个（只在样本根上认，经共用库那一判）：
+#   DOC_PROCESS_RECORDS_BREAK=code-round-checklist-unjudged  这一格不判，有代码轮正文也直接报通过
+#       code-round-checklist-red、code-round-checklist-empty-red（期望退出 1，实测 0）
+#   DOC_PROCESS_RECORDS_BREAK=code-round-checklist-answers-unchecked  只看格的标题在不在，不看标题底下有没有写字
+#       code-round-checklist-empty-red（期望退出 1，实测 0）
+# 退役判据：代码轮正文不再按 -code-r<数字> 起名，或检查单挪进别的门禁时删掉这一格。
+#
 # ── 样本 ──
 # fixtures/doc-process-records.sh/ 下每格一对，各放 .gate-cells 只点名它那一格；setup.sh 里给别的格补的东西不碍事。
 #   batch-scope-red                 没登记的触发文件、不在这一批的登记、没写理由的登记、不从仓库根起的路径，四种同时判红
@@ -440,7 +511,14 @@
 #   crates-adversarial-review-snapshot-green  一份在那一节里点名、那一轮开工快照 crates-sha256.txt 记的哈希与此刻对得上；另一份点名它的判决那一轮没有快照，判绿、报 1 个对得上并列出没比的那一份
 #   crates-adversarial-review-snapshot-stale-red  同一轮点名两份，快照记的是返回 2 那一版，判决之后 lib.rs 又改成返回 3：判红只列 lib.rs（写清单与两边的哈希），kept.rs 对得上不列
 #   crates-adversarial-review-snapshot-stale-exempt-green  同 snapshot-stale-red 的现场，.claude/crates-review-exempt 按改后那一版的哈希登记了 lib.rs，判绿报 1 个豁免
-#   crates-adversarial-review-test-code-only  只改了验证包与池级 checker 两个包的 src、另有 crates/*/tests/ 与 crates/mutations.tsv，没有判决，退 77 逐个报出不判的
+#   crates-adversarial-review-test-code-only  只改了验证包与池级 checker 两个包的 src 四个、验证包 tests/ 下一个测试与 crates/mutations.tsv，没有判决，判红逐个列出这六份（测试代码同样是对象）
+#   crates-adversarial-review-test-code-green  同一份改动，判决在「## 这一轮被判过的文件」一节里点名了这六份，判绿报 6 个
+#   crates-adversarial-review-test-code-comment-only  验证包的 src 一份与 tests/ 下一份都只改了注释，没有判决，退 77 逐个报出只改注释的
+#   crates-adversarial-review-exempt-grown-red  基准里的豁免表有一行，工作区又加了一行（哈希对得上，改了的 lib.rs 靠它能豁免），豁免表只缩不涨，判红点名新加的第 2 行
+#   crates-adversarial-review-exempt-shrunk-green  基准里的豁免表有两行，工作区删了一行，留着的一行按改后的内容哈希豁免 comment.rs，判绿报 1 个豁免
+#   crates-adversarial-review-test-code-transition-green  过渡挂账表在基准里三行、工作区删了变异表那一行，改了的两份测试登记着、没有判决，判绿报 2 个挂账与登记的理由
+#   crates-adversarial-review-test-code-transition-grown-red  基准里的挂账表一行、工作区又加了一行，两份测试都改了，挂账表只缩不涨，判红点名新加的第 2 行
+#   crates-adversarial-review-test-code-transition-table-red  挂账表写坏五行（理由太短、路径是产品代码、变异表登记两次、只有一段），判红列四处
 #   crates-adversarial-review-comment-only  两份产品代码只改了注释（行注释、行尾注释、文档注释的文字），没有判决，退 77 逐个报出只改注释的
 #   crates-adversarial-review-comment-and-code-red  一份只改注释、一份改了字符串里的 //、一份改了文档注释里的 doctest，都没有判决，判红只列后两份
 #   code-round-snapshot-red         新判决点名两份产品代码文件、快照清单只列了一份，判红只列缺的那一份
@@ -449,6 +527,9 @@
 #   code-round-snapshot-no-object   新判决只点 kb 与测试代码，退 77 逐份报出不判的
 #   implementation-premise-red      没有 crates/ 的正文、标题没日期的正文、缺开工快照，逐个点名判红
 #   implementation-premise-green    判绿，报查了几份、没查哪一份
+#   code-round-checklist-red        一份代码轮正文只写了六格（缺「不新建判定库」「所有任务多机可用」），判红点名缺的两格
+#   code-round-checklist-empty-red  一份代码轮正文八格的标题都在，其中「测试优先多线程」底下紧接下一个标题、一个字没写，判红点名这一格
+#   code-round-checklist-green      一份代码轮正文八格都点名并写了答案；另一份标题日期早于截止日的旧代码轮正文没有检查单，不判、成功行报没查哪一份
 #   abandoned-rounds-red            发了腿没判决没登记的轮、只在 kb 里被提到的轮、写坏与说反话的登记，另有 setup.sh 建的缺旧树对象的 git 仓，判红
 #   abandoned-rounds-green          判决文件、kb 小节判决、登记撂下各一轮，判绿报对数（登记撂下那一行 c364-r3 的出处是 records/halt.md 第 1 行）
 #   abandoned-rounds-source-red     没写出处的行（2026-10-13）、出处那一行同时写着别的轮名、出处指到 research/ 下这一轮自己的材料、「」里的原话不到 6 个字、没写出处而日期是 2026-10-11 的行（不按日期免）、
@@ -480,6 +561,25 @@
 #   knowledge-sync-old-record-green 基准里已有的旧记录这一轮只追加了一行「不改：」，旧记录里早先「改了」「补了」两行点名的载体（更早一轮改的）不在这次改动范围里，不判；
 #                                   这一轮新建的触发文件由这一轮新写的记录点名，判绿报对数
 #   agent-def-adversarial-review-red   共用约束没人点名、主 agent 入口只被旧判决点名、删掉的定义没有去向，判红逐个列出
+#   agent-def-adversarial-review-rules-red  改了一份项目规则与同目录的一份 .txt，没有判决，判红只列规则那一份
+#   agent-def-adversarial-review-rules-green  同一份改动，判决在那一节里点名了规则，判绿报项目规则 1 份
+#   agent-def-adversarial-review-skills-red  改了一份技能的 SKILL.md 与同目录的一份 .txt，没有判决，判红只列 SKILL.md
+#   agent-def-adversarial-review-skills-green  同一份改动，判决点名了 SKILL.md，判绿报技能 1 份
+#   agent-def-adversarial-review-hooks-red  改了钩子与钩子库各一份、同目录的登记表与 fixtures 里的一份脚本，没有判决，判红只列钩子与库两份
+#   agent-def-adversarial-review-hooks-green  同一份改动，判决点名了钩子与库两份，判绿报钩子 2 份
+#   agent-def-adversarial-review-gate-red  改了门禁与 lib/ 下的库各一份、同目录的登记表与 fixtures 里的一份脚本，没有判决，判红只列门禁与库两份
+#   agent-def-adversarial-review-gate-green  同一份改动，判决点名了门禁与库两份，判绿报门禁 2 份
+#   agent-def-adversarial-review-scripts-red  改了 scripts/ 下的 .sh、.py、.rs 各一份、同目录的登记表与说明，没有判决，判红只列三份脚本
+#   agent-def-adversarial-review-scripts-green  同一份改动，判决点名了三份脚本，判绿报脚本 3 份
+#   agent-def-adversarial-review-task-server-red  改了 task-server/ 下的入口、一份 .py、一份测试、同目录的说明与 __pycache__ 里的字节码，没有判决，判红只列前三份
+#   agent-def-adversarial-review-task-server-green  同一份改动，判决点名了前三份，判绿报统一任务服务 3 份
+#   agent-def-adversarial-review-prune-server-red  改了 scripts/prune-server/ 的客户端、prune-server/ 的 src 与 control，删了一份 src，另改说明与 Cargo.lock，没有判决，判红列四份（含删掉的）
+#   agent-def-adversarial-review-prune-server-green  同一份改动，判决点名了四份，判绿报判定库服务 4 份
+#   agent-def-adversarial-review-exempt-grown-red  基准里的豁免表有一行，工作区又加了一行（哈希对得上，改了的 demo.md 靠它能豁免），豁免表只缩不涨，判红点名新加的第 2 行
+#   agent-def-adversarial-review-exempt-shrunk-green  基准里的豁免表有两行，工作区删了一行，留着的一行按改后的内容哈希豁免 demo.md，判绿报 1 份豁免
+#   agent-def-adversarial-review-governance-transition-green  过渡挂账表在基准里三行（钩子、脚本、规则）、工作区删了规则那一行，改了的钩子与脚本登记着、没有判决，判绿报 2 份挂账与各类各几份
+#   agent-def-adversarial-review-governance-transition-grown-red  基准里的挂账表一行、工作区又加了一行，钩子与脚本都改了，挂账表只缩不涨，判红点名新加的第 2 行
+#   agent-def-adversarial-review-governance-transition-table-red  挂账表写坏五行（理由太短、路径是定义与共用约束、脚本登记两次、只有一段），判红列四处
 #   agent-def-adversarial-review-green 四份被新判决（在「## 这一轮被判过的文件」一节里）点名、一份删除按 deleted 豁免、顺带改的 README 不算，判绿报对数
 #   agent-def-adversarial-review-section-green  三份在那一节里的三种列法（列表项、表格行、三级小标题底下的列表项），判绿报对数
 #   agent-def-adversarial-review-section-moved-red  同一份判决：一份列在那一节里，共用约束只在节前的正文里提到，主 agent 入口只在节后的正文里提到，判红只列后两份并提示判决在正文别处提到过
@@ -561,8 +661,12 @@
 #       deferred-items-registered-ledger-red、deferred-items-registered-ledger-missing-red、batch-scope-stale-red、
 #       crates-adversarial-review-section-negated-red、agent-def-adversarial-review-section-negated-red、abandoned-rounds-kb-negated-red、
 #       ledger-section-numbers-duplicate-red、ledger-section-numbers-index-missing-red、deferred-items-registered-pointers-red、
-#       crates-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-stale-red、sealed-ledgers-unchanged-red、sealed-ledgers-unchanged-registry-red（期望退出 1，实测 0）
-#   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本十三格全跑
+#       crates-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-stale-red、sealed-ledgers-unchanged-red、sealed-ledgers-unchanged-registry-red、code-round-checklist-red、code-round-checklist-empty-red、
+#       crates-adversarial-review-test-code-only、crates-adversarial-review-exempt-grown-red、crates-adversarial-review-test-code-transition-grown-red、crates-adversarial-review-test-code-transition-table-red、
+#       agent-def-adversarial-review-exempt-grown-red、agent-def-adversarial-review-governance-transition-grown-red、agent-def-adversarial-review-governance-transition-table-red、
+#       agent-def-adversarial-review-rules-red、agent-def-adversarial-review-skills-red、agent-def-adversarial-review-hooks-red、agent-def-adversarial-review-gate-red、
+#       agent-def-adversarial-review-scripts-red、agent-def-adversarial-review-task-server-red、agent-def-adversarial-review-prune-server-red（期望退出 1，实测 0）
+#   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本十四格全跑
 #       abandoned-rounds-green、abandoned-rounds-red、abandoned-rounds-source-date-parentheses-green、abandoned-rounds-source-green、abandoned-rounds-source-red、agent-def-adversarial-review-green、agent-def-adversarial-review-pending-green、agent-def-adversarial-review-red、agent-def-adversarial-review-section-green、agent-def-adversarial-review-section-moved-red、batch-scope-green、
 #       batch-scope-red、code-round-snapshot-green、code-round-snapshot-no-object、code-round-snapshot-no-snapshot-red、code-round-snapshot-red、crates-adversarial-review-comment-and-code-red、crates-adversarial-review-comment-only、crates-adversarial-review-exempt-green、crates-adversarial-review-exempt-stale-red、crates-adversarial-review-green、
 #       crates-adversarial-review-pending-green、crates-adversarial-review-pending-grown-red、crates-adversarial-review-pending-table-red、crates-adversarial-review-red、crates-adversarial-review-section-edges-red、crates-adversarial-review-section-green、crates-adversarial-review-section-moved-red、crates-adversarial-review-test-code-only、implementation-premise-green、implementation-premise-red、
@@ -576,8 +680,16 @@
 #       ledger-section-numbers-duplicate-red、ledger-section-numbers-index-missing-red、deferred-items-registered-pointers-red、
 #       crates-adversarial-review-snapshot-green、crates-adversarial-review-snapshot-stale-red、crates-adversarial-review-snapshot-stale-exempt-green、
 #       agent-def-adversarial-review-snapshot-stale-red、agent-def-adversarial-review-snapshot-green、
+#       crates-adversarial-review-test-code-green、crates-adversarial-review-test-code-comment-only、crates-adversarial-review-exempt-grown-red、crates-adversarial-review-exempt-shrunk-green、
+#       crates-adversarial-review-test-code-transition-green、crates-adversarial-review-test-code-transition-grown-red、crates-adversarial-review-test-code-transition-table-red、
+#       agent-def-adversarial-review-exempt-grown-red、agent-def-adversarial-review-exempt-shrunk-green、agent-def-adversarial-review-governance-transition-green、
+#       agent-def-adversarial-review-governance-transition-grown-red、agent-def-adversarial-review-governance-transition-table-red、
+#       agent-def-adversarial-review-rules-red、agent-def-adversarial-review-rules-green、agent-def-adversarial-review-skills-red、agent-def-adversarial-review-skills-green、
+#       agent-def-adversarial-review-hooks-red、agent-def-adversarial-review-hooks-green、agent-def-adversarial-review-gate-red、agent-def-adversarial-review-gate-green、
+#       agent-def-adversarial-review-scripts-red、agent-def-adversarial-review-scripts-green、agent-def-adversarial-review-task-server-red、agent-def-adversarial-review-task-server-green、
+#       agent-def-adversarial-review-prune-server-red、agent-def-adversarial-review-prune-server-green、
 #       sealed-ledgers-unchanged-green、sealed-ledgers-unchanged-red、sealed-ledgers-unchanged-registry-red、deferred-items-registered-section-scope-green（输出里找不到「样本只跑 .gate-cells 点名的格：…」）；
-#       batch-scope-stale-pruned-green（期望退出 0，实测 1）；batch-scope-stale-red（输出里找不到「样本只跑 .gate-cells 点名的格：batch-scope」）
+#       batch-scope-stale-pruned-green、code-round-checklist-green（期望退出 0，实测 1）；batch-scope-stale-red（输出里找不到「样本只跑 .gate-cells 点名的格：batch-scope」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -596,21 +708,48 @@ source "$STAGE_DIR/lib/stage-cells.sh"
 TRIGGER_TABLE=".claude/gate.d/knowledge-sync-triggers.tsv"
 PREMISE_CUTOFF="2026-09-17"
 SIDE_AND_SNAPSHOT_CUTOFF="2026-09-28"
-# crates-adversarial-review 格不判的测试代码：验证包、池级 checker 与函数单元图的 src（.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）
+# code-round-checklist 格：标题日期在它及以后的代码轮正文要有检查单；八个格名与 .claude/rules/implementation-workflow.md「代码轮正文的检查单」那张表逐字相同
+CODE_ROUND_CHECKLIST_CUTOFF="2026-11-07"
+CODE_ROUND_CHECKLIST_HEADING_PREFIX="### 检查单："
+CODE_ROUND_CHECKLIST_CELLS=("走不到的理由二次查实" "类型与名字" "不兼容旧代码与旧格式" "不新建判定库" "所有任务多机可用" "测试优先多线程" "带 --item 的命令与项" "新崩溃流多罩了什么")
+# code-round-snapshot 格点名里不算的测试代码：验证包、池级 checker 与函数单元图的 src（.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）
 TEST_CODE_SOURCES='^crates/(singlefs-verification|singlefs-checker|singlefs-unit-graph)/src/'
+# crates-adversarial-review 格的对象：crates/ 下的全部代码，各包 src 里的 .rs、各包 tests 里的 .rs 与 crates/mutations.tsv（同一份规则第 2 步的射程）
+CRATES_REVIEW_OBJECTS='^crates/([^/]+/(src|tests)/.+\.rs|mutations\.tsv)$'
+# 对象里过渡挂账表 CRATES_TRANSITION_TABLE 认的那一类：验证包、池级 checker、函数单元图的 src 里的 .rs，各包 tests 里的 .rs，crates/mutations.tsv；弄坏开关 test-code-skipped 把这一类从对象里去掉
+CRATES_TRANSITION_PATHS="${TEST_CODE_SOURCES}"'.+\.rs$|^crates/[^/]+/tests/.+\.rs$|^crates/mutations\.tsv$'
 # 判决里认点名的那一节（crates-adversarial-review 与 agent-def-adversarial-review 两格共用）：标题一行逐字是它，判决里别处提到路径不算点名
 REVIEWED_SECTION_HEADING="## 这一轮被判过的文件"
 # 那一节里写了这些否定词之一的行不算点名（文件头「点名一节」判据 ⑤），空白分隔；加词之前先量真仓判决的那一节会多红几行
 REVIEWED_SECTION_NEGATIONS="没攻 没判 未攻 未判 没审 未审 不攻 不判"
 # 这一节上线之前写的新判决没有那一节：挂账表一行一份判决，认整份正文里的提到；只缩不涨，格式见文件头「点名一节」
 REVIEW_PENDING_TABLE=".claude/gate.d/review-section-pending.tsv"
+# 两张豁免表只缩不涨、不再加行（表里已有的行照旧生效）；两张过渡挂账表登记存量没补完三方的文件，只缩不涨（文件头「豁免表与过渡挂账表」）
+CRATES_EXEMPT_TABLE=".claude/crates-review-exempt"
+AGENT_DEF_EXEMPT_TABLE=".claude/agent-def-review-exempt"
+CRATES_TRANSITION_TABLE=".claude/gate.d/review-test-code-pending.tsv"
+GOVERNANCE_TRANSITION_TABLE=".claude/gate.d/governance-review-pending.tsv"
+# agent-def-adversarial-review 格的被管集合：一类一个名字、一条认路径的正则、一条排除的正则（空是不排除）；一个路径算头一个对上的类，次序就是成功句里各类的次序；
+# 头一类（定义与共用约束）之外的七类是过渡挂账表认的那几类；判定库服务排在脚本前面，scripts/prune-server/ 归它
+GOVERNANCE_CLASS_NAMES=("定义与共用约束" "项目规则" "技能" "钩子" "门禁" "判定库服务" "统一任务服务" "脚本")
+GOVERNANCE_CLASS_PATTERNS=(
+  '^\.claude/(agents/[^/]+\.md|agent-common\.md|main-agent\.md)$'
+  '^\.claude/rules/[^/]+\.md$'
+  '^\.claude/skills/.+\.md$'
+  '^\.claude/hooks/[^/]+\.(sh|py)$'
+  '^\.claude/gate\.d/([^/]+|lib/[^/]+)\.(sh|py)$'
+  '^(scripts/prune-server|prune-server)/'
+  '^task-server/'
+  '^scripts/.+\.(sh|py|rs)$'
+)
+GOVERNANCE_CLASS_EXCLUDES=('' '' '' '' '' '(^|/)(target|__pycache__)/|\.(md|lock|pyc)$' '(^|/)__pycache__/|\.(md|pyc)$' '')
 
 stage_cell batch-scope check_batch_scope "这一批要碰的触发文件有没有登记进范围" \
   "没登记的触发文件先问它挡不挡着本轮课题，挡着的在 .claude/batch-scope 加一行「<从仓库根起的路径>  # 为什么这一批要碰它」，不挡着的挪到下一批；多出来的登记（红行格式「文件:行号：路径」，路径是冒号后面那段）照红行下面那条命令整行删掉"
 stage_cell verdict-names-local-samples check_verdict_names_local_samples "新写的三方判决有没有按路径点名那一轮本地腿的每一份样本（含作废副本）" \
   "逐份读那一轮本地腿交回的样本（干净的、通读判带损坏的、-output-void<n>.md），在新写的判决里按路径列出：.claude/rules/three-way-inference.md「判决由主 agent 做，不由投票做」"
-stage_cell crates-adversarial-review check_crates_adversarial_review "crates 里产品代码的实现改动有没有走过三方正反对抗推理" \
-  "提交之前走一轮三方（.claude/rules/three-way-inference.md），判决写进 research/prompts/<题>-r<n>-main-verification.md，判决里写一节「## 这一轮被判过的文件」（标题逐字、二级标题），节里逐个按路径列出改过的 crates 产品代码文件（测试代码不点名，射程见 .claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）；只认这一节，正文别处提到路径不算；点名写进新的判决，不往旧判决里补；判决之后又改过的（那一轮开工快照的 sha256 与此刻的内容对不上）再开一轮，或照 .claude/crates-review-exempt 按内容哈希登记豁免"
+stage_cell crates-adversarial-review check_crates_adversarial_review "crates/ 下全部代码（各包 src 与 tests 里的 .rs、crates/mutations.tsv）的改动有没有走过三方正反对抗推理" \
+  "提交之前走一轮三方（.claude/rules/three-way-inference.md），判决写进 research/prompts/<题>-r<n>-main-verification.md，判决里写一节「## 这一轮被判过的文件」（标题逐字、二级标题），节里逐个按路径列出改过的 crates 代码文件（各包 src 与 tests 里的 .rs、crates/mutations.tsv，测试代码同样在内，射程见 .claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）；只认这一节，正文别处提到路径不算；点名写进新的判决，不往旧判决里补；判决之后又改过的（那一轮开工快照的 sha256 与此刻的内容对不上）再开一轮；豁免表 .claude/crates-review-exempt 不再加行；存量测试代码没补完的登记在 .claude/gate.d/review-test-code-pending.tsv（只缩不涨）"
 stage_cell code-round-snapshot check_code_round_snapshot "按路径点名了产品代码 crates 文件的新判决，有没有点名开工快照、快照有没有罩住点名的每份文件" \
   "派腿之前 sha256sum <判决要点名的 crates 文件…> > research/prompts/<轮>-snapshot/crates-sha256.txt（kb 文件另记 kb-sha256.txt），判决里写一行开工快照指到那个目录（.claude/rules/implementation-workflow.md「代码轮派腿之前记一份开工快照」）；派腿时刻已过的，主 agent 补记快照并在判决里写明是事后补的"
 stage_cell implementation-premise check_implementation_premise "三方论证材料有没有「实现今天的样子」" \
@@ -619,8 +758,8 @@ stage_cell abandoned-rounds check_abandoned_rounds "发过腿的三方轮次，�
   "补判决 research/prompts/<轮>-main-verification.md，或在 research/prompts/abandoned-rounds.tsv 加一行（轮名、日期、为什么撂下、去向，制表符分隔）；登记表写坏的照上面逐行改"
 stage_cell knowledge-sync check_knowledge_sync "改了规则、agent、hook、门禁、脚本或实现之后，有没有写阶段同步记录" \
   "写或补 research/prompts/<阶段>-sync.md（格式见这道门禁文件头 knowledge-sync 那一段）：触发文件逐个按路径点名，「## 搜索」「## 命中处置」「## 原始证据」三节照格式写全"
-stage_cell agent-def-adversarial-review check_agent_def_adversarial_review "改过的 agent 定义与共用约束有没有走过三方审核" \
-  "走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md，判决里写一节「## 这一轮被判过的文件」（标题逐字、二级标题），节里按路径列出改过的每一份；只认这一节，正文别处提到路径不算；用户逐次豁免的登记进 .claude/agent-def-review-exempt；判决之后又改过的（那一轮开工快照的 sha256 与此刻的内容对不上）再开一轮，或照 .claude/agent-def-review-exempt 按内容哈希登记豁免"
+stage_cell agent-def-adversarial-review check_agent_def_adversarial_review "改过的治理文件（定义与共用约束、规则、技能、钩子、门禁、scripts/ 下的脚本、两个服务）有没有走过三方审核" \
+  "走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md，判决里写一节「## 这一轮被判过的文件」（标题逐字、二级标题），节里按路径列出改过的每一份治理文件；只认这一节，正文别处提到路径不算；点名写进新的判决，不往旧判决里补；判决之后又改过的（那一轮开工快照的 sha256 与此刻的内容对不上）再开一轮；豁免表 .claude/agent-def-review-exempt 不再加行；存量没补完的登记在 .claude/gate.d/governance-review-pending.tsv（只缩不涨）"
 stage_cell milestone-close-owed check_milestone_close_owed "段表写了收口的里程碑，欠账表开着的那张表里没有一行的前置点名它" \
   "收口之前把点名它的那几行逐行了结：做完的挪进 .claude/kb/checks-owed.md 的「已还清」，没做完的把去向改到还开着的里程碑（「去向：」之后开头的落点不再写这个里程碑的号或文件名，挪出来的经过写在落点之后）；改不了的就别收口，把段表那一格的「结束 / 已完结」撤回；改完跑 python3 scripts/kb/milestone-close-owed-check.py <号> 到绿"
 stage_cell owed-destination-form check_owed_destination_form "欠账表开着的行，「去向：」之后开头是三种落点之一（里程碑文件、「里程碑<号>」、「未排」），落点点名的里程碑文件都在" \
@@ -631,6 +770,8 @@ stage_cell ledger-section-numbers check_ledger_section_numbers "现行账本（�
   "新登一节用 python3 scripts/kb/ledger-append-section.py --title '<标题（含日期）>' --body-file <正文文件>：它读 .claude/gate.d/split-proposal-ledgers.tsv 里 current 那一份，现取最大节号加一，「## 索引」表末行与末尾的「## <节号>、」一节一次写入，两个会话同时追加时后到的退 4、重跑取下一个号；不手写新节的标题；撞了号的改成下一个空号、索引表里同步改；索引里多出的、少了的照红行补删"
 stage_cell sealed-ledgers-unchanged check_sealed_ledgers_unchanged "拆分提案账本登记表里封存的那几份，内容与登记的 sha256 相同（封存之后没被改）" \
   "封存账本不改，往现行账本追加：把红行点名的那份恢复成封存时那一版（git log -- <路径> 找到内容的 sha256 与登记表那一行相同的提交，git show <提交>:<路径> > <路径>），要记的新内容写进 .claude/gate.d/split-proposal-ledgers.tsv 里 current 那一份；登记表写坏的照红行逐行改"
+stage_cell code-round-checklist check_code_round_checklist "代码轮正文逐格点名了检查单的八格，每格底下写了答案" \
+  "照 .claude/rules/implementation-workflow.md「代码轮正文的检查单」，在红句点名的正文里补上缺的格：每格一个「### 检查单：<格名>」小节，底下写答案与证据（文件:行），再单跑 bash .claude/gate.d/doc-process-records.sh --check code-round-checklist"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
 root_argument=""
@@ -656,7 +797,7 @@ git rev-parse --is-inside-work-tree >/dev/null 2>&1 && inside_git=1
 # 弄坏开关 REVIEW_SECTION_BREAK 只在样本里认（与样本根的 .gate-cells 同一个口径）：被判的根是这道阶段所在的仓或 --staged 的临时树时不认，平常跑环境里留着它也不起作用
 review_break=""
 case "${REVIEW_SECTION_BREAK:-}" in
-  whole-verdict-substring|pending-rows-unchecked|pending-growth-ignored|negated-lines-counted|snapshot-hash-unchecked)
+  whole-verdict-substring|pending-rows-unchecked|pending-growth-ignored|negated-lines-counted|snapshot-hash-unchecked|lists-path-never|exempt-growth-ignored|transition-growth-ignored|transition-rows-unchecked|transition-ignored)
     if [[ -z "${GATE_STAGED_FROM:-}" && "$(pwd -P)" != "$STAGE_CELLS_STAGE_REPOSITORY" ]]; then review_break="$REVIEW_SECTION_BREAK"; fi ;;
 esac
 LIB_CHANGED_PATHS="$(cd "$STAGE_DIR/../.." && pwd)/scripts/gate/changed-paths.sh"
@@ -1048,7 +1189,7 @@ PY
 # ── crates-adversarial-review ───────────────────────────────────────────────
 # user_exemption_reason <豁免表> <路径>：豁免表一行三段（路径、豁免时那一版的 sha256、为什么），打印这一路径、这一份内容那一行的理由，没有就不打印。
 # 按内容哈希认：那份文件再改一个字就对不上。删掉的文件没有内容可算哈希，第二段写 deleted，只在文件确实不在时对得上。
-# 只有用户明说「这次不走三方」时才加一行，理由里写明是哪一次、他说了什么。两格共用：.claude/agent-def-review-exempt 与 .claude/crates-review-exempt。
+# 豁免表不再加行（只缩不涨，check_review_exempt_frozen 判）；表里已有的行照旧生效。两格共用：.claude/agent-def-review-exempt 与 .claude/crates-review-exempt。
 user_exemption_reason() {
   local table="$1" path="$2" now
   [[ -f "$table" ]] || return 0
@@ -1124,8 +1265,10 @@ review_scope_text() {
 
 # review_lists_path <判决> <路径>：这份判决点名了这个路径吗（字面子串，范围见 review_scope_text）
 review_lists_path() {
+  [[ "$review_break" == lists-path-never ]] && return 1      # 弄坏：没有一份判决点名任何路径
   review_scope_text "$1"
-  grep -qF -- "$2" <<<"$review_scope_result"
+  # 路径里没有换行，整段文字里的子串判与逐行字面匹配同义；不为每一对（判决, 路径）起一个 grep
+  [[ "$review_scope_result" == *"$2"* ]]
 }
 
 # review_mention_note <路径> <判决（一行一个）>：没被点名的路径，若某份新判决在正文别处提到过它，打印一句提示（给红格的出路用），没有就不打印
@@ -1213,8 +1356,8 @@ review_report_stale() {
   local what="$1" table="$2"; shift 2
   echo "  ✗ ${what}里 $# 个在判决之后又改过（点名它的新判决那一轮开工快照 research/prompts/<轮>-snapshot/ 的 sha256 清单记的哈希，与此刻被判的树里——--staged 时是暂存进来的那一份——的内容对不上）："   # gate-lint:summary
   printf '      %s\n' "$@"   # gate-lint:detail
-  echo "     → 怎么办：判决之后又改过：再开一轮（派腿之前重记快照，新判决在「$REVIEWED_SECTION_HEADING」一节里点名它），"
-  echo "               或照 $table 按内容哈希登记豁免（一行：路径、此刻的 sha256、用户说了什么；用户明说这一版不再走三方才登）。"
+  echo "     → 怎么办：判决之后又改过：再开一轮（派腿之前重记快照，新判决在「$REVIEWED_SECTION_HEADING」一节里点名它）；"
+  echo "               豁免表 $table 不再加行，表里已有的行（路径与内容哈希都对得上）照旧生效。"
 }
 
 # review_report_snapshot_coverage <没比的路径说明> <没比的路径…>：成功行之后报快照比对了几份、没比的逐个列出（两格共用；弄坏开关 snapshot-hash-unchecked 下不报）
@@ -1300,6 +1443,140 @@ if problems:
 PY
 }
 
+# load_transition_rows <过渡挂账表>：读第一列（路径）与第二列（理由）进 transition_rows，一格只读一张；弄坏开关 transition-ignored 下不读（登记的路径照旧要点名）。
+# 表自己合不合规是 check_review_transition_table 的事。
+declare -A transition_rows=()
+load_transition_rows() {
+  transition_rows=()
+  [[ -f "$1" && "$review_break" != transition-ignored ]] || return 0
+  local path reason
+  while IFS=$'\t' read -r path reason _ || [[ -n "$path" ]]; do
+    path="${path//[$' \r']/}"
+    [[ -z "$path" || "$path" == '#'* ]] && continue
+    transition_rows[$path]="${reason%$'\r'}"
+  done < "$1"
+  return 0
+}
+
+# check_review_exempt_frozen <豁免表>：豁免表只缩不涨（文件头「豁免表与过渡挂账表」①）：基准（gate 取法的基准）里有这张表时，表里不许出现基准里没有的行（按「路径、sha256」两列认），
+# 基准里还没有这张表时不比，表不存在不算红。两格各在开头调一次，没有对象可判的那一趟也判。弄坏开关 exempt-growth-ignored 不比。
+check_review_exempt_frozen() {
+  [[ -f "$1" ]] || return 0
+  python3 - "$1" "$gate_base" "$inside_git" "$review_break" "$LAG_BASELINE_LIBRARY" <<'PY'
+import importlib.util, sys
+
+table, base, inside_git, breakage = sys.argv[1], sys.argv[2], sys.argv[3] == "1", sys.argv[4]
+lag_baseline_spec = importlib.util.spec_from_file_location("lag_baseline", sys.argv[5])
+lag_baseline = importlib.util.module_from_spec(lag_baseline_spec)
+lag_baseline_spec.loader.exec_module(lag_baseline)
+
+
+def row_key(fields):
+    return (fields[0].strip(), fields[1].strip() if len(fields) > 1 else "")
+
+
+problems = []
+if inside_git and base and breakage != "exempt-growth-ignored":
+    baseline_rows, baseline_problem = lag_baseline.baseline_rows(base, table)
+    if baseline_problem is not None:
+        problems.append(f"{baseline_problem.sentence()}，只缩不涨没比")
+    elif baseline_rows is not None:
+        baseline = {row_key(fields) for _number, fields in baseline_rows}
+        with open(table, encoding="utf-8") as handle:
+            for number, fields in lag_baseline.content_rows(handle.read()):
+                path, digest = row_key(fields)
+                if (path, digest) not in baseline:
+                    problems.append(f"第 {number} 行 {path}（sha256 {digest[:12]}…）是基准 {base} 之后新加的")
+if problems:
+    print(f"  ✗ 豁免表 {table} 只缩不涨，有 {len(problems)} 处不合规：")   # gate-lint:summary
+    for problem in problems:
+        print(f"      {problem}")   # gate-lint:detail
+    print("     → 怎么办：三方不再豁免，豁免表不再加行：把新加的行删掉，改走一轮三方（.claude/rules/three-way-inference.md），")
+    print("               判决在「## 这一轮被判过的文件」一节里按路径点名这份文件；表里已有的行照旧生效，补完一轮三方就删一行。")
+    sys.exit(1)
+PY
+}
+
+# check_review_transition_table <过渡挂账表> <这张表认的路径叫什么> <路径形态…>：过渡挂账表自己合不合规（文件头「豁免表与过渡挂账表」②）。
+# 路径形态一项一个参数，写成「认路径的正则<制表符>排除的正则」（排除的可以空）。每行「路径<制表符>理由」两段非空、理由 8 个字以上、路径对得上某一项形态、同一路径不登两次；
+# 只缩不涨：基准里有这张表时，表里不许出现基准里没有的路径。表不存在不算红；两格各在开头调一次，没有对象可判的那一趟也判。
+# 弄坏开关 transition-rows-unchecked 不核行，transition-growth-ignored 不和基准比。
+check_review_transition_table() {
+  [[ -f "$1" ]] || return 0
+  local table="$1" what="$2"
+  shift 2
+  python3 - "$table" "$what" "$gate_base" "$inside_git" "$review_break" "$LAG_BASELINE_LIBRARY" "$@" <<'PY'
+import importlib.util, re, sys
+
+table, what, base, inside_git, breakage = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4] == "1", sys.argv[5]
+lag_baseline_spec = importlib.util.spec_from_file_location("lag_baseline", sys.argv[6])
+lag_baseline = importlib.util.module_from_spec(lag_baseline_spec)
+lag_baseline_spec.loader.exec_module(lag_baseline)
+FORMS = [tuple((form.split("\t") + [""])[:2]) for form in sys.argv[7:]]
+MINIMUM_REASON = 8
+
+
+def allowed(path):
+    return any(re.search(include, path) and not (exclude and re.search(exclude, path)) for include, exclude in FORMS)
+
+
+problems, rows = [], {}
+with open(table, encoding="utf-8") as handle:
+    for number, fields in lag_baseline.content_rows(handle.read()):
+        path = fields[0].strip()
+        reason = fields[1].strip() if len(fields) > 1 else ""
+        if breakage == "transition-rows-unchecked":
+            rows[path] = number
+        elif len(fields) < 2 or not path or len(reason) < MINIMUM_REASON:
+            problems.append(f"第 {number} 行不是「路径<制表符>理由」两段，或理由不到 {MINIMUM_REASON} 个字：{path}")
+        elif not allowed(path):
+            problems.append(f"第 {number} 行的路径不是{what}：{path}")
+        elif path in rows:
+            problems.append(f"第 {number} 行重复登记了 {path}（第 {rows[path]} 行已经有）")
+        else:
+            rows[path] = number
+
+baseline = None
+if inside_git and base and breakage != "transition-growth-ignored":
+    baseline_rows, baseline_problem = lag_baseline.baseline_rows(base, table)
+    if baseline_problem is not None:
+        problems.append(f"{baseline_problem.sentence()}，只缩不涨没比")
+    elif baseline_rows is not None:
+        baseline = {fields[0].strip() for _number, fields in baseline_rows}
+if baseline is not None:
+    for path, number in rows.items():
+        if path not in baseline:
+            problems.append(f"第 {number} 行 {path} 是基准 {base} 之后新加的：挂账表只缩不涨")
+
+if problems:
+    print(f"  ✗ 过渡挂账表 {table} 有 {len(problems)} 处不合规：")   # gate-lint:summary
+    for problem in problems:
+        print(f"      {problem}")   # gate-lint:detail
+    print(f"     → 怎么办：表里一行一条「路径<制表符>理由（{MINIMUM_REASON} 个字以上）」，路径要是{what}；")
+    print("               只缩不涨：新改的文件一律在判决「## 这一轮被判过的文件」一节里按路径点名，不往表里加行；判决点名了它、或那一份不再有改动，就把那一行删掉。")
+    sys.exit(1)
+PY
+}
+
+# governance_objects：改动范围里被管的路径，一行「<类名><制表符><路径>」，一个路径只算头一个对上的类（类与次序见 GOVERNANCE_CLASS_NAMES）。
+# 弄坏开关（AGENT_DEF_ADVERSARIAL_REVIEW_BREAK）definitions-only 只认头一类；要先调过 load_changed_since_gate。
+governance_objects() {
+  local index matched path last=$((${#GOVERNANCE_CLASS_NAMES[@]} - 1))
+  local -A seen=()
+  [[ "${AGENT_DEF_ADVERSARIAL_REVIEW_BREAK:-}" == definitions-only ]] && last=0
+  for ((index = 0; index <= last; index++)); do
+    matched="$(grep -E "${GOVERNANCE_CLASS_PATTERNS[index]}" <<<"$changed_since_gate" || true)"
+    if [[ -n "$matched" && -n "${GOVERNANCE_CLASS_EXCLUDES[index]}" ]]; then
+      matched="$(grep -vE "${GOVERNANCE_CLASS_EXCLUDES[index]}" <<<"$matched" || true)"
+    fi
+    while IFS= read -r path; do
+      [[ -z "$path" || -n "${seen[$path]+set}" ]] && continue
+      seen[$path]=1
+      printf '%s\t%s\n' "${GOVERNANCE_CLASS_NAMES[index]}" "$path"
+    done <<<"$matched"
+  done
+}
+
 check_crates_adversarial_review() {
   ((inside_git)) || { not_git_repository; return; }
   load_changed_since_gate || {
@@ -1308,20 +1585,19 @@ check_crates_adversarial_review() {
     return 1
   }
   check_review_pending_table || return 1
-  local sources verdicts source verdict_count all_sources test_sources test_count why
-  local -a missing=() exempted=() stale=() unhashed=()
+  check_review_exempt_frozen "$CRATES_EXEMPT_TABLE" || return 1
+  check_review_transition_table "$CRATES_TRANSITION_TABLE" "验证包、池级 checker、函数单元图的 src、各包 tests 里的 .rs 或 crates/mutations.tsv" "$CRATES_TRANSITION_PATHS"$'\t' || return 1
+  load_transition_rows "$CRATES_TRANSITION_TABLE"
+  local sources verdicts source verdict_count why
+  local -a missing=() exempted=() stale=() unhashed=() transitioned=()
   local count=0
-  local exempt_table=".claude/crates-review-exempt"
-  all_sources="$(grep -E '^crates/[^/]+/src/.*\.rs$' <<<"$changed_since_gate" || true)"
-  # 测试代码（TEST_CODE_SOURCES）改完直接测、不走三方：从对象里去掉，另列出来
-  if [[ "${CRATES_ADVERSARIAL_REVIEW_BREAK:-}" == test-code-counted ]]; then
-    sources="$all_sources"; test_sources=""
-  else
-    sources="$(grep -vE "$TEST_CODE_SOURCES" <<<"$all_sources" || true)"
-    test_sources="$(grep -E "$TEST_CODE_SOURCES" <<<"$all_sources" || true)"
+  local exempt_table="$CRATES_EXEMPT_TABLE"
+  sources="$(grep -E "$CRATES_REVIEW_OBJECTS" <<<"$changed_since_gate" || true)"
+  # 弄坏开关 test-code-skipped：测试代码（CRATES_TRANSITION_PATHS 那一类）不算对象
+  if [[ "${CRATES_ADVERSARIAL_REVIEW_BREAK:-}" == test-code-skipped ]]; then
+    sources="$(grep -vE "$CRATES_TRANSITION_PATHS" <<<"$sources" || true)"
   fi
-  test_count="$(grep -c . <<<"$test_sources" || true)"
-  # 只改了注释的产品代码不走三方：去掉注释与空白之后代码词元与基准逐个相同（判法文件头写了哪些注释照代码算）
+  # 只改了注释的 .rs 不走三方：去掉注释与空白之后代码词元与基准逐个相同（判法文件头写了哪些注释照代码算）；不是 .rs 的（crates/mutations.tsv）判法照代码算
   local comment_only="" comment_only_count=0
   local -a source_list=()
   if [[ -n "$sources" && "${CRATES_ADVERSARIAL_REVIEW_BREAK:-}" != comments-count-as-code ]]; then
@@ -1332,7 +1608,7 @@ check_crates_adversarial_review() {
     fi
     mapfile -t source_list <<<"$sources"
     if ! comment_only="$(python3 "$COMMENT_ONLY_JUDGE" "$ROOT" "$gate_base" "${source_list[@]}")"; then
-      echo "  ✗ 判不出哪些产品代码文件只改了注释（$COMMENT_ONLY_JUDGE 判不了，原话在上面；基准 $gate_base）"
+      echo "  ✗ 判不出哪些 crates 代码文件只改了注释（$COMMENT_ONLY_JUDGE 判不了，原话在上面；基准 $gate_base）"
       echo "     → 怎么办：核基准在不在、改动清单里的路径对不对，修好再跑；判不了的不当只改注释。"
       return 1
     fi
@@ -1343,10 +1619,9 @@ check_crates_adversarial_review() {
   fi
   if [[ -z "$sources" ]]; then
     local comment_only_note=""
-    ((comment_only_count)) && comment_only_note="，只改注释的产品代码 ${comment_only_count} 个不走三方"
-    echo "  ! 这次改动没碰产品代码的 crates/*/src（测试代码 ${test_count} 个不归这一格${comment_only_note}），这一格无对象可判（基准 $gate_base）"
+    ((comment_only_count)) && comment_only_note="；只改了注释的 ${comment_only_count} 个不走三方"
+    echo "  ! 这次改动没碰 crates/ 下要判的代码（各包 src 与 tests 里的 .rs、crates/mutations.tsv${comment_only_note}），这一格无对象可判（基准 $gate_base）"
     report_comment_only_sources "$comment_only" "$comment_only_count"
-    report_test_code_sources "$test_sources" "$test_count"
     return 77
   fi
   load_added_since_gate || {
@@ -1358,7 +1633,8 @@ check_crates_adversarial_review() {
   while IFS= read -r source; do
     [[ -z "$source" ]] && continue
     count=$((count + 1))
-    # 点名了、快照对得上（或没快照可比）的有去向；又改过的与没点名的先查豁免表（按此刻的内容哈希）
+    # 登记在过渡挂账表里的路径不要求点名；别的点名了、快照对得上（或没快照可比）的有去向，又改过的与没点名的先查豁免表（按此刻的内容哈希）
+    if [[ -n "${transition_rows[$source]+set}" ]]; then transitioned+=("$source：${transition_rows[$source]}"); continue; fi
     review_judge_named "$source" "$verdicts"
     case "$review_outcome" in
       named) continue ;;
@@ -1377,10 +1653,11 @@ check_crates_adversarial_review() {
     printf '      %s\n' "${missing[@]}"   # gate-lint:detail
     echo "     → 怎么办：写代码之后、提交之前走一轮三方（.claude/rules/three-way-inference.md）：材料带上 diff，正推 / 反推 / 找反例三条腿各攻一遍，"
     echo "               主 agent 的判决写进 research/prompts/<题>-r<n>-main-verification.md，在判决里写一节，标题一行逐字是「$REVIEWED_SECTION_HEADING」（二级标题），"
-    echo "               节里一行一个，逐个按路径列出这一轮判过的 crates 文件（节到下一个一、二级标题为止；打中的写回代码再改一轮）："
+    echo "               节里一行一个，逐个按路径列出这一轮判过的 crates 文件（产品代码、测试代码与 crates/mutations.tsv 都算；节到下一个一、二级标题为止；打中的写回代码再改一轮）："
     echo "                 $REVIEWED_SECTION_HEADING"
     echo "                 - crates/<包>/src/<文件>.rs：<这一轮判了它的什么>"
-    echo "               点名写进新的判决，不往旧判决里补；用户明说这次不走三方的，按内容哈希登记进 $exempt_table（一行：路径、sha256、他说了什么）。"
+    echo "               点名写进新的判决，不往旧判决里补；豁免表 $exempt_table 不再加行（表里已有的行照旧生效）；"
+    echo "               存量测试代码没补完三方的登记在挂账表 $CRATES_TRANSITION_TABLE（只缩不涨，新改的文件不往里加）。"
     report_comment_only_sources "$comment_only" "$comment_only_count"
     return 1
   fi
@@ -1389,36 +1666,33 @@ check_crates_adversarial_review() {
     return 1
   fi
   verdict_count="$(grep -c . <<<"$verdicts" || true)"
-  if ((${#exempted[@]})); then
-    echo "  ✓ crates 改动 ${count} 个文件都有去向（新写的判决文件 ${verdict_count} 份，另有 ${#exempted[@]} 个按 $exempt_table 豁免，基准 $gate_base）"
-    echo "    豁免的 ${#exempted[@]} 个（按内容哈希认，那份文件再改一个字就不再豁免）："
-    printf '      %s\n' "${exempted[@]}"
+  if ((${#exempted[@]} || ${#transitioned[@]})); then
+    local extras=""
+    ((${#exempted[@]})) && extras+="，另有 ${#exempted[@]} 个按 $exempt_table 豁免"
+    ((${#transitioned[@]})) && extras+="，另有 ${#transitioned[@]} 个按 $CRATES_TRANSITION_TABLE 挂账、不要求点名"
+    echo "  ✓ crates 改动 ${count} 个文件都有去向（新写的判决文件 ${verdict_count} 份${extras}，基准 $gate_base）"
+    if ((${#exempted[@]})); then
+      echo "    豁免的 ${#exempted[@]} 个（按内容哈希认，那份文件再改一个字就不再豁免）："
+      printf '      %s\n' "${exempted[@]}"
+    fi
+    if ((${#transitioned[@]})); then
+      echo "    挂账的 ${#transitioned[@]} 个（登记的路径这一格不要求点名；只缩不涨，补完一轮三方删一行）："
+      printf '      %s\n' "${transitioned[@]}"
+    fi
   else
     echo "  ✓ crates 改动 ${count} 个文件都有三方判决点名（新写的判决文件 ${verdict_count} 份，基准 $gate_base）"
   fi
   review_report_snapshot_coverage "那一轮没有开工快照、或快照清单里没有它的行；快照立没立住归 code-round-snapshot 格判" ${unhashed[@]+"${unhashed[@]}"}
   report_review_pending_in_use "$verdicts"
   report_comment_only_sources "$comment_only" "$comment_only_count"
-  report_test_code_sources "$test_sources" "$test_count"
 }
 
-# report_comment_only_sources <只改注释的路径（一行一个）> <个数>：逐个报出只改了注释、不走三方的产品代码，0 个不报
+# report_comment_only_sources <只改注释的路径（一行一个）> <个数>：逐个报出只改了注释、不走三方的 crates 代码，0 个不报
 report_comment_only_sources() {
   local listed="$1" listed_count="$2"
   ((listed_count)) || return 0
-  echo "    只改了注释、不走三方的产品代码 ${listed_count} 个（判法 $COMMENT_ONLY_JUDGE）："
+  echo "    只改了注释、不走三方的 crates 代码 ${listed_count} 个（判法 $COMMENT_ONLY_JUDGE）："
   printf '%s\n' "$listed" | sed 's/^/      /'
-}
-
-# report_test_code_sources <去掉的路径（一行一个）> <个数>：逐个报出这一格不判的测试代码，0 个不报
-report_test_code_sources() {
-  local listed="$1" listed_count="$2" path
-  ((listed_count)) || return 0
-  echo "    不判的测试代码 ${listed_count} 个（验证包、池级 checker 与函数单元图的 src，改完直接测、不走三方：.claude/rules/implementation-workflow.md「三步，缺一步就不算做完」）："
-  while IFS= read -r path; do
-    [[ -n "$path" ]] && printf '      %s\n' "$path"
-  done <<<"$listed"
-  return 0
 }
 
 # ── code-round-snapshot ─────────────────────────────────────────────────────
@@ -1619,7 +1893,7 @@ check_implementation_premise() {
 # ── abandoned-rounds ────────────────────────────────────────────────────────
 check_abandoned_rounds() {
   python3 - "$ABANDONED_ROUNDS_LIBRARY" <<'PY'
-import importlib.util, os, re, subprocess, sys
+import importlib.util, json, os, re, subprocess, sys
 
 prompts_dir = "research/prompts"
 registry_path = "research/prompts/abandoned-rounds.tsv"
@@ -1643,9 +1917,58 @@ archived_names = set()
 archive_log_error = None                     # 在 git 仓里而 git log 失败：归档的轮次读不到，收尾判红
 inside_repository = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
                                    capture_output=True, text=True).returncode == 0
+
+
+def deleted_prompt_paths_log():
+    """全部历史里在 prompts_dir 下被删掉的路径：交回 git log --all --diff-filter=D --name-only 的那种结果（带 returncode、stdout、stderr）。
+    走全部历史要好几秒，而历史只增不改：结果连同当时全部 ref 的端点记在 git 目录下，下一次只走新端点够得着、旧端点够不着的那几个提交，并进记下的结果。
+    旧端点有一个从现在的 ref 够不着了（分支删了、历史改写过），或记下的那一份读不了，整份重走。每个提交的删除各算各的，并出来的集合与整份重走相同。"""
+    def git(*arguments):
+        return subprocess.run(["git", "-c", "core.quotepath=false", *arguments], capture_output=True, text=True)
+
+    def whole():
+        return git("log", "--all", "--diff-filter=D", "--format=", "--name-only", "--", prompts_dir)
+
+    tips = git("rev-parse", "--all")
+    common = git("rev-parse", "--git-common-dir")
+    if tips.returncode != 0 or common.returncode != 0 or not tips.stdout.strip():
+        return whole()
+    current_tips = sorted(set(tips.stdout.split()))
+    cache_path = os.path.join(common.stdout.strip(), "singlefs-gate-cache", "deleted-prompt-paths.json")
+    cached_tips, cached_paths = None, None
+    try:
+        with open(cache_path, encoding="utf-8") as handle:
+            recorded = json.load(handle)
+        if recorded.get("directory") == prompts_dir and isinstance(recorded.get("tips"), list) and isinstance(recorded.get("paths"), list):
+            cached_tips, cached_paths = [str(tip) for tip in recorded["tips"]], [str(path) for path in recorded["paths"]]
+    except (OSError, ValueError):
+        pass
+    result = None
+    if cached_tips:
+        unreachable = git("rev-list", "--count", *cached_tips, "--not", "--all")
+        if unreachable.returncode == 0 and unreachable.stdout.strip() == "0":
+            added = git("log", *current_tips, "--not", *cached_tips, "--diff-filter=D", "--format=", "--name-only", "--", prompts_dir)
+            if added.returncode == 0:
+                paths = sorted(set(cached_paths) | {line for line in added.stdout.split("\n") if line.strip()})
+                result = subprocess.CompletedProcess(added.args, 0, "\n".join(paths) + ("\n" if paths else ""), "")
+    if result is None:
+        result = whole()
+        if result.returncode != 0:
+            return result
+        paths = sorted({line for line in result.stdout.split("\n") if line.strip()})
+    try:
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        temporary = f"{cache_path}.{os.getpid()}"
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump({"directory": prompts_dir, "tips": current_tips, "paths": paths}, handle)
+        os.replace(temporary, cache_path)
+    except OSError:
+        pass
+    return result
+
+
 if inside_repository:
-    log = subprocess.run(["git", "-c", "core.quotepath=false", "log", "--all", "--diff-filter=D", "--format=", "--name-only",
-                          "--", prompts_dir], capture_output=True, text=True)
+    log = deleted_prompt_paths_log()
     if log.returncode != 0:
         archive_log_error = f"git log 退出码 {log.returncode}：{(log.stderr.strip().splitlines() or ['（git 没说原因）'])[-1]}"
     else:
@@ -2182,12 +2505,21 @@ check_agent_def_adversarial_review() {
     return 1
   }
   check_review_pending_table || return 1
-  local definitions verdicts definition why verdict_count
-  local -a exempted=() missing=() stale=() unhashed=()
+  check_review_exempt_frozen "$AGENT_DEF_EXEMPT_TABLE" || return 1
+  local index
+  local -a forms=()
+  for ((index = 1; index < ${#GOVERNANCE_CLASS_NAMES[@]}; index++)); do
+    forms+=("${GOVERNANCE_CLASS_PATTERNS[index]}"$'\t'"${GOVERNANCE_CLASS_EXCLUDES[index]}")
+  done
+  check_review_transition_table "$GOVERNANCE_TRANSITION_TABLE" "项目规则、技能、钩子、门禁、判定库服务、统一任务服务、脚本这几类新扩进来的被管文件（定义与共用约束已在管，不进这张表）" "${forms[@]}" || return 1
+  load_transition_rows "$GOVERNANCE_TRANSITION_TABLE"
+  local objects verdicts definition class why verdict_count class_text=""
+  local -a exempted=() missing=() stale=() unhashed=() transitioned=()
+  local -A class_counts=()
   local count=0
-  definitions="$(grep -E '^\.claude/(agents/[^/]+\.md|agent-common\.md|main-agent\.md)$' <<<"$changed_since_gate" || true)"
-  if [[ -z "$definitions" ]]; then
-    echo "  ! 这次改动没碰 .claude/agents/、.claude/agent-common.md、.claude/main-agent.md，这一格无对象可判（基准 $gate_base）"
+  objects="$(governance_objects)"
+  if [[ -z "$objects" ]]; then
+    echo "  ! 这次改动没碰被管的治理文件（.claude/agents/、.claude/agent-common.md、.claude/main-agent.md、.claude/rules/、.claude/skills/、.claude/hooks/ 的钩子与库、.claude/gate.d/ 顶层的门禁与 lib/、scripts/ 下的脚本、task-server/、scripts/prune-server/、prune-server/），这一格无对象可判（基准 $gate_base）"
     return 77
   fi
   load_added_since_gate || {
@@ -2197,11 +2529,13 @@ check_agent_def_adversarial_review() {
   }
   verdicts="$(new_verdict_paths)"
   # 豁免表的格式与认法在 user_exemption_reason
-  local exempt_table=".claude/agent-def-review-exempt"
-  while IFS= read -r definition; do
+  local exempt_table="$AGENT_DEF_EXEMPT_TABLE"
+  while IFS=$'\t' read -r class definition; do
     [[ -z "$definition" ]] && continue
     count=$((count + 1))
-    # 判法与 crates-adversarial-review 同一份：review_judge_named 判点名与快照，又改过的与没点名的先查豁免表
+    class_counts[$class]=$((${class_counts[$class]:-0} + 1))
+    # 登记在过渡挂账表里的路径不要求点名；判法与 crates-adversarial-review 同一份：review_judge_named 判点名与快照，又改过的与没点名的先查豁免表
+    if [[ -n "${transition_rows[$definition]+set}" ]]; then transitioned+=("$definition：${transition_rows[$definition]}"); continue; fi
     review_judge_named "$definition" "$verdicts"
     case "$review_outcome" in
       named) continue ;;
@@ -2211,27 +2545,35 @@ check_agent_def_adversarial_review() {
     if [[ -n "$why" ]]; then exempted+=("$definition：$why"); continue; fi
     if [[ "$review_outcome" == stale ]]; then stale+=("$definition（$review_outcome_note）"); continue; fi
     missing+=("$definition$(review_mention_note "$definition" "$verdicts")")
-  done <<<"$definitions"
+  done <<<"$objects"
   if ((${#stale[@]})); then
-    review_report_stale "改过的定义与共用约束" "$exempt_table" "${stale[@]}"
+    review_report_stale "改过的治理文件" "$exempt_table" "${stale[@]}"
   fi
   if ((${#missing[@]})); then
-    echo "  ✗ 改过的定义与共用约束里 ${#missing[@]} 份没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没在「$REVIEWED_SECTION_HEADING」一节里按路径列出它；正文别处提到不算，节里写了没攻、没判这类否定词的行也不算；被改过的旧判决不算）："   # gate-lint:summary
+    echo "  ✗ 改过的治理文件里 ${#missing[@]} 份没有三方判决点名（这次改动新写的 research/prompts/*-main-verification.md 里一份都没在「$REVIEWED_SECTION_HEADING」一节里按路径列出它；正文别处提到不算，节里写了没攻、没判这类否定词的行也不算；被改过的旧判决不算）："   # gate-lint:summary
     printf '      %s\n' "${missing[@]}"   # gate-lint:detail
     echo "     → 怎么办：走一轮三方（.claude/rules/three-way-inference.md），判决落 research/prompts/<轮>-main-verification.md，"
-    echo "               在判决里写一节，标题一行逐字是「$REVIEWED_SECTION_HEADING」（二级标题），节里一行一个，逐个按路径列出改过的每一份定义"
-    echo "               （节到下一个一、二级标题为止；打中的写回定义再改一轮）："
+    echo "               在判决里写一节，标题一行逐字是「$REVIEWED_SECTION_HEADING」（二级标题），节里一行一个，逐个按路径列出改过的每一份治理文件"
+    echo "               （定义与共用约束、规则、技能、钩子、门禁、scripts/ 下的脚本、两个服务；节到下一个一、二级标题为止；打中的写回文件再改一轮）："
     echo "                 $REVIEWED_SECTION_HEADING"
     echo "                 - .claude/agents/<名>.md：<这一轮判了它的什么>"
-    echo "               点名写进新的判决，不往旧判决里补。"
+    echo "               点名写进新的判决，不往旧判决里补；豁免表 $exempt_table 不再加行（表里已有的行照旧生效）；"
+    echo "               存量没补完三方的登记在挂账表 $GOVERNANCE_TRANSITION_TABLE（只缩不涨，新改的文件不往里加）。"
     return 1
   fi
   ((${#stale[@]})) && return 1
   verdict_count="$(grep -c . <<<"$verdicts" || true)"
-  echo "  ✓ 改过的定义与共用约束 ${count} 份都有去向（新写的判决文件 ${verdict_count} 份，另有 ${#exempted[@]} 份按 $exempt_table 豁免，基准 $gate_base）"
+  for class in "${GOVERNANCE_CLASS_NAMES[@]}"; do
+    [[ -n "${class_counts[$class]+set}" ]] && class_text+="${class_text:+、}${class} ${class_counts[$class]} 份"
+  done
+  echo "  ✓ 改过的治理文件 ${count} 份都有去向（${class_text}；新写的判决文件 ${verdict_count} 份，另有 ${#exempted[@]} 份按 $exempt_table 豁免，另有 ${#transitioned[@]} 份按 $GOVERNANCE_TRANSITION_TABLE 挂账、不要求点名，基准 $gate_base）"
   if ((${#exempted[@]})); then
     echo "    豁免的 ${#exempted[@]} 份（按内容哈希认，那份文件再改一个字就不再豁免）："
     printf '      %s\n' "${exempted[@]}"
+  fi
+  if ((${#transitioned[@]})); then
+    echo "    挂账的 ${#transitioned[@]} 份（登记的路径这一格不要求点名；只缩不涨，补完一轮三方删一行）："
+    printf '      %s\n' "${transitioned[@]}"
   fi
   review_report_snapshot_coverage "那一轮没有开工快照、或快照清单里没有它的行" ${unhashed[@]+"${unhashed[@]}"}
   report_review_pending_in_use "$verdicts"
@@ -2693,6 +3035,62 @@ check_sealed_ledgers_unchanged() {
   echo "  ✓ 封存的 ${#sealed_ledgers[@]} 份拆分提案（${sealed_ledgers[*]}）内容都与登记的 sha256 相同；新内容往现行账本 $current_ledger 追加"
 }
 
+# ── code-round-checklist ───────────────────────────────────────────────────
+# 判据在文件头「code-round-checklist」；只看树，不用改动范围
+check_code_round_checklist() {
+  local prompts_directory="research/prompts"
+  local body heading date label state checked=0
+  local -a bodies=("$prompts_directory"/_*-code-r[0-9]*-body.md)
+  local -a before_cutoff=() undated=() problems=()
+  for body in "${bodies[@]}"; do
+    heading="$(head -n 1 "$body")"
+    date="$(grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' <<<"$heading" | head -n 1)"
+    if [[ -z "$date" ]]; then
+      undated+=("$body")
+    elif [[ "$date" < "$CODE_ROUND_CHECKLIST_CUTOFF" ]]; then
+      before_cutoff+=("$body（$date）")
+      continue
+    fi
+    checked=$((checked + 1))
+    # 弄坏开关 DOC_PROCESS_RECORDS_BREAK=code-round-checklist-unjudged：不判
+    [[ "${DOC_PROCESS_RECORDS_BREAK:-}" == code-round-checklist-unjudged ]] && continue
+    for label in "${CODE_ROUND_CHECKLIST_CELLS[@]}"; do
+      state="$(awk -v heading="$CODE_ROUND_CHECKLIST_HEADING_PREFIX$label" '
+        { line = $0; sub(/[ \t]+$/, "", line) }
+        line == heading { found = 1; next }
+        found && /^#/ { exit }
+        found && NF { filled = 1; exit }
+        END { print (found ? (filled ? "filled" : "empty") : "missing") }' "$body")"
+      case "$state" in
+        missing) problems+=("$body：没有「$CODE_ROUND_CHECKLIST_HEADING_PREFIX$label」这一格") ;;
+        # 弄坏开关 DOC_PROCESS_RECORDS_BREAK=code-round-checklist-answers-unchecked：只看标题在不在
+        empty) [[ "${DOC_PROCESS_RECORDS_BREAK:-}" == code-round-checklist-answers-unchecked ]] \
+                 || problems+=("$body：「$CODE_ROUND_CHECKLIST_HEADING_PREFIX$label」底下没写答案（到下一个标题为止一行字都没有）") ;;
+      esac
+    done
+  done
+  if ((${#bodies[@]} == 0)); then
+    echo "  ! research/prompts/ 下没有 _<题>-code-r<数字>-body.md，这一格无对象可判"
+    return 77
+  fi
+  if ((checked == 0)); then
+    echo "  ! 代码轮正文 ${#bodies[@]} 份的标题日期都早于 $CODE_ROUND_CHECKLIST_CUTOFF（规范落地之前写的，不回改），这一格无对象可判：${before_cutoff[*]}"
+    return 77
+  fi
+  if ((${#problems[@]})); then
+    echo "  ✗ 代码轮正文的检查单没写全（${#problems[@]} 处，查了 $checked 份）："   # gate-lint:summary
+    printf '     %s\n' "${problems[@]}"   # gate-lint:detail
+    echo "     → 怎么办：照 .claude/rules/implementation-workflow.md「代码轮正文的检查单」，每格一个「$CODE_ROUND_CHECKLIST_HEADING_PREFIX<格名>」小节，底下写答案与证据（文件:行）；八个格名逐字照那张表"
+    return 1
+  fi
+  echo "  ✓ 代码轮正文的检查单 ${#CODE_ROUND_CHECKLIST_CELLS[@]} 格都点名并写了答案（检查了 $checked 份，其中标题没有日期、照要查的算的 ${#undated[@]} 份）"
+  if ((${#before_cutoff[@]})); then
+    echo "    没查 ${#before_cutoff[@]} 份（标题日期早于 $CODE_ROUND_CHECKLIST_CUTOFF，规范落地之前写的）：${before_cutoff[*]}"
+  else
+    echo "    没查 0 份"
+  fi
+}
+
 # ── 改动范围在父进程里按选中的格预取：各格在自己的子 shell 里跑，子 shell 里取的传不回父进程，也传不到别的格 ──
 # 取不到的不在这里判红：状态留在 *_status 里，要用它的格调 load_* 时照样拿到失败，各自判红、各报各的出路。
 if ((inside_git)); then
@@ -2707,4 +3105,6 @@ if ((inside_git)); then
   done
 fi
 
+# 这一道的格互不依赖、都只读被判的树：并行跑（.claude/gate.d/lib/stage-cells.sh 文件头「格并行」）
+STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"
 stage_cells_run "$ROOT"

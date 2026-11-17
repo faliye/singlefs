@@ -1,0 +1,8 @@
+exit=3
+want=样本档：
+want=块那一行：这条用例登记了 blocks-line=not-printed-by-the-case，日志里没有这一行不判
+want=✓ crash-case:plain-stream 判绿（
+want=✓ crash-case:other-stream 判绿（
+want=✓ 崩溃状态块：现判 0、复用 2、拒算 0、本次未跑 0
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

@@ -1,3 +1,4 @@
 # 样本豁免表
 scripts/gate/written.sh	# 样本：已经写全了，这一行该删
 scripts/gate/gone.sh	# 样本：文件不在，这一行该删
+task-server/registered-exempt.py	# 样本：也登在复跑登记表里，这一行该删

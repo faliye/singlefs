@@ -1,0 +1,8 @@
+exit=3
+want=样本档：
+want=CRASH_POINT_REPLAY 那一行不判 exhaustive=true：这一趟缩过域、不算门禁通过（SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=5）
+want=✓ crash-case:plain-stream 判绿（
+want=缩过域、不算门禁通过：SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=5
+want=逐格：crash-case-replay：绿
+want=退 3 不退 0
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

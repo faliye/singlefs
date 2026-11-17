@@ -1,0 +1,19 @@
+exit=3
+want=样本档：
+want=第 1 节（stream=clean-stream states=100）：signatures=0 red_states=0 states=100
+want=没有签名
+want=这条用例没走读 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE 的枚举入口
+want=crash-case:clean-stream 判绿
+want=crash-case:no-enumeration 判绿
+want=── 没有 TASK_SERVER_SHARD_PHASE：这一件里自己走计划、单片、合并三步
+want=· 计划：1 片（第 0/1 片，SINGLEFS_CRASH_AMPLIFICATION_SHARE=0/1）
+want=· crash-case:clean-stream 开跑（第 0/1 片：
+want=✓ crash-case:clean-stream 第 0/1 片判完它领的块
+want=✓ 第 0/1 片判完：登记的崩溃枚举用例判绿 2 条，判定都写进 prune-server，九格的结论由合并那一步出
+want=── 合并：九格照常判，crash-case-replay 格核账、一块不现判
+want=· crash-case:clean-stream 开跑（核账（整份 0/1）：
+want=✓ 崩溃状态块：现判 0、复用 3、拒算 0、本次未跑 0
+want=退 3 不退 0
+want=不指定范围，这一趟判绿：
+want=/all-green 记下了这一趟
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

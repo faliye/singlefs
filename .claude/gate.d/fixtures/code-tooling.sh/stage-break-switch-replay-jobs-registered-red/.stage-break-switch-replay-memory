@@ -1,0 +1,6 @@
+# 并行度同 stage-break-switch-replay-jobs-registered-green（能给 1 TiB、这一条拿到的上限 2.5 GiB、峰值 1 GiB、线程 3：同时最多 3 条）；
+# 小阶段 invert-all 那一条点名的样本少写了 slot-red：只那一条点名的与实测不等，判红
+capacity=1099511627776
+hard-cap=2684354560
+peak:slot-stage.sh=1073741824
+threads=3

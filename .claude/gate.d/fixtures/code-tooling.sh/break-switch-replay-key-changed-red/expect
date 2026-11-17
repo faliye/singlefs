@@ -1,0 +1,10 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=· 重算键：没对上的 1 条照开跑前同一份请求重算，键变了 1 条
+want=scripts/gate/shifts.py SHIFTS_BREAK=other：不符，点名的项没在失败行里：「✗ 自检：约定的那一格」；失败行没被点名：
+want=；跑的过程中键变了（开跑前算的键
+want=组成清单有
+want=变了 data-file scripts/gate/shifted.tsv
+want=出路：在冻结快照树里重判这一条
+want=脚本与钩子的弄坏开关复跑：1 处不对（复跑了 1 条、1 份）
+want=break-switch-replay：红（退出 1）

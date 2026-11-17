@@ -1,0 +1,2 @@
+# 样本复跑登记表：scripts/gate/cells.py 一份
+scripts/gate/cells.py	60	# 样本：指定范围只起点名的格；两条开关各带一格没点名的也弄坏，没点名的格不起所以不红

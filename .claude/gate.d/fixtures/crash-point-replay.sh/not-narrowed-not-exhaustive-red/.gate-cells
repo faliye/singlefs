@@ -1,0 +1,2 @@
+# 调用方环境没设缩域变量：登记了 exhaustive= 的计数行 exhaustive=false 判红。 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

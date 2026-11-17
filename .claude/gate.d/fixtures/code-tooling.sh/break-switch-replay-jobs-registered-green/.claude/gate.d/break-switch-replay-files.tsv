@@ -1,0 +1,2 @@
+# 样本复跑登记表：scripts/gate/fanout.sh 一份
+scripts/gate/fanout.sh	60	# 样本：32 条开关，内存上限 1536 MiB、线程 8：并行取线程数 8，开关趟等到同时 8 趟在跑才往下

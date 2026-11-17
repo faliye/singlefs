@@ -1,0 +1,2 @@
+# 没有分片阶段那一路照服务分片走 2 片（.gate-shard-count）、不带 --crash-cases-only：计划那一步把登记的用例与按条复用那一趟的测试二进制各编一回、放进计划目录，两片的按条复用那一趟与用例都直接起放进去的测试二进制、各片与合并一回都不编，样本档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

@@ -1,6 +1,6 @@
 exit=0
-want=scripts/ 里声称有 --selftest 的 9 份中 1 份有门禁阶段在跑
-want=没跑的 8 份（登记在这一格的 NOT_RUN_HERE）
+want=scripts/ 里声称有 --selftest 的 14 份中 1 份有门禁阶段在跑
+want=没跑的 13 份（登记在这一格的 NOT_RUN_HERE）
 want=scripts/crash/lib_crash_point_replay_items.py：它自己没有自证
 want=scripts/kb/lib_notation_check.py：它自己没有自证
 want=scripts/mutation/lib_mutation_units.py：它自己没有自证
@@ -9,3 +9,8 @@ want=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_f
 want=scripts/gate/large-file-check.py：它自己没有自证
 want=scripts/kb/lib_atomic_replace.py：它自己没有自证
 want=scripts/prune-server/prune_server_client.py：它自己没有自证
+want=scripts/experiment-apparatus/e203_admission_scan_cost_library.py：它自己没有自证
+want=scripts/experiment-apparatus/e206_fixed_point_cost_library.py：它自己没有自证
+want=scripts/experiment-apparatus/e207_strict_scan_steps_library.py：它自己没有自证
+want=scripts/experiment-apparatus/e209_spike_cause_library.py：它自己没有自证
+want=scripts/experiment-apparatus/e21_card_lease.py：它自己没有自证

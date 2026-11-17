@@ -1,0 +1,3 @@
+# 没登记 red-blocks=judged-by-test 的崩溃枚举用例，合并那一步核账那一趟块那一行现判 1（红 0）：一块都不许现判，判红；同一趟里登记了标记的那条现判 2、红 2 照旧判绿（例外只给带标记的）。
+# 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

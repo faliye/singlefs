@@ -5,5 +5,8 @@ want=scripts/gate/undescribed.sh:3 UNDESCRIBED_BREAK=skip 缺弄坏哪一处
 want=.claude/hooks/no-items.py:3 NO_ITEMS_BREAK=skip 缺点名的项
 want=.claude/gate.d/break-switch-headers-exempt.tsv:2 scripts/gate/written.sh 的开关表已经三样写全了，豁免那一行删掉
 want=.claude/gate.d/break-switch-headers-exempt.tsv:3 指到的 scripts/gate/gone.sh 不在，那一行删掉
-want=弄坏开关文件头：5 处不对（读开关的 4 份：写全 0 份、豁免 1 份）
+want=task-server/same-depth-items.py:3 SAME_DEPTH_BREAK=skip 缺点名的项
+want=task-server/registered-exempt.py:3 REGISTERED_EXEMPT_BREAK=skip 缺点名的项
+want=.claude/gate.d/break-switch-headers-exempt.tsv:4 task-server/registered-exempt.py 在复跑登记表 .claude/gate.d/break-switch-replay-files.tsv 里，复跑那一格要判它的开关表，豁免不算数
+want=弄坏开关文件头：8 处不对（读开关的 6 份：写全 0 份、豁免 1 份）
 want=break-switch-headers：红（退出 1）

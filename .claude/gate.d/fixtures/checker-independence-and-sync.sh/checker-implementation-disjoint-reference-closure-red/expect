@@ -1,5 +1,6 @@
 exit=1
-want=RefFS 包 `singlefs-reference-filesystem` 的依赖闭包（dev-dependencies 也算）里有 3 个不在 {它自己, `singlefs-format`} 里
+want=RefFS 包 `singlefs-reference-filesystem` 的依赖闭包（dev-dependencies 也算）里有 4 个不在 {它自己} 里
+want=singlefs-reference-filesystem → singlefs-format
 want=singlefs-reference-filesystem → sample-external-parser
 want=singlefs-reference-filesystem → sample-reference-bridge → singlefs-core
 want=样本只跑 .gate-cells 点名的格：checker-implementation-disjoint

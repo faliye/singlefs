@@ -1,0 +1,8 @@
+# 门禁 doc-process-records 的 agent-def-adversarial-review 格的过渡挂账表：存量没补完三方的治理文件。登记的路径这一格不要求点名。
+# 一行一条，两段用制表符分隔：路径、为什么这一份还没补三方（8 个字以上）。
+# 路径只认新扩进被管集合的几类：项目规则 .claude/rules/ 顶层的 .md，技能 .claude/skills/ 下的 .md，钩子 .claude/hooks/ 顶层的 .sh 与 .py，
+# 门禁 .claude/gate.d/ 顶层与 lib/ 下的 .sh 与 .py，scripts/ 下的 .sh、.py、.rs，task-server/、scripts/prune-server/、prune-server/ 下的文件；
+# 定义与共用约束（.claude/agents/、.claude/agent-common.md、.claude/main-agent.md）已在管，不进这张表。同一路径不登两次；删掉的文件也可以登记。
+# 只缩不涨：基准里有这张表时，表里不许出现基准里没有的路径；新改的治理文件一律在判决「## 这一轮被判过的文件」一节里按路径点名，不往表里加行。
+# 补完一轮三方（判决点名了它），或那一份不再有改动，把那一行删掉；表里没有行时这一格照旧要求每一份都点名。
+# 判据与弄坏开关见 .claude/gate.d/doc-process-records.sh 文件头「豁免表与过渡挂账表」。

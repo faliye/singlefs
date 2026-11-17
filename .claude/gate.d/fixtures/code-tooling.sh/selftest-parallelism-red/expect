@@ -1,0 +1,8 @@
+exit=1
+want=3 份登记的自证既没报并行度、也没写明为什么不能并行
+want=scripts/gate/silent.py：成功句没报并行度，文件头也没写 # selftest-serial: <为什么不能并行>
+want=scripts/gate/commented.py：成功句没报并行度，文件头也没写 # selftest-serial: <为什么不能并行>
+want=scripts/gate/short.sh：文件头 selftest-serial 的理由「太短了」不到 8 个字
+want=第 2 行指向不存在的文件：scripts/gate/gone.py
+want=第 3 行的 scripts/gate/fine.py 已经达标（第 2 行报了并行度），删掉这一行
+want=selftest-parallelism：红（退出 1）

@@ -1,0 +1,16 @@
+exit=3
+want=CRASH_JUDGE_GPU_PAIRING_PROGRESS flow=sample
+want=CRASH_INJECTION_PROGRESS slice=1/2
+want=FAULT_INJECTION_PROGRESS slice=1/2
+want=BAD_DISK_INPUT_PROGRESS slice=1/2
+want=ROOT_RING_READER_ADMISSION_PROGRESS slice=1/2
+want=TEST_TARGETS_PARALLEL_PROGRESS seconds=300 targets=2 finished=1 running=1
+want=CRASH_AMPLIFICATION_BLOCK block=1
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments:
+want=CRASH_POINT_REPLAY_PASS_ACTIVE seconds=
+want=· crash-case-replay：不带特性那一趟的逐提交的行没进日志：GPU_LIFECYCLE 4 行、CRASH_JUDGE_ACCOUNTING_SLICE 1 行（夹了别的记号、留在日志里的 1 行）；末尾现场 3 行在 
+want=phase=lease_return_handler_end
+want=· 判绿记库：RECORD recorded=1 changed=0 refused=0
+want=本次未跑（这不是通过）：验证包不带特性那一趟（tests/plain_stream.rs）报了本次未跑：NOT_RUN_SAMPLE_MARKER test=plain_stream_quick reason=样本
+want=逐格：crash-case-replay：绿；不带特性那一趟有 1 处本次未跑
+not-green-by-design=crash-case-replay 样本档用假 cargo 走流程，判绿也退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

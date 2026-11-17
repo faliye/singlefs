@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：citations
+want=样本替身：3 条里 1 条未命中
+want=外部引用复核没过：scripts/kb/verify-citations.sh 退 3
+want=按上面 verify-citations.sh 自己打印的下一步处置
+want=  citations：红（退出 1）
+want=doc-registries.sh：1 格里 1 格红（citations）

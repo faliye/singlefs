@@ -1,0 +1,2 @@
+# 没有分片阶段那一路照服务分片走 1 片（.gate-shard-count）：计划那一步编出来的日志里没有 plain_stream 的 Executable 行（标记目录里没有假测试二进制），那一片与合并各自经 cargo test 编一回并打一行原因，样本档判绿退 3（expect 里写了按设计不绿的理由），判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

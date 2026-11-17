@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# crash-point-replay 判别力样本的假 cargo：-V 打版本；test 照 cases/<测试目标>.log 打日志、退 0；设了 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE 时
+# 把 cases/<测试目标>.findings.tsv 追加进那个文件（与 crates 里的发现日志同一个脾气：有就往末尾追加）。别的一律退 101。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# case_log <日志> <测试目标>：登记的崩溃枚举用例那一趟打的日志；库里的块用 $here/.judged-blocks/<测试目标> 这个记号模拟。
+#   环境里有 SINGLEFS_CRASH_AMPLIFICATION_SHARE 的是单片（引擎判这一片领的块、写进库）：日志原样打、留下记号；
+#   没有的是核账（整份 0/1）：记号在就是各片判过的块都从库里读到，CRASH_CASE_BLOCKS 那一行的 fresh 并进 reused、fresh 写 0；记号不在（库里没有）原样打
+case_log() {
+  if [[ -n "${SINGLEFS_CRASH_AMPLIFICATION_SHARE:-}" ]]; then
+    mkdir -p "$here/.judged-blocks" && : > "$here/.judged-blocks/$2"
+    cat "$1"
+  elif [[ -f "$here/.judged-blocks/$2" ]]; then
+    awk '/^CRASH_CASE_BLOCKS / { reused = fresh = 0; for (i = 1; i <= NF; i++) { if ($i ~ /^reused=/) { reused = substr($i, 8) + 0; reused_at = i } else if ($i ~ /^fresh=/) { fresh = substr($i, 7) + 0; fresh_at = i } } $reused_at = "reused=" (reused + fresh); $fresh_at = "fresh=0" } { print }' "$1"
+  else
+    cat "$1"
+  fi
+}
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+[[ "${1:-}" == test ]] || { echo "样本的假 cargo 只认 -V 与 test：$*"; exit 101; }
+# 登记的崩溃枚举用例那一趟（不带 --lib、最后一个 --test 的目标有 cases/<目标>.log）：先打收到的参数，再打那一份日志、退出码照同名 .exit（没有就 0）；
+# 设了 SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE 而 cases/<目标>.findings.tsv 在时追加进去。没有那一份日志的往下走别的日志
+last_test=""
+previous_word=""
+for word in "$@"; do
+  if [[ "$previous_word" == --test ]]; then last_test="$word"; fi
+  previous_word="$word"
+done
+if [[ -n "$last_test" && " $* " != *" --lib "* && -f "$here/cases/$last_test.log" ]]; then
+  echo "CRASH_POINT_REPLAY_PROGRESS sample-cargo-arguments: $*"
+  if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE:-}" && -f "$here/cases/$last_test.findings.tsv" ]]; then
+    cat "$here/cases/$last_test.findings.tsv" >> "$SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE" || exit 101
+  fi
+  case_log "$here/cases/$last_test.log" "$last_test"
+  exit "$(cat "$here/cases/$last_test.exit" 2>/dev/null || echo 0)"
+fi
+target=""
+previous=""
+for word in "$@"; do
+  if [[ "$previous" == --test ]]; then target="$word"; fi
+  previous="$word"
+done
+[[ -n "$target" && -f "$here/cases/$target.log" ]] || { echo "样本里没有测试目标 $target 的日志"; exit 101; }
+if [[ -n "${SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE:-}" && -f "$here/cases/$target.findings.tsv" ]]; then
+  cat "$here/cases/$target.findings.tsv" >> "$SINGLEFS_CRASH_POINT_REPLAY_FINDINGS_FILE" || exit 101
+fi
+case_log "$here/cases/$target.log" "$target"
+exit 0

@@ -1,6 +1,6 @@
 exit=77
-want=这次改动没碰产品代码的 crates/*/src（测试代码 0 个不归这一格，只改注释的产品代码 2 个不走三方），这一格无对象可判（基准 HEAD）
-want=只改了注释、不走三方的产品代码 2 个
+want=这次改动没碰 crates/ 下要判的代码（各包 src 与 tests 里的 .rs、crates/mutations.tsv；只改了注释的 2 个不走三方），这一格无对象可判（基准 HEAD）
+want=只改了注释、不走三方的 crates 代码 2 个
 want=      crates/demo/src/lib.rs
 want=      crates/demo/src/named.rs
 want=crates-adversarial-review：本次未跑

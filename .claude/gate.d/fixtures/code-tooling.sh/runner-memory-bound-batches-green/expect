@@ -1,0 +1,5 @@
+exit=0
+want=· 这一趟要起的里面，登记的大自证 2 条各占一批，不与别的自证同批（SELFTEST_RUNNERS_MEMORY_BOUND）
+want=research 脚本的自证都通过（这一格跑了 4 条，表取自 样本根的 .selftest-runners
+want=共 4 批
+want=research-script-selftests：绿

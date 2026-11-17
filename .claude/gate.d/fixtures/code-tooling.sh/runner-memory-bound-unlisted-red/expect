@@ -1,0 +1,4 @@
+exit=1
+want=✗ 登记的大自证「bash scripts/gate/sample-renamed.sh --selftest」不在 runner 表里（取自 样本根的 .selftest-runners
+want=→ 怎么办：runner 表里改了名或删了那一条，就同步改 SELFTEST_RUNNERS_MEMORY_BOUND
+want=research-script-selftests：红（退出 1）

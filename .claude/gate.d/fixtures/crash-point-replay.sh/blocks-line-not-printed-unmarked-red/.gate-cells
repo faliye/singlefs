@@ -1,0 +1,2 @@
+# 没带标记的用例日志里一行 CRASH_CASE_BLOCKS 都没有：crash-case-blocks 退 4，判红。 判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

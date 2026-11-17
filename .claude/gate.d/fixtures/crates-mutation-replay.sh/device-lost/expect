@@ -1,0 +1,12 @@
+exit=0
+want=✓ add-becomes-sub：adds_two_and_three_to_five 红了
+want=✓ card-offset-other-test-lost：offset_on_the_card_matches_the_cpu 红了
+want=计数：抓到 2 条、没红 0 条、无效 0 条、锚点失效 0 行（共 4 条）
+want=基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 4 行，基线不绿 0 行（按 cargo 参数分 1 批；共 4 行）
+want=本次未跑：2 条（点名的测试在本机打了 NOT_RUN_NO_GPU_ADAPTER 后返回成功
+want=crates/mutations.tsv:3 card-scaling-device-lost：本次未跑——点名的测试 scaling_on_the_card_matches_the_cpu 红了，它自己那一段输出里有行首 GPU_DEVICE_LOST 的行（test=main card=样本 GPU reason=样本：设备丢失），红的是设备丢失、不是断言
+want=crates/mutations.tsv:5 card-shift-outside-sections-lost：本次未跑——点名的测试 shift_on_the_card_matches_the_cpu 红了，所有 ---- <名> stdout ---- 段之外（归属不明）的输出里有行首 GPU_DEVICE_LOST 的行（test=wgpu-callback card=样本 GPU reason=样本：设备丢失（没带点名用例的输出捕获的线程打的）），红的是设备丢失、不是断言
+want=✓ crates 变异表复跑：4 条里抓到 2 条、本次未跑 2 条
+want=覆盖：这一趟记了 2 份（点名测试执行过的单元，基线按它复用），已有、沿用 0 份，没记成 0 份
+want=；这一趟现判 4 条、复用 0 条、拒算 0 条、本次未跑 2 条
+want=crates-mutation-rows：绿

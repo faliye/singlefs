@@ -3,3 +3,9 @@
 # 原因写清为什么重跑出来的产物和留存的不会逐字节相同（配置行带输出目录、计数随回收变这类），空着判红；页文件名在 kb/experiments/ 下不存在判红（页改了名或删了，改或删这一行）。
 # 能写出复跑命令的页不登这里：纯 Python 或 bash 装置的复跑行（起 scripts/experiment-apparatus/ 下脚本的 task-server/task submit 整条）本身就放行；原始输出没留的页写明「原始输出未留存」。
 # 登记只放行这一格的「没写复跑命令」；页上整行抄的产物行仍由 quoted-result-lines 格逐字对照产物。
+205-多处读坏倒挂三条改法的代价.md	实验退场，装置与只供测试的开关都删了（research/prompts/m3-close-b20-code-r2-main-verification.md 第四节），产物跑不出第二次，源码在提交 84b4ae23f 里
+205-cost-of-three-fixes-for-the-inverted-root-after-multiple-read-failures.en.md	实验退场，装置与只供测试的开关都删了（research/prompts/m3-close-b20-code-r2-main-verification.md 第四节），产物跑不出第二次，源码在提交 84b4ae23f 里；中文页那一行的英语译文
+205-複数箇所の読み取り不良による逆転ルートの3つの修正案のコスト.ja.md	实验退场，装置与只供测试的开关都删了（research/prompts/m3-close-b20-code-r2-main-verification.md 第四节），产物跑不出第二次，源码在提交 84b4ae23f 里；中文页那一行的日语译文
+129-小于iomin的写在真设备上怎么出事.md	复跑命令在页里（scripts/devices/ 下三份设备探针），要 sudo 与 loop、dm 真设备，产物里的设备名与工作目录每次不同、逐字节复跑不了
+129-how-writes-below-io_min-fail-on-real-devices.en.md	复跑命令在页里（scripts/devices/ 下三份设备探针），要 sudo 与 loop、dm 真设备，产物里的设备名与工作目录每次不同、逐字节复跑不了；中文页那一行的英语译文
+129-io_min-未満の書き込みの実デバイス上での障害形態.ja.md	复跑命令在页里（scripts/devices/ 下三份设备探针），要 sudo 与 loop、dm 真设备，产物里的设备名与工作目录每次不同、逐字节复跑不了；中文页那一行的日语译文

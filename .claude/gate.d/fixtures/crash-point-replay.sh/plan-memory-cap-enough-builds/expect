@@ -1,0 +1,11 @@
+exit=3
+want=· 样本带 .gate-shard-phase：当作服务交的 TASK_SERVER_SHARD_PHASE=plan
+want=· 计划：这一条拿到的内存上限 10737418240 字节（10240 MiB）不低于编一次验证包要的 10737418240 字节，起编
+want=· 计划：预先编登记的崩溃枚举用例的测试二进制（不持卡，只编不跑）：
+want=CRASH_POINT_REPLAY_PROGRESS sample-cargo-build: target=plain_stream
+want=✓ 计划：登记的崩溃枚举用例要用的测试二进制按命令分 1 组各编一回（cargo test … --no-run，不持卡），1 个放进
+want=（硬链接 1 份、拷 0 份）；没放的 0 个由各片自己经 cargo test 起
+want=· 样本档：到计划结束为止 cargo test 起了 1 遍（其中只编不跑 1 遍）
+want=✓ 分片的计划：1 片（取这一趟要现判的量算出的 1 片：点名的 1 条用例上一趟整份记下的块共 8 个（一片担 64 个）；上界 5 片（多机配置 HOSTS 点名 5 项，一项一片）；1 条点名的崩溃枚举用例（0 是全部登记的））
+want=样本根的 .gate-shard-phase 只演计划那一步，写完计划退 3 不退 0
+not-green-by-design=crash-case-replay 样本只演服务交的计划那一步，写完计划退 3 不退 0（这一趟没跑过真的崩溃点重放，不许记成通过）

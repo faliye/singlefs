@@ -1,0 +1,5 @@
+# 样本登记表：三行 selftest、一行 samples（不判）
+scripts/gate/parallel.py	selftest	# 样本：成功句报了并行度
+scripts/gate/serial.sh	selftest	# 样本：文件头写明不能并行
+scripts/gate/legacy.py	selftest	# 样本：两样都没有，登在排除表里
+.claude/gate.d/sample-stage.sh	samples	# 样本：门禁阶段的样本档，这一格不判

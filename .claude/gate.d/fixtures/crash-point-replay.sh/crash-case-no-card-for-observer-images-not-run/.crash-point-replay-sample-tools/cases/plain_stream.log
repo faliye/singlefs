@@ -1,0 +1,16 @@
+   Compiling singlefs-verification v0.0.0 (样本)
+    Finished `release` profile [optimized] target(s) in 0.01s
+     Running tests/plain_stream.rs (target/release/deps/plain_stream-0000000000000001)
+
+running 1 test
+test plain_stream_full ... CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS reason=样本：取卡报的原因：观察者交回了盘、配了 GPU 要在卡上判池级 checker，这个进程取不到卡，退 78（运行条件不满足），不退回 CPU 判。
+thread 'plain_stream_full' panicked at crates/singlefs-verification/tests/plain_stream.rs:6:1:
+样本：观察者交回的盘取不到卡，用例退 78
+FAILED
+
+failures:
+    plain_stream_full
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p singlefs-verification --test plain_stream`
