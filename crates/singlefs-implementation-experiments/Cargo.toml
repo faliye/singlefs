@@ -1,0 +1,41 @@
+[package]
+name = "singlefs-implementation-experiments"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "实验包：驱动实现（核心层、池级 checker、验证包的脚手架与崩溃判定库）跑的实验装置二进制（src/bin/），连同装置共用的库（src/lib.rs：装置造的池（这个包自己写的，池的样子取验证包库的公开项）、装置自己的判法单元入口登记表与构建脚本编进来的键表）。没有包依赖它（.claude/rules/directory-layout.md「crates/：各包放什么」）；只用来独立验证、不与实现共用代码的装置在 scripts/experiment-apparatus/，不在这里"
+
+[dependencies]
+# 这两个包各声明了特性：构建脚本照 `singlefs-unit-graph` 的取法读它们这一次编译里开着的特性（各自的构建脚本经 `links` 交出），
+# 那个取法只认直接的普通依赖，所以两个都写在这里。
+singlefs-core = { path = "../singlefs-core" }
+singlefs-verification = { path = "../singlefs-verification" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-checker = { path = "../singlefs-checker" }
+# E171（三 oracle 合谋测试）第 1 次重跑的装置直接调 RefFS 判允许集合（src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs 的 O1-RefFS 子列）：
+# 验证包只 use 它、不转出，所以这里另列一份。
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
+# E197（扫环胶水内存随盘数） 的装置直接调扫环核 `first_copy_of_each_record_key`：singlefs-core 只 use 它、不转出。
+singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
+# E158（择根与修复四岔路）、E182（被抛弃根读不出的三条岔路） 的装置跑时现算自己判法入口的函数单元闭包指纹。
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
+# 实验装置读写判定库的口子（E158（择根与修复四岔路） 第 5 次重跑的装置 src/bin/e158_root_choice_repair.rs 用）：经 device-code-key.py run 开的管道
+# 转给 prune-server（族 apparatus-items）；按 path 依赖引，不用 `#[path]`（从仓根算单元键时 unit-graph 看不到 `#[path]` 引进来的文件）。
+singlefs-device-library = { path = "../singlefs-device-library" }
+# E185（GC一批搬迁的挂钟拆分） 装置读线程钟、进程钟、单调钟与绑核调的系统调用（src/bin/e185_gc_batch_wall_clock_split.rs）：
+# 取这份声明，不在源码里手写外部函数块（判法单元闭包遇到它拒算，D13（验证路线） 已定项 17）；与 Cargo.lock 里已有的 libc 同一份，不新增包。
+libc = "0.2"
+# E185 上卡的子命令与带卡单测枚举适配器、建管线：版本与特性照验证包那一行写死，同一个工作区里解析成同一份。
+wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "wgsl", "std"], optional = true }
+
+# 构建脚本按装置自己的判法单元入口登记表（src/judging_units_entries.rs）逐组算键与组成清单，写进 OUT_DIR（build.rs 文件头）。
+[build-dependencies]
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
+
+[dev-dependencies]
+# 装置的内联单测与验证包的测试编在同一种核心层上：E182 判「闭包指纹照这一次编译并到核心层上的特性算」的那条单测要核心层开着计数。
+singlefs-core = { path = "../singlefs-core", features = ["lookup-work-counters", "test-only-publish-thresholds"] }
+
+[features]
+# E171、E185 里 `cfg(feature = "gpu")` 那几段（上卡的子命令、带卡单测）连同验证包的 GPU 判器与 GPU 核对：配置里 ENABLE_GPU=1 的跑法才开。
+gpu = ["dep:wgpu", "singlefs-verification/gpu"]
