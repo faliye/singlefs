@@ -643,6 +643,12 @@ impl PoolReader for ReaderRecordingEveryReadAndShorteningSome<'_> {
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.image.device_size_in_bytes(device)
     }
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        self.image.physical_block_size_probed_on_the_device(device)
+    }
     fn read(
         &self,
         device: DeviceIdentity,

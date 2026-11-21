@@ -1,4 +1,4 @@
-//! 验证包模块：crash、crash_state_enumeration、crash_identity、crash_library、gpu_unit_checks、crash_facts、crash_verify_gpu
+//! 验证包模块：crash、crash_state_enumeration、crash_library、gpu_unit_checks、crash_facts、crash_verify_gpu
 //! 崩溃放量三段流的第 ②、③ 段在新池新建文件那条流上：① 抽事实；② GPU 内核与 CPU 参照按同一张事实表判每个状态，逐状态相等、健康流全 0；
 //! ③ 改坏一次单元写的一个字节之后，两份仍逐状态相等，那次写持久的每个状态都红，而且每个红状态在 CPU 判器上也红（核对红 ⇒ 判器红）。
 //! 要本机一张空闲显存够的 NVIDIA 独显：本机没有 NVIDIA 卡时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，
@@ -27,11 +27,9 @@ use singlefs_verification::crash_facts::FlowFactsReadBack;
 use singlefs_verification::crash_facts::{
     extract_flow_facts, verdict_bits, verify_states_from_facts, FlowFacts, BASE_IMAGE_SOURCE,
 };
-use singlefs_verification::crash_identity::{judging_units_key, JudgingUnits};
 use singlefs_verification::crash_library::{
-    facts_through_the_pairing_library, pairing_conclusion_reused_or_judged,
-    toolchain_of_this_process, CrashLibrary, CrashLibraryClass, PairingAgreement,
-    PairingConclusionSource, PairingJudged, StageOutcome,
+    facts_through_the_pairing_library, pairing_conclusion_reused_or_judged, CrashLibrary,
+    CrashLibraryClass, PairingAgreement, PairingConclusionSource, PairingJudged, StageOutcome,
 };
 use singlefs_verification::crash_state_enumeration::{
     sample_crash_states_on_the_cpu, CrashPointReplayItem,
@@ -137,7 +135,7 @@ const LARGEST_EXPANSION_OF_A_FACTS_BYTE_ON_THE_CARD: u64 = 16;
 const FACTS_VERIFIERS_ALIVE_AT_ONCE: u64 = 3;
 
 /// 对拍的比法：CPU 参照与 GPU 内核逐状态相等、GPU 分两块核与一次核完逐位相同（块边界不改结论），交回要存的结论（每个状态的核对位，
-/// 小端四字节一个）。这个函数自成一组判法单元（`gpu_and_cpu_facts_verifier_pairing_comparison`），它的键拼进对拍结论的输入摘要。
+/// 小端四字节一个）。比法的代码不进对拍结论的键（键只取输入摘要）：比法改了对不对，靠这条对拍自己与复用哨兵抓。
 fn verifier_bits_agreeing_on_every_state(
     cpu: &[u32],
     gpu: &[u32],
@@ -152,33 +150,18 @@ fn verifier_bits_agreeing_on_every_state(
 }
 
 /// 一张事实表上 GPU 核对内核与 CPU 参照逐状态对拍，交回每个状态的核对位。对拍结论入库（
-/// `crash_library::pairing_conclusion_reused_or_judged`）：键是事实表摘要与两边核对那一组判法单元的键（CPU 参照、GPU 核对内核），
+/// `crash_library::pairing_conclusion_reused_or_judged`）：键只是事实表摘要（CPU 参照、GPU 核对内核与比法的代码都不进键），
 /// 库里有就复用、不再上卡；没有就两边都核（GPU 那一侧另分两块核一遍，块边界不改结论）、逐状态相等才存（不等当场判红、不入库）。
-/// 两边哪一边的判法单元拒算：照核、不入库。交回核对位与这一份对拍结论从哪来。
+/// 交回核对位与这一份对拍结论从哪来。
 fn verifier_bits_paired_through_the_library(
     card: &GpuCard,
     facts: &FlowFactsReadBack,
 ) -> (Vec<u32>, PairingConclusionSource) {
     let library =
         CrashLibrary::open(CrashLibraryClass::FactsPairing).expect("对拍那一类的库开得了");
-    let judging_units = |units: JudgingUnits| {
-        judging_units_key(&units, toolchain_of_this_process()).map_err(|refused| refused.sentence())
-    };
-    // 比法那一组的键拼进输入摘要；它拒算时整份对拍照核、不入库（拒算交进一边）
-    let comparison_units = judging_units(JudgingUnits::PairingComparison {
-        group_name: "gpu_and_cpu_facts_verifier_pairing_comparison",
-    });
-    let mut inputs = facts.digest().to_vec();
-    inputs.extend_from_slice(
-        comparison_units
-            .as_ref()
-            .map_or(&[0u8; 32], |units| units.fingerprint()),
-    );
     let (conclusion, source) = pairing_conclusion_reused_or_judged(
         &library,
-        &singlefs_verification::sha256::sha256_digest(&inputs),
-        &comparison_units.and_then(|_| judging_units(JudgingUnits::CpuFactsVerifier)),
-        &judging_units(JudgingUnits::GpuFactsVerifier),
+        &singlefs_verification::sha256::sha256_digest(&facts.digest()),
         || {
             let cpu = verify_states_from_facts(facts, 0..facts.state_count);
             let verifier = GpuFactsVerifier::new(card, facts);

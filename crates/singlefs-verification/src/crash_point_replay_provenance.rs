@@ -720,6 +720,11 @@ pub const PROVENANCE_OF_THE_FLOWS: &[ProvenanceOfAFlow] = &[
     ),
     unregistered(
         RunOfTheFlow::CrashAmplification,
+        "placement-facts-verifier",
+        FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
+    ),
+    unregistered(
+        RunOfTheFlow::CrashAmplification,
         "gpu-without-the-feature",
         FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
     ),
@@ -736,11 +741,6 @@ pub const PROVENANCE_OF_THE_FLOWS: &[ProvenanceOfAFlow] = &[
     unregistered(
         RunOfTheFlow::CrashAmplification,
         "gpu-observer-rewriting-one-location",
-        FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
-    ),
-    unregistered(
-        RunOfTheFlow::CrashAmplification,
-        "the_product_path_books_the_facts_verifier_buffers_on_the_card_pool",
         FlowProvenance::RecordedAfterTheMakeFilesystemReturned,
     ),
 ];

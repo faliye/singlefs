@@ -19,8 +19,9 @@ use singlefs_verification::crash_library::{
     CrashLibrary, CrashLibraryClass, RecordingInputsDigest,
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
-    cpu_reference_table_of_the_manifest, cpu_reference_table_read_back_from_the_pairing_library,
-    gpu_card_pool_or_report_not_run, GpuCardLease, GpuCardPoolStartedAtTheFirstLease,
+    cpu_reference_item_name, cpu_reference_table_of_the_manifest,
+    cpu_reference_table_read_back_from_the_pairing_library, gpu_card_pool_or_report_not_run,
+    GpuCardLease, GpuCardPoolStartedAtTheFirstLease,
 };
 use singlefs_verification::gpu_unit_checks::{
     check_unit_checksums_on_gpu, check_unit_checksums_on_the_cpu, mebibytes_crc32c_of_ranges_needs,
@@ -233,8 +234,12 @@ fn the_cpu_reference_inputs_are_read_back_from_the_pairing_library() {
     assert_eq!(read_back, table, "交回的是读回的那一份，与给的逐字段相同");
     let library =
         CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("对拍那一类的库开得了");
+    let table_digest = sha256_digest(&table.to_bytes());
     let manifest = library
-        .manifest_of_the_inputs(&RecordingInputsDigest(sha256_digest(&table.to_bytes())))
+        .manifest_of_the_inputs(
+            &cpu_reference_item_name(&table_digest),
+            &RecordingInputsDigest(table_digest),
+        )
         .expect("库里有这一项的清单：CPU 参照那一侧经过了库");
     assert_eq!(
         cpu_reference_table_of_the_manifest(&library, &manifest),

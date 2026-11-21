@@ -242,6 +242,9 @@ fn assert_refused_as_swapped(refusal: Option<EntryRefusal>, entry: EntryAfterThe
                     DeviceTableDisagreement::DeviceCountDiffersFromTheSystemConfiguration { .. }
                     | DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn {
                         ..
+                    }
+                    | DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration {
+                        ..
                     } => panic!("{entry:?}：只该是本盘设备号不符，实际 {disagreement:?}"),
                 })
                 .collect()

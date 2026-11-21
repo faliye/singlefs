@@ -1,11 +1,11 @@
 //! 验证包模块：crash_library、crash_amplification、gpu_unit_checks
 //! 崩溃放量判段这一趟这台机器一块都没选中（块区间变量 `crash_amplification::BLOCK_RANGE_ENVIRONMENT_VARIABLE` 给这条流写了空区间）时
-//! 不领卡、不起卡池、不起判器，照常交回：配置开着 GPU、编进了 gpu 特性（判段是要卡的那一路），两段都跑，调用方没交卡串而交了领卡通道
-//! （按需领卡的尝试），经测试共用的 `common_crash_points::amplify_prepared_flow` 跑完，领卡客户端一回都没被调、这个进程的卡池没起，
-//! 交回的结果说这一趟一块没选中（`EnvironmentRun::no_block_selected_here`）。领卡通道是假的
+//! 不取卡、不起卡池、不起判器，照常交回：配置开着 GPU、编进了 gpu 特性（判段是要卡的那一路），两段都跑，调用方没交卡串而有借卡通道
+//! （任务服务交给每次尝试的三个尝试变量），经测试共用的 `common_crash_points::amplify_prepared_flow` 跑完，借卡客户端一回都没被调、这个进程的卡池没起，
+//! 交回的结果说这一趟一块没选中（`EnvironmentRun::no_block_selected_here`）。借卡通道是假的
 //! （`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`：每次调用记一行、
-//! 领卡退 3），不要真卡；判段真去领卡的话领卡退 3、这一趟交错，共用的那一层当场断言失败。调用方的显卡配置与领到的卡进程里只记一回，
-//! 这份文件只放这一条用例。
+//! 借卡退 3），不要真卡；这一趟不在一块没选中那一处交回而往下判的话，判段写待判行进一次性库或取卡报没经服务给卡（判段取卡不问借卡通道），
+//! 这一趟交错，共用的那一层当场断言失败。调用方的显卡配置与借到的卡进程里只记一回，这份文件只放这一条用例。
 #![cfg(feature = "gpu")]
 
 mod common;

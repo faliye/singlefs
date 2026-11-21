@@ -331,6 +331,9 @@ impl<Device: DeviceOverASparseImage> PoolUnderTest<Device> {
             }
             Err(
                 UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
+                | UserChangeRefused::PhysicalBlockSizesProbedOnTheDevicesDifferFromTheSystemConfiguration {
+                    ..
+                }
                 | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
                 | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
                 | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {

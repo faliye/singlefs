@@ -1,10 +1,11 @@
 //! 验证包模块：crash_point_replay_progress、crash_given_states、crash_library、crash_amplification、gpu_unit_checks
-//! 给定状态引擎只录（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）时起步、过一张表、收尾都不领卡、不起卡池：配置开着 GPU、编进了 gpu 特性
-//! （判器走 GPU 那一路），调用方没交卡串而交了领卡通道（按需领卡的尝试，`common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run`
-//! 交给引擎、不先领）。表录进库、交占位结论，领卡客户端一回都没被调，这个进程的卡池没起，交回的卡的来路是「没取过卡」。
-//! 引擎第一次要在卡上判一张表时才取卡（`crash_amplification::GivenStatesEngine` 判 GPU 那一路的入口），起步只记显卡的来路。
-//! 领卡通道是假的（`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`），不要真卡。
-//! 调用方的显卡配置与领卡的结局进程里只记一回，这份文件只放这一条用例。
+//! 给定状态引擎只录（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）时起步、过一张表、收尾都不借卡、不起卡池：配置开着 GPU、编进了 gpu 特性
+//! （判器走 GPU 那一路），调用方没交卡串而进程环境里摆着一条借卡通道（用例开头设进去的假通道；
+//! `common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run` 只交服务交的卡串，没交的不设、不把通道交给引擎）。
+//! 表录进库、交占位结论，借卡客户端一回都没被调，这个进程的卡池没起，交回的卡的来路是「没取过卡」。
+//! 引擎第一次要在卡上判一张表时才取卡（`crash_amplification::GivenStatesEngine` 判 GPU 那一路的入口），起步只记显卡的来路；判段取卡不问借卡通道。
+//! 借卡通道是假的（`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`），不要真卡。
+//! 调用方的显卡配置与借卡的结局进程里只记一回，这份文件只放这一条用例。
 #![cfg(feature = "gpu")]
 
 mod common;

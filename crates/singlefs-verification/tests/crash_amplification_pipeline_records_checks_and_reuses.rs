@@ -1,4 +1,4 @@
-//! 验证包模块：crash、crash_state_enumeration、crash_point_replay_progress、crash_identity、crash_library、crash_amplification、verdict_store、gpu_unit_checks
+//! 验证包模块：crash、crash_state_enumeration、crash_identity、crash_library、crash_amplification、verdict_store
 //! 崩溃放量流水线在新池新建文件那条流（取号与暖机、发布两个崩溃点）上的端到端用例：录入 → 核对 → 第二趟复用 → 两方各判各的、直接写进同一份库、
 //! 对账为空 → ignore 的点不出状态 → 版本表写错要红；经公共模块按环境真跑两趟，驱动行带复用数、全域与否、展开上限；
 //! 被叫停、只排派活计划的那一趟照实报复用数（L1）。库一律是临时 prune-server 里的一次性库（`crash_library::DisposableLibrary`，临时 prune-server
@@ -31,16 +31,12 @@ use singlefs_verification::crash_amplification::{
     ENVIRONMENT_VARIABLES_READ_BY_A_RUN,
 };
 use singlefs_verification::crash_identity::{
-    judging_units_key, ConclusionKind, ConclusionVersion, CoverageReport, JudgingUnits,
-    JudgingUnitsKey, ObserverName,
+    ConclusionKind, ConclusionVersion, CoverageReport, ObserverName,
 };
 use singlefs_verification::crash_library::{
     multi_host_configuration_on_the_cpu_keeping_the_prune_server_of, DisposableLibrary,
     DisposableLibraryOfThisProcess,
 };
-use singlefs_verification::crash_point_replay_progress::CrashPointReplayToolchainIdentity;
-#[cfg(feature = "gpu")]
-use singlefs_verification::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
 use singlefs_verification::memory_pool::{
     writes_and_segments_with_stream_indexes, CrashImage, MemoryPool, PublishedVersion,
     RetainedWrite,
@@ -139,20 +135,8 @@ fn record_new_pool_file_creation(
     }
 }
 
-/// CPU 参照核对那一组判法单元的键（核对键里判器那一半，经 `crash_identity::judging_units_key` 取）。
-fn cpu_facts_verifier_units() -> JudgingUnitsKey {
-    judging_units_key(
-        &JudgingUnits::CpuFactsVerifier,
-        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-    )
-    .unwrap_or_else(|refusal| panic!("{}", refusal.sentence()))
-}
-
 fn judging_code() -> PipelineJudgingCode {
-    PipelineJudgingCode::of_the_judges(
-        &CrashPointReplayToolchainIdentity::of_the_cargo_running_this_test(),
-    )
-    .expect("判法代码摘要算得出")
+    PipelineJudgingCode::of_the_pipeline()
 }
 
 /// 这条用例的库：临时 prune-server 里这条用例独占的一段名字空间（`crash_library::DisposableLibrary`：流水线单测起跑
@@ -891,25 +875,20 @@ fn the_cpu_facts_verifier_agrees_with_the_judge_on_every_state_and_reuses_its_bl
     .expect("核得完");
     assert_eq!(checking.red_states, 0);
     let on = FactsVerifierOn::Cpu;
-    let verifier_units = cpu_facts_verifier_units();
     let tally = verify_blocks_from_facts(
         &mut store,
         &flow_read_back_from_the_library,
         &plan,
         &|_| true,
         &on,
-        &verifier_units,
     )
     .expect("核得完");
-    let verifier_row_key = facts_verifier_row_key_of_the_plan(
-        &flow_read_back_from_the_library,
-        &plan,
-        &verifier_units,
-    );
+    let verifier_row_key =
+        facts_verifier_row_key_of_the_plan(&flow_read_back_from_the_library, &plan);
     assert_eq!(
         tally.blocks_verified + tally.blocks_already_verified,
         total_blocks(&plan),
-        "第 ② 段每一块都核了或早核过（长期库：上一趟这一版核对代码核过的块照摘要复用）"
+        "第 ② 段每一块都核了或早核过（长期库：上一趟同一份事实表核过的块照摘要复用）"
     );
     assert_eq!(tally.verifier_red_states, 0, "健康流第 ② 段也全绿");
     let comparison =
@@ -925,12 +904,11 @@ fn the_cpu_facts_verifier_agrees_with_the_judge_on_every_state_and_reuses_its_bl
         &plan,
         &|_| true,
         &on,
-        &verifier_units,
     )
     .expect("核得完");
-    assert_eq!(again.blocks_verified, 0, "同一版核对代码第二趟全部复用");
+    assert_eq!(again.blocks_verified, 0, "同一份事实表第二趟全部复用");
     assert_eq!(again.blocks_already_verified, total_blocks(&plan));
-    // 换一版「核对代码」（摘要不同）：旧行留着，新版从头核
+    // 换一份事实表（核对键不同）：旧行留着，新的从头核
     let mut other_digest = verifier_row_key;
     other_digest[0] ^= 0x01;
     let elsewhere =
@@ -967,14 +945,12 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
     .expect("核得完");
     assert!(checking.red_states > 0, "版本表写错，判器红");
     let on = FactsVerifierOn::Cpu;
-    let verifier_units = cpu_facts_verifier_units();
     let tally = verify_blocks_from_facts(
         &mut store,
         &flow_read_back_from_the_library,
         &plan,
         &|_| true,
         &on,
-        &verifier_units,
     )
     .expect("核得完");
     assert_eq!(
@@ -984,11 +960,7 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
     let comparison = compare_judge_and_verifier(
         &store,
         &plan,
-        &facts_verifier_row_key_of_the_plan(
-            &flow_read_back_from_the_library,
-            &plan,
-            &verifier_units,
-        ),
+        &facts_verifier_row_key_of_the_plan(&flow_read_back_from_the_library, &plan),
         &version,
     )
     .expect("比得完");
@@ -1370,56 +1342,181 @@ fn an_observer_without_a_registered_entry_is_judged_without_storing_its_conclusi
     );
 }
 
-/// L1：只排派活计划的那一趟照实报录入时库里已判的态数，不写 0。同一份库上第一趟（单机 CPU）把整条流判完；第二趟配置开 GPU、
-/// 登记 `crash_judge_gpu`、只排计划：一块都不判，复用数等于整条流的态数。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」
-/// （经这个进程的卡池判有没有卡，`gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run`），有适配器而点名的卡找不到判红。
-/// 只排计划的那一趟一个状态都不上卡判，这条用例不向卡池借显存；那一趟的卡照这个进程的卡池用（K4-4：每张卡这个进程只起一个设备；
-/// 借到哪张卡才在哪张上起，驱动那一份记在这个进程的显存账上），不经产品路径另起一套不记账的设备。要 `gpu` 特性。
+/// L1：只排派活计划的那一趟照实报录入时库里已判的态数，不写 0。
+/// 场景：同一份一次性库上，配置开 GPU、只排计划的那一趟先在空库上跑（录入段照 GPU 判器那一路录、带 GPU 判表，库里一块结论都没有）；
+/// 接着单机 CPU 那一趟把整条流判完；再照开 GPU 的配置只排计划跑一趟。GPU 判器与 CPU 判器判出的镜像判定存在同一种结论、同一把版本下
+/// （`crash_amplification::JudgedBy::conclusion_kind` 两种判器都交 `ConclusionKind::ImageJudgement`，
+/// `crash_amplification::ConclusionVersionsOfThePlan::versions_of_each_point_when_judged_by` 两条路线同一把），块键只由内容定、两条路线逐字相同，
+/// 所以 CPU 那一趟写进库的结论就是只排计划那一趟按 GPU 判器那一处问复用时读的那几块（GPU 批处理服务写回的也是这一种、这一把）。
+/// 用例不起卡池、不借显存、不写待判行：只排计划的那一趟一个状态都不判、不取卡，没有卡的任务里照样判得出结局。
+/// 预期：判之前那一趟复用 0 态（PLACEMENT 行 `states_reused=0`）；判完之后那一趟复用数等于整条流的态数（闭式另算），PLACEMENT 行同样带它；
+/// 两趟都不打汇总行、不取卡（`GpuCardsSource::NoCardNeeded`）。
+/// 挂 `gpu` 特性：配置开 GPU 时只有编进 `gpu` 特性的二进制才走 GPU 判器那一路（录 GPU 判表、排 GPU 判器的活）；不带特性那一趟判段报本次未跑、
+/// 交只录，到不了只排计划那一步（`a_binary_without_the_gpu_feature_reports_the_judge_not_run_when_the_configuration_switches_the_gpu_on`）。
+/// 判别力（`crates/mutations.tsv`）：GPU 判器那一处问复用的结论种类换成观察者那一种，判完之后那一趟复用数报 0，这条红；
+/// 录入时数复用不看库里有没有可复用的结论，判之前那一趟也报整条流，这条红。
 #[cfg(feature = "gpu")]
 #[test]
 fn a_placement_only_run_reports_the_states_judged_at_recording_as_reused() {
     use singlefs_verification::crash_amplification::GpuCardsSource;
-    if gpu_card_pool_or_report_not_run(
-        "a_placement_only_run_reports_the_states_judged_at_recording_as_reused",
-    )
-    .is_none()
-    {
-        return;
-    }
     let recorded =
         record_new_pool_file_creation("crash-amplification-placement-reuse", false, file_content());
-    // 清场之下要清场之后那一份显卡先后：照抄调用方给这个进程的那一份写进配置（同 crash_injection_campaign.rs；
-    // 不读此刻的环境，别的用例拿着改环境的锁换着临时配置时也一样）
-    let cards = singlefs_verification::crash_amplification::card_priority_lines_of_the_caller(
-        &std::env::current_dir().expect("取得到这个进程的当前目录（多机配置从这里起找）"),
-    )
-    .expect("本机的多机配置读得了");
-    let directory = EnvironmentRunDirectory::new("placement-reuse");
-    let mut environment = directory.environment();
-    // 两趟都开 GPU：结论按（块键，结论种类，版本）存（J8），CPU 判过的块不是 GPU 那一种的复用
-    let gpu_configuration = directory.directory.join("multi-host-with-gpu.env");
-    std::fs::write(&gpu_configuration, format!("ENABLE_GPU=1\n{cards}"))
-        .expect("写得了开 GPU 的配置");
-    environment.set_variable("SINGLEFS_MULTI_HOST_CONFIG", gpu_configuration.as_os_str());
-    let (first_run, _) = amplify(&recorded, "placement-reuse");
-    environment.set_variable(
-        "SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY",
-        OsStr::new("1"),
+    let state_count = crash_point_replay_plan_state_count(
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        &expansion,
     );
-    let (placement_run, placement_line) = amplify(&recorded, "placement-reuse");
-    drop(environment);
-    let state_count = first_run.recording.states_recorded;
-    assert!(state_count > 0, "第一趟录了状态");
-    assert!(placement_run.placement_only, "第二趟只排了派活计划");
+    assert!(state_count > 0, "整条流有状态");
+    let directory = EnvironmentRunDirectory::new("placement-reuse");
+    let configuration_with_the_gpu = directory.directory.join("multi-host-with-gpu.env");
+    std::fs::write(&configuration_with_the_gpu, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
+    let placement_only_on_the_gpu_configuration = || {
+        let mut environment = directory.environment();
+        environment.set_variable(
+            "SINGLEFS_MULTI_HOST_CONFIG",
+            configuration_with_the_gpu.as_os_str(),
+        );
+        environment.set_variable(
+            "SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY",
+            OsStr::new("1"),
+        );
+        let placement = amplify(&recorded, "placement-reuse");
+        drop(environment);
+        placement
+    };
+    let (placement_run_before_judging, line_before_judging) =
+        placement_only_on_the_gpu_configuration();
+    // 单机 CPU（用例那一份空配置）、两段先后跑：整条流的镜像判定写进这一份库
+    let environment_on_the_cpu = directory.environment();
+    let (run_on_the_cpu, _) = amplify(&recorded, "placement-reuse");
+    drop(environment_on_the_cpu);
+    let (placement_run, placement_line) = placement_only_on_the_gpu_configuration();
+    assert!(
+        placement_run_before_judging.placement_only,
+        "判之前那一趟只排了派活计划"
+    );
+    assert!(line_before_judging.is_none(), "只排计划的那一趟不打汇总行");
+    assert_eq!(
+        placement_run_before_judging.states_reused, 0,
+        "判之前库里一块结论都没有：只排计划的那一趟一态都不算复用"
+    );
+    assert!(
+        placement_run_before_judging
+            .placement_line
+            .as_deref()
+            .is_some_and(|line| line.contains(" states_reused=0 ")),
+        "判之前那一趟的 PLACEMENT 行带 states_reused=0：{:?}",
+        placement_run_before_judging.placement_line
+    );
+    assert_eq!(
+        (
+            run_on_the_cpu.judged_by,
+            run_on_the_cpu.recording.states_recorded,
+            run_on_the_cpu.unjudged_blocks
+        ),
+        (JudgedBy::CpuJudge, state_count, 0),
+        "CPU 那一趟由 CPU 判器把整条流判完"
+    );
+    assert!(placement_run.placement_only, "判完之后那一趟只排了派活计划");
     assert!(placement_line.is_none(), "只排计划的那一趟不打汇总行");
     assert_eq!(
         placement_run.states_reused, state_count,
         "只排计划的那一趟录入时库里整条流都判过"
     );
+    for run in [&placement_run_before_judging, &placement_run] {
+        assert_eq!(
+            run.gpu_cards_taken_from,
+            GpuCardsSource::NoCardNeeded,
+            "只排计划的那一趟只数要判的块与状态，不取卡"
+        );
+    }
+    assert!(
+        placement_run
+            .placement_line
+            .as_deref()
+            .is_some_and(|line| line.contains(&format!(" states_reused={state_count} "))),
+        "PLACEMENT 行也带录入时库里已判的态数：{:?}",
+        placement_run.placement_line
+    );
+    drop(directory);
+}
+
+/// 只排派活计划那一行也数第 ② 段：第 ① 段库里都有结论、第 ② 段在 GPU 核对器那一把核对键下一块都没核过时，
+/// 第 ① 段要判的是 0，第 ② 段要核的是整条流。
+/// 场景：同一份一次性库上，单机 CPU 那一趟（用例那一份空配置）把整条流判完、由 CPU 参照核完（核对行记在 CPU 核对器那一把核对键下）；
+/// 再照开 GPU 的配置只排计划跑一趟（第 ① 段问复用的是两条路线同一种、同一把的镜像判定，第 ② 段数的是 GPU 核对器那一把核对键下的核对行）。
+/// 预期：PLACEMENT 行 `pending_blocks=0 pending_states=0`，`verifier_pending_states` 等于整条流的态数（闭式另算），`verifier_pending_blocks` 不为 0。
+/// 挂 `gpu` 特性：同 `a_placement_only_run_reports_the_states_judged_at_recording_as_reused`。
+/// 判别力（`crates/mutations.tsv`）：第 ② 段那两栏恒写 0，这条红。
+#[cfg(feature = "gpu")]
+#[test]
+fn a_placement_only_run_counts_every_state_for_the_facts_verifier_when_the_judge_conclusions_are_all_stored(
+) {
+    let recorded = record_new_pool_file_creation(
+        "crash-amplification-placement-facts-verifier",
+        false,
+        file_content(),
+    );
+    let state_count = crash_point_replay_plan_state_count(
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        &expansion,
+    );
+    assert!(state_count > 0, "整条流有状态");
+    let directory = EnvironmentRunDirectory::new("placement-facts-verifier");
+    let configuration_with_the_gpu = directory.directory.join("multi-host-with-gpu.env");
+    std::fs::write(&configuration_with_the_gpu, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
+    // 单机 CPU（用例那一份空配置）、两段先后跑：整条流的镜像判定与 CPU 参照的核对行写进这一份库
+    let environment_on_the_cpu = directory.environment();
+    let (run_on_the_cpu, _) = amplify(&recorded, "placement-facts-verifier");
+    drop(environment_on_the_cpu);
+    let mut environment = directory.environment();
+    environment.set_variable(
+        "SINGLEFS_MULTI_HOST_CONFIG",
+        configuration_with_the_gpu.as_os_str(),
+    );
+    environment.set_variable(
+        "SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY",
+        OsStr::new("1"),
+    );
+    let (placement_run, _) = amplify(&recorded, "placement-facts-verifier");
+    drop(environment);
     assert_eq!(
-        placement_run.gpu_cards_taken_from,
-        GpuCardsSource::TheCardPoolOfThisProcess,
-        "这个进程起过卡池：只排计划的那一趟照池里的卡用，不另起不记账的设备"
+        (
+            run_on_the_cpu.judged_by,
+            run_on_the_cpu.recording.states_recorded,
+            run_on_the_cpu.unjudged_blocks,
+            run_on_the_cpu
+                .verification
+                .as_ref()
+                .map(|verification| verification.verifier)
+        ),
+        (JudgedBy::CpuJudge, state_count, 0, Some("cpu")),
+        "前提：CPU 那一趟由 CPU 判器把整条流判完、由 CPU 参照核过"
+    );
+    let line = placement_run
+        .placement_line
+        .as_deref()
+        .expect("只排计划那一趟打了 PLACEMENT 那一行");
+    let number_of_the_field = |field: &str| {
+        line.split(' ')
+            .find_map(|pair| pair.strip_prefix(&format!("{field}=")))
+            .and_then(|value| value.parse::<u64>().ok())
+    };
+    assert_eq!(
+        (
+            number_of_the_field("pending_blocks"),
+            number_of_the_field("pending_states"),
+            number_of_the_field("verifier_pending_states")
+        ),
+        (Some(0), Some(0), Some(state_count)),
+        "第 ① 段都复用、第 ② 段整条流都要核：{line}"
+    );
+    assert!(
+        number_of_the_field("verifier_pending_blocks").is_some_and(|blocks| blocks > 0),
+        "第 ② 段要核的块不为 0：{line}"
     );
     drop(directory);
 }

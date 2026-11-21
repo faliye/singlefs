@@ -59,7 +59,7 @@ use singlefs_verification::crash_amplification::RecordedGivenStatesTable;
 use singlefs_verification::crash_given_states::{
     judge_a_given_state_on_the_cpu, ClaimedVersionOfAGivenState, GivenStatesOfATable,
 };
-use singlefs_verification::crash_identity::{judging_units_key, JudgingUnits, SectorImage};
+use singlefs_verification::crash_identity::SectorImage;
 use singlefs_verification::crash_judge_conclusions::cross_check_words_without_the_oracle;
 use singlefs_verification::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
 use singlefs_verification::crash_judge_gpu::{
@@ -72,8 +72,8 @@ use singlefs_verification::crash_judge_tables::{
     build_judge_tables_for_the_given_persisted_sets, JudgeFlow, JudgeTables,
 };
 use singlefs_verification::crash_library::{
-    pairing_conclusion_reused_or_judged, toolchain_of_this_process, CrashLibrary,
-    CrashLibraryClass, PairingAgreement, PairingJudged,
+    pairing_conclusion_reused_or_judged, CrashLibrary, CrashLibraryClass, PairingAgreement,
+    PairingJudged,
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
     cpu_reference_table_read_back_from_the_pairing_library, gpu_card_pool_or_report_not_run,
@@ -314,17 +314,12 @@ fn judge_the_image_on_both_judges(
         vec![Vec::new()],
     )
     .unwrap_or_else(|refusal| panic!("{table_name}：建不出判表（GPU 判不了）：{refusal:?}"));
-    let judging_units = |units: JudgingUnits| {
-        judging_units_key(&units, toolchain_of_this_process()).map_err(|refused| refused.sentence())
-    };
     let library =
         CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("对拍那一类的库开得了");
     let paired = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         pairing_conclusion_reused_or_judged(
             &library,
             &pairing_inputs_digest(image, &tables),
-            &judging_units(JudgingUnits::GpuJudge),
-            &judging_units(JudgingUnits::JudgementOfTheGivenStates),
             || {
                 let judgements =
                     judgements_of_both_judges_on_the_image(cards, table_name, image, &tables)

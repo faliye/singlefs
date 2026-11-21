@@ -1,0 +1,1497 @@
+//! 根环、抬回收下限与被抛弃的根这一族 harness 场景交出的镜像：挂载时读不出较新的根、被抛弃根的账与回退下限、一圈窗口里的空洞、重建分配器时重读根环、根槽重读与转圈、根记录里的回收阈值与钉住的环槽。
+
+use super::*;
+
+// ============================== 场景：每份 harness 测试文件一组，与 harness 用例同名 ==============================
+
+// ─── `tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::run_the_scenario_where_a_witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned`）。
+#[test]
+fn witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned",
+        scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::run_the_scenario_where_a_witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::run_the_scenario_where_a_witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache`）。
+#[test]
+fn witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache",
+        scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::run_the_scenario_where_a_witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::run_the_scenario_where_a_witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path`）。
+#[test]
+fn witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path",
+        scenarios_of_a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable::run_the_scenario_where_a_witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path,
+    );
+}
+
+// ─── `tests/an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor::run_the_scenario_where_the_checkers_effective_floor_counts_the_floor_an_abandoned_root_carries`）。
+#[test]
+fn the_checkers_effective_floor_counts_the_floor_an_abandoned_root_carries() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_checkers_effective_floor_counts_the_floor_an_abandoned_root_carries",
+        scenarios_of_an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor::run_the_scenario_where_the_checkers_effective_floor_counts_the_floor_an_abandoned_root_carries,
+    );
+}
+
+// ─── `tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31`）。
+#[test]
+fn abandoned_root_whose_allocation_record_tree_reads_isolates_14_and_nothing_of_it_is_reused_through_txg_31(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_allocation_record_tree_reads_isolates_14_and_nothing_of_it_is_reused_through_txg_31",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_tree_table_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31`）。
+#[test]
+fn abandoned_root_whose_tree_table_reads_isolates_14_and_nothing_of_it_is_reused_through_txg_31() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_tree_table_reads_isolates_14_and_nothing_of_it_is_reused_through_txg_31",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_readable_tree_table_control_isolates_14_and_nothing_of_the_abandoned_publish_is_reused_through_txg_31,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_allocation_record_tree_unreadable_on_every_read`）。
+#[test]
+fn abandoned_root_whose_allocation_record_tree_is_unreadable_on_every_read_is_recomputed_from_the_mapping_and_isolated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_allocation_record_tree_is_unreadable_on_every_read_is_recomputed_from_the_mapping_and_isolated",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_allocation_record_tree_unreadable_on_every_read,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_allocation_record_tree_unreadable_until_the_reread_hook`）。
+#[test]
+fn abandoned_root_whose_allocation_record_tree_is_unreadable_until_the_reread_hook_is_recomputed_from_the_mapping_without_the_reread(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_allocation_record_tree_is_unreadable_until_the_reread_hook_is_recomputed_from_the_mapping_without_the_reread",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_allocation_record_tree_unreadable_until_the_reread_hook,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_allocation_record_tree_unreadable_only_on_the_first_read_of_each_copy`）。
+#[test]
+fn abandoned_root_whose_allocation_record_tree_fails_only_the_first_read_of_each_copy_is_read_through_the_central_mapping(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_allocation_record_tree_fails_only_the_first_read_of_each_copy_is_read_through_the_central_mapping",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_allocation_record_tree_unreadable_only_on_the_first_read_of_each_copy,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_tree_table_unreadable_on_every_read`）。
+#[test]
+fn abandoned_root_whose_tree_table_is_unreadable_on_every_read_is_recomputed_from_the_mapping_and_isolated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_tree_table_is_unreadable_on_every_read_is_recomputed_from_the_mapping_and_isolated",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_tree_table_unreadable_on_every_read,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_tree_table_unreadable_until_the_reread_hook`）。
+#[test]
+fn abandoned_root_whose_tree_table_is_unreadable_until_the_reread_hook_is_recomputed_from_the_mapping_without_the_reread(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_tree_table_is_unreadable_until_the_reread_hook_is_recomputed_from_the_mapping_without_the_reread",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_tree_table_unreadable_until_the_reread_hook,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_tree_table_unreadable_only_on_the_first_read_of_each_copy`）。
+#[test]
+fn abandoned_root_whose_tree_table_fails_only_the_first_read_of_each_copy_is_recomputed_from_the_mapping_and_isolated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "abandoned_root_whose_tree_table_fails_only_the_first_read_of_each_copy_is_recomputed_from_the_mapping_and_isolated",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_tree_table_unreadable_only_on_the_first_read_of_each_copy,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_checker_on_a_persistently_damaged_allocation_record_tree_without_reuse`）。
+#[test]
+fn pool_checker_on_an_abandoned_roots_allocation_record_tree_zeroed_on_both_copies_without_reuse() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pool_checker_on_an_abandoned_roots_allocation_record_tree_zeroed_on_both_copies_without_reuse",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_checker_on_a_persistently_damaged_allocation_record_tree_without_reuse,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_checker_on_a_persistently_damaged_tree_table_without_reuse`）。
+#[test]
+fn pool_checker_on_an_abandoned_roots_tree_table_zeroed_on_both_copies_without_reuse() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pool_checker_on_an_abandoned_roots_tree_table_zeroed_on_both_copies_without_reuse",
+        scenarios_of_an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping::c393_checker_on_a_persistently_damaged_tree_table_without_reuse,
+    );
+}
+
+// ─── `tests/one_revolution_window_after_a_hole_in_the_root_ring.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_reclaiming_after_a_hole_in_the_root_ring_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated`）。
+#[test]
+fn reclaiming_after_a_hole_in_the_root_ring_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "reclaiming_after_a_hole_in_the_root_ring_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated",
+        scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_reclaiming_after_a_hole_in_the_root_ring_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_a_remount_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated`）。
+#[test]
+fn remount_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "remount_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated",
+        scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_a_remount_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_raising_the_floor_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated`）。
+#[test]
+fn raising_the_floor_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "raising_the_floor_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated",
+        scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_raising_the_floor_after_the_hole_keeps_every_unit_of_the_stale_root_left_in_the_hole_allocated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_a_remount_reading_the_slot_of_the_stale_root_left_in_the_hole_bad_keeps_every_unit_of_it_allocated`）。
+#[test]
+fn remount_reading_the_slot_of_the_stale_root_left_in_the_hole_bad_keeps_every_unit_of_it_allocated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "remount_reading_the_slot_of_the_stale_root_left_in_the_hole_bad_keeps_every_unit_of_it_allocated",
+        scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_a_remount_reading_the_slot_of_the_stale_root_left_in_the_hole_bad_keeps_every_unit_of_it_allocated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_stays_unreadable_keeps_every_unit_of_it_allocated`）。
+#[test]
+fn raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_stays_unreadable_keeps_every_unit_of_it_allocated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_stays_unreadable_keeps_every_unit_of_it_allocated",
+        scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_stays_unreadable_keeps_every_unit_of_it_allocated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_reads_back_all_zero_keeps_every_unit_of_it_allocated`）。
+#[test]
+fn raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_reads_back_all_zero_keeps_every_unit_of_it_allocated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_reads_back_all_zero_keeps_every_unit_of_it_allocated",
+        scenarios_of_one_revolution_window_after_a_hole_in_the_root_ring::run_the_scenario_where_raising_the_floor_while_the_slot_of_the_stale_root_left_in_the_hole_reads_back_all_zero_keeps_every_unit_of_it_allocated,
+    );
+}
+
+// ─── `tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmount_after_the_account_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds`）。
+#[test]
+fn unmount_after_the_account_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unmount_after_the_account_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmount_after_the_account_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_session_writes_after_the_account_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements`）。
+#[test]
+fn session_writes_after_the_account_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "session_writes_after_the_account_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_session_writes_after_the_account_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmount_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds`）。
+#[test]
+fn unmount_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unmount_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmount_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_session_writes_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements`）。
+#[test]
+fn session_writes_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "session_writes_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_session_writes_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot`）。
+#[test]
+fn unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_once_its_account_reads_again`）。
+#[test]
+fn units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_once_its_account_reads_again(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_once_its_account_reads_again",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_once_its_account_reads_again,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_while_its_account_still_reads_back_zero`）。
+#[test]
+fn units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_while_its_account_still_reads_back_zero(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_while_its_account_still_reads_back_zero",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_while_its_account_still_reads_back_zero,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written`）。
+#[test]
+fn units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written_where_both_devices_lost_their_newest_rotation_write(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written_where_both_devices_lost_their_newest_rotation_write",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount`）。
+#[test]
+fn units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_its_lineage_unit_and_its_account_read_back_zero_at_the_mount`）。
+#[test]
+fn units_a_rollback_revived_stay_through_writes_while_its_lineage_unit_and_its_account_read_back_zero_at_the_mount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_rollback_revived_stay_through_writes_while_its_lineage_unit_and_its_account_read_back_zero_at_the_mount",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_its_lineage_unit_and_its_account_read_back_zero_at_the_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_every_unit_it_wrote_reads_back_zero_at_the_mount`）。
+#[test]
+fn units_a_rollback_revived_stay_through_writes_while_every_unit_it_wrote_reads_back_zero_at_the_mount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_rollback_revived_stay_through_writes_while_every_unit_it_wrote_reads_back_zero_at_the_mount",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_every_unit_it_wrote_reads_back_zero_at_the_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount`）。
+#[test]
+fn units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount`）。
+#[test]
+fn units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_wide_protection_after_releasing_a_large_batch_counts_no_slot_twice_and_writes_go_through_on_the_1536_slot_devices`）。
+#[test]
+fn wide_protection_after_releasing_a_large_batch_counts_no_slot_twice_and_writes_go_through_on_the_1536_slot_devices(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "wide_protection_after_releasing_a_large_batch_counts_no_slot_twice_and_writes_go_through_on_the_1536_slot_devices",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_wide_protection_after_releasing_a_large_batch_counts_no_slot_twice_and_writes_go_through_on_the_1536_slot_devices,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero`）。
+#[test]
+fn revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_rollback_after_twenty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through`）。
+#[test]
+fn rollback_after_twenty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "rollback_after_twenty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_rollback_after_twenty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_inode_creation_after_forty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through`）。
+#[test]
+fn an_inode_creation_after_forty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_inode_creation_after_forty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_inode_creation_after_forty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_deletion_after_one_hundred_sixty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through`）。
+#[test]
+fn deletion_after_one_hundred_sixty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "deletion_after_one_hundred_sixty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_deletion_after_one_hundred_sixty_overwrites_stuck_behind_the_wide_protection_is_reported_and_pushing_the_root_ring_lets_writes_through,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through`）。
+#[test]
+fn unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_unmounting_and_mounting_again_after_the_wide_protection_stops_writes_takes_the_account_of_the_recorded_publish_and_lets_writes_through,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_without_placements_for_the_whole_push_is_refused_before_any_write`）。
+#[test]
+fn pushing_the_root_ring_without_placements_for_the_whole_push_is_refused_before_any_write() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_without_placements_for_the_whole_push_is_refused_before_any_write",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_without_placements_for_the_whole_push_is_refused_before_any_write,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_ways_out_when_the_push_finds_no_placements_in_the_rehearsal_list_only_unmounting_and_the_push_is_refused_the_same_way`）。
+#[test]
+fn ways_out_when_the_push_finds_no_placements_in_the_rehearsal_list_only_unmounting_and_the_push_is_refused_the_same_way(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "ways_out_when_the_push_finds_no_placements_in_the_rehearsal_list_only_unmounting_and_the_push_is_refused_the_same_way",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_ways_out_when_the_push_finds_no_placements_in_the_rehearsal_list_only_unmounting_and_the_push_is_refused_the_same_way,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_defer_slots_an_abandoned_root_references_are_not_counted_twice_at_the_mount_and_stay_isolated_once_reclaimed`）。
+#[test]
+fn defer_slots_an_abandoned_root_references_are_not_counted_twice_at_the_mount_and_stay_isolated_once_reclaimed(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "defer_slots_an_abandoned_root_references_are_not_counted_twice_at_the_mount_and_stay_isolated_once_reclaimed",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_defer_slots_an_abandoned_root_references_are_not_counted_twice_at_the_mount_and_stay_isolated_once_reclaimed,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_write_stuck_behind_the_wide_protection_that_fits_after_the_push_lists_both_ways_out_and_goes_through_after_the_push`）。
+#[test]
+fn write_stuck_behind_the_wide_protection_that_fits_after_the_push_lists_both_ways_out_and_goes_through_after_the_push(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "write_stuck_behind_the_wide_protection_that_fits_after_the_push_lists_both_ways_out_and_goes_through_after_the_push",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_write_stuck_behind_the_wide_protection_that_fits_after_the_push_lists_both_ways_out_and_goes_through_after_the_push,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_write_stuck_behind_the_wide_protection_still_refused_after_the_push_lists_only_unmounting_which_lets_it_through`）。
+#[test]
+fn write_stuck_behind_the_wide_protection_still_refused_after_the_push_lists_only_unmounting_which_lets_it_through(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "write_stuck_behind_the_wide_protection_still_refused_after_the_push_lists_only_unmounting_which_lets_it_through",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_write_stuck_behind_the_wide_protection_still_refused_after_the_push_lists_only_unmounting_which_lets_it_through,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_write_refused_even_without_the_wide_protection_lists_only_unmounting_which_lets_it_through`）。
+#[test]
+fn write_refused_even_without_the_wide_protection_lists_only_unmounting_which_lets_it_through() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "write_refused_even_without_the_wide_protection_lists_only_unmounting_which_lets_it_through",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_write_refused_even_without_the_wide_protection_lists_only_unmounting_which_lets_it_through,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_sixty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting`）。
+#[test]
+fn sixty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "sixty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_sixty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_eighty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting`）。
+#[test]
+fn an_eighty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_eighty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_eighty_unit_write_after_a_rollback_stuck_behind_the_wide_protection_lists_only_unmounting,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_sixty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting`）。
+#[test]
+fn sixty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "sixty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_sixty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_eighty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting`）。
+#[test]
+fn an_eighty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_eighty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_eighty_unit_write_after_an_inode_creation_stuck_behind_the_wide_protection_lists_only_unmounting,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_sixty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting`）。
+#[test]
+fn sixty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "sixty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_sixty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_eighty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting`）。
+#[test]
+fn an_eighty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_eighty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_an_eighty_unit_write_after_a_deletion_stuck_behind_the_wide_protection_lists_only_unmounting,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_again_after_a_block_device_error_halfway_is_refused_as_frozen_before_any_write`）。
+#[test]
+fn pushing_the_root_ring_again_after_a_block_device_error_halfway_is_refused_as_frozen_before_any_write(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_again_after_a_block_device_error_halfway_is_refused_as_frozen_before_any_write",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_again_after_a_block_device_error_halfway_is_refused_as_frozen_before_any_write,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_the_two_device_bodies_swapped_is_refused_before_any_write`）。
+#[test]
+fn pushing_the_root_ring_with_the_two_device_bodies_swapped_is_refused_before_any_write() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_with_the_two_device_bodies_swapped_is_refused_before_any_write",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_the_two_device_bodies_swapped_is_refused_before_any_write,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_no_space_while_the_ring_slots_hold_placements_none_of_which_is_isolated_is_not_reported_as_the_wide_protection`）。
+#[test]
+fn no_space_while_the_ring_slots_hold_placements_none_of_which_is_isolated_is_not_reported_as_the_wide_protection(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "no_space_while_the_ring_slots_hold_placements_none_of_which_is_isolated_is_not_reported_as_the_wide_protection",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_no_space_while_the_ring_slots_hold_placements_none_of_which_is_isolated_is_not_reported_as_the_wide_protection,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_while_the_ring_slots_hold_placements_none_of_which_is_isolated_writes_nothing`）。
+#[test]
+fn pushing_the_root_ring_while_the_ring_slots_hold_placements_none_of_which_is_isolated_writes_nothing(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_while_the_ring_slots_hold_placements_none_of_which_is_isolated_writes_nothing",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_while_the_ring_slots_hold_placements_none_of_which_is_isolated_writes_nothing,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_ring_slot_recording_no_placement_is_not_the_ring_slot_the_push_writes_up_to`）。
+#[test]
+fn ring_slot_recording_no_placement_is_not_the_ring_slot_the_push_writes_up_to() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "ring_slot_recording_no_placement_is_not_the_ring_slot_the_push_writes_up_to",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_a_ring_slot_recording_no_placement_is_not_the_ring_slot_the_push_writes_up_to,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both`）。
+#[test]
+fn pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both_where_both_devices_lost_their_newest_rotation_write(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both_where_both_devices_lost_their_newest_rotation_write",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_both_devices_lost_their_newest_rotation_write_and_pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up_to_the_later_one_and_releases_both,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_after_the_session_moved_past_the_version_refused_on_is_refused_without_reading_a_device`）。
+#[test]
+fn asking_for_the_ways_out_after_the_session_moved_past_the_version_refused_on_is_refused_without_reading_a_device(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "asking_for_the_ways_out_after_the_session_moved_past_the_version_refused_on_is_refused_without_reading_a_device",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_after_the_session_moved_past_the_version_refused_on_is_refused_without_reading_a_device,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_with_the_two_devices_in_reversed_order_is_refused_without_reading_a_device`）。
+#[test]
+fn asking_for_the_ways_out_with_the_two_devices_in_reversed_order_is_refused_without_reading_a_device(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "asking_for_the_ways_out_with_the_two_devices_in_reversed_order_is_refused_without_reading_a_device",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_with_the_two_devices_in_reversed_order_is_refused_without_reading_a_device,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device`）。
+#[test]
+fn asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_with_one_device_fewer_than_the_mount_is_refused_without_reading_a_device`）。
+#[test]
+fn asking_for_the_ways_out_with_one_device_fewer_than_the_mount_is_refused_without_reading_a_device(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "asking_for_the_ways_out_with_one_device_fewer_than_the_mount_is_refused_without_reading_a_device",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_with_one_device_fewer_than_the_mount_is_refused_without_reading_a_device,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_a_device_table_other_than_the_mount_in_reversed_order_is_refused_without_reading_a_device`）。
+#[test]
+fn pushing_the_root_ring_with_a_device_table_other_than_the_mount_in_reversed_order_is_refused_without_reading_a_device(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_with_a_device_table_other_than_the_mount_in_reversed_order_is_refused_without_reading_a_device",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_a_device_table_other_than_the_mount_in_reversed_order_is_refused_without_reading_a_device,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_more_is_refused_without_reading_a_device`）。
+#[test]
+fn pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_more_is_refused_without_reading_a_device(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_more_is_refused_without_reading_a_device",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_more_is_refused_without_reading_a_device,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_fewer_is_refused_without_reading_a_device`）。
+#[test]
+fn pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_fewer_is_refused_without_reading_a_device(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_fewer_is_refused_without_reading_a_device",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_pushing_the_root_ring_with_a_device_table_other_than_the_mount_with_one_device_fewer_is_refused_without_reading_a_device,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_after_the_session_moved_with_the_two_devices_in_reversed_order_is_refused_as_the_session_moved`）。
+#[test]
+fn asking_for_the_ways_out_after_the_session_moved_with_the_two_devices_in_reversed_order_is_refused_as_the_session_moved(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "asking_for_the_ways_out_after_the_session_moved_with_the_two_devices_in_reversed_order_is_refused_as_the_session_moved",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_after_the_session_moved_with_the_two_devices_in_reversed_order_is_refused_as_the_session_moved,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_after_unmounting_and_mounting_again_with_the_report_from_before_is_refused_as_the_session_moved_naming_the_new_instance`）。
+#[test]
+fn asking_for_the_ways_out_after_unmounting_and_mounting_again_with_the_report_from_before_is_refused_as_the_session_moved_naming_the_new_instance(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "asking_for_the_ways_out_after_unmounting_and_mounting_again_with_the_report_from_before_is_refused_as_the_session_moved_naming_the_new_instance",
+        scenarios_of_raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table::run_the_scenario_where_asking_for_the_ways_out_after_unmounting_and_mounting_again_with_the_report_from_before_is_refused_as_the_session_moved_naming_the_new_instance,
+    );
+}
+
+// ─── `tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window::run_the_scenario_where_admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes_its_ceiling_only_from_roots_inside_the_window`）。
+#[test]
+fn admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes_its_ceiling_only_from_roots_inside_the_window(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes_its_ceiling_only_from_roots_inside_the_window",
+        scenarios_of_raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window::run_the_scenario_where_admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes_its_ceiling_only_from_roots_inside_the_window,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window::run_the_scenario_where_admission_raising_the_floor_keeps_the_root_ring_slot_unreadable_since_the_mount_pinned_at_the_oldest_txg_it_can_have_held`）。
+#[test]
+fn admission_raising_the_floor_keeps_the_root_ring_slot_unreadable_since_the_mount_pinned_at_the_oldest_txg_it_can_have_held(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "admission_raising_the_floor_keeps_the_root_ring_slot_unreadable_since_the_mount_pinned_at_the_oldest_txg_it_can_have_held",
+        scenarios_of_raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window::run_the_scenario_where_admission_raising_the_floor_keeps_the_root_ring_slot_unreadable_since_the_mount_pinned_at_the_oldest_txg_it_can_have_held,
+    );
+}
+
+// ─── `tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic::run_the_scenario_where_raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_every_invariant_green`）。
+#[test]
+fn raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_every_invariant_green() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_every_invariant_green",
+        scenarios_of_raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic::run_the_scenario_where_raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_every_invariant_green,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic::run_the_scenario_where_raising_the_floor_past_the_gap_keeps_every_invariant_green`）。
+#[test]
+fn raising_the_floor_past_the_gap_keeps_every_invariant_green() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "raising_the_floor_past_the_gap_keeps_every_invariant_green",
+        scenarios_of_raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic::run_the_scenario_where_raising_the_floor_past_the_gap_keeps_every_invariant_green,
+    );
+}
+
+// ─── `tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_stops_at_a_slot_unreadable_since_the_mount`）。
+#[test]
+fn admission_raising_the_floor_to_the_ceiling_stops_at_a_slot_unreadable_since_the_mount() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "admission_raising_the_floor_to_the_ceiling_stops_at_a_slot_unreadable_since_the_mount",
+        scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_stops_at_a_slot_unreadable_since_the_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_with_the_watched_root_readable_reaches_it`）。
+#[test]
+fn admission_raising_the_floor_to_the_ceiling_with_the_watched_root_readable_reaches_it() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "admission_raising_the_floor_to_the_ceiling_with_the_watched_root_readable_reaches_it",
+        scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_to_the_ceiling_with_the_watched_root_readable_reaches_it,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_over_the_holes_with_a_slot_reading_back_zeros_since_the_mount_stops_at_the_roots_left_in_the_holes`）。
+#[test]
+fn admission_raising_the_floor_over_the_holes_with_a_slot_reading_back_zeros_since_the_mount_stops_at_the_roots_left_in_the_holes(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "admission_raising_the_floor_over_the_holes_with_a_slot_reading_back_zeros_since_the_mount_stops_at_the_roots_left_in_the_holes",
+        scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_over_the_holes_with_a_slot_reading_back_zeros_since_the_mount_stops_at_the_roots_left_in_the_holes,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_without_holes_stops_at_a_slot_unreadable_since_the_mount`）。
+#[test]
+fn admission_raising_the_floor_without_holes_stops_at_a_slot_unreadable_since_the_mount() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "admission_raising_the_floor_without_holes_stops_at_a_slot_unreadable_since_the_mount",
+        scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_without_holes_stops_at_a_slot_unreadable_since_the_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_without_holes_stops_at_a_slot_reading_back_zeros_since_the_mount`）。
+#[test]
+fn admission_raising_the_floor_without_holes_stops_at_a_slot_reading_back_zeros_since_the_mount() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "admission_raising_the_floor_without_holes_stops_at_a_slot_reading_back_zeros_since_the_mount",
+        scenarios_of_raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount::run_the_scenario_where_admission_raising_the_floor_without_holes_stops_at_a_slot_reading_back_zeros_since_the_mount,
+    );
+}
+
+// ─── `tests/random_histories.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/random_histories.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_random_histories::run_the_scenario_where_crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units`）。
+#[test]
+fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units",
+        scenarios_of_random_histories::run_the_scenario_where_crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units,
+    );
+}
+
+// ─── `tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read::run_the_scenario_where_only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over`）。
+#[test]
+fn only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read::run_the_scenario_where_only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read::run_the_scenario_where_a_remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before`）。
+#[test]
+fn remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read::run_the_scenario_where_a_remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read::run_the_scenario_where_a_reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over`）。
+#[test]
+fn reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read::run_the_scenario_where_a_reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over,
+    );
+}
+
+// ─── `tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_zero_failing_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_192_slot_pool_after_a_crashed_unmount_device_zero_failing_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_192_slot_pool_after_a_crashed_unmount_device_zero_failing_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_zero_failing_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_one_failing_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_192_slot_pool_after_a_crashed_unmount_device_one_failing_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_192_slot_pool_after_a_crashed_unmount_device_one_failing_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_one_failing_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_192_slot_pool_after_a_crashed_unmount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_192_slot_pool_after_a_crashed_unmount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_192_slot_pool_after_a_crashed_unmount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_192_slot_pool_after_a_crashed_unmount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_192_slot_pool_after_a_crashed_unmount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_failing_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_failing_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_failing_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_failing_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_failing_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_failing_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_failing_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_failing_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts`）。
+#[test]
+fn on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before`）。
+#[test]
+fn on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_one_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before`）。
+#[test]
+fn on_the_264_slot_pool_with_a_live_file_device_one_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_264_slot_pool_with_a_live_file_device_one_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_one_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before`）。
+#[test]
+fn on_the_264_slot_pool_with_a_live_file_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_264_slot_pool_with_a_live_file_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before`）。
+#[test]
+fn on_the_264_slot_pool_with_a_live_file_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "on_the_264_slot_pool_with_a_live_file_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_on_the_264_slot_pool_with_a_live_file_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_does_not_refuse_the_floor_raise_of_the_narrow_mount`）。
+#[test]
+fn root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_does_not_refuse_the_floor_raise_of_the_narrow_mount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_does_not_refuse_the_floor_raise_of_the_narrow_mount",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_does_not_refuse_the_floor_raise_of_the_narrow_mount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_root_self_verified_only_on_the_rebuild_pass_read_bad_once_more_after_the_reread_is_taken_as_read_by_the_floor_raise`）。
+#[test]
+fn root_self_verified_only_on_the_rebuild_pass_read_bad_once_more_after_the_reread_is_taken_as_read_by_the_floor_raise(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "root_self_verified_only_on_the_rebuild_pass_read_bad_once_more_after_the_reread_is_taken_as_read_by_the_floor_raise",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_root_self_verified_only_on_the_rebuild_pass_read_bad_once_more_after_the_reread_is_taken_as_read_by_the_floor_raise,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_fourth_newest_non_empty_root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_still_sets_the_ceiling_of_the_narrow_mounts_floor_raise`）。
+#[test]
+fn the_fourth_newest_non_empty_root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_still_sets_the_ceiling_of_the_narrow_mounts_floor_raise(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_fourth_newest_non_empty_root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_still_sets_the_ceiling_of_the_narrow_mounts_floor_raise",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_fourth_newest_non_empty_root_self_verified_only_on_the_rebuild_pass_and_unreadable_from_the_reread_onward_still_sets_the_ceiling_of_the_narrow_mounts_floor_raise,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring`）。
+#[test]
+fn the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring`）。
+#[test]
+fn the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_384_unit_slot_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite`）。
+#[test]
+fn the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite`）。
+#[test]
+fn the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_one_overwrite,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites`）。
+#[test]
+fn the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring_on_four_gibibyte_devices_after_three_overwrites,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots`）。
+#[test]
+fn reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_an_abandoned_root_self_verified_only_on_the_rebuild_pass_read_back_as_zeros_by_the_floor_raise_keeps_its_units_isolated`）。
+#[test]
+fn an_abandoned_root_self_verified_only_on_the_rebuild_pass_read_back_as_zeros_by_the_floor_raise_keeps_its_units_isolated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_abandoned_root_self_verified_only_on_the_rebuild_pass_read_back_as_zeros_by_the_floor_raise_keeps_its_units_isolated",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_an_abandoned_root_self_verified_only_on_the_rebuild_pass_read_back_as_zeros_by_the_floor_raise_keeps_its_units_isolated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_an_abandoned_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling`）。
+#[test]
+fn an_abandoned_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_abandoned_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_an_abandoned_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_valid_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling`）。
+#[test]
+fn valid_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "valid_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_a_valid_root_self_verified_only_on_the_rebuild_pass_unreadable_from_the_reread_onward_does_not_hold_the_ceiling,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_unmounting_after_a_remount_with_an_abandoned_root_self_verified_only_on_the_rebuild_pass_keeps_its_units_isolated`）。
+#[test]
+fn unmounting_after_a_remount_with_an_abandoned_root_self_verified_only_on_the_rebuild_pass_keeps_its_units_isolated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "unmounting_after_a_remount_with_an_abandoned_root_self_verified_only_on_the_rebuild_pass_keeps_its_units_isolated",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_unmounting_after_a_remount_with_an_abandoned_root_self_verified_only_on_the_rebuild_pass_keeps_its_units_isolated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_an_abandoned_root_self_verified_only_on_the_rebuild_pass_holds_its_units_in_the_allocator_until_it_leaves_the_ring`）。
+#[test]
+fn an_abandoned_root_self_verified_only_on_the_rebuild_pass_holds_its_units_in_the_allocator_until_it_leaves_the_ring(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_abandoned_root_self_verified_only_on_the_rebuild_pass_holds_its_units_in_the_allocator_until_it_leaves_the_ring",
+        scenarios_of_rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root::run_the_scenario_where_an_abandoned_root_self_verified_only_on_the_rebuild_pass_holds_its_units_in_the_allocator_until_it_leaves_the_ring,
+    );
+}
+
+// ─── `tests/reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root::run_the_scenario_where_eleven_crashes_before_the_row_root_then_a_mount_leave_every_unit_of_the_roots_outside_the_one_revolution_window_allocated`）。
+#[test]
+fn eleven_crashes_before_the_row_root_then_a_mount_leave_every_unit_of_the_roots_outside_the_one_revolution_window_allocated(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "eleven_crashes_before_the_row_root_then_a_mount_leave_every_unit_of_the_roots_outside_the_one_revolution_window_allocated",
+        scenarios_of_reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root::run_the_scenario_where_eleven_crashes_before_the_row_root_then_a_mount_leave_every_unit_of_the_roots_outside_the_one_revolution_window_allocated,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root::run_the_scenario_where_one_crash_before_the_row_root_then_a_mount_keeps_the_allocated_statistic_with_the_reclaim_floor_and_the_checker_candidates_both_on_the_whole_ring`）。
+#[test]
+fn one_crash_before_the_row_root_then_a_mount_keeps_the_allocated_statistic_with_the_reclaim_floor_and_the_checker_candidates_both_on_the_whole_ring(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "one_crash_before_the_row_root_then_a_mount_keeps_the_allocated_statistic_with_the_reclaim_floor_and_the_checker_candidates_both_on_the_whole_ring",
+        scenarios_of_reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root::run_the_scenario_where_one_crash_before_the_row_root_then_a_mount_keeps_the_allocated_statistic_with_the_reclaim_floor_and_the_checker_candidates_both_on_the_whole_ring,
+    );
+}
+
+// ─── `tests/rollback_target_left_in_a_hole_outside_the_one_revolution_window_is_a_candidate.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/rollback_target_left_in_a_hole_outside_the_one_revolution_window_is_a_candidate.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_target_left_in_a_hole_outside_the_one_revolution_window_is_a_candidate::run_the_scenario_where_rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_reads_back_that_version`）。
+#[test]
+fn rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_reads_back_that_version()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_reads_back_that_version",
+        scenarios_of_rollback_target_left_in_a_hole_outside_the_one_revolution_window_is_a_candidate::run_the_scenario_where_rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_reads_back_that_version,
+    );
+}
+
+// ─── `tests/root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance::run_the_scenario_where_of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does`）。
+#[test]
+fn of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does",
+        scenarios_of_root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance::run_the_scenario_where_of_two_roots_with_the_same_choice_key_the_pool_checker_walks_the_root_in_the_earlier_slot_as_choose_root_does,
+    );
+}
+
+// ─── `tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_a_valid_root_read_bad_once_on_the_reread_keeps_the_slot_pinned_at_the_oldest_txg_it_can_have_held`）。
+#[test]
+fn valid_root_read_bad_once_on_the_reread_keeps_the_slot_pinned_at_the_oldest_txg_it_can_have_held()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "valid_root_read_bad_once_on_the_reread_keeps_the_slot_pinned_at_the_oldest_txg_it_can_have_held",
+        scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_a_valid_root_read_bad_once_on_the_reread_keeps_the_slot_pinned_at_the_oldest_txg_it_can_have_held,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_a_valid_root_read_on_the_reread_holds_the_reclaim_threshold_at_its_txg`）。
+#[test]
+fn valid_root_read_on_the_reread_holds_the_reclaim_threshold_at_its_txg() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "valid_root_read_on_the_reread_holds_the_reclaim_threshold_at_its_txg",
+        scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_a_valid_root_read_on_the_reread_holds_the_reclaim_threshold_at_its_txg,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_a_front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_the_process_overwrites_it`）。
+#[test]
+fn front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_the_process_overwrites_it()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_the_process_overwrites_it",
+        scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_a_front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_the_process_overwrites_it,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_an_abandoned_root_read_on_the_reread_is_taken_as_no_root`）。
+#[test]
+fn an_abandoned_root_read_on_the_reread_is_taken_as_no_root() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_abandoned_root_read_on_the_reread_is_taken_as_no_root",
+        scenarios_of_root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread::run_the_scenario_where_an_abandoned_root_read_on_the_reread_is_taken_as_no_root,
+    );
+}
+
+// ─── `tests/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window::run_the_scenario_where_a_root_ring_slot_unreadable_only_at_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_and_every_version_keeps_the_invariants`）。
+#[test]
+fn root_ring_slot_unreadable_only_at_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_and_every_version_keeps_the_invariants(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "root_ring_slot_unreadable_only_at_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_and_every_version_keeps_the_invariants",
+        scenarios_of_root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window::run_the_scenario_where_a_root_ring_slot_unreadable_only_at_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_and_every_version_keeps_the_invariants,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window::run_the_scenario_where_a_root_ring_slot_reading_back_all_zero_since_the_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_until_the_process_overwrites_it`）。
+#[test]
+fn root_ring_slot_reading_back_all_zero_since_the_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_until_the_process_overwrites_it(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "root_ring_slot_reading_back_all_zero_since_the_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_until_the_process_overwrites_it",
+        scenarios_of_root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window::run_the_scenario_where_a_root_ring_slot_reading_back_all_zero_since_the_mount_pins_the_reclaim_floor_at_the_oldest_txg_it_can_have_held_until_the_process_overwrites_it,
+    );
+}
+
+// ─── `tests/root_ring_turn_in_one_mount.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/root_ring_turn_in_one_mount.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_turn_in_one_mount::run_the_scenario_where_turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it`）。
+#[test]
+fn turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it",
+        scenarios_of_root_ring_turn_in_one_mount::run_the_scenario_where_turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it,
+    );
+}
+
+// ─── `tests/root_ring_turn_in_the_make_filesystem_session.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/root_ring_turn_in_the_make_filesystem_session.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_root_ring_turn_in_the_make_filesystem_session::run_the_scenario_where_overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant`）。
+#[test]
+fn overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant",
+        scenarios_of_root_ring_turn_in_the_make_filesystem_session::run_the_scenario_where_overwrites_in_the_make_filesystem_session_past_one_turn_of_the_root_ring_reclaim_and_keep_every_invariant,
+    );
+}
+
+// ─── `tests/shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring::run_the_scenario_where_raising_the_floor_over_a_root_left_in_a_hole_below_an_abandoned_root_keeps_the_allocated_statistic_with_the_deferred_threshold_on_the_whole_ring`）。
+#[test]
+fn raising_the_floor_over_a_root_left_in_a_hole_below_an_abandoned_root_keeps_the_allocated_statistic_with_the_deferred_threshold_on_the_whole_ring(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "raising_the_floor_over_a_root_left_in_a_hole_below_an_abandoned_root_keeps_the_allocated_statistic_with_the_deferred_threshold_on_the_whole_ring",
+        scenarios_of_shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring::run_the_scenario_where_raising_the_floor_over_a_root_left_in_a_hole_below_an_abandoned_root_keeps_the_allocated_statistic_with_the_deferred_threshold_on_the_whole_ring,
+    );
+}
+
+#[test]
+fn ring_slot_reading_back_all_zero_at_the_mount_is_carried_as_the_pinned_ring_slot_and_the_allocated_statistic_holds(
+) {
+    judge_the_images_a_harness_scenario_hands_out("ring_slot_reading_back_all_zero_at_the_mount_is_carried_as_the_pinned_ring_slot_and_the_allocated_statistic_holds", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_a_ring_slot_reading_back_all_zero_at_the_mount_is_carried_as_the_pinned_ring_slot_and_the_allocated_statistic_holds);
+}
+
+#[test]
+fn mount_without_read_faults_pins_nothing_and_writes_the_oldest_valid_root_as_the_reclaim_threshold(
+) {
+    judge_the_images_a_harness_scenario_hands_out("mount_without_read_faults_pins_nothing_and_writes_the_oldest_valid_root_as_the_reclaim_threshold", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_a_mount_without_read_faults_pins_nothing_and_writes_the_oldest_valid_root_as_the_reclaim_threshold);
+}
+
+#[test]
+fn the_unmount_raising_the_floor_writes_the_raised_floor_as_the_reclaim_threshold() {
+    judge_the_images_a_harness_scenario_hands_out("the_unmount_raising_the_floor_writes_the_raised_floor_as_the_reclaim_threshold", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_the_unmount_raising_the_floor_writes_the_raised_floor_as_the_reclaim_threshold);
+}
+
+#[test]
+fn reclaim_threshold_written_as_the_floor_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant(
+) {
+    judge_the_images_a_harness_scenario_hands_out("reclaim_threshold_written_as_the_floor_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_a_reclaim_threshold_written_as_the_floor_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant);
+}
+
+#[test]
+fn pinned_ring_slot_written_as_none_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant(
+) {
+    judge_the_images_a_harness_scenario_hands_out("pinned_ring_slot_written_as_none_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_a_pinned_ring_slot_written_as_none_while_a_slot_stays_pinned_reddens_the_reclaim_threshold_invariant);
+}
+
+#[test]
+fn pinned_ring_slot_left_on_a_slot_this_instance_wrote_reddens_the_pinned_slot_invariant() {
+    judge_the_images_a_harness_scenario_hands_out("pinned_ring_slot_left_on_a_slot_this_instance_wrote_reddens_the_pinned_slot_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_a_pinned_ring_slot_left_on_a_slot_this_instance_wrote_reddens_the_pinned_slot_invariant);
+}
+
+#[test]
+fn root_slot_torn_at_a_sector_boundary_with_four_kibibyte_physical_blocks_does_not_redden_the_reclaim_threshold_invariant(
+) {
+    judge_the_images_a_harness_scenario_hands_out("root_slot_torn_at_a_sector_boundary_with_four_kibibyte_physical_blocks_does_not_redden_the_reclaim_threshold_invariant", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_a_root_slot_torn_at_a_sector_boundary_with_four_kibibyte_physical_blocks_does_not_redden_the_reclaim_threshold_invariant);
+}
+
+#[test]
+fn genesis_root_left_in_region_one_slot_zero_reading_bad_at_the_mount_is_pinned_at_txg_zero_and_carried_as_region_one_slot_zero(
+) {
+    judge_the_images_a_harness_scenario_hands_out("genesis_root_left_in_region_one_slot_zero_reading_bad_at_the_mount_is_pinned_at_txg_zero_and_carried_as_region_one_slot_zero", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_genesis_root_left_in_region_one_slot_zero_reading_bad_at_the_mount_is_pinned_at_txg_zero_and_carried_as_region_one_slot_zero);
+}
+
+#[test]
+fn genesis_root_left_in_region_one_slot_zero_reading_bad_at_a_mount_whose_first_txg_is_the_ring_length_is_carried_as_its_ring_slot_not_its_pin(
+) {
+    judge_the_images_a_harness_scenario_hands_out("genesis_root_left_in_region_one_slot_zero_reading_bad_at_a_mount_whose_first_txg_is_the_ring_length_is_carried_as_its_ring_slot_not_its_pin", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_genesis_root_left_in_region_one_slot_zero_reading_bad_at_a_mount_whose_first_txg_is_the_ring_length_is_carried_as_its_ring_slot_not_its_pin);
+}
+
+#[test]
+fn two_genesis_ring_slots_pinned_at_txg_zero_carry_the_lower_ring_slot_as_the_pinned_ring_slot() {
+    judge_the_images_a_harness_scenario_hands_out("two_genesis_ring_slots_pinned_at_txg_zero_carry_the_lower_ring_slot_as_the_pinned_ring_slot", scenarios_of_root_record_carries_the_reclaim_threshold_and_the_pinned_ring_slot::run_the_scenario_where_two_genesis_ring_slots_pinned_at_txg_zero_carry_the_lower_ring_slot_as_the_pinned_ring_slot);
+}

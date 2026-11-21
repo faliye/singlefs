@@ -1,11 +1,13 @@
 //! 验证包模块：crash_point_replay_progress、crash_given_states、crash_library、crash_amplification、gpu_unit_checks
-//! 给定状态引擎两段先后跑（不设选段）时，起步不领卡，第一张表录完、要在卡上判时才去领：配置开着 GPU、编进了 gpu 特性，
-//! 调用方没交卡串而交了领卡通道，领卡被服务拒（假领卡客户端 `lease take` 退 3）。引擎起得来；判那张表时报领卡的错，
-//! 领卡客户端只被调了一回、是领卡；交回的卡的来路是「没取过卡」；这个进程的卡池没起。再起一个只录的引擎过同一张表，
-//! 表的录入键命中（库里已有逐字节相同的那一份、这一趟一张不另录）：头一个引擎领卡之前已经把这张表录进库。
-//! 领卡挪回引擎起步的话，头一个引擎起不来，这一条红。
-//! 领卡通道是假的（`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`），不要真卡。
-//! 调用方的显卡配置与领卡的结局进程里只记一回，这份文件只放这一条用例。
+//! 给定状态引擎两段先后跑（不设选段）时，起步不取卡，第一张表录完、要在卡上判时才取卡：配置开着 GPU、编进了 gpu 特性，
+//! 调用方没交卡串而有借卡通道（假借卡客户端 `lease take` 退 3；守卫清掉的通道不设回给引擎）。判段取卡不问借卡通道、不借卡：
+//! 引擎起得来；判那张表时取卡没成（没经服务给卡），那张表交 GPU 批处理服务判：判段的库在临时 prune-server 里（一次性库），直接在真服务里登记那份临时库、
+//! 写判表待判行、等服务写回结论字（不问服务收不收；服务读不了就点名跳过，等不到的由统一任务服务照卡住停）；
+//! 借卡客户端一回都没被调；交回的卡的来路是「没取过卡」；这个进程的卡池没起。
+//! 再起一个只录的引擎过同一张表，表的录入键命中（库里已有逐字节相同的那一份、这一趟一张不另录）：头一个引擎取卡之前已经把这张表录进库。
+//! 取卡挪回引擎起步的话，头一个引擎起不来，这一条红；判段照借卡通道借的话，借卡客户端被调过，这一条红。
+//! 借卡通道是假的（`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`），不要真卡。
+//! 调用方的显卡配置与借卡的结局进程里只记一回，这份文件只放这一条用例。
 #![cfg(feature = "gpu")]
 
 mod common;
@@ -58,15 +60,15 @@ fn a_given_states_engine_of_both_stages_records_the_first_table_before_its_card_
         MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
         configuration.as_os_str(),
     )]);
-    // 调用方的领卡通道交给引擎、不在这里领（守卫清掉了通道目录与凭据）
+    // 调用方的借卡通道交给引擎、不在这里借（守卫清掉了通道的三个尝试变量，这里照调用方的值设回）
     let cards_of_the_caller =
         common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run();
     let engine_of_both_stages = GivenStatesEngine::start_from_environment(item(), &toolchain)
-        .unwrap_or_else(|reason| panic!("两段先后跑的引擎起步不领卡、起得来：{reason}"));
+        .unwrap_or_else(|reason| panic!("两段先后跑的引擎起步不取卡、起得来：{reason}"));
     let calls_after_the_start = std::fs::read_to_string(&calls).unwrap_or_default();
-    let refusal = engine_of_both_stages
+    engine_of_both_stages
         .judge_the_given_states(&table)
-        .expect_err("领卡被拒：第一张表要在卡上判时报错");
+        .unwrap_or_else(|reason| panic!("没经服务给卡：第一张表交 GPU 批处理服务判完：{reason}"));
     let run_of_both_stages = engine_of_both_stages.finish();
     let calls_after_the_first_table = std::fs::read_to_string(&calls).unwrap_or_default();
     environment.set_variable(
@@ -81,14 +83,10 @@ fn a_given_states_engine_of_both_stages_records_the_first_table_before_its_card_
     let recording_only_run = recording_only_engine.finish();
     drop(cards_of_the_caller);
     drop(environment);
-    assert_eq!(calls_after_the_start, "", "引擎起步没调领卡客户端");
-    assert!(
-        refusal.contains("lease take 退 3"),
-        "第一张表报的是领卡被拒：{refusal}"
-    );
+    assert_eq!(calls_after_the_start, "", "引擎起步没调借卡客户端");
     assert_eq!(
-        calls_after_the_first_table, "lease take\n",
-        "第一张表要上卡时领卡客户端被调了一回、是领卡"
+        calls_after_the_first_table, "",
+        "第一张表要上卡时也没调借卡客户端（判段取卡不问借卡通道）"
     );
     assert_eq!(
         run_of_both_stages.gpu_cards_taken_from, None,
@@ -105,17 +103,17 @@ fn a_given_states_engine_of_both_stages_records_the_first_table_before_its_card_
             recording_only_run.tally.tables_recorded_here
         ),
         (1, 0),
-        "只录的引擎过同一张表：录入键命中、一张不另录，头一个引擎领卡之前已经录完（{:?}）",
+        "只录的引擎过同一张表：录入键命中、一张不另录，头一个引擎取卡之前已经录完（{:?}）",
         recording_only_run.tally
     );
     assert_eq!(
         std::fs::read_to_string(&calls).unwrap_or_default(),
-        "lease take\n",
-        "只录的引擎没再调领卡客户端"
+        "",
+        "只录的引擎也没调借卡客户端"
     );
     assert!(
         card_pool_started_in_this_process().is_none(),
-        "领卡被拒、只录：这个进程的卡池一直没起"
+        "没经服务给卡、只录：这个进程的卡池一直没起"
     );
     drop(fake_card_lease);
 }

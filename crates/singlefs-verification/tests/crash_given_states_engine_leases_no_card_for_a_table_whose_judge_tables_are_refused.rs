@@ -1,11 +1,11 @@
 //! 验证包模块：crash_point_replay_progress、crash_given_states、crash_library、crash_amplification、gpu_unit_checks
 //! 给定状态引擎判器走 GPU、两段先后跑（不设选段），一张表的判表建不出（基线是两块空盘，系统配置槽一份都解不开：
 //! `crash_judge_tables::JudgeTablesRefusal::BaseSystemConfigurationUnreadable`）：这张表交 CPU 判器判，一直不上卡。
-//! 上卡判那一段开头限流要数这一趟在几张卡上判，数的是起步时记下的显卡来路，不为数张数领卡：调用方没交卡串而交了领卡通道
-//! （假领卡客户端，`lease take` 退 3），领卡客户端一回都没被调，这个进程的卡池没起，判这张表不报错。
-//! 张数改成先取卡再数的话，判表还没建就去领、领卡被拒，这张表报领卡的错，这一条红。
-//! 领卡通道是假的（`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`），不要真卡。
-//! 调用方的显卡配置与领卡的结局进程里只记一回，这份文件只放这一条用例。
+//! 上卡判那一段开头限流要数这一趟在几张卡上判，数的是起步时记下的显卡来路，不为数张数取卡：调用方没交卡串而有借卡通道
+//! （假借卡客户端，`lease take` 退 3），借卡客户端一回都没被调，这个进程的卡池没起，判这张表不报错。
+//! 张数改成先取卡再数的话，判表还没建就去取卡、报没经服务给卡（判段取卡不问借卡通道），这张表报取卡的错，这一条红。
+//! 借卡通道是假的（`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`），不要真卡。
+//! 调用方的显卡配置与借卡的结局进程里只记一回，这份文件只放这一条用例。
 #![cfg(feature = "gpu")]
 
 mod common;
@@ -55,7 +55,7 @@ fn a_given_states_engine_leases_no_card_for_a_table_whose_judge_tables_are_refus
         MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
         configuration.as_os_str(),
     )]);
-    // 调用方的领卡通道交给引擎、不在这里领（守卫清掉了通道目录与凭据）
+    // 调用方的借卡通道交给引擎、不在这里借（守卫清掉了通道的三个尝试变量，这里照调用方的值设回）
     let cards_of_the_caller =
         common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run();
     let engine = GivenStatesEngine::start_from_environment(

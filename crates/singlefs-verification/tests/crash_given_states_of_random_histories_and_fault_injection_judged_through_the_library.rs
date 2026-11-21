@@ -1407,7 +1407,7 @@ fn write_a_configuration_with_the_gpu_enabled(configuration: &std::path::Path) {
 
 /// 这一趟在环境守卫里判：多机配置指到 `configuration`、库是 `library` 那一份一次性库（设成这个进程开的那一份），开 GPU 时卡是调用方给这个进程的那一份
 /// （守卫把一趟读的变量清掉之后，`common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run` 交给引擎：服务交了卡串的设卡串，
-/// 清场之下是清场之后那一份；交领卡通道的把通道设回环境、不在这里领，引擎第一次上卡时才领；配置只写开关；
+/// 清场之下是清场之后那一份；没交卡串的不设、不借卡；配置只写开关；
 /// 这一台是 HOSTS 里哪一项照调用方那份多机配置上判法认出的，不经环境交）。
 #[cfg(feature = "gpu")]
 fn two_eight_step_histories_and_their_fault_injection_judged_under(

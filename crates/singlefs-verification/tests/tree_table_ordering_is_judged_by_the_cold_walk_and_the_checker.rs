@@ -27,6 +27,7 @@ use scenarios_of_tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker:
 };
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
 use singlefs_core::allocator::UnitAreaStart;
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::records::{TREE_KIND_LIVELIST, TREE_KIND_SPARSE_SIDE_TABLE};
 use singlefs_core::recovery::{
     rebuild_version, walk_to_file_in_the_unit_area_starting_at, PoolReader, RebuildVersionFailure,
@@ -76,6 +77,12 @@ impl PoolReader for ReadRecordingReader<'_> {
     }
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.image.device_size_in_bytes(device)
+    }
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        self.image.physical_block_size_probed_on_the_device(device)
     }
     fn read(
         &self,

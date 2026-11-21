@@ -1,4 +1,4 @@
-//! 验证包模块：crash、crash_state_enumeration、writable_mount_phases、crash_amplification
+//! 验证包模块：crash、crash_state_enumeration、writable_mount_phases、crash_library、crash_amplification
 //! 删除与整理交错、回退跨过整理意图的崩溃流（里程碑四二·3，欠账 C621 那一条流；条款：D8（核心索引结构） 已定项 16 第 6 条续做、
 //! 判决 `research/prompts/m4-trunc-r1-main-verification.md` K1「回退时整理条目照旧随现行」、D23（journal 的角色与格式） 已定项 14 管理员回退）：
 //! 「取号 → 暖机 × 2 → A → 实例 1 里建 inode 2、顺序写它（两个数据单元）→ 重挂（取号、写行、暖机）→ 整理签发 → 一批（两个单元）
@@ -23,6 +23,10 @@
 //! 每个状态上的可写挂载续做（删除在前、整理在后）与挂完的盘上那一遍池级 checker。这条流上没有 discard。
 //!
 //! 每段都展开的那一条登记成崩溃枚举用例，可双机分片。
+//! 同一组崩溃状态另有一条在 CPU 判器上判的崩溃枚举用例（只开 CPU 的多机配置，先录进库、再从库读回判；两个观察者同上，挂完的盘同样在判段过池级 checker）：
+//! 多机配置开着 GPU 时上面那一条的判段交 GPU 判器，这一条的判段一律交 CPU 判器；两条经同一个枚举函数录同一条流、挂同两个观察者，块键相同，
+//! 库里有上面那一条判过的块就照块复用。改坏池级 checker 判反的变异行点名上面那一条（改 GPU 判器那一份），这一条的变异行在录入段之前就红。
+//! 它不多罩崩溃状态，多跑的是 CPU 判器那一遍判。
 //! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
 
 mod common;
@@ -52,8 +56,13 @@ use singlefs_verification::crash::{
     CrashPointReplayVersionTable,
 };
 use singlefs_verification::crash_amplification::{
-    ImageAfterTheObserver, InvariantsJudgedOnTheImageAfterTheObserver,
-    ObserveACrashStateHandingBackAnImage, ObserverDeduplication, ReadRangeOnTheCrashImage,
+    CrashAmplificationEnvironment, ImageAfterTheObserver,
+    InvariantsJudgedOnTheImageAfterTheObserver, ObserveACrashStateHandingBackAnImage,
+    ObserverDeduplication, ReadRangeOnTheCrashImage,
+};
+use singlefs_verification::crash_library::{
+    multi_host_configuration_on_the_cpu_keeping_the_prune_server_of, ExclusiveTemporaryDirectory,
+    TheOneLibraryKeptForThisProcess,
 };
 use singlefs_verification::crash_state_enumeration::{
     enumerate_crash_states_with_every_kind_of_observer, CrashPointReplayItem,
@@ -452,10 +461,22 @@ fn assert_every_state_was_observed(
     );
 }
 
-/// 只展开写数小于 10 的段那一趟（测从库里重判计数相同）：单元段不展开，每个状态交两个观察者。
-fn enumerate_the_segments_shorter_than_ten(
+/// 判段交哪一个判器（[`enumerate_with_both_observers`] 的最后一个参数）。全量那两条只差这一样：录的是同一条流、挂的是同两个观察者，块键相同，
+/// CPU 判器那一条从库里复用另一条判过的块。
+enum JudgeOfTheEnumeration {
+    /// 照调用方的多机配置：开着 GPU 交 GPU 判器，没开交 CPU 判器。
+    ConfiguredByTheCaller,
+    /// 只开 CPU 的多机配置（[`with_only_the_cpu_judge_configured`]，那一份写进 `configuration_label` 起名的临时目录）：判段一律交 CPU 判器。
+    TheCpuJudgeOnly { configuration_label: &'static str },
+}
+
+/// 按 `expansion` 枚举一趟，项名 `item_name`，每个状态交两个观察者（抹掉这一版没人用的源落点再沿根读两个文件；可写挂载续做，删除在前、整理在后，
+/// 交回挂完的盘），判段交 `judge` 点名的判器。这份文件里每一趟枚举都经它（全量、CPU 判器那一条全量、只展开写数小于 10 的段那一趟）。
+fn enumerate_with_both_observers(
     prepared: &PreparedDeletionCompactionCrashFlow,
-    item_label: &str,
+    item_name: &str,
+    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
+    judge: JudgeOfTheEnumeration,
 ) -> Option<CrashPointReplayTally> {
     let versions_of_the_flow = prepared.versions_of_the_flow.as_slice();
     let observe = |_ordinal: u64,
@@ -481,23 +502,42 @@ fn enumerate_the_segments_shorter_than_ten(
                 counts,
             )
         };
-    let item_name =
-        format!("deletion_interleaved_with_compaction_across_a_rollback::segments_shorter_than_ten::{item_label}");
-    enumerate_crash_states_with_every_kind_of_observer(
-        CrashPointReplayItem {
-            name: &item_name,
-            setting_file: THIS_FILE,
-        },
-        &prepared.base,
-        &prepared.writes,
-        &prepared.segments,
-        prepared.judged_root_index,
-        version_table(prepared),
+    let enumerate = || {
+        enumerate_crash_states_with_every_kind_of_observer(
+            CrashPointReplayItem {
+                name: item_name,
+                setting_file: THIS_FILE,
+            },
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            prepared.judged_root_index,
+            version_table(prepared),
+            expansion,
+            &[landed_version_observer(prepared, &observe)],
+            &[mount_continuation_observer(prepared, &observe_the_mount)],
+        )
+        .judged()
+    };
+    match judge {
+        JudgeOfTheEnumeration::ConfiguredByTheCaller => enumerate(),
+        JudgeOfTheEnumeration::TheCpuJudgeOnly {
+            configuration_label,
+        } => with_only_the_cpu_judge_configured(configuration_label, enumerate),
+    }
+}
+
+/// 只展开写数小于 10 的段那一趟（测从库里重判计数相同）：单元段不展开，每个状态交两个观察者，照调用方的配置判。
+fn enumerate_the_segments_shorter_than_ten(
+    prepared: &PreparedDeletionCompactionCrashFlow,
+    item_label: &str,
+) -> Option<CrashPointReplayTally> {
+    enumerate_with_both_observers(
+        prepared,
+        &format!("deletion_interleaved_with_compaction_across_a_rollback::segments_shorter_than_ten::{item_label}"),
         &expansion_of_the_segments_shorter_than_ten,
-        &[landed_version_observer(prepared, &observe)],
-        &[mount_continuation_observer(prepared, &observe_the_mount)],
+        JudgeOfTheEnumeration::ConfiguredByTheCaller,
     )
-    .judged()
 }
 
 /// 复用不改判定：只展开写数小于 10 的段跑两遍，后跑的那一遍块与观察者结论照库里的（键拒算的那几组照判），两份计数逐项相同。
@@ -540,45 +580,12 @@ fn full_enumeration_of_the_deletion_interleaved_with_compaction_across_a_rollbac
         &prepared.segments,
         &full_expansion,
     );
-    let versions_of_the_flow = prepared.versions_of_the_flow.as_slice();
-    let observe = |_ordinal: u64,
-                   image: &CrashImage<'_>,
-                   report: &RecoveryReport,
-                   counts: &mut CrashPointReplayObserverCounts| {
-        observe_the_landed_version_reading_both_files_through_the_mapping(
-            versions_of_the_flow,
-            image,
-            report,
-            counts,
-        );
-    };
-    let observe_the_mount =
-        |_ordinal: u64,
-         image: &CrashImage<'_>,
-         report: &RecoveryReport,
-         counts: &mut CrashPointReplayObserverCounts| {
-            observe_the_mount_continuing_the_deletion_and_the_compaction(
-                versions_of_the_flow,
-                image,
-                report,
-                counts,
-            )
-        };
-    let Some(tally) = enumerate_crash_states_with_every_kind_of_observer(
-        CrashPointReplayItem {
-            name: "deletion_interleaved_with_compaction_across_a_rollback::full",
-            setting_file: THIS_FILE,
-        },
-        &prepared.base,
-        &prepared.writes,
-        &prepared.segments,
-        prepared.judged_root_index,
-        version_table(&prepared),
+    let Some(tally) = enumerate_with_both_observers(
+        &prepared,
+        "deletion_interleaved_with_compaction_across_a_rollback::full",
         &full_expansion,
-        &[landed_version_observer(&prepared, &observe)],
-        &[mount_continuation_observer(&prepared, &observe_the_mount)],
-    )
-    .judged() else {
+        JudgeOfTheEnumeration::ConfiguredByTheCaller,
+    ) else {
         return;
     };
     println!(
@@ -596,6 +603,123 @@ fn full_enumeration_of_the_deletion_interleaved_with_compaction_across_a_rollbac
         tally.states,
         closed_form,
         "deletion_interleaved_with_compaction_across_a_rollback_stream：用例自己的展开下的闭式",
+    );
+    assert_the_shape_of_the_flow(&prepared);
+    assert_every_state_was_observed(&prepared, &tally);
+}
+
+/// 在只开 CPU 的多机配置下跑 `enumerate`：照调用方的多机配置写一份只开 CPU 的（`crash_library::multi_host_configuration_on_the_cpu_keeping_the_prune_server_of`：
+/// 不开 GPU，判段交 CPU 判器；照抄 prune-server 的地址，块照块键与判器组的单元键进全仓那一份库），环境守卫里把多机配置指过去；
+/// 调用方设了 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`（指定范围的那几趟可缩域）照它缩，守卫清掉之前记下、清完设回（别的变量照清，只换多机配置）。
+/// 只开 CPU 的配置写在 `tag` 起名的测试自己的临时目录里，`enumerate` 跑完连同两个守卫一起放掉。
+///
+/// 换上之后、`enumerate` 之前（录入段与判段都还没起）核这个进程读到的就是那一份、它定的跑法不上卡：换不上的当场红，
+/// 不照调用方的配置往下判（`crates/mutations.tsv` 里每份文件一行把换上的那一份改回调用方的，红在这里）。
+///
+/// # Panics
+/// 调用方的多机配置取不到、临时目录建不了、只开 CPU 的配置写不进；换上之后这个进程读到的不是那一份，或那一份定的跑法上卡。
+// gpu-exempt: cpu-judge-mutation-rows
+fn with_only_the_cpu_judge_configured<Outcome>(
+    tag: &str,
+    enumerate: impl FnOnce() -> Outcome,
+) -> Outcome {
+    // 调用方的多机配置在守卫清掉 SINGLEFS_MULTI_HOST_CONFIG 之前取（仓副本里只经这个变量交进来）
+    let configuration_of_the_caller =
+        singlefs_verification::crash_amplification::multi_host_configuration_of_this_process()
+            .unwrap_or_else(|refusal| panic!("{refusal}"))
+            .configuration_file;
+    let configuration_directory =
+        ExclusiveTemporaryDirectory::create(tag).unwrap_or_else(|refusal| panic!("{refusal}"));
+    let configuration_on_the_cpu = configuration_directory.join("multi-host-on-the-cpu.env");
+    std::fs::write(
+        &configuration_on_the_cpu,
+        multi_host_configuration_on_the_cpu_keeping_the_prune_server_of(
+            &configuration_of_the_caller,
+        )
+        .unwrap_or_else(|refusal| panic!("{refusal}")),
+    )
+    .expect("测试自己的临时目录里写得了只开 CPU 的多机配置");
+    // 调用方缩过域的那一趟照它缩：守卫清掉一趟读的全部变量之前记下，清完设回
+    let narrowing_of_the_caller = std::env::var_os(
+        singlefs_verification::crash_amplification::EXPAND_UP_TO_ENVIRONMENT_VARIABLE,
+    );
+    // 先拿全仓那一份的守卫、再拿改环境的锁（`crash_library::TheOneLibraryKeptForThisProcess` 文档里的次序）；丢的时候倒过来
+    let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
+    let mut environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+        singlefs_verification::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+        configuration_on_the_cpu.as_os_str(),
+    )]);
+    if let Some(expand_up_to) = &narrowing_of_the_caller {
+        environment.set_variable(
+            singlefs_verification::crash_amplification::EXPAND_UP_TO_ENVIRONMENT_VARIABLE,
+            expand_up_to,
+        );
+    }
+    let configuration_in_effect =
+        singlefs_verification::crash_amplification::multi_host_configuration_of_this_process()
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+    assert_eq!(
+        configuration_in_effect.configuration_file, configuration_on_the_cpu,
+        "环境守卫里换上的多机配置是测试自己写的那一份只开 CPU 的"
+    );
+    assert!(
+        !configuration_in_effect.mode.uses_gpu(),
+        "只开 CPU 的多机配置定的跑法不上卡：{}",
+        configuration_in_effect.mode.name()
+    );
+    enumerate()
+}
+
+/// 全量的 CPU 判器那一条：同一条流、同一组崩溃状态（每段都展开）、同两个观察者，在只开 CPU 的多机配置下先录进库、再从库读回，
+/// 逐状态在 CPU 判器上判（两遍恢复 + 多版本 oracle、池级 checker、记录核对器；挂完的盘在判段同样交 CPU 判器过池级 checker）。
+/// 状态数等于闭式（缩过域照缩域的判），判器零红，录流的形状与观察者计数同上面那条全量。
+/// 判完打计数行 `CRASH_POINT_REPLAY_DELETION_INTERLEAVED_WITH_COMPACTION_ACROSS_A_ROLLBACK_ON_THE_CPU_JUDGE`，
+/// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:deletion-interleaved-with-compaction-across-a-rollback-on-the-cpu-judge`）。
+/// 与上面那条全量经同一个 [`enumerate_with_both_observers`]，只差判段交哪一个判器：块键相同，库里有上面那条判过的块就照块复用、不在 CPU 上重判。
+/// 判别力（`crates/mutations.tsv`「删除与整理交错流 CPU 判器那一条：环境守卫里换上的多机配置改回调用方那一份」）：换不上只开 CPU 的配置，
+/// [`with_only_the_cpu_judge_configured`] 在录入段之前就红。池级 checker 判反的判别力由点名上面那条全量的变异行担（改 GPU 判器那一份）。
+// gpu-exempt: cpu-judge-mutation-rows
+#[test]
+fn full_enumeration_of_the_deletion_interleaved_with_compaction_across_a_rollback_stream_judged_on_the_cpu_judge_is_exhaustive_and_clean(
+) {
+    let prepared =
+        prepare("deletion-interleaved-with-compaction-crash-point-replay-full-on-the-cpu-judge");
+    assert_eq!(
+        closed_form_state_count_of_write_index_segments(&prepared.segments),
+        CLOSED_FORM_WITH_TWO_STATES_PER_WRITE,
+        "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)"
+    );
+    let closed_form = crash_state_count_with_torn_in_place_overwrites(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &full_expansion,
+    );
+    let Some(tally) = enumerate_with_both_observers(
+        &prepared,
+        "deletion_interleaved_with_compaction_across_a_rollback::full_on_the_cpu_judge",
+        &full_expansion,
+        JudgeOfTheEnumeration::TheCpuJudgeOnly {
+            configuration_label: "deletion-interleaved-with-compaction-on-the-cpu-judge",
+        },
+    ) else {
+        return;
+    };
+    println!(
+        "CRASH_POINT_REPLAY_DELETION_INTERLEAVED_WITH_COMPACTION_ACROSS_A_ROLLBACK_ON_THE_CPU_JUDGE states={} closed_form={closed_form} exhaustive={} violations={} observer {:?} states_by_publish=[{}] checker {} first_violation={}",
+        tally.states,
+        tally.states == closed_form,
+        tally.violations,
+        tally.observer_counts,
+        tally.states_by_publish_text(),
+        tally.checker_counts_by_invariant(),
+        tally.first_violation.as_deref().unwrap_or("none")
+    );
+    assert_clean(&tally);
+    singlefs_verification::crash_state_enumeration::assert_the_counted_states_equal_the_closed_form_unless_narrowed(
+        tally.states,
+        closed_form,
+        "deletion_interleaved_with_compaction_across_a_rollback_stream（CPU 判器）：用例自己的展开下的闭式",
     );
     assert_the_shape_of_the_flow(&prepared);
     assert_every_state_was_observed(&prepared, &tally);

@@ -6,7 +6,7 @@
 //! 这条流前两段十次全是清零写（两块盘的 [0, 根环基址)、三个根环区域与整个 journal 环），罩住旧池的系统配置槽、根槽与 journal 记录槽，
 //! 判表照落点模型把它们（连同撕裂镜像）记进罩住的落点的写；漏记一处，作废之后那一槽的版本照旧是旧池的字节，GPU 读回旧池、CPU 整池拒，逐状态比那一句红。
 //! 两边的输入都经对拍那一类的库（判表入库再读回上卡；CPU 那一侧流先入库、再读回判）；两边判出的东西作一份对拍结论入库
-//! （`crash_library::pairing_conclusion_reused_or_judged`，键是这条流的输入摘要与两边判法单元的键），比法与断言每趟照读回的那一份现比、不进键。
+//! （`crash_library::pairing_conclusion_reused_or_judged`，键只是这条流的输入摘要，两边判器的代码不进键），比法与断言每趟照读回的那一份现比、不进键。
 //! 要本机一张 NVIDIA 独显：一张适配器都没有时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」。要 `gpu` 特性。
 //! 这是 GPU 判器（加速路径）与 CPU 判器（参照路径）的对拍，不标 `#[ignore]`，不带 `--ignored` 的 `cargo test` 就跑到。
 #![cfg(feature = "gpu")]
@@ -23,7 +23,7 @@ use singlefs_verification::crash::{
     crash_point_replay_plan_state_count, in_place_subsets_with_copy_on_write_none_or_all_expansion,
     CrashPointReplayVersionTable,
 };
-use singlefs_verification::crash_identity::{judging_units_key, JudgingUnits, SectorImage};
+use singlefs_verification::crash_identity::SectorImage;
 use singlefs_verification::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
 use singlefs_verification::crash_judge_gpu::{
     cross_check_words_compared_by_the_cross_check, cross_check_words_of_cpu_judgement,
@@ -33,8 +33,8 @@ use singlefs_verification::crash_judge_tables::{
     build_judge_tables_against_the_version_table, JudgeFlow, JudgeTables,
 };
 use singlefs_verification::crash_library::{
-    pairing_conclusion_reused_or_judged, toolchain_of_this_process, CrashLibrary,
-    CrashLibraryClass, PairingAgreement, PairingJudged,
+    pairing_conclusion_reused_or_judged, CrashLibrary, CrashLibraryClass, PairingAgreement,
+    PairingJudged,
 };
 use singlefs_verification::crash_state_enumeration::{
     sample_crash_states_on_the_cpu_with_threads_against_the_version_table, CrashPointReplayItem,
@@ -431,17 +431,12 @@ fn the_gpu_judge_agrees_with_the_cpu_on_every_in_place_subsets_state_of_a_make_f
             .max()
             .unwrap_or(0)
     );
-    let judging_units = |units: JudgingUnits| {
-        judging_units_key(&units, toolchain_of_this_process()).map_err(|refused| refused.sentence())
-    };
     let library =
         CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("对拍那一类的库开得了");
     let paired = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         pairing_conclusion_reused_or_judged(
             &library,
             &pairing_inputs_digest(&flow, &tables),
-            &judging_units(JudgingUnits::GpuJudge),
-            &judging_units(JudgingUnits::JudgementOfTheCrashImages),
             || {
                 let conclusion = judgements_of_both_judges(cards, &flow, &tables)
                     .unwrap_or_else(|| std::panic::panic_any(PairingNotRun));

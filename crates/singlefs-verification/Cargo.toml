@@ -6,7 +6,7 @@ links = "singlefs-verification"
 version = "0.1.0"
 publish = false
 edition = "2021"
-description = "验证包：单元测试与集成测试，连同它们用的脚手架库（录制器、内存池、理想模型、随机历史、故障注入设备、场景）；崩溃态枚举引擎、记录核对器、oracle、断点续跑、崩溃注入与坏盘输入战役、真设备与实验装置，以及它们的用例（.claude/rules/verification.md）。判决器库在 singlefs-checker"
+description = "验证包：单元测试与集成测试，连同它们用的脚手架库（录制器、内存池、理想模型、随机历史、故障注入设备、场景）；崩溃态枚举引擎、记录核对器、oracle、断点续跑、崩溃注入与坏盘输入战役，门禁与崩溃入口自己起的工具二进制（src/bin/），以及它们的用例（.claude/rules/verification.md）。判决器库在 singlefs-checker；实验装置在实验包 singlefs-implementation-experiments"
 
 [dependencies]
 singlefs-checker = { path = "../singlefs-checker" }
@@ -18,9 +18,7 @@ singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
 # 判法单元（4-2a）：库读回构建脚本写进 OUT_DIR 的那份判器键表（`singlefs_unit_graph::entry_groups`），测试在临时拷贝上照同一套算法重算键。
 # 只用 std，不依赖工作区任何 crate。
 singlefs-unit-graph = { path = "../singlefs-unit-graph" }
-# E197（扫环胶水内存随盘数） 的装置直接调扫环核 `first_copy_of_each_record_key`：singlefs-core 只 use 它、不转出。
-singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
-# E185（GC一批搬迁的挂钟拆分） 装置读线程钟、进程钟、单调钟与绑核调的系统调用（src/bin/e185_gc_batch_wall_clock_split.rs）：
+# 给定状态的场景镜像搭建（tests/common_given_states_of_harness_scenario_images/mod.rs）建完一批镜像之后把空闲堆还给系统调的 `malloc_trim`：
 # 取这份声明，不在源码里手写外部函数块（判法单元闭包遇到它拒算，D13（验证路线） 已定项 17）；与 Cargo.lock 里已有的 libc 同一份，不新增包。
 libc = "0.2"
 # 崩溃放量的 GPU 核对（src/gpu_unit_checks.rs）：版本与特性钉成 E163（GPU多卡算单元校验和） 装置用的那一份（scripts/experiment-apparatus/Cargo.toml）。
@@ -31,9 +29,6 @@ pollster = { version = "=1.0.1", optional = true }
 # [workspace]，仓根 Cargo.toml 的 exclude 列了它），只调它的 reliable_client、client、protocol 与 configuration。判定库只经服务这一条路（用户 2026-11-02 定：不设兼容开关），它常在、不可选。
 # 它那一个包把服务与客户端编在一起，服务那一半依赖 rocksdb，所以编译时 librocksdb-sys 照旧随它进依赖图（只当服务的代码编，这里不调）。
 prune-server = { path = "../../prune-server" }
-# 实验装置读写判定库的口子（E158（择根与修复四岔路） 第 5 次重跑的装置 src/bin/e158_root_choice_repair.rs 用）：经 device-code-key.py run 开的管道
-# 转给 prune-server（族 apparatus-items）；按 path 依赖引，不用 `#[path]`（从仓根算单元键时 unit-graph 看不到 `#[path]` 引进来的文件）。
-singlefs-device-library = { path = "../singlefs-device-library" }
 
 # 构建脚本按判法单元的入口登记表（src/judging_units_entries.rs）逐组算判器键与组成清单，写进 OUT_DIR（build.rs 文件头）。
 [build-dependencies]
@@ -43,9 +38,9 @@ singlefs-unit-graph = { path = "../singlefs-unit-graph" }
 # 判定存储（src/verdict_store.rs）与 prune-server 的客户端不挂特性、一律编：崩溃点重放枚举与按序号段判只吃从库里读回的流（src/crash_library.rs）。
 # GPU 核对默认不编：配置里 ENABLE_GPU=1 的跑法才开（单机或双机的 CPU + GPU）。
 gpu = ["dep:wgpu", "dep:pollster"]
-# 装置二进制（src/bin/）挂这个特性，缺省开着：`--bin`、`--bins`、`--lib --tests` 这些起法照旧。
-# cargo 给集成测试编目标时会把本包的二进制目标全编一遍；只点名测试目标（`--test <名>`）又用不到装置二进制的起法带 `--no-default-features`，
-# 这 26 个二进制就不编。源码里没有一处读这个特性（它不是条件编译的开关），只出现在各 [[bin]] 的 required-features 上。
+# 门禁与崩溃入口起的工具二进制（src/bin/）挂这个特性，缺省开着：`--bin`、`--bins`、`--lib --tests` 这些起法照旧。
+# cargo 给集成测试编目标时会把本包的二进制目标全编一遍；只点名测试目标（`--test <名>`）又用不到这几个二进制的起法带 `--no-default-features`，
+# 这 4 个二进制就不编。源码里没有一处读这个特性（它不是条件编译的开关），只出现在各 [[bin]] 的 required-features 上。
 apparatus-binaries = []
 default = ["apparatus-binaries"]
 
@@ -54,120 +49,15 @@ default = ["apparatus-binaries"]
 # 发布触发阈值的只供测试来源（`system_configuration::PublishTriggerThresholds::of_test_only_values_clamped_by_the_journal_ring`）同样只在测试构建打开。
 singlefs-core = { path = "../singlefs-core", features = ["lookup-work-counters", "test-only-publish-thresholds"] }
 
-# 装置二进制逐个声明，只为挂 required-features（路径与名字同自动发现的那一份）
+# 工具二进制逐个声明，只为挂 required-features（路径与名字同自动发现的那一份）
 [[bin]]
 name = "crash_library_reader"
 path = "src/bin/crash_library_reader.rs"
 required-features = ["apparatus-binaries"]
 
 [[bin]]
-name = "deletion_write_dump"
-path = "src/bin/deletion_write_dump.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e142_new_pool_file_creation_write_dump"
-path = "src/bin/e142_new_pool_file_creation_write_dump.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e142_new_pool_file_creation_write_dump_one_device"
-path = "src/bin/e142_new_pool_file_creation_write_dump_one_device.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e156_allocation_basis_counts"
-path = "src/bin/e156_allocation_basis_counts.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e158_root_choice_repair"
-path = "src/bin/e158_root_choice_repair.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e161_crash_state_dedup_and_time_split"
-path = "src/bin/e161_crash_state_dedup_and_time_split.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
 name = "e165_replay_bounded_enumeration"
-path = "src/bin/e165_replay_bounded_enumeration.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e168_delete_ring_window_borrow"
-path = "src/bin/e168_delete_ring_window_borrow.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e170_specification_executor_export"
-path = "src/bin/e170_specification_executor_export.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e171_three_oracle_collusion"
-path = "src/bin/e171_three_oracle_collusion.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e171_three_oracle_collusion_after_the_oracle_fixes"
-path = "src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e173_checkpoint_cost_against_empty_publish_cost"
-path = "src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e175_product_path_inode_watermark_regression"
-path = "src/bin/e175_product_path_inode_watermark_regression.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e180_admission_reading_versus_writable_bytes"
-path = "src/bin/e180_admission_reading_versus_writable_bytes.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e181_landing_check_fixed_point_and_mount_lower_bound"
-path = "src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e182_unreadable_abandoned_root_forks"
-path = "src/bin/e182_unreadable_abandoned_root_forks.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e183_capacity_read_cache_reserve_and_sweep_costs"
-path = "src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e184_regular_layer_cost_counts"
-path = "src/bin/e184_regular_layer_cost_counts.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e184_regular_layer_cost_counts_write_dump"
-path = "src/bin/e184_regular_layer_cost_counts_write_dump.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e185_gc_batch_wall_clock_split"
-path = "src/bin/e185_gc_batch_wall_clock_split.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e197_scan_journal_glue_memory_by_device_count"
-path = "src/bin/e197_scan_journal_glue_memory_by_device_count.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "e198_instance_table_pointer_birth_skip_premise"
-path = "src/bin/e198_instance_table_pointer_birth_skip_premise.rs"
+path = "src/bin/e165_replay_bounded_enumeration/main.rs"
 required-features = ["apparatus-binaries"]
 
 [[bin]]
@@ -177,10 +67,5 @@ required-features = ["apparatus-binaries"]
 
 [[bin]]
 name = "new_pool_file_creation_on_device"
-path = "src/bin/new_pool_file_creation_on_device.rs"
-required-features = ["apparatus-binaries"]
-
-[[bin]]
-name = "new_pool_file_creation_region_bytes"
-path = "src/bin/new_pool_file_creation_region_bytes.rs"
+path = "src/bin/new_pool_file_creation_on_device/main.rs"
 required-features = ["apparatus-binaries"]

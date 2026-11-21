@@ -105,6 +105,12 @@ impl<Inner: PoolReader + ?Sized> PoolReader for ReadCountingPoolReader<'_, Inner
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.inner.device_size_in_bytes(device)
     }
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        self.inner.physical_block_size_probed_on_the_device(device)
+    }
 
     fn read(
         &self,

@@ -85,8 +85,15 @@ impl ImageReader for Reader<'_> {
     }
 }
 
+/// 解一个系统配置槽：magic、整槽校验和、incompat 位与 checker 另判的那几格（`check_system_configuration_slot`），单元几何四格
+/// （单元大小、落点粒度、位置条目宽等于格式常量，扩展点声明值 N 等于 0；`unit_geometry_field_that_disagrees`，C1041），
+/// 几何（`geometry_of`），journal 环三格等式。与 core 择系统配置（`system_configuration_values_this_reader_accepts`）、
+/// 池级 checker 读槽（`read_system_configuration_slot`）同判，哪一关不过都交 `Err(())`。
 pub(crate) fn parse_system_configuration(slot: &[u8]) -> Result<SystemConfiguration, ()> {
     let view = singlefs_checker::check_system_configuration_slot(slot).map_err(|_| ())?;
+    if singlefs_checker::image::unit_geometry_field_that_disagrees(slot).is_some() {
+        return Err(());
+    }
     let geometry = singlefs_checker::image::geometry_of(slot, &view).map_err(|_| ())?;
     configuration_from_view(&view, &geometry)
 }
@@ -1098,5 +1105,75 @@ mod tests {
             CheckpointTxg(3),
             "同盘较旧但未被抛弃的根不能压过该盘最新根的 F"
         );
+    }
+
+    /// 单元几何四格（D21（权威态与派生态的分界） 已定项 16、已定项 8；C1041）：mkfs 写出的系统配置槽 0 这一读解得开（阳性对照）；
+    /// 单元大小 305、落点粒度 309、位置条目宽 313、扩展点声明值 N 321 各改一个值、整槽校验和重封，magic、校验和、incompat 那几关照样过，
+    /// 验证侧这一读要拒，与 core 择系统配置、池级 checker 读槽同判。偏移与改成的值用例自己写死，不从实现里取。
+    #[test]
+    fn independent_system_configuration_parse_refuses_a_slot_whose_unit_geometry_field_is_not_the_first_version_value(
+    ) {
+        use singlefs_core::block_device::BlockDevice;
+        use singlefs_core::checksum::wide_checksum_with_field_zeroed;
+        use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
+        use singlefs_core::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET;
+        use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
+
+        let parameters = MakeFilesystemParameters {
+            filesystem_identifier: *b"singlefs-readgeo",
+            region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
+            geometry: SystemImmutableSizes {
+                physical_block_size: 512,
+                minimum_input_output_bytes: 0,
+                fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(0),
+                journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
+                root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
+            },
+        };
+        let mut devices = [0, 1].map(|device| {
+            (
+                DeviceIdentity(device),
+                SparseBlockDevice::new(4 << 30, PhysicalBlockSizeInBytes(512)),
+            )
+        });
+        make_filesystem(&parameters, &mut devices).expect("mkfs 收这一份几何");
+        let mut slot = vec![
+            0u8;
+            usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES)
+                .expect("SYSTEM_CONFIGURATION_SLOT_BYTES 是格式常量，装得进 usize")
+        ];
+        devices[0]
+            .1
+            .read_at(DeviceOffsetInBytes(0), &mut slot)
+            .expect("系统配置槽 0 在盘内");
+        assert!(
+            parse_system_configuration(&slot).is_ok(),
+            "mkfs 写出的系统配置槽 0 这一读解得开（阳性对照）"
+        );
+        for (field_offset, rewritten_value, field_named) in [
+            (305, 65_536, "单元大小"),
+            (309, 4096, "落点粒度"),
+            (313, 15, "位置条目宽"),
+            (321, 1, "扩展点声明值 N"),
+        ] {
+            let mut rewritten = slot.clone();
+            put(&mut rewritten, field_offset, rewritten_value, 4);
+            let digest = wide_checksum_with_field_zeroed(
+                &rewritten,
+                rewritten.len(),
+                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
+            );
+            rewritten
+                [SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
+                .copy_from_slice(&digest);
+            assert!(
+                singlefs_checker::check_system_configuration_slot(&rewritten).is_ok(),
+                "{field_named} 写成 {rewritten_value}、重封之后 magic、整槽校验和、incompat 那几关照样过：拒它的只能是四格那一判"
+            );
+            assert!(
+                parse_system_configuration(&rewritten).is_err(),
+                "{field_named} 写成 {rewritten_value} 的槽：验证侧解系统配置要拒，与 core、池级 checker 同判"
+            );
+        }
     }
 }

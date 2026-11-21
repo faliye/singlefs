@@ -10,9 +10,10 @@
 //! 同一组判据算，逐状态相等是 GPU 那一份的判别力自证；第 ③ 段（`crash_amplification::compare_judge_and_verifier`）再把它们
 //! 与 CPU 判器（`crash::judge_crash_image`）的判定逐状态比。
 //!
-//! 事实表进 KV 时按录入键存（录入那一组判法单元的键连同录入的输入摘要，`crate::crash_library::recording_key_of_the_inputs`；抽取事实的
-//! 函数在录入那一组的入口里），[`FlowFacts::digest`] 只按内容取；核对表的键带核对那一组判法单元的键：换了代码就是新一轮，
-//! 旧行留着当历史、不覆盖，每一段各自对账（「事实表和核对表按代码摘要分版本存储、旧行保留为历史、每段独立对账」）。
+//! 事实表进 KV 时按录入键登清单（录下的写流摘要与场景标识，`crate::crash_library::recording_key_of_the_scenario_and_the_inputs`；
+//! 抽取事实的函数是录制管线、不进录入键），[`FlowFacts::digest`] 只按内容取；核对表的键只由事实表摘要定
+//! （`crate::crash_amplification::facts_verifier_row_key`）：CPU 参照与 GPU 核对内核的代码都不进键，改核对代码不作废已核的块，
+//! 核对对不对靠两边对拍与复用哨兵抓。
 use std::collections::BTreeMap;
 use std::ops::Range;
 
@@ -30,13 +31,6 @@ use crate::crash::{
     CrashPointReplaySegmentExpansion, CrashPointReplaySegmentSlice, CrashStateEnumerationTables,
     StateCount1280Bits, STATE_COUNT_BYTES,
 };
-
-/// 事实表字节的布局版本：字节以 [`FACTS_LAYOUT_MAGIC`] 起头，布局变了就换它（这一版每段带片起点那一格）。读库里的字节只认这一版：
-/// 头不是它的一律拒（不是这一版的布局），不按这一版的布局去解。不进任何复用键：[`FlowFacts::digest`] 不收这个头。
-pub const FACTS_LAYOUT_VERSION: u32 = 2;
-
-/// 事实表字节的头：布局版本 [`FACTS_LAYOUT_VERSION`] 的写法；读到别的头就拒。
-pub const FACTS_LAYOUT_MAGIC: &[u8; 8] = b"SFFACTS2";
 
 /// 「基线镜像里本来就有」的单元或根，在事实里用这个来源号（不是任何一次写）。
 pub const BASE_IMAGE_SOURCE: u32 = u32::MAX;
@@ -707,12 +701,11 @@ fn base_roots(base: &MemoryPool) -> Vec<RootFact> {
 }
 
 impl FlowFacts {
-    /// 事实表的摘要：只按内容取（布局头 [`FACTS_LAYOUT_MAGIC`] 之后的字节），进核对键。抽取规则变了由录入那一组判法单元的键管，
-    /// 不靠手写的版本号。
+    /// 事实表的摘要：[`Self::to_bytes`] 整份字节的 SHA-256，进核对键。字节里只有事实本身，没有头与版本号：
+    /// 抽取规则变了，抽出的字节跟着变、摘要跟着变；抽取代码本身不进键。
     #[must_use]
     pub fn digest(&self) -> [u8; DIGEST_BYTES] {
-        let bytes = self.to_bytes();
-        sha256_digest(&bytes[FACTS_LAYOUT_MAGIC.len()..])
+        sha256_digest(&self.to_bytes())
     }
 
     /// 序号落在哪一段；等于段数就是最后全部持久那一个状态。
@@ -763,10 +756,10 @@ impl FlowFacts {
         )
     }
 
-    /// 序列化：全部小端定宽，字段次序就是 [`Self::from_bytes`] 读的次序。
+    /// 序列化：全部小端定宽，从头一个字节起就是已录写数，字段次序就是 [`Self::from_bytes`] 读的次序；不带头、不带版本号。
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut out = FACTS_LAYOUT_MAGIC.to_vec();
+        let mut out = Vec::new();
         let put32 = |serialized: &mut Vec<u8>, value: u32| {
             serialized.extend_from_slice(&value.to_le_bytes())
         };
@@ -854,13 +847,10 @@ impl FlowFacts {
         out
     }
 
-    /// 反序列化；不是布局版本 [`FACTS_LAYOUT_VERSION`] 的头（[`FACTS_LAYOUT_MAGIC`]）、字节不够或对不上返回 None。
+    /// 反序列化；字节不够、对不上或后面多出字节返回 None。
     #[must_use]
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         let mut cursor = Cursor { bytes, at: 0 };
-        if cursor.take(FACTS_LAYOUT_MAGIC.len())? != FACTS_LAYOUT_MAGIC {
-            return None;
-        }
         let recorded_write_count = cursor.u32()?;
         let enumerated_write_count = cursor.u32()?;
         let tearable_count = cursor.u32()? as usize;
@@ -993,14 +983,8 @@ impl FlowFactsReadBack {
         bytes: &[u8],
         digest: &[u8; DIGEST_BYTES],
     ) -> Result<Self, String> {
-        if !bytes.starts_with(FACTS_LAYOUT_MAGIC) {
-            return Err(format!(
-                "事实表的布局不是版本 {FACTS_LAYOUT_VERSION}，不认（头不是 {}）：重跑录入段",
-                String::from_utf8_lossy(FACTS_LAYOUT_MAGIC)
-            ));
-        }
         let facts = FlowFacts::from_bytes(bytes)
-            .ok_or_else(|| "事实表解不出（字节坏了或编码换了）：重跑录入段".to_string())?;
+            .ok_or_else(|| "事实表解不出（字节坏了或不是这一版的编码）：重跑录入段".to_string())?;
         if facts.digest() != *digest {
             return Err("事实表摘要对不上：库里那份坏了，重跑录入段".to_string());
         }
@@ -1815,31 +1799,49 @@ mod tests {
         );
     }
 
-    /// 头不是这一版布局头（[`FACTS_LAYOUT_MAGIC`]）的事实表字节读到就拒，拒跑句点名这一版的布局版本，不按这一版的布局去解。
+    /// 事实表的字节从头一个字节起就是数据（已录写数、枚举写数……，不带头、不带版本号），摘要就是这份字节的 SHA-256：
+    /// 两份事实表只差态数，摘要就不同；这一份的字节按它的摘要读回原样，按别的摘要不认。
+    /// 判别力（`crates/mutations.tsv`）：序列化开头又写一段头、摘要只取字节的前 8 个，这条各红。
     #[test]
-    fn facts_table_without_the_layout_header_of_this_version_is_refused_naming_the_layout_version()
-    {
+    fn facts_bytes_start_with_the_data_and_their_digest_is_the_sha256_of_the_data_alone() {
         let facts = FlowFacts {
             recorded_write_count: 1,
-            enumerated_write_count: 1,
-            is_tearable: vec![false],
+            enumerated_write_count: 2,
+            is_tearable: vec![false, true],
             torn_images: vec![],
             segments: vec![],
-            state_count: 1,
+            state_count: 3,
             units: vec![],
             roots: vec![],
             newest_base_root: None,
         };
         let bytes = facts.to_bytes();
-        assert!(bytes.starts_with(FACTS_LAYOUT_MAGIC));
-        let bytes_without_the_header = &bytes[FACTS_LAYOUT_MAGIC.len()..];
-        let refused =
-            FlowFactsReadBack::from_the_library_bytes(bytes_without_the_header, &facts.digest())
-                .expect_err("头不是这一版布局头的事实表不认");
-        assert!(refused.contains("布局不是版本 2，不认"), "{refused}");
+        // 已录写数、枚举写数、可撕裂表长各 4，可撕裂表两个字节，撕裂镜像数、段数各 4，态数 8，单元数、根数、基线最新根各 4
+        assert_eq!(
+            bytes.len(),
+            4 + 4 + 4 + 2 + 4 + 4 + 8 + 4 + 4 + 4,
+            "字节里只有这几格数据"
+        );
+        assert_eq!(&bytes[..4], &1u32.to_le_bytes(), "头一个字节起就是已录写数");
+        assert_eq!(&bytes[4..8], &2u32.to_le_bytes(), "接着是枚举写数");
+        assert_eq!(
+            facts.digest(),
+            sha256_digest(&bytes),
+            "摘要就是整份字节的 SHA-256"
+        );
+        let mut one_more_state = facts.clone();
+        one_more_state.state_count += 1;
+        assert_ne!(
+            one_more_state.digest(),
+            facts.digest(),
+            "态数不同，摘要不同"
+        );
+        let read_back = FlowFactsReadBack::from_the_library_bytes(&bytes, &facts.digest())
+            .expect("这一份的字节按它的摘要照读");
+        assert_eq!(*read_back, facts, "读回原样");
         assert!(
-            FlowFactsReadBack::from_the_library_bytes(&bytes, &facts.digest()).is_ok(),
-            "这一版布局的照读"
+            FlowFactsReadBack::from_the_library_bytes(&bytes, &one_more_state.digest()).is_err(),
+            "按别的摘要不认"
         );
     }
 

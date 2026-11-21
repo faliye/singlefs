@@ -542,18 +542,14 @@ pub mod common_gpu_cards_of_the_caller;
 
 /// 清过场（服务给了卡）、用例自己写的多机配置（`SINGLEFS_MULTI_HOST_CONFIG` 指的那一份）开了 GPU，环境变量 `GPU_CARDS_BY_PRIORITY`
 /// 却没设（用例的环境守卫清掉了）时：把调用方给这个进程的卡交给这一趟
-/// （`common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run`：服务交的卡串设成这个环境变量，一张卡都没点名是空串、本机能用的卡全用；
-/// 按需领卡的尝试交的是领卡通道的，把通道设回环境、不领卡），交回的守卫丢掉时还原；别的情形不动环境、交 `None`。
-/// 用例配置里写没写显卡先后都一样：配置里的卡不拿来挑卡，没经服务给卡、配置又开了 GPU 的，清没清场都照「清场与分卡由服务做」拒
-/// （`cards_by_priority_from`）。没清场而调用方给了领卡通道的照样交通道，这一趟录完、第一次真要卡时才领（只录的那一趟不领）；
-/// 没清场也没有通道的不设：要卡的那一趟没经服务给卡就该拒，没要卡的那一趟（不带 gpu 特性）不取卡。
-/// 用例的环境守卫（`CrashAmplificationEnvironment`）清掉了通道目录与凭据，用例自己不设回的话这一刻环境里没有完整的通道，所以由这里设回。
+/// （`common_gpu_cards_of_the_caller::cards_of_the_caller_handed_to_the_run`：服务交的卡串原样设成这个环境变量，没交卡串的不设），
+/// 交回的守卫丢掉时还原；别的情形不动环境、交 `None`。
+/// 用例配置里写没写显卡先后都一样：配置里的卡不拿来挑卡，没经服务给卡、配置又开了 GPU 的，清没清场都照没经服务给卡那一句拒
+/// （`cards_by_priority_from`）。没清场的不设、不问调用方有没有借卡通道：这一趟走到的取卡都在判段（观察者那一段、给定状态引擎），
+/// 判段取卡不问借卡通道、不借卡，要卡的那一趟没经服务给卡就该拒，没要卡的那一趟（不带 gpu 特性）不取卡。
 /// 经环境交过去的就是调用方的那一份，与卡池挑的卡对得上。
-///
-/// # Panics
-/// 调用方的多机配置读不了、显卡先后写坏了，或清场之下没经服务给卡、也没有领卡通道而调用方的多机配置开了 GPU（GPU 用例整条经 `task-server/task submit` 交）。
-fn cards_of_the_caller_for_a_test_configuration_with_the_gpu() -> Option<EnvironmentRestoredOnDrop>
-{
+pub fn cards_of_the_caller_for_a_test_configuration_with_the_gpu(
+) -> Option<EnvironmentRestoredOnDrop> {
     use singlefs_verification::gpu_card_configuration::{
         configuration_value, GpuQuiesce, CARDS_BY_PRIORITY_KEY, GPU_SWITCH_KEY,
         MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
@@ -568,11 +564,8 @@ fn cards_of_the_caller_for_a_test_configuration_with_the_gpu() -> Option<Environ
         .is_some_and(|value| value.trim().trim_matches('"') == "1");
     match GpuQuiesce::of_this_process() {
         GpuQuiesce::QuiescedByTheWrapper => {}
-        GpuQuiesce::NotQuiesced => {
-            // 按需领卡的尝试起跑不清场（服务在交卡之前才清）：调用方给了领卡通道的照样往下，把通道交给这一趟（不在这里领）
-            singlefs_verification::gpu_card_configuration::GpuConfigurationOfTheCaller::of_this_process()
-                .card_lease_channel()?;
-        }
+        // 判段取卡不问借卡通道：调用方有没有通道都不交，与没有通道的那一趟同一个结局
+        GpuQuiesce::NotQuiesced => return None,
     }
     if !gpu_is_enabled {
         return None;

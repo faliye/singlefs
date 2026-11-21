@@ -45,15 +45,7 @@ const CARD_TAKING_FUNCTIONS_THROUGH_THE_ENTRY: [&str; 3] = [
 
 /// 改走卡池的测试文件（相对包根）与它的正文：每份至少一处调 [`CARD_POOL_FUNCTION`]，[`NAMES_THAT_BYPASS_THE_POOL`] 一处都不许有。
 /// 正文按字面文件名编进测试二进制，变异判法的单元键才认得出读的是哪几份文件；相对路径只用来报错与比对名单，两段指同一份文件。
-const FILES_THAT_TAKE_CARDS_ONLY_FROM_THE_POOL: [(&str, &str); 10] = [
-    (
-        "tests/crash_amplification_pipeline_records_checks_and_reuses.rs",
-        include_str!("crash_amplification_pipeline_records_checks_and_reuses.rs"),
-    ),
-    (
-        "tests/crash_amplification_product_path_books_its_scratch_on_the_card_pool.rs",
-        include_str!("crash_amplification_product_path_books_its_scratch_on_the_card_pool.rs"),
-    ),
+const FILES_THAT_TAKE_CARDS_ONLY_FROM_THE_POOL: [(&str, &str); 8] = [
     (
         "tests/crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs",
         include_str!("crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs"),

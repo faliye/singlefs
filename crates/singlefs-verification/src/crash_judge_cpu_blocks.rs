@@ -1,10 +1,8 @@
 //! CPU 路线判一块：崩溃放量判段没配 GPU 时，一条核对线程判一块里的一段状态、交回存库之前的那几样。
 //!
-//! 它是判镜像的定义那一组判法单元（`judgement_of_the_crash_images`，`crate::judging_units_entries`）的入口之一：镜像判定的版本
-//! 不分路线（「数据不与设备绑定」「GPU 判器代码进键」，`crate::crash_identity::judgement_units_key_with_the_gpu_judge`），
-//! 所以 CPU 路线逐块判的代码一改，两条路线判过的块一起换版本、一起现判；不登进去，这里改了块照样复用。
-//! 放在判器一侧、不放在流水线（`crate::crash_amplification`）里：判器的闭包里不许有流水线的单元
-//! （`crate::judging_units_entries::PIPELINE_FILES_THE_JUDGES_MUST_NOT_REACH`）。谁调它、日志怎么打、结论怎么存都留在流水线，不进这一组的键。
+//! 镜像判定的版本由结论种类与判器引到的被检测产品代码定（`crate::crash_identity::ConclusionVersion::of_the_crash_image_judgement`），判器的代码不进键：这里改了，
+//! 判过的块照样复用，判法改了对不对靠对拍与复用哨兵抓。
+//! 放在判器一侧、不放在流水线（`crate::crash_amplification`）里：判一段状态的判法与谁调它、日志怎么打、结论怎么存分开，后几样留在流水线。
 
 use std::ops::Range;
 

@@ -11,7 +11,7 @@
 //! 带与不带 discard 两份逐条同种类、分配记录树读不出时 I-3.10 报那一句部分没判、读得出时判成立）逐条钉在这里，判在从库里读回的 CPU 参照上。
 //! 每张镜像两边的输入都经对拍那一类的库：GPU 那一侧把镜像当基线、一个空持久集合建判表，判表入库再读回上卡；CPU 那一侧把镜像作一张给定状态表
 //! 写进库、读回，池级 checker 判读回的那一份。两边判出的东西（CPU 逐条的判定、GPU 那一个状态的结论字）作一份对拍结论入库（
-//! `crash_library::pairing_conclusion_reused_or_judged`）：键是这张镜像的输入摘要与两边判法单元的键，同一张镜像再判时从库里
+//! `crash_library::pairing_conclusion_reused_or_judged`）：键只是这张镜像的输入摘要（两边判器的代码不进键），同一张镜像再判时从库里
 //! 复用、不上卡也不再判；比法与断言每趟照读回的那一份现比，不进键。逐条不变量比违例位与判到位（判到位 = 成立或违例；不适用与部分没判两边都不置位），
 //! GPU 判不了判红。
 //! 要本机一张 NVIDIA 独显：一张适配器都没有时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」。要 `gpu` 特性。
@@ -40,7 +40,7 @@ use singlefs_core::transaction::{FirstFile, TransactionOutput};
 use singlefs_format::SLOT_BYTES;
 use singlefs_verification::crash::CrashPointReplaySegmentExpansion;
 use singlefs_verification::crash_amplification::RecordedGivenStatesTable;
-use singlefs_verification::crash_identity::{judging_units_key, JudgingUnits, SectorImage};
+use singlefs_verification::crash_identity::SectorImage;
 use singlefs_verification::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
 use singlefs_verification::crash_judge_gpu::{
     cross_check_words_of_gpu_verdict, pool_checker_bits_agree_in_the_cross_check,
@@ -51,8 +51,8 @@ use singlefs_verification::crash_judge_tables::{
     build_judge_tables_for_the_given_persisted_sets, JudgeFlow, JudgeTables,
 };
 use singlefs_verification::crash_library::{
-    pairing_conclusion_reused_or_judged, toolchain_of_this_process, CrashLibrary,
-    CrashLibraryClass, PairingAgreement, PairingConclusionSource, PairingJudged,
+    pairing_conclusion_reused_or_judged, CrashLibrary, CrashLibraryClass, PairingAgreement,
+    PairingConclusionSource, PairingJudged,
 };
 use singlefs_verification::gpu_unit_checks::gpu_test_start::{
     cpu_reference_table_read_back_from_the_pairing_library, gpu_card_pool_or_report_not_run,
@@ -470,9 +470,8 @@ fn judgements_of_both_judges_on_the_image(
 }
 
 /// 一张镜像两边各判一次（GPU 那一侧把镜像当基线、一个空持久集合建判表）。对拍结论入库（
-/// `crash_library::pairing_conclusion_reused_or_judged`）：键是这张镜像的输入摘要（[`pairing_inputs_digest`]）与两边判法单元的键
-/// （GPU 判器那一组；CPU 那一侧调的池级 checker `check_pool_image` 在判镜像的定义那一组 `judgement_of_the_crash_images` 的闭包里），
-/// 库里有就复用、不上卡也不再判；没有就两边都判、两边判出的东西按键存进库。两边哪一边的判法单元拒算：照判、不入库。
+/// `crash_library::pairing_conclusion_reused_or_judged`）：键只是这张镜像的输入摘要（[`pairing_inputs_digest`]；GPU 判器与 CPU 那一侧调的
+/// 池级 checker `check_pool_image` 的代码都不进键），库里有就复用、不上卡也不再判；没有就两边都判、两边判出的东西按键存进库。
 /// 每趟打一行 `GPU_SECONDARY_READS_PAIRING_CONCLUSION table=<表名> source=<ReusedFromTheLibrary|JudgedNow>`。
 /// 只录那一趟、卡借不到交 `None`（不存进库）；GPU 判不了（建不出判表，或结论里判不了那一位）判红。
 fn judge_the_image_on_both_judges(
@@ -495,17 +494,12 @@ fn judge_the_image_on_both_judges(
         vec![Vec::new()],
     )
     .unwrap_or_else(|refusal| panic!("{table_name}：建不出判表（GPU 判不了）：{refusal:?}"));
-    let judging_units = |units: JudgingUnits| {
-        judging_units_key(&units, toolchain_of_this_process()).map_err(|refused| refused.sentence())
-    };
     let library =
         CrashLibrary::open(CrashLibraryClass::JudgeTablesPairing).expect("对拍那一类的库开得了");
     let paired = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         pairing_conclusion_reused_or_judged(
             &library,
             &pairing_inputs_digest(image, &tables),
-            &judging_units(JudgingUnits::GpuJudge),
-            &judging_units(JudgingUnits::JudgementOfTheCrashImages),
             || {
                 let judgements =
                     judgements_of_both_judges_on_the_image(cards, table_name, image, &tables)

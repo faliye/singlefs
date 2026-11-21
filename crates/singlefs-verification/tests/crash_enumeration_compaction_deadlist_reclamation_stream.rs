@@ -1,4 +1,4 @@
-//! 验证包模块：crash、crash_state_enumeration、crash_library
+//! 验证包模块：crash、crash_state_enumeration、crash_library、crash_amplification
 //! 整理搬只被快照引用的单元、deadlist 跨两代实例记与清、回收的流（录法在 `common_compaction_prefix` 的
 //! `record_the_compaction_of_snapshot_units_flow`）。
 //! 流头在基镜像里、不枚举：实例 1 第一个文件 → 建快照之前覆盖写第一个文件、连带建空 inode（inode 树连同第一个文件填满 6 个叶容器，
@@ -13,6 +13,10 @@
 //! 崩溃放量那一路的基镜像取在 mkfs 之后（标准前缀上的观察者要有状态可看），展开到 6 写的段。
 //!
 //! 每段都展开、与闭式比，登记成崩溃枚举用例，带断点续跑、可双机分片。
+//! 同一组崩溃状态另有一条在 CPU 判器上判的崩溃枚举用例（只开 CPU 的多机配置，先录进库、再从库读回判；两个观察者同上，挂完的盘同样在判段过池级 checker）：
+//! 多机配置开着 GPU 时上面那一条的判段交 GPU 判器，这一条的判段一律交 CPU 判器；两条经同一个枚举函数录同一条流、挂同两个观察者，块键相同，
+//! 库里有上面那一条判过的块就照块复用。改坏池级 checker 判反的变异行点名上面那一条（改 GPU 判器那一份），这一条的变异行在录入段之前就红。
+//! 它不多罩崩溃状态，多跑的是 CPU 判器那一遍判。
 
 mod common;
 mod common_compaction_crash_point_observers;
@@ -37,7 +41,11 @@ use singlefs_verification::crash::{
     CrashPointReplayObserverCounts, CrashPointReplaySegmentExpansion, CrashPointReplayTally,
     CrashPointReplayVersionTable,
 };
-use singlefs_verification::crash_library::StageOutcome;
+use singlefs_verification::crash_amplification::CrashAmplificationEnvironment;
+use singlefs_verification::crash_library::{
+    multi_host_configuration_on_the_cpu_keeping_the_prune_server_of, ExclusiveTemporaryDirectory,
+    StageOutcome, TheOneLibraryKeptForThisProcess,
+};
 use singlefs_verification::crash_state_enumeration::{
     enumerate_crash_states_with_every_kind_of_observer, CrashPointReplayItem,
 };
@@ -211,38 +219,11 @@ fn judged_tally_or_left_to_another_stage(
 #[test]
 fn full_enumeration_of_the_compaction_deadlist_reclamation_stream_is_exhaustive_and_clean() {
     let prepared = prepare("compaction-deadlist-reclamation-full");
-    let versions_of_the_flow = prepared.versions_of_the_flow.as_slice();
-    let observe = |_ordinal: u64,
-                   image: &CrashImage<'_>,
-                   report: &RecoveryReport,
-                   counts: &mut CrashPointReplayObserverCounts| {
-        observe_the_landed_version_reading_through_the_mapping(
-            versions_of_the_flow,
-            image,
-            report,
-            counts,
-        );
-    };
-    let observe_the_mount =
-        |_ordinal: u64,
-         image: &CrashImage<'_>,
-         report: &RecoveryReport,
-         counts: &mut CrashPointReplayObserverCounts| {
-            observe_the_mount_continuing_the_compaction(versions_of_the_flow, image, report, counts)
-        };
-    let tally_outcome = enumerate_crash_states_with_every_kind_of_observer(
-        CrashPointReplayItem {
-            name: "compaction_deadlist_reclamation::full",
-            setting_file: PATH_OF_THIS_TEST_FILE,
-        },
-        &prepared.base,
-        &prepared.writes,
-        &prepared.segments,
-        prepared.judged_root_index,
-        version_table(&prepared),
+    let tally_outcome = enumerate_with_both_observers(
+        &prepared,
+        "compaction_deadlist_reclamation::full",
         &full_expansion,
-        &[landed_version_observer(&prepared, &observe)],
-        &[mount_continuation_observer(&prepared, &observe_the_mount)],
+        JudgeOfTheEnumeration::ConfiguredByTheCaller,
     );
     let Some(tally) = judged_tally_or_left_to_another_stage(tally_outcome) else {
         return;
@@ -269,6 +250,177 @@ fn full_enumeration_of_the_compaction_deadlist_reclamation_stream_is_exhaustive_
         tally.states,
         closed_form,
         "compaction_deadlist_reclamation_stream：用例自己的展开下的闭式",
+    );
+    assert_every_state_was_observed(&prepared, &tally, &landed_counters(&prepared));
+}
+
+/// 在只开 CPU 的多机配置下跑 `enumerate`：照调用方的多机配置写一份只开 CPU 的（`crash_library::multi_host_configuration_on_the_cpu_keeping_the_prune_server_of`：
+/// 不开 GPU，判段交 CPU 判器；照抄 prune-server 的地址，块照块键与判器组的单元键进全仓那一份库），环境守卫里把多机配置指过去；
+/// 调用方设了 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`（指定范围的那几趟可缩域）照它缩，守卫清掉之前记下、清完设回（别的变量照清，只换多机配置）。
+/// 只开 CPU 的配置写在 `tag` 起名的测试自己的临时目录里，`enumerate` 跑完连同两个守卫一起放掉。
+///
+/// 换上之后、`enumerate` 之前（录入段与判段都还没起）核这个进程读到的就是那一份、它定的跑法不上卡：换不上的当场红，
+/// 不照调用方的配置往下判（`crates/mutations.tsv` 里每份文件一行把换上的那一份改回调用方的，红在这里）。
+///
+/// # Panics
+/// 调用方的多机配置取不到、临时目录建不了、只开 CPU 的配置写不进；换上之后这个进程读到的不是那一份，或那一份定的跑法上卡。
+// gpu-exempt: cpu-judge-mutation-rows
+fn with_only_the_cpu_judge_configured<Outcome>(
+    tag: &str,
+    enumerate: impl FnOnce() -> Outcome,
+) -> Outcome {
+    // 调用方的多机配置在守卫清掉 SINGLEFS_MULTI_HOST_CONFIG 之前取（仓副本里只经这个变量交进来）
+    let configuration_of_the_caller =
+        singlefs_verification::crash_amplification::multi_host_configuration_of_this_process()
+            .unwrap_or_else(|refusal| panic!("{refusal}"))
+            .configuration_file;
+    let configuration_directory =
+        ExclusiveTemporaryDirectory::create(tag).unwrap_or_else(|refusal| panic!("{refusal}"));
+    let configuration_on_the_cpu = configuration_directory.join("multi-host-on-the-cpu.env");
+    std::fs::write(
+        &configuration_on_the_cpu,
+        multi_host_configuration_on_the_cpu_keeping_the_prune_server_of(
+            &configuration_of_the_caller,
+        )
+        .unwrap_or_else(|refusal| panic!("{refusal}")),
+    )
+    .expect("测试自己的临时目录里写得了只开 CPU 的多机配置");
+    // 调用方缩过域的那一趟照它缩：守卫清掉一趟读的全部变量之前记下，清完设回
+    let narrowing_of_the_caller = std::env::var_os(
+        singlefs_verification::crash_amplification::EXPAND_UP_TO_ENVIRONMENT_VARIABLE,
+    );
+    // 先拿全仓那一份的守卫、再拿改环境的锁（`crash_library::TheOneLibraryKeptForThisProcess` 文档里的次序）；丢的时候倒过来
+    let _the_one_library = TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
+    let mut environment = CrashAmplificationEnvironment::cleared_then_set(&[(
+        singlefs_verification::gpu_card_configuration::MULTI_HOST_CONFIGURATION_ENVIRONMENT_VARIABLE,
+        configuration_on_the_cpu.as_os_str(),
+    )]);
+    if let Some(expand_up_to) = &narrowing_of_the_caller {
+        environment.set_variable(
+            singlefs_verification::crash_amplification::EXPAND_UP_TO_ENVIRONMENT_VARIABLE,
+            expand_up_to,
+        );
+    }
+    let configuration_in_effect =
+        singlefs_verification::crash_amplification::multi_host_configuration_of_this_process()
+            .unwrap_or_else(|refusal| panic!("{refusal}"));
+    assert_eq!(
+        configuration_in_effect.configuration_file, configuration_on_the_cpu,
+        "环境守卫里换上的多机配置是测试自己写的那一份只开 CPU 的"
+    );
+    assert!(
+        !configuration_in_effect.mode.uses_gpu(),
+        "只开 CPU 的多机配置定的跑法不上卡：{}",
+        configuration_in_effect.mode.name()
+    );
+    enumerate()
+}
+
+/// 判段交哪一个判器（[`enumerate_with_both_observers`] 的最后一个参数）。全量那两条只差这一样：录的是同一条流、挂的是同两个观察者，块键相同，
+/// CPU 判器那一条从库里复用另一条判过的块。
+enum JudgeOfTheEnumeration {
+    /// 照调用方的多机配置：开着 GPU 交 GPU 判器，没开交 CPU 判器。
+    ConfiguredByTheCaller,
+    /// 只开 CPU 的多机配置（[`with_only_the_cpu_judge_configured`]，那一份写进 `configuration_label` 起名的临时目录）：判段一律交 CPU 判器。
+    TheCpuJudgeOnly { configuration_label: &'static str },
+}
+
+/// 按 `expansion` 枚举一趟，项名 `item_name`，每个状态交两个观察者（读每一版的活快照、搬迁之后照映射读；可写挂载续做，交回挂完的盘），
+/// 判段交 `judge` 点名的判器；交回判段整份的结局（[`judged_tally_or_left_to_another_stage`] 收）。全量与 CPU 判器那一条全量都经它。
+fn enumerate_with_both_observers(
+    prepared: &PreparedCompactionCrashFlow,
+    item_name: &str,
+    expansion: &dyn Fn(usize, &[usize]) -> CrashPointReplaySegmentExpansion,
+    judge: JudgeOfTheEnumeration,
+) -> StageOutcome<CrashPointReplayTally> {
+    let versions_of_the_flow = prepared.versions_of_the_flow.as_slice();
+    let observe = |_ordinal: u64,
+                   image: &CrashImage<'_>,
+                   report: &RecoveryReport,
+                   counts: &mut CrashPointReplayObserverCounts| {
+        observe_the_landed_version_reading_through_the_mapping(
+            versions_of_the_flow,
+            image,
+            report,
+            counts,
+        );
+    };
+    let observe_the_mount =
+        |_ordinal: u64,
+         image: &CrashImage<'_>,
+         report: &RecoveryReport,
+         counts: &mut CrashPointReplayObserverCounts| {
+            observe_the_mount_continuing_the_compaction(versions_of_the_flow, image, report, counts)
+        };
+    let enumerate = || {
+        enumerate_crash_states_with_every_kind_of_observer(
+            CrashPointReplayItem {
+                name: item_name,
+                setting_file: PATH_OF_THIS_TEST_FILE,
+            },
+            &prepared.base,
+            &prepared.writes,
+            &prepared.segments,
+            prepared.judged_root_index,
+            version_table(prepared),
+            expansion,
+            &[landed_version_observer(prepared, &observe)],
+            &[mount_continuation_observer(prepared, &observe_the_mount)],
+        )
+    };
+    match judge {
+        JudgeOfTheEnumeration::ConfiguredByTheCaller => enumerate(),
+        JudgeOfTheEnumeration::TheCpuJudgeOnly {
+            configuration_label,
+        } => with_only_the_cpu_judge_configured(configuration_label, enumerate),
+    }
+}
+
+/// 全量的 CPU 判器那一条：同一条流、同一组崩溃状态（基镜像取在流头之后，每段展开任意真子集）、同两个观察者，在只开 CPU 的多机配置下
+/// 先录进库、再从库读回，逐状态在 CPU 判器上判（两遍恢复 + 多版本 oracle、池级 checker、记录核对器；挂完的盘在判段同样交 CPU 判器过池级 checker）。
+/// 状态数等于闭式（缩过域照缩域的判），判器零红，观察者计数同上面那条全量。判完打计数行 `CRASH_POINT_REPLAY_COMPACTION_DEADLIST_RECLAMATION_ON_THE_CPU_JUDGE`，
+/// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:compaction-deadlist-reclamation-on-the-cpu-judge`）。
+/// 与上面那条全量经同一个 [`enumerate_with_both_observers`]，只差判段交哪一个判器：块键相同，库里有上面那条判过的块就照块复用、不在 CPU 上重判。
+/// 判别力（`crates/mutations.tsv`「整理搬快照单元流 CPU 判器那一条：环境守卫里换上的多机配置改回调用方那一份」）：换不上只开 CPU 的配置，
+/// [`with_only_the_cpu_judge_configured`] 在录入段之前就红。池级 checker 判反的判别力由点名上面那条全量的变异行担（改 GPU 判器那一份）。
+// gpu-exempt: cpu-judge-mutation-rows
+#[test]
+fn full_enumeration_of_the_compaction_deadlist_reclamation_stream_judged_on_the_cpu_judge_is_exhaustive_and_clean(
+) {
+    let prepared = prepare("compaction-deadlist-reclamation-full-on-the-cpu-judge");
+    let tally_outcome = enumerate_with_both_observers(
+        &prepared,
+        "compaction_deadlist_reclamation::full_on_the_cpu_judge",
+        &full_expansion,
+        JudgeOfTheEnumeration::TheCpuJudgeOnly {
+            configuration_label: "compaction-deadlist-reclamation-on-the-cpu-judge",
+        },
+    );
+    let Some(tally) = judged_tally_or_left_to_another_stage(tally_outcome) else {
+        return;
+    };
+    let closed_form = crash_state_count_with_torn_in_place_overwrites(
+        &prepared.base,
+        &prepared.writes,
+        &prepared.segments,
+        &full_expansion,
+    );
+    println!(
+        "CRASH_POINT_REPLAY_COMPACTION_DEADLIST_RECLAMATION_ON_THE_CPU_JUDGE states={} closed_form={} exhaustive={} violations={} observer {:?} states_by_publish=[{}] checker {} first_violation={}",
+        tally.states,
+        closed_form,
+        tally.states == closed_form,
+        tally.violations,
+        tally.observer_counts,
+        tally.states_by_publish_text(),
+        tally.checker_counts_by_invariant(),
+        tally.first_violation.as_deref().unwrap_or("none")
+    );
+    assert_clean(&tally);
+    singlefs_verification::crash_state_enumeration::assert_the_counted_states_equal_the_closed_form_unless_narrowed(
+        tally.states,
+        closed_form,
+        "compaction_deadlist_reclamation_stream（CPU 判器）：用例自己的展开下的闭式",
     );
     assert_every_state_was_observed(&prepared, &tally, &landed_counters(&prepared));
 }

@@ -12,7 +12,7 @@ use singlefs_core::make_filesystem::{
 use singlefs_core::root_ring::{RootRingSlot, RootRingSlotsPerRegion};
 use singlefs_core::system_configuration::SystemImmutableSizes;
 use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
-use singlefs_verification::memory_pool::{SparseBlockDevice, SparseDevice};
+use singlefs_verification::memory_pool::SparseBlockDevice;
 use singlefs_verification::{RecordingBlockDevice, SharedStream};
 
 const DEVICE_BYTES: u64 = 4 << 30;
@@ -75,9 +75,8 @@ fn assert_nothing_was_written(
         "{geometry_named}：录制流里一步都没有"
     );
     for (identity, device) in devices {
-        assert_eq!(
-            device.wrapped_device().image,
-            SparseDevice::default(),
+        assert!(
+            device.wrapped_device().image.written_sectors().is_empty(),
             "{geometry_named}：盘 {identity:?} 一个扇区都没写"
         );
     }

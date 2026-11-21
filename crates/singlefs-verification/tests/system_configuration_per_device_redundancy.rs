@@ -19,6 +19,7 @@ use scenarios_of_system_configuration_per_device_redundancy::{
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::recovery::{
     choose_system_configuration, recover, JournalPolicy, PoolReader, RecoveryFailure,
     RecoveryOutcome,
@@ -72,6 +73,12 @@ impl PoolReader for PoolWithUnreadableSystemConfigurationSlots<'_> {
     /// 这个包装只让系统配置槽读不出，不改几何：盘多大照问内层。
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.image.device_size_in_bytes(device)
+    }
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        self.image.physical_block_size_probed_on_the_device(device)
     }
     fn read(
         &self,

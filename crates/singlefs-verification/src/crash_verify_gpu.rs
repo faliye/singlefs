@@ -24,7 +24,7 @@ use crate::gpu_unit_checks::{
 /// 每个工作组 64 个状态。
 const FACTS_VERIFY_KERNEL_WORKGROUP_SIZE: usize = 64;
 /// 每条录制流的写在 `recorded` 表里占几个 u32：取几态、撕裂镜像下标、重放起点、重放条数。
-/// 这几个表宽公开给崩溃放量记显存账（`crate::crash_amplification` 的 `facts_verifier_buffer_footprint`，今天在那边抄了一份）。
+/// 这几个表宽公开给在卡上建核对器、照表宽记显存账的调用方。
 pub const FACTS_VERIFIER_WORDS_PER_RECORDED_WRITE: usize = 4;
 /// 每一段在 `segments` 表里占几个 u32：数位那一组写的起点与条数、状态起点 lo/hi、状态终点 lo/hi、展开方式码
 /// （[`SegmentExpansionFact::code`]）、整组落的单元写那一组的起点与条数（只有甲二段有，别的段 0 条；两组合起来是段里全部的写）、

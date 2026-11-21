@@ -1,0 +1,141 @@
+//! 空间准入这一族 harness 场景交出的镜像：挂载态上的准入公式、拒绝之前先抬回收下限、单元落不到挂载聚簇段之外时先拒、行发布的准入。
+
+use super::*;
+
+// ─── `tests/admission_formula_on_the_mounted_state.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/admission_formula_on_the_mounted_state.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_formula_on_the_mounted_state::run_the_scenario_where_writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted`）。
+#[test]
+fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted",
+        scenarios_of_admission_formula_on_the_mounted_state::run_the_scenario_where_writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_the_row_publish_and_is_admitted,
+    );
+}
+
+// ─── `tests/admission_raises_the_floor_before_refusing.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version`）。
+#[test]
+fn mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue`）。
+#[test]
+fn mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims`）。
+#[test]
+fn mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version`）。
+#[test]
+fn an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor`）。
+#[test]
+fn after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes`）。
+#[test]
+fn after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck`）。
+#[test]
+fn crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/admission_raises_the_floor_before_refusing.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount`）。
+#[test]
+fn mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount",
+        scenarios_of_admission_raises_the_floor_before_refusing::run_the_scenario_where_mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount,
+    );
+}
+
+// ─── `tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments::run_the_scenario_where_with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write`）。
+#[test]
+fn with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write",
+        scenarios_of_admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments::run_the_scenario_where_with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write,
+    );
+}
+
+// ─── `tests/row_publish_admission.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/row_publish_admission.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_row_publish_admission::run_the_scenario_where_writable_mount_on_the_pool_whose_row_publish_used_to_be_refused_before_acquisition_succeeds`）。
+#[test]
+fn writable_mount_on_the_pool_whose_row_publish_used_to_be_refused_before_acquisition_succeeds() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "writable_mount_on_the_pool_whose_row_publish_used_to_be_refused_before_acquisition_succeeds",
+        scenarios_of_row_publish_admission::run_the_scenario_where_writable_mount_on_the_pool_whose_row_publish_used_to_be_refused_before_acquisition_succeeds,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/row_publish_admission.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_row_publish_admission::run_the_scenario_where_writable_mount_on_the_pool_whose_second_warm_up_used_to_be_refused_before_acquisition_succeeds`）。
+#[test]
+fn writable_mount_on_the_pool_whose_second_warm_up_used_to_be_refused_before_acquisition_succeeds()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "writable_mount_on_the_pool_whose_second_warm_up_used_to_be_refused_before_acquisition_succeeds",
+        scenarios_of_row_publish_admission::run_the_scenario_where_writable_mount_on_the_pool_whose_second_warm_up_used_to_be_refused_before_acquisition_succeeds,
+    );
+}

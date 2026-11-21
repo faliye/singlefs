@@ -1,11 +1,11 @@
 //! 验证包模块：crash、crash_library、crash_amplification、gpu_unit_checks、crash_judge_tables、crash_judge_dispatch
-//! GPU 对拍用例的只录那一趟（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）拿着卡池把手从头到尾不起卡池、不领卡：用例开头取卡池把手
+//! GPU 对拍用例的只录那一趟（`SINGLEFS_CRASH_AMPLIFICATION_STAGE=record`）拿着卡池把手从头到尾不起卡池、不借卡：用例开头取卡池把手
 //! （`gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run` 一族，这台机器有没有卡由用例给「有」，没卡的机器上也走得到），
 //! CPU 参照那张表过对拍那一类的库（`gpu_test_start::cpu_reference_table_read_back_from_the_pairing_library`）只录、交 `None`，
 //! GPU 那一侧的对拍帮手（`crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool`）判表过库只录、交 `None`：
-//! 领卡客户端一回都没被调、这个进程的卡池没起。领卡通道是假的
-//! （`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`：每次调用记一行、
-//! 领卡退 3），不要真卡；库是一次性库，只录的那一趟写进去的不留在全仓那一份里。调用方的显卡配置、领到的卡与卡池进程里各只记一回，
+//! 借卡客户端一回都没被调、这个进程的卡池没起（起池才照调用方的借卡通道借）。借卡通道是假的
+//! （`common_gpu_cards_of_the_caller::fake_card_lease_channel_refusing_every_lease_set_into_the_process_environment`：经 `python3` 起，
+//! 每次调用记一行参数、借卡退 3），不要真卡；库是一次性库，只录的那一趟写进去的不留在全仓那一份里。调用方的显卡配置、借到的卡与卡池进程里各只记一回，
 //! 这份文件只放这一条用例。
 #![cfg(feature = "gpu")]
 

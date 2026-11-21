@@ -14,6 +14,7 @@ mod common;
 use std::collections::BTreeSet;
 
 use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::recovery::{choose_system_configuration, scan_journal, PoolReader};
 use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, SLOT_BYTES};
 use singlefs_verification::memory_pool::{
@@ -33,6 +34,12 @@ impl<Reader: PoolReader> PoolReader for WithoutJournalHint<'_, Reader> {
     }
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.0.device_size_in_bytes(device)
+    }
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        self.0.physical_block_size_probed_on_the_device(device)
     }
     fn read(
         &self,

@@ -1,0 +1,368 @@
+//! 发布、日志记录与回退这一族 harness 场景交出的镜像：多记录发布的末记录标志、事务零的多记录发布、具名单元校验代替记录前的屏障、发布失败照原样重发、行发布记录没有它的根、往前发布的回退与回退谱系记录、重放的版本取新根段的实例表与分配记录树、单元区起点跟着日志环、记录读回全零的未应用发布的账。
+
+use super::*;
+
+// ─── `tests/journal_last_record_flag_of_a_multi_record_publish.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/journal_last_record_flag_of_a_multi_record_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_journal_last_record_flag_of_a_multi_record_publish::run_the_scenario_where_with_a_readable_anchor_a_next_publish_whose_first_ordinal_is_not_one_is_not_applied_and_the_checker_reddens`）。
+#[test]
+fn with_a_readable_anchor_a_next_publish_whose_first_ordinal_is_not_one_is_not_applied_and_the_checker_reddens(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "with_a_readable_anchor_a_next_publish_whose_first_ordinal_is_not_one_is_not_applied_and_the_checker_reddens",
+        scenarios_of_journal_last_record_flag_of_a_multi_record_publish::run_the_scenario_where_with_a_readable_anchor_a_next_publish_whose_first_ordinal_is_not_one_is_not_applied_and_the_checker_reddens,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/journal_last_record_flag_of_a_multi_record_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_journal_last_record_flag_of_a_multi_record_publish::run_the_scenario_where_last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens`）。
+#[test]
+fn last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens",
+        scenarios_of_journal_last_record_flag_of_a_multi_record_publish::run_the_scenario_where_last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/journal_last_record_flag_of_a_multi_record_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_journal_last_record_flag_of_a_multi_record_publish::run_the_scenario_where_last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag`）。
+#[test]
+fn last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag",
+        scenarios_of_journal_last_record_flag_of_a_multi_record_publish::run_the_scenario_where_last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag,
+    );
+}
+
+// ─── `tests/multi_record_publishes_of_transaction_zero.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/multi_record_publishes_of_transaction_zero.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_multi_record_publishes_of_transaction_zero::run_the_scenario_where_row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recovery_and_the_checker_accept_it`）。
+#[test]
+fn row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recovery_and_the_checker_accept_it(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recovery_and_the_checker_accept_it",
+        scenarios_of_multi_record_publishes_of_transaction_zero::run_the_scenario_where_row_publish_whose_named_units_do_not_fit_one_record_spills_over_and_recovery_and_the_checker_accept_it,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/multi_record_publishes_of_transaction_zero.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_multi_record_publishes_of_transaction_zero::run_the_scenario_where_commit_marker_other_than_zero_or_one_counts_as_torn_and_breaks_the_chain_and_the_checker_reddens`）。
+#[test]
+fn commit_marker_other_than_zero_or_one_counts_as_torn_and_breaks_the_chain_and_the_checker_reddens(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "commit_marker_other_than_zero_or_one_counts_as_torn_and_breaks_the_chain_and_the_checker_reddens",
+        scenarios_of_multi_record_publishes_of_transaction_zero::run_the_scenario_where_commit_marker_other_than_zero_or_one_counts_as_torn_and_breaks_the_chain_and_the_checker_reddens,
+    );
+}
+
+// ─── `tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_named_unit_verification_stands_in_for_the_barrier_before_the_record::run_the_scenario_where_with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations`）。
+#[test]
+fn with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations",
+        scenarios_of_named_unit_verification_stands_in_for_the_barrier_before_the_record::run_the_scenario_where_with_the_barrier_before_the_record_a_publish_reusing_reclaimed_slots_keeps_every_single_withheld_state_free_of_checker_violations,
+    );
+}
+
+// ─── `tests/publish_failure_resent_unchanged.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/publish_failure_resent_unchanged.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_publish_failure_resent_unchanged::run_the_scenario_where_publish_that_fails_midway_is_frozen_and_resent_byte_for_byte_before_the_next_publish`）。
+#[test]
+fn publish_that_fails_midway_is_frozen_and_resent_byte_for_byte_before_the_next_publish() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "publish_that_fails_midway_is_frozen_and_resent_byte_for_byte_before_the_next_publish",
+        scenarios_of_publish_failure_resent_unchanged::run_the_scenario_where_publish_that_fails_midway_is_frozen_and_resent_byte_for_byte_before_the_next_publish,
+    );
+}
+
+// ─── `tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment::run_the_scenario_where_the_replayed_version_invariant_holds_over_the_untouched_record_without_its_root`）。
+#[test]
+fn the_replayed_version_invariant_holds_over_the_untouched_record_without_its_root() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_replayed_version_invariant_holds_over_the_untouched_record_without_its_root",
+        scenarios_of_replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment::run_the_scenario_where_the_replayed_version_invariant_holds_over_the_untouched_record_without_its_root,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment::run_the_scenario_where_the_replayed_version_invariant_walks_the_instance_table_of_the_new_root_segment`）。
+#[test]
+fn the_replayed_version_invariant_walks_the_instance_table_of_the_new_root_segment() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_replayed_version_invariant_walks_the_instance_table_of_the_new_root_segment",
+        scenarios_of_replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment::run_the_scenario_where_the_replayed_version_invariant_walks_the_instance_table_of_the_new_root_segment,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment::run_the_scenario_where_the_replayed_version_invariant_walks_the_allocation_record_tree_root_of_the_new_root_segment`）。
+#[test]
+fn the_replayed_version_invariant_walks_the_allocation_record_tree_root_of_the_new_root_segment() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_replayed_version_invariant_walks_the_allocation_record_tree_root_of_the_new_root_segment",
+        scenarios_of_replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment::run_the_scenario_where_the_replayed_version_invariant_walks_the_allocation_record_tree_root_of_the_new_root_segment,
+    );
+}
+
+// ─── `tests/rollback_by_a_forward_publish.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content`）。
+#[test]
+fn rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds`）。
+#[test]
+fn after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content`）。
+#[test]
+fn after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write`）。
+#[test]
+fn rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write`）。
+#[test]
+fn rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash`）。
+#[test]
+fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash`）。
+#[test]
+fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash`）。
+#[test]
+fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge`）。
+#[test]
+fn writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_the_reclaim_threshold`）。
+#[test]
+fn plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_the_reclaim_threshold(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_the_reclaim_threshold",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_the_reclaim_threshold,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root`）。
+#[test]
+fn rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_by_a_forward_publish.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_inode_number_watermark_steps_are_left_by_publishes_creating_inodes_and_carried_by_the_others_and_by_a_rollback`）。
+#[test]
+fn inode_number_watermark_steps_are_left_by_publishes_creating_inodes_and_carried_by_the_others_and_by_a_rollback(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "inode_number_watermark_steps_are_left_by_publishes_creating_inodes_and_carried_by_the_others_and_by_a_rollback",
+        scenarios_of_rollback_by_a_forward_publish::run_the_scenario_where_inode_number_watermark_steps_are_left_by_publishes_creating_inodes_and_carried_by_the_others_and_by_a_rollback,
+    );
+}
+
+// ─── `tests/rollback_lineage_record_and_its_checkpoint_cost_term.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/rollback_lineage_record_and_its_checkpoint_cost_term.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_lineage_record_and_its_checkpoint_cost_term::run_the_scenario_where_a_rollback_appends_one_lineage_record_that_reads_back_field_by_field`）。
+#[test]
+fn rollback_appends_one_lineage_record_that_reads_back_field_by_field() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "rollback_appends_one_lineage_record_that_reads_back_field_by_field",
+        scenarios_of_rollback_lineage_record_and_its_checkpoint_cost_term::run_the_scenario_where_a_rollback_appends_one_lineage_record_that_reads_back_field_by_field,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_lineage_record_and_its_checkpoint_cost_term.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_lineage_record_and_its_checkpoint_cost_term::run_the_scenario_where_a_second_rollback_appends_to_the_same_open_lineage_container`）。
+#[test]
+fn second_rollback_appends_to_the_same_open_lineage_container() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "second_rollback_appends_to_the_same_open_lineage_container",
+        scenarios_of_rollback_lineage_record_and_its_checkpoint_cost_term::run_the_scenario_where_a_second_rollback_appends_to_the_same_open_lineage_container,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/rollback_lineage_record_and_its_checkpoint_cost_term.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_rollback_lineage_record_and_its_checkpoint_cost_term::run_the_scenario_where_a_rollback_records_the_inode_number_watermark_of_the_version_it_rolls_back_from_not_of_its_target`）。
+#[test]
+fn rollback_records_the_inode_number_watermark_of_the_version_it_rolls_back_from_not_of_its_target()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "rollback_records_the_inode_number_watermark_of_the_version_it_rolls_back_from_not_of_its_target",
+        scenarios_of_rollback_lineage_record_and_its_checkpoint_cost_term::run_the_scenario_where_a_rollback_records_the_inode_number_watermark_of_the_version_it_rolls_back_from_not_of_its_target,
+    );
+}
+
+// ─── `tests/row_publish_record_without_its_root.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/row_publish_record_without_its_root.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_row_publish_record_without_its_root::c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_never_applied_and_its_two_units_stay_isolated_from_the_next_mount`）。
+#[test]
+fn row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_never_applied_and_its_two_units_stay_isolated_from_the_next_mount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_never_applied_and_its_two_units_stay_isolated_from_the_next_mount",
+        scenarios_of_row_publish_record_without_its_root::c533_row_publish_record_persisted_without_its_root_on_a_formatted_pool_is_never_applied_and_its_two_units_stay_isolated_from_the_next_mount,
+    );
+}
+
+// ─── `tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::run_the_scenario_where_a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker`）。
+#[test]
+fn one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker() {
+    judge_the_images_a_harness_scenario_hands_out(
+        "one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker",
+        scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::run_the_scenario_where_a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::run_the_scenario_where_a_128_mebibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker`）。
+#[test]
+fn journal_ring_of_128_mebibytes_puts_the_unit_area_right_after_the_ring_through_mount_and_checker()
+{
+    judge_the_images_a_harness_scenario_hands_out(
+        "journal_ring_of_128_mebibytes_puts_the_unit_area_right_after_the_ring_through_mount_and_checker",
+        scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::run_the_scenario_where_a_128_mebibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 里同名的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::run_the_scenario_where_the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it`）。
+#[test]
+fn the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it",
+        scenarios_of_unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over::run_the_scenario_where_the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it,
+    );
+}
+
+// ─── `tests/writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero.rs` ───
+
+/// 与 `crates/singlefs-verification/tests/writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::run_the_scenario_where_a_publish_whose_root_slot_and_last_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount`）。
+#[test]
+fn publish_whose_root_slot_and_last_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "publish_whose_root_slot_and_last_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount",
+        scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::run_the_scenario_where_a_publish_whose_root_slot_and_last_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::run_the_scenario_where_a_publish_whose_root_slot_and_middle_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount`）。
+#[test]
+fn publish_whose_root_slot_and_middle_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "publish_whose_root_slot_and_middle_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount",
+        scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::run_the_scenario_where_a_publish_whose_root_slot_and_middle_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount,
+    );
+}
+
+/// 与 `crates/singlefs-verification/tests/writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero.rs` 里跑同一个场景函数的用例同一个场景（场景、要判的镜像与该判成什么见
+/// `scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::run_the_scenario_where_a_publish_whose_root_slot_and_first_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount`）。
+#[test]
+fn publish_whose_root_slot_and_first_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount(
+) {
+    judge_the_images_a_harness_scenario_hands_out(
+        "publish_whose_root_slot_and_first_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount",
+        scenarios_of_writable_mount_isolates_the_account_of_an_unapplied_publish_whose_record_reads_back_zero::run_the_scenario_where_a_publish_whose_root_slot_and_first_record_read_back_zero_keeps_its_units_through_an_overwrite_and_the_unmount,
+    );
+}

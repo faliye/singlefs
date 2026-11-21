@@ -34,6 +34,7 @@ use common::{
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
+use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::journal::{
     record_offset, JournalRecord, JournalRecordOrdinalWithinPublish, JournalRecordPlaceInPublish,
 };
@@ -97,6 +98,12 @@ impl PoolReader for ReadLoggingPoolReader<'_> {
 
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.inner.device_size_in_bytes(device)
+    }
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        self.inner.physical_block_size_probed_on_the_device(device)
     }
 
     fn read(

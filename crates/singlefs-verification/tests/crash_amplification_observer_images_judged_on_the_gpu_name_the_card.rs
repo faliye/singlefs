@@ -43,7 +43,7 @@ struct RecordedFlow {
 }
 
 /// mkfs → 取号 → 两次暖机 → 新池新建文件，按 `build_pool` 的做法录；崩溃点按录制流里暖机与发布的分界切
-/// （同 `crash_amplification_product_path_books_its_scratch_on_the_card_pool.rs`，设点的文件是这一份）。
+/// （两个崩溃点的设点文件都写这一份）。
 fn record_new_pool_file_creation(tag: &str) -> RecordedFlow {
     let pool = build_pool(tag);
     let operations = pool.retained_operations();

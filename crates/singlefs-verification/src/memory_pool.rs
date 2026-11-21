@@ -23,13 +23,40 @@ use singlefs_core::root_record::{UnmountMarker, ROOT_RECORD_FLAG_UNMOUNT_MARKER}
 /// 稀疏设备的扇区宽：第一版测试镜像的 physical_block_size。
 pub const SECTOR_BYTES: u64 = 512;
 
-/// 一块盘：只存写过的扇区，没写过的读出全 0。
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// 一块盘：只存写过的扇区，没写过的读出全 0；另记这些字节是在多宽的盘上写的（[`Self::physical_block_size`]）。
+/// 扇区一律按 [`SECTOR_BYTES`] 存，与块宽无关：块宽只是这块盘的属性，内存池当读者时拿它答探测（D12（目标介质） 已定项 4）。
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SparseDevice {
     sectors: BTreeMap<u64, Vec<u8>>,
+    /// 在它上面做 mkfs 的那块盘探测到的 `physical_block_size`：字节挪到别的盘上（`SparseBlockDevice::image` 换掉）也不变，
+    /// 那块盘自己这一刻探测到多少归 [`SparseBlockDevice`] 自己答。
+    physical_block_size: PhysicalBlockSizeInBytes,
+}
+
+/// 空盘取第一版测试镜像的块宽（[`SECTOR_BYTES`]，[`sector_as_the_physical_block_size`]）：`MemoryPool::with_devices` 建的池、
+/// 按录制流重放出来的崩溃镜像都是在这一档的盘上录的。
+impl Default for SparseDevice {
+    fn default() -> Self {
+        SparseDevice::of_the_physical_block_size(sector_as_the_physical_block_size())
+    }
 }
 
 impl SparseDevice {
+    /// 一块没写过的盘，它的块宽是 `physical_block_size`。
+    #[must_use]
+    pub fn of_the_physical_block_size(physical_block_size: PhysicalBlockSizeInBytes) -> Self {
+        SparseDevice {
+            sectors: BTreeMap::new(),
+            physical_block_size,
+        }
+    }
+
+    /// 这些字节是在多宽的盘上写的：在它上面做 mkfs 的那块盘探测到的 `physical_block_size`。
+    #[must_use]
+    pub fn physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.physical_block_size
+    }
+
     /// 写过的扇区（扇区号 → 512 字节），只读：崩溃点重放枚举器按它判基镜像在某段有没有非零字节、按它算续跑的输入摘要。
     #[must_use]
     pub fn written_sectors(&self) -> &BTreeMap<u64, Vec<u8>> {
@@ -155,7 +182,7 @@ impl SparseBlockDevice {
     #[must_use]
     pub fn new(size_in_bytes: u64, physical_block_size: PhysicalBlockSizeInBytes) -> Self {
         Self {
-            image: SparseDevice::default(),
+            image: SparseDevice::of_the_physical_block_size(physical_block_size),
             size_in_bytes,
             physical_block_size,
         }
@@ -421,6 +448,14 @@ impl PoolReader for MemoryPool {
             .contains_key(&device)
             .then_some(self.device_size_in_bytes)
     }
+    /// 内存池是 mkfs 那一刻那几块盘的字节：每块盘答它记下的、在它上面做 mkfs 的那块盘的块宽（[`SparseDevice::physical_block_size`]）；
+    /// 池里没有这块盘就 `None`。
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        Some(self.devices.get(&device)?.physical_block_size())
+    }
     /// 读不到（池里没有这块盘、越界、没按扇区对齐）返回 None，与一池真盘那一份（`[(DeviceIdentity, 块设备)]` 的 `PoolReader`：
     /// 块设备按同一条判据报错、它交回 None）同一个契约；判据是 [`check_request_against_the_device_contract`]。
     fn read(
@@ -471,6 +506,13 @@ impl PoolReader for CrashImage<'_> {
     /// 截断出来的崩溃镜像与它的基线池同几何：盘的字节数不随截断变。
     fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
         self.base.device_size_in_bytes(device)
+    }
+    /// 崩溃只截断写、不换盘：块宽答基线池记下的那一份。
+    fn physical_block_size_probed_on_the_device(
+        &self,
+        device: DeviceIdentity,
+    ) -> Option<PhysicalBlockSizeInBytes> {
+        self.base.physical_block_size_probed_on_the_device(device)
     }
     fn read(
         &self,
@@ -743,6 +785,8 @@ impl RecordedGeometryForScanCandidates {
 
 /// `reader` 读出的这块盘系统配置槽 0 自述的 journal 环长与单元区起始槽号（单元区起点随环长走，C475（非默认环长下单元区起点取编译期常量））。
 /// 只看 `reader` 交出来的这一槽字节：崩溃镜像传它自己（基线叠上持久了的写），落成的池传池本身。
+/// 槽 0 过不了池级 checker 读槽那几关（`check_system_configuration_slot`、单元几何四格 `unit_geometry_field_that_disagrees`（C1041）、
+/// `geometry_of`）就不认它自述的几何，交 [`RecordedGeometryForScanCandidates::SlotZeroNotSelfDescribing`]。
 fn recorded_geometry_in_the_slot_zero_read_through<Reader: PoolReader + ?Sized>(
     reader: &Reader,
     device: DeviceIdentity,
@@ -752,6 +796,9 @@ fn recorded_geometry_in_the_slot_zero_read_through<Reader: PoolReader + ?Sized>(
         .and_then(|slot| {
             singlefs_checker::check_system_configuration_slot(&slot)
                 .ok()
+                .filter(|_| {
+                    singlefs_checker::image::unit_geometry_field_that_disagrees(&slot).is_none()
+                })
                 .and_then(|view| singlefs_checker::image::geometry_of(&slot, &view).ok())
                 .map(
                     |geometry| RecordedGeometryForScanCandidates::RecordedInSlotZero {

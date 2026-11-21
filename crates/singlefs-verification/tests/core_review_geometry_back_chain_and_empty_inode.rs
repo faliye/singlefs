@@ -111,7 +111,12 @@ fn make_filesystem_on_patterned_devices(
     let mut devices = Vec::new();
     let mut images_before: Vec<SparseDevice> = Vec::new();
     for identity in [DeviceIdentity(0), DeviceIdentity(1)] {
-        let mut device = SparseBlockDevice::new(device_bytes, SECTOR_PHYSICAL_BLOCK_SIZE);
+        // 盘探测到的块宽取参数里的：mkfs 拒参数与探测值不同的盘（`MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue`），
+        // 这里各条用例判的是几何那几判，探测值与参数相等才走得到它们之后的那一步。
+        let mut device = SparseBlockDevice::new(
+            device_bytes,
+            PhysicalBlockSizeInBytes(parameters.geometry.physical_block_size),
+        );
         for offset in offsets_carrying_the_pattern(device_bytes) {
             device
                 .image
