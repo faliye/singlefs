@@ -16,7 +16,7 @@
 什么时候读它：改这道门禁起 cargo 的那几趟、照它的写法单跑一趟、或要知道一趟有多少条要现判时。分片、复用与各格的判法以 `.claude/gate.d/crash-point-replay.sh` 文件头「逐项点名」「复用」「分片」「feature-gated-tests 格」「product-gpu-real-card-tests 格」「显卡与清场」为准。
 
 - 经服务交的每一种跑法（不带参数、`--check`、`--item`）都照文件头 `# task-server-shards: *` 拆成计划、各片、合并：各片只现判 crash-case-replay 格里起 cargo 的两样（按条复用那一趟只现判归这一片的测试目标，登记的崩溃枚举用例只判这一片领的块），合并那一步照常判九格、crash-case-replay 格核账不现判（按条复用那一趟还有键对不上的、崩溃枚举用例核账那一趟现判了块的，都判红）。`gate.sh` 整轮与样本档没有分片阶段，这道门禁自己在一件里依次走计划（1 片）、单片（`SHARE=0/1`，键对不上的测试函数与库里没有的块在这一步现判）、合并（核账），复用同一套代码、不另有不分片的路，单片红整件退单片的码、不起合并。
-- crash-case-replay 格起 `cargo test --release -p singlefs-verification --lib --tests`：库、集成测试与装置二进制 `src/bin/` 的内联单测（`--tests` 带上全部 `test = true` 的目标，装置二进制都是）。包里全部测试函数按单元键复用，登记的崩溃枚举用例与放量分项经 `--skip` 排掉、交按块那一路逐条跑。
+- crash-case-replay 格起 `cargo test --release -p singlefs-verification --lib --tests`：库、集成测试与工具二进制 `src/bin/` 的内联单测（`--tests` 带上全部 `test = true` 的目标；实验装置二进制在实验包 `crates/singlefs-implementation-experiments`，不在这一趟）。包里全部测试函数按单元键复用，登记的崩溃枚举用例与放量分项经 `--skip` 排掉、交按块那一路逐条跑。
 - feature-gated-tests 格再起一趟 `cargo test --release -p singlefs-verification --features <tests/ 里 cfg 点到的特性> --lib --test <挂特性的测试文件>…`；`BINDGEN_EXTRA_CLANG_ARGS` 取 `scripts/crash/crash-amplification-lib.sh` 的 `CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS`。特性里有 `gpu` 的那一趟照旧一条 `cargo test`；不带特性那一趟与特性里没有 `gpu` 的那一趟经 `python3 scripts/gate/test-targets-parallel.py --jobs <每台默认重活线程数> -- <cargo test 的参数>` 按测试目标并行起，`--jobs` 取 `.claude/heavy-thread-default`，第二个 `--` 之后的 `--nocapture`、`--exact --skip` 原样交给每个目标。
 - 要上卡的三处在任务里都不拿卡：登记的崩溃枚举用例里带 `gpu` 特性的命令只在 CPU 上录、往判定库写待判行，由 GPU 服务判、门禁读结论；feature-gated-tests 带 `gpu` 特性那一趟与 product-gpu-real-card-tests 的对拍那一趟交 GPU 服务代跑（接口待定）。读不到 GPU 服务结论的各自判红：崩溃枚举用例带 `gpu` 的，录好而没有结论的那几条判红；另两格那一格判红。
 - 要知道一趟有多少条要现判：门禁 `crash-point-replay`、crates-mutation-replay、formal-verification 都用 `--list-items --with-keys`（`crash-point-replay` 逐条点名拒算的测试函数与理由）；崩溃点重放入口 `scripts/crash/crash-point-replay.sh --list-items --with-keys` 按项打 `ITEM_PLAN` 行。
@@ -33,7 +33,7 @@
 
 什么时候读它：改崩溃放量的复用、或判一块为什么现判时。键的算法以 `crates/singlefs-verification/src/crash_identity.rs` 为准，存放布局在 `crates/singlefs-verification/src/verdict_store.rs`。
 
-复用与续跑照 `.claude/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」。每块的键是块键（这一步的写表与起步镜像的摘要、段展开、判器另读的输入与段内序号）加判这一块的判器组的单元键（判器入口的函数单元闭包，WGSL 按 fn 切、去注释；闭包真引到的 cfg 原子各带这一次编译的真值；工具链与 cargo 解析后的构建档；`Cargo.lock` 里闭包真引到的外部包）；闭包没引到的 cfg 原子不进键，带不带 `gpu` 特性编的两趟里闭包不提 `gpu` 的判器组键相同、判定共用这一份库。判器组的单元键由 `crates/singlefs-verification/build.rs` 经 `crates/singlefs-unit-graph` 按 `crates/singlefs-verification/src/judging_units_entries.rs` 算好编进二进制。崩溃放量、崩溃枚举用例、给定状态表与两种对拍的判定都在 prune-server 那一份库里，不随趟、不随判器换，测试的类只当索引。
+复用与续跑照 `.claude/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」。每块的键是块键（这一步的写表与起步镜像的摘要、段展开、判器另读的输入与段内序号）加判器引到的被检测产品代码那一组的键（六个判器入口收成一组，只留产品五包的函数单元、去注释，按一组固定的 cfg 算、依赖包不开特性；判器自己的代码、WGSL 内核、观察者的代码、工具链与依赖版本不进）；带不带 `gpu` 特性编的两趟这一组的键相同、判定共用这一份库。这一组的键由 `crates/singlefs-verification/build.rs` 经 `crates/singlefs-unit-graph` 按 `crates/singlefs-verification/src/judging_units_entries.rs` 算好编进二进制。崩溃放量、崩溃枚举用例、给定状态表与两种对拍的判定都在 prune-server 那一份库里，不随趟、不随判器换，测试的类只当索引。
 
 ### 各道的判定单位
 
@@ -65,10 +65,12 @@
 
 ### 卡只归 GPU 服务，任务不拿卡
 
-什么时候读它：跑或改用 GPU 的测试、入口与门禁时。判据（卡、清场、查卡归 GPU 服务，任务不拿卡、不套清场，清场之后不复原，卡坏当场弹窗）在 `.claude/rules/verification.md` 同名一条。
+什么时候读它：跑或改用 GPU 的测试、入口与门禁时。判据（卡、清场、查卡归 GPU 服务，任务不拿卡、不套清场，清场之后不复原，卡坏当场弹窗，测试进程借卡只许白名单里的借方）在 `.claude/rules/verification.md` 同名一条；产品包真卡测试怎么开卡，照同名一条的例外。
 
 - 算在内的：崩溃放量入口与分项驱动、带 `gpu` 特性的 cargo（GPU 对拍、门禁带 `gpu` 特性那一趟）、手跑的 GPU 测试。手跑的 GPU 测试编与跑写成一条交，不先另交 `--no-run` 只编的那一条；门禁与入口脚本照各自的起法。
-- 门禁与入口（崩溃放量入口 `scripts/crash/crash-amplification.sh`、门禁 `crash-point-replay`）要上卡的那一段只往判定库写待判行、读 GPU 服务的结论，自己不清场、不挑卡、不领卡；崩溃判段之外用卡的测试交 GPU 服务代跑（接口待定）。
+- 门禁与入口（崩溃放量入口 `scripts/crash/crash-amplification.sh`、门禁 `crash-point-replay`）与测试要上卡的那一段只往判定库写待判行、读 GPU 服务的结论，自己不清场、不挑卡、不领卡；崩溃判段之外用卡的测试交 GPU 服务代跑（接口待定）。
+- 判段的库在临时 prune-server 里时，判段在真服务里登记那份临时服务（键 `gpu-claim/temporary-library/…`，载荷是连哪、键空间前缀与标签，写法与解法、持有者身份与租期归验证包 `crates/singlefs-verification/src/crash_library.rs` 的 `TemporaryLibraryRegistration`，GPU 服务那一侧照它解、两道拦（指到真服务的、前缀头字节不是 0xE0 的不连）在 `gpu-verification-server/src/registered_libraries.rs`），续租到判段交回再放；临时服务的 TCP 绑这一台在 HOSTS 里的地址，两台的 GPU 服务都连得到。GPU 服务每一圈列出登记，照登记去连那份临时服务取待判行、写回结论，登记没了或连不上就丢掉那一份库、不退出；指到真服务或键空间前缀不合的登记不连。GPU 服务认领待判行不看键，照行的数据算。
+- 借卡：测试进程要卡只经借卡通道 `python3 gpu-verification-server/control lease take`（还用 `lease return <卡串>`，写法与退出码在 `gpu-verification-server/control` 文件头，借与还的流程在 `gpu-verification-server/src/card_lease.rs` 文件头）。谁判：GPU 服务的借卡入口（`lease take`）照借方的可执行文件名查白名单 `gpu-verification-server/src/card-lease-borrowers.tsv`，不在表里的拒绝、不往下认领；白名单里现有 E202（GPU与CPU两种模式GC对照组）的真卡验证装置（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`）。被拒的出路：不借卡；崩溃判段与验证包的测试把待判行写进判定库、读 GPU 服务的结论；GPU 用例没交卡串的报本次未跑；确要新增借方的，往白名单加一行，用户定了才加。借卡通道的名单是否被越过、验证包里有没有借卡的路，没有检查判，靠 review（`.claude/rules/verification.md` 同名一条写了打回的情形）。
 - 卡坏：GPU 服务开卡与清场时查卡，判出卡坏直接发消息给提交那批待判行的会话；主 agent 收到照 `.claude/rules/verification.md` 同名一条弹窗。
 - 要复原，手动跑多机配置 `QUIESCE_START_COMMAND` 那一条私有复原脚本，再跑 `QUIESCE_STARTED_CHECK_COMMAND` 回读到它退 0。
 - 测试二进制与入口不开卡、不挑卡：卡上那一段交 GPU 服务，派活（哪件上哪张卡）归 GPU 服务，与判法拆开。
@@ -89,7 +91,7 @@
 什么时候读它：要核判定库有哪几类表、某类判定该落哪张表时。表的布局与键的字节写法以 `crates/singlefs-verification/src/verdict_store.rs` 文件头为准，Python 一侧的族与种类以 `scripts/prune-server/prune_server_client.py` 文件头「键空间」为准。
 
 - 库是 prune-server 服务状态目录下的 `library`，布局只一种：全部表在默认列族、键原样、开库选项照 `verdict_store.rs`。
-- Rust 一侧 `verdict_store.rs` 文件头登记的 29 张表：判定块、判定向量两张、违例、录入块、路径索引、事实表、核对表、判法单元组成清单、布局行、结论块与结论违例、恢复字、计数向量、块属性、录下的流程、一趟的清单、判表、给定状态表、片进度、观察者四张、被抛弃根、配对结论、对拍输入、读集见证两张。
+- Rust 一侧 `verdict_store.rs` 文件头登记的 33 张表：判定块、判定向量两张、违例、录入块、路径索引、事实表、核对表、判法单元组成清单、结论块与结论违例、恢复字、计数向量、块属性、录下的流程、一趟的清单、判表、给定状态表、片进度、观察者四张、被抛弃根、配对结论、对拍输入、读集见证两张、GPU 待判行、强制现判行、核对待判行、判表待判行、判表结论字。
 - Python 一侧的五族：verdict-library、unit-verdicts、mutation-units、broad-mutation、apparatus-items，各自种类下的条目。
 
 ### 库名与命名空间
@@ -150,6 +152,9 @@
 | 崩溃枚举用例住在验证包的 `tests/`、不标 `#[ignore]`、登记进崩溃点重放合表 `.claude/gate.d/crash-point-replay-items.tsv`（点名 `crash-case:` 行或放量分项）；验证包导入崩溃引擎模块的测试文件第一行声明它测哪几个模块（`scripts/crash/crash-case-check.py` 的 modules）| 门禁 `crash-point-replay` 开跑前在真仓上跑 `scripts/crash/crash-case-check.py --only placement,modules`（placement 那一样判写在别的包里、标了 `#[ignore]` 或没登记的），红了不起 cargo；门禁 code-tooling 的 research-script-selftests 格跑那份脚本的自证 |
 | 函数名与类型名不只由空泛词拼成；测试文件不按里程碑起名 | 门禁 code-source-discipline：vague-names 格读 `.claude/naming-vague-words` 与 `.claude/naming-vague-exclude`；test-file-names 格在真仓上跑 `scripts/crash/crash-case-check.py --only file-names` |
 | 池级 checker 库不依赖实现；RefFS 的依赖只有 `std`、源码零处引实现、池级 checker 与验证包（真名与改名别名都算）、实现与池级 checker 的依赖闭包里没有它 | 门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格（⑤⑥⑦ 判 RefFS 那三样；RefFS 包不在时 ⑤⑥ 报本次未跑） |
+| `crates/` 下各包的编译单元（`cargo check --all-targets --all-features`）不读另一个包目录下的源码：dep-info 列着的文件落在别的包目录里、后缀不是 `.toml`、`.md`、`.tsv` 的，与不属任何包的 `.rs`、`.wgsl`，都登在两张表里（`.claude/rules/directory-layout.md`「crates/：各包放什么」） | 门禁 checker-independence-and-sync 的 crate-cross-references 格（判法、单元键与射程在 `scripts/gate/crate-cross-references-check.py` 文件头）：一个包一条判定、按单元键复用；存量登在只缩不涨的 `.claude/gate.d/crate-cross-references-lag.tsv`，确要编进别的包的源码的登在放行表 `.claude/gate.d/crate-cross-references-allowed.tsv`，一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」 |
+| `crates/` 下任意深度的每个包在 `.claude/gate.d/crate-roles.tsv` 登了角色（产品、验证、测试支撑、实验装置）；实验装置包之外的每个二进制目标（照 cargo 的认法：`<包>/src/main.rs`、`src/bin/<名>.rs` 与 `src/bin/<名>/main.rs`、`examples/`、`[[bin]]` 与 `[[example]]` 的 `path` 指到哪都算，不看名字）都登在放行表或滞后表里；库为空（库文件不在也算）而有测试目标的只许是测试支撑；测试支撑包至少两个无条件的依赖者（`crates/` 下的包与根 `Cargo.toml` 的 `[workspace]` `members`、`exclude` 点名的别的 cargo 工程都算，`target.<条件>` 下的与 `optional = true` 的不算）；产品包不经 `[dependencies]`、`[build-dependencies]` 依赖测试支撑包；没有包依赖实验装置包（`.claude/rules/directory-layout.md`「crates/：各包放什么」） | 门禁 code-tooling 的 crate-roles 格（判法 `scripts/gate/crate-roles-check.py` 文件头「判法」）：存量逐个目标登在只缩不涨的 `.claude/gate.d/crate-roles-lag.tsv`（整包行不收），门禁与崩溃入口自己起的工具、产品自己的可执行入口登在放行表 `.claude/gate.d/crate-roles-allowed.tsv` |
+| 代码轮正文 `research/prompts/_<题>-code-r<数字>-body.md` 的检查单逐格有「### 检查单：<格名>」小节、底下写了字（`.claude/rules/implementation-workflow.md`「代码轮正文的检查单」）：不在只判八格的名单 `.claude/gate.d/code-round-checklist-eight-cells.tsv` 里、标题日期不早于第九格截止日（常量 `CODE_ROUND_CHECKLIST_PLACEMENT_CUTOFF`）或标题没有日期的，判九格（第九格「放的位置」）；名单里的与标题日期早于第九格截止日的只判前八格；标题日期早于检查单截止日（常量 `CODE_ROUND_CHECKLIST_CUTOFF`）的一格都不查；名单里每一行指的正文都要在，名单只缩不长（与 gate 基准那一版比，多出的行判红） | 门禁 doc-process-records 的 code-round-checklist 格（判法与截止日在它文件头 code-round-checklist 一段）；答得对不对不判，靠主 agent 核腿的报告 |
 | 判器调用点（池级 checker、记录核对器、GPU 判器）合规：判法文件头「一处调用点算合规，有一样成立就行」那一段列了落在判定段里、落在判器本体里、包住它的函数带 `// gpu-exempt: <截名>` 或 `// cpu-reference-for-gpu-comparison` 标记、文件在登记表 excluded 里、落在判器自测里；一样都不成立的判红 | 门禁 checker-independence-and-sync 的 cpu-judging-sites 格：判法 `scripts/crash/cpu-judging-sites-check.py`（合规的几种位置与标记写在哪，在它文件头「一处调用点算合规」那一段），判定段与判器本体登记在 `.claude/gate.d/cpu-judging-sites.tsv` |
 | 验证包一条用例一个场景 | 门禁 model-differential-and-scenarios 的 one-scenario 格（在真仓上跑 `scripts/crash/crash-case-check.py --only one-scenario`，读 `crates/singlefs-verification/tests/` 的用例源码，不跑测试） |
 | 变异行点名的测试跑得到：`--` 之后的筛选词筛得到点名的测试 | 门禁 code-source-discipline 的 mutation-tables 格 |
@@ -174,7 +179,7 @@
 什么时候读它：读 broad-mutation 的判定、或它的一条被停了时。
 
 - 判定在 prune-server 里：broad-mutation 族的 `verdicts/` 等七张表（驱动文件头「判定库」），判定行不带校验列。
-- 驱动不给任何一步设内存上限、不限时，撞上限与卡住由统一任务服务管；被停的那一条不落行、不算抓到（`scripts/mutation/broad-mutation.py` 文件头「内存与限时」）。
+- 驱动不给任何一步设内存上限、不限时，超限与卡住由统一任务服务管；被停的那一条不落行、不算抓到（`scripts/mutation/broad-mutation.py` 文件头「内存与限时」）。
 
 ## 复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判
 
@@ -182,7 +187,7 @@
 
 什么时候读它：改算键的代码、判法新读文件、登记文件级或边级排除时。键的逐项组成以 `scripts/gate/admission.py` 文件头「单元键」为准；一句定义在 `.claude/rules/verification.md`「一个门禁：两种跑法」。
 
-- 文件级排除：`scripts/crash/lib_verdict_library.py` 的 `NOT_JUDGING_FILES` 那两份（算键的库自己与 `scripts/gate/lib_function_units.py`）按角色排，管怎么存、怎么算键，不管判对错，它们的单元不进任何一份判定的键。crates 变异判法不在这条排除的射程里：那里两份照进判法单元指纹，覆盖号带判法单元指纹。
+- 文件级排除：`scripts/crash/lib_verdict_library.py` 的 `NOT_JUDGING_FILES` 那两份（算键的库自己与 `scripts/gate/lib_function_units.py`）按角色排，管怎么存、怎么算键，不管判对错，它们的单元不进任何一份判定的键，变异三族的键同样不带（D13（验证路线） 已定项 17「各个键由什么组成」变异三族那一行）。
 - 边级排除：一条只打提示、不改判定结局的子进程边，按实测排，不沿它收；登记在 `scripts/gate/lib_function_units.py` 的 `EXCLUDED_PROGRAM_EDGES`。每一条登记的边配三格自证：这条路上的任何异常不改包装退出码；判法读包装输出前去掉这条路打的行；切边前后少掉的单元只经这条边可达。另有一格「键不变而退出码变」必红。
 - python 模块有单元进闭包时，它在 import 时执行的模块级语句一起进闭包：import、赋值、类头本身（不连方法）、带装饰器或缺省值的 def 头（`lib_function_units.py` 文件头「Python 闭包：import 时执行的模块级语句」）。
 - 判法运行期按字面尾巴整组收的数据文件，收进来的不许落在 `records/`、`research/` 下：照那一处真走到的地方登记 `TAIL_READ_SCOPES`，读的是调用方交进来的输入的登空元组（`lib_function_units.py` 文件头「按尾巴读的登记」）；算键库自证的 `TAIL_READS_RECORDS_REAL_CELL` 在真仓判，点名读法的 文件:行 与收进来的文件。

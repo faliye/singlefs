@@ -7,7 +7,7 @@
 | 步 | 做什么 | 谁在判 |
 |---|---|---|
 | 1 写代码 | `crates/` 下的改动带测试，每条新测试先证明会红（`.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」） | show-me-test 阶段判「有没有测试」；会不会红写进变异清单与 commit message，两样都要，写法与哪类测试进哪张表照 `.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」 |
-| 2 多 agent 正反对抗推理 | 改完的 `crates/` 代码（产品代码与测试代码）走一轮三方：材料带上 diff 与它压着的条款，`three-way-forward`（或 `three-way-defense`）核「代码做的是不是条款说的」、`three-way-attack` 攻「哪一格会错」（不派本地模型的腿）；轮数与收法照「代码轮与治理文件轮怎么收」一节；代码轮正文每一轮按「代码轮正文的检查单」一节逐格点名。射程是 `crates/` 下的全部代码：各包的 `src/`（含其中的 `#[cfg(test)]` 模块）与 `tests/`，验证包 `crates/singlefs-verification/`、池级 checker `crates/singlefs-checker/`、函数单元图 `crates/singlefs-unit-graph/` 同样在内，加 `crates/mutations.tsv`；只改了注释的文件不走（去掉注释与空白之后代码与改前逐个相同；文档注释里会编成 doctest 的代码块、文档注释与 `// SAFETY:` 注释的增删照代码算；判法是规范副本的 `.claude/singlefs-ai-sop/scripts/comment-only-change.py`，show-me-test 用同一份） | 门禁 doc-process-records 的 crates-adversarial-review 格判形式：这次改动里每个 `crates/*/src/*.rs`（`crates/singlefs-verification/`、`crates/singlefs-checker/`、`crates/singlefs-unit-graph/` 下的与只改了注释的除外）都要在同一次改动带来的 `research/prompts/*-main-verification.md` 里被按路径点名；那三个包的 `src/`、各包的 `tests/` 与 `crates/mutations.tsv` 这一格还没判，由主 agent 写判决时逐份点名。豁免表 `.claude/crates-review-exempt` 与 `.claude/agent-def-review-exempt` 不再加行，现有的行补完一轮三方删一行。点名了判得对不对，要人看；同一道的 code-round-checklist 格判代码轮正文（`_<题>-code-r<数字>-body.md`）里检查单八格的标题在不在、底下写没写字，答案对不对由腿与主 agent 核 |
+| 2 多 agent 正反对抗推理 | 改完的 `crates/` 代码（产品代码与测试代码）走一轮三方：材料带上 diff 与它压着的条款，`three-way-forward`（或 `three-way-defense`）核「代码做的是不是条款说的」、`three-way-attack` 攻「哪一格会错」（不派本地模型的腿）；轮数与收法照「代码轮与治理文件轮怎么收」一节；代码轮正文每一轮按「代码轮正文的检查单」一节逐格点名。射程是 `crates/` 下的全部代码：各包的 `src/`（含其中的 `#[cfg(test)]` 模块）与 `tests/`，`.claude/gate.d/crate-roles.tsv` 里角色不是「产品」的包（验证、测试支撑、实验装置）同样在内，加 `crates/mutations.tsv`；只改了注释的文件不走（去掉注释与空白之后代码与改前逐个相同；文档注释里会编成 doctest 的代码块、文档注释与 `// SAFETY:` 注释的增删照代码算；判法是规范副本的 `.claude/singlefs-ai-sop/scripts/comment-only-change.py`，show-me-test 用同一份） | 门禁 doc-process-records 的 crates-adversarial-review 格判形式：这次改动里每个 `crates/*/src/*.rs`（`.claude/gate.d/crate-roles.tsv` 里角色不是「产品」的包下的与只改了注释的除外；没登记角色的包照产品算）都要在同一次改动带来的 `research/prompts/*-main-verification.md` 里被按路径点名；角色不是「产品」的包的 `src/`、各包的 `tests/` 与 `crates/mutations.tsv` 这一格还没判，由主 agent 写判决时逐份点名。豁免表 `.claude/crates-review-exempt` 与 `.claude/agent-def-review-exempt` 不再加行，现有的行补完一轮三方删一行。点名了判得对不对，要人看；同一道的 code-round-checklist 格判代码轮正文（`_<题>-code-r<数字>-body.md`）里检查单各格的标题在不在、底下写没写字，答案对不对由腿与主 agent 核 |
 | 3 checker 测试 | 池级 checker、崩溃点重放、变异表：三方打中的每一条先做成会红的量再改；每一处改法在 `crates/mutations.tsv` 留一条「改回去它就红」的变异 | 门禁 `crash-point-replay`、crates-mutation-replay、code-source-discipline 的 mutation-tables 格（`scripts/mutation/tables/` 与 `crates/mutations.tsv` 的静态几样）、`check.sh` |
 
 **次序不能倒**：第 2 步攻的是写好的产品代码与它的测试，攻在计划上的那一轮替代不了它。只改测试代码的同样走第 2 步，并进按批的代码轮；测试怎么写、覆盖够不够、用例对不对在同一轮里攻。
@@ -18,7 +18,7 @@
 
 **改它们与改 `crates/` 同规矩**：写完要走一轮三方（轮数与收法照「代码轮与治理文件轮怎么收」一节），判决落 `research/prompts/<轮>-main-verification.md` 并按路径点名改过的每一份定义，门禁 doc-process-records 的 agent-def-adversarial-review 格判形式（形态照同一道的 crates-adversarial-review 格）。
 
-**治理文件同规矩**：项目规则（`.claude/rules/`）、技能（`.claude/skills/`）、钩子（`.claude/hooks/`）、门禁（`.claude/gate.d/`）、`scripts/` 下的脚本、统一任务服务 `task-server/` 与判定库服务 `prune-server/`（客户端在 `scripts/prune-server/`）的改动按批走一轮三方（`.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条；轮数与收法照「代码轮与治理文件轮怎么收」一节），判决按路径点名改过的每一份，不等用户点名、不登豁免；这几类门禁还没判，由主 agent 写判决时逐份点名。
+**治理文件同规矩**：项目规则（`.claude/rules/`）、技能（`.claude/skills/`）、钩子（`.claude/hooks/`）、门禁（`.claude/gate.d/`）、`scripts/` 下的脚本、统一任务服务 `task-server/` 与判定库服务 `prune-server/`（客户端在 `scripts/prune-server/`）的改动改完当场走一轮三方（`.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条；轮数与收法照「代码轮与治理文件轮怎么收」一节），判决按路径点名改过的每一份，不等用户点名、不登豁免；这几类门禁还没判，由主 agent 写判决时逐份点名。
 
 **三步在定义上各取什么**：第 1 步不适用（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没有测试的 patch 一律不收」只管 `crates/*/src/`，只改文档和脚本除外）；第 2 步就是「改它们与改 `crates/` 同规矩」那一轮三方；第 3 步照 `.claude/rules/show-me-test-by-review.md`「新增的测试必须先证明它会红」里「设计论证同样照办」那一句：三方打中的每一条，先在模型里做成一个必须报非 0 的世界，再改定义。
 
@@ -40,7 +40,7 @@
 
 ## 代码轮正文的检查单
 
-代码轮的正文 `research/prompts/_<题>-code-r<数字>-body.md` 每一轮都逐格点名八格，每格一个标题「### 检查单：<格名>」，底下写这一轮对这一格的答案与证据（文件:行）；只改测试代码的轮同样写。腿对每一格回「成立」「不成立」或「推不出」，推不出的算打中，按三方的写回判决办。八个格名逐字是：走不到的理由二次查实、类型与名字、不兼容旧代码与旧格式、不新建判定库、所有任务多机可用、测试优先多线程、带 --item 的命令与项、新崩溃流多罩了什么。写正文或当腿判这八格之前，先读 `.claude/skills/three-way/SKILL.md`「代码轮正文的检查单」。
+代码轮的正文 `research/prompts/_<题>-code-r<数字>-body.md` 每一轮都逐格点名九格，每格一个标题「### 检查单：<格名>」，底下写这一轮对这一格的答案与证据（文件:行）；只改测试代码的轮同样写。腿对每一格回「成立」「不成立」或「推不出」，推不出的算打中，按三方的写回判决办。九个格名逐字是：走不到的理由二次查实、类型与名字、不兼容旧代码与旧格式、不新建判定库、所有任务多机可用、测试优先多线程、带 --item 的命令与项、新崩溃流多罩了什么、放的位置。写正文或当腿判这九格之前，先读 `.claude/skills/three-way/SKILL.md`「代码轮正文的检查单」。
 
 ## 复用门禁的判定：按每条判定的单元键判，不按「改了哪个目录」或「哪棵树绿过」判
 
@@ -57,7 +57,7 @@
 
 | 场合 | 跑不跑 |
 |---|---|
-| 实现员交回前 | 一条都不交（`.claude/agent-common.md`「子 agent 不交任务」），只自己跑 `cargo fmt`；点名动到的测试函数（`-- <测试全名…> --exact`）、clippy / build、证红、命名检查、登记的崩溃枚举用例（门禁 `crash-point-replay` 按块那一路）、崩溃放量分项、formal-verification、crates-mutation-replay 带 `--item`（点这一次改到的项）各写成 `task-server/task submit --cwd <自己的副本> -- <命令>` 写进报告 |
+| 实现员交回前 | 一条都不交（`.claude/agent-common.md`「子 agent 不交任务」），只自己跑 `cargo fmt`；点名动到的测试函数（`-- <测试全名…> --exact`）、clippy（点名改到的包；不写 build，链接留给合入后验证）、证红、命名检查、登记的崩溃枚举用例（门禁 `crash-point-replay` 按块那一路）、崩溃放量分项、formal-verification、crates-mutation-replay 带 `--item`（点这一次改到的项）各写成 `task-server/task submit --cwd <自己的副本> -- <命令>` 写进报告 |
 | 每次提交代码、提交之外要跑不指定范围的、其余任何时候 | 照 `.claude/rules/verification.md`「一个门禁：两种跑法」那张表、「提交之外」那一条与提交时只走一条路那一条 |
 | 仓副本里正文改过的脚本的自证 | 子 agent 不交，把命令写进交回报告；主 agent 经 `task-server/task submit --cwd <集成副本> -- …` 交，不弹窗；跑之前主 agent 逐份 `diff -u <主工作区里那一份> <副本里那一份>` 看那份自证（连同它 source / import 的库），正文起编译、测试或别的重活的不交，退回改成假驱动 |
 

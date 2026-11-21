@@ -15,9 +15,9 @@ description: 主 agent 每次派发子 agent 之前、起看门狗之前、被�
 
 **第 8 条**：「折算与挂钟」那一列的数从 `task-server/task submit -- python3 scripts/agents/agent-cost.py usage --since <开工日期>` 与 `timing` 的输出（`task-server/task log <号> --all`）取。闭窗口结局账交 `task-server/task submit -- python3 scripts/agents/agent-cost.py outcome --since <开工日期> --until <这一天> --summary --out <仓根>/records/<轮>-outcome-<这一天>.txt`，落进这一轮调度记录所在的 `records/`，文件名照 `scripts/agents/agent-cost.py` 文件头；`--out` 只排他新建，那个文件已在就换一个名字。
 
-**第 11 条**：中转库指 `.claude/rules/verification.md`「判定库只有一份」点名的、并回服务之后就该删的中转目录。删之前 `du -sh` 记大小。子 agent 在 `.deliverables` 里写成「交接」的副本，照它的报告跑完那几条命令就删。会编的 cargo 经服务交、编译目录由服务给，不往 `<仓根>/target` 编，跑完 `task-server/task clean <号>` 删，不自己 `rm`。要留测试的临时现场，在 submit 前面设 `SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1`。完工清理闸 `.claude/hooks/completion-cleanup-guard.sh`（挂 Stop）在结束一轮时拦下还留着的这几样与本会话合入后验证留下的快照（判哪几处照它文件头），删完再收；要留的报告、补丁、打补丁前的备份、留着接着用的段树与快照（种类「基线」）照它文件头「要留的交付物」写。删了大的之后提醒用户跑 `sudo fstrim -v /`（要密码，主 agent 不跑）。
+**第 11 条**：中转库指 `.claude/rules/verification.md`「判定库只有一份」点名的、并回服务之后就该删的中转目录。删之前 `du -sh` 记大小。子 agent 在 `.deliverables` 里写成「交接」的副本，照它的报告跑完那几条命令就删。会编的 cargo 经服务交、编译目录由服务给，不往 `<仓根>/target` 编；编译目录归树、不归任务，不归主 agent 删，也不自己 `rm`：树是任务 `--cwd` 解开符号链接后往上第一层有 `.git` 的那一层（哪一层都没有就是解开后的 `--cwd` 本身），树删了服务跟着删它那一整组；`task-server/task clean <号>` 删的是那一条任务自己的现场（分片父任务连同它的测试二进制）。要留测试的临时现场，在 submit 前面设 `SINGLEFS_KEEP_TEST_TEMPORARY_FILES=1`；这样留下的现场服务不到时删，读完照 `task-server/task clean <号>` 删。完工清理闸 `.claude/hooks/completion-cleanup-guard.sh`（挂 Stop）在结束一轮时拦下还留着的这几样：本会话认领的目录、临时草稿目录与起的运行目录里的仓副本、编译目录与中转库（库拷贝），本会话的命令点到过的迁库遗留，本会话合入后验证留下的快照，本会话已有结局、现场目录还在、结局没取走或设了留现场的任务现场（只是结局没取走的删法 `task-server/task wait <号>`，取走结局之后服务过一小时自己删；设了留现场、结局已取走的删法 `task-server/task clean <号>`；两样都占的先 `task-server/task wait <号>`、再 `task-server/task clean <号>`，`clean` 只删现场、不算取走结局；不直接 `rm`）；判哪几处照它文件头，删完再收；要留的报告、补丁、打补丁前的备份、留着接着用的段树与快照（种类「基线」）照它文件头「要留的交付物」写。删了大的之后提醒用户跑 `sudo fstrim -v /`（要密码，主 agent 不跑）。
 
-**第 15 条**：认会话看变异行与记录里的名字、改它的提交与草稿目录、`ListAgents` 列的会话；查谁改过某个路径或谁提到过某个符号，在本机直接跑 `python3 scripts/agents/who-touched.py <路径或符号>… [--since-minutes N]`，读法照它文件头，Edit / Write 为 0 的会话没改过它。发给那个会话的消息写明文件:行、原话、复现命令与改法建议；认不出是谁的，发给 `ListAgents` 列的每个在跑的会话，请各自认领。
+**第 15 条**：认会话看 `ListAgents` 列的会话与任务服务的调度记录（`task-server/task status <号>`），再对改它的提交与草稿目录；查谁改过某个路径或谁提到过某个符号，在本机直接跑 `python3 scripts/agents/who-touched.py <路径或符号>… [--since-minutes N]`，读法照它文件头，Edit / Write 为 0 的会话没改过它。发给那个会话的消息写明文件:行、原话、复现命令与改法建议；认不出是谁的，发给 `ListAgents` 列的每个在跑的会话，请各自认领。
 
 ## 派出去之后
 
@@ -36,6 +36,8 @@ description: 主 agent 每次派发子 agent 之前、起看门狗之前、被�
 
 叫醒之后主 agent 判断：只是慢就再起一只看门狗接着盯，确认只是慢的带 `--ack` 再起，键照 `scripts/agents/agent-watch.py` 文件头「--ack 的写法」三种：`进程:<pid>`、`<agent 号>:<告警名>`、`类:<告警名>`（这一类的全部，范围最大）；是问题就决定发消息让它改、停掉重派、还是报给用户。看门狗在有子 agent 交回时（被停的同样算）另列草稿根里超过 `watch.conf` 的 `scratch-idle-hours` 没动的编译目录与仓副本，只报不删，主 agent 核过没人在用再删；重启前旧进程留下的子 agent 记录标「状态=已失效」，不按无动静报。不发整点例行询问（`watch.conf` 的 `ask-every-minutes=0`）；要看一个子 agent 在做什么，读它草稿目录的 `progress.md` 或它的会话记录，不发消息叫醒它。
 
+告警退出（看门狗退 3）与定时回报（退 4）离上次提醒满 `watch.conf` 的 `max-minutes` 时带一节「知识同步提醒」；没满的、全部交回（退 0）的与 `--report` 的不带。离上次提醒满 `max-minutes` 时看门狗提前定时回报（「定时回报：」那一行写明提前回报），照常读它的输出、再起一只。这一节以一句提醒起头（到点该同步项目最新变动与状态），随后逐份点名变过的知识类文件（`CLAUDE.md`、`.claude/main-agent.md`、`.claude/agent-common.md`、`.claude/rules/`、`.claude/skills/`、`.claude/agents/`、`.claude/kb/`、`.claude/singlefs-ai-sop/rules/` 底下的，不分提交没提交，各标七种来源之一：「新提交动到」「工作区改了没提交」「两样都有」「被 git 忽略、内容摘要变了」「新进 git 忽略」「移出 git 忽略」「起来时未提交的改动已不在 git status 里」；里程碑、决策索引、欠账表排最前；路径里的换行与控制字符写成 `\n` 这类转义，一份点名只占一行），再是分支与 HEAD、这份基线从哪来、基线之后的新提交、`git status` 的计数、别的变了的路径，末尾一行「→ 同步：」。读到之后照「→ 同步：」那一行做：还有子 agent 在跑的，先照报告最后一行「→ 接着盯」起下一只看门狗（`--processes` 那一只退 3、退 4 都以这一行收尾）；再逐份重读点名的文件（提醒句写知识类文件没变的不用重读）；再用 `python3 scripts/agents/who-touched.py <路径>…` 核手上正在改或要改的文件有没有被别的会话改过、提交过。写着「没查成」的，照它下面一行一条的命令自己看仓（最后一条列范围里被 git 忽略的条目，`git status` 不列它们）。基线与上次提醒的时刻落盘在会话目录，下一只看门狗接着比；几只看门狗盯同一个会话时只提醒一次，写着「没查成」的那一次同样算提醒过。条数上限是 `watch.conf` 的 `repository-report-lines`。
+
 坏卡与服务健康不由看门狗报。GPU 服务发来卡坏消息（发给提交那批待判行的会话）时，当场弹窗告诉用户哪台哪张卡与依据（消息里的查卡结果）、请用户重置那张卡，不等、不重试。task-server 把任务的结局、要处置的提醒与服务健康毛病直接发消息给发起任务的会话，收到就处置；服务重启之前交的任务没带会话地址，只能靠 `task-server/task wait <号>` 取结局；处置后的回读照 `.claude/main-agent.md`「派出去之后」；`python3 task-server/control check` 缺一样退 78，出路写在输出里。
 
 主 agent 自己交的任务（长的同样）照 `.claude/agent-common.md`「长活交回主 agent」：看排队与日志用 `task-server/task status <号>`、`task-server/task log <号>`，停用 `task-server/task cancel <号>`；`cancel`、`clean` 只对自己交的号做。`task wait` 以 `needs-attention` 退出时怎么办照 `.claude/main-agent.md`「派出去之后」；退出码以 `task-server/task` 文件头里 `task wait <号>` 那一条与「退出码（wait 之外）」那一段为准（`needs-attention` 退 230）。
@@ -51,7 +53,7 @@ description: 主 agent 每次派发子 agent 之前、起看门狗之前、被�
 - 结果写「This agent has not reported yet: it is waiting on its own background work」、或 note 写「the result below may be interim」的：它起了后台任务，越出 `.claude/agent-common.md`「子 agent 不交任务」。看它起了什么，发消息让它停掉那个任务、把命令写进报告「要主 agent 跑的命令」一节交回；它交过的任务号照停掉子 agent 的那一套核出、逐个 `cancel` 或 `clean`。
 - 没有交回消息、note 与 result 里也没有这两句的：它结束本轮时手里没有还在跑的后台任务，不会自己醒（看门狗报「结束本轮却不会醒」）。看它最后在等什么，发消息让它接着做或交回，或者停掉。
 
-主 agent 用 TaskStop 停掉的子 agent 不再交回，它的看门狗按被停退出。停掉之后照它的会话记录或草稿目录核出它交的任务号：还在排、在跑的逐个 `task-server/task cancel <号>`（服务当场删掉那一条的编译目录与现场，删了几份打在 cancel 的输出里；没删成的 cancel 退 5，照它的出路处置），有了结局的逐个 `task-server/task clean <号>`。
+主 agent 用 TaskStop 停掉的子 agent 不再交回，它的看门狗按被停退出。停掉之后照它的会话记录或草稿目录核出它交的任务号：还在排、在跑的逐个 `task-server/task cancel <号>`（服务当场删掉那一条的现场、编译目录放回它那棵树的组里，删了几份打在 cancel 的输出里；没删成的 cancel 退 5，照它的出路处置），有了结局的逐个 `task-server/task clean <号>`。
 
 ## 派发提示怎么写
 

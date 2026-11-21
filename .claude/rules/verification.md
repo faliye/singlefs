@@ -6,10 +6,12 @@
 
 | 名字 | 包 | 装什么 | 什么时候跑 |
 |---|---|---|---|
-| **验证包** | `crates/singlefs-verification` | 单元测试、集成测试、它们用的脚手架库与实验、真设备装置二进制（`src/bin/`），连同各道门禁判的东西 | 照「一个门禁：两种跑法」那张表 |
+| **验证包** | `crates/singlefs-verification` | 单元测试、集成测试、它们用的脚手架库、门禁与崩溃入口自己起的工具二进制（`src/bin/`），连同各道门禁判的东西 | 照「一个门禁：两种跑法」那张表 |
 | **池级 checker** | `crates/singlefs-checker` | 判一个镜像的判决器库（O2，`check_pool_image`，D13（验证路线） 已定项 7）；只依赖 `singlefs-format` | 被验证包调用；它自己的库单测随时跑 |
 | **RefFS** | `crates/singlefs-reference-filesystem` | 语义级的参照文件系统：只在内存里按 POSIX 操作走，判一次崩溃之后恢复读出的内容落不落在允许集合里；依赖只有 `std`，不引实现、池级 checker、验证包，实现与池级 checker 也不依赖它 | 被验证包调用；它自己的单测随时跑 |
 | **函数单元图** | `crates/singlefs-unit-graph` | 把 Rust 与 WGSL 源码按条目切成单元、取去注释指纹、从入口收闭包、算复用键的库，只用 `std`（D13（验证路线） 已定项 17 的键算法住在这里）；归测试基础设施，不是产品代码 | 被验证包的构建脚本与门禁脚本调用；它自己的单测随时跑 |
+
+实验装置二进制不在这四个包里：在实验包 `crates/singlefs-implementation-experiments`（`src/bin/`，一个装置一份 `e<号>_<名>.rs` 或一个目录 `e<号>_<名>/`），与不共用实现代码的独立装置 `scripts/experiment-apparatus/`（顶层的 `<名>.rs` 或装置目录 `<名>/`）；两处的角色与规矩在 `.claude/rules/directory-layout.md`「crates/：各包放什么」「scripts/：反复要用的脚本」。
 
 查验证包哪个模块装什么、哪几道门禁连带判它之前，先读 `.claude/rules/verification-reference.md`「定义与名字」。
 
@@ -36,7 +38,7 @@
 | 指定范围 | `--item <项>`、`--check <格>`（点了起测试的格的另带 `--item`）、`cargo test` 点名测试函数（`--test`、`--lib`、`--bin` 加 `-- <测试全名…> --exact`；只点目标的提交时被服务拒）。范围声明种类 `items` 或 `target` | 主 agent 随时经任务服务交，点这一次改到的项、格与目标；子 agent 一律不交，写进报告「要主 agent 跑的命令」一节 |
 
 - **提交之外**：不指定范围的只在提交时跑；提交之外要跑（包括用户要求的那一趟），要用户确认一次、同意了才跑。按命令带不带标记分：命令带 `--full-gate` 或 `--whole-package-confirmed`（写在 `task-server/task submit` 的 `--` 之前）的，钩子 `.claude/hooks/run-scope-guard.sh`（文件头「放宽检查的提交标识」那一段）弹的那一次就是确认，主 agent 不另问；钩子没弹的（命令不带这两个标记，或带了而钩子判不了），主 agent 自己弹窗问用户一次。不指定范围的六道门禁与崩溃放量入口不带标识时，钩子是执行前拒、不是不弹：它们提交时与用户要求时都带 `--full-gate` 交。提交时那一趟的确认也是带 `--full-gate` 的那一次钩子弹窗。
-- 判哪些、复用哪些由门禁照每条判定的单元键自己选，只剪键相同、已判过的与等价的。单元键只由判定依赖的函数单元各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值、工具链、解析出的闭包真引到的依赖版本与判定自己的内容输入组成；路径、名字、行号、资源上限、限时、提交与树不进键（D13（验证路线） 已定项 17）。两种排除不在这句全称里：算键的库自己两份（`scripts/crash/lib_verdict_library.py`、`scripts/gate/lib_function_units.py`）的单元不进任何一份判定的键（crates 变异判法除外，那里照进），一条只打提示、不改判定结局的子进程边按实测排；估「哪些判定要重判」之前先读 `.claude/rules/verification-reference.md`「单元键的组成与排除」。崩溃判定库的键不读仓根；断言就是关于真仓、要读活树的测试拒算（照跑、不复用、不入库）。
+- 判哪些、复用哪些由门禁照每条判定的单元键自己选，只剪键相同、已判过的与等价的。单元键只由判定依赖的函数单元（只取产品代码与测试代码里的）各自去注释后的指纹、闭包真引到的 cfg 原子与它们的真值与判定自己的内容输入组成；路径、名字、行号、资源上限、限时、提交与树、工具链、外部工具版本、依赖版本、编译档、线程数与测试服务代码不进键（D13（验证路线） 已定项 17；各类键各由什么组成照那一条「各个键由什么组成」那张表）。两种排除不在这句全称里：算键的库自己两份（`scripts/crash/lib_verdict_library.py`、`scripts/gate/lib_function_units.py`）的单元不进任何一份判定的键，一条只打提示、不改判定结局的子进程边按实测排；估「哪些判定要重判」之前先读 `.claude/rules/verification-reference.md`「单元键的组成与排除」。崩溃判定库的键不读仓根；断言就是关于真仓、要读活树的测试拒算（照跑、不复用、不入库）。
 - 按判定入库：凡起编译、跑自证、现算键的判定都按判定入库、按单元键复用、记红撤绿（判红的照同一把键记红、撤掉这把键原有的绿，下一趟现判），没有每趟整格照跑的格；例外只有 prune-server 与 task-server 自己的自证与只读文本的静态检查格。broad-mutation 的驱动只算翻面（同一把键先抓到、后判没红），不沿用、现判一次。带判定库的门禁与入口登记在 `.claude/gate.d/verdict-library-scripts.tsv`，各道的键与键前缀写在它的文件头。
 - 每一趟真跑开跑前从键相同、库里有判定的项里随机抽几条当哨兵、再抽一条强制现判（种子打进日志），哨兵有一条被现判、强制现判的判定与库里那一条不同、或强制现判那一条仍复用，整道红。
 - **缩域**：崩溃域只往小缩；不给缩域参数、不设缩域变量就是全量域。缩过域的那一趟成功句写「缩过域、不算门禁通过」并写出实际值，不当门禁通过。
@@ -47,7 +49,7 @@
 
 起一道门禁或入口、照它的写法单跑一趟、写范围声明、核它的判定单位、缩域与复用自证之前，先读 `.claude/rules/verification-reference.md`「一个门禁：两种跑法」。
 
-**卡只归 GPU 服务，任务不拿卡**：GPU 批处理验证服务（`gpu-verification-server/`）起来就照多机配置 `GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED` 开卡、一直持着；开卡之前的清场（复用 `scripts/crash/gpu-quiesce-run.sh`）、查卡与判都归它，清场之后不复原。统一任务服务只调配 CPU：经 `task-server/task submit -- <命令>` 交的任务只跑录入、往判定库写待判行、读结论，不领卡、不分卡、不清场，调用方不在外面套清场、不挑卡。两个服务只经判定库（prune-server 那一份 RocksDB）连。崩溃判段之外用卡的测试交 GPU 服务代跑（接口待定）。GPU 服务发来卡坏消息（发给提交那批待判行的会话）时，主 agent 当场弹窗请用户重置那张卡，不等、不重试。跑或改用 GPU 的测试、入口与门禁之前，先读 `.claude/rules/verification-reference.md`「卡只归 GPU 服务，任务不拿卡」「测试线程」。
+**卡只归 GPU 服务，任务不拿卡**：GPU 批处理验证服务（`gpu-verification-server/`）起来就照多机配置 `GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED` 开卡、一直持着；开卡之前的清场（复用 `scripts/crash/gpu-quiesce-run.sh`）、查卡与判都归它，清场之后不复原。统一任务服务只调配 CPU：经 `task-server/task submit -- <命令>` 交的任务只跑录入、往判定库写待判行、读结论，不领卡、不分卡、不清场，调用方不在外面套清场、不挑卡。两个服务经判定库（prune-server 那一份 RocksDB）连；判段的库在临时 prune-server 里时（测试的一次性库、变异门禁与证红每块起的临时服务），判段在真服务里登记那份临时服务（一把续着租的认领，不写数据行，判段等完就放），GPU 服务照登记去连那份临时服务取待判行、把结论写回那一份，不写进真库，卡照旧只在 GPU 服务手里。崩溃判段之外用卡的测试交 GPU 服务代跑（接口待定）。测试进程经 GPU 服务的借卡通道（`python3 gpu-verification-server/control lease take`）借卡，只许白名单里的借方：登记位是 `gpu-verification-server/src/card-lease-borrowers.tsv`，GPU 服务照借方的可执行文件名认，不在表里的拒绝；表里只有 E202（GPU与CPU两种模式GC对照组）的真卡验证装置。验证包的测试与崩溃判段不借卡：GPU 用例没交卡串的报本次未跑。这一条判据还没有检查判，立前靠 review：审改动时见到白名单之外的进程调借卡通道、或验证包里有借卡的路，就打回。例外：`.claude/gate.d/crate-roles.tsv` 里角色是「产品」的包，它自己 `tests/` 下的真卡测试照产品挂载那样开卡：开产品的 GPU 模式、给定显存上限（1 GiB），由产品自己的开卡路径申请卡；不经借卡通道，也不交 GPU 服务代跑。GPU 服务发来卡坏消息（发给提交那批待判行的会话）时，主 agent 当场弹窗请用户重置那张卡，不等、不重试。跑或改用 GPU 的测试、入口与门禁之前，先读 `.claude/rules/verification-reference.md`「卡只归 GPU 服务，任务不拿卡」「测试线程」。
 
 ## 判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB
 

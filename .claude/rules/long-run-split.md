@@ -15,7 +15,7 @@
 3. 拆不开的（单个场景、单条义务本身就跑这么久），优化那段算法，改完在同一份输入上重跑、量到不超过 7200 秒，优化前后判定逐项相同（`.claude/rules/test-script-discipline.md`「编译与算法都要快」）。
 4. 缩域（`--crash-expand-up-to`、`SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`）、少点几项、填 `--why`、确认长跑都不算拆。
 5. 拆与优化的改动照 `.claude/main-agent.md`「写与验分两段」走；那一项的代码归别的会话管的，照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 15 条发给那个会话，写明项名、任务号、用时与日志里慢在哪一步。
-6. 调度记录里写一行：项名、任务号、用时、怎么拆（或优化了哪一段）、拆后的项名与它们重跑的任务号。
+6. `records/` 下这一轮的调度记录里写一行，以「长跑拆分：」起头：项名、任务号、用时、怎么拆（或优化了哪一段）、拆后的项名与它们重跑的任务号；这一行只在 `records/` 下照写任务号（`.claude/gate.d/lib-forbidden-notations.py` 只在那里放过它）。
 
 ## 豁免
 

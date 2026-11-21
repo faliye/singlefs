@@ -63,3 +63,4 @@
 - 不确定就写「不确定」，加上缺什么，不用语气词绕。
 - 问用户拍板之前，问句里说范围的那几个词（「只是」「只改了」「全部」「没有别的」）先照 `.claude/rules/evidence-discipline.md`「核了窄的那一句，说出口的却是宽的那一句」现查一次。
 - 精确不让位于简短：术语、数字、口径、命令、下一步照旧写全（`.claude/singlefs-ai-sop/rules/writing-discipline.md`「别矫枉过正」）。
+- 给用户的回复与汇报里指别的会话，写它在 `ListAgents` 那一行的编号（例「`(5b)`」），连同它改了哪个文件、做了什么；不写 mainagent(A) 这类字母，也不写 `<做什么>那一路的会话`、`那一路的 agent` 这类描述。会话之间的消息指别的会话写 mainagent(A)、mainagent(B)，指子 agent 写 subagent(A)、subagent(B)（括号里只放大写字母），同一份文字里按出场次序编字母，写清它改了哪个文件、做了什么，不写会话全名、两位短号与那类描述；给用户的回复与汇报里指子 agent 同样写 subagent(A)、subagent(B)（进仓文字的同一条在 `.claude/agent-common.md`「写」一节）。

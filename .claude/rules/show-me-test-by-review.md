@@ -4,12 +4,12 @@
 ## 新增的测试必须先证明它会红
 
 - 先把被测代码改坏，看着测试变红，再改回来；证明不了会红的测试等于没写。
-- 本仓有变异 harness，所以两样都要，commit message 的叙述不是没有 harness 时的退路：把「改坏哪里、哪条断言红」做成存进仓里的变异清单交给门禁反复复跑（`crates/` 下的测试与装置，含 `crates/singlefs-verification/src/bin/` 下的装置，变异行进 `crates/mutations.tsv`；`scripts/experiment-apparatus/` 下的装置进 `scripts/mutation/tables/` 下它那一张表）；变异行之外，commit message 里也写明怎么确认它会红（改坏了哪一行，看到哪个断言失败）。脚本查不了 commit message 那一样，写不出来就是没做。没有变异表收的测试（钩子、门禁与 `scripts/` 下非装置脚本的自证这类）用弄坏开关证红（`.claude/rules/test-script-discipline.md`「测试脚本自己也要被测试证明有效」里「每一处会判红的分支配一个弄坏开关或一条变异」那一条），commit message 照样写明。
+- 本仓有变异 harness，两样都要，commit message 的叙述不替代变异清单：把「改坏哪里、哪条断言红」做成存进仓里的变异清单交给门禁反复复跑（`crates/` 下的测试与装置，含实验包 `crates/singlefs-implementation-experiments/src/bin/` 下的装置，变异行进 `crates/mutations.tsv`；`scripts/experiment-apparatus/` 下的装置（顶层的 `<名>.rs` 或装置目录 `<名>/`）进 `scripts/mutation/tables/` 下它那一张表，表名是装置名）；变异行之外，commit message 里也写明怎么确认它会红（改坏了哪一行，看到哪个断言失败）。脚本查不了 commit message 那一样，写不出来就是没做。没有变异表收的测试（钩子、门禁与 `scripts/` 下非装置脚本的自证这类）用弄坏开关证红（`.claude/rules/test-script-discipline.md`「测试脚本自己也要被测试证明有效」里「每一处会判红的分支配一个弄坏开关或一条变异」那一条），commit message 照样写明。
 - 设计论证同样照办：对抗轮打中的每一条，先在模型里做成一个必须报非 0 的世界，再改规则。
 
 ## 踩过的坑要做成会失败的检查，不要做成提醒句
 
-形态与立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`「推论」与「边界」：做成当场拒绝执行的检查，先记欠账、按批立，正在反复发生的当场立。
+形态与立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`「推论」与「边界」：做成当场拒绝执行的检查，先记欠账、按批立，正在反复发生的当场立；子 agent 与协作工具的坑不记账，照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条当场修。
 
 ### 但要先问这个坑在哪一层：装置里，还是口径上
 

@@ -12,7 +12,7 @@
 ## 1. 这轮敲的脚本/命令，有没有该收归 `scripts/` 的？
 
 - 判据是「会不会被抄第二遍」，不是「写得好不好」。
-- 踩过的坑做成会红的检查，不做成提醒句，立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`「边界」：先记欠账、按批立。
+- 踩过的坑做成会红的检查，不做成提醒句，立的时机照 `.claude/singlefs-ai-sop/rules/sop-first.md`「边界」：先记欠账、按批立；子 agent 与协作工具的坑不记账，照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条当场修。
 - 已经没人用的，删。
 
 ## 2. 这轮用到的 skill / 规则，有没有该改的？
