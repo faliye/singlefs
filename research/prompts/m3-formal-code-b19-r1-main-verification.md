@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers K1 K2 K3 H1 H2 -->
 
-被判的文件：`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl`、`crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`、`crates/singlefs-harness/tests/checker_known_bad_images.rs`、`crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs`、`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`，`crates/mutations.tsv` 19-1 追加的 12 行。
+被判的文件：`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl`、`crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs`、`crates/singlefs-harness/tests/checker_known_bad_images.rs`、`crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs`、`crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`、`crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs`，`crates/mutations.tsv` 19-1 追加的 12 行。
 
 ## 一、这一轮的材料与证据
 

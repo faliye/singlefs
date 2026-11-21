@@ -1,0 +1,1 @@
+94f0bcb495315a79b77481e87f9f0371f39772891e03215df0ddfa7f9fce3e0e  .claude/gate.d/verus-pins.tsv

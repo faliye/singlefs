@@ -145,8 +145,8 @@ python3 -B -I scripts/experiment-apparatus/e183_capacity_read_cache_reserve_and_
 门禁侧的验收：`.claude/gate.d/replay-comparison-units.tsv` 第 65、66 行改成下面两整行（制表符分隔，六列）之后，replay-comparison-units 格对本份的比对对象表两行都对上：
 
 ```
-E183	research/prompts/e183-r3-prereg.md	all	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08.out	driver_e183
-E183	research/prompts/e183-r3-prereg.md	all	crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08-anchor-check.out	driver_e183_anchor_check
+E183	research/prompts/e183-r3-prereg.md	all	crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08.out	driver_e183
+E183	research/prompts/e183-r3-prereg.md	all	crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs	e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-11-08-anchor-check.out	driver_e183_anchor_check
 ```
 
 ## 七、钉绝对值的断言

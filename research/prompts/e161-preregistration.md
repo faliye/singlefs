@@ -47,7 +47,7 @@
 | 可用显存（G5） | 按第四条追加：单卡取最大那张 32607 MiB（本机 5090，nvidia-smi memory.total），另报 16 GB 那一档里最小的 16303 MiB（另一台 5080）；按卡切开取 5 张卡之和 97843 MiB，去重后的单元内容每张卡各放一份 |
 | 外推的状态数（G5） | N_ext = 10¹⁰（问题单原文）；另报第二条流整条流的 14 960 689 284（附带） |
 
-**装置写在哪（写死）**：入库装置，`crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs`，只新增这一个文件。不改 `crates/singlefs-core`、`crates/singlefs-checker`、`crates/singlefs-harness/src/` 下已有的文件、`crates/singlefs-harness/tests/`、任何 `Cargo.toml`（因此不加依赖，hash 用 std 之外自己写的）。问的是 `crates/` 今天这份恢复与 checker 的性质，独立模型答不了。
+**装置写在哪（写死）**：入库装置，`crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs`，只新增这一个文件。不改 `crates/singlefs-core`、`crates/singlefs-checker`、`crates/singlefs-harness/src/` 下已有的文件、`crates/singlefs-harness/tests/`、任何 `Cargo.toml`（因此不加依赖，hash 用 std 之外自己写的）。问的是 `crates/` 今天这份恢复与 checker 的性质，独立模型答不了。
 读集用包在 `PoolReader`（恢复）与 `ImageReader`（checker）外面的记录读者取，读者只转发、只记，不改答案。要读 crates 常量的地方一律改成本地常量加回比断言（清单在第十一节 S1），不直接引。
 
 **重型测试**：不跑门禁 54 号；不跑任何名字含 `layer0` 的测试二进制（与 crates 对拍的停机条款只调 `crates/singlefs-harness/src/crash.rs` 的公开函数，不跑用例）；不跑 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」清单里的任何一样。装置的二进制名不含 `layer0`。
@@ -499,7 +499,7 @@ PC2c、PC4c 找不到判别位置、或命中数为 0 不作废：那条臂的�
 | `crates/singlefs-checker/src/position_addressed.rs` | 公开项 grep |
 | `crates/singlefs-core/src/recovery.rs` | 类型 grep；70–284 |
 | `crates/singlefs-format/src/lib.rs` | 常量 grep 命中 14、17、19、20、35、41、188、191、209、211、213、233、234、238、247、252、256、258、260、263、265、268、353、358、408、413、414、491、495、555 |
-| `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs` | 1–60；`use` / `mod` 行 grep（17–89、5031、5032、7504、8076、11030、11598、17014、17451、22513）。只看装置结构，没读它的结果 |
+| `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` | 1–60；`use` / `mod` 行 grep（17–89、5031、5032、7504、8076、11030、11598、17014、17451、22513）。只看装置结构，没读它的结果 |
 | `crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs` | 函数与常量 grep；380–579 |
 | `crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs` | 函数与常量 grep；40–477；`固定脚本` grep 命中 64、396、412、426、443、573、605、700、767、1103、1340、1513 |
 | `固定脚本` 在别处的 grep 命中 | `crates/singlefs-harness/src/crash_injection.rs:406`；`tests/second_transaction_supplement_two_admission_formula.rs:4`、`76`；`tests/second_transaction_supplement_two_unreadable_abandoned_root_slot.rs:95`；`tests/second_transaction_step_five_reuse.rs:1`、`62`；`src/model_comparison.rs:60`、`79` |

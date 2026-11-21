@@ -27,7 +27,7 @@
 | 5 | W3 三块盘 | 今天的 mkfs 交三块盘会 panic，两块盘归属不是 0/1/0 就拒，往挂着的池里多交一块盘四个入口都拒；改 mkfs 断言造的三盘副本上，MOD2、FV 两种在两块盘上与对的实现同值，在三块盘上让 txg 8 会话发布做成 | — | 三块盘不在今天的取样域里，MOD2、FV 今天算等价变异，不算 `.claude/rules/mutation-sampling.md` 第三类；记零轮，三块盘开线时补（L3，不在这一轮做） |
 | 6 | W1 J1–J5 做到了没有 | 都做到；J3 那一句判决字面写「EC、AC 两种错实现必须红」在 txg 27 上，实情是 AC 只在 txg 25 红（txg 27 的根正落在区域 0 那块盘上），实现员另加的 txg 25 三条是对的 | — | 采：第二轮判决第三节 J3 应读作「EC 在 txg 27 与 25 红，AC 只在 txg 25 红」，冻结的那份不改，以这一条为准 |
 | 7 | W1 前两轮判决引的数 | 都找得到；第二轮判决「3 处对不上」今天重跑是 5 处（多的 2 处在 `command-safety.md`，当时的输出复核不了）；背景材料「98 个测试二进制」实为 94 个目标加 4 个文档测试的 98 行 `test result` | — | 采：两处说法以这一条为准，「98 个测试二进制」应读作「98 行 test result（94 个目标加 4 个文档测试）」 |
-| 8 | W1 留白 | checker 档 `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs` 第 834、1251 行一带还有旧成员名的注释 | — | 采，并进 L1、L2 那一批 |
+| 8 | W1 留白 | checker 档 `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs` 第 834、1251 行一带还有旧成员名的注释 | — | 采，并进 L1、L2 那一批 |
 | 9 | W1 AC 单处写法与原样的差 | 只在「盘 0 落后而 P 的根槽住盘 1」那一格不同 | W2 量过：AC 原样被 txg 25 抓到 | 不改 |
 
 ## 三、改法（最终轮，修完不再开第四轮；都被攻过零轮）

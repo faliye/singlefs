@@ -27,7 +27,7 @@
 |---|---|
 | `crates/singlefs-background-gpu/src/background_gpu.rs` | **要改**：打中 2、5 改代码与测试，打中 1、4、6 改文档 |
 | `crates/singlefs-background-gpu/src/background_gpu_compute.rs` | 照旧 |
-| `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs` | 照旧；`vulkan_instance_for_the_gpu_arm` 一处文档措辞小误随修补一起改 |
+| `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs` | 照旧；`vulkan_instance_for_the_gpu_arm` 一处文档措辞小误随修补一起改 |
 
 打中逐条：
 

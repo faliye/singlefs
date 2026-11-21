@@ -17,7 +17,7 @@
 | 复跑 | 草稿目录 `~/.local/share/singlefs/work/m3-batch10z-d-code-r1-main/rerun.sh`，两份冻结副本拷贝并行，rc 全 0。攻方 `rerun.sh … a3 a4 a5 a6 x`：`summary-a4.txt 全同`、`summary-a5.txt 全同`、`summary-a6.txt 全同`、`summary-x1.txt 全同`、`summary-z1.txt 全同`；`summary-a3.txt 不同`，差的只是模型目录里多出的两行 `arm=h2 k=1 … red_at_some_step:98`，`scripts/spec-a3.tsv` 11 件里没有 k=1 的 h2 臂，这两行复跑不出、判决不引；其余各行逐字相同。正推 `k2d_probe` 的 `k11_`（`2 passed`）、`k23_`（`6 passed`）两组，`RESULT k11-admin-rollback fault_on=true: Err(CandidateJudgementStillUnreadableAfterOneReread(…))`、`RESULT K2-3 根槽挂载时读回全零(之后恢复): 参照落点数=22 挂载记着=None 挂后空闲=20` 与 `logs/` 里的相同 |
 | 腿的数 | 都是腿的模型或副本上的数，不进 kb |
 
-被判的源文件：`crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs`、`crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs`。
+被判的源文件：`crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs`、`crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs`。
 
 ## 二、逐格判决
 

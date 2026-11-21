@@ -1,0 +1,2 @@
+2ada7157b3771d8a0eb295e8327081d9dcbed1ec77f8db32d1124f5b6b14d688  .claude/rules/verification.md
+0c43a3370242da6b29ebb55404a2f4c9f09dff3a44b15550b18476732afb2cc5  .claude/rules/implementation-workflow.md

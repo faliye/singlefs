@@ -40,7 +40,7 @@
   - `crates/singlefs-harness/src/history.rs`
   - `crates/singlefs-harness/src/model_comparison.rs`
   - `crates/singlefs-harness/src/model.rs`
-- **不判**：`crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs`。它是 E156 的实验装置，由那个实验页判，这一轮只点名。
+- **不判**：`crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`。它是 E156 的实验装置，由那个实验页判，这一轮只点名。
 
 **这一轮判的定义**：
 - `.claude/agent-common.md`

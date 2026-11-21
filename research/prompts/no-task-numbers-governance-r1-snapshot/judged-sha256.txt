@@ -1,0 +1,12 @@
+38ed31c207d54a226eb77acc33deb10c930eea1652fa3b13e3643c2074267cef  research/prompts/_no-task-numbers-governance-r1-body.md
+255b3b5b69e6a3b2542f9007d2adf8a788160a615fd20f63249615ba080f9d8d  .claude/agent-common.md
+3d12ba9a026424bb7d1a83cf435060b786cd89fef38b7fca141aec5bb16e1682  .claude/rules/long-run-split.md
+780ad0855eb3be13c2a314f5585ba6fab623f472fdc2efbdcde42b60f0602dfc  .claude/rules/three-way-inference.md
+0267903a9cee5da2d813d38c841e712a40edc7fbf1e470d11afd53ee3a92e3aa  .claude/gate.d/lib-forbidden-notations.py
+c71d28e4b45aabc49a7a0b6229e1527ab1fca43f3aa7c03750d053f3a4aab086  .claude/hooks/write-guard.sh
+02d0c3c820d5d9e46de611250dfcae2edef7831786c8be87a1bdccfcb4027ea9  .claude/hooks/bash-command-detector.sh
+fcf58d75678dcdadab15f95f2cb29909824c94cf672a2a573f85e6f18e38d32c  scripts/kb/append-record.py
+23b8137d220cf55943d03c1876eec526709e24a2bb4a0f024c37597b12b9d86b  scripts/kb/lib_notation_check.py
+2f8052d29534a97da3e409699430495d1c04d819a91301e392d97899eab105e6  scripts/kb/ledger-append-section.py
+c935532f7098e68d4dbd266744a7a5d6e97f60d6836bb11281e6d724cd243e01  scripts/kb/replace-batch.py
+5e41b4ea0d4762580a48af88373ecb06384f37441b7b3395cee3649ab4d781ce  .claude/gate.d/break-switch-replay-files.tsv

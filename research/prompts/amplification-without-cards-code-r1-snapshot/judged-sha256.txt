@@ -1,0 +1,4 @@
+07d4f1f9b14f800a3090d264e6c2da4149d7faa259af12626457aa7943f64c7a  research/prompts/_amplification-without-cards-code-r1-body.md
+2ada7157b3771d8a0eb295e8327081d9dcbed1ec77f8db32d1124f5b6b14d688  .claude/rules/verification.md
+35de8f78572e1e439329a221779e6e9a164ccd43731beb0750d589834a1c1b57  records/2026-11-17-崩溃判器与测试流的效率优化.md
+c995d5073ef2e77ab3a9ab201b09858cd2f7b357ec3f9a0b263140ae8b3d31f8  scripts/crash/crash-amplification-item.sh

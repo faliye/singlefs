@@ -153,7 +153,7 @@
 | `.claude/agents/implementation-writer.md:16` | verification.md「定义与名字」…（括注「测试文件第一行声明模块」：原件只在「门禁管哪一半」那张表里） | 不改：「测试文件第一行声明模块」已放回 `.claude/rules/verification.md`「测试不分档，红了只重跑红的」崩溃枚举用例那一条，括注点名的三节里有 | 合稿树里的 |
 | `task-server/task_server.py:219` | verification.md「一个门禁：两种跑法」里「控制测试线程的只有变异那一路」 | `.claude/rules/verification-reference.md`「一个门禁：两种跑法」「测试线程」 | 合稿树外 |
 | `crates/singlefs-verification/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs:87` | 同上（GPU 测试线程那一条） | 同上；`crates/` 下的注释改动照只改注释算 | 合稿树外 |
-| `crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:26` | verification.md「一个门禁：两种跑法」按需领卡那一句 | `.claude/rules/verification-reference.md`「一个门禁：两种跑法」「凡用 GPU 先清场，跑完不复原」 | 合稿树外 |
+| `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs:26` | verification.md「一个门禁：两种跑法」按需领卡那一句 | `.claude/rules/verification-reference.md`「一个门禁：两种跑法」「凡用 GPU 先清场，跑完不复原」 | 合稿树外 |
 | `.claude/kb/checks-owed.md:538` | verification.md「一个门禁：两种跑法」里 crash-case-replay 格的 cargo 命令；kb | `.claude/rules/verification-reference.md`「门禁 crash-point-replay 怎么跑」 | 合稿树外 |
 | `.claude/kb/verification-build.md:317` | verification.md「一个门禁：两种跑法」的「缩域」一条「写法在」；kb | 判据还在常驻 **缩域**；写法改指 `.claude/rules/verification-reference.md`「缩域与崩溃域上限」 | 合稿树外 |
 | `.claude/main-agent.md:12` | verification.md「判定库只有一份」：「判定库的内容、一族「接完」的三件、中转库都在那一节」 | 「判定库的内容」那一样（表与族的名字）改指 `.claude/rules/verification-reference.md`「判定库里的表」；接完与中转库还在常驻 | 合稿树里的（节名在，照旧可用；要一步到细则的照右栏改） |

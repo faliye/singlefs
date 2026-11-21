@@ -1,0 +1,128 @@
+--- a/crates/singlefs-replay-prefix/src/file_range_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/file_range_proofs.rs
+@@ -153,14 +153,27 @@
+     write_start <= byte < write_end && unit_start <= byte < unit_end
+ }
+ 
++/// 两个半开区间的精确交集长度；空区间、倒置区间与不相交区间的长度都是零。
++pub open spec fn range_intersection_length(
++    write_start: int, write_end: int, unit_start: int, unit_end: int,
++) -> int {
++    let intersection_start = if write_start > unit_start { write_start } else { unit_start };
++    let intersection_end = if write_end < unit_end { write_end } else { unit_end };
++    if intersection_start < intersection_end { intersection_end - intersection_start } else { 0 }
++}
++
+ /// 返回（单元内偏移，请求内偏移，长度）；None 恰好表示交集为空。也接受空或倒置的区间。
+ pub fn bytes_in_unit(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
+     -> (answer: Option<(u64, u64, u64)>)
+     ensures
+         match answer {
+-            None => forall|byte: int| !in_both_ranges(byte, write_start, write_end, unit_start, unit_end),
++            None => {
++                &&& range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int) == 0
++                &&& forall|byte: int| !in_both_ranges(byte, write_start, write_end, unit_start, unit_end)
++            },
+             Some((in_unit, in_write, length)) => {
+                 &&& length > 0
++                &&& length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int)
+                 &&& unit_start + in_unit as int == write_start + in_write as int
+                 &&& in_unit + length as int <= unit_end - unit_start
+                 &&& in_write + length as int <= write_end - write_start
+@@ -204,9 +217,13 @@
+             Some(intersection) => {
+                 &&& unit_index * capacity + capacity <= u64::MAX
+                 &&& match intersection {
+-                    None => forall|byte: int| !byte_in_write_and_indexed_unit(byte, write_start, write_end, unit_index, capacity),
++                    None => {
++                        &&& range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity) == 0
++                        &&& forall|byte: int| !byte_in_write_and_indexed_unit(byte, write_start, write_end, unit_index, capacity)
++                    },
+                     Some((in_unit, in_write, length)) => {
+                         &&& length > 0
++                        &&& length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity)
+                         &&& unit_index * capacity + in_unit == write_start + in_write as int
+                         &&& in_unit + length as int <= capacity
+                         &&& in_write + length as int <= write_end - write_start
+@@ -322,6 +339,54 @@
+         forall|byte: int| !(in_both_ranges(byte, write_start, write_end, left, seam)
+             && in_both_ranges(byte, write_start, write_end, seam, right)),
+ {
++}
++
++/// 合法单元分界两侧的交集长度之和等于整段交集长度；写区间可以为空或倒置。
++pub proof fn lemma_adjacent_unit_intersection_lengths_add_up(
++    write_start: int, write_end: int, unit_start: int, boundary: int, unit_end: int,
++)
++    requires unit_start <= boundary <= unit_end,
++    ensures
++        range_intersection_length(write_start, write_end, unit_start, unit_end)
++            == range_intersection_length(write_start, write_end, unit_start, boundary)
++                + range_intersection_length(write_start, write_end, boundary, unit_end),
++{
++}
++
++/// 合法请求分界两侧的交集长度之和等于整请求交集长度；单元区间可以为空或倒置。
++pub proof fn lemma_split_write_intersection_lengths_add_up(
++    write_start: int, split: int, write_end: int, unit_start: int, unit_end: int,
++)
++    requires write_start <= split <= write_end,
++    ensures
++        range_intersection_length(write_start, write_end, unit_start, unit_end)
++            == range_intersection_length(write_start, split, unit_start, unit_end)
++                + range_intersection_length(split, write_end, unit_start, unit_end),
++{
++}
++
++/// 无前提见证：内部与两端分界、空与倒置区间，以及 u64 上界附近的单字节交集。
++pub proof fn witness_intersection_length_partitions()
++    ensures
++        range_intersection_length(3, 7, 0, 8) == 4,
++        range_intersection_length(3, 7, 0, 4) == 1,
++        range_intersection_length(3, 7, 4, 8) == 3,
++        range_intersection_length(1, 9, 3, 7) == 4,
++        range_intersection_length(1, 5, 3, 7) == 2,
++        range_intersection_length(5, 9, 3, 7) == 2,
++        range_intersection_length(3, 3, 0, 8) == 0,
++        range_intersection_length(7, 3, 0, 8) == 0,
++        range_intersection_length(1, 9, 5, 5) == 0,
++        range_intersection_length(1, 9, 7, 3) == 0,
++        range_intersection_length(u64::MAX as int - 1, u64::MAX as int,
++            u64::MAX as int - 1, u64::MAX as int) == 1,
++{
++    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 4, 8);
++    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 0, 8);
++    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 8, 8);
++    lemma_split_write_intersection_lengths_add_up(1, 5, 9, 3, 7);
++    lemma_split_write_intersection_lengths_add_up(1, 1, 9, 3, 7);
++    lemma_split_write_intersection_lengths_add_up(1, 9, 9, 3, 7);
+ }
+ 
+ } // verus!
+--- a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
++++ b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+@@ -399,3 +399,11 @@
+ overwrite-split-needs-valid-boundary	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        0 <= split <= data.len(),\n		proof_errors=2	landing=lemma_splitting_an_overwrite_preserves_the_result
+ overwrite-contained-needs-payload-bounds	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        overwrite_fits(data, offset, replacement),\n		proof_errors=2	landing=lemma_a_contained_overwrite_folds_into_the_payload
+ overwrite-composition-witness-byte	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	            == seq![1u8, 8, 20, 21, 11, 6],\n	            == seq![1u8, 8, 19, 21, 11, 6],\n	proof_errors=1	landing=witness_split_and_contained_overwrites
++intersection-length-contract-lemma_adjacent_unit_intersection_lengths_add_up	crates/singlefs-replay-prefix/src/file_range_proofs.rs	pub proof fn lemma_adjacent_unit_intersection_lengths_add_up(\n    write_start: int, write_end: int, unit_start: int, boundary: int, unit_end: int,\n)\n    requires unit_start <= boundary <= unit_end,\n    ensures\n	pub proof fn lemma_adjacent_unit_intersection_lengths_add_up(\n    write_start: int, write_end: int, unit_start: int, boundary: int, unit_end: int,\n)\n    requires unit_start <= boundary <= unit_end,\n    ensures\n        false,\n	proof_errors=1	landing=lemma_adjacent_unit_intersection_lengths_add_up
++intersection-length-contract-lemma_split_write_intersection_lengths_add_up	crates/singlefs-replay-prefix/src/file_range_proofs.rs	pub proof fn lemma_split_write_intersection_lengths_add_up(\n    write_start: int, split: int, write_end: int, unit_start: int, unit_end: int,\n)\n    requires write_start <= split <= write_end,\n    ensures\n	pub proof fn lemma_split_write_intersection_lengths_add_up(\n    write_start: int, split: int, write_end: int, unit_start: int, unit_end: int,\n)\n    requires write_start <= split <= write_end,\n    ensures\n        false,\n	proof_errors=1	landing=lemma_split_write_intersection_lengths_add_up
++intersection-length-contract-witness_intersection_length_partitions	crates/singlefs-replay-prefix/src/file_range_proofs.rs	pub proof fn witness_intersection_length_partitions()\n    ensures\n	pub proof fn witness_intersection_length_partitions()\n    ensures\n        false,\n	proof_errors=1	landing=witness_intersection_length_partitions
++intersection-length-unit-split-needs-valid-boundary	crates/singlefs-replay-prefix/src/file_range_proofs.rs	    requires unit_start <= boundary <= unit_end,\n		proof_errors=1	landing=lemma_adjacent_unit_intersection_lengths_add_up
++intersection-length-write-split-needs-valid-boundary	crates/singlefs-replay-prefix/src/file_range_proofs.rs	    requires write_start <= split <= write_end,\n		proof_errors=1	landing=lemma_split_write_intersection_lengths_add_up
++write-intersection-exact-length	crates/singlefs-replay-prefix/src/file_range_proofs.rs	length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int)	length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int) + 1	proof_errors=1	landing=bytes_in_unit
++indexed-intersection-exact-length	crates/singlefs-replay-prefix/src/file_range_proofs.rs	length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity)	length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity) + 1	proof_errors=1	landing=checked_bytes_in_indexed_unit
++intersection-length-witness-sum	crates/singlefs-replay-prefix/src/file_range_proofs.rs	        range_intersection_length(3, 7, 0, 8) == 4,	        range_intersection_length(3, 7, 0, 8) == 5,	proof_errors=1	landing=witness_intersection_length_partitions
+--- a/crates/singlefs-replay-prefix/src/README.md
++++ b/crates/singlefs-replay-prefix/src/README.md
+@@ -190,6 +190,10 @@
+ 
+ `checked_bytes_in_indexed_unit` 把地址换算与求交组合在同一证明中：外层 None 表示地址溢出，Some(None) 表示可表示区间内没有写入字节；Some(Some(...)) 给出两个相对偏移及正长度，并与数学上的逐字节交集等价。core 的 `bytes_written_into` 直接调用它，地址溢出时显式 panic，其余返回行为保持不变。
+ 
++`range_intersection_length` 用数学整数端点给出精确交集长度：最大起点到最小终点之间的正差，否则为零。`bytes_in_unit` 的空结果对应长度零，非空结果的 `length` 直接等于此规格；`checked_bytes_in_indexed_unit` 在地址可表示的外层 `Some` 内保留同样关联，单元端点使用数学乘法与加法。外层 `None` 仍只表示地址溢出，不能当作零长度交集。core 直接消费返回的 `length` 字段，因此该契约关联的是执行核给出的长度。
++
++`lemma_adjacent_unit_intersection_lengths_add_up` 证明在单元内合法分界时两侧交集长度相加等于整体，允许写区间为空或倒置。`lemma_split_write_intersection_lengths_add_up` 证明在写请求内合法分界时两段请求的交集长度相加等于整体，允许单元区间为空或倒置。无前提见证 `witness_intersection_length_partitions` 覆盖内部与两端分界、具体的 `4 = 1 + 3` 和 `4 = 2 + 2`、空与倒置区间及 u64 上界附近的单字节交集。规格与组合引理只涉及字节区间和返回长度，不代表缓冲区拷贝、设备 I/O 或持久化顺序已经精化到这些性质。
++
+ `lemma_rounded_size_bounds_written_unit_addresses` 将取整准入条件连接到单元地址安全性：正容量、取整后长度可表示且单元号小于 size 所需单元数时，该单元终点不溢出。size 之外保留的已有单元需要文件状态另给界限。无前提边界见证覆盖该引理及两个新入口。
+ 
+ 这一步没有封闭计划公开字段的不变量，也没有验证五类来源到 core 枚举的转换或实际 I/O。原有其它单元地址换算仍各由调用方负责。

@@ -43,13 +43,13 @@
 - format：
   - `crates/singlefs-format/src/lib.rs`
 - harness：
-  - `crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs`
-  - `crates/singlefs-harness/src/bin/first_transaction_on_device.rs`
+  - `crates/singlefs-verification/src/bin/new_pool_file_creation_device_log_check.rs`
+  - `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs`
   - `crates/singlefs-harness/src/history.rs`
   - `crates/singlefs-harness/src/model_comparison.rs`
   - `crates/singlefs-harness/src/model.rs`
   - `crates/singlefs-harness/src/on_device_modes.rs`
-- **不判**：`crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`。它是 E158 的实验装置，由 E158 页的变异表与单测判，这一轮只点名。
+- **不判**：`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs`。它是 E158 的实验装置，由 E158 页的变异表与单测判，这一轮只点名。
 
 **这一轮判的定义**：
 - `.claude/agent-common.md`

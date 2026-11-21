@@ -8,7 +8,7 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄 r5 第 13 行；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起；驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
+英文名：replay_bounded_enumeration（照抄 r5 第 13 行；装置仍是 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`，不另起；驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
 
 ### 1.1 主 agent 给的问题（派发原文，逐字）
 
@@ -39,7 +39,7 @@
 
 ### 1.4 装置写在哪（写死）
 
-**入库装置**，改原装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`：L1、L2 问的是 `crates/` 今天的 `choose_root`（连同 C743 的落点核）在这一族上的结局，另写一份独立模型答不了；独立的那一半是第七节的两份脚本（不读装置、不调 crates）。
+**入库装置**，改原装置 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`：L1、L2 问的是 `crates/` 今天的 `choose_root`（连同 C743 的落点核）在这一族上的结局，另写一份独立模型答不了；独立的那一半是第七节的两份脚本（不读装置、不调 crates）。
 
 要读 `crates/` 的常量：不加新的。KL 摆根的落点用装置已有的本地算法 `root_choice_target_of_publish`（今天第 9805 行，区域 = txg mod 3、槽 = (txg div 3) mod S），每摆一条根都过装置已有的 TH2 回比（第 9844–9860 行：本地 (区域, 槽) 与 `root_ring::target_for_publish` 相等），不直接调 `target_for_publish` 去摆根。第 0 代根的落点（`make_filesystem.rs:825` `genesis_root_ring_slots`）KL 用不到。
 
@@ -217,7 +217,7 @@
 
 r3 档这一族状态数由 2 931 574 + 5 472 + 80 + 125 = 2 937 251 变成 2 937 153（KL 比 KA 少 98）；r4 档合计 13 856 755 变成 13 856 657（r4 第 561 行的合计减 98）。
 
-### 5.6 装置要改哪几处（要动的文件：`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/mutations.tsv`、`scripts/experiment-apparatus/replay.sh`）
+### 5.6 装置要改哪几处（要动的文件：`crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`、`crates/mutations.tsv`、`scripts/experiment-apparatus/replay.sh`）
 
 行号是 2026-10-23 工作区的（第三节）。**表里的新值都是执行员要量出来、再与第七节对的数**：先照下表改，再跑 5.8 的三份产物，KL 那几行等于第七节才算钉住；对不上的照第十一节 LV1 / LS1 判，不把量到的数改进常量来让它对上。
 
@@ -404,7 +404,7 @@ L2 的「上一次」：今天 `replay.sh` 三行指的那三份。sha256 与行
 | `research/prompts/e165-r3-prereg.md` | 标题 grep；9–38、454–498；`KA\|KJ2\|KJ0` grep 命中行（30、33、34、394、403、411、414、425、433、434、461、463、471、473、490–497、506、517、518、527–531、539、545、602、604、635、649、661、682–687、705–708、718、726、727、738–745、759、760、766、807、811–817、823–835、874、927） |
 | `research/prompts/e165-r4-prereg.md` | 标题 grep；`KA` grep 命中行（5、31、40、41、481、484、490、498、502、559、561、570–573、591、594、614、615、632、633、643、843、856、902–909、944、967、969、992、1040、1127） |
 | `research/prompts/e165-r5-prereg.md` | 标题 grep；13、655–700（比对对象表） |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | `KA` grep 命中行；9629–9700、9795–9835、10660–10760、11580–11665、11735–11760、11985–11995、12195–12205、12512–12520、12649–12760 的 `format!` 行、12715–12732、12883、12945–12965、16376–16385、16470–16560、16914–16940 的 `name=` 行、17160–17200、17229、17432、17700–17712、18367–18732 的单元名、19195–19240；30–33；`fn` 名 grep |
+| `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` | `KA` grep 命中行；9629–9700、9795–9835、10660–10760、11580–11665、11735–11760、11985–11995、12195–12205、12512–12520、12649–12760 的 `format!` 行、12715–12732、12883、12945–12965、16376–16385、16470–16560、16914–16940 的 `name=` 行、17160–17200、17229、17432、17700–17712、18367–18732 的单元名、19195–19240；30–33；`fn` 名 grep |
 | `crates/singlefs-core/src/root_ring.rs` | 100–200 |
 | `crates/singlefs-core/src/recovery.rs` | 1695–1718、1720–1800 |
 | `crates/singlefs-core/src/make_filesystem.rs` | 820–835；grep 56 |

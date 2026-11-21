@@ -1,0 +1,626 @@
+diff --git a/crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md b/crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md
+index 69054f9c926abd667a4e4c3d2b5c5d1b0f9706dc..b1a976971859a1f37f2e4fd160d4bed2a5adcf49 100644
+--- a/crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md
++++ b/crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md
+@@ -2,7 +2,7 @@
+ 
+ 入口是 [gpu_gc_proofs.rs](gpu_gc_proofs.rs)。这些性质补充 GPU GC 的仲裁、计数、算术与准入；已有根环、旧读者、回退和崩溃协议证明不重复计入。G01–G20 各有独立契约和必红变异，常量、递归终止与见证不占这 20 项的名额。
+ 
+-容量与资源记账的 G21–G30 位于 [gpu_gc_capacity_proofs.rs](gpu_gc_capacity_proofs.rs)：整批准入、最大输入、收紧上限、预留、释放、等待完成后释放、失败折半、派发覆盖、映射表占用及追加输入准入。这些是产品直接调用的可执行核；并不证明外层资源账本所有调用都符合协议。
++容量与资源记账的 G21–G30 位于 [gpu_gc_capacity_proofs.rs](gpu_gc_capacity_proofs.rs)：整批准入、最大输入、收紧上限、预留、释放、等待完成后释放、失败折半、派发覆盖、映射表占用及追加输入准入。G21–G29 是产品直接调用的可执行核；G30 `extended_gpu_chunk_input` 产品此刻没有调用点（`crates/singlefs-background-gpu/src/` 里没有一处调它），产品追加输入那一步在 `memory_limit_and_chunks::chunks_that_fit_on_the_gpu` 里自己做加法与过滤，那一段在核外、没验。这些核不证明外层资源账本所有调用都符合协议。
+ 
+ ## 两份打分算法的归纳证明
+ 
+@@ -10,8 +10,8 @@
+ 
+ 证明链包括：
+ 
+-- `lower_bound_of_sorted_records` 对二分循环状态 `(below, above)` 归纳，验证前缀/后缀不变量、下标界限与严格递减量，得到完整下界性质；下界不是输入假设。
+-- `lemma_candidate_window_keeps_every_contribution` 从两端的下界性质及最大跨度推导：窗内全是目标设备，窗外贡献为零。下界使用饱和减法，覆盖从段前伸入的记录。
++- `lower_bound_of_sorted_records` 对二分循环状态 `(below, above)` 归纳，验证前缀/后缀不变量、下标界限与严格递减量，得到完整下界性质；下界不是输入假设。函数体断言 `middle + 1` 不超过 `u32::MAX`，这一步靠 `requires` 里记录数不超过 `u32::MAX` 那条界（删掉那条界的反例是必红表 `gpu-score-binary-midpoint-needs-u32-bound`）。
++- `lemma_candidate_window_keeps_every_contribution` 从两端的下界性质及最大跨度推导：窗内全是目标设备，窗外贡献为零。下界使用饱和减法，覆盖从段前伸入的记录。窗口下沿往前退 65535 个槽；证明钉住的是「至少退 65534 个」：跨度不超过 65535 的记录，起点早于 `start − 65534` 的尾端不超过 `start`、贡献为零，所以退 65534 个照样验得过，退 65533 个才漏（必红表 `gpu-score-window-too-narrow`）。65535 比证明要的宽一格，这一格不由证明钉住。
+ - `lemma_counting_slots_equals_interval_intersection` 对跨度归纳，从逐槽成员判定推导交集长度。
+ - `lemma_search_prefix_matches_the_walk` 对已访问记录数归纳，证明裁剪窗口与整表扫描的前缀对应。
+ - `lemma_permuting_records_preserves_the_walk` 以多重集合相等为排列条件，利用已验证的可交换 fold 引理证明排序保持总和。
+@@ -19,99 +19,97 @@
+ 
+ 前提是排序表按 `(device, start)` 非降、排序保持整个记录的多重集合、记录起止有效且跨度不超过 65535、记录数装得进 u32、段为有效的 u64 非空半开区间。非空见证含重复、异盘、释放及跨段记录；另有空表见证。
+ 
+-这是**算法模型的机器检查证明**，不是 WGSL 源码的直接验证。二分模型以递归表示每一次循环状态转移，使用数学整数并证明中间值落在 u32 范围内；逐槽模型使用完整整数槽号。WGSL 的实际双字操作、排序索引解引用、缓冲区布局与派发到该模型的精化仍未证明。主机的 `sort_by_key` 确实建立上述排列与有序前提，也仍须另证。不得把此定理称为整个 GPU GC 已验证。
++这是**算法模型的机器检查证明**，不是 WGSL 源码的直接验证。二分模型以递归表示每一次循环状态转移，使用数学整数，下一轮下界 `middle + 1` 装得进 u32 由函数体里的断言证明；逐槽模型使用完整整数槽号。WGSL 的实际双字操作、排序索引解引用、缓冲区布局与派发到该模型的精化仍未证明。主机的 `sort_by_key` 确实建立上述排列与有序前提，也仍须另证。不得把此定理称为整个 GPU GC 已验证。
+ 
+-复跑算法模块（`VERUS` 取下文固定工具路径，提交后核对并确认任务）：
+-
+-```sh
+-task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
+-  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
+-  --verify-only-module gpu_gc_scoring_proofs crates/singlefs-replay-prefix/src/lib.rs
+-
+-task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
+-  --item must-red:gpu-score-binary-skips-entry \
+-  --item must-red:gpu-score-window-too-narrow \
+-  --item must-red:gpu-score-search-counts-released \
+-  --item must-red:gpu-score-permutation-needs-multiplicity
+-```
+-
+-完整反例清单为 `verus-must-red-worlds.tsv` 中 `gpu-score-` 开头的各行。实现反例覆盖二分跳项/错误上界、逐槽偏移、窗口过窄、释放误计、跳过记录；前提反例覆盖有序、合法跨度、重数、排列和计数上界；另外检查归纳步和见证。编译失败、类型错误或只有求解超时都不能计为抓住反例。
++完整反例清单为 `verus-must-red-worlds.tsv` 中 `gpu-score-` 开头的各行。实现反例覆盖二分跳项/错误上界、逐槽偏移、窗口过窄、释放误计、跳过记录；前提反例覆盖有序、合法跨度、重数、排列、计数上界与中点的 u32 界；另外检查归纳步、计数上下界与见证。编译失败、类型错误或只有求解超时都不能计为抓住反例。
+ 
+ ## 覆盖清单
+ 
+-“产品核”表示产品直接调用 Verus 验证的同一份可执行函数。“模型”表示抽象状态或算术定理，到 Rust 容器、WGSL 或设备实现的精化仍未证明。
++“产品核”表示产品直接调用 Verus 验证的同一份可执行函数。“模型”表示抽象状态或算术定理，到 Rust 容器、WGSL 或设备实现的精化仍未证明。“定义自检”表示 `ensures` 是同一文件里 spec 函数定义的展开，只钉住那份定义，对产品代码没有约束。
+ 
+ | 编号 | 性质与被验入口 | 对应 GPU GC 路径 | 层次 |
+ | --- | --- | --- | --- |
+ | G01 | 一致才确认，首轮分歧暂缓，第二轮交 CPU，三种决策互斥且计数不溢出。`reconcile_gpu_entry` | `two_kernel_reconciliation::reconcile_the_two_kernel_outcomes` | 产品核 |
+-| G02 | 连续两次分歧恰好触发一次 CPU 判定，之后重新计数。`lemma_two_disagreements_trigger_exactly_one_cpu_judgment` | 双核仲裁 | 模型 |
+-| G03 | 一次一致打断连续分歧，不能累计隔轮分歧。`lemma_agreement_restarts_the_disagreement_history` | 双核仲裁 | 模型 |
+-| G04 | GPU 批失败不改状态；成功轮次精确更新计数与 CPU 调用次数。`lemma_failed_batch_keeps_all_counts_and_cpu_calls` | `reconcile_unless_the_batch_failed` | 模型 |
++| G02 | 连续两次分歧恰好触发一次 CPU 判定，之后重新计数。`lemma_two_disagreements_trigger_exactly_one_cpu_judgment` | 双核仲裁 | 模型，定义自检 |
++| G03 | 一次一致打断连续分歧，不能累计隔轮分歧。`lemma_agreement_restarts_the_disagreement_history` | 双核仲裁 | 模型，定义自检 |
++| G04 | GPU 批失败不改状态；成功轮次精确更新计数与 CPU 调用次数。`lemma_failed_batch_keeps_all_counts_and_cpu_calls` | `reconcile_unless_the_batch_failed` | 模型，定义自检 |
+ | G05 | 不同条目的更新可交换，重排后计数表和 CPU 调用总数相同。`lemma_distinct_entry_updates_commute` | 按条目键保存的计数表 | 模型 |
+ | G06 | 稀疏表只保存一个未决轮次，未出现的条目不变。`lemma_count_updates_preserve_the_sparse_counter_invariant` | 同上 | 模型 |
+ | G07 | 区间贡献非负、对称、不超过任一跨度，相邻区间贡献零。`lemma_live_slot_intersection_bounds` | 逐记录求交的打分核 | 模型 |
+ | G08 | 段切开后的贡献可加，跨界记录不漏不重算。`lemma_splitting_a_segment_preserves_live_slot_contributions` | 两份打分核的段边界 | 模型 |
+ | G09 | 任意有限记录表在任意切口分片，分片求和等于整表。`lemma_record_slices_preserve_the_score` | `live_slots_summed_over_the_record_slices` | 模型，归纳而非定深枚举 |
+-| G10 | 重复记录保留计数重数，不能误改为槽集合去重。`lemma_duplicate_records_keep_their_multiplicity` | 两份打分核和 CPU 参照 | 模型 |
++| G10 | 重复记录保留计数重数，不能误改为槽集合去重。`lemma_duplicate_records_keep_their_multiplicity` | 两份打分核和 CPU 参照 | 模型，只证重数 2 |
+ | G11 | 已释放或异盘记录贡献零；同盘活记录贡献恰为交集长度，严格相交才为正。`lemma_released_and_foreign_records_do_not_score` | 打分核的记录过滤 | 模型 |
+ | G12 | 双 u32 的高字优先比较等价于全宽槽号比较。`lemma_two_word_slot_order_is_u64_order` | WGSL 槽号比较 | 模型 |
+ | G13 | 低字加跨度至多进位一次，全宽和合法时高字不溢出。`lemma_two_word_span_addition_carries_exactly_once` | WGSL `slot_past_the_span` | 模型 |
+ | G14 | 两核分片计数各自累加，任一溢出都拒绝。`checked_live_slot_totals` | `live_slots_summed_over_the_record_slices` | 产品核 |
+ | G15 | 最小非零四字节对齐输入长度，向上取整溢出拒绝。`checked_gpu_input_bytes` | `memory_limit_and_chunks::input_buffer_bytes` | 产品核 |
+ | G16 | 预算包含对齐输入、逐条占用和固定占用，乘加溢出拒绝。`checked_gpu_chunk_bytes` | `ChunkFootprint::bytes_held_by_a_chunk` | 产品核 |
+-| G17 | 扣除其他阶段已占显存后不回绕；未超额时已占加剩余恰为总限。`remaining_gpu_memory` | `ChunkBoundsOfAGpu::with_the_room_left_after` | 产品核 |
++| G17 | 扣除其他阶段已占显存后不回绕；未超额时已占加剩余恰为总限；不超过剩余量的正的新增分配加上已占不超过总限。`remaining_gpu_memory` | `ChunkBoundsOfAGpu::with_the_room_left_after` | 产品核 |
+ | G18 | 下一记录片有进展、不过界，与余下区间不重不漏，避免先加后取 min 的溢出。`next_gpu_record_slice_end` | `live_slot_plan_on_a_gpu` | 产品核 |
+ | G19 | 同盘、未释放、起点及全跨度在区内才扫描，跨度溢出拒绝。`gpu_record_is_in_scan_region` | `region_record_kernels::record_is_one_the_region_scan_reads` | 产品核 |
+ | G20 | 只接受 counted=1，拒绝填充字和未知字，保留数值高低两字。`decoded_gpu_live_slots` | `live_slot_kernels::decoded_live_slot_outcomes` | 产品核 |
++| G21 | 显存、输入绑定、条目绑定和派发四道界同时满足才放行；乘加溢出不误放行。`gpu_chunk_fits` | `memory_limit_and_chunks::chunk_fits_with_the_staging_of_its_input` | 产品核；显存上限是交进来的，扣暂存那一层在核外，见下 |
++| G22 | 最大单条分片是装得下的最大四字节倍数；`None` 当且仅当最小输入也放不下。`largest_gpu_piece_input` | `memory_limit_and_chunks::largest_piece_input_bytes` | 产品核；显存上限是交进来的，扣暂存那一层在核外，见下 |
++| G23 | 收紧显存上限：原来无限额时采用新上限，已有限额时不放宽。`tightened_gpu_memory_limit` | `ChunkBoundsOfAGpu::with_the_memory_limit_at_most` | 产品核 |
++| G24 | 尚有未完成提交、账本溢出或超限时拒绝新增占用。`checked_gpu_memory_hold` | `GpuMemoryAccount::hold` | 产品核 |
++| G25 | 只释放已记账的字节，超额释放拒绝。`checked_gpu_memory_release` | `GpuMemoryAccount::release` | 产品核 |
++| G26 | 等待未成功时保留全部占用，完成才释放本段；段大小超过占用时拒绝。`gpu_bytes_after_submission_wait` | `GpuMemoryAccount::settle_the_chunk_after_its_submission` | 产品核 |
++| G27 | 显存不足后把失败段占用折半：正占用严格下降，零仍为零，取整误差至多一。`gpu_memory_cap_after_allocation_failure` | `background_gpu::outcomes_of_a_batch_over_the_cards` | 产品核 |
++| G28 | 派发恰好所需的工作组数，零条目不派发，全宽条数不溢出。`gpu_workgroups_for_entries` | `background_gpu` 里三份核的派发 | 产品核 |
++| G29 | 映射条目、落点、排序索引三张表含空表占位，交回总量与最大绑定量，任何溢出拒绝。`checked_gpu_mapping_table_bytes` | `region_record_kernels::mapping_table_bytes_of` | 产品核 |
++| G30 | 追加输入只有和可表示且整批满足四道界才接受，拒绝不把和回绕成小批。`extended_gpu_chunk_input` | 无：产品此刻没有调用点 | 核，未接产品 |
+ 
+ ## 衔接与未覆盖边界
+ 
+-后台 GPU crate 直接依赖 `singlefs-replay-prefix`，调用表内八个产品核。两轮阈值、四字节对齐和 counted 判定字由核定义，主机引用同一份常量。两份 WGSL 仍独立实现，CPU 打分参照也保持独立。
++后台 GPU crate 直接依赖 `singlefs-replay-prefix`，调用 G01–G20 表里的八个产品核与 G21–G29 九个产品核。两轮阈值、四字节对齐和 counted 判定字由核定义，主机引用同一份常量。两份 WGSL 仍独立实现，CPU 打分参照也保持独立。门禁 formal-verification 的 verus-proof 格另比产品构建与 `verus --compile` 构建的 MIR 逐条目相同：产品编进的就是被验的那一份可执行核；这不代表外围容器、WGSL、驱动或硬件已形式化验证。
+ 
+-仲裁适配层将真实结果的相等比较传给 G01，只有 `ask_cpu` 分支调用 CPU，只有暂缓分支保存一个未决轮次。`Map<int, nat>` 抽象条目身份与稀疏表；模型不证明 `HashMap`、结果类型的 `PartialEq`、批内键唯一性或外层循环的精化。G04 对应批失败时的提前返回，不能据此宣称整个批处理循环已验证。
++G02–G04 的 `ensures` 是 `next_uncertain_count`、`cpu_is_needed`、`round_state` 这几个 spec 函数在给定输入上的展开：它们只钉住 spec 定义（改坏定义会红，例 `gpu-gc-audit-successful-cpu-call-lost`），与产品的 `two_kernel_reconciliation::reconcile_unless_the_batch_failed` 之间没有机器连接。仲裁适配层将真实结果的相等比较传给 G01，只有 `ask_cpu` 分支调用 CPU，只有暂缓分支保存一个未决轮次。`Map<int, nat>` 抽象条目身份与稀疏表；模型不证明 `HashMap`、结果类型的 `PartialEq`、批内键唯一性或外层循环的精化。G04 对应批失败时的提前返回，不能据此宣称整个批处理循环已验证。
+ 
+ G07–G11 按记录分别计数，重叠记录可多次贡献同一槽，不能推导“总分不超过段长”。G09 依赖真实分片有序、不重不漏；G18 验证下一片的边界，Vec 构建、GPU 派发与返回段数仍属于适配层。G14 防止回绕，不会把错误 GPU 计数变成正确结果。
+ 
+-G12–G13 没有直接解析或验证 WGSL 源码；G13 显式要求尾端点装得进 u64。G19 对任意 u64 输入定义并拒绝溢出，继续允许原实现允许的零跨度；合法单元跨度、钉住和隔离是调用方的其他检查。
++G12–G13 没有直接解析或验证 WGSL 源码；G13 显式要求尾端点装得进 u64。G19 对任意 u64 输入定义并拒绝溢出，允许零跨度；合法单元跨度、钉住和隔离是调用方的其他检查。
++
++G15–G16 的外层接口返回 u64，核返回 `None` 时外层明确 panic。G17 不证明多任务预留的原子性，无上限时外层保持 `None`。G20 无法检测“两份核都给出相同错误结果”。
+ 
+-G15–G16 的外层接口保留返回 u64 的形状，核返回 `None` 时明确 panic，正常输入行为不变。G17 不证明多任务预留的原子性，无上限时外层仍保持 `None`。G20 无法检测“两份核都给出相同错误结果”。
++G21、G22 的显存界是交进来的上限，不是卡上的真占用：映射着建的输入在卡上另带暂存（`memory_limit_and_chunks::COPIES_ON_THE_GPU_OF_A_BUFFER_MAPPED_AT_CREATION` 份），产品的 `chunk_fits_with_the_staging_of_its_input` 交给 G21 之前先从上限里扣掉输入的暂存，`largest_piece_input_bytes` 交给 G22 之前把扣掉固定占用之后剩下的地方按份数分开。这一层折算在核外、没进 Verus，「卡上真占用不超过上限」靠的是这一层没验的代码。G30 没有产品调用点（见开头）。
+ 
+-本次不覆盖 GPU 驱动、编译器、执行内存模型、设备屏障、校验和算法及整个 GC 发布路径到模型的精化，不构成整个 GPU GC 的完整正确性证明。
++不覆盖 GPU 驱动、编译器、执行内存模型、设备屏障、校验和算法及整个 GC 发布路径到模型的精化，不构成整个 GPU GC 的完整正确性证明。
+ 
+-## 见证、反例与复跑
++## 见证与反例
+ 
+-两条见证不占 20 项名额：`witness_gpu_gc_protocol_and_score_premises` 构造非空计数表、跨段活记录、切口与进位边界；`witness_gpu_gc_arithmetic_boundaries` 调用产品核，覆盖空输入、全宽极值、预算/累计溢出、越界记录与未写判定字。
++`witness_gpu_gc_protocol_and_score_premises` 构造非空计数表、跨段活记录、切口与进位边界；`witness_gpu_gc_arithmetic_boundaries` 调用产品核，覆盖空输入、全宽极值、预算/累计溢出、越界记录与未写判定字；`witness_gpu_capacity_and_accounting_boundaries` 覆盖恰好装满与超出一字节、超时保留、完成释放、空表占位及全宽派发。见证不占 G01–G30 的编号。`gpu_gc_proofs` 模块共 26 条义务：20 项核心性质、3 条常量、1 条递归终止（`record_slice_sum`）、2 个见证。
+ 
+-`verus-must-red-worlds.tsv` 的 `gpu-gc-G01` 到 `gpu-gc-G20` 分别改坏上述决策、前提、边界或计算；另两条 `gpu-gc-witness_*` 向见证注入不可能断言，两条 `gpu-gc-audit-*` 改坏模型中的贡献值和 CPU 调用累计，共 24 条。要求 Verus 报证明错误且落点匹配，编不过或只耗尽求解资源都不算。八处 `requires` 另做入口空真筛查；筛查不是一般可满足性证明，具体可满足输入由见证补充。
++`verus-must-red-worlds.tsv` 里 `gpu-gc-G01` 到 `gpu-gc-G30` 各一行改坏对应的决策、前提、边界或计算；名字形如 `gpu-gc-G<编号>-<说明>` 的行逐条罩住同一编号里那一行没碰到的 `ensures` 条、拒绝分支与三条常量（多数是改函数体的一处，推不出别的反例的派生条改 `ensures` 本身）；三条 `gpu-gc-*witness*` 向见证注入不可能断言；两条 `gpu-gc-audit-*` 改坏模型：`gpu-gc-audit-score-capped-at-two` 把每条记录的贡献截顶为 2（同盘未释放记录 `[0,3)` 对段 `[0,3)` 应贡献 3，G11「同盘活记录贡献恰为交集长度」那一条抓它），`gpu-gc-audit-successful-cpu-call-lost` 让成功轮不累计 CPU 调用（G04 成功那一支抓它）。每行要求 Verus 报证明错误且落点等于第六段，编不过或只耗尽求解资源都不算。每处 `requires` 的入口空真由门禁 formal-verification 的 verus-vacuity 格逐处判（项 `vacuity:<所属函数>#<第几处>`）；那不是一般可满足性证明，具体可满足输入由见证补充。
+ 
+-仓根执行，`VERUS` 指向 `.claude/gate.d/verus-pins.tsv` 固定版本的可执行文件。任务服务按返回的确认单确认后运行。
++## 独立核对测试
++
++- `crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs`（4 个测试）：用 u128 参照核对 G14–G20 的预算、溢出、片界、扫描区准入、双核累计与回读，4096 条十二轮历史核对 G01 的仲裁。边界值表含 `u64::MAX − 3` 到 `u64::MAX` 四个相邻值，四字节对齐向上取整溢出的分界落在 `u64::MAX − 3` 与 `u64::MAX − 2` 之间。
++- `crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs`（5 个测试）：G21–G30。G22 拿闭式结果对 43,050 组容量的穷举；G27 不做除法，按折半的定义（两倍不超过失败占用、加一的两倍超过）判；G29 每项字节数按产品交给核的缓冲布局（`region_record_kernels.rs` 文件头「缓冲布局」）逐个字段数出来，不抄核里的乘数。
++- 两份测试的每个 `#[test]` 在 `crates/mutations.tsv` 挂一行「改坏被测核的哪一处、这条测试红」。
++- 后台包 `two_kernel_reconciliation`、`memory_limit_and_chunks`、`live_slot_kernels`、`region_record_kernels` 四个模块源码里共 82 个 `#[test]`（7、36、23、16）。
++- `crates/singlefs-background-gpu/tests/gpu_gc_formal_contracts_through_the_host.rs`（2 个测试）走真实主机适配层：穷举 `7^6 = 117649` 条六步事件历史（两条目的相符/分歧、失败批、空批、重新创建挂载状态），逐步核对按键计数、决策、CPU 回调次数及批统计；另对 4 种初始状态 × 4 种相符组合 × 2 种顺序共 32 个批次核对回调位置和按键结果。参照每条目一个布尔未决状态，不调被验的仲裁函数算期望值。有限枚举不替代任意长度历史的精化证明。
++- `crates/singlefs-background-gpu/tests/gpu_gc_capacity_contracts_through_the_host.rs`（5 个测试）在主机一侧核容量与记账，其中 G29 的尺寸对真打包出来的映射表。
++- 真 GPU 两组测试（`singlefs-background-gpu-tests` 的 `live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference`、`region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference`，各 6 个测试，挂 `tests-on-a-real-gpu` 特性）做双核与 CPU 对拍、跨 32 位槽界、小显存分段/分片与预算过低时排除设备。
++
++## 复跑
++
++命令由主 agent 在仓根经统一任务服务交（`.claude/agent-common.md`「子 agent 不交任务」）；卡、内存与线程由服务分。证明逐项的项名是 `proof:<全路径>`，照门禁 formal-verification 的 `--list-items` 列出的写。
+ 
+ ```sh
+-task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
+-  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
+-  --verify-only-module gpu_gc_proofs crates/singlefs-replay-prefix/src/lib.rs
++SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 formal-verification.sh 带 --item; 范围=点名的 4 项; 为什么=复判打分算法的二分跳项、窗口过窄、释放误计与重数四行反例' task-server/task submit -- bash .claude/gate.d/formal-verification.sh --item must-red:gpu-score-binary-skips-entry --item must-red:gpu-score-window-too-narrow --item must-red:gpu-score-search-counts-released --item must-red:gpu-score-permutation-needs-multiplicity .
+ 
+-task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
+-  --item must-red:gpu-gc-G01 --item must-red:gpu-gc-G02 \
+-  --item must-red:gpu-gc-G03 --item must-red:gpu-gc-G04
++SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 formal-verification.sh 带 --item; 范围=点名的 4 项; 为什么=复判 G01 到 G04 四行反例，看仲裁与计数模型的契约还抓得住' task-server/task submit -- bash .claude/gate.d/formal-verification.sh --item must-red:gpu-gc-G01 --item must-red:gpu-gc-G02 --item must-red:gpu-gc-G03 --item must-red:gpu-gc-G04 .
+ 
+-task-server/task submit --manual -- cargo test -p singlefs-replay-prefix --offline \
+-  --test gpu_gc_arithmetic_matches_wide_integer_reference
++SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-replay-prefix 的测试目标 gpu_gc_arithmetic_matches_wide_integer_reference; 范围=1 个测试目标; 为什么=用 u128 参照复核 G01 与 G14 到 G20 的产品核' task-server/task submit -- cargo test -p singlefs-replay-prefix --test gpu_gc_arithmetic_matches_wide_integer_reference
+ 
+-task-server/task submit --manual -- cargo test -p singlefs-background-gpu --offline \
+-  --lib two_kernel_reconciliation::tests -- memory_limit_and_chunks::tests \
+-  live_slot_kernels::tests region_record_kernels::tests
+-```
++SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-replay-prefix 的测试目标 gpu_gc_capacity_matches_independent_reference; 范围=1 个测试目标; 为什么=用独立参照复核 G21 到 G30 的容量与记账核' task-server/task submit -- cargo test -p singlefs-replay-prefix --test gpu_gc_capacity_matches_independent_reference
+ 
+-反例按同样写法继续点名 G05–G20、两条见证和两条审计反例，每批至多四项。模块共 26 条义务：20 项核心性质、3 条常量、1 条递归终止、2 个见证。新增四个独立核对测试用 u128 覆盖全宽边界、4096 条十二轮历史核对仲裁，并检查判定字和两份累计值的独立性。后台包命令点名四个模块的 56 个测试，不开启真 GPU 特性。
++SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-background-gpu 的 --lib 里四个主机模块的测试; 范围=1 个测试目标; 为什么=复核接这些核的四个主机模块' task-server/task submit -- cargo test -p singlefs-background-gpu --lib -- two_kernel_reconciliation::tests memory_limit_and_chunks::tests live_slot_kernels::tests region_record_kernels::tests
+ 
+-严格自测还直接检查真实主机适配层：
++SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-background-gpu 的测试目标 gpu_gc_formal_contracts_through_the_host; 范围=1 个测试目标; 为什么=复核真实主机仲裁适配层的有限历史枚举' task-server/task submit -- cargo test -p singlefs-background-gpu --test gpu_gc_formal_contracts_through_the_host
+ 
+-```sh
+-task-server/task submit --manual -- cargo test -p singlefs-background-gpu --offline \
+-  --test gpu_gc_formal_contracts_through_the_host
+-task-server/task submit --manual -- cargo test -p singlefs-background-gpu-tests --offline \
+-  --test background_gpu_compute_agrees_with_the_cpu_backed_test_double
++SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-background-gpu-tests 的测试目标 live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference; 范围=1 个测试目标; 为什么=真 GPU 上复核活槽统计两份核与 CPU 参照对拍' task-server/task submit -- cargo test -p singlefs-background-gpu-tests --features tests-on-a-real-gpu --test live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference
+ ```
+ 
+-新增两个主机测试穷举 117,649 条六步历史（两条目的相符/分歧、失败批、空批、重挂），逐步核对状态、决策、回调次数和批统计；另对 32 个不同初态、输入与排列的批次检查按键结果及回调位置。有限枚举补充适配层证据，不替代任意长度的形式化证明。严格自测发现、修正及实测结果见 [GPU_GC_SELFTEST.md](GPU_GC_SELFTEST.md)。
++别的反例照第一条的写法点名（`must-red:<变异名>`，变异名是必红表第一段）；真 GPU 区域记录分类那一组把测试目标换成 `region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference`。
+diff --git a/crates/singlefs-replay-prefix/src/GPU_GC_SELFTEST.md b/crates/singlefs-replay-prefix/src/GPU_GC_SELFTEST.md
+deleted file mode 100644
+index 2338f40e28b56d57380748b3eec4fc492a2be040..0000000000000000000000000000000000000000
+--- a/crates/singlefs-replay-prefix/src/GPU_GC_SELFTEST.md
++++ /dev/null
+@@ -1,65 +0,0 @@
+-# GPU GC 20 项新增形式化验证的严格自测
+-
+-本轮自测发现并修复了两处**契约漏检**。它们不是本轮发现的产品故障：实验改坏的是模型，原契约未拒绝错误模型。覆盖边界仍以 [GPU_GC_PROOFS.md](GPU_GC_PROOFS.md) 为准。
+-
+-## 先构造错误，再补强契约
+-
+-任务 `12857` 在修复前分别应用下面两个变异，两次 Verus 都返回 `verified 186、errors 0`，因此反例门禁正确判为失败：
+-
+-| 错误模型 | 为什么是错误 | 原来漏在哪里 | 修复 |
+-| --- | --- | --- | --- |
+-| `record_contribution` 将每条记录的贡献截顶为 2 | 同盘未释放记录 `[0,3)` 对段 `[0,3)` 应贡献 3，截顶后只有 2 | G11 只约束零值和正负；G09/G10 只约束同一贡献函数的分片与重数；见证贡献恰好为 2 | G11 增加同盘活记录的贡献恰等于交集长度 |
+-| 成功 `round_state` 直接保留旧 `cpu_calls` | 条目已有一次分歧，再次分歧且本轮成功时应恰增加一次 CPU 调用 | G04 只约束失败轮次；G02 检查调用条件，没有约束累计状态 | G04 增加成功轮次的计数表与 CPU 调用精确更新；G05 进一步比较交换次序后的完整状态和调用总数 |
+-
+-这两个实验均已加入 `verus-must-red-worlds.tsv`，名称为 `gpu-gc-audit-score-capped-at-two` 和 `gpu-gc-audit-successful-cpu-call-lost`。原 G04 变异的锚点也已收窄到失败分支的完整后置条件，避免补强契约后匹配歧义。
+-
+-## 实测
+-
+-任务编号由本机 `task-server/task` 分配，可用 `task-server/task log <编号>` 查对应原始输出。以下不是只检查证明数量：反例要求真实证明错误及指定函数落点，编译失败、求解资源耗尽或进程被杀均不算抓到。
+-
+-| 检查 | 结果 | 任务 |
+-| --- | --- | --- |
+-| 修复后 GPU GC 模块，`--no-cheating --rlimit 10` | 26 条义务通过，0 错误 | `12858` 的完成尝试 |
+-| `singlefs-replay-prefix` 全包证明及信任边界检查 | 170 个验证项重新执行，义务合计 186，0 错误，复用 0；禁止标记、axiom、未登记可信声明均为 0 | `12871` |
+-| 产品编译与 `verus --compile` 的 MIR 对比 | 产品 109 个条目全部存在，规整后的整段内容逐字相同 | `12871` |
+-| 24 个必红反例：G01–G20、两个见证、两个审计反例 | 全部重新执行并捕获；编译有效，证明错误落点匹配，未用资源耗尽冒充证明错误；复用 0 | `12872`–`12877`，末批取第 2 次完成尝试 |
+-| 8 处入口 `requires` 空真筛查 | 全部在入口插入的 `assert(false)` 处报错，未检出空真；复用 0 | `12878`、`12879` |
+-| 固定工具链与依赖来源 | Verus 版本、commit、归档 SHA256、6 个包的版本/出处/源码指纹及两种 rustc 版本均与登记一致 | `12882` |
+-| 全宽算术及仲裁对拍 | 4 通过，0 失败、忽略；用 u128 独立参照核对预算、溢出、片界、准入、双核累计和回读 | `12880` |
+-| 真实主机仲裁适配层 | 2 通过，0 失败、忽略 | `12860` |
+-| 既有 CPU 测试替身端到端对拍 | 11 通过，0 失败、忽略 | `12860` |
+-| 四个主机模块回归，含 WGSL 验证器检查 | 56 通过，0 失败、忽略；其他模块的 112 项未纳入本次范围 | `12881` 第 2 次完成尝试 |
+-| 真 GPU 活槽统计测试 | 6 通过，0 失败、忽略、过滤；含双核对拍、跨 32 位槽界、小显存分段/分片及预算过低时排除设备 | `12861` |
+-| 真 GPU 区域记录分类测试 | 6 通过，0 失败、忽略、过滤；含双核与 CPU 对拍、小显存切批、映射分片及单元分片 | `12861` |
+-
+-修复后的 `12877` 明确捕获了修复前能通过的两个错误模型：打分截顶的证明错误落在 G11，漏记 CPU 调用落在 G04。任务的首次尝试因内存上限中断，未计为抓到；这里只采用任务服务自动重试后的完整成功结果。
+-
+-普通测试合计 85 项通过（4 + 2 + 11 + 56 + 6 + 6）。`12881` 的首次编译也因内存上限中断，只计自动重试后的结果。真 GPU 任务此前因设备占用排队，最终在第二台的卡 1（`0000:05:00.0`）完成；每个用例均有 `GPUS_HANDED_OVER_BY_THE_TASK_SERVER` 记录，日志没有 `NOT_RUN_NO_GPU_ADAPTER` 或 `GPU_DEVICE_LOST`，不是无设备返回成功。预算过低的用例按设计验证排除设备的路径，不声称该用例派发了着色器。
+-
+-证明、反例和入口空真检查通过项目提供的 `prune_server_client_selftest.py --with-temporary-service` 使用临时判定库，仍使用仓根计算的标准库名及真实固定版本 Verus。临时服务初始没有判定记录，日志逐条记下“现判、复用 0”。没有修改判器、放宽求解限制或启用破坏判器的测试开关。
+-
+-例如，不复用既有判定地重跑本次发现的两个反例：
+-
+-```sh
+-task-server/task submit --manual -- python3 scripts/prune-server/prune_server_client_selftest.py \
+-  --with-temporary-service -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
+-  --item must-red:gpu-gc-audit-score-capped-at-two \
+-  --item must-red:gpu-gc-audit-successful-cpu-call-lost
+-```
+-
+-按任务服务确认单核对项数与范围后确认；工具链与内存、线程额度均由现有入口管理。
+-
+-真 GPU 两组测试的复跑入口：
+-
+-```sh
+-task-server/task submit --manual -- cargo test -p singlefs-background-gpu-tests --offline \
+-  --features tests-on-a-real-gpu \
+-  --test live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference \
+-  --test region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference -- --nocapture
+-```
+-
+-新增主机测试在 [gpu_gc_formal_contracts_through_the_host.rs](../../singlefs-background-gpu/tests/gpu_gc_formal_contracts_through_the_host.rs)：穷举 `7^6 = 117649` 条六步事件历史，涵盖两条目的相符/分歧、失败批、空批和重新创建挂载状态，逐步检查按键计数、决策、CPU 回调次数及批统计。另检查 4 种初始状态 × 4 种相符组合 × 2 种顺序，共 32 个批次，核对回调位置和按键结果。参照使用每条目一个布尔未决状态，不调用被验证的仲裁函数来计算预期值。
+-
+-## 结果的边界
+-
+-上述有限历史枚举验证实际 Rust 主机接口，不能替代任意长度历史的精化证明。MIR 一致说明产品编译包含被验证的可执行核，不代表外围容器、WGSL、驱动或硬件已形式化验证。八个直接调用的产品核与十二个抽象模型的区分保持不变。
+diff --git a/crates/singlefs-replay-prefix/src/README.md b/crates/singlefs-replay-prefix/src/README.md
+index 074289428b853a79f4c24a9ee1d2fbc56a6982be..f67ddc49dc587f9fe55040de846e7b0fce199c76 100644
+--- a/crates/singlefs-replay-prefix/src/README.md
++++ b/crates/singlefs-replay-prefix/src/README.md
+@@ -4,7 +4,7 @@
+ 
+ 本次 GC 扩展的审查记录在 [records](../../../records/2026-10-24-GC形式化与core改动复核.md)。原始验证记录在 [扩展报告](../../../records/2026-10-24-GC实现与旧读者及崩溃协议形式化扩展.md)。以下说明当前源码，而非冻结历史。
+ 
+-## 八份源文件各负责什么
++## 十份源文件各负责什么
+ 
+ | 文件 | 可执行产品入口 | 验证内容与主要边界 |
+ | --- | --- | --- |
+@@ -12,12 +12,14 @@
+ | [compaction_plan_proofs.rs](compaction_plan_proofs.rs) | `choose_compaction_segment`、`plan_compaction_batch` | 选段资格、贪心和平局规则；计划顺序、数量、互异性和进展；另有按槽区间的搬迁保持引理（P4），前提含回退候选与读者的区间，它不是产品 I/O 代码 |
+ | [gc_ring_interval_proofs.rs](gc_ring_interval_proofs.rs) | 无 | GC 搬迁协议的根环版：映射值是槽区间，F 分内存与持久两层，根按版本号点名；任意有限历史的读取保持、三个反例被拒、G7 |
+ | [gc_crash_proofs.rs](gc_crash_proofs.rs) | **只有** `released_record_can_be_reclaimed` | 回收比较核，与「门槛蕴涵没被引用」那一条引理（两条前提显式写在 requires 里） |
+-| [gpu_gc_proofs.rs](gpu_gc_proofs.rs) | 双核仲裁、预算、分片、区域准入和回读的八个纯函数入口 | [GPU GC 新增 20 项核心性质与边界](GPU_GC_PROOFS.md)：主机端纯核直验，抽象计数协议、区间打分与 WGSL 双字算术模型另列边界 |
++| [gpu_gc_proofs.rs](gpu_gc_proofs.rs) | 双核仲裁、预算、分片、区域准入和回读的八个纯函数入口 | [GPU GC 的 G01–G20 与边界](GPU_GC_PROOFS.md)：主机端纯核直验，抽象计数协议、区间打分与 WGSL 双字算术模型另列边界 |
++| [gpu_gc_capacity_proofs.rs](gpu_gc_capacity_proofs.rs) | `gpu_chunk_fits`、`largest_gpu_piece_input`、`tightened_gpu_memory_limit`、`checked_gpu_memory_hold`、`checked_gpu_memory_release`、`gpu_bytes_after_submission_wait`、`gpu_memory_cap_after_allocation_failure`、`gpu_workgroups_for_entries`、`checked_gpu_mapping_table_bytes`；`extended_gpu_chunk_input` 产品此刻没有调用点 | [G21–G30](GPU_GC_PROOFS.md)：切批准入、最大分片、显存账本、派发尺寸与映射表占用；显存界比的是交进来的上限，产品扣输入暂存那一层在核外 |
++| [gpu_gc_scoring_proofs.rs](gpu_gc_scoring_proofs.rs) | 无 | 两份 GPU 活槽打分算法（逐条走与二分查）的模型：二分下界、候选窗口、逐槽计数与排列等价，任意长度不超过 `u32::MAX` 的记录表；WGSL 到模型的翻译、主机排序与 GPU 执行在边界外（[GPU_GC_PROOFS.md](GPU_GC_PROOFS.md)「两份打分算法的归纳证明」） |
+ | [file_range_proofs.rs](file_range_proofs.rs) | `next_tail_batch`、`bytes_in_unit`、`checked_write_end`、`payload_length_from_start`、`units_covering_size`、`units_for_sequential_write`、`rounded_size_fits`、`checked_unit_byte_range`、`checked_bytes_in_indexed_unit` | 截断/删除的批量释放边界、进展与尾区间分区；部分写交集的精确覆盖、两侧偏移与容量上界；相邻单元无重叠无遗漏；按单元号算单元端点的乘加与溢出拒绝 |
+ | [unlink_proofs.rs](unlink_proofs.rs) | `next_unlink_batch`、`size_after_an_unlink_batch` | unlink 的分批计划：整串计划的形状与步数、每个数据单元恰好释放一次、从任一中间版续做的计划等于一路做下来的后半截；删除批的下段节点每层至多重写截口那一个（按跨度模型）；size 乘法不回绕 |
+ | [partial_write_proofs.rs](partial_write_proofs.rs) | `classify_partial_write_unit`、`first_unit_to_rewrite`、`units_after_partial_write`、`unit_containing_byte` | 部分写五类单元来源、重写起点、写后单元数；端点覆盖/相交判定与逐字节语义等价；抽象字节模型的覆盖规律与整单元覆盖不依赖旧内容 |
+ 
+-核的入口文件为 `lib.rs`，另七份文件通过模块引入。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
++核的入口文件为 `lib.rs`，另九份文件由 `lib.rs` 的九个 `pub mod` 引入。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
+ 
+ ## core 到 compaction 核的转换
+ 
+@@ -151,7 +153,7 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
+ 
+ `partial_write_proofs` 的 `overwritten_bytes` 用 `Seq<u8>` 表示固定长度文件内的覆盖写，`overwrite_fits` 要求写入起点非负、整个请求位于文件内。证明义务包括：
+ 
+-- `lemma_overwrite_changes_exactly_the_requested_bytes`：长度不变，写内字节来自请求，写外字节保留旧值，空请求不改变文件。
++- `lemma_overwrite_changes_exactly_the_requested_bytes`：长度不变，写内字节来自请求，写外字节保留旧值，空请求不改变文件；另按段说写入那一段恰是请求、前后两段恰是原值，这三条要 `overwrite_fits`（请求越出文件时那几段的 `subrange` 落在序列之外）。逐字节那一条是 `overwritten_bytes` 定义的展开，它钉住的是定义本身。
+ - `lemma_overwriting_the_same_range_keeps_only_the_last_write`：同起点、同长度的连续覆盖只保留最后一次的内容。
+ - `lemma_disjoint_overwrites_commute`：不相交的两次覆盖可以交换顺序，两种顺序下第二次写仍满足范围前提；允许相邻区间和空请求。
+ - `lemma_whole_unit_overwrite_does_not_depend_on_old_bytes`：利用现有整单元覆盖引理，证明分类核的覆盖条件足以使单元结果不依赖旧内容。
+@@ -160,28 +162,14 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
+ - `lemma_a_contained_overwrite_folds_into_the_payload`：后写完全位于前次请求内时，依序写入与先改请求内容、再整段写回相同，两条路径均满足范围前提。
+ - `witness_split_and_contained_overwrites`：构造非空分段写入、严格包含的后写、两端分界与空后写，钉住组合后的具体字节。
+ 
+-这些性质仅针对抽象字节模型，不代表 core 的缓冲区拷贝、扩展文件、补洞、设备 I/O 或持久化顺序已经精化到此模型。规格使用数学整数和有限序列，不新增运行时代码或可信假设。必红表含各函数的契约反例及删除关键前提的反例（同长度、不相交、整单元覆盖、合法分界、后写包含于请求）。组合性质另有后缀偏移错位、后写偏移错位和见证字节错误的反例。
++这些性质仅针对抽象字节模型，不代表 core 的缓冲区拷贝、扩展文件、补洞、设备 I/O 或持久化顺序已经精化到此模型。规格使用数学整数和有限序列，不带运行时代码或可信假设。必红表里这一块有各函数的契约反例（`overwrite-contract-*` 五条、`overwrite-composition-contract-*` 三条，每条结论改成 false）、六条删除关键前提的反例（第一条引理的范围前提、同长度、不相交、整单元覆盖、合法分界、后写包含于请求）、两条改坏 `overwritten_bytes` 定义的反例（写入段整段右移一格、写入段少一格）与两条改坏另两条引理结论的反例；组合性质另有后缀偏移错位、后写偏移错位和见证字节错误的反例。
+ 
+-复跑本模块（仓根执行；`VERUS` 指向 `.claude/gate.d/verus-pins.tsv` 固定版本的 `verus`，任务服务按确认单确认后运行）：
++复跑本模块（命令由主 agent 在仓根经统一任务服务交，`.claude/agent-common.md`「子 agent 不交任务」；证明逐项的项名是 `proof:<全路径>`，照门禁 formal-verification 的 `--list-items` 列出的写）：
+ 
+ ```sh
+-task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
+-  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
+-  --verify-only-module partial_write_proofs crates/singlefs-replay-prefix/src/lib.rs
+-task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
+-  --item must-red:overwrite-last-needs-equal-lengths \
+-  --item must-red:overwrite-commute-needs-disjoint-ranges \
+-  --item must-red:overwrite-whole-needs-coverage \
+-  --item must-red:overwrite-split-needs-suffix-offset \
+-  --item must-red:overwrite-contained-needs-file-offset \
+-  --item must-red:overwrite-split-needs-valid-boundary \
+-  --item must-red:overwrite-contained-needs-payload-bounds
+-task-server/task submit --manual -- cargo test -p singlefs-replay-prefix \
+-  --offline --lib -- --exact \
+-  partial_write_proofs::tests::located_unit_contains_the_byte_even_when_its_end_exceeds_u64 \
+-  partial_write_proofs::tests::unit_sources_match_the_bytes_actually_overwritten \
+-  partial_write_proofs::tests::rewrite_start_includes_the_gap_and_the_partial_old_tail \
+-  partial_write_proofs::tests::after_count_preserves_old_units_and_covers_the_write_at_full_width
++SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 formal-verification.sh 带 --item; 范围=点名的 8 项; 为什么=复判覆盖写字节模型的范围前提、同长度、不相交、整单元覆盖、后缀偏移、后写偏移、合法分界与后写包含于请求八行反例' task-server/task submit -- bash .claude/gate.d/formal-verification.sh --item must-red:overwrite-exact-needs-fit --item must-red:overwrite-last-needs-equal-lengths --item must-red:overwrite-commute-needs-disjoint-ranges --item must-red:overwrite-whole-needs-coverage --item must-red:overwrite-split-needs-suffix-offset --item must-red:overwrite-contained-needs-file-offset --item must-red:overwrite-split-needs-valid-boundary --item must-red:overwrite-contained-needs-payload-bounds .
++
++SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-replay-prefix 的 --lib 里 partial_write_proofs 的 4 条测试; 范围=4 个测试; 为什么=复核部分写计划核的四个 Rust 测试' task-server/task submit -- cargo test -p singlefs-replay-prefix --lib -- partial_write_proofs::tests::located_unit_contains_the_byte_even_when_its_end_exceeds_u64 partial_write_proofs::tests::unit_sources_match_the_bytes_actually_overwritten partial_write_proofs::tests::rewrite_start_includes_the_gap_and_the_partial_old_tail partial_write_proofs::tests::after_count_preserves_old_units_and_covers_the_write_at_full_width --exact
+ ```
+ 
+ ## 按单元号计算部分写区间
+diff --git a/crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs b/crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs
+index 4df8fcb7238682e902dbfb5e77484f6bb7f208e1..4e23e396eb8ac1d87ed4f6878bb0a67589f603a3 100644
+--- a/crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs
+@@ -1,4 +1,4 @@
+-//! GPU GC 的切批准入、最大分片、显存账本和派发尺寸；产品调用同一份 exec 核。
++//! GPU GC 的切批准入、最大分片、显存账本和派发尺寸；G21–G29 由产品调用同一份 exec 核，G30 产品此刻没有调用点。
+ //! G21–G30 续接 gpu_gc_proofs；设备完成信号的真实性和外围容器不在本模块证明。
+ use crate::gpu_gc_proofs::{checked_gpu_chunk_bytes, checked_gpu_input_bytes};
+ use vstd::prelude::*;
+@@ -24,7 +24,7 @@ pub open spec fn chunk_fits(input: u64, entries: u64, capacity: GpuChunkCapacity
+         }
+ }
+ 
+-/// G21：显存、输入绑定、条目绑定和派发四道界必须同时满足；乘加溢出不能误放行。
++/// G21：显存、输入绑定、条目绑定和派发四道界必须同时满足；乘加溢出不能误放行。显存那一道比的是交进来的上限，产品扣输入暂存那一层在调用方。
+ pub fn gpu_chunk_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> (fits: bool)
+     ensures fits == chunk_fits(input, entries, *capacity),
+ {
+diff --git a/crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs b/crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs
+index fa8003be919dd2f7c92031fd8bee732f2cc4fd95..63d8afaedc0fd9efc25fa55d47fbea278c5d15a8 100644
+--- a/crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs
+@@ -1,4 +1,4 @@
+-//! GPU GC 的主机端纯核与着色器算术模型。20 项核心性质见 src/README.md。
++//! GPU GC 的主机端纯核与着色器算术模型。20 项核心性质的清单见 src/GPU_GC_PROOFS.md「覆盖清单」。
+ //! 仲裁、预算、分片、回读与区域准入的 exec 函数由产品直接调用；
+ //! Map/Seq 与双字算术证明不等于验证 WGSL 编译器、GPU 执行或设备 I/O。
+ use crate::file_range_proofs::units_for_sequential_write;
+@@ -282,13 +282,18 @@ pub fn checked_gpu_chunk_bytes(input: u64, entries: u64, per_entry: u64, fixed:
+     }
+ }
+ 
+-/// G17：各后台阶段共享显存预算；已占超限时不回绕，正的新增分配必在总限内。
++pub open spec fn allocation_stays_within_the_limit(held: u64, request: int, limit: u64) -> bool {
++    held + request <= limit
++}
++
++/// G17：各后台阶段共享显存预算；已占超限时不回绕，不超过剩余量的正的新增分配加上已占必在总限内。
+ #[allow(clippy::implicit_saturating_sub, reason = "被验函数体与 ensures 的分支逐字对照，不换成饱和减")]
+ pub fn remaining_gpu_memory(limit: u64, held: u64) -> (remaining: u64)
+     ensures
+         remaining == if held < limit { limit - held } else { 0int },
+         remaining <= limit,
+         held <= limit ==> held + remaining == limit,
++        forall|request: int| 0 < request <= remaining ==> #[trigger] allocation_stays_within_the_limit(held, request, limit),
+ {
+     if held >= limit { 0 } else { limit - held }
+ }
+diff --git a/crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs b/crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs
+index f98c13d46570263d7da1a16e7e987fc31387f4c4..5f2adf582e53d0d4143ec9329f9467e0883605e5 100644
+--- a/crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs
+@@ -43,6 +43,8 @@ pub proof fn lower_bound_of_sorted_records(records: Seq<ScoringRecord>, device:
+     if below < above {
+         let middle = below + (above - below) / 2;
+         assert(below <= middle < above);
++        // WGSL 里 below、above、middle 都是 u32，下一轮的 below 取 middle + 1u：requires 里记录数不超过 u32::MAX 这条界让它不回绕。
++        assert(middle + 1 <= u32::MAX);
+         if record_key_before(records[middle], device, slot) {
+             assert forall|position: int| 0 <= position < middle + 1 implies
+                 #[trigger] record_key_before(records[position], device, slot) by {
+@@ -89,6 +91,8 @@ pub proof fn lemma_counting_slots_equals_interval_intersection(first: int, span:
+     }
+ }
+ 
++/// 窗口下沿往前退 65535 个槽，比证明要的多一格：跨度不超过 65535 的记录，起点早于 start − 65534 的尾端不超过 start、贡献为零，
++/// 所以退 65534 个已不漏，退 65533 个才漏（必红表 gpu-score-window-too-narrow）。
+ pub open spec fn earliest_candidate_start(start: int) -> int {
+     if start >= 65535 { start - 65535 } else { 0 }
+ }
+diff --git a/crates/singlefs-replay-prefix/src/partial_write_proofs.rs b/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
+index 6e651c2b786916fb201222cc406e39a53d0b92fd..3ac5c1ff0ea9ffeb07486eef5f7329228cbc3889 100644
+--- a/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/partial_write_proofs.rs
+@@ -116,6 +116,7 @@ pub open spec fn overwritten_bytes(old: Seq<u8>, start: int, data: Seq<u8>) -> S
+ }
+ 
+ /// 写内每个字节来自请求，写外每个字节仍是原值；空写也包括在内。
++/// 按段说的三条（写入那一段恰是请求、前后两段恰是原值）要 overwrite_fits：请求越出文件时那几段的 subrange 落在序列之外，推不出相等。
+ pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)
+     requires overwrite_fits(old, start, data),
+     ensures
+@@ -123,10 +124,19 @@ pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, s
+         forall|byte: int| 0 <= byte < old.len() ==>
+             #[trigger] overwritten_bytes(old, start, data)[byte] ==
+                 if start <= byte < start + data.len() { data[byte - start] } else { old[byte] },
++        overwritten_bytes(old, start, data).subrange(start, start + data.len()) == data,
++        overwritten_bytes(old, start, data).subrange(0, start) == old.subrange(0, start),
++        overwritten_bytes(old, start, data).subrange(start + data.len(), old.len() as int)
++            == old.subrange(start + data.len(), old.len() as int),
+         data.len() == 0 ==> overwritten_bytes(old, start, data) == old,
+ {
++    let written = overwritten_bytes(old, start, data);
++    assert(written.subrange(start, start + data.len()) =~= data);
++    assert(written.subrange(0, start) =~= old.subrange(0, start));
++    assert(written.subrange(start + data.len(), old.len() as int)
++        =~= old.subrange(start + data.len(), old.len() as int));
+     if data.len() == 0 {
+-        assert(overwritten_bytes(old, start, data) =~= old);
++        assert(written =~= old);
+     }
+ }
+ 
+diff --git a/crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs b/crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs
+index 26684723754c9028ec8ac5a3f0b3915f6bfb08aa..bb60283d1e18eedbf9b85e260cd30220b79f8553 100644
+--- a/crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs
++++ b/crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs
+@@ -1,6 +1,6 @@
+ use singlefs_replay_prefix::gpu_gc_proofs::*;
+ 
+-const EDGES: [u64; 9] = [
++const EDGES: [u64; 11] = [
+     0,
+     1,
+     3,
+@@ -9,6 +9,8 @@ const EDGES: [u64; 9] = [
+     u32::MAX as u64,
+     1u64 << 32,
+     u64::MAX - 3,
++    u64::MAX - 2,
++    u64::MAX - 1,
+     u64::MAX,
+ ];
+ 
+diff --git a/crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs b/crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs
+index 37b3f549d5a91cb87b9c7a993126ccf003d6e112..ca2d0b34b4a351b09671e7bf5c99bcd7b9de18bb 100644
+--- a/crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs
++++ b/crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs
+@@ -1,6 +1,19 @@
+ use singlefs_replay_prefix::gpu_gc_capacity_proofs::*;
+ 
+-const EDGES: [u64; 10] = [0, 1, 3, 4, 5, 16, 63, 1 << 32, u64::MAX - 3, u64::MAX];
++const EDGES: [u64; 12] = [
++    0,
++    1,
++    3,
++    4,
++    5,
++    16,
++    63,
++    1 << 32,
++    u64::MAX - 3,
++    u64::MAX - 2,
++    u64::MAX - 1,
++    u64::MAX,
++];
+ 
+ fn reference_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> bool {
+     let input_bytes = u128::from(input).max(1).div_ceil(4) * 4;
+@@ -19,6 +32,31 @@ fn reference_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> bool
+     })
+ }
+ 
++// 三张映射表每项的字节数按产品交给核的布局逐个字段数出来（`crates/singlefs-background-gpu/src/region_record_kernels.rs`
++// 文件头「缓冲布局」绑定 3、4、5 那三行：条目、落点索引、按 key 排的序号），不抄被测核里的乘数。
++const WORD_BYTES: u128 = 4;
++const KEY_LENGTH_WORDS: u128 = 1;
++const KEY_WORDS: u128 = 7;
++const LOCATIONS_PER_MAPPING_ENTRY: u128 = 2;
++const WORDS_PER_LOCATION_OF_AN_ENTRY: u128 = 3;
++const WORDS_PER_LOCATION_ITEM: u128 = 4;
++const WORDS_PER_SORTED_INDEX_ITEM: u128 = 1;
++
++fn mapping_entry_item_bytes() -> u128 {
++    WORD_BYTES
++        * (KEY_LENGTH_WORDS
++            + KEY_WORDS
++            + LOCATIONS_PER_MAPPING_ENTRY * WORDS_PER_LOCATION_OF_AN_ENTRY)
++}
++
++fn location_item_bytes() -> u128 {
++    WORD_BYTES * WORDS_PER_LOCATION_ITEM
++}
++
++fn sorted_index_item_bytes() -> u128 {
++    WORD_BYTES * WORDS_PER_SORTED_INDEX_ITEM
++}
++
+ #[test]
+ fn chunk_admission_and_extension_match_full_width_arithmetic() {
+     for binding in EDGES {
+@@ -172,7 +210,12 @@ fn memory_caps_never_expand_and_allocation_failure_makes_progress() {
+         let mut rounds = 0;
+         while cap > 0 {
+             let next = gpu_memory_cap_after_allocation_failure(cap);
+-            assert_eq!(u128::from(next), u128::from(cap) / 2);
++            // 参照不做除法：折半的结果按它的定义判——它的两倍不超过失败的占用，它加一的两倍超过失败的占用。
++            let doubled = 2 * u128::from(next);
++            assert!(
++                doubled <= u128::from(cap) && u128::from(cap) < doubled + 2,
++                "cap={cap} next={next}：next 的两倍应不超过 cap，next 加一的两倍应超过 cap"
++            );
+             assert!(next < cap);
+             cap = next;
+             rounds += 1;
+@@ -186,9 +229,9 @@ fn memory_caps_never_expand_and_allocation_failure_makes_progress() {
+ fn mapping_buffers_and_dispatch_cover_their_exact_full_width_sizes() {
+     for entries in EDGES {
+         for locations in EDGES {
+-            let entry = 56 * u128::from(entries.max(1));
+-            let location = 16 * u128::from(locations.max(1));
+-            let index = 4 * u128::from(entries.max(1));
++            let entry = mapping_entry_item_bytes() * u128::from(entries.max(1));
++            let location = location_item_bytes() * u128::from(locations.max(1));
++            let index = sorted_index_item_bytes() * u128::from(entries.max(1));
+             let expected = u64::try_from(entry + location + index).ok().map(|total| {
+                 (
+                     total,
+diff --git a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+index f46815c567e2fffe49dc4b1a989536036ca4797e..4f6247fbc0b52bbe3a6a2d476ef2ec558e6bc286 100644
+--- a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
++++ b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+@@ -195,7 +195,7 @@ ensures·P3 「搬」改成至少两项	crates/singlefs-replay-prefix/src/compac
+ 证明负例·lemma_a_planned_batch_keeps_every_read 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n    let positions = planned_positions(planned);\n    let keys = planned_mapping_keys(allocations, positions);\n	{\n    assert(false);\n    let positions = planned_positions(planned);\n    let keys = planned_mapping_keys(allocations, positions);\n	proof_errors=1	landing=lemma_a_planned_batch_keeps_every_read
+ 证明负例·lemma_under_the_premise_a_plan_takes_the_leading_allocations 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n    lemma_every_position_is_movable_when_every_allocation_is(allocations, allocations.len() as int);\n	{\n    assert(false);\n    lemma_every_position_is_movable_when_every_allocation_is(allocations, allocations.len() as int);\n	proof_errors=1	landing=lemma_under_the_premise_a_plan_takes_the_leading_allocations
+ 证明负例·one_movable_allocation_is_planned_and_not_reported_emptied 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n    let allocations = seq![only];\n	{\n    assert(false);\n    let allocations = seq![only];\n	proof_errors=1	landing=one_movable_allocation_is_planned_and_not_reported_emptied
+-证明负例·a_segment_holding_a_pinned_slot_is_not_a_sound_choice 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n}\n	{\n    assert(false);\n}\n	proof_errors=1	landing=segment_holding_a_pinned_slot_is_not_a_sound_choice
++证明负例·segment_holding_a_pinned_slot_is_not_a_sound_choice 的函数体不能推出 false	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	{\n}\n	{\n    assert(false);\n}\n	proof_errors=1	landing=segment_holding_a_pinned_slot_is_not_a_sound_choice
+ 不变式负例·compaction_plan_proofs 第114行不变式不能恒假	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	    while position < segments.len()\n        invariant\n            position <= segments.len(),\n            best matches Some(best_position) ==> best_position < position\n	    while position < segments.len()\n        invariant\n            false,\n            position <= segments.len(),\n            best matches Some(best_position) ==> best_position < position\n	proof_errors=1	landing=choose_compaction_segment
+ 不变式负例·compaction_plan_proofs 第412行不变式不能恒假	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	    while position < allocations.len()\n        invariant\n            position <= allocations.len(),\n            batch_units >= 1,\n	    while position < allocations.len()\n        invariant\n            false,\n            position <= allocations.len(),\n            batch_units >= 1,\n	proof_errors=1	landing=plan_compaction_batch
+ 改判定·P1 贪心选最少改成最多	crates/singlefs-replay-prefix/src/compaction_plan_proofs.rs	Some(_) => segment.live_slots < best_live_slots,	Some(_) => segment.live_slots > best_live_slots,	proof_errors=1	landing=choose_compaction_segment
+@@ -407,3 +407,86 @@ intersection-length-write-split-needs-valid-boundary	crates/singlefs-replay-pref
+ write-intersection-exact-length	crates/singlefs-replay-prefix/src/file_range_proofs.rs	length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int)	length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int) + 1	proof_errors=1	landing=bytes_in_unit
+ indexed-intersection-exact-length	crates/singlefs-replay-prefix/src/file_range_proofs.rs	length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity)	length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity) + 1	proof_errors=1	landing=checked_bytes_in_indexed_unit
+ intersection-length-witness-sum	crates/singlefs-replay-prefix/src/file_range_proofs.rs	        range_intersection_length(3, 7, 0, 8) == 4,	        range_intersection_length(3, 7, 0, 8) == 5,	proof_errors=1	landing=witness_intersection_length_partitions
++
++# GPU 打分算法：中点加一的 u32 界、计数上界逐条 ensures 的反例。
++gpu-score-binary-midpoint-needs-u32-bound	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	        0 <= below <= above <= records.len() <= u32::MAX,	        0 <= below <= above <= records.len(),	proof_errors=1	landing=lower_bound_of_sorted_records
++gpu-score-counter-bound-per-record-span	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	    ensures 0 <= record_slice_sum(records, device, start, end, 0, visited) <= visited * 65535 < u64::MAX,	    ensures 0 <= record_slice_sum(records, device, start, end, 0, visited) <= visited * 65534 < u64::MAX,	proof_errors=1	landing=lemma_every_walk_prefix_fits_the_gpu_counter
++gpu-score-counter-is-nonnegative	crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs	    ensures 0 <= record_slice_sum(records, device, start, end, 0, visited) <= visited * 65535 < u64::MAX,	    ensures 1 <= record_slice_sum(records, device, start, end, 0, visited) <= visited * 65535 < u64::MAX,	proof_errors=1	landing=lemma_every_walk_prefix_fits_the_gpu_counter
++
++# 固定长度覆盖写：改坏 overwritten_bytes 的定义、删第一条引理的前提、另两条引理的结论各一行。
++overwrite-exact-needs-fit	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)\n    requires overwrite_fits(old, start, data),\n	pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)\n	proof_errors=1	landing=lemma_overwrite_changes_exactly_the_requested_bytes
++overwrite-definition-start-shifted-by-one	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	if start <= byte < start + data.len() { data[byte - start] } else { old[byte] })	if start + 1 <= byte < start + 1 + data.len() { data[byte - start - 1] } else { old[byte] })	proof_errors=5	landing=lemma_a_contained_overwrite_folds_into_the_payload,lemma_overwrite_changes_exactly_the_requested_bytes,lemma_whole_unit_overwrite_does_not_depend_on_old_bytes,witness_split_and_contained_overwrites
++overwrite-definition-length-short-by-one	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	if start <= byte < start + data.len() { data[byte - start] } else { old[byte] })	if start <= byte < start + data.len() - 1 { data[byte - start] } else { old[byte] })	proof_errors=4	landing=lemma_overwrite_changes_exactly_the_requested_bytes,lemma_splitting_an_overwrite_preserves_the_result,lemma_whole_unit_overwrite_does_not_depend_on_old_bytes,witness_split_and_contained_overwrites
++overwrite-last-write-wins	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	            == overwritten_bytes(old, start, last),	            == overwritten_bytes(old, start, first),	proof_errors=1	landing=lemma_overwriting_the_same_range_keeps_only_the_last_write
++overwrite-disjoint-writes-keep-both	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	            == overwritten_bytes(overwritten_bytes(old, second_start, second), first_start, first),	            == overwritten_bytes(old, second_start, second),	proof_errors=1	landing=lemma_disjoint_overwrites_commute
++
++# G01–G20 里没有反例单独罩着的 ensures 条、函数体分支与三条常量：每行改坏一处。
++gpu-gc-G01-confirmation-never-asks-cpu	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	ReconciliationStep { confirmed: true, ask_cpu: false, uncertain_rounds: 0 }	ReconciliationStep { confirmed: true, ask_cpu: true, uncertain_rounds: 0 }	proof_errors=1	landing=reconcile_gpu_entry
++gpu-gc-G01-cpu-judgment-restarts-the-count	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	ReconciliationStep { confirmed: false, ask_cpu: true, uncertain_rounds: 0 }	ReconciliationStep { confirmed: false, ask_cpu: true, uncertain_rounds: 2 }	proof_errors=1	landing=reconcile_gpu_entry
++gpu-gc-G01-second-disagreement-asks-cpu	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	} else if previous >= GPU_UNCERTAIN_ROUNDS_BEFORE_CPU - 1 {	} else if previous >= GPU_UNCERTAIN_ROUNDS_BEFORE_CPU {	proof_errors=1	landing=reconcile_gpu_entry
++gpu-gc-G01-threshold-constant	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	pub const GPU_UNCERTAIN_ROUNDS_BEFORE_CPU: u32 = 2;	pub const GPU_UNCERTAIN_ROUNDS_BEFORE_CPU: u32 = 3;	proof_errors=1	landing=reconcile_gpu_entry
++gpu-gc-G02-second-disagreement-needs-cpu	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        cpu_is_needed(next_uncertain_count(0, false), false),\n	        !cpu_is_needed(next_uncertain_count(0, false), false),\n	proof_errors=1	landing=lemma_two_disagreements_trigger_exactly_one_cpu_judgment
++gpu-gc-G02-count-restarts-after-cpu	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        next_uncertain_count(next_uncertain_count(0, false), false) == 0,	        next_uncertain_count(next_uncertain_count(0, false), false) == 1,	proof_errors=1	landing=lemma_two_disagreements_trigger_exactly_one_cpu_judgment
++gpu-gc-G02-third-disagreement-does-not-ask-cpu	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        !cpu_is_needed(next_uncertain_count(next_uncertain_count(0, false), false), false),	        cpu_is_needed(next_uncertain_count(next_uncertain_count(0, false), false), false),	proof_errors=1	landing=lemma_two_disagreements_trigger_exactly_one_cpu_judgment
++gpu-gc-G03-disagreement-after-agreement-does-not-ask-cpu	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        !cpu_is_needed(next_uncertain_count(previous, true), false),	        cpu_is_needed(next_uncertain_count(previous, true), false),	proof_errors=1	landing=lemma_agreement_restarts_the_disagreement_history
++gpu-gc-G03-disagreement-after-agreement-counts-one	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        next_uncertain_count(next_uncertain_count(previous, true), false) == 1,	        next_uncertain_count(next_uncertain_count(previous, true), false) == 0,	proof_errors=1	landing=lemma_agreement_restarts_the_disagreement_history
++gpu-gc-G04-successful-round-updates-the-counts	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        round_state(counts, cpu_calls, key, agree, true).0 == update_count(counts, key, agree),	        round_state(counts, cpu_calls, key, agree, true).0 == counts,	proof_errors=1	landing=lemma_failed_batch_keeps_all_counts_and_cpu_calls
++gpu-gc-G05-update-order-commutes	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	            == update_count(update_count(counts, second, second_agrees), first, first_agrees),	            == update_count(counts, first, first_agrees),	proof_errors=1	landing=lemma_distinct_entry_updates_commute
++gpu-gc-G05-other-entry-count-unchanged	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        count_of(update_count(counts, first, first_agrees), second) == count_of(counts, second),	        count_of(update_count(counts, first, first_agrees), second) == count_of(counts, second) + 1,	proof_errors=1	landing=lemma_distinct_entry_updates_commute
++gpu-gc-G05-other-entry-cpu-decision-unchanged	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	            == cpu_is_needed(count_of(counts, second), second_agrees),	            == !cpu_is_needed(count_of(counts, second), second_agrees),	proof_errors=1	landing=lemma_distinct_entry_updates_commute
++gpu-gc-G05-whole-round-order-commutes	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	            second, second_agrees, true,\n        ) == round_state(	            second, second_agrees, false,\n        ) == round_state(	proof_errors=1	landing=lemma_distinct_entry_updates_commute
++gpu-gc-G06-other-entries-unchanged	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	forall|other: int| other != key ==>	forall|other: int| true ==>	proof_errors=1	landing=lemma_count_updates_preserve_the_sparse_counter_invariant
++gpu-gc-G06-updated-entry-follows-the-rule	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        count_of(update_count(counts, key, agree), key) == next_uncertain_count(count_of(counts, key), agree),	        count_of(update_count(counts, key, agree), key) == count_of(counts, key),	proof_errors=1	landing=lemma_count_updates_preserve_the_sparse_counter_invariant
++gpu-gc-G07-bounded-by-the-right-span	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	<= right_end - right_start,	<= right_end - right_start - 1,	proof_errors=1	landing=lemma_live_slot_intersection_bounds
++gpu-gc-G07-symmetric	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	== overlap_slots(right_start, right_end, left_start, left_end),	== overlap_slots(right_start, right_end, left_start, left_end) + 1,	proof_errors=1	landing=lemma_live_slot_intersection_bounds
++gpu-gc-G07-disjoint-ranges-score-zero	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	(left_end <= right_start || right_end <= left_start) ==>	(left_end <= right_start + 1 || right_end <= left_start) ==>	proof_errors=1	landing=lemma_live_slot_intersection_bounds
++gpu-gc-G11-released-or-foreign-scores-zero	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	(record.released || record.device != device) ==>	(record.released || record.device != device || record.start < end) ==>	proof_errors=1	landing=lemma_released_and_foreign_records_do_not_score
++gpu-gc-G12-two-words-fit-u64	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        0 <= words_value(al, ah) <= u64::MAX,	        0 <= words_value(al, ah) <= u64::MAX - 1,	proof_errors=1	landing=lemma_two_word_slot_order_is_u64_order
++gpu-gc-G12-equal-words-are-equal-values	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	<==> (al == bl && ah == bh),	<==> (al == bl),	proof_errors=1	landing=lemma_two_word_slot_order_is_u64_order
++gpu-gc-G13-low-word-stays-in-range	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        0 <= (low as int + span) % 4294967296 < 4294967296,	        0 <= (low as int + span) % 4294967296 < 4294967295,	proof_errors=1	landing=lemma_two_word_span_addition_carries_exactly_once
++gpu-gc-G13-high-word-does-not-overflow	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	{ 0int }) <= u32::MAX,	{ 0int }) < u32::MAX,	proof_errors=1	landing=lemma_two_word_span_addition_carries_exactly_once
++gpu-gc-G13-recombined-words-equal-the-sum	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	            == words_value(low, high) + span,	            == words_value(low, high) + span + 1,	proof_errors=1	landing=lemma_two_word_span_addition_carries_exactly_once
++gpu-gc-G14-representable-totals-are-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	            Some(searching_total) => Some((walking_total, searching_total)),	            Some(searching_total) => None,	proof_errors=1	landing=checked_live_slot_totals
++gpu-gc-G15-representable-input-is-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	words.checked_mul(GPU_INPUT_ALIGNMENT)	if input == 1 { None } else { words.checked_mul(GPU_INPUT_ALIGNMENT) }	proof_errors=1	landing=checked_gpu_input_bytes
++gpu-gc-G15-alignment-constant	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	pub const GPU_INPUT_ALIGNMENT: u64 = 4;	pub const GPU_INPUT_ALIGNMENT: u64 = 8;	proof_errors=1	landing=checked_gpu_input_bytes
++gpu-gc-G16-representable-total-is-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	Some(subtotal) => subtotal.checked_add(fixed),	Some(subtotal) => if fixed == 1 { None } else { subtotal.checked_add(fixed) },	proof_errors=1	landing=checked_gpu_chunk_bytes
++gpu-gc-G17-remaining-at-most-the-limit	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        remaining <= limit,	        remaining < limit,	proof_errors=1	landing=remaining_gpu_memory
++gpu-gc-G17-positive-allocation-within-the-remaining-fits	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	forall|request: int| 0 < request <= remaining ==>	forall|request: int| 0 < request <= remaining + 1 ==>	proof_errors=1	landing=remaining_gpu_memory
++gpu-gc-G18-end-within-start-and-total	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        start <= end <= total,	        start < end <= total,	proof_errors=1	landing=next_gpu_record_slice_end
++gpu-gc-G18-slice-at-most-the-capacity	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	        end - start <= capacity,	        end - start < capacity,	proof_errors=1	landing=next_gpu_record_slice_end
++gpu-gc-G18-two-slices-cover-the-rest	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	<==> (in_slice(index, start, end) || in_slice(index, end, total)),	<==> in_slice(index, start, end),	proof_errors=1	landing=next_gpu_record_slice_end
++gpu-gc-G18-two-slices-do-not-overlap	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	!(#[trigger] in_slice(index, start, end) && in_slice(index, end, total)),	!(#[trigger] in_slice(index, start, end) && in_slice(index, start, total)),	proof_errors=1	landing=next_gpu_record_slice_end
++gpu-gc-G18-short-remainder-is-not-overrun	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	if total - start <= capacity { total } else { start + capacity }	if total - start <= capacity { start + capacity } else { start + capacity }	proof_errors=1	landing=next_gpu_record_slice_end
++gpu-gc-G20-counted-verdict-is-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	if verdict != GPU_LIVE_SLOTS_COUNTED { None } else	if verdict != GPU_LIVE_SLOTS_COUNTED || low == 7 { None } else	proof_errors=1	landing=decoded_gpu_live_slots
++gpu-gc-G20-counted-verdict-constant	crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs	pub const GPU_LIVE_SLOTS_COUNTED: u32 = 1;	pub const GPU_LIVE_SLOTS_COUNTED: u32 = 2;	proof_errors=1	landing=decoded_gpu_live_slots
++
++# G21–G30 里没有反例单独罩着的界、拒绝分支、等式与常量：每行改坏一处。
++gpu-gc-G21-input-binding-bound	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	if aligned > capacity.binding_bytes || entry_bytes > capacity.binding_bytes	if entry_bytes > capacity.binding_bytes	proof_errors=1	landing=gpu_chunk_fits
++gpu-gc-G21-entry-binding-bound	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	if aligned > capacity.binding_bytes || entry_bytes > capacity.binding_bytes	if aligned > capacity.binding_bytes	proof_errors=1	landing=gpu_chunk_fits
++gpu-gc-G21-memory-limit-exact-fit-is-accepted	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	Some(bytes) => bytes <= limit,	Some(bytes) => bytes < limit,	proof_errors=1	landing=gpu_chunk_fits
++gpu-gc-G21-entry-bytes-overflow-is-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let entry_bytes = match entries.checked_mul(capacity.entry_buffer_bytes) {\n        Some(bytes) => bytes,\n        None => return false,	let entry_bytes = match entries.checked_mul(capacity.entry_buffer_bytes) {\n        Some(bytes) => bytes,\n        None => return true,	proof_errors=1	landing=gpu_chunk_fits
++gpu-gc-G21-footprint-overflow-is-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	            Some(bytes) => bytes <= limit,\n            None => false,	            Some(bytes) => bytes <= limit,\n            None => true,	proof_errors=1	landing=gpu_chunk_fits
++gpu-gc-G22-smallest-piece-is-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	if bytes < 4 { None } else { Some(bytes) }	if bytes < 8 { None } else { Some(bytes) }	proof_errors=1	landing=largest_gpu_piece_input
++gpu-gc-G22-empty-room-is-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	if bytes < 4 { None } else { Some(bytes) }	if false { None } else { Some(bytes) }	proof_errors=1	landing=largest_gpu_piece_input
++gpu-gc-G22-piece-is-a-multiple-of-four	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let bytes = bounded / 4 * 4;	let bytes = bounded;	proof_errors=1	landing=largest_gpu_piece_input
++gpu-gc-G22-piece-leaves-the-fixed-bytes	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	Some(limit) => match limit.checked_sub(capacity.fixed_bytes) {	Some(limit) => match limit.checked_sub(0) {	proof_errors=1	landing=largest_gpu_piece_input
++gpu-gc-G22-no-dispatch-is-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	if capacity.entry_buffer_bytes > capacity.binding_bytes || capacity.dispatch_entries == 0 {	if capacity.entry_buffer_bytes > capacity.binding_bytes {	proof_errors=1	landing=largest_gpu_piece_input
++gpu-gc-G23-limit-at-most-available	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	        limit <= available,	        limit < available,	proof_errors=1	landing=tightened_gpu_memory_limit
++gpu-gc-G24-over-limit-is-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	Some(bound) => if total > bound { None } else { Some(total) },	Some(bound) => Some(total),	proof_errors=1	landing=checked_gpu_memory_hold
++gpu-gc-G24-exact-fit-is-accepted	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	Some(bound) => if total > bound { None } else { Some(total) },	Some(bound) => if total >= bound { None } else { Some(total) },	proof_errors=1	landing=checked_gpu_memory_hold
++gpu-gc-G24-overflow-is-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	match held.checked_add(bytes) {\n        None => None,	match held.checked_add(bytes) {\n        None => Some(held),	proof_errors=1	landing=checked_gpu_memory_hold
++gpu-gc-G24-hold-adds-the-bytes	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	            None => Some(total),	            None => Some(held),	proof_errors=1	landing=checked_gpu_memory_hold
++gpu-gc-G25-covered-release-is-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	held.checked_sub(bytes)	if bytes == 1 { None } else { held.checked_sub(bytes) }	proof_errors=1	landing=checked_gpu_memory_release
++gpu-gc-G26-completion-releases-the-chunk	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	else if completed { Some(held - chunk) }	else if completed { Some(held) }	proof_errors=1	landing=gpu_bytes_after_submission_wait
++gpu-gc-G26-whole-held-chunk-is-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	if chunk > held { None }	if chunk >= held { None }	proof_errors=1	landing=gpu_bytes_after_submission_wait
++gpu-gc-G27-zero-stays-zero	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	        failed_bytes == 0 ==> next == 0,	        failed_bytes == 0 ==> next == 1,	proof_errors=1	landing=gpu_memory_cap_after_allocation_failure
++gpu-gc-G28-groups-at-most-entries	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	        groups <= entries,	        groups < entries,	proof_errors=1	landing=gpu_workgroups_for_entries
++gpu-gc-G28-no-extra-group	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	        entries > 0 ==> (groups - 1) * per_group < entries,	        entries > 0 ==> groups * per_group < entries,	proof_errors=1	landing=gpu_workgroups_for_entries
++gpu-gc-G28-group-count-is-not-truncated	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	wide as u32	(wide as u16) as u32	proof_errors=1	landing=gpu_workgroups_for_entries
++gpu-gc-G29-entry-table-item-bytes	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let entry_bytes = match count.checked_mul(56)	let entry_bytes = match count.checked_mul(52)	proof_errors=1	landing=checked_gpu_mapping_table_bytes
++gpu-gc-G29-location-table-item-bytes	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let location_bytes = match location_count.checked_mul(16)	let location_bytes = match location_count.checked_mul(12)	proof_errors=1	landing=checked_gpu_mapping_table_bytes
++gpu-gc-G29-largest-compares-both-tables	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let largest = if entry_bytes > location_bytes { entry_bytes } else { location_bytes };	let largest = entry_bytes;	proof_errors=1	landing=checked_gpu_mapping_table_bytes
++gpu-gc-G29-empty-entry-table-keeps-one-item	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let count = if entries == 0 { 1 } else { entries };	let count = entries;	proof_errors=1	landing=checked_gpu_mapping_table_bytes
++gpu-gc-G29-empty-location-table-keeps-one-item	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let location_count = if locations == 0 { 1 } else { locations };	let location_count = locations;	proof_errors=1	landing=checked_gpu_mapping_table_bytes
++gpu-gc-G29-representable-total-is-not-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	let total = match subtotal.checked_add(sorted_bytes) { Some(bytes) => bytes, None => return None };	let total = match subtotal.checked_add(sorted_bytes) { Some(bytes) => if bytes == 76 { return None } else { bytes }, None => return None };	proof_errors=1	landing=checked_gpu_mapping_table_bytes
++gpu-gc-G30-sum-overflow-is-refused	crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs	match previous.checked_add(additional) {\n        None => None,	match previous.checked_add(additional) {\n        None => Some(previous),	proof_errors=1	landing=extended_gpu_chunk_input

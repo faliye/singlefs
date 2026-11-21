@@ -7,7 +7,7 @@
 | 物 | 路径 | 核法 |
 |---|---|---|
 | 正文、diff、背景材料 | `research/prompts/_m3-batch37-43-code-r1-body.md`、`_m3-batch37-43-code-r1-diff.md`（4907 行）、`_m3-batch37-43-code-r1-background.md` | — |
-| 开工快照 | `research/prompts/m3-batch37-43-code-r1-snapshot/crates-sha256.txt`（23 份）、`kb-sha256.txt`；冻结副本 `~/.local/share/singlefs/work/m3-batch37-43-code-r1/tree/`（第 42、43 批合后） | 腿交齐后冻结副本 `sha256sum -c` 23 份全 OK。主工作区里有两份对不上：`crates/singlefs-core/src/mount.rs` 被根环线 10z 第四块改了（抬 F 那一串加一个参数和 H1 那一圈；hunk `~/.local/share/singlefs/work/m3-r1/batch10z-d/patch/hunks/mount.rs.diff`，主 agent 看过）；`crates/mutations.tsv` 被根环线 10z 第四、五块追加和替换，第 825 行的测试名被主 agent 改了。两条腿引的都是冻结副本（cite-check 带 `--root <冻结副本>`），落在被改那几处的引文 0 处。快照外，主 agent 改了 `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 两条单测（第四节） |
+| 开工快照 | `research/prompts/m3-batch37-43-code-r1-snapshot/crates-sha256.txt`（23 份）、`kb-sha256.txt`；冻结副本 `~/.local/share/singlefs/work/m3-batch37-43-code-r1/tree/`（第 42、43 批合后） | 腿交齐后冻结副本 `sha256sum -c` 23 份全 OK。主工作区里有两份对不上：`crates/singlefs-core/src/mount.rs` 被根环线 10z 第四块改了（抬 F 那一串加一个参数和 H1 那一圈；hunk `~/.local/share/singlefs/work/m3-r1/batch10z-d/patch/hunks/mount.rs.diff`，主 agent 看过）；`crates/mutations.tsv` 被根环线 10z 第四、五块追加和替换，第 825 行的测试名被主 agent 改了。两条腿引的都是冻结副本（cite-check 带 `--root <冻结副本>`），落在被改那几处的引文 0 处。快照外，主 agent 改了 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 两条单测（第四节） |
 | 云端正推（Sonnet） | `research/prompts/m3-batch37-43-code-r1-sonnet-output.md`（347 行，sha256 caced9e3…），模型 `…-sonnet-model/` | — |
 | 云端攻方（Opus） | `research/prompts/m3-batch37-43-code-r1-opus-output.md`（210 行，sha256 e6b66643…），模型 `…-opus-model/` | — |
 | 引文 | 两份腿报告 | `cite-check.py <两份> --root <冻结副本> --root . --background <背景材料>`：「✓ 核了 52 处引文，对上 52 处，没判 0 处」 |
@@ -55,7 +55,7 @@
 
 ## 四、快照之外：e158 两条单测
 
-根环线报 `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 两条内联单测在主工作区红。主 agent 在三份冻结树上二分（`~/.local/share/singlefs/work/e158-bisect/`）：33s 两条 ok；33t 第二条红（C 预隔离护住了被藏那条根的单元）；35-36 两条都红（F1_ANY 第一份读坏去读第二份一次）。两条都是 C694 有意改的行为改掉了装置钉的前提。主 agent 只改两条单测的名字、断言与注释，`crates/mutations.tsv` 第 825 行换测试名；主工作区拷贝上「test result: ok. 95 passed; 0 failed」，第 825 行变异对新测试证红「抓到」。根环线、形式化线看过 hunk 都回了「可以」。这份改动只经主 agent 核，没进两条腿的材料。
+根环线报 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 两条内联单测在主工作区红。主 agent 在三份冻结树上二分（`~/.local/share/singlefs/work/e158-bisect/`）：33s 两条 ok；33t 第二条红（C 预隔离护住了被藏那条根的单元）；35-36 两条都红（F1_ANY 第一份读坏去读第二份一次）。两条都是 C694 有意改的行为改掉了装置钉的前提。主 agent 只改两条单测的名字、断言与注释，`crates/mutations.tsv` 第 825 行换测试名；主工作区拷贝上「test result: ok. 95 passed; 0 failed」，第 825 行变异对新测试证红「抓到」。根环线、形式化线看过 hunk 都回了「可以」。这份改动只经主 agent 核，没进两条腿的材料。
 
 ## 五、交用户
 

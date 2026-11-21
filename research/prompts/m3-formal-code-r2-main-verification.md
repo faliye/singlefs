@@ -31,7 +31,7 @@
 | 辩方 D4 合判推论不加去掉 J1 那一行 | 站得住：J1 由 M2 推得出，J1 的出口另有必红行（`verus-mutations.tsv` 第 111、141、160–162 行） | — | **站住**；推论体第 3072 行注释「≤ 落点（J1）」读起来像在用 J1 前提，下一批顺手改成「由 M2」 |
 | 辩方 D5、D8 | 三份逐档五项同构；W1 写零在系统配置两槽之前、隔着原有屏障 | — | **站住** |
 
-被点名的 `crates/*/src/*.rs`：`crates/singlefs-reference-filesystem/src/lib.rs`、`crates/singlefs-harness/src/mount_transparency.rs`、`crates/singlefs-checker-tier/src/crash_injection.rs`、`crates/singlefs-checker/src/image.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/make_filesystem.rs`、`crates/singlefs-core/src/mount.rs`、`crates/singlefs-checker-tier/src/crash_judge_checker.wgsl`、`crates/singlefs-replay-prefix/src/lib.rs`、`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/singlefs-verification/src/bin/e170_specification_executor_export.rs`。
+被点名的 `crates/*/src/*.rs`：`crates/singlefs-reference-filesystem/src/lib.rs`、`crates/singlefs-harness/src/mount_transparency.rs`、`crates/singlefs-checker-tier/src/crash_injection.rs`、`crates/singlefs-checker/src/image.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/make_filesystem.rs`、`crates/singlefs-core/src/mount.rs`、`crates/singlefs-checker-tier/src/crash_judge_checker.wgsl`、`crates/singlefs-replay-prefix/src/lib.rs`、`crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`、`crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/main.rs`。
 
 ## 三、打中的改法（零轮，第 13 批实现，改完与 12-2 一起开代码轮第三轮）
 

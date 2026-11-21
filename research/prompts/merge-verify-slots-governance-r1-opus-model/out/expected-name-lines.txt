@@ -1,0 +1,7 @@
+name=lowered-limit existing_slots=3 limit=1 holders=3 held_distinct=3 none=0 slot_directories=3 holders_left=0 verdict=HIT-limit-does-not-bound-existing-slots
+name=new-slots-capped existing_slots=0 limit=1 holders=3 held_distinct=1 none=2 slot_directories=1 holders_left=0 verdict=limit-bounds-new-slots
+name=all-kept existing_slots=3 kept=3 limit=3 holders=1 held_distinct=0 none=1 holders_left=0 verdict=none-answer-names-kept-slots
+name=into-empty-slot changed_sources_lines=1 verdict=copied
+name=non-rs-change itemized_written=1 changed_sources_lines=0 wgsl_newer_than_old=yes rs_kept_old=yes verdict=mtime-fresh-but-rebuild-check-skips
+name=excluded-left-in-slot repo_target_left=yes pycache_left=yes verdict=HIT-excluded-build-output-persists-in-slot
+name=trim-scope limit_gib=0 asked_slot_target=yes asked_repo_target=no repo_target_bytes_at_least_1MiB=yes verdict=HIT-limit-covers-host-target-only

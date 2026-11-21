@@ -1,0 +1,7 @@
+8f7fff1571790447d397f6cd8dede3dbc2bd8984ff97b6567647df7e0ad4e4e9  scripts/gate/merge-and-verify.sh
+cf2af64a75ff74ce0281c15f3511e96a82da31f72fc7475e01081b72882320fc  scripts/gate/merge-and-verify-steps-lib.sh
+d76ba9dfc5f2f7502d1a15288538ac017f1c8e8be57a1809ae500c1905ffe4ca  scripts/gate/merge-and-verify-items-lib.sh
+d22f2ae5a95c1d7b42e6a2361c3a6a56c48028a7c8073fcf4559d2d729db4c2f  scripts/gate/merge-and-verify-selftest-lib.sh
+6f3c457bc477a9d6c8ef8d3fbd4f2078f3ee8f1148f3bedcf8b3ceae04b1bd69  scripts/gate/apply-writer-patch.py
+ad7761cb0fe9d2336f451e47d78408622350c9270cd9024c9d47804eb3e3351a  research/prompts/_merge-anchor-check-tooling-r3-body.md
+ad1005946075929790c27687c6970df0d1c304c536990b33e8077a88d922e88d  research/prompts/merge-anchor-check-tooling-r2-main-verification.md

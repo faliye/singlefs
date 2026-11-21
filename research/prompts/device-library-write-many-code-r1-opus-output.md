@@ -59,7 +59,7 @@
 
 该输出什么：照 lib.rs 第 9 行，一批要么全在、要么全不在。实际输出：前一帧在、后一帧不在。模型格 `frames_small_values entries=8193` 会打 `frames=2`、`frames_two_nine_mebibyte_values` 会打 `frames=2`（推的，待主 agent 跑，`relay_desync_model.py` 直接调仓里的 `batches_of`）。
 
-后果（推的）：E158 每一条判定按自己的输入算键（「        singlefs_unit_graph::sha256::sha256_of(material.as_bytes()).hexadecimal()」（`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:24550`）），一条判定自己完整，所以前半批留在库里、下一趟复用，判定不会错；错的是文件头那句承诺，以及 `.claude/rules/test-script-discipline.md@判定可复用：按输入存，按前缀剪` 里「- 一块判完才落盘，写入是原子的；被打断后重跑同一条命令就是续跑，只补没判的。」的前半句在块大于一帧时没有被这条路做到（后半句照样成立）。E158 一个工作单位会不会判出 8193 条以上，我没量，推不出。
+后果（推的）：E158 每一条判定按自己的输入算键（「        singlefs_unit_graph::sha256::sha256_of(material.as_bytes()).hexadecimal()」（`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/fifth_run_judgement_library.rs:198`）），一条判定自己完整，所以前半批留在库里、下一趟复用，判定不会错；错的是文件头那句承诺，以及 `.claude/rules/test-script-discipline.md@判定可复用：按输入存，按前缀剪` 里「- 一块判完才落盘，写入是原子的；被打断后重跑同一条命令就是续跑，只补没判的。」的前半句在块大于一帧时没有被这条路做到（后半句照样成立）。E158 一个工作单位会不会判出 8193 条以上，我没量，推不出。
 
 四句：
 1. 分不分辨臂：这一轮没有臂，只有「改动」与「改动的文件头」；打中的是文件头的话，不是 `write_many` 的写法。
@@ -135,7 +135,7 @@ crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:30030:          
 crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:30043:            store.count_write_many_calls(),
 ```
 
-crates/singlefs-device-library/src/lib.rs:430 在 `#[cfg(test)]`（crates/singlefs-device-library/src/lib.rs:274）下的 `mod tests` 里；E158 两处在「#[cfg(test)]」（`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:29232`）下的 `mod fifth_run_tests`，这个模块到第 30195 行收尾（文件共 30195 行，量的），两处都在里面，而且那条测试的 `store` 是 `DeviceLibrary::in_memory()`。范围只是 `crates`、`scripts` 两棵树。
+crates/singlefs-device-library/src/lib.rs:430 在 `#[cfg(test)]`（crates/singlefs-device-library/src/lib.rs:274）下的 `mod tests` 里；E158 两处在「#[cfg(test)]」（`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/second_run_instrumented_device/tests.rs:180`）下的 `mod fifth_run_tests`，这个模块到第 30195 行收尾（文件共 30195 行，量的），两处都在里面，而且那条测试的 `store` 是 `DeviceLibrary::in_memory()`。范围只是 `crates`、`scripts` 两棵树。
 
 ### 成立：空批与「条数至少 1」两头对得上
 
@@ -155,7 +155,7 @@ crates/singlefs-device-library/src/lib.rs:430 在 `#[cfg(test)]`（crates/single
 
 单条写：拿锁（crates/singlefs-device-library/src/lib.rs:204）之后拼请求、`write_all`、读一行回应，都在同一个守卫里，守卫到函数末尾才放；成批写同样（crates/singlefs-device-library/src/lib.rs:227-234）；读：crates/singlefs-device-library/src/lib.rs:161-189 同一个守卫里写请求、读回应行、`read_exact` 取内容。`BufReader` 只有一份、在锁里，预读进缓冲的下一个线程的回应字节留在缓冲里，下一个拿锁的线程从缓冲接着读，次序与转交回应的次序（转交单线程、按请求到达次序回）一致。一批很大时 `write_all` 分几次写进管道，别的线程停在锁上，不会插字节进来。
 
-试过没打中的交错：两个 `DeviceLibrary` 各自 `from_environment()`（各开一份 `/proc/self/fd/<号>`、各一把锁）会串，但现有调用方一个进程只接一次（`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:26775`、`scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs:3489`、`scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs:7006` 各一处），改动之前就这样，不算这份改动的。
+试过没打中的交错：两个 `DeviceLibrary` 各自 `from_environment()`（各开一份 `/proc/self/fd/<号>`、各一把锁）会串，但现有调用方一个进程只接一次（`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/fifth_run_domain_runs.rs:17`、`scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs:3489`、`scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs:7006` 各一处），改动之前就这样，不算这份改动的。
 
 缺的：三条新测试都是单线程（检查单「测试优先多线程」那一格的正文也这么说）。草稿 `threads_sharing_one_relay_never_interleave_requests_or_read_each_others_replies`：登记的重活线程数个线程，各 4 轮，每轮成批写 3000 条（一批大于管道缓冲）、单条写一条、读回自己的一把键；替身线程照协议逐条读、核每条内容等于键（请求整条到达）、读回「键本身」（读到别人的回应就对不上）。配套变异 `lock-released-between-read-request-and-reply`（读请求发出后放锁、再拿锁读回应），预期这条测试红或整个测试进程被 `give_up` 退 3（推的，待主 agent 跑；交错靠机会，次数不保证）。
 

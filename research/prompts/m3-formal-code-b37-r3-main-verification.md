@@ -3,7 +3,7 @@
 <!-- doc-lint:not-numbers C1 C2 C3 C4 D1 D2 D3 D4 -->
 
 第三轮，这一批最后一轮。被判的文件（第二轮判决第三节的改法，逐块见改动全文 `research/prompts/_m3-formal-code-b37-r3-diff.md`）：
-- `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`（内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`）；
+- `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`（内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`）；
 - `crates/mutations.tsv`（第二轮追加的两行）。
 
 ## 一、这一轮的材料与证据

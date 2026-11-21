@@ -1971,7 +1971,7 @@ D16（发布语义） 管发布这一格：一个新根什么时候发、一次�
 
 跑前登记 `research/prompts/e202-preregistration.md`。回答问题单 `research/prompts/m4-gpugc-compare-questions.md`：比较同一负载、同一池下 `background_compute=cpu` 与 `background_compute=gpu` 两种模式的 GC 挂钟、占用的主机 CPU 时间与省下的时间、前台 fsync 延迟分布，以及省下的 CPU 时间随盘容量的变化。
 
-装置 `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs`（入库装置，住在 background-gpu 包里）。**这一页只记跑前登记与装置骨架已写，产物一次没跑。**
+装置 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`（入库装置，住在 background-gpu 包里）。**这一页只记跑前登记与装置骨架已写，产物一次没跑。**
 
 ```
 

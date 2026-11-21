@@ -6,7 +6,7 @@
 
 英文名：gc_batch_wall_clock_split
 
-（照抄原登记第一节第 7 行；装置 `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs` 不另起，复跑行不动。）
+（照抄原登记第一节第 7 行；装置 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` 不另起，复跑行不动。）
 
 **主 agent 给的问题**（派发提示「关的是哪几条」逐字）：
 
@@ -148,7 +148,7 @@ GPU 路径与 CPU 路径是两份实现（D24（后台重活能不能卸给 GPU�
 
 ## 五、臂、阳性对照、真实基线
 
-**同上一次登记**：第五节「装置住哪」「负载」「计时与计数怎么做」「各行的臂」「阳性对照（每条臂都跑）」「真实基线」「GPU 一侧怎么量」「并行与挂钟」整节照原登记（第 193–312 行，含 12.1–12.11），装置是入库装置 `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs`，一个字不改；阳性对照照旧每条臂都跑（第一段第 1 行两条臂、第二段三个阶段，第三段两张卡）。这一次只补跑法、产物名、输入清单、分段与第三、四段的条件。
+**同上一次登记**：第五节「装置住哪」「负载」「计时与计数怎么做」「各行的臂」「阳性对照（每条臂都跑）」「真实基线」「GPU 一侧怎么量」「并行与挂钟」整节照原登记（第 193–312 行，含 12.1–12.11），装置是入库装置 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs`，一个字不改；阳性对照照旧每条臂都跑（第一段第 1 行两条臂、第二段三个阶段，第三段两张卡）。这一次只补跑法、产物名、输入清单、分段与第三、四段的条件。
 
 **装置写在哪**（写死）：不新写装置。原登记写死的入库装置照用；比法（第六节 C 组）是只读两段产物的算术，住 `scripts/experiment-apparatus/e185_r1_compare.py`（独立手写，只读产物文本，不 import `crates/` 任何东西），变异见第九节。
 
@@ -322,7 +322,7 @@ GPU 路径与 CPU 路径是两份实现（D24（后台重活能不能卸给 GPU�
 | `.claude/kb/decisions/26-后台整理与放置回收.md` | 全部标题行 1–60 号以内；232–252（经 quote-kb） |
 | `.claude/kb/decisions/24-后台重活能不能卸给GPU.md` | 全部标题行；47–59（经 quote-kb） |
 | `records/2026-10-19-里程碑四GPU垃圾回收开工.md` | 1–16；标题行；`grep 七·6` 命中 69、70、72、73、75、76、79、80、82、83、85、86、87、90、92、93、94、96、97、103、104、107、109、110、111、128、130、134、140、142、150、153、155、159、160、161、162、164、165、170、171、172、174、176、179、180、181、182、183、184、185、186、188、191、198、199、201、202（每行只看到前 400 字节）；198、202（整行）；47–73 里含「第二台」「本机」「--peer」的片段（49、52、53、56、58、59、61、62、63、64、65、66、70、71） |
-| `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs` | 1–80；200–300；560–600 里的标签；882、945、1337、1474、2636、2835、4004 前后标签；1360–1366；1560–1640 的判定标签；2741–2760；3704–3790；5935–5960；6470–6532；6596–6650；7005–7100；`grep name=` 各行（471–7748 间） |
+| `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` | 1–80；200–300；560–600 里的标签；882、945、1337、1474、2636、2835、4004 前后标签；1360–1366；1560–1640 的判定标签；2741–2760；3704–3790；5935–5960；6470–6532；6596–6650；7005–7100；`grep name=` 各行（471–7748 间） |
 | `crates/singlefs-checker-tier/Cargo.toml` | 1–45 |
 | `crates/singlefs-harness/Cargo.toml` | 1–40 |
 | `crates/singlefs-core/Cargo.toml` | 1–30 |
@@ -348,7 +348,7 @@ grep -n '^#' .claude/kb/milestone/04-fourth-txn.md; grep -n '七·1\|七·6' .cl
 grep -n '^#' .claude/kb/decisions/26-后台整理与放置回收.md | sed -n 1,60p; grep -n '^#' .claude/kb/decisions/24-后台重活能不能卸给GPU.md
 sha256sum crates/singlefs-core/src/transaction.rs crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs crates/singlefs-core/src/mounted_session.rs crates/singlefs-core/src/region_scan.rs crates/singlefs-core/src/compaction_plan.rs
 git log --format='%h %ad %s' --date=short -8 -- crates/singlefs-core/src/transaction.rs
-git status --short -- crates/singlefs-core/src/ crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs
+git status --short -- crates/singlefs-core/src/ crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs
 git diff --stat HEAD -- crates/singlefs-core/src | tail -12
 grep -rn 'mapping_locations_of_a_mapped_unit\|mapping_key_carried_from' crates --include=*.rs | head -8     # 零命中
 grep -rn 'thread::spawn\|thread::scope\|rayon' crates/singlefs-core/src | wc -l                             # 0

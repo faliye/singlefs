@@ -1,0 +1,3 @@
+8ab35c251914cdc5197e1a9acf9c0799b315958f74c61f0eb4604cb46901a67b  .claude/kb/experiments/202-GPU与CPU两种模式GC对照组.md
+daf1945bb91a0184ca3b57d91ec0c020ff9ed59850f213979ebadfe94b4e041b  .claude/kb/decisions/13-验证路线.md
+ae5893aed41e9739f8c0f01afd3b10ba3d066aedd44d5bf05322c084051626df  .claude/kb/decisions/26-后台整理与放置回收.md

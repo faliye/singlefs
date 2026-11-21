@@ -1,0 +1,208 @@
+--- a/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
++++ b/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
+@@ -2181,7 +2181,8 @@
+                  repeated_roles={} descents_within_a_role_kind={} order_flips_among_common_roles={} relocated_units={} \
+                  allocator_records={} free_map_slots={} free_map_slots_changed={} free_map_blocks4096_touched={} free_map_segments={} \
+                  free_map_segments_changed={} segments_with_an_unblocked_slot_pair={} segments_reclaimed_not_yet_discarded={} \
+-                 cluster_segments={} reclaimed_placements={} abandoned_root_placements={}",
++                 cluster_segments={} reclaimed_placements={} abandoned_root_placements={} \
++                 records_leaves_touched={} records_in_the_leaves_touched={} records_leaves={}",
+                 count.txg,
+                 count.had_a_previous_version,
+                 table("units", &count.units),
+@@ -2204,6 +2205,9 @@
+                 allocator.cluster_segments,
+                 allocator.reclaimed_placements,
+                 allocator.placements_of_abandoned_roots_in_the_root_ring,
++                count.records_leaves_touched,
++                count.records_in_the_leaves_touched,
++                count.records_leaves,
+             ),
+         ));
+     }
+@@ -8443,11 +8447,80 @@
+                 ),
+             );
+         }
++        probe_the_compaction_publishes_on_the_cpu_arm(
++            &mut product,
++            command,
++            *live_data_units,
++            &image,
++        );
+     }
+     product.finish();
+     EXIT_SUCCESS
+ }
+ 
++/// 探针副本专用：造完的起步镜像上照几何核那一套阶梯在 CPU 臂上不计时地交替跑（每一级都从同一份起步镜像拷池，不要卡），
++/// 每一级跑完把发布路径探针的表整份取走，按 `phase=compaction_cpu_arm_user_changes_<次数>` 打逐次发布行与分布行，另打一行
++/// `name=compaction_probe`（批数、搬走的单元数、探针数到的发布次数、挂钟）；几何没成形的不跑，打一行说明。
++fn probe_the_compaction_publishes_on_the_cpu_arm(
++    product: &mut ProductWriter,
++    command: &ConstructionTimingCommand,
++    live_data_units: u64,
++    image: &StartingImage,
++) {
++    let counted_after_the_construction = singlefs_core::publish_change_probe::take_the_counts();
++    let fields_of_the_command = format!(
++        "tier={} live_data_units={live_data_units} chunks={}",
++        command.tier.name(),
++        command.storage.name()
++    );
++    if !image.construction.geometry.is_formed() {
++        product.emit(
++            "compaction_probe",
++            &format!(
++                "{fields_of_the_command} geometry_formed=false ran=no counted_after_the_construction={}",
++                counted_after_the_construction.len()
++            ),
++        );
++        return;
++    }
++    let memory_leaked = GpuMemoryLeakedInThisProcess::with_nothing_leaked();
++    for user_changes in LOCKSTEP_USER_CHANGES_LADDER {
++        let setting = LockstepRunSetting {
++            image,
++            discrete_gpus: &[],
++            discrete_gpus_of_the_every_card_arm: &[],
++            memory_leaked: &memory_leaked,
++            vulkan_instance: None,
++            user_changes,
++            batch_units: BATCH_UNITS_AT_THE_MAIN_SAMPLING_POINT,
++        };
++        let started = Instant::now();
++        let run = run_lockstep_once(&setting, LOCKSTEP_ARMS[0], 0);
++        let seconds = started.elapsed().as_secs_f64();
++        let counted = singlefs_core::publish_change_probe::take_the_counts();
++        let phase = format!("compaction_cpu_arm_user_changes_{user_changes}");
++        for (name, fields) in probe_lines_of_the_phase(&phase, &counted) {
++            product.emit(&name, &format!("{fields_of_the_command} {fields}"));
++        }
++        let (batches, units_relocated, outcome) = match &run {
++            Ok(summary) => (summary.batches, summary.units_relocated, "ok".to_string()),
++            Err(reason) => (0, 0, field_value(reason)),
++        };
++        product.emit(
++            "compaction_probe",
++            &format!(
++                "{fields_of_the_command} geometry_formed=true ran=yes user_changes={user_changes} outcome={outcome} \
++                 batches={batches} units_relocated={units_relocated} publishes_counted={} counted_after_the_construction={} seconds={seconds:.3}",
++                counted.len(),
++                counted_after_the_construction.len()
++            ),
++        );
++        if run.is_err() || batches >= MINIMUM_BATCHES_PER_RUN {
++            break;
++        }
++    }
++}
++
+ // ---- 子命令 stage-three-cost（登记第十二节修订第 9 条：丙段代价另量一遍，只交用户定「强制选段之后对照缺不缺丙段」那一条岔路，不进判据）----
+ 
+ /// 每条臂数几遍、取中位（修订第 9 条「各量 5 次……取中位」）。
+--- a/crates/singlefs-core/src/publish_change_probe.rs
++++ b/crates/singlefs-core/src/publish_change_probe.rs
+@@ -5,7 +5,7 @@
+ 
+ use crate::allocator::{AllocatorChangeCount, PoolAllocator};
+ use crate::transaction::{TransactionOutput, TransactionUnit};
+-use std::collections::{BTreeSet, HashMap};
++use std::collections::{BTreeMap, BTreeSet, HashMap};
+ use std::sync::Mutex;
+ 
+ /// 一张按键有序的表在一次发布里的变化。
+@@ -54,6 +54,12 @@
+     /// 这次搬走的单元数（整理的一批）。
+     pub relocated_units: u64,
+     pub allocator: AllocatorChangeCount,
++    /// 分配记录按分配记录树的叶分块（盘 d 上第 k 片叶罩槽 `[k × W, (k + 1) × W)`）：这次改到的记录落在几片叶。
++    pub records_leaves_touched: u64,
++    /// 这几片叶里共有几条记录（每片取两版里多的那一版）：按叶分块的持久表这次要拷的条数。
++    pub records_in_the_leaves_touched: u64,
++    /// 这一版有记录的叶有几片：按叶分块的持久表的块指针数。
++    pub records_leaves: u64,
+ }
+ 
+ static COUNTS: Mutex<Vec<PublishChangeCount>> = Mutex::new(Vec::new());
+@@ -249,6 +255,57 @@
+     .expect("项数")
+ }
+ 
++/// 分配记录按叶分块：改到的记录落在几片叶、这几片叶里共几条记录、这一版有记录的叶几片（[`PublishChangeCount::records_leaves_touched`] 那三项）。
++fn leaves_of_the_records_touched(
++    before: &[((u32, u64), crate::allocator::AllocationRecord)],
++    after: &[((u32, u64), crate::allocator::AllocationRecord)],
++) -> (u64, u64, u64) {
++    let leaf_of = |key: &(u32, u64)| {
++        (
++            key.0,
++            key.1 / singlefs_format::ALLOCATION_RECORD_TREE_LEAF_SLOTS,
++        )
++    };
++    let mut records_per_leaf_before: BTreeMap<(u32, u64), u64> = BTreeMap::new();
++    for (key, _) in before {
++        *records_per_leaf_before.entry(leaf_of(key)).or_insert(0) += 1;
++    }
++    let mut records_per_leaf_after: BTreeMap<(u32, u64), u64> = BTreeMap::new();
++    for (key, _) in after {
++        *records_per_leaf_after.entry(leaf_of(key)).or_insert(0) += 1;
++    }
++    let before_by_key: HashMap<(u32, u64), crate::allocator::AllocationRecord> =
++        before.iter().copied().collect();
++    let after_by_key: HashMap<(u32, u64), crate::allocator::AllocationRecord> =
++        after.iter().copied().collect();
++    let mut touched: BTreeSet<(u32, u64)> = BTreeSet::new();
++    for (key, record) in after {
++        if before_by_key.get(key) != Some(record) {
++            touched.insert(leaf_of(key));
++        }
++    }
++    for (key, _) in before {
++        if !after_by_key.contains_key(key) {
++            touched.insert(leaf_of(key));
++        }
++    }
++    let records_in_the_touched: u64 = touched
++        .iter()
++        .map(|leaf| {
++            records_per_leaf_before
++                .get(leaf)
++                .copied()
++                .unwrap_or(0)
++                .max(records_per_leaf_after.get(leaf).copied().unwrap_or(0))
++        })
++        .sum();
++    (
++        u64::try_from(touched.len()).expect("叶数"),
++        records_in_the_touched,
++        u64::try_from(records_per_leaf_after.len()).expect("叶数"),
++    )
++}
++
+ /// 一次带树的发布落盘成了之后调：上一版（没有就当空表）对这一版逐表比，分配器发布前后比，记进进程里的表。
+ ///
+ /// # Panics
+@@ -287,6 +344,12 @@
+     };
+     let (repeated_roles, descents_within_a_role_kind, order_flips_among_common_roles) =
+         order_of_the_roles(previous, output);
++    let records_before = match previous {
++        Some(previous_version) => allocation_records_keyed_by_device_and_slot(previous_version),
++        None => Vec::new(),
++    };
++    let (records_leaves_touched, records_in_the_leaves_touched, records_leaves) =
++        leaves_of_the_records_touched(&records_before, &records_after);
+     let count = PublishChangeCount {
+         txg: output.root.checkpoint_txg.0,
+         had_a_previous_version: previous.is_some(),
+@@ -301,6 +364,9 @@
+         relocated_units: u64::try_from(output.units_relocated_by_this_publish.len())
+             .expect("单元数"),
+         allocator: allocator_after_this_publish.change_count_since(allocator_before_this_publish),
++        records_leaves_touched,
++        records_in_the_leaves_touched,
++        records_leaves,
+     };
+     COUNTS.lock().expect("探针表的锁").push(count);
+ }

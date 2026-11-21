@@ -1,0 +1,24 @@
+== 任务 19166 第 1 次尝试的日志 /home/fy5090/.local/state/singlefs/task-server/logs/task-b0f6b921-19166.attempt-1.log（共 23 行，下面是整份）
+...............................................................................  ✗ 只经统一任务服务的分片三步起（环境里没有 TASK_SERVER_SHARD_PHASE）
+     → 怎么办：task-server/task submit -- python3 scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/full_table_run.py run
+.......F..................................
+======================================================================
+FAIL: test_every_repository_root_path_the_crates_name_outside_test_code_is_copied_and_synchronized (test_full_table_run.RepositoryRootReferenceTests.test_every_repository_root_path_the_crates_name_outside_test_code_is_copied_and_synchronized)
+读真仓：crates 非测试代码里 `../` 起头的字面路径解到仓根下的，都在两份 SYNCED_ENTRIES 罩住的范围里。
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/fy5090/code/singlefs/scripts/experiment-apparatus/e201_three_oracle_collusion_full_table_on_the_current_tree/test_full_table_run.py", line 411, in test_every_repository_root_path_the_crates_name_outside_test_code_is_copied_and_synchronized
+    self.assertEqual(paths_not_covered_by(named, run.SYNCED_ENTRIES), [], named)
+AssertionError: Lists differ: ['.'] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+'.'
+
+- ['.']
++ [] : {'.claude/heavy-thread-default': ['crates/singlefs-unit-graph/src/heavy_threads.rs:15', 'crates/singlefs-verification/src/heavy_threads.rs:25', 'crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs:881', 'crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs:47'], 'scripts/crash/crash-point-replay-shard-configuration-check.sh': ['crates/singlefs-verification/src/gpu_card_configuration.rs:54'], '.claude/singlefs-ai-sop/scripts/preflight.py': ['crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:647', 'crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs:2372', 'crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs:3518', 'crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs:4169', 'crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs:4731', 'crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs:1133'], '.': ['crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs:823']}
+
+----------------------------------------------------------------------
+Ran 121 tests in 12.753s
+
+FAILED (failures=1)

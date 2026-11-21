@@ -1,6 +1,6 @@
 # checker-src-backfill-code-r1：判决（2026-11-17）
 
-正文 `research/prompts/_checker-src-backfill-code-r1-body.md`，开工快照 `research/prompts/checker-src-backfill-code-r1-snapshot/`。这是这一题的第一轮，补的是池级 checker `src` 五份在途改动没走过的三方。
+正文 `research/prompts/_checker-src-backfill-code-r1-body.md`，开工快照 `research/prompts/checker-src-backfill-code-r1-snapshot/`。这是这一题的第一轮，补的是池级 checker `src` 五份在途改动没走过的三方。快照清单 `crates-sha256.txt` 末尾 `crates/singlefs-core/src/recovery.rs` 那一行是事后补的（2026-11-18），哈希对应提交 `3a7bd4fc8` 里那一版；这一轮只把它当出处引、没判它，派腿时没记它。
 
 ## 一、腿与核查
 

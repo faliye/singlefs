@@ -64,7 +64,7 @@ kb：正推腿报两处还写旧名字（D22（单元原子性怎么合成） �
 | `crates/singlefs-background-gpu/src/background_gpu.rs` | 照旧 |
 | `crates/singlefs-background-gpu/src/lib.rs` | 照旧 |
 | `crates/singlefs-background-gpu/src/adapter_inventory.rs` | 照旧（只改注释） |
-| `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs` | 照旧（只改文档） |
+| `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs` | 照旧（只改文档） |
 
 打中语义的格有，修完开第二轮，攻这一轮的修补。
 

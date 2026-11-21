@@ -10,13 +10,13 @@
 
 英文名：three_oracle_collusion_after_the_oracle_fixes
 
-原装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`、研究一侧 `scripts/experiment-apparatus/e171_three_oracle_collusion/` 与 `scripts/experiment-apparatus/replay.sh` 里它的十一行复跑留着不动：那几份是 s4 冻结树上的读数的装置，改它就改了复跑的输出。这一次另起新装置与新目录（E155R2–R4 的先例），名字用上面这个英文名（第五节 5.4）。
+原装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs`、研究一侧 `scripts/experiment-apparatus/e171_three_oracle_collusion/` 与 `scripts/experiment-apparatus/replay.sh` 里它的十一行复跑留着不动：那几份是 s4 冻结树上的读数的装置，改它就改了复跑的输出。这一次另起新装置与新目录（E155R2–R4 的先例），名字用上面这个英文名（第五节 5.4）。
 
 主 agent 给的问题（派发提示原文逐字；第一段只是登记路径与草稿目录，不抄）：
 
 > - 问题单：`research/prompts/e171-r1-questions.md` 的 Q1–Q5（Q6 是 O3 第 2 版，归下一份登记，这一份只写「E171 用哪一版 O3」由 Q6 那份登记定，留接口）。每行一种读法；有两种读法的先交回。
 > - 被测条款：`.claude/kb/decisions/13-验证路线.md`「#### 已定项 6：三个互相独立的 oracle」；Q4 另压 `.claude/kb/decisions/23-journal的角色与格式.md`「#### 已定项 14」与 `.claude/kb/decisions/13-验证路线.md`「#### 已定项 1」挂载透明那一段。
-> - 原登记与装置：`research/prompts/e171-preregistration.md`（含修订 1–5）、实验页 `.claude/kb/experiments/171-三oracle合谋测试.md`、装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` 与 `scripts/experiment-apparatus/e171_three_oracle_collusion/`。
+> - 原登记与装置：`research/prompts/e171-preregistration.md`（含修订 1–5）、实验页 `.claude/kb/experiments/171-三oracle合谋测试.md`、装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs` 与 `scripts/experiment-apparatus/e171_three_oracle_collusion/`。
 > - 这次要改的装置（来源：`research/prompts/e171-conclusion-r2-main-verification.md` 第三节「补 oracle 的改法」表与 `research/prompts/e171-conclusion-r3-main-verification.md` 第五节，全部零轮）：历史加「跨一片叶」（第 23 行要的）；记成功调用的交回值（C672：第 49、110、155、161、162、174、252 行）；panic 与报错同样截断照判（第 125 行）；O1 崩溃一列接 RefFS 或并列（`crates/singlefs-reference-filesystem`）；卸载那一步改调理想模型的卸载答（第 16 批 16-2 在加，接口以它交回为准）。
 > - 树：E171 的行级读数今天只属于 s4 冻结树；这次要在第 16 批合入之后取一棵新的冻结树跑（Q1、Q4 要的是合入后的实现）。登记写清冻结树怎么取、何时取（第 16 批合入验证绿之后），旧 s4 读数只当对照参考、不改判据。
 > - 规模与挂钟：s4 整表两条线道 5 569.6 秒、F4 扩表 7 607.9 秒、补位 1 277.9 秒（实验页 Q4 行）；登记写推的总挂钟，并写明哪几步是重型、要主 agent 起。
@@ -122,7 +122,7 @@
 ```markdown
 #### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」
 
-**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 不是产品调用方。四个里程碑依次是：
+**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 不是产品调用方。四个里程碑依次是：
 
 | 里程碑 | 义务 | 落点 |
 |---|---|---|
@@ -290,7 +290,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 行号是 2026-10-03 在第 16 批合入**之前**的树上现查的（`git rev-parse HEAD` 为 `fcc4d3404c806b83f335d1c95eb303e5fe287fd2`，命令在第十三节）；16-1 到 16-3 会改其中几份，执行员在冻结树上开工时逐项再查一遍，对不上的照实写进第十二节修订，不改判据。
 
-- **原装置** `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`（6 202 行，sha256 `0a15dabdac3543c933e56e275f3e612e328d0dfba8b70bfe796552f343995a54`，内联单测 31 条）：
+- **原装置** `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs`（6 202 行，sha256 `0a15dabdac3543c933e56e275f3e612e328d0dfba8b70bfe796552f343995a54`，内联单测 31 条）：
   - 调用入口 `StreamDriver::call` 第 425 行，`catch_unwind` 第 431 行；panic 记 `implementation_crash`，流的结局记 `StreamEnding::ImplementationCrashed`（第 1121 行），这样的流不导出（`export_stream` 第 2492 行起，第 2522 行那一支）。
   - 卸载 `step_unmount` 第 982 行调 `note_that_the_model_has_no_answer_for_the_last_call`（第 461 行）：模型停在卸载，此后的态 O1-崩溃判官不适用。
   - 成功调用只经胶水造观测交模型（`judge` 第 503 行；发布用 `observed_root_of_file_version`），交回值本身不记。
@@ -361,7 +361,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ### 5.3 装置写在哪（写死）
 
-**入库装置**：问题单五行问的都是「第 16 批合入之后 `crates/` 里的 O1、O2、第二截与实现本身在同一批状态上放不放过」，另写一份独立模型答不了。新文件 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`，由原装置照抄起头（不 `#[path]` 引原装置），只读、只驱动、只观测，不改 core、checker、harness、format、replay-prefix、reference-filesystem。
+**入库装置**：问题单五行问的都是「第 16 批合入之后 `crates/` 里的 O1、O2、第二截与实现本身在同一批状态上放不放过」，另写一份独立模型答不了。新文件 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`，由原装置照抄起头（不 `#[path]` 引原装置），只读、只驱动、只观测，不改 core、checker、harness、format、replay-prefix、reference-filesystem。
 
 **要读 `crates/` 常量的量**（逐个写成本地常量，`baseline` 开头与 crates 的同名公开常量或现算值回比，不直接引；回比不过走停机 S1；只在基线那一趟回比）：原登记 5.3 那一批（盘数、盘字节数、物理块与 io_min、固定 fsid 与写时刻、文件内容生成式、流一流二的段长表、写数、根槽写数、全量与快档状态数），加：
 - 流三的段长表、写数、根槽写数、K（叶容器第一次到 2 的那次建 inode 发布的序号），以及 `INODE_LEAF_RECORDS`（与 `crates/singlefs-format/src/lib.rs` 第 110 行回比）；
@@ -617,7 +617,7 @@ name=freeze_seed sha256_prefix16=ce39b484ec109c7a
 - `crates/singlefs-harness/src/reference_filesystem_translation.rs` 1–210、304–364、620–1070 与 `pub` 项的 `grep -n`。
 - `crates/singlefs-harness/src/mount_transparency.rs` 1–40、1330–1469 与 `pub` 项的 `grep -n`。
 - `crates/singlefs-checker-tier/src/crash_injection.rs` 1495–1530、2005–2075 与 `grep -n`（`pub fn`、见证、第 77、85 行）。
-- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` 1–82、205–600、688–800、980–1013、1099–1216、1859–1935 与函数、常量、`catch_unwind`、`ImplementationCrashed` 的 `grep -n`。
+- `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs` 1–82、205–600、688–800、980–1013、1099–1216、1859–1935 与函数、常量、`catch_unwind`、`ImplementationCrashed` 的 `grep -n`。
 - `crates/singlefs-harness/src/model_comparison.rs` 公开函数的 `grep -n`；`crates/singlefs-harness/src/model.rs` `answer_*` 等的 `grep -n`、1960–2000；`crates/singlefs-harness/src/history.rs` `CreateInode` 的 `grep -n` 命中行（第 496–547、699、752、894、1071、1111、1523 行附近）。
 - `crates/singlefs-core/src/transaction.rs` `pub fn` 的 `grep -n`、5781–5811、`inode_leaf_containers` 等的 `grep -n`；`crates/singlefs-core/src/mount.rs`、`mounted_session.rs` `pub fn` 的 `grep -n`；`crates/singlefs-core/src/inode_tree.rs` 50–130 与 `const`、`pub fn` 的 `grep -n`；`crates/singlefs-core/src/recovery.rs` 第 3232 行；几个交回类型 `derive` 的 `grep -B3` 命中行（`allocator.rs` 1063–1064，`transaction.rs` 578–579、960–961、2031、2680–2681，`mount.rs` 885–886、2196、2212、5363–5364）。
 - `crates/singlefs-format/src/lib.rs` 第 109–110 行。
@@ -714,7 +714,7 @@ $ python3 scripts/kb/replace-once.py research/prompts/e171-r1-prereg.md <旧串>
 - 每一跑都要核过的四条（任一不过走新设的停机 S13，不当结果、不自动退回抽样）：
   - 类核对 ①（输入清单）：执行员在新树上逐项列 `observation_of_a_judged_state` 里 O1 两个崩溃子列与 RefFS 一票读的每一个逐态输入与行号；多出上面四样之外的，把它加进键再分类。
   - 类核对 ②（C 的种类）：C 的 24 个写经 `geometry.classify` 逐个列种类，没有根槽写、系统配置槽写、journal 记录写。
-  - 类核对 ③（读集不相交）：72 个 K 取法各取「C 一个没落」那一态当代表，经装置自写的只转发、只记的读者（做法照 `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs` 第 1488 行 `RecordingReader`，本装置另写一份，不引它）跑 `recover(…, JournalPolicy::Consult)`，记下每一次读的（盘、起点、长度），与 C 的 24 个写的（盘、起点、长度）求交，必须为空。不为空的：交到的 C 写移进键（逐个枚举它的取法），细分出的每个代表重做 ③，直到不动点；细分后要判的态数超过装置上限 10 000 000 走 S13。
+  - 类核对 ③（读集不相交）：72 个 K 取法各取「C 一个没落」那一态当代表，经装置自写的只转发、只记的读者（做法照 `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs` 第 1488 行 `RecordingReader`，本装置另写一份，不引它）跑 `recover(…, JournalPolicy::Consult)`，记下每一次读的（盘、起点、长度），与 C 的 24 个写的（盘、起点、长度）求交，必须为空。不为空的：交到的 C 写移进键（逐个枚举它的取法），细分出的每个代表重做 ③，直到不动点；细分后要判的态数超过装置上限 10 000 000 走 S13。
   - 类核对 ④（两条路同答）：③ 那一遍的恢复报告与层 0 判同一态交的 `judgement.consulted` 逐字段相同；另把每个 K 取法下「C 全落」那一态走原路径（`judge_layer0_state_range`）判一遍，它的恢复报告、两个崩溃子列与 RefFS 一票与它所在的类推出的逐项相同。
 - 判的态：72 个代表（记读集）+ 72 个「C 全落」= 144 态（不细分时）。推约 1.5 秒加记读的开销，**推的**。
 - 出什么：每类一行 `name=q5_class`（K 取法的落地串、C 落没落、类的态数、恢复落到的版本、是不是「已确认的丢了」、模型崩溃判官、RefFS 一票）；`name=q5` 那一行照旧（`states` 是各类态数之和，另加 `derived_by=equivalence_classes judged_states=…`）；`name=q5_equivalence` 一行报 ①–④ 各自的计数与细分次数。L = 「已确认的丢了」各类的态数之和。轨迹（第八节「按末段里落了几个写排开」）照组合数精确算：K 取法落了 n 个写的类，「C 至少落一个」那一类里落了 j 个 C 写的有 C(24, j) 态。
@@ -825,8 +825,8 @@ $ python3 scripts/kb/replace-once.py research/prompts/e171-r1-prereg.md <旧串>
 - 本登记 1–679 全文；`research/prompts/e171-r1-questions.md` 1–12。
 - 第一段执行员报告全文（没入库）；第一段那一趟 Q5 两个取样点的装置标准输出（`E7TIMING` 行，没入库）。
 - `research/results/` 下第一段的两份 Q5 产物全文（主取样点 13 行、反向 42 行）；`scripts/experiment-apparatus/target/e171-r1-dumps/q5-reverse/confirmed_loss_form/fixed_script_through_e_then_unmount/` 的 `impl-verdicts.tsv`（末列求和）、`stream-status.tsv`、`manifest.tsv`、`ops.tsv` 头 2 行与末 16 行、`torn.tsv`、`calls.tsv`；`scripts/experiment-apparatus/target/e171-r1-dumps/s2-baseline-streams-1-2/fixed_script_through_e_then_unmount/` 的 `calls.tsv` 头 5 行、`ops.tsv` 第 5–46、45–90 行（`awk` 按第 1 列取）。
-- 新装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：26–41、1880–1920、3085–3200、3414–3463、3530–3612、3713–3800、4379–4440、6478–6500、6944–7100、7955–8000、8290–8340、8615–8680 与 `grep -n` 命中行（计时、`#[path]`、`reference_filesystem::`、`StoppedByAPanic`、见证两支）。
-- `crates/singlefs-checker-tier/src/crash.rs` 1255–1300；`crates/singlefs-checker-tier/Cargo.toml` 全文；`crates/singlefs-checker-tier/src/crash_injection.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/Cargo.toml` 与 `src/lib.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/src/model_comparison.rs` 79–84；`crates/singlefs-harness/src/memory_pool.rs`、`read_tally.rs` 的 `pub` 项 `grep -n` 与 `read_tally.rs` 1–40；`crates/singlefs-core/src/recovery.rs` 102–114；全仓 `impl … PoolReader for` 的 `grep -n` 命中行；`crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs` 1–40、1476–1500（只读读者的做法，没读它的结果）。
+- 新装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`：26–41、1880–1920、3085–3200、3414–3463、3530–3612、3713–3800、4379–4440、6478–6500、6944–7100、7955–8000、8290–8340、8615–8680 与 `grep -n` 命中行（计时、`#[path]`、`reference_filesystem::`、`StoppedByAPanic`、见证两支）。
+- `crates/singlefs-checker-tier/src/crash.rs` 1255–1300；`crates/singlefs-checker-tier/Cargo.toml` 全文；`crates/singlefs-checker-tier/src/crash_injection.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/Cargo.toml` 与 `src/lib.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/src/model_comparison.rs` 79–84；`crates/singlefs-harness/src/memory_pool.rs`、`read_tally.rs` 的 `pub` 项 `grep -n` 与 `read_tally.rs` 1–40；`crates/singlefs-core/src/recovery.rs` 102–114；全仓 `impl … PoolReader for` 的 `grep -n` 命中行；`crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs` 1–40、1476–1500（只读读者的做法，没读它的结果）。
 - `crates/mutations.tsv` 第 1 行与第 2443–2465 行（名字、文件、测试名三列）。
 - `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 255–300 与 `grep -n` 命中行（第 64、266、270、534、547–548、696 行）；`scripts/hosts/capped.sh` 1–30；`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 900–975（not-numbers 怎么读）。
 
@@ -872,7 +872,7 @@ $ ls research/results/ | grep -c '^e171-r1-…-2026-10-04-s1-.*\.out$'     # 20
 
 <!-- doc-lint:not-numbers K1 K2 K3 KM1 KM2 KM3 KM4 KM5 KM6 KM7 U1 U2 U3 U4 U5 U6 U7 U8 U9 V9 V20 V21 V22 V23 V24 V25 V26 V27 V28 V29 V30 V31 S14 F9 Z7 -->
 
-**时点**：第一段新树（快照摘要 `4d071c12…`，修订 4）的按序脚本在跑，第 10 步 Q5 主取样点用的是修订 4 那一版装置（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`，sha256 `b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84`，与冻结树里那份相同）；修订 5 的装置改动（27-2）还没写；Q5 在修订 5 装置上的产物一份都没有。
+**时点**：第一段新树（快照摘要 `4d071c12…`，修订 4）的按序脚本在跑，第 10 步 Q5 主取样点用的是修订 4 那一版装置（`crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`，sha256 `b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84`，与冻结树里那份相同）；修订 5 的装置改动（27-2）还没写；Q5 在修订 5 装置上的产物一份都没有。
 **依据**：第 25 批代码轮第一轮判决 `research/prompts/m3-formal-code-b25-r1-main-verification.md`（sha256 `bf573a92377b7c5d41fb562f6460024c69f77c47b5a5121a60cd2f085b0aaade`）第二节 K2 表与第三节第 1、2 条。
 **不换候选**：Q5 主取样点仍是修订 3 用户定的候选二「Q5-等价类」；甲、丙与下面各件是在候选二之内补它自己的前提。
 **原判据原样保留**：第一至十一节、修订 1–4、「主 agent 认定：25-3a 装置返工交回」一个字不改；Q5-有效、Q5-判、Q5-阴性、Q5-反向的判据与门槛、F5、F8 不动。下面每件写改了什么、收严还是放宽。
@@ -1053,7 +1053,7 @@ V20–V27 见第 5.4 节表。V20–V31 都要在提交时那一趟抓到（第 
 - `research/prompts/m3-formal-code-b25-r1-opus-output.md`：`grep -n '^#'` 前 40 行；`grep -n 'fault-k\|noroot\|第五样\|k = 6\|4608\|OPUSWRITE'` 命中行（第 49、50、152、156、160、171、174、177、179、180、185、187、188、189、197、207–210、219、222、257 行，截到 300 字）；第 162–172、186–236 行（每行截到 900 字）。
 - `research/prompts/m3-formal-code-b25-r1-sonnet-output.md`：`grep -n 'KM[1-7]'` 命中行（第 95、99、184、186 行，截到 400 字）；第 85–100 行。
 - `records/2026-10-01-里程碑三形式化接入.md`：`grep -n '^#'` 末 20 行；第 963–1040 行。
-- 装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：第 3376–3855、7290–7559、7690–8613、9688–9713、10009–10208 行，第 7150–7175、7195–7215 行；`grep -n` 命中行（Q5 与 S13 的字段、`catch_unwind`、`recovery_panic`、`JournalPolicy`、`check_records`、函数与测试名、常量、第 4100–4160 行里 `panic` 的命中、第 6482、6931 行的字段）。
+- 装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`：第 3376–3855、7290–7559、7690–8613、9688–9713、10009–10208 行，第 7150–7175、7195–7215 行；`grep -n` 命中行（Q5 与 S13 的字段、`catch_unwind`、`recovery_panic`、`JournalPolicy`、`check_records`、函数与测试名、常量、第 4100–4160 行里 `panic` 的命中、第 6482、6931 行的字段）。
 - `crates/singlefs-checker-tier/src/crash.rs` 第 1130–1300 行与 `grep -n` 命中行（`judge_crash_image`、`check_records`、`JournalPolicy`）。
 - `crates/singlefs-harness/src/memory_pool.rs` 第 470–500、995–1015 行；`crates/singlefs-core/src/recovery.rs` 第 3405–3430 行；全仓 `fn journal_record_offsets_hint` 的 `grep -rn` 命中行；`crates/singlefs-harness/src/segments.rs` 第 34–38 行（`grep` 命中）。
 - `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/`：`ls`；`row_driver.py` `grep -n 'def \|snapshot'` 命中行与第 235–247 行；目录里 `*.py` 的 `grep -n 's13\|q5_not_run\|q5_partition\|q5_equivalence'`（0 命中）。
@@ -1164,7 +1164,7 @@ $ head -n 869 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +870 resea
 
 1. **装根环表**：`LiveStream::start`（第 1087 行起）在 `allocator.mark_format_time_units(…)`（第 1093–1102 行）之后加一句 `allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(&common::parameters(), &formatted.genesis));`。
    - 形态的出处：根环表的值取 core 给 mkfs 同进程会话的那个函数（冻结树 `make_filesystem.rs` 第 681 行 `root_ring_occupancy_after_make_filesystem`，mkfs 建分配器的第 731 行用的就是它），装法是 core 挂载与 mkfs 共用的 `install_root_ring_occupancy`（冻结树 `allocator.rs` 第 1780 行）。即调查报告第 1、8 节改法 a 的「丙」那一句。
-   - 不整个换成 `allocator_after_make_filesystem`（「乙」）：它另把空闲图换成 `DeviceFreeMap::with_unit_area_start`，而流一的 S1 回比 `new_pool_file_creation_operations_equal_build_pool`（第 2112 行）比的 `build_pool` 与 S2 比的 E170 导出装置（`crates/singlefs-verification/src/bin/e170_specification_executor_export.rs`，`grep -c 'install_root_ring_occupancy\|allocator_after_make_filesystem'` 为 0）都用 `DeviceFreeMap::new`；用户定的只是根环表一件，调查报告第 4 节「丙」那一臂证明只这一句就够。
+   - 不整个换成 `allocator_after_make_filesystem`（「乙」）：它另把空闲图换成 `DeviceFreeMap::with_unit_area_start`，而流一的 S1 回比 `new_pool_file_creation_operations_equal_build_pool`（第 2112 行）比的 `build_pool` 与 S2 比的 E170 导出装置（`crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/main.rs`，`grep -c 'install_root_ring_occupancy\|allocator_after_make_filesystem'` 为 0）都用 `DeviceFreeMap::new`；用户定的只是根环表一件，调查报告第 4 节「丙」那一臂证明只这一句就够。
    - 启动核对（S1 加一条，名 `<流>_allocator_carries_the_root_ring_of_make_filesystem`）：装完那一刻，`allocator.root_ring_occupancy()` 是 `Some`，且它的 `{:?}` 文本与 `root_ring_occupancy_after_make_filesystem(&common::parameters(), &formatted.genesis)` 的 `{:?}` 文本相同（`RootRingOccupancy` 只派生 `Clone, Debug`，冻结树 `allocator.rs` 第 979 行）；结果在 `start` 里存进流，S1 照原登记只在基线与 `stream-constants` 那几趟打出、回比，不过走 S1。
 2. **流三本地常量重取**：S1 里流三的段长表、写数、根槽写数（原登记 5.3）是旧造法下实测写死的；根环转过之后回收，单元落点与分配记录树都会变，这几样可能跟着变。拍树之前，第一段执行员在草稿副本（`4d071c12…` 那棵整棵拷出、换上第 31 批合入后的装置）上编、跑 `stream-constants --streams 1,2,3`：
    - 流一、流二的常量一项都不许变（变了走 S15 ⑤ 的同一个停机，交主 agent）；
@@ -1328,9 +1328,9 @@ S15 ⑤ ⑥ 的预言出自调查报告第 4、5、8 节的机理（转环之前
 - `research/prompts/m3-formal-code-b29-r1-main-verification.md` 全文（109 行）；`research/prompts/m3-formal-code-b29-r1-opus-output.md` 的 `grep -n '^#\|A1\|A2'` 命中行与第 46–64、194–209 行。
 - `records/2026-10-01-里程碑三形式化接入.md`：`grep -n '^#'` 末 30 行、`grep -n '第 31 批\|#31'`、`grep -n '停在第 7 步'` 命中行；第 963–994、1063–1080 行。
 - `.claude/kb/checks-owed.md` 第 425 行（C551）。
-- 仓里装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：第 1060–1130、1395–1415、2095–2135、3715–3775、3890–3902、5018–5030、7938–8275、9358–9370、9476–9515、9597–9640、10685–10700、10885–10900 行，与函数、常量、`common::`、`PoolAllocator::new`、`judge_the_confirmed_loss_shapes(`、`stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(`、`PiecePanicInjection` 的 `grep -n` 命中行；`diff` 对 Q5 树那份的全部输出。
+- 仓里装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`：第 1060–1130、1395–1415、2095–2135、3715–3775、3890–3902、5018–5030、7938–8275、9358–9370、9476–9515、9597–9640、10685–10700、10885–10900 行，与函数、常量、`common::`、`PoolAllocator::new`、`judge_the_confirmed_loss_shapes(`、`stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(`、`PiecePanicInjection` 的 `grep -n` 命中行；`diff` 对 Q5 树那份的全部输出。
 - 冻结树 `scripts/experiment-apparatus/target/e171-r1-frozen-tree/`：装置第 1060–1083 行与 `fn start(name`、`PoolAllocator::new(vec`、`mark_format_time_units`、`new_pool_file_creation_operations_equal_build_pool` 的命中行；`crates/singlefs-core/src/allocator.rs` 的 `root_ring` 等命中行（第 24、975–980、1207–1241、1780–1798、1817–1818、1864–1871、1929、2687–2816 行附近）；`crates/singlefs-core/src/make_filesystem.rs` 第 670–740 行；`crates/singlefs-core/src/mount.rs` 第 1942 行；`crates/singlefs-harness/tests/common/mod.rs` 第 56–62、221–227 行；`crates/singlefs-harness/src/mount_transparency.rs` 那个枚举的 `grep -n -A40` 命中行。
-- 仓里 `crates/singlefs-core/src/allocator.rs` 第 1905–1925 行与 `root_ring_occupancy`、`record_root_written_by_this_process` 等命中行；`crates/singlefs-core/src/make_filesystem.rs`、`mount.rs`、`admission.rs` 的 `install_root_ring_occupancy` 命中行；`crates/singlefs-harness/tests/common/mod.rs` 第 670–720 行；`crates/singlefs-verification/src/bin/e170_specification_executor_export.rs` 的 `PoolAllocator::new\|build_pool` 命中行（第 9、258 行）。
+- 仓里 `crates/singlefs-core/src/allocator.rs` 第 1905–1925 行与 `root_ring_occupancy`、`record_root_written_by_this_process` 等命中行；`crates/singlefs-core/src/make_filesystem.rs`、`mount.rs`、`admission.rs` 的 `install_root_ring_occupancy` 命中行；`crates/singlefs-harness/tests/common/mod.rs` 第 670–720 行；`crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/main.rs` 的 `PoolAllocator::new\|build_pool` 命中行（第 9、258 行）。
 - `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 第 235–260 行。
 - `scripts/kb/quote-kb.py` 1–40；`.claude/gate.d/doc-experiments.sh` 第 409–428、614–640 行与 `grep -n tmp` 命中行（查 /tmp 怎么算引依据）。
 - `research/results/` 与 `scripts/experiment-apparatus/target/e171-r1-dumps/` 只 `ls`（文件名、修改时刻），没打开任何一份。
@@ -1678,9 +1678,9 @@ $ head -n 1097 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1098 res
 - 本登记 1–90、289–1431（第 91–288 行是第二节整抄的条款，这一次没重读）；`research/prompts/e171-r1-questions.md` 1–12。
 - `records/2026-10-01-里程碑三形式化接入.md`：`grep -n '^#'` 末 30 行；`grep -n '36\b\|#36\|第 36 批'` 命中行；第 1218–1287 行。
 - 修订 6 草稿 `~/.local/share/singlefs/work/e171-r1-segment1-rev6/`（下写 `<修订 6 草稿>`）：`frozen_tree_lines_revision_6.py` 1–192、`frozen_tree_lines.py` 1–74、`run_segment_one_on_the_revision_6_tree_multi_host.sh` 1–383、`resume_check.py` 1–137、`rows_orchestrator.py` 1–146 与 `grep -n '^"""\|^# \|^def \|^class \|^[A-Z_]* = '` 命中行、第 696–708、717–730 行、`s15_compare.py` 1–40、`check_product.py` 1–30、`s2_compare.py` 1–36；`run_segment_one_on_the_revision_6_tree.sh` 的 `grep -n` 命中行（第 11、23、67、107、113、210、229、230、254、352–382 行）与它前 350 行对多机那份的 `diff`；`exact-reconstruction/frozen_tree_lines_revision_6.py` 对新根那份的 `diff`；`devices/` 两份装置之间的 `diff -u` 与 `fixtures/hunk-b29.diff`、`fixtures/hunk-10g.diff` 的块。
-- 仓里装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：第 255–300 行；`grep -n` 命中行（命令行开关第 7449–7477 行、`stream-constants` 的 S1 第 7899–7961 行、第 9797、9808 行）。
+- 仓里装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`：第 255–300 行；`grep -n` 命中行（命令行开关第 7449–7477 行、`stream-constants` 的 S1 第 7899–7961 行、第 9797、9808 行）。
 - `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/`：`ls`；`row_driver.py` 第 359–392 行与 `grep -n` 命中行（第 17、56、67、235、622、673、709 行等）；`bad_implementation_table.py` 的 `grep -n` 命中行；`o3_bad_image_judge.py` 1–40 与 `base_digest` 命中行（第 59–232 行一带）；`bad-implementations-117.tsv` 头 2 行。
-- `crates/singlefs-verification/src/bin/e170_specification_executor_export.rs` 第 3435–3470 行与 `grep -n` 命中行（第 1706、2020、3448、3892 行）；`research/prompts/e170-r2-prereg.md` 的 `grep -n 'seed-hex\|种子'` 与 `grep -n 'e170-bad-states-second-run'` 命中行（截到 300 字）；`crates/singlefs-format/src/lib.rs` 第 109–110、375 行（`grep` 命中）。
+- `crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/main.rs` 第 3435–3470 行与 `grep -n` 命中行（第 1706、2020、3448、3892 行）；`research/prompts/e170-r2-prereg.md` 的 `grep -n 'seed-hex\|种子'` 与 `grep -n 'e170-bad-states-second-run'` 命中行（截到 300 字）；`crates/singlefs-format/src/lib.rs` 第 109–110、375 行（`grep` 命中）。
 - `research/results/` 与 `scripts/experiment-apparatus/target/e171-r1-dumps/` 一份都没打开，也没 `ls`。
 
 跑过的命令（原样，草稿目录写成 `<草稿目录>`）：
@@ -2404,7 +2404,7 @@ $ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 res
 - `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–96、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/three-way-inference.md` 1–174、`.claude/rules/mutation-sampling.md` 1–96、`.claude/rules/implementation-first.md` 1–20（全文）；`.claude/singlefs-ai-sop/rules/command-safety.md` 第 153 行（grep 命中）。
 - 本登记 1–82、289–573、793–812、1220–1300、1403–2047；`research/prompts/e171-r1-reuse-questions.md` 全文（17 行）；`records/2026-10-01-里程碑三形式化接入.md` 第 1353–1380 行与 `grep -n '^#'` 末 8 行、`grep -n '38-[0-9]'` 命中行。
 - 研究一侧目录（下写 `<研究一侧>`）：`row_driver.py` 1–130、221–748；`bad_implementation_table.py` 1–64、125–175 与 `grep -n` 命中行；`rows_orchestrator.py` 1–160、680–700 与 `grep -n` 命中行（第 110、112、137、146、581、597、681、696、915、1211 行）；`rows_orchestrator_segment_two.py` 1–130 与 `grep -n` 命中行；`segment_one_units_revision_8.py` 1–150；`segment_one_unit_revision_8.sh` 1–376；`run_segment_two_on_the_revision_6_tree_multi_host.sh`、`run_segment_one_on_the_revision_8_tree_multi_host.sh`、`run_segment_two_revision_10_multi_host.sh` 全文；`frozen_o3.py` 1–60；`check_product.py`、`cross_host_o3_check.py`、`device_timing.py`、`o3_bad_image_judge.py` 的 `grep -n` 命中行。
-- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 1–60、2485–2514、5225–5236、9780–9830 与 `grep -n` 命中行；`crates/singlefs-checker-tier/src/crash.rs` 与 `crash_identity.rs`、`verdict_store.rs` 的 `grep -n` 命中行（文件头）；`scripts/gate/admission.py` 1188–1240、260–300、517–560 与 `grep -n` 命中行；`scripts/hosts/capped.sh` 22–36；`scripts/hosts/multi-host-run.sh` 的 `grep -n` 命中行；根 `Cargo.toml` 第 17–19 行；修订 6 树里各 `Cargo.toml` 的 `[dependencies]` 一段、`singlefs-checker-tier/Cargo.toml` 去注释的全文、两份 dep-info 全文、`target/.rustc_info.json` 的 rustc 一行；修订 6 树 dep-info 列的 67 个文件里读环境变量的 `grep` 命中行。
+- `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs` 1–60、2485–2514、5225–5236、9780–9830 与 `grep -n` 命中行；`crates/singlefs-checker-tier/src/crash.rs` 与 `crash_identity.rs`、`verdict_store.rs` 的 `grep -n` 命中行（文件头）；`scripts/gate/admission.py` 1188–1240、260–300、517–560 与 `grep -n` 命中行；`scripts/hosts/capped.sh` 22–36；`scripts/hosts/multi-host-run.sh` 的 `grep -n` 命中行；根 `Cargo.toml` 第 17–19 行；修订 6 树里各 `Cargo.toml` 的 `[dependencies]` 一段、`singlefs-checker-tier/Cargo.toml` 去注释的全文、两份 dep-info 全文、`target/.rustc_info.json` 的 rustc 一行；修订 6 树 dep-info 列的 67 个文件里读环境变量的 `grep` 命中行。
 
 跑过的命令（原样，草稿目录写成 `<草稿目录>`，修订 6 树写成 `$T`；输出在设计员报告与草稿目录里）：
 
@@ -2481,7 +2481,7 @@ H30 认 `~/.local/share/singlefs/reuse/e171-r1/`（主 agent 已建目录）；H
 
 #### 12.1 问题（问题单逐行）
 
-英文名：沿用第一节第 1 行 `three_oracle_collusion_after_the_oracle_fixes`；装置不另起，改的就是 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`。
+英文名：沿用第一节第 1 行 `three_oracle_collusion_after_the_oracle_fixes`；装置不另起，改的就是 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`。
 
 问题单第 5–9 行逐字（`sed -n '5,9p'` 原样）：
 
@@ -2557,7 +2557,7 @@ H30 认 `~/.local/share/singlefs/reuse/e171-r1/`（主 agent 已建目录）；H
 // K 另有推的值 234（登记第七节 A7：删完之后 inode 树没有记录、一容器 233 条），不进回比，照实测记。
 ```
 
-**出处 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:223-223`（整段抄，未转述）**
+**出处 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/local_constants_and_stream_contents.rs:88`（整段抄，未转述）**
 
 ```markdown
 /// 流三的段长、写数、根槽写数。
@@ -2618,7 +2618,7 @@ H30 认 `~/.local/share/singlefs/reuse/e171-r1/`（主 agent 已建目录）；H
 
 ##### 12.5.4 装置写在哪（写死）
 
-**入库装置**：改 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`（第五节 5.3 那一支）。理由：这一行问的是「`crates/` 今天这份代码在流三上算出什么段长」，另写一份独立模型答不了。这一条不新读 `crates/` 的常量：段长表本来就是本地常量，S1 现场拿它与 crates 现算的比，不引 crates 的值。执行员照执行员定义第 2 步第 ④ 条在草稿副本里改，经 `scripts/hosts/compile-then-swap.py` 换进主工作区，不直接写主工作区 `crates/` 下的 `.rs`。
+**入库装置**：改 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`（第五节 5.3 那一支）。理由：这一行问的是「`crates/` 今天这份代码在流三上算出什么段长」，另写一份独立模型答不了。这一条不新读 `crates/` 的常量：段长表本来就是本地常量，S1 现场拿它与 crates 现算的比，不引 crates 的值。执行员照执行员定义第 2 步第 ④ 条在草稿副本里改，经 `scripts/hosts/compile-then-swap.py` 换进主工作区，不直接写主工作区 `crates/` 下的 `.rs`。
 
 ##### 12.5.5 谁跑什么、实现量、挂钟与分段
 
@@ -2700,7 +2700,7 @@ H30 认 `~/.local/share/singlefs/reuse/e171-r1/`（主 agent 已建目录）；H
 
 #### 12.12 执行员要改的条目与落点
 
-下面 `<草稿>` 是派发提示给执行员的草稿目录，`<日期>` 是跑那天的 `TZ=Asia/Tokyo date +%F`，`D` = `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`。
+下面 `<草稿>` 是派发提示给执行员的草稿目录，`<日期>` 是跑那天的 `TZ=Asia/Tokyo date +%F`，`D` = `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`。
 
 ##### 12.12.1 装置：改哪个常量、注释怎么改（问题单第 1 行）
 
@@ -2854,7 +2854,7 @@ print("holds",l.strip().rsplit("holds=",1)[1])'
 
 ```
 python3 -I - <<'PY'
-D="crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
+D="crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs"
 src=open(D,encoding="utf-8").read(); rows=[]
 for line in open("crates/mutations.tsv",encoding="utf-8"):
     f=line.rstrip("\n").split("\t")
@@ -2874,7 +2874,7 @@ PY
 1. 问题单 `research/prompts/e171-r1-s3-segment-lengths-questions.md` 第 2 行状态改成「够判：入库装置上做不到（修订 12 第 12.5.3 节），副本上的反事实只作线索、写进实验页『它答不了的（修订 12）』」；第 1、3 行等执行员交回后由主 agent 改。
 2. S16 ③ 的来源：修订 12 换的两个数与注释这一块，来源记 `main_agent_ruling`——认定如下：`LOCAL_THIRD_STREAM_SEGMENT_LENGTHS` 下标 15 由 20 改 24、下标 43 由 24 改 20，依据是调查员在 f8a9ddaa 原样副本、HEAD ce1457c3、HEAD + 2026-10-13 暂存区三棵树上现跑同一行逐字相同、与 2026-10-05 产物的 `crates=` 一栏只差这两处，机理是 2026-10-09 退役树判决落地后删第一个文件那次多写两个退役单元（`crates/singlefs-core/src/transaction.rs:5434`）；主 agent 现查过四趟日志那一行 sha256 相同（`~/.local/share/singlefs/work/commit-2026-10-11/e171-constants-2026-10-13.log` 等四份）。
 3. 修订 9 照旧要做，不并进这一次。
-4. 装置文件 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 在主工作区已有这一轮（C790 分片补丁）的暂存改动；执行员改完不 git add，由主 agent 整份暂存、并进 2026-10-11 那一轮的提交（同一次提交里 `crates/singlefs-checker-tier/tests/` 带着新用例，show-me-test 按整次改动判；这一块是常量重钉、不另写同义反复的用例，提交说明写明依据是本节第 2 条）。
+4. 装置文件 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs` 在主工作区已有这一轮（C790 分片补丁）的暂存改动；执行员改完不 git add，由主 agent 整份暂存、并进 2026-10-11 那一轮的提交（同一次提交里 `crates/singlefs-checker-tier/tests/` 带着新用例，show-me-test 按整次改动判；这一块是常量重钉、不另写同义反复的用例，提交说明写明依据是本节第 2 条）。
 5. 产物名照第 12.12.2 节，不照「旧名接日期」的拼法（不是旧产物的重跑）。
 6. 三趟都设 `TMPDIR=/dev/shm/<草稿名>`；复跑驱动不设。
 7. 修订 6 第 6.2 节第 2 条的位置限制这一次不套用，照第 8.2 节乙类办，预言写成 RA1。
@@ -2921,10 +2921,10 @@ PY
 
 ```
 run-with-memory-cap: 照 slice singlefs-heavy.slice 已有的总上限 53808726016 字节走（自己按余量 20G 算的是 43071307776 字节，不改 slice 的 MemoryMax）：……
-目标 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs（包 singlefs-checker-tier，bin e171_three_oracle_collusion_after_the_oracle_fixes）；草稿副本 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/device-draft.rs
+目标 crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs（包 singlefs-checker-tier，bin e171_three_oracle_collusion_after_the_oracle_fixes）；草稿副本 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/device-draft.rs
 主工作区那份开跑时 sha256 c556d42d8bb28c04111a4e6a5682280bd343e7d9d57cfd4f04d532ebe63699a2；草稿副本 sha256 6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412
 编译输出：/home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/build-2026-10-13-134080.log；编译目录 /home/fy5090/.local/share/singlefs/work/e171-r12-runner/compile-then-swap/target 留着给下一次增量编，收工前 --clean --scratch /home/fy5090/.local/share/singlefs/work/e171-r12-runner
-✓ 编过（cargo build 与 cargo test --no-run，-p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes），已整份换进主工作区 crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs，回读 sha256 6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412
+✓ 编过（cargo build 与 cargo test --no-run，-p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes），已整份换进主工作区 crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs，回读 sha256 6aa1bb8240633395f4de6122f5d2d343b7f672d1e18e549b0d8e44226e4f9412
 ```
 
 **甲、乙、丙**（都经 `run-with-memory-cap.sh 8G`、`capped.sh 8`、`TMPDIR=/dev/shm/…`；包装退出码都不在 245 与 250–254）：

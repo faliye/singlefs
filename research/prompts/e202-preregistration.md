@@ -73,7 +73,7 @@
 | 第 5 行 阳性对照 | 量 P（多判臂与不多判臂的成对差，连同里层计时的锚） | 多判之后省下的不比不多判少，或增量与里层计时对不上：测量分不出差，整档作废 |
 
 未定项（主 agent 2026-11-03 判：第 1 项照登记住产品 GPU 包；第 2 项取定占用读法、定数据量读法已删；第 3–6 项照登记的办法走，第 3 项看得到不到两张卡就报本次未跑、第 4 项不进判定库、第 5 项靠阳性对照、第 6 项第一段先跑几何核量真数）：
-1. 装置住哪。问题问的是 `crates/` 产品 GPU 包这份代码的性质（独立模型答不了），要写入库装置；而 checker 档包 `singlefs-checker-tier` 不许依赖产品 GPU 包 `singlefs-background-gpu`（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条，`.claude/gate.d/checker-independence-and-sync.sh:42`），定义里写的入库装置位置（`crates/singlefs-checker-tier/src/bin/`）装不下它。登记写成住产品 GPU 包：`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs`（`scripts/hosts/compile-then-swap.py` 收 `crates/<crate>/src/bin/` 下任一包，第 11 行）。缺：主 agent 认这一处偏离定义（产品包里多一个实验 bin，涉不涉及产品包的审阅豁免表、门禁对产品包源码的格），谁来定：主 agent。
+1. 装置住哪。问题问的是 `crates/` 产品 GPU 包这份代码的性质（独立模型答不了），要写入库装置；而 checker 档包 `singlefs-checker-tier` 不许依赖产品 GPU 包 `singlefs-background-gpu`（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条，`.claude/gate.d/checker-independence-and-sync.sh:42`），定义里写的入库装置位置（`crates/singlefs-checker-tier/src/bin/`）装不下它。登记写成住产品 GPU 包：`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`（`scripts/hosts/compile-then-swap.py` 收 `crates/<crate>/src/bin/` 下任一包，第 11 行）。缺：主 agent 认这一处偏离定义（产品包里多一个实验 bin，涉不涉及产品包的审阅豁免表、门禁对产品包源码的格），谁来定：主 agent。
 2. 盘容量的两种读法删哪一种（文件头那一句）。谁来定：主 agent。
 3. 「全部卡」臂要这次任务看得到至少两张独立显卡。服务给一个 GPU 任务几张卡由服务定（`task-server/task_server_lib.py` 文件头「GPU」一段），登记里查不到一个 GPU 任务会不会拿到那台的全部卡。缺：服务给卡的规矩；只看得到一张时「全部卡」臂与「点名一张卡」臂相同，那一臂报本次未跑。谁来定：主 agent。
 4. 判定进 prune-server。这个实验量的是挂钟与 CPU 时间，每次跑都是新观测（装置文件头写 `admission: always`，同 E185（GC一批搬迁的挂钟拆分） 装置），没有可按输入复用的判定；逐条比对（第五节「判定逐条与 CPU 参照相同」）是每次跑当场核、不复用。登记写成不写判定库、不新开一族。缺：主 agent 认「这一族没有判定要进库」，或点名要进库的是哪一样、键前缀是什么。
@@ -231,7 +231,7 @@ checker 档与产品 GPU 包互不依赖：门禁 `.claude/gate.d/checker-indepe
 
 ### 装置住哪（写死）
 
-**入库装置**：`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs`（第一节未定项 1：住产品 GPU 包，主 agent 2026-11-03 认了：`scripts/experiment-apparatus/` 下的装置只做独立模型、不引 `crates/`，checker 档不许依赖产品 GPU 包，这是唯一走得通的落点）。理由：问题问的是 `crates/` 产品 GPU 包与核心层后台入口这份代码的性质（两种模式各占多少主机 CPU），另写一份独立模型答不了；checker 档不许依赖产品 GPU 包。变异表放执行员定义里入库装置那一支写的位置。执行员经 `scripts/hosts/compile-then-swap.py` 换进主工作区。
+**入库装置**：`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`（第一节未定项 1：住产品 GPU 包，主 agent 2026-11-03 认了：`scripts/experiment-apparatus/` 下的装置只做独立模型、不引 `crates/`，checker 档不许依赖产品 GPU 包，这是唯一走得通的落点）。理由：问题问的是 `crates/` 产品 GPU 包与核心层后台入口这份代码的性质（两种模式各占多少主机 CPU），另写一份独立模型答不了；checker 档不许依赖产品 GPU 包。变异表放执行员定义里入库装置那一支写的位置。执行员经 `scripts/hosts/compile-then-swap.py` 换进主工作区。
 
 文件头写：`// admission: always 每跑一次都在今天这份 crates 上现造池、现量挂钟与 CPU，计时每次都是新观测，上一次跑完不替这一次作保`；`// task-server-gpu-arguments: lockstep concurrent sensitivity`（编出来的二进制直接起时服务照它认要卡；`geometry-check` 不要卡）。不调任何崩溃判段入口（`crash_amplification` 的 `run_from_environment` 一族、`GivenStatesEngine` 这类都不碰），所以不带 `gpu` 特性、不写 NOT_RUN 那一条判据；要真卡的子命令经 `cargo run` 起时带 `--features tests-on-a-real-gpu`（产品 GPU 包已有的特性，`crates/singlefs-background-gpu/Cargo.toml` 的 `[features]`；服务把它认成要卡、套清场，`task-server/task_server.py:312` 的 `GPU_FEATURE_NAMES`），bin 本身不读这个特性。一张独显都看不到时，要卡的子命令每个臂打一行 `name=not_run reason=本进程看得到的独立显卡一张都没有`、退 77，不当跑过。
 
@@ -476,13 +476,161 @@ checker 档与产品 GPU 包互不依赖：门禁 `.claude/gate.d/checker-indepe
 第 12 条由主 agent 写，时点在装置搬进测试包、加 `--cards`、续跑核卡改完之后，任何产物之前（交替跑、并发跑都还没起过）；依据是用户定案与读代码，没有产物读数。补记的原因：代码轮 `research/prompts/gpu-tests-src-backfill-code-r1-main-verification.md` 第三节第 4 条判「与跑前登记对不上」。
 
 12. **「全部卡」臂开的是服务交来的卡，张数由 `lockstep --cards <张数>` 设；开了哪几张卡逐张记进产物，续跑时核（第一节「卡」那一行与第四节臂表「GPU 全部卡臂」那一行的开法由这一条替掉）。** 用户定案原话（`records/2026-11-11-GPU两段与按需领卡核查.md:334`）：「E202 开头这个全部卡的说明是错误的。 而是根据设定来使用设定值设定的全部卡。 设定了记账用几张。」；张数可设是同一份记录第 412 行的弹窗定案「做成可设，服务改好前先写 all」。改成：
-    - 卡只用服务交的：环境变量 `GPU_CARDS_BY_PRIORITY` 有卡串就只开那几张，没有而有领卡通道时在起步镜像造完、开设备之前按需领；两样都没有报错退出，装置不自己枚举本机的卡（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs` 文件头「卡只用服务交的」那一段）。
+    - 卡只用服务交的：环境变量 `GPU_CARDS_BY_PRIORITY` 有卡串就只开那几张，没有而有领卡通道时在起步镜像造完、开设备之前按需领；两样都没有报错退出，装置不自己枚举本机的卡（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs` 文件头「卡只用服务交的」那一段）。
     - 「全部卡」臂：`lockstep --cards N` 只开服务交来的卡里排在前头的 N 张（先后照服务交来的卡串），不给开交来的全部；`background_gpu_devices` 点名开的那几张（原文写「不给 `background_gpu_devices`」，不再成立）。N 小于 2、不是数、多于交来的张数退 2；这一台一张都没交退 77；没给 `--cards` 而只交来一张时这条臂与点名一张卡臂相同，报本次未跑。每张参与的卡上限照旧 1 GiB。
     - 「点名一张卡」臂：开的是交来的卡里的一张，哪一张记进产物（原文「本进程看得到的独立显卡里 PCI 地址最小的那一张」的范围收成服务交来的卡）。
     - 产物多两种行：`name=every_card_arm_cards` 记全部卡臂开了几张、照什么开的（`named_by=cards_option` 或 `every_handed_over_card`）、每张的 PCI 地址与型号；`name=one_card_arm_card` 记点名一张卡臂那一张的 PCI 地址与型号（交替跑与并发跑都打）。
     - 续跑核卡（并进第十一节停机条款）：这几样与产物里已有的同种行有一处不同，或产物里有这条臂跑出的结果行（`name=run`、`name=concurrent_run`）而没有这种行，打 `name=stopped clause=cards_differ_from_the_product_being_resumed` 退 2；一条结果行都没跑出来的那一趟不挡以后的续跑。什么观测会让它触发：同一份 `--product` 续跑时换了卡、换了张数或换了一台。
     - 起法里的包名（第十四节那四条命令）：装置住测试包，`-p singlefs-background-gpu` 换成 `-p singlefs-background-gpu-tests`，全部卡臂的张数在 `lockstep` 后面加 `--cards <张数>`。
     比原文的变动：「全部卡」的范围从「本进程看得到的全部独显」收成「服务交来的、`--cards` 点到的那几张」，两组卡的重复不混进同一份产物（收严）；第四节「做完会怎样」那一句与第六节各量、第十节失败条款一个字不动。卡的身份取 PCI 地址加型号，认不出「两台同一个槽插同一种型号」那一形（实现员报告 `~/.local/share/singlefs/work/e202-apparatus-backfill-fixes/result.md`，没量过），产物合并时另看产物所在的机器。
+
+第 13 条由主 agent 写，时点在代码轮 `research/prompts/gpu-tests-src-backfill-code-r2-main-verification.md` 判决之后、任何产物之前；它更正修订第 12 条自己的三处，依据是现读登记与装置的原文，没有产物读数。
+
+13. **更正修订第 12 条的三处。**
+    - 续跑核卡不属第十一节停机条款：第十一节写「停机时产物照打、退 3」，续跑核卡对不上打 `name=stopped clause=cards_differ_from_the_product_being_resumed` 之后退 2（命令行不对：续的产物与这一趟的卡不是同一组）。第 12 条里「（并进第十一节停机条款）」那半句作废；它是续跑入口（第十四节）的一条拒绝，不是停机。
+    - 第 12 条末尾「产物合并时另看产物所在的机器」作废：产物里此刻没有一种行记了机器。卡的身份只取 PCI 地址加型号，认不出「两台同一个槽插同一种型号」与「只点 CPU 臂的命令换一台续跑」两形；把读数依赖的硬件记进产物是代码轮判决第三节第 10 条的待定改法，定了再另起修订。
+    - 第 12 条里「服务交卡」的读法：写下那一条时卡由统一任务服务交给任务；现在任务不拿卡，卡归 GPU 批处理验证服务，装置在任务里拿不到卡串，要卡的四个子命令（lockstep、concurrent、sensitivity、stage-three-cost）跑不出来。取卡怎么改等代跑的接口定型，定了另起修订；在那之前第 12 条写的是装置代码此刻的行为，不是跑得起来的起法。
+    另记代码轮坐实的两处装置行为，供读产物的人知道（改法在同一份判决第三节第 6、7 条，随取卡一起改）：报本次未跑的那条臂照样记下一行记卡行；记了卡、还没打出一条结果行就断的那一趟，照样挡住换卡之后的续跑。装置文件头「一条结果行都没跑出来的那一趟…不挡以后的续跑」只对一张都没交、`--cards` 多于交来的张数、领卡没成三种成立。
+
+第 14 条由实验设计员写，主 agent 派发（问题单 `research/prompts/e202-construction-by-whole-file-publishes-questions.md`；用户 2026-11-18 弹窗定「造池报没空间这一关选一次发布写整个文件」，`records/2026-11-17-里程碑四收口续做.md`「2026-11-18 用户对造池三问的定案」）。时点：任何产物之前——`ls research/results | grep -i e202` 零命中（E202（GPU与CPU两种模式GC对照组）没有产物目录），装置此刻仍是现造法（逐单元一次发布），没有一个用新造法造出的池或读数。依据是读 `crates/` 与定位报告 `~/.local/share/singlefs/work/e202-pool-construction-no-space-investigation/result.md` 的读数；下面标「推的」的数没有用新造法量过。
+
+14. **造池改成一次发布写一整个文件的 16 个单元：把造法完整写进登记，替掉第五节「负载：池怎么造」第 2、3 步；第 4 步几何核的两条判法一个字不动。**
+    - **为什么改（量的）。** 任务 20071（没打补丁的代码加探针，2288MiB 档、16384 个活数据单元）被拒那一刻的探针行「label=refusal publishes=21987 segments=2288 cluster_segments=1614」，四次拒因都是 `SlotPairsOutsideTheClusterSegmentsForDataUnits`；重挂之后「cluster_segments=1 … core_pairs_outside=49503」，同一次写发得出去。机理是 D3（空间分配） 已定项 8 第 2 条：这次挂载开过的聚簇段整次挂载不给用户数据（`crates/singlefs-core/src/allocator.rs:2289` 字段文档，`:3075` 是全 core 唯一往这个集合里写的地方）。一次挂载里开的聚簇段数随发布次数涨：1614 ÷ 21987 = 0.0734 段每次发布（推的，两个量的数相除）；现造法的数据挂载发布 1.535 × P 次（推的：P=8192 一趟数据挂载的发布数 1 + 4096 + 32 + 8448 = 12577，量的，`~/.local/share/singlefs/work/e202-run/construction-timing-2288MiB-P8192-P16384-after-the-second-speedup.out` 的 `name=construction_phase` 行；12577 ÷ 8192）。登记的三档照现造法都造不出（推的，定位报告第 3 问）。
+    - **现造法（装置今天的写法，不是登记第五节第 2、3 步写的那一种）。** 登记里「垫片」一词在本条写之前零命中（`grep -c 垫片 research/prompts/e202-preregistration.md`）；第五节第 2、3 步写的是单文件顺序写 P 个单元再覆盖写奇数单元，装置据第 4 步「几何没造成就改负载重造」早已不是这样（修订第 11 条提到换写法，写法本身没进过修订）。装置今天（`construct_a_starting_image_on_the_clock`，`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/starting_image_construction.rs:64`）：活数据放进 P ÷ 16 个 16 单元的活数据文件；顺序写后一半，补齐，再把前一半活数据单元与垫片单元一个活的一个垫片地交错写，每个单元一次发布（`append_a_unit_to_the_end_of_a_file`，`:2245`）；垫片文件在碎片挂载里逐个删。
+    - **新造法，逐步定义（造法只有这一种，下面没写的旋钮不许动）。** 记 K = 16（一个文件的单元数，装置常量 `LIVE_DATA_UNITS_PER_FILE` 与 `SPACER_UNITS_PER_FILE`）；P 是 32 的倍数、P ÷ 2 是 K 的倍数（三档 36608、65536、131072 都满足）。数据写类的发布一律是：一次 `WriteAtOffset`、偏移 0，字节 = 这个文件的全部单元（K × `data_unit_payload_capacity()` 个字节，补齐文件是 a 个单元），单元内容照今天（`fill_the_content_of_a_data_unit(单元下标, 写代数, …)`，活数据文件写代数 `WRITE_GENERATION_OF_THE_DATA_MOUNT`、垫片文件 `WRITE_GENERATION_OF_THE_SPACER_FILE`）。每次这样的调用交回的发成版数必须恰好 1（装置每次核，停机条款第 8 条）。
+      - 起步池：登记第五节第 1 步原样（两块内存盘、`parameters()`、换 fsid、取号暖机、新池新建文件）。
+      - 造数据挂载（一次可写挂载，到交错那一半写完才丢会话）：
+        - 建 inode：本挂载要用的 inode 一次建齐，每次发布至多 `INODES_CREATED_BY_ONE_PUBLISH` = 4096 个，号从水位起连着发：先 P ÷ 16 个活数据文件，再 1 个补齐文件，再 P ÷ 32 个交错垫片文件（共 P ÷ 16 + P ÷ 32 + 1 个）。垫片文件不再「接到头一个单元才建」，每个垫片文件省掉一次发布。
+        - 顺序写那一半：活数据文件 P ÷ 32 到 P ÷ 16 − 1（后一半单元），按文件号从小到大，每个文件一次发布写满 16 个单元，共 P ÷ 32 次发布。
+        - 补齐：读下一个用户数据落点（`lowest_user_data_slot`），算它离下一个段边界还差 a 个单元（0 ≤ a ≤ 31）；a > 0 用一次发布给补齐文件写满 a 个单元，a = 0 不发布、补齐文件留空。
+        - 交错那一半：文件序号 f 从 0 到 P ÷ 32 − 1，先一次发布写满活数据文件 f（16 个单元），再一次发布写满第 f 个交错垫片文件（16 个单元），共 P ÷ 16 次发布。对齐之后一个活数据文件占段的 32 槽、一个垫片文件占同段另外 32 槽，一个碎片段 = 一对。
+      - 造碎片挂载（重挂）：删全部垫片文件（P ÷ 32 + 1 个，含补齐文件，空的也删；`UserChange::Unlink`，一次调用两次发布，P=8192 现造法那一趟 258 次调用 516 次发布，量的，同一份产物），再照今天抬 F 到准入上限，直到垫片的旧落点按记录都已释放（迭代上界 `RELEASE_ROUNDS_AT_MOST`，每轮没放完发一次建一个 inode 的改动），会话丢掉。这一挂载不写用户数据；第 3 步原文「`DataChangesPublishedTogether` 一次合几个」那半句作废（理由见下一条）。
+      - 几何核（第 4 步）：照下面「几何核」那一条。
+    - **合并的个数：一次发布一个文件的 16 个单元，不合更多，不合更少。** 一、用户定案（上引）。二、核心层最多只能合到一个文件：`DataChangesPublishedTogether` 的文档写「至多一个文件的整份写……不同 inode 的写不在同一次发布里」（`crates/singlefs-core/src/transaction.rs:10299-10302`），跨文件合发布做不到。三、K 取 16 是几何定的：一个碎片段要恰好 32 槽活，16 个单元 × 2 槽 = 半个段，一个文件正好占半段；K = 32 则文件占满一段，段只有全活与全垫片两种，造不出 32 槽活的碎片段；K 必须整除 16，16 是其中最大的，发布最少。K 同时不超过 extent 下段一片叶罩的 144 个单元，且一层 inode 树装得下 P ÷ 16 + P ÷ 32 + 1 个文件（顶档 12289 ≤ 31455，装置 `inode_records_one_level_tree_holds` 开造之前照核心层算一遍，今天的 `spacer_files_at_most` 往大里算，够用）。
+    - **几何核（第 4 步）要不要改写法：两条判法一个字不改，分母写死，追加读数，收严一处。** 前一半「碎片段里至少 90% 恰好 32 槽活」：碎片段 = 交错那一半里交错垫片文件（不含补齐文件）的单元所在的段，去重（装置 `written_segment_starts`），门槛 90% 不动。后一半「强制选定的那一段活槽 ≤ 32 且只装码 1 数据单元」照修订第 8 条，不动。第七节乙类第 3 行与第 4 步原文里「造数据挂载写的段」都读成这个碎片段集合。追加读数（只报、不进门槛）：碎片段总数（预期恰好 P ÷ 32：1144、2048、4096，推的；对齐没做好会多出一两段）；碎片段里活槽的极大连续片数（预期 1 片 32 槽，推的）；全空段数；`mapped_units`；`live_data_units_found` 必须等于 P。收严：第 4 步原文允许几何没造成时「改负载重造、改三次」，造法只有上面这一种，几何没造成就停（停机条款第 7 条），不改旋钮、不换造法重造。
+    - **新造法与登记要的池差在哪一处。** 碎片段里活单元在段内的排列由逐个交错（每 2 槽一个活的）变成前半一整片活、后半空（32 个相邻槽）；每段活槽数、碎片段数、数据占单元区 50%、峰值占用 75% 都不变（算式见下表）。登记第五节没有写段内排列，所以不是对不上；实验页的结论要写「在这种排列上」。这个旋钮不扫（现造法的排列在三档上造不出，没有相反取样点），并入第八节「没扫的旋钮」。
+    - **新造法每一档预计的发布次数与聚簇段开多少（推的，没量过；P、段数、峰值数据段是第十三节同一式子现算的整数，命令与原样输出在第十三节「修订第 14 条写作时」那一块）。** 数据挂载发布 = 建 inode ⌈(P ÷ 16 + P ÷ 32 + 1) ÷ 4096⌉ + P ÷ 32 + a 的一次（至多 1）+ P ÷ 16；聚簇段预算 = 单元区段数 − 峰值数据段（3P ÷ 64），三档都是单元区的 25%：
+      | 档（单元区） | P | 单元区段数 | 峰值数据段 | 聚簇段预算 | 建 inode | 顺序写 | 补齐 | 交错 | 数据挂载发布合计 | 现造法同一阶段（1.535 × P） |
+      |---|---|---|---|---|---|---|---|---|---|---|
+      | 2288 MiB | 36608 | 2288 | 1716 | 572 | 1 | 1144 | 至多 1 | 2288 | 3434 | 56193 |
+      | 4 GiB | 65536 | 4096 | 3072 | 1024 | 2 | 2048 | 至多 1 | 4096 | 6147 | 100597 |
+      | 8 GiB | 131072 | 8192 | 6144 | 2048 | 4 | 4096 | 至多 1 | 8192 | 12293 | 201195 |
+
+      发布次数约少 16.4 倍。聚簇段预计 = 数据挂载发布数 × 每次发布开的段数：下界取 0.0734（上面量的两个数的商，一单元一次发布），上界取 0.15（我的猜：一次发布写 16 个单元，分配记录与映射条目各多 16 条，每次发布的元数据落点比一单元的至多多一倍；没量过）。三档的预算除以发布数都是 0.1666，高于 0.1666 就造不出：
+      | 档 | 聚簇段预计 | 占预算 | 碎片挂载删垫片文件（次数 / 发布） | 碎片挂载新开聚簇段预计（2 × 次数 × 0.0734） | 造池挂钟（打补丁的树，推的） | 没打补丁的树（推的） | 造池常驻（推的） |
+      |---|---|---|---|---|---|---|---|
+      | 2288 MiB | 252 至 515 | 44% 至 90% | 1145 / 2290 | 168 | 约 2 分钟 | 约 5 分钟 | 约 3.5 GiB |
+      | 4 GiB | 451 至 922 | 44% 至 90% | 2049 / 4098 | 301 | 约 5 分钟 | 约 14 分钟 | 约 6.3 GiB |
+      | 8 GiB | 902 至 1844 | 44% 至 90% | 4097 / 8194 | 602 | 约 18 分钟 | 约 46 分钟 | 约 12.7 GiB，三档同时约 22 GiB |
+
+      碎片挂载是重挂之后的新挂载，聚簇段集合重新从空开始；它要的 168、301、602 段对着重挂之后的空闲：单元区段数 − 峰值数据段 − 长寿元数据钉住的段（每次数据挂载发布约 0.05 段，定位报告第 1 问表里 P=1024 到 8192 四点，量的）= 400、717、1433 段，够。挂钟与常驻的依据（都是一个锚点上的外推）：每次发布耗时 ≈ 0.2 ms × 此刻版本里分配记录条数（千）（P=8192 交错那一阶段最早八分之一每步 17.645 ms、版本约 4.6 万条，最晚八分之一每步 61.468 ms、版本 13.5 万条，每步约 2.06 次发布，同一份产物），再加每次写 16 个单元的至多 16 ms（同产物顺序写阶段最早八分之一一个单元一次发布 1.046 ms 的 16 倍，往大里取）；分配记录条数 = 1.5P + 9.65 × 发布数（P=8192 数据挂载末 134752 条、13405 个单元、12577 次发布，同产物）；没打补丁的树取 2.5 倍（只有两棵树在同一类拒绝之前的用时之比 2100.8 秒比 900.5 秒，`records/2026-11-17-里程碑四收口续做.md` 第 158、159 行，不在同一台，只当量级）；常驻 = 1.84 × （1.5 × P × 32 KiB + 76.2 KiB × 数据挂载发布数），1.84 是 P=8192 碎片挂载末 `resident_bytes` 2136842240 ÷ `chunk_bytes_stored` 1163657216，76.2 KiB = (1420361728 − 13405 × 32768) ÷ 12577（同产物）。
+    - **「造得出」的跑前判法（每档各判一次，判据写在跑之前）。** 造得出：该档 `construction-timing` 命令退 0，产物里有该档的 `name=construction_timing` 行，`live_data_units_found` = P，几何核两半都过（`is_formed`），且没有 `name=construction_refused` 行。仍造不出的读数（任一条就是）：一、产物里有 `name=construction_refused` 行（装置新加：造池里任一发布被核心层拒的那一刻打，字段 tier、phase、step、publishes、cluster_segments、unit_area_segments、`judged_short_by`、`most_a_floor_raise_could_make_available`，随后退 3；今天是 `publish_while_constructing`（`:2119`）里 `panic!`、退 101，读不到那一刻的聚簇段数）；二、几何核没过。拒因是 `SlotPairsOutsideTheClusterSegmentsForDataUnits` 而 cluster_segments 加数据段数接近单元区段数，就是与任务 20071 同一形（聚簇段把空间吃光）。那时怎么办：停下交主 agent，写明哪一档、哪一阶段、第几步、发布做了几次、聚簇段数；后面的档不再起，没跑的标「够判后未跑」；不换第三种造法、不改 K、不加大盘、不在造池中途重挂、不碰核心层规则，这几条归用户与主 agent 定（定位报告第 5 问列过候选）。跑的次序先便宜后贵、遇拒即停：2288 MiB 盘 P=8192 同形校验、2288 MiB 档、4 GiB 档、8 GiB 档。P=8192 那一趟量出每次发布开的聚簇段数 r = 数据挂载末 `cluster_segments` ÷ 数据挂载发布数；r > 0.1666 就预计各档造不出，预计只用来排序与预告，该档照跑一次，以跑出来的为准。
+    - **问题单三行各由哪几个量答、量到哪算够（量 B 在第六节原是附带，这一条把它拆成下面几行并升成判问题单第 1、2、3 行的量）。**
+      | 量 | 怎么算 | 门槛与判定 | 对应问题单哪一行、取什么值翻面、量到哪算够 |
+      |---|---|---|---|
+      | 量 B 造成（每档） | 命令退出码；`name=construction_timing` 行有没有；`live_data_units_found`；有没有 `name=construction_refused` 行；几何核两半 | 退 0、`live_data_units_found` = P、`is_formed` 真、无拒绝行 | 第 1 行：某一档有拒绝行或几何核没过 = 翻面（点名那一档、阶段与步）；三档各造完一次且几何核过 = 够判；有一档拒绝就够判，不再起后面的档 |
+      | 量 B 池形（每档） | `live_slot_histogram`；`written_segments`、`written_segments_with_half_live`；全空段数；`mapped_units`；强制选定的那一段；碎片段活槽连续片数；几何核阶梯（用户改动 24、48、96 次，`LOCKSTEP_USER_CHANGES_LADDER`）每步的批数 | 登记既有门槛不动：碎片段里恰好 32 槽的占 ≥ 90%；强制那一段活槽 ≤ 32 且只装码 1 数据单元；批数 ≥ 64（第六节前提 N）。只报不判：碎片段总数对 P ÷ 32、64 槽的段数对 P ÷ 64、`mapped_units`（登记第 4 步只写「打」，没有目标数）、连续片数。全空段数 < 200 交主 agent（并发跑一次新开目的段的上界 192：256 次用户改动 × 1.5 条意图 ÷ 2，推的，第四节前提事件一行的口径） | 第 2 行：以上任一门槛不过 = 与登记目标对不上；三档的这几样各报一次、与登记目标逐条并排 = 够判；P=8192 同形校验那一点另与现造法同点读数并排（现造法同点：`written_segments=257 written_segments_with_half_live=254 mapped_units=8930 empty_segments=1245`，直方图 32 槽 254 段、64 槽 127 段，量的，同一份产物），只并排不判 |
+      | 量 B 用时与内存（每档） | `construction_seconds` 与各阶段秒、发布数（`name=construction_phase` 行）；`resident_bytes` 各阶段末的最大值；新加 `peak_resident_bytes_of_the_process`（造完那一刻读 `/proc/self/status` 的 `VmHWM`，放进 `name=construction_timing` 行）；三档同时造那一趟（`geometry-check`，各档一条线程）整个进程的同一个读数 | 一档 `construction_seconds` > 14400（任务服务的四小时上限）= 翻面；> 7200 交主 agent；三档同时的进程 `VmHWM` > 40 GiB = 翻面（本机 60 GiB，第四节；留给同台别的任务与随后的 lockstep 起步镜像加工作副本；第二台内存没查，交主 agent 补）；读数落到门槛的 75% 以上，该点再量两次（单次观测不算数） | 第 3 行：每档在打补丁与没打补丁两种树上各量一次，加三档同时那一趟在主 agent 指定的那棵树上量一次 = 够判；估计值（上表）不进判据，只供排程 |
+      | 量 B 聚簇段（每档，附带，够判后不跑） | 每个 `name=construction_phase` 行新加 `cluster_segments`（核心层此刻这次挂载开过的聚簇段数）与 `unit_area_segments`；数据挂载末的 `cluster_segments` ÷ 发布数 | 只报；与上表预计区间并排，高于 0.15 记「预计被推翻」，不作废、不停 | 不翻任何一行；是第 1 行的前兆读数，在同一次造池里读出，不另跑 |
+
+      量 B 各行都是造池那一条命令里读出的，不另起命令。造池是确定性的写序（没有随机、没有并发），池形与发布数每档量一次就是它的全部（没有隐藏状态，不是统计上稳定）；只有用时与内存是时序量，所以才有 75% 那一条。
+    - **阳性对照与真实基线：这一条没有臂，不适用。** 要证的是「判法看得见造不出」：现造法在 2288MiB 档 P=16384 被拒是量的（任务 20071，同一个拒因），是这一判能看见的事件的真例，不重跑；新装置里 `name=construction_refused` 行打不打得出，由装置自证里一份合成的被拒结果证（上面变异里「拒绝行不打」那一条）。真实基线是产品里造数据的办法本身，没有另一条要比的。
+    - **停机条款追加（第十一节停机节，原有六条之后；停机时产物照打、退 3）。** 7. 造池任一发布被拒（`name=construction_refused`），或几何核没过；原第 6 条「改三次」作废，不过就停。8. 数据写类调用交回的发成版数不是 1，或它写进的单元数不等于该文件的单元数（核心层的发布形状与本条读到的不符，`crates/singlefs-core/src/transaction.rs:10299-10302`），或某阶段的发布数与上表公式不等（建 inode ⌈(P ÷ 16 + P ÷ 32 + 1) ÷ 4096⌉、顺序写 P ÷ 32、补齐 0 或 1、交错 P ÷ 16）。第 8 条不是造不出，是装置与 `crates/` 对不上，两边都查。作废条款一个不动；常量回比表（第五节）不加新行：新造法用到的核心层量（`data_unit_payload_capacity()`、`WriteAtOffset`）装置本来就在用，`INODES_CREATED_BY_ONE_PUBLISH`、K 是装置本地常量，不读 `crates/` 的常量。
+    - **变异（装置变异表追加，每条写明在哪个取样点上改变输出）。** 一、整文件写改成逐单元一次发布（今天的写法）：每档、P=8192 点上发布数不等于公式（阶段公式断言）；拒绝事件只在 2288 MiB 档 P ≥ 16384 一类的点上变（量的，任务 20071），P=8192 同形校验点上拒绝同值，只敏感于次数。二、垫片 inode 不提前建（回到接到头一个单元才建）：每档发布数多 P ÷ 32（P=8192 多 256；三档多 1144、2048、4096），聚簇段预计上界（0.15 × 发布数）在三档上都由 515、922、1844 变成 687、1229、2458，各越过 572、1024、2048 的预算（推的）。三、整文件写少写一个单元（15 个）：每个取样点的 `live_data_units_found` 与每次调用写进的单元数断言。四、补齐文件改成逐单元补齐：只在 a > 0 的池上改变补齐阶段发布数（P=8192 现造法补齐 30 个单元，量的；三档的 a 没算出来，不保证）。五、拒绝行不打（仍 panic）：自证里一份合成的被拒结果上变；真跑里只在被拒的那一次变，没被拒的取样点上同值，所以靠自证。六、交错那一半里垫片文件先于活数据文件：碎片段仍恰好 32 槽，登记门槛上同值（不敏感）；只在活槽连续片的位置读数上变，自证里加一份合成的段断言活槽落在段的前 32 槽。七、碎片段分母含补齐文件的段：a > 0 的池上 `written_segments` 多一段、90% 门槛上同值；取样点是碎片段总数 = P ÷ 32 那一行读数的断言。
+    - **几何敏感性（第八节一行追加）。** 「造得出」这一判：主取样点一次发布 16 个单元、三档；方向相反的取样点一次发布 1 个单元（现造法，2288 MiB 档 P=16384 被拒，量的，任务 20071，已有的一个点）；再加比例不同的一个点：2288 MiB 盘上 P=8192（预算 1904 段、数据挂载发布 770 次，每次发布能花 2.47 段，三档是 0.1666 段），新造法在这一点上应远离边界（推的）。三档的预算占单元区都是 25%、比例相同，是三个点不是三个独立的几何。实验页只写「在这几个点上造得出 / 造不出」，不写「一次发布写整个文件解决了聚簇段只进不出」这类性质（那条由聚簇段设计轮另定）。第八节「没扫的旋钮」追加：K（取 16，理由在合并的个数那一条）、段内活槽排列（前半活后半空）、聚簇段预算占单元区的比例（25%，三档同比）。
+    - **测量手段的分辨率与可跑性。** 要分辨的差：造不造得出（退出码与拒绝行，二值）；各阶段发布数与碎片段数（整数，装置计数，没有分辨率问题）；用时（`Instant`，纳秒级，而门槛是 14400 秒、估计最长约 46 分钟）；常驻（`VmHWM` 千字节级，门槛 40 GiB、估计约 22 GiB）。用时与内存的估计离门槛都在 5 倍与 1.8 倍以外，一次观测分得出（只有落进门槛 75% 以内才加量）。单态耗时与总量见上表；登记点上要触发的事件只有「聚簇段不够」，它是被问的量，不是前提，不做触发条件推算。算不出、不写死判据的量：每次发布写 16 个单元的聚簇段开销（上界 0.15 是猜）——它不进判据，判据是「被不被拒」这个事件本身，跑出来的读数才算。
+    - **分段（按问题单行排序）与挂钟、核数（登记第五节「分段」与第十四节里造池的数以本条为准）。** 造池实量段：`construction-timing` 命令，2288 MiB 盘 P=8192 同形校验一条、三档各一条，打补丁的树与没打补丁的树各一遍（两棵树的产物分文件，各有自己的 `name=crates_version`，同一棵树的几条命令之间 sha256 不许变，停机条款第 2 条）；补问题单第 1 行、第 2 行（除批数）、第 3 行（每档用时与每档常驻）；补完三档都造完且几何核过，则第 1 行够判、第 2 行除批数够判、第 3 行单档的用时与内存够判、三档同时的常驻还差。几何核与批数段：`geometry-check`（三档各一条线程同时造，造完每档按用户改动阶梯跑 CPU 臂交替跑量批数），在主 agent 指定的那棵树上跑一遍；补第 2 行的批数与第 3 行三档同时的常驻；补完三行都够判就停。登记第五节分段里的交替跑、并发跑、几何敏感性不属于这个问题单，另判。独立单位：（档，树）一条命令一个进程，互相独立，服务能并起就并起；线程：每个 `construction-timing` 进程 1 条线程，`geometry-check` 3 条（各档一条，取登记值 `.claude/heavy-thread-default` 作上限）；串行：同一条命令里数据挂载、碎片挂载按次序做，没有计时的跑与它们并行。预计挂钟（推的）：造池实量段打补丁的树约 0.5 + 2 + 5 + 18 = 26 分钟、没打补丁的树约 1 + 5 + 14 + 46 = 66 分钟（P=8192 一趟：770 次发布 × 约 24 ms ≈ 20 秒，加碎片挂载，约 30 秒；其余是上表），并起则取最长一条约 46 分钟；几何核与批数段约 21 至 30 分钟（顶档造池约 18 分钟，加阶梯里 1 至 3 次 CPU 臂交替跑，每次约 141 秒，由第十四节顶档 30 次 × 144 批 × 0.98 s 折得；阶梯 24、48、96 次改动的批数不到 64 才往下走）。预计在用核数：造池实量段每条 1 个核，并起 8 条（P=8192 与三档，两棵树）至多 8 个核；几何核与批数段 3 个核。没有一段超过 2 小时，不需要分片单元与续跑入口：每条命令独立重起，造池不可续。分段不是全部做完的计划：每段交回后主 agent 对着问题单三行判续不续，一行开着的都不剩就停。
+    - **登记里因此过时的句子（以本条为准，原句不删；下面的行号是写本条之前那份文件的行号，本条插入之后第十四节里的两句下移）。** 一、第 268 行第五节「负载」第 2 步整句「造数据挂载：可写挂载，第一个文件顺序写 P 个数据单元……」。二、第 269 行第 3 步整句「造碎片挂载：重挂，对第一个文件里每段按槽序每 2 个单元覆盖写其中 1 个……」，含「`DataChangesPublishedTogether` 一次合几个，执行员挑造得快的」那半句。三、第 270 行第 4 步里「不过就记『几何没造成』、改负载重造」「改三次仍造不成的那一档停下交主 agent」两句，与第 440 行停机条款第 6 条「几何核改三次仍造不成」：造法不再改，几何没造成即停（停机条款第 7 条）。四、第 320 行第六节开头工作量里「造池顶档 1.5 × 65536 = 98304 次发布（推的，按一次一个单元的写法）」。五、第 336 行量 B 一行「每档造起步镜像的挂钟与发布次数（顶档约 98304 次发布）」与「附带」：以本条上表与「问题单三行各由哪几个量答」为准。六、第十四节「预计挂钟」一行里「造池顶档 98304 次发布 × 2 ms ≈ 197 s」与同节「续跑入口」一条里「造池顶档约 197 s，推的」（这两句在写本条之前的第 588、593 行）：以本条上表的造池挂钟为准（2 ms 一次发布与量的 P=8192 数据挂载 12577 次发布 157.8 秒不符，同一份产物）。七、第 81 行第一节未定项 6 里「顶档预计挂钟超过第十四节写的两倍，停下交主 agent」的造池那一部分：造池挂钟的基数换成本条上表，超过上表没打补丁那一列的两倍（10、28、92 分钟）停下交主 agent；这是一处估计数的替换，不是判据的改动。八、读法澄清（不是过时）：第七节乙类第 3 行与第 4 步原文「造数据挂载写的段」读成本条的碎片段集合。
+    - **写这一条时读到的已有读数（不当判据，列出让对不对得上的人看得到）。** 定位报告 `~/.local/share/singlefs/work/e202-pool-construction-no-space-investigation/result.md` 第 1 问表（P=1024、2048、4096、8192 的发布数 1670、3302、6566、13093，长寿元数据钉住的段 80、163、328、660，量的）与第 3 问的推断；`~/.local/share/singlefs/work/e202-run/` 下的造池计时产物（只读了 P=8192 那一份的各阶段行，不是 `research/results/` 下 E202 的产物）；任务 20071 探针行与 20033 对照（`records/2026-11-17-里程碑四收口续做.md` 第 158 至 164 行）；实验页「现状」里老造法的读数（2288MiB 档顺序写那一半约 34 分钟、三档同时造 2100 秒时常驻 9.4 GiB，量的，老造法）。这几样对判据的影响：只定了上表的估计与上界 0.15 的位置，没有改任何门槛。
+    - **比原文的变动：只收严、不放宽。** 第六节各量、第七节两类断言、第八节三行取样点、第九节既有变异、第十节失败条款、第十一节作废条款与停机前六条一个字不动；本条只增不减：几何核「改三次」改成「不过就停」（收严）；停机加两条（造池被拒或几何没过、发布形状对不上）；多报聚簇段、碎片段总数、连续片数、`VmHWM`；没扫的旋钮多记三个；问题单三行各有量与翻面取值。换掉的只有造法本身（第 2、3 步）与造池的估计数（第十四节，不是判据）。
+
+第 15 条由主 agent 写，时点在代码轮 `research/prompts/gpu-tests-src-backfill-code-r2-main-verification.md` 判决之后、任何产物之前（`ls research/results | grep -ci e202` 打 0）；依据是现读登记、装置与那份判决，没有产物读数。
+
+15. **`name=crates_version` 那一行带哪些文件的 sha256（第一节「读的是哪一版」那一句里「带产品 GPU 包与核心层 `src/` 下每个文件的 sha256」由这一条替掉，原句不删）。** 代码轮两轮判决坐实原定义罩不全这一趟在计时窗里跑的 `crates/` 下的代码：第一轮判决 `research/prompts/gpu-tests-src-backfill-code-r1-main-verification.md` 第三节第 3 条（装置自己与它经 `#[path]` 编进来的共用模块不在摘要里），第二轮判决第三节第 2 条（漏 `singlefs-replay-prefix`、`singlefs-mount-runtime` 两个直接路径依赖与经它们来的 `singlefs-format`）。改成：摘要从八处起走，目录逐层走到每个文件、文件就是它自己，按路径排——`crates/singlefs-background-gpu/src`、`crates/singlefs-mount-runtime/src`、`crates/singlefs-replay-prefix/src`、`crates/singlefs-format/src`、`crates/singlefs-core/src`、`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`、`crates/singlefs-background-gpu-tests/tests/common_discrete_gpus_of_this_host/mod.rs`、`crates/singlefs-background-gpu-tests/tests/common_pairing_input_through_the_library/mod.rs`；取法以装置的 `STARTING_PATHS_OF_THE_CRATES_DIGEST` 为准。验证包不进：它只管按需领卡与判定库，不在计时窗里决定读数（第二轮两条腿一致）。包有没有漏，由装置的单测 `every_package_linked_into_the_apparatus_by_path_has_its_sources_in_the_crates_digest` 照各包 `Cargo.toml` 的路径依赖核。时点：主工作区的装置此刻起走五处（第一轮判决的改法已合），八处的那一版在补丁 `~/.local/share/singlefs/work/e202-apparatus-r2-fixes/patch/crates.patch` 里、还没合；出产物的那一版必须是八处的，五处那一版跑出的产物不算。比原文的变动：只收严——摘要多罩六处，第十一节停机条款第 2 条（同一段的几条命令之间 sha256 变了就停）的字一个不动，判得更严：这六处中途被改同样停。
+
+第 16 条由实验设计员写，主 agent 派发（用户 2026-11-18 弹窗定 E202（GPU与CPU两种模式GC对照组） 续跑换了卡「只记不停，判读分组」，`records/2026-11-17-里程碑四收口续做.md` 第 191 行；依据的判决是代码轮 `research/prompts/gpu-tests-src-backfill-code-r2-main-verification.md`「交用户的」与第三节第 6–10 条；问题单 `~/.local/share/singlefs/work/e202-run/interface-questions.md` 第 4、9 行）。时点：任何产物之前——`ls research/results | grep -ci e202` 打 0；装置此刻（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`，sha256 `2fca7eb42017bbdf3833acc5df70b19281f1a8a2a8e996d3ccfd9007f983b2d7`）仍是续跑时卡对不上就退 2 的那一版。依据是用户定案与读装置代码，没有产物读数。
+
+16. **续跑换了卡、换了台只记不停：每一趟把主机硬件与开的卡（连同驱动）记进产物，判读按硬件组分开算，两组的重复不混着比；修订第 12 条的续跑核卡那一条拒绝由这一条替掉。**
+    - **替掉的是哪几句（原句都不删，逐句写替成什么）。** 派发写的「第十一节停机条款 `cards_differ_from_the_product_being_resumed` 那一条」按修订第 13 条第一项读：它不在第十一节，是续跑入口的一条拒绝；本条替的就是它。
+      | # | 原句在哪 | 原句（照抄） | 替成 |
+      |---|---|---|---|
+      | 一 | 修订第 12 条标题 | 「开了哪几张卡逐张记进产物，续跑时核」 | 「续跑时核」那三个字替成「续跑时归组（修订第 16 条）」；「逐张记进产物」照旧，记的字段照本条加 |
+      | 二 | 修订第 12 条第五个分项整句 | 「续跑核卡（并进第十一节停机条款）：这几样与产物里已有的同种行有一处不同，或产物里有这条臂跑出的结果行（`name=run`、`name=concurrent_run`）而没有这种行，打 `name=stopped clause=cards_differ_from_the_product_being_resumed` 退 2；一条结果行都没跑出来的那一趟不挡以后的续跑。什么观测会让它触发：同一份 `--product` 续跑时换了卡、换了张数或换了一台。」 | 整句作废：续跑不因卡、张数、驱动或台不同而停，照本条「续跑核什么」接着跑；本条唯一的续跑拒绝是那一趟认不出归哪一组（下面「续跑核什么」第二段），什么观测会让它触发写在那里 |
+      | 三 | 修订第 12 条「比原文的变动」 | 「两组卡的重复不混进同一份产物（收严）」 | 「两组卡的重复可以在同一份产物里，判读时不混」（同一组之内的门槛一个字不动，见本条「比原文的变动」） |
+      | 四 | 修订第 13 条第一项整项 | 「续跑核卡不属第十一节停机条款：……它是续跑入口（第十四节）的一条拒绝，不是停机。」 | 这条拒绝没有了，整项不再有对象；它说的「不是停机、退 2」本身没错，照留作那一刻的更正 |
+      | 五 | 修订第 13 条第二项后两句 | 「卡的身份只取 PCI 地址加型号，认不出「两台同一个槽插同一种型号」与「只点 CPU 臂的命令换一台续跑」两形；把读数依赖的硬件记进产物是代码轮判决第三节第 10 条的待定改法，定了再另起修订。」 | 由本条「组标识怎么算」替：CPU 型号、逻辑 CPU 数与每张卡的驱动记进产物、进组键。同项前半「产物合并时另看产物所在的机器」作废照旧（产物里仍不记机器，只记硬件） |
+      | 六 | 修订第 13 条末段 | 「另记代码轮坐实的两处装置行为……报本次未跑的那条臂照样记下一行记卡行；记了卡、还没打出一条结果行就断的那一趟，照样挡住换卡之后的续跑。」 | 两处行为由本条去掉（下面第三节第 6、7 条的去向）；装置照本条改完之后这一段不再描述装置，只留作那一刻的记录 |
+      | 七 | 第十四节「续跑入口」一条 | 「跳过做完的重复，只补没做完的」 | 「跳过这一趟所在的那一组里做完的重复，只补这一组没做完的」；同一条其余的字（没做完的那一次重复整组重跑、起步镜像每次现造、判定库那一层做不到）不动 |
+      | 八 | 第一节「读法写死」的「重复次数」「离散度」两行；第六节量 W、C、S、T、P、F 各行 | 「每档每臂 5 次」「每档每臂 5 个数」「5 个成对差」「5 次跑合起来 1280 个数」「三档」 | 字不改，读法由本条定死：都是同一档、同一组之内的 5 次与 1280 个，T 的三档是同一组的三档 |
+    - **本条不碰的。** 第十一节作废条款八条、停机条款原有六条与修订第 14 条追加的两条，一个字不动。`--cards` 多于交来的退 2、领卡没成退 78、这一台一张都没交退 77、没给 `--cards` 而只交来一张时全部卡臂报本次未跑，照旧。第五节「两种跑法」与第十四节「成对相减要两条臂在同一台、同一组卡上跑」照旧成立：一次重复的六条臂（并发跑三条臂）在同一趟、同一个进程里跑完，没做完的整组重跑，所以一次重复从不跨组，成对差天然在组内；本条管的只是「凑够 5 个」「凑够三档」不跨组。
+    - **每一趟记哪几行（形态 `E202 name=…`，`<…>` 是值；值里的空白照装置今天的 `field_value` 去掉）。**
+      | 行 | 形态 | 哪些子命令、什么时候打 |
+      |---|---|---|
+      | 主机硬件 | `name=host_hardware session=<趟号> cpu_model=<值> logical_cpus=<个数>` | 每个子命令开头，`name=session_start` 之后、取卡之前，每趟一次。`cpu_model` 取 `/proc/cpuinfo` 头一个 `model name` 行冒号后的值；`logical_cpus` 取 `/proc/cpuinfo` 里 `processor` 行的行数（这台的逻辑 CPU，不是任务被准用的那几个）。读不到、认不出或行数为 0：打 `name=host_hardware session=<趟号> readable=false reason=<…>` 与 `name=stopped clause=host_hardware_not_readable way_out=<…>`，退 78（读不到 ≠ 读到 0，不当一组「不知道」接着跑） |
+      | 点名一张卡臂的卡 | `name=one_card_arm_card session=<趟号> tier=<档> pci_bus_address=<地址> model=<型号> driver=<驱动> driver_info=<驱动信息>` | lockstep、concurrent（sensitivity 走的两段同）、stage-three-cost；只在这一趟这条臂真跑（判过「跑不跑」之后仍在要跑的臂里）时打 |
+      | 全部卡臂的卡 | `name=every_card_arm_cards session=<趟号> tier=<档> cards_named=<张数> named_by=<cards_option 或 every_handed_over_card> pci_bus_addresses=<地址,…> models=<型号,…> drivers=<驱动,…> driver_infos=<驱动信息,…>` | lockstep（sensitivity 的交替跑段同）；只在这条臂这一趟真跑时打；四个列表按 PCI 地址次序、逐张对齐 |
+      | 硬件组 | `name=hardware_group session=<趟号> tier=<档> group=<组标识> cpu_model=<值> logical_cpus=<个数> one_card=<那一段> every_card=<那一段>` | lockstep、concurrent（sensitivity 两段各一行）；记卡那几行之后、`name=resume` 之前，每趟一次；两段的写法同下面组键里的那两段 |
+      | 续跑 | `name=resume` 原有字段之后加 `group=<组标识> repeats_of_the_group_already_done=<个数> groups_in_the_product=<组标识>:<做完的重复数>,…` | 同上；`groups_in_the_product` 列产物里（连同这一趟）每一组与它做完的重复数，按组标识排 |
+      | 带组的结果行 | `name=repeat_done`、`name=concurrent_repeat_done` 加 `group=<组标识>`；这一趟收尾判读打的 `arm_spread`、`wall_clock_comparison`、`saving`、`saving_per_batch`、`positive_control`、`not_a_gpu_arm`、`latency_distribution`、`latency_comparison` 与 `verdict` 都加 `group=<组标识>` | lockstep、concurrent、sensitivity |
+      驱动的两个字段取 wgpu 适配器信息里的 `driver`、`driver_info`（`wgpu-types` 30.0.1 的 `src/adapter.rs` 第 181 行 `pub driver: String,`、第 183 行 `pub driver_info: String,`；与地址、型号同一次 `get_info()` 读出）。空串写 `none`、不停：两台的卡填不填、填什么没量过（推的），那一组的 `hardware_group` 行照打，实验页在那一组旁写「驱动没读到」。geometry-check 与 construction-timing 只打主机硬件那一行（不用卡、不续跑、不归组，造池计时的读数也随主机）。
+    - **组标识怎么算。** 组键是下面四段按次序、每段一行拼成的文字（UTF-8，行尾一个换行）：`cpu_model=<值>`；`logical_cpus=<个数>`；`one_card=<地址>|<型号>|<驱动>|<驱动信息>`，这一趟点名一张卡臂没跑写 `one_card=none`；`every_card=<张数>|<地址>|<型号>|<驱动>|<驱动信息>;<地址>|…`（按 PCI 地址次序），全部卡臂没跑写 `every_card=none`。组标识 = 组键 SHA-256 的十六进制前 16 个字。
+      - 两趟组键逐字相同就是同一组，不同就是两组。由此：换了一台而 CPU 型号或逻辑 CPU 数不同的是另一组（只点 CPU 臂的那种命令也认得出：两段卡都是 none，CPU 两段不同）；换了卡、换了张数、换了驱动的是另一组；两台的 CPU 型号、逻辑 CPU 数、卡的地址、型号、驱动全都相同的是同一组，合着判正是要的（读数依赖的是硬件，不是哪台机器；代码轮判决第二节第 11 条「读数依赖的是硬件不是地址」）。
+      - 不进组键的：`named_by`（照什么挑的不改开了哪几张）；档（一份产物一档，跨档比的是 judge-trend，见下）；趟号。
+      - 读数可能依赖而不进组键、也没扫的：内核版本、内存、`--arms` 里除用卡那两条臂跑没跑之外的选择（用卡那两条由组键的卡那两段带进去：点了与没点是两组；别的如点没点多判臂不进组键，轮换里挨着谁跑因之不同）。第八节「没扫的旋钮」追加这三样与「硬件组」本身（下面「判读怎么分组」第四条）。
+    - **续跑核什么（不停，归组）。**
+      - 续跑开头照旧核 crates 版本（第十一节停机条款第 2 条，不变）。卡与硬件不比对不对得上，只算出这一趟的组标识。产物里已有的每一次做完的重复按它那一趟归组：`repeat_done`（`concurrent_repeat_done`）的 `session=` 对上同趟号的 `hardware_group` 行；做完与读回的规矩（`void=no`、那一次重复的 `session` 与 `repeat_done` 的相同）照旧。这一趟只补自己那一组：这一组做完 k 次，再跑 5 − k 次；k ≥ 5 不跑、照判。别的组的重复留在产物里，这一趟不改、不判、不并进。重复号照旧全产物统一往后编（最大号加 1），不按组各编。
+      - 唯一的拒绝：产物里某一趟有结果行（`name=run` 或 `name=concurrent_run`）而那一趟没有 `name=hardware_group` 行，那几次重复认不出归哪一组：打 `name=stopped clause=product_session_without_a_hardware_group session=<那一趟> way_out=换一个--product`，退 2（命令行不对：这份产物不是这一版装置写的）。什么观测会让它触发：本条落地之前的装置写的产物（此刻 `research/results/` 下 E202 的产物零份），或装置漏打这一行。不为这种产物开认旧的分支（共用约束「里程碑 17 收尾之前不兼容任何旧东西」）。有记卡行而没有结果行的那一趟（记了卡就断的）不触发它，给它的组添 0 次。
+    - **判读怎么分组（够判按组，不合起来）。**
+      1. 一切凑数都在一组之内：第六节量 W、C、S、P 的「5 个」、量 F 的「5 次跑合起来 1280 个」、量 T 的「三档」，都只取同一组的；不同组的数不拼成一组 5 个，也不拿一组的数补另一组。
+      2. 够判按组：问题单第 1、2、5 行在一档上够判，要那一档的 lockstep 产物里至少有一组做完 5 次重复且那一组的阳性对照（量 P）过；量 P 在一组上不过，那一组那一档整档作废（第十一节作废第 5 条照旧），不连累同一档别的组。第 3 行要 concurrent 产物里至少一组的 CPU 臂与 GPU 点名一张卡臂各做完 5 次。第 4 行要至少一组在三档的 lockstep 产物里都有 `saving_per_batch` 行，组标识相同。
+      3. 一组不到 5 次：不判、不并进别的组；它的 `run` 行留在产物里，实验页「各组读数」里列它做了几次、标「这一组未够判」。一档里没有一组做满 5 次，那一档在那几行上未够判，主 agent 照原命令重交（续跑落到哪一组由任务服务定）；同一档的产物里已有 3 组都没做满 5 次，主 agent 不再重交，交用户（每次都落到新的一组，重交不收敛）。
+      4. 两组以上都够判：各组各判、各报，组标识与那一组的 CPU 型号、逻辑 CPU 数、卡、驱动写在一起。结论一致写一次、注明「在 N 组硬件上相同」；不一致照第八节「几何敏感性」那一套记：那一行记「随硬件组不同」，各组结论并列，不合成一个，不作废（硬件组是没扫的旋钮，碰巧取到了两点；实验页不写「这是两种模式的性质」）。
+      5. 装置命令收尾那一段判读（lockstep、concurrent 的各判读行与退出码 4）只判这一趟所在的那一组；别的组的判读行是它们自己那几趟打的。
+      6. judge-trend：`saving_per_batch` 按（对比的臂、组标识、档）取；某一组三档都有才判那一组的量 T，打 `name=trend against=<臂> group=<组标识> tiers_with_a_saving=3 trend=<分类>`；三档凑不齐同一组的，那一组打 `trend=not_judged` 与它有几档，不跨组拼三档。三档的 crates 版本相同（停机条款第 2 条）照旧先判。
+    - **代码轮判决第三节第 6–10 条的去向（逐条判照不照做、落到本条哪一句）。**
+      | 条 | 判决原文要点 | 去向 | 落在本条哪里 |
+      |---|---|---|---|
+      | 6 | 先判「这条臂跑不跑」再记卡，报本次未跑的臂不记不核 | 照做 | 「每一趟记哪几行」两种记卡行只在那条臂这一趟真跑时打；组键里没跑的臂写 `none`。没交够卡而报本次未跑的全部卡臂不再留一行记卡行 |
+      | 7 | 记了卡、没出结果行的那一趟不挡续跑（记卡行分趟，或只拿有结果行的那几趟去比） | 照做，由归组吸收：续跑不再因卡停，哪一趟都不挡别的趟 | 记卡行与 `hardware_group` 行带 `session=`（取「记卡行分趟」那一种）；「续跑核什么」第二段末句 |
+      | 8 | 「取卡之后到开跑之前」抽成纯函数，单测与变异锚在它上面 | 照做，入出写死 | 下面「装置的结构要求」一项 |
+      | 9 | 停下那一行的出路只写做得到的 | 照做 | 下面「出路」一项 |
+      | 10 | 读数依赖的硬件（CPU 型号、逻辑 CPU 数、每张卡的驱动）记进产物并在续跑时核，罩住只点 CPU 臂与同槽同型号两形 | 照用户定案落：记、进组键、按组续与判，不核停 | 「每一趟记哪几行」主机硬件一行与两种记卡行的驱动字段；「组标识怎么算」第一条说明两形怎么罩住、全同的合着判 |
+    - **装置的结构要求（第 8 条）。** 取卡之后、开跑之前那一段写成一个纯函数，lockstep 与 concurrent 共用（concurrent 没有全部卡臂）：入 = 产物里已有的结果行、这一趟的趟号、档、点了的臂、`--cards` 的设定、交来的卡（每张的地址、型号、驱动、驱动信息与交来的先后）、主机硬件读数；出 = 要打的行（`not_run`、记卡、`hardware_group`、`resume`，按这个次序）、要跑的臂、组标识、这一组已做完的重复（重复号与读回的数）、下一个重复号，或一条拒绝（退出码与那一行 `name=stopped`）。它不读环境、不碰卡、不写文件；本条的单测与下面的变异都锚在它与组键那一个函数上。
+    - **出路（第 9 条）。** 取卡与续跑这一路每一行 `name=stopped` 带 `way_out=<…>`，只写调用方在任务不挑卡、不挑台之下做得到的：`cards_option_exceeds_the_cards_handed_over` 写「--cards改小或不给」；`cards_not_taken` 写「照reason修好再交同一条命令」；`no_cards_from_the_task_server` 写「经task-server/task submit交」；`host_hardware_not_readable` 写「再交同一条命令，两台都读不到交主agent」；`product_session_without_a_hardware_group` 写「换一个--product」。不写「照产物里的那几张卡重起」「换到某一台」这类做不到的。`stopped` 行的 `reason=` 照旧。
+    - **失败条款与停机条款（第十、十一节）。** 第十条不加不删。第十一节作废条款不动；停机条款不加：本条的两条拒绝（`host_hardware_not_readable` 退 78、`product_session_without_a_hardware_group` 退 2）照退出码表是运行条件与命令行，不是「装置与 `crates/` 对不上」。本条新加的失败条款一条：「判读分组看得见硬件组之间的差」——什么观测会让它触发：下面阳性对照那一份合成产物上按组判没有判出两行不同的结论；触发了是装置的归组写错，装置自证红、不出产物，不是结果。
+    - **阳性对照与判别力自证（真跑里多半只有一组，敏感点都放在装置自证的合成产物上）。** 一份合成的 lockstep 产物：组甲、组乙各 5 次做完的重复，两组只差一张卡的驱动信息；组甲 5 个 S 全 > 0，组乙 5 个全 < 0。按组判必须打两行：组甲「省」、组乙「多占」；两组合着判会是「不稳定」，所以这一对照分得出「分没分组」。
+    - **变异（第九节与装置变异表追加；每条写明在哪个取样点上改变输出）。** 真跑的产物多半只有一组，下面每一条在真跑上都不敏感，敏感点一律在装置自证的合成输入上：
+      | 变异 | 改哪 | 在哪个取样点上改变输出 |
+      |---|---|---|
+      | 判读不分组 | 收尾判读与 judge-trend 取全产物的重复，不按组标识过滤 | 上面阳性对照那一份合成产物：两行（「省」「多占」）变成一行「不稳定」 |
+      | 组键不含驱动 | 组键的卡那两段去掉驱动与驱动信息 | 同一份合成产物：两组并成一组，`groups_in_the_product` 由两项变一项 |
+      | 组键不含 CPU 型号 | 组键去掉 `cpu_model` 那一段 | 合成产物：两趟只点 CPU 臂、CPU 型号不同、别的全同，由两组变一组 |
+      | 这一组做完的重复按全产物数 | k 取产物里全部做完的重复数 | 合成产物：组甲做完 5 次，这一趟在组乙：`repeats_of_the_group_already_done` 应为 0、要跑 5 次，变异后为 5、跑 0 次 |
+      | 没跑的臂照记卡 | 记卡在判「跑不跑」之前做（今天的次序） | 合成输入：只交来一张卡、没给 `--cards`，全部卡臂报本次未跑：应没有 `every_card_arm_cards` 行、组键 `every_card=none`，变异后有一行一张卡、组标识跟着变 |
+      | 续跑遇到另一组照旧退 2 | 归组之前先照今天的逐字段比、不同就退 2 | 合成产物有组甲做完的重复，这一趟在组乙：应接着跑、退出码不是 2，变异后退 2（代码轮任务 19730 两条探针那一形） |
+      | 缺硬件组行的那一趟照样归组 | 认不出归哪一组的那几次重复归进这一趟的组 | 合成产物：一趟有 `run` 行、没有 `hardware_group` 行：应退 2、打 `product_session_without_a_hardware_group`，变异后接着跑 |
+      | judge-trend 跨组拼三档 | 按（臂、档）取，不看组标识 | 合成三份档产物：两小档在组甲、顶档在组乙：应 `trend=not_judged`，变异后判出一个趋势 |
+      | 主机硬件读不到当一组接着跑 | `host_hardware` 读不到时组键写空串、不退 | 自证里喂一份没有 `model name` 行的 `/proc/cpuinfo` 文本：应退 78，变异后接着跑 |
+    - **可跑性与判别力（第 3a 步）。** 本条不改任何量的定义、口径与门槛，不加要分辨的差：组键是逐字相等的字符串比较，没有分辨率问题；每趟多读一次 `/proc/cpuinfo`、算一次 SHA-256，相对一趟分钟到小时的挂钟可略（推的）。登记点上的事件「续跑落到另一组」是不是会发生由任务服务定，不是被问的量，也不是哪个量的前提，不推它发不发生。跑之前已经存在的数：没有新读到的（不读产物；E202 的产物此刻零份）。
+    - **挂钟与核数（第十四节）。** 换了组的续跑至多再做满 5 次重复：顶档一条 lockstep 命令登记推的约 1.2 小时就是 5 次重复的整份，换组最坏再来一整份；一档至多 3 组（「判读怎么分组」第三条），一档最坏约 3 倍（推的）。分片单元、线程、核数与「续跑入口」的形态不变（同一条命令重起只补这一组没做完的）。
+    - **比原文的变动。** 判据上只收严：每一组各自守原来的门槛（5 次、三档、阳性对照），一个数都不放宽；原来认不出而会合着判的两形（两台同槽同型号而驱动或 CPU 不同、只点 CPU 臂的命令换了台）现在分成两组，判得更严。流程上换掉一条拒绝：续跑不再因卡或台不同而退 2——这是用户定案换的（上引），不是设计员的收严，记在这里：原来一份产物只会有一组，现在可以有几组，代价是凑满一组的挂钟最坏到 3 倍（上一项）。第五节臂表「做完会怎样」与臂的定义、第七节两类断言、第八节既有三行取样点一个字不动；第八节「没扫的旋钮」多记四样（「组标识怎么算」末条）。
+    - **写这一条时读过的文件与跑过的命令。** 读过：`.claude/agent-common.md` 整份；`.claude/rules/test-discipline.md`、`implementation-first.md`、`mutation-sampling.md`、`three-way-inference.md`、`test-script-discipline.md`、`evidence-discipline.md` 整份；`~/.local/share/singlefs/work/e202-run/interface-questions.md` 整份；`research/prompts/gpu-tests-src-backfill-code-r2-main-verification.md` 整份；`records/2026-11-17-里程碑四收口续做.md` 第 150–192 行；本登记第 1–151、230–552、639–713 行（第二节被测条款没读，本条不改它）；装置 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs` 第 1–160、795–840、2770–2830、5593–5640、5690–6743、7725–7934、8966–9025、9094–9183 行，grep 命中 26、38–40、811、3565、5103、5232、5364、5707、6044–6213、6432–6465、7322、7429、7711、7734–7759、9264 与测试 10262–13330 一带的函数名行；`~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/wgpu-types-30.0.1/src/adapter.rs` 第 140–200 行；`scripts/kb/replace-once.py` 文件头与入口。命令（只读）：`ls research/results | grep -ci e202`（打 0）；`sha256sum` 登记与装置；`grep -n '^#'` 登记；`grep -n` 装置里的记卡、续跑、判读行名与 `host_hardware`、`hardware_group`、`way_out`、`driver_info`（后四个各 0 命中）；`grep -n 'pub driver'` wgpu-types；`TZ=Asia/Tokyo date +%F`。
+
+第 17 条由实验设计员写，主 agent 派发（批次记录 `records/2026-11-17-里程碑四收口续做.md#批14`）。时点在修订第 16 条的产物之前：`ls research/results | grep -ci e202` 打 0，装置照第 16 条打的两个键一次都没出过产物；依据是门禁 code-source-discipline 的 data-names 格对这两个键名判红，没有任何产物读数。
+
+17. **修订第 16 条「每一趟记哪几行」表里两个驱动信息键名写全：`driver_info` 改 `driver_information`，`driver_infos` 改 `driver_information_of_each_card`；判据一个字不动，第 16 条原句不删。**
+    - **缘由。** data-names 格判这两个键名红：「键= 的键名「driver_info」里 「info」是缩写，写全：information」「键= 的键名「driver_infos」里 「infos」是缩写的复数，写全：information」。装置照第 16 条的表打这两个键，所以键名在登记里先改，装置与自证再照本条改。
+    - **替的是第 16 条哪几处（原句照抄；只替键名，行里别的字一个不动）。**
+      | # | 原句在哪 | 原句（照抄） | 替成 |
+      |---|---|---|---|
+      | 一 | 修订第 16 条「每一趟记哪几行」表，「点名一张卡臂的卡」行，形态一栏末段 | `driver=<驱动> driver_info=<驱动信息>` | `driver=<驱动> driver_information=<驱动信息>`；整行形态变成 `name=one_card_arm_card session=<趟号> tier=<档> pci_bus_address=<地址> model=<型号> driver=<驱动> driver_information=<驱动信息>` |
+      | 二 | 同一张表，「全部卡臂的卡」行，形态一栏末段 | `drivers=<驱动,…> driver_infos=<驱动信息,…>` | `drivers=<驱动,…> driver_information_of_each_card=<驱动信息,…>`；整行形态变成 `name=every_card_arm_cards session=<趟号> tier=<档> cards_named=<张数> named_by=<cards_option 或 every_handed_over_card> pci_bus_addresses=<地址,…> models=<型号,…> drivers=<驱动,…> driver_information_of_each_card=<驱动信息,…>`；「四个列表按 PCI 地址次序、逐张对齐」照旧，键名里的 `each_card` 就是这一条：每张卡一项 |
+    - **不替的（照留，写明为什么）。**
+      1. 那张表之后「驱动的两个字段取 wgpu 适配器信息里的 `driver`、`driver_info`（`wgpu-types` 30.0.1 的 `src/adapter.rs` 第 181 行 `pub driver: String,`、第 183 行 `pub driver_info: String,`；……）」这一句里的 `driver_info`：说的是 wgpu-types 的结构字段名，不是产物里的键，字段名不归本仓改。这一句里装置把读到的 `driver_info` 值打进上表的 `driver_information` 键（一张卡臂行）与 `driver_information_of_each_card` 键（全部卡臂行）。
+      2. 「组标识怎么算」里组键第三、四段 `one_card=<地址>|<型号>|<驱动>|<驱动信息>` 与 `every_card=<张数>|<地址>|<型号>|<驱动>|<驱动信息>;<地址>|…` 的 `<驱动信息>`：是值的占位，不是键名；组键文字、段次序、哈希输入一个字不动，所以同一组硬件算出的组标识与第 16 条原写法逐字相同。
+      3. `driver=`、`drivers=` 两个键：「驱动」不是缩写，不动。
+      4. 第 16 条末项「写这一条时读过的文件与跑过的命令」里 grep 的词 `driver_info`（当时装置里 0 命中）：是那一刻命令的记录，不是键名，照留。
+    - **不变的。** 两个键的取值（wgpu 适配器信息的 `driver_info`，空串写 `none`、不停）、列表次序与对齐、两行哪些子命令打与何时打、第六至十一节的任何量、门槛、失败条款、停机条款、变异表、阳性对照与第十四节，一个字不动。产物一份没有（上面时点），没有读数要重判；本条没有新量、没有新岔路。装置与自证里凡按这两个键名取值、断言或变异的地方，由执行员照本条改名，不当装置与登记对不上。
 
 ## 十三、读过的文件与跑过的命令
 
@@ -528,7 +676,7 @@ checker 档与产品 GPU 包互不依赖：门禁 `.claude/gate.d/checker-indepe
 | `.claude/gate.d/experiment-number-directories.tsv` | 整份 |
 | `scripts/kb/quote-kb.py` | 1-60 |
 | `research/prompts/e185-preregistration.md` | 标题行；grep 12、22、23、28、32-48、87、100、149、182、189、197；193-232（只读口径、装置住哪与负载造法，没读结果） |
-| `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs` | 1-60（文件头口径） |
+| `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` | 1-60（文件头口径） |
 | `crates/singlefs-checker-tier/Cargo.toml`、`scripts/experiment-apparatus/Cargo.toml`、`Cargo.toml` | grep 20；1-80；15、20-24 |
 | `.claude/heavy-thread-default` | 整份 |
 
@@ -571,6 +719,58 @@ P 65536 live slots 131072 frag segments 2048 alloc before release units 98304 Gi
 ```
 
 其余是 `grep -n`、`sed -n`、`wc -l`、`ls` 读上表那些文件的只读命令。
+
+### 修订第 14 条写作时读过的文件与跑过的命令
+
+| 文件 | 读了哪些 |
+|---|---|
+| `.claude/agent-common.md` | 1-125 |
+| `.claude/rules/test-discipline.md`、`mutation-sampling.md`、`implementation-first.md`、`test-script-discipline.md`、`three-way-inference.md`、`evidence-discipline.md` | 整份 |
+| `research/prompts/e202-construction-by-whole-file-publishes-questions.md` | 整份 |
+| `research/prompts/e202-preregistration.md` | 1-82、166-604（第二节被测条款没读，本条不改它） |
+| `records/2026-11-17-里程碑四收口续做.md` | 150-181 |
+| `~/.local/share/singlefs/work/e202-pool-construction-no-space-investigation/result.md` | 1-110 |
+| `~/.local/share/singlefs/work/e202-run/construction-timing-2288MiB-P8192-P16384-after-the-second-speedup.out` | 第 70-80 行（`name=construction_timing`、`name=construction_phase`，只有 P=8192 的行；这是造池计时产物，不是 `research/results/` 下 E202 的产物） |
+| `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs` | 1560-1735、2119-2620；grep 命中 206-231、1317-1318、1849、8022-8053 |
+| `crates/singlefs-core/src/transaction.rs` | 1738-1768、5832-5845、10147-10177、10296-10324、11853-11879、12525-12548 |
+| `crates/singlefs-core/src/mounted_session.rs` | 147-207（`UserChange`） |
+| `crates/singlefs-core/src/allocator.rs` | 2289、3075 |
+| `.claude/kb/experiments/202-GPU与CPU两种模式GC对照组.md` | 整份 54 行（只为列实验页要改的行；页里没有产物，只有现状里老造法的读数） |
+| `scripts/kb/replace-once.py`、`scripts/kb/insert-row.py` | 文件头用法 |
+
+命令（原样）：
+
+```
+bash scripts/hosts/work-directory-ownership.sh claim ~/.local/share/singlefs/work/e202-construction-amendment-designer --purpose 'E202 造池改成一次发布写一整个文件的登记修订草稿与报告'
+grep -n '^#' research/prompts/e202-preregistration.md
+grep -c '垫片' research/prompts/e202-preregistration.md
+ls research/results | grep -i 'e202'
+sha256sum research/prompts/e202-preregistration.md crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
+python3 -c "
+import math
+S=16384; start=50176
+tiers=[('2288MiB',3072),('4GiB',4880),('8GiB',8976)]
+for name,mib in tiers:
+    b=mib<<20; slots=b//S-start; segs=slots//64; P=slots//4
+    seq=P//32; inter=P//16; ino=P//16+P//32+1; inopub=math.ceil(ino/4096)
+    data=inopub+seq+1+inter
+    unl=P//32+1; frag=2*unl
+    peak=3*P//64; budget=segs-peak
+    lo=data*0.073; hi=data*0.15; fl=frag*0.073
+    old=int(1.535*P)
+    print(name,'segs',segs,'P',P,'fragsegs',P//32,'seqsegs',P//64,'peakdataSegs',peak,'budget',budget,'inodes',ino,'inopub',inopub,'seqpub',seq,'interpub',inter,'datamount_pub',data,'unlinkcalls',unl,'unlinkpub~',frag,'old_datamount_pub~',old,'ratio',round(old/data,1),'clusterlow',round(lo),'clusterhigh',round(hi),'lowfrac',round(lo/budget,2),'highfrac',round(hi/budget,2),'fragmentmount_segs',round(fl))
+"
+```
+
+最后那条的输出（原样；表里聚簇段下界取 0.0734，这条命令里写的是 0.073，差 0.5%，表里的 252、451、902 与 168、301、602 另用 0.0734 现算）：
+
+```
+2288MiB segs 2288 P 36608 fragsegs 1144 seqsegs 572 peakdataSegs 1716 budget 572 inodes 3433 inopub 1 seqpub 1144 interpub 2288 datamount_pub 3434 unlinkcalls 1145 unlinkpub~ 2290 old_datamount_pub~ 56193 ratio 16.4 clusterlow 251 clusterhigh 515 lowfrac 0.44 highfrac 0.9 fragmentmount_segs 167
+4GiB segs 4096 P 65536 fragsegs 2048 seqsegs 1024 peakdataSegs 3072 budget 1024 inodes 6145 inopub 2 seqpub 2048 interpub 4096 datamount_pub 6147 unlinkcalls 2049 unlinkpub~ 4098 old_datamount_pub~ 100597 ratio 16.4 clusterlow 449 clusterhigh 922 lowfrac 0.44 highfrac 0.9 fragmentmount_segs 299
+8GiB segs 8192 P 131072 fragsegs 4096 seqsegs 2048 peakdataSegs 6144 budget 2048 inodes 12289 inopub 4 seqpub 4096 interpub 8192 datamount_pub 12293 unlinkcalls 4097 unlinkpub~ 8194 old_datamount_pub~ 201195 ratio 16.4 clusterlow 897 clusterhigh 1844 lowfrac 0.44 highfrac 0.9 fragmentmount_segs 598
+```
+
+其余是 `python3 -c` 的算术（挂钟与常驻估计：按上表式子代入，结果取整写进表）、`grep -n`、`sed -n`、`ls`、`wc -l` 读上表那些文件的只读命令。
 
 ## 十四、并行与挂钟
 

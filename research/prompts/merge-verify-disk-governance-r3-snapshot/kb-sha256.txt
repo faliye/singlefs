@@ -1,0 +1,4 @@
+a828f32be81e60b1fda589de9d30a6e2033f3ed6b9fcb803b28d68bff912843f  .claude/main-agent.md
+7624502887ba282ada04571205f712729610047362e2f756fe7b508af8df117d  .claude/singlefs-ai-sop/rules/show-me-test.md
+ade124757fca685b9b9d41d1ce1e9943b7eea8a9005a681561c05fae276f19a6  .claude/rules/implementation-workflow.md
+c08a7976a82d6bc6392d66a1c40f2e5aacb9b6902add549eb1fabe2445adf22d  research/prompts/merge-verify-disk-governance-r2-main-verification.md

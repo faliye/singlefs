@@ -40,7 +40,7 @@ $ diff patched.rs crates/singlefs-device-library/src/lib.rs
 - 三条测试：带换行（`lib.rs:761`，断言退 3 且 `requests_sent` 为空串）、带空格（`lib.rs:785`，同样两条断言）、内存坏键（`lib.rs:808`，断言退 3）。
 - 变异行三条：`crates/mutations.tsv:7605` 「判定库口子 read 不核相对键」点名带换行那条；`:7606` 「判定库口子 相对键规则放过空白」点名带空格那条；`:7607` 「判定库口子 read 只在转交那一种核相对键」点名内存坏键那条。
 - 证红：任务 12233 日志里这三行都是「抓到」（点名测试各自「红了」）；任务 12232（变异表静态核）退 0，末尾「CHECKED 7606 783 12」。
-- 修过头？没有。下游内存库测试在改后仍绿：E158 任务 12235 `158 passed`，E174、E178 任务 12236 `30 passed`、`54 passed`。三处调用方的键都是 `items/<键>.out`、`codes/<键>.txt`、`index.tsv`、`<轮键>.out` 拼成的（`scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs:2929-2939`，`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:24446-24448`）。一处旁注：E174 读 `previous_index.get(...)` 取出的 `previous_key` 来自库里存的 `index.tsv`（`e174_lease_drop_wait_memory_return.rs:3117`），库里那份若被写坏，`read` 现在退 3 而不是发出一个畸形请求——这是条 1 要的行为，不算过头。
+- 修过头？没有。下游内存库测试在改后仍绿：E158 任务 12235 `158 passed`，E174、E178 任务 12236 `30 passed`、`54 passed`。三处调用方的键都是 `items/<键>.out`、`codes/<键>.txt`、`index.tsv`、`<轮键>.out` 拼成的（`scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs:2929-2939`，`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/fifth_run_judgement_library.rs:94-96`）。一处旁注：E174 读 `previous_index.get(...)` 取出的 `previous_key` 来自库里存的 `index.tsv`（`e174_lease_drop_wait_memory_return.rs:3117`），库里那份若被写坏，`read` 现在退 3 而不是发出一个畸形请求——这是条 1 要的行为，不算过头。
 - 推翻条件：任一个后端的 `read` 在坏键上仍交 `None` 或发出字节；或三处核键的函数不是同一个。
 
 ### 条 2：`found` 报的长度分配不出时退 3，用可失败的分配；配测试与变异行

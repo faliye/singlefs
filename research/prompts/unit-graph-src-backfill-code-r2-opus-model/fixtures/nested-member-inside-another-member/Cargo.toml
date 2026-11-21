@@ -1,0 +1,2 @@
+[workspace]
+members = ["crates/outer", "crates/outer/inner"]

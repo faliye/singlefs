@@ -10,7 +10,7 @@
 
 英文名：three_oracle_collusion_after_the_oracle_fixes
 
-沿用上一次登记第一节第 1 行。不另起装置：入库装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 与研究一侧 `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/` 照用；原装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` 与研究一侧 `scripts/experiment-apparatus/e171_three_oracle_collusion/` 只改名单与引名单的地方（读法 3、4）。新写的只有研究一侧两份小脚本（撤项核算、名单核对，第五节 5.3）。
+沿用上一次登记第一节第 1 行。不另起装置：入库装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs` 与研究一侧 `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/` 照用；原装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs` 与研究一侧 `scripts/experiment-apparatus/e171_three_oracle_collusion/` 只改名单与引名单的地方（读法 3、4）。新写的只有研究一侧两份小脚本（撤项核算、名单核对，第五节 5.3）。
 
 主 agent 给的问题（派发提示「关的是哪几条」原文逐字）：
 
@@ -95,7 +95,7 @@ E171 自己的被测条款 D13（验证路线） 已定项 6「三个互相独�
 - **写死行集与项数的地方**（读法 7）：`segment_two_comparator.py`（sha256 `3b22a1d0…`）第 35 行 `TABLE_ROWS = 281`、第 231 行 `q2_verdict`、第 377 行 `q3_lines`；`rows_orchestrator_segment_two.py` 第 108 行 `TABLE_FILES`、第 109 行 `WHOLE_TABLE_ROWS = tuple(range(1, 282))`、第 218–223 行「不是恰好 1–281 就拒」；`count_reusable_units.py` 第 11 行「单元总数 330」、第 29 行；`rows_orchestrator_segment_two_revision_11.py` 第 345 行；`reuse_library.py` 第 135 行 `SELECTED_ROW_TABLES`；`frozen_tree_lines_revision_8.py` 第 95 行 `ROW_TABLES`；`rows_orchestrator_segment_two_revision_10.py` 第 102–103 行 `INPUT_RESEARCH_FILES`；`run_segment_two_on_the_revision_6_tree_multi_host.sh` 第 31 行。原目录：`expansion_table.py` 第 26–27 行（`FIRST_EXPANSION_ROW_NUMBER = 118`、`EXPECTED_EXPANSION_ROWS = 164`，原登记挑法的事实）、`comparator.py` 第 106 行（`expected_step_4_only=164`）与第 114–131 行 `expansion_table_lines`。
 - **原登记比对器的判定词**：`scripts/experiment-apparatus/e171_three_oracle_collusion/collusion_report.py`（sha256 `6ad0d810…`）第 196 行 `reading_verdict`（有一行全放行 → `yes_…`；D 不够 → `not_enough_rows`；严格读法到不了 → `not_reported_f7_…`），第 207 行 `q1_lines`、第 273 行 `q3_line`；`collusion_matrix.py` 第 279 行 `coverage_enough_to_judge`、第 284 行 `strict_reading_is_unreachable`。
 - **冻结层的 sha256 钉**：`.claude/kb/checks-owed.md` 第 592 行 C936（E171 冻结层按 sha256 钉住的编排器在 HEAD 上已对不上）——`rows_orchestrator_revision_8.py` 第 53 行钉的 `rows_orchestrator.py` sha256 与 HEAD 对不上、开跑先退 3，另几份冻结层的模块顶核对同红；第 594 行 C938（两格自证负载高时会抖）。
-- **入库装置**：`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`（12 972 行，sha256 `22400a1bfadca19c0f1caec20fbf38501495ab60a6dea84aedf3d1adc357e983`）第 17 行 `stream-constants [--streams 1,2,3]` 模式，第 211–227 行流三本地常量与出处注释（上一次登记修订 12、13 改过的那一段）。这一次不改它；`stream-constants` 在今天的主工作区上不过时照上一次登记修订 8 第 8.2 节分类办（S20）。
+- **入库装置**：`crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`（12 972 行，sha256 `22400a1bfadca19c0f1caec20fbf38501495ab60a6dea84aedf3d1adc357e983`）第 17 行 `stream-constants [--streams 1,2,3]` 模式，第 211–227 行流三本地常量与出处注释（上一次登记修订 12、13 改过的那一段）。这一次不改它；`stream-constants` 在今天的主工作区上不过时照上一次登记修订 8 第 8.2 节分类办（S20）。
 - **兼容旧版本的删法**：`records/2026-10-31-删兼容旧版本代码.md` 第 96 行（「延后（等实验执行员）」那一条点名两份名单第 119 行）与第 97 行（用户原话与本批派发）。
 
 ## 四、跑之前已经存在的数
@@ -137,7 +137,7 @@ E171 自己的被测条款 D13（验证路线） 已定项 6「三个互相独�
 
 ### 5.3 装置写在哪（写死）
 
-**装置一律走研究一侧** `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/`（Python，不与 `crates/` 共用代码）：撤项核算与名单核对问的是「名单与已有读数之间的算术」，独立模型答得了。入库装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 不改、只照用：撤项核算段里只跑它的 `stream-constants --streams 1,2,3`（钉值重核）；现状整表段照上一次登记修订 8、10、11 跑它。它要读的 `crates/` 常量同上一次登记第五节 5.3 与修订 8 第 8.2 节，这一次不加；`stream-constants` 不过时照修订 8 第 8.2 节甲乙丙三类办（S20）。
+**装置一律走研究一侧** `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/`（Python，不与 `crates/` 共用代码）：撤项核算与名单核对问的是「名单与已有读数之间的算术」，独立模型答得了。入库装置 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs` 不改、只照用：撤项核算段里只跑它的 `stream-constants --streams 1,2,3`（钉值重核）；现状整表段照上一次登记修订 8、10、11 跑它。它要读的 `crates/` 常量同上一次登记第五节 5.3 与修订 8 第 8.2 节，这一次不加；`stream-constants` 不过时照修订 8 第 8.2 节甲乙丙三类办（S20）。
 
 新写（每份带单测，单测进下面那张变异表）：
 - `list_check.py`：读法 5 的逐项核对、读法 3 的分类、改名单之后的核对（两个目录逐字节相同、行集等于两张表第一列之并、编号不重、除「未分类」外每一项在今天的表里恰命中 1 次）。读 `crates/mutations.tsv`、`git show HEAD:crates/mutations.tsv` 落到草稿目录的那一份、r1 用的那张表（读法 3 末条）、`.claude/kb/term-renames.md`。产物 `research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-list-check.out`。
@@ -342,7 +342,7 @@ E171 自己的被测条款 D13（验证路线） 已定项 6「三个互相独�
 
 2.2 **新钉值**（取上面那份产物各行 `crates=` 一栏，旧值是 `local=` 一栏）：流一段长 11 段 → 12 段（下标 2 多一段 2 写）、写数 41 → 43、全量 16 777 260 → 16 777 268、快档 46 → 54、闭式 16 777 240 → 16 777 243；流二段长 78 段 → 80 段（下标 2、17 各多一段 2 写）、写数 481 → 485、全量 1 678 377 204 → 1 678 377 220、快档 278 → 294、闭式 1 678 377 089 → 1 678 377 095；流三段长 959 段 → 960 段（下标 2 多一段 2 写，其余后移一位）、写数 5980 → 5982、全量 362 809 947 → 362 809 955、快档 3127 → 3135、闭式 362 808 742 → 362 808 745；Q5 删的屏障 (50, 51, 55, 56) → (54, 55, 59, 60)、根槽写 52 → 56、截断 81 → 85、反向截断 57 → 61。为什么变（推的，读 `crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs` 第 815–826、861–866 行的注释与断言，没在装置上另核）：今天的 crates 取号写两轮（D22（单元原子性怎么合成） 已定项 8 落地，每轮两盘各一写、轮后一道池屏障），每次取号多一段 2 写；流二取号两次，所以多两段；Q5 那一形的四个下标都在第二次取号之后，后推 4（两写两屏障）。三段新表各等于旧表在上述下标插进一个 2，闭式按新表 1 + Σ(2^n − 1) 现算与 `crates=` 闭式相等（草稿脚本 `tools/new_values2.py` 的输出，第十三节之外的草稿读数）。
 
-2.3 **改在哪**：只改 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 第 165–298 行那一段本地常量的值与出处注释，加内联单测 `local_segment_tables_reproduce_the_closed_forms_and_write_counts_copied_from_the_tests` 末两行钉的两个闭式（它们是同一组乙类常量的绝对值钉，不改就编过而单测红）。草稿副本在 `~/.local/share/singlefs/work/compat-removal-e171-r2-run-b/repin/`：改前 sha256 `22400a1bfadca19c0f1caec20fbf38501495ab60a6dea84aedf3d1adc357e983`（与第三节记的一致），改后 `173360b407d762356eb13b171987e8533fa1da4a230ab8663ac1355e99c45fb8`（12 977 行，`rustfmt --check` 过）；草稿脚本 `tools/check_repin.py` 逐个比 22 个常量与产物 `crates=` 一栏，改前 `pairs 22 differs 19`、改后 `pairs 22 differs 0`。换进主工作区由主 agent 照 S20 跑 `compile-then-swap.py`。
+2.3 **改在哪**：只改 `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs` 第 165–298 行那一段本地常量的值与出处注释，加内联单测 `local_segment_tables_reproduce_the_closed_forms_and_write_counts_copied_from_the_tests` 末两行钉的两个闭式（它们是同一组乙类常量的绝对值钉，不改就编过而单测红）。草稿副本在 `~/.local/share/singlefs/work/compat-removal-e171-r2-run-b/repin/`：改前 sha256 `22400a1bfadca19c0f1caec20fbf38501495ab60a6dea84aedf3d1adc357e983`（与第三节记的一致），改后 `173360b407d762356eb13b171987e8533fa1da4a230ab8663ac1355e99c45fb8`（12 977 行，`rustfmt --check` 过）；草稿脚本 `tools/check_repin.py` 逐个比 22 个常量与产物 `crates=` 一栏，改前 `pairs 22 differs 19`、改后 `pairs 22 differs 0`。换进主工作区由主 agent 照 S20 跑 `compile-then-swap.py`。
 
 2.4 **重钉之后的判法**：换上之后在主工作区再跑一次 `stream-constants --streams 1,2,3`，产物名 `research/results/e171-r2-three-oracle-collusion-after-the-oracle-fixes-2026-11-01-stream-constants-r2.out`（跑的那天不是 2026-11-01 的，照第 1.12 条换日期）：`grep -c 'holds=false'` 为 0、`name=verdict s1_failed_checks=0`、`grep -c '^E7RESULT '` 等于 `name=done emitted=` 的值（A26）、命令退 0，S20 才算过；与 2026-11-01 那一份逐行比，只许上面 19 行与第 82 行不同。拍树宣布之后、拍树之前，照上一次登记修订 8 第 8.2 节「怎么取」在宣布那一刻的草稿副本上再跑一次；crates 在这之间又变了的，照 S20 再归类，不沿用这一次的钉值。
 
@@ -794,7 +794,7 @@ Q1 撤项那一格与 Q2 不动：Q1 撤项那一格仍是 Z12 重跑之后三�
    3. 修订 9 第 9.3 条末段：E200 页量的两棵近似树都停在停机 S40。影响：只进第 11.9 条。
    4. 门槛在已有读数上的值（推的）：拿第 1 项的 T₂ = 75.274 秒代进去，R = 1800 秒，与杀进程限时相同，第二段没有门槛行；第一段在这一条的跑法上没有 T。
    5. 第 11.12 条第 4 项那两处钉值与被钉文件此刻的 sha256 不同（量的）。
-   6. 装置是否随线程数变快（a）：`crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 里 `grep -n 'thread\|rayon\|par_iter\|available_parallelism\|THREAD_CAP\|spawn'` 零命中，它经 `GivenStatesEngine` 与 `crash_state_enumeration` 判态（文件第 2、32、109 行），那两处用不用多线程这一次没读；a 照第 11.4 条当未知。
+   6. 装置是否随线程数变快（a）：`crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs` 里 `grep -n 'thread\|rayon\|par_iter\|available_parallelism\|THREAD_CAP\|spawn'` 零命中，它经 `GivenStatesEngine` 与 `crash_state_enumeration` 判态（文件第 2、32、109 行），那两处用不用多线程这一次没读；a 照第 11.4 条当未知。
 
 11.14 **设计这一条时读过的文件与跑过的命令**（2026-11-06，HEAD `ff5dca7d22b1c6f95b2ac64a8c79e0467d580d1c`；研究目录 `git status --porcelain` 为空，本登记是 ` M`，改前 sha256 `8aea17911c4c155c89162027bc7bf058e8c5470590c06d106be383b142b8bf77`）：
    - `.claude/agent-common.md`（整份）；规则整份：`.claude/singlefs-ai-sop/rules/test-discipline.md`、`.claude/rules/three-way-inference.md`、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`、`.claude/rules/mutation-sampling.md`、`.claude/rules/implementation-first.md`、`.claude/rules/test-script-discipline.md`。
@@ -831,7 +831,7 @@ Q1 撤项那一格与 Q2 不动：Q1 撤项那一格仍是 Z12 重跑之后三�
 - 两份名单（四个文件）：第 1–3 行、扩表第 117–121 行；`awk` 逐行取第 1、3、5 列。
 - `crates/mutations.tsv`（今天、`HEAD`、`0c7fdb82b`、`f8a9ddaab`、`73866746b`、`d6dd6da42`、`4e8b03705` 七个版本）：只经 `awk` 按名字与三样取行，命中行原样见草稿 `q2-lookup.txt`、`q2-history.txt`；第 476、612–620、954–956、2517 行（`grep` 现名）。
 - `crates/singlefs-core/src/system_configuration.rs`：`grep -n 'INCOMPAT\|incompat'` 命中的第 24–36、164、598、705–724、824–860 行。
-- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：`grep` 命中的第 17、21、211、215、227 行。
+- `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`：`grep` 命中的第 17、21、211、215、227 行。
 - `.claude/kb/checks-owed.md`：`grep` 命中的第 282、407、444、448、469、555、559、563、587、588、592、594、785、828 行；第 592、594 行整行。
 - `.claude/kb/term-renames.md` 第 24–34 行（`grep '层 0'`）；`.claude/term-rename-exempt` 第 89–94 行；`.claude/gate.d/mutation-duplicates-lag.tsv` 第 1–16 行；`.claude/gate.d/counted-claims.tsv` 第 1–12 行；`.claude/gate.d/replay-comparison-units.tsv` 第 1–40 行；`.claude/gate.d/doc-experiments.sh` `grep` 命中的第 27–88、143–144 行。
 - `records/2026-10-31-删兼容旧版本代码.md`：`grep` 命中行与第 88–97 行。

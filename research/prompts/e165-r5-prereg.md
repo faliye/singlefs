@@ -10,13 +10,13 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`，自造表仍是 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`）
+英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`，不另起新装置；驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`，自造表仍是 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`）
 
 主 agent 给的问题（派发提示原句，逐字；只抄与问题相关的四条，「前几次登记」「被测条款」「交付」几条与草稿目录不抄，前两样的落点在本登记开头与第二节）：
 
 > 任务：写 E165（恢复重放有界穷举与变异杀伤界） 第 5 次重跑的重跑登记 `research/prompts/e165-r5-prereg.md`（重跑，不占号；节名照你定义里「登记的固定节名」）。
 > - 问题单：`research/prompts/m3-r1-batch9-reruns-questions.md` 第 3 行（sha256 d6b328eb…）。要回答的问题照那一行：记录格式按今天的新根段（后三项实例表指针、分配记录树根指针、卸载记号，364 字节）与施加七项全取记录改过之后，有界穷举的判定与变异杀伤界是否仍与第 4 次重跑相同；翻面观测、够判条件照那一行。
-> - 事实表：`research/prompts/m3-r1-batch9-reruns-evidence/e165-format-change-facts.md`（sha256 6892de6f…，根环那条线事务员现查）。要点：改动全出自根环那条线第 7 批 7-2；装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 直接调 core 编解码，但 r2 / r3 档投影之外的字段（第 597–604 行一带）与 J7a/b/c 判据（第 3284 行一带）还照旧的「抄所选根」规则登记，源码第 380–387 行自己写明要重新登记；驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` r4 档钉的三个 sha256 今天全对不上；7-2 同时让系统配置读错取 R2（`crates/singlefs-core/src/recovery.rs` 第 3322 行一带），实验页第 616 行一带「闸取的是实现今天的取甲」那句的前提变了。登记里要逐条写这几处怎么处置（重新登记的判据跑前写死）。
+> - 事实表：`research/prompts/m3-r1-batch9-reruns-evidence/e165-format-change-facts.md`（sha256 6892de6f…，根环那条线事务员现查）。要点：改动全出自根环那条线第 7 批 7-2；装置 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 直接调 core 编解码，但 r2 / r3 档投影之外的字段（第 597–604 行一带）与 J7a/b/c 判据（第 3284 行一带）还照旧的「抄所选根」规则登记，源码第 380–387 行自己写明要重新登记；驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` r4 档钉的三个 sha256 今天全对不上；7-2 同时让系统配置读错取 R2（`crates/singlefs-core/src/recovery.rs` 第 3322 行一带），实验页第 616 行一带「闸取的是实现今天的取甲」那句的前提变了。登记里要逐条写这几处怎么处置（重新登记的判据跑前写死）。
 > - 执行的时机：执行员要等固定脚本那条流写次数终值与删除与并发那条线第 14 批合入之后才派；登记里写一条「开跑前把装置里引用的记录格式与 `crates/singlefs-core/src/recovery.rs` 当时的样子逐处对一遍，对不上先回登记」。
 > - 段：照你判断切，段与段不共用装置改动的写明，主 agent 照它并行派执行员。
 
@@ -223,7 +223,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 ```markdown
 #### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」
 
-**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 不是产品调用方。四个里程碑依次是：
+**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 不是产品调用方。四个里程碑依次是：
 
 | 里程碑 | 义务 | 落点 |
 |---|---|---|
@@ -374,7 +374,7 @@ M1–M4 的前提与域：语义层只挂「同一 (实例代号, 计数器) 在
 - 选行四条在今天的工作区上现核（`/tmp/claude-1000/m3-formal-21-3/names_today.py`，sha256 `f03457075db6e9e6e55a155fb984e83ebc9a0429848f1f085d08a51efb4154f7`，只读）：r2 模式那 23 个名字各恰 1 行、文件列是两份之一、原文命中 1 次、命中处落在今天的九个函数区间里（今天的区间：replay-prefix `record_ends_its_publish` 3101–3109、`readable_record_of_the_same_publish_follows` 3113–3228、`counter_of_the_last_record_the_root_covers` 3232–3300、`is_above_the_chosen_root` 3303–3312、`maximum_transaction_of` 3315–3361、`judge_the_candidate` 3372–3537、`replay_core` 3543–3975，`recovery.rs` `judge_back_chain_against_the_previous_record_on_disk` 3404–3436、`replay_journal` 3467–3614）；r3 / r4 模式那 6 个名字今天在表第 1810–1815 行，各恰 1 行、命中 1 次，落在 `choose_root_slot`（`lib.rs` 3980–4019）或 `choose_root`（`recovery.rs` 1268–1305）里。
 - **自造表 Z5 的锚点腐化**：原文 `unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,` 在今天的 `recovery.rs` 命中 0 次（7-2 改了那一行）。r2 模式开工第 2 步逐条核锚点，会整轮退 3、一条都不跑（`.claude/rules/mutation-sampling.md` 第七类）。Z1–Z4 各命中 1 次。
 
-**装置写在哪（写死）**：入库装置，改 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 这一份（同 r2–r4 登记第三节）。理由：三格问的都是 `crates/` 今天这份 `replay_journal`（与 `choose_root`、`scan_journal`）在记录格式改过之后的性质与它的变体，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外，同原登记第三节）。判据一侧（含第五节 5.3 新写的 J8 期望）只用本地常量与生成时记下的真相，不调 core 的施加、不读 `replay_journal` 的结果定期望。**这一次没有新读的 `crates/` 常量**：J8 的期望是「记录里那三项」与「所选根的 fsid」，都是生成器自己造、自己记下的值；r1–r4 档那几张本地常量回比表照旧生效（原登记第三节、r2 登记第三节、r4 登记第三节）。
+**装置写在哪（写死）**：入库装置，改 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 这一份（同 r2–r4 登记第三节）。理由：三格问的都是 `crates/` 今天这份 `replay_journal`（与 `choose_root`、`scan_journal`）在记录格式改过之后的性质与它的变体，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外，同原登记第三节）。判据一侧（含第五节 5.3 新写的 J8 期望）只用本地常量与生成时记下的真相，不调 core 的施加、不读 `replay_journal` 的结果定期望。**这一次没有新读的 `crates/` 常量**：J8 的期望是「记录里那三项」与「所选根的 fsid」，都是生成器自己造、自己记下的值；r1–r4 档那几张本地常量回比表照旧生效（原登记第三节、r2 登记第三节、r4 登记第三节）。
 
 **第 5 次从哪份根起（写死）**：第一段开工那一刻**主工作区**的拷贝（`Cargo.toml`、`Cargo.lock`、`.cargo/`、`crates/`，不带 `target`），整份拷进第一段草稿目录下的 `root/`，当场建 `sha256sum` 清单（清单本身的 sha256 写进交回与第十二节修订）。拷之前跑第十一节 PH1 的对拍清单。第二、三、四段都在这份根上（第三段盖上自己改的装置与 `crates/mutations.tsv`，第二段的驱动与自造表在仓里改、`--root` 指这份根）；主工作区在各段之间被别人改，不进这份根。不从第 4 次的根起：被测的是 7-2 之后的实现。
 
@@ -714,7 +714,7 @@ C8a、C8c 在 C 域 Nc ≤ 3 上只要求 > 0（C 域所选根随落盘变，钉
 | `crates/singlefs-core/src/root_record.rs` | 23–27；40–48 |
 | `crates/singlefs-format/src/lib.rs` | grep 命中的 220、223、229 行 |
 | `crates/mutations.tsv` | 1810–1815 第一列；第 1857、2156、2157、2158、2236 行（awk 取列）；`journal.rs` 那几行的第一列 |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 70–90；296–400；540–672；860–930；2770–2835；2895–2945；3284–3330；4740–4866；grep 命中行（`name=` 行名统计、`name=violations` / `name=verdict` / `name=self_check` / `name=control` 的格式行、几个函数名与常量、「311」「188」） |
+| `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` | 70–90；296–400；540–672；860–930；2770–2835；2895–2945；3284–3330；4740–4866；grep 命中行（`name=` 行名统计、`name=violations` / `name=verdict` / `name=self_check` / `name=control` 的格式行、几个函数名与常量、「311」「188」） |
 | `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 1–120；186–370；1042–1100；grep 命中行 |
 | `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` | 全文 |
 | `scripts/experiment-apparatus/replay.sh` | grep `e165` 命中的 224–238 与 555–658；548–670 里 E165 那几段注释 |
@@ -801,7 +801,7 @@ cd research/results && sha256sum、wc -l 十九份比对对象
 
 ### 修1.一、问题
 
-英文名：replay_bounded_enumeration（照抄；装置、驱动、自造表都不另起，装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
+英文名：replay_bounded_enumeration（照抄；装置、驱动、自造表都不另起，装置仍是 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`，驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
 
 主 agent 给的问题（派发提示原句，逐字；只抄任务那一句）：
 
@@ -908,7 +908,7 @@ cd research/results && sha256sum、wc -l 十九份比对对象
 
 **驱动今天的样子**：r4 模式调装置的参数 `R4_BOUNDS_ARGUMENTS`（`327`）、钉值 `R4_REGISTERED`（`344` 起，TV7 的比对对象 `segment1_product` `365`）、KG 钉值 `R4_KG_RULE_READINGS`（`316`）。第二段加 `--pins r5` 之后这几行还会动。
 
-**装置写在哪（写死）**：入库装置，改 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 这一份（同第三节）。理由同 r4 登记第三节：Q1、Q2 问的是 `crates/` 今天这份三步在 R2 下写得出的带故障历史上的性质与这份代码的变体，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外）。生成器与判据一侧照条款另写，不调 core 的判定函数。**这一段没有新读的 `crates/` 常量**：R2 只用每块盘系统配置槽数 2，那个本地常量与回比断言 r4 已加（r4 登记第三节那张表第 1 行，`singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE`）。
+**装置写在哪（写死）**：入库装置，改 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 这一份（同第三节）。理由同 r4 登记第三节：Q1、Q2 问的是 `crates/` 今天这份三步在 R2 下写得出的带故障历史上的性质与这份代码的变体，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外）。生成器与判据一侧照条款另写，不调 core 的判定函数。**这一段没有新读的 `crates/` 常量**：R2 只用每块盘系统配置槽数 2，那个本地常量与回比断言 r4 已加（r4 登记第三节那张表第 1 行，`singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE`）。
 
 ### 修1.四、跑之前已经存在的数
 
@@ -1237,7 +1237,7 @@ KA（`anchors_r3_ka.py`，同 r4）：125 态，没有一条自证过的根的 1
 | `crates/singlefs-core/src/mount.rs` | 395–460；1225–1260；3790–3900；4540–4660；5300–5500；grep 命中的 58、247、403、448、704、1230、3805、3822、3826、3861、4058、4422–4430、4592、4627、4633、5329、5354、5360、5362、5389、5401、5439 |
 | `crates/singlefs-core/src/transaction.rs` | 395–412；640–760；grep 命中的 108、405、407、443、453、677、705、720；`write_acquired_instance` 与第 4 次的根那一份的 `diff`（两句注释） |
 | 第 4 次的根 `/tmp/claude-1000/e165-r4-segment1b/root` 的 `mount.rs`、`transaction.rs` | grep 命中的 405、433、3234、3289、4463、4531；`self_verified_system_configurations_of_every_device` 的 grep 片段 |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 12471–12501；12985–13075；13150–13200；15575–15600；grep 命中的 2093、2105、2332、2652、4060、7072、8199、9736、9748、11961、12031、12173、12181、12225、12420、12612、12640、12675、12704、12925、12926、12990、12997、13152、13166–13198、13466、13484、13532、13565、13586、13626、13646、13964、14058、14156、14180、14200、14798、14839、14904、14989、15219–15280、15421、15441、15485、15587–15591、15608、15624、15725、15881、15905、15967、15968、16028、16191、16520、17469、17514、17515、17533、17543、17563、17570 |
+| `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` | 12471–12501；12985–13075；13150–13200；15575–15600；grep 命中的 2093、2105、2332、2652、4060、7072、8199、9736、9748、11961、12031、12173、12181、12225、12420、12612、12640、12675、12704、12925、12926、12990、12997、13152、13166–13198、13466、13484、13532、13565、13586、13626、13646、13964、14058、14156、14180、14200、14798、14839、14904、14989、15219–15280、15421、15441、15485、15587–15591、15608、15624、15725、15881、15905、15967、15968、16028、16191、16520、17469、17514、17515、17533、17543、17563、17570 |
 | `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 336–372；grep 命中的 28–54、252、316、327、339、365、367、1139、1164、1312、1469–1474、1509–1521、1559 |
 | `crates/mutations.tsv` | grep `system_configuration_witness_is_undecidable` 命中的 2164–2168；grep `E165 r4 第一段` 命中的 1979、1980、1996 与计数 18 |
 | `crates/singlefs-harness/tests/system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both.rs`、`a_writable_mount_with_system_configuration_slot_zero_unreadable.rs`、`crates/singlefs-harness/src/mount_transparency.rs` | grep 命中的第 2、6、1359 行 |

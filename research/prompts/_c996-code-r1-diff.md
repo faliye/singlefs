@@ -3125,7 +3125,7 @@ index 48c8099..9b2af18 100644
  
 ````
 
-### crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs
+### crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs
 
 ````diff
 diff --git a/crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs b/crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs

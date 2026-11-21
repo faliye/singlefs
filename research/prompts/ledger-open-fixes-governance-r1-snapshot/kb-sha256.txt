@@ -1,0 +1,5 @@
+121009baaf1ac6896489dabd3aa249324de1069b4e678f7901dee8265b6ce999  .claude/kb/experiments/07-离线索引harness.md
+e40e3b4a7650b7bfdf8f20868fd07389a90e6cb313b7ff4454dd53f9c849398d  .claude/kb/experiments/53-丢一整块盘之后根环还挂不挂得上.md
+bc9a4c215e120fbace86bee4ebbc316903cbc1d0f09318ae7b061751153e9413  .claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md
+60bde28dcc97b72295b9904777d4dd1b4feef57aaf5ed92c96dbce97f3651ede  .claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md
+f46d000d9cde86503882199d48142b00bcb16a83c5421a71b71f3002d5ad31ed  .claude/kb/tooling.md

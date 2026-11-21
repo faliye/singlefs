@@ -1,0 +1,3460 @@
+diff --git a/crates/singlefs-background-gpu-tests/build.rs b/crates/singlefs-background-gpu-tests/build.rs
+index 3cb081d32..114fdc46f 100644
+--- a/crates/singlefs-background-gpu-tests/build.rs
++++ b/crates/singlefs-background-gpu-tests/build.rs
+@@ -19,9 +19,9 @@ use singlefs_unit_graph::build_features::{
+     features_enabled_on_the_dependencies, FeaturesEnabledByTheBuild,
+ };
+ use singlefs_unit_graph::build_toolchain::{
+-    effective_profile_lines, profile_environment_variable,
++    effective_profile_lines, environment_variables_the_profile_lines_read,
+     profile_name_of_the_build_script_profile_variable, toolchain_lines_of_the_build,
+-    BuildToolchainInputs, PROFILE_SETTING_KEYS,
++    BuildToolchainInputs,
+ };
+ use singlefs_unit_graph::entry_groups::{
+     entry_group_key_with_the_features_of_the_build,
+@@ -210,10 +210,9 @@ fn main() {
+             repository_root.join(path).display()
+         );
+     }
+-    for setting_key in PROFILE_SETTING_KEYS {
+-        println!(
+-            "cargo:rerun-if-env-changed={}",
+-            profile_environment_variable(&profile_name, setting_key)
+-        );
++    // profile 的生效值读到的每个环境变量都报：其中任一个变了（含定 `codegen-units` 缺省值的 `CARGO_PROFILE_<名>_INCREMENTAL` 与
++    // `CARGO_INCREMENTAL`），构建脚本重跑、键重算
++    for environment_variable_name in environment_variables_the_profile_lines_read(&profile_name) {
++        println!("cargo:rerun-if-env-changed={environment_variable_name}");
+     }
+ }
+diff --git a/crates/singlefs-unit-graph/src/build_toolchain.rs b/crates/singlefs-unit-graph/src/build_toolchain.rs
+index 89f871c69..c84e750b8 100644
+--- a/crates/singlefs-unit-graph/src/build_toolchain.rs
++++ b/crates/singlefs-unit-graph/src/build_toolchain.rs
+@@ -13,9 +13,10 @@ use std::collections::BTreeMap;
+ 
+ use crate::manifest::{parse_toml_entries, TomlValue};
+ 
+-/// 进键的 profile 设置：会改编出来的代码跑出的结果的那几样（按 cargo 文档 Profiles 一节的键名）。
+-/// `debug`（调试信息）与 `incremental`（增量编译）不改编出来的代码跑出的结果，不进键：根清单与 `CARGO_PROFILE_<名>_<键>`
+-/// 里写了也不读。`codegen-units` 进键：它改代码分区与栈深。依据是 D13（验证路线） 已定项 17
++/// 进键的 profile 设置：会改编出来的代码跑出的结果的那几样（按 cargo 文档 Profiles 一节的键名），每个一行。
++/// `debug`（调试信息）不改编出来的代码跑出的结果，不进键：根清单与 `CARGO_PROFILE_<名>_<键>` 里写了也不读。
++/// `codegen-units` 进键：它改代码分区与栈深。`incremental`（增量编译）自己不出行，只在 `codegen-units` 没写时定它的生效值
++/// （[`CODEGEN_UNITS_WHEN_INCREMENTAL`]、[`CODEGEN_UNITS_WHEN_NOT_INCREMENTAL`]）。依据是 D13（验证路线） 已定项 17
+ /// 「工具链（含 cargo 解析后的生效构建环境与外部工具版本）」那一句。
+ pub const PROFILE_SETTING_KEYS: [&str; 6] = [
+     "opt-level",
+@@ -26,18 +27,114 @@ pub const PROFILE_SETTING_KEYS: [&str; 6] = [
+     "codegen-units",
+ ];
+ 
++/// 定 `codegen-units` 生效值的那一个设置的键名：它自己不出行。
++const INCREMENTAL_SETTING_KEY: &str = "incremental";
++
++/// `codegen-units` 的键名（[`PROFILE_SETTING_KEYS`] 里那一个）。
++const CODEGEN_UNITS_SETTING_KEY: &str = "codegen-units";
++
++/// 根清单与 `CARGO_PROFILE_<名>_<键>` 里读的设置：进键的那几样加 [`INCREMENTAL_SETTING_KEY`]。
++const PROFILE_SETTINGS_READ: [&str; 7] = [
++    "opt-level",
++    "debug-assertions",
++    "overflow-checks",
++    "lto",
++    "panic",
++    "codegen-units",
++    "incremental",
++];
++
++/// `codegen-units` 没写、增量编译开着时 rustc 取的代码生成单元数。缺省值照 cargo 文档 Profiles 一节，本机没有文档可核
++/// （`rustc -C help` 的 codegen-units 条不写缺省值，工具链目录与 `~/.cargo/registry` 里没有 cargo 的文档与源码）。
++pub const CODEGEN_UNITS_WHEN_INCREMENTAL: &str = "256";
++
++/// `codegen-units` 没写、增量编译关着时 rustc 取的代码生成单元数。缺省值照 cargo 文档 Profiles 一节，本机没有文档可核
++/// （同 [`CODEGEN_UNITS_WHEN_INCREMENTAL`]）。
++pub const CODEGEN_UNITS_WHEN_NOT_INCREMENTAL: &str = "16";
++
++/// 盖过所有 profile 的增量编译开关（cargo 文档 Environment variables 一节）：`1` 强开、`0` 强关。
++pub const CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE: &str = "CARGO_INCREMENTAL";
++
++/// 内置的根 profile（`dev`、`release`）：没写时各设置的默认值（cargo 文档 Profiles 一节「Default profiles」）。
++/// `codegen-units` 不在里面：它没写时的值由生效的 `incremental` 定。
++struct BuiltinRootProfile {
++    defaults: [(&'static str, &'static str); 6],
++}
++
++/// 内置 profile 是根（带默认值）还是继承别的内置 profile。
++enum BuiltinProfile {
++    Root(BuiltinRootProfile),
++    InheritsBuiltin(&'static str),
++}
++
+ /// 内置 profile 的默认值与它继承谁（cargo 文档 Profiles 一节「Default profiles」）。
+-fn builtin_profile(profile_name: &str) -> Option<(Option<&'static str>, [&'static str; 6])> {
+-    // 次序照 [`PROFILE_SETTING_KEYS`]
++fn builtin_profile(profile_name: &str) -> Option<BuiltinProfile> {
+     match profile_name {
+-        "dev" => Some((None, ["0", "true", "true", "false", "unwind", "256"])),
+-        "release" => Some((None, ["3", "false", "false", "false", "unwind", "16"])),
+-        "test" => Some((Some("dev"), [""; 6])),
+-        "bench" => Some((Some("release"), [""; 6])),
++        "dev" => Some(BuiltinProfile::Root(BuiltinRootProfile {
++            defaults: [
++                ("opt-level", "0"),
++                ("debug-assertions", "true"),
++                ("overflow-checks", "true"),
++                ("lto", "false"),
++                ("panic", "unwind"),
++                ("incremental", "true"),
++            ],
++        })),
++        "release" => Some(BuiltinProfile::Root(BuiltinRootProfile {
++            defaults: [
++                ("opt-level", "3"),
++                ("debug-assertions", "false"),
++                ("overflow-checks", "false"),
++                ("lto", "false"),
++                ("panic", "unwind"),
++                ("incremental", "false"),
++            ],
++        })),
++        "test" => Some(BuiltinProfile::InheritsBuiltin("dev")),
++        "bench" => Some(BuiltinProfile::InheritsBuiltin("release")),
+         _ => None,
+     }
+ }
+ 
++/// profile 里 `incremental` 的生效文字读成开没开：只认 `true` / `false`。
++fn incremental_setting_is_on(setting_text: &str) -> Result<bool, String> {
++    match setting_text {
++        "true" => Ok(true),
++        "false" => Ok(false),
++        other => Err(format!(
++            "profile 的 incremental 写成「{other}」，只认 true / false"
++        )),
++    }
++}
++
++/// 生效的增量编译开关：profile 里的生效值，再由 [`CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE`] 盖（`1` 开、`0` 关）。
++fn incremental_compilation_is_on(
++    profile_incremental_text: &str,
++    cargo_incremental: Option<String>,
++) -> Result<bool, String> {
++    let is_on_by_the_profile = incremental_setting_is_on(profile_incremental_text)?;
++    match cargo_incremental.as_deref() {
++        None => Ok(is_on_by_the_profile),
++        Some("1") => Ok(true),
++        Some("0") => Ok(false),
++        Some(other) => Err(format!(
++            "{CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE} 设成「{other}」，只认 1 / 0"
++        )),
++    }
++}
++
++/// 这个 profile 的生效值读到的全部环境变量：每个读的设置一个 `CARGO_PROFILE_<名>_<键>`，加
++/// [`CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE`]。构建脚本照它报 `cargo:rerun-if-env-changed`。
++#[must_use]
++pub fn environment_variables_the_profile_lines_read(profile_name: &str) -> Vec<String> {
++    let mut names: Vec<String> = PROFILE_SETTINGS_READ
++        .iter()
++        .map(|setting_key| profile_environment_variable(profile_name, setting_key))
++        .collect();
++    names.push(CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE.to_string());
++    names
++}
++
+ /// 一个 TOML 值写成键行里的文字：串照原样，布尔写 `true` / `false`，数照原文。
+ fn setting_text(value: &TomlValue) -> Option<String> {
+     match value {
+@@ -68,10 +165,13 @@ pub fn profile_name_of_the_build_script_profile_variable(profile_variable: &str)
+ }
+ 
+ /// 这个 profile 的生效值：`profile: <名>` 一行，再按 [`PROFILE_SETTING_KEYS`] 的次序每个键一行 `profile.<键>: <值>`。
++/// 每个设置依次由内置默认、根清单从继承链的根到叶、`CARGO_PROFILE_<名>_<键>` 盖；`codegen-units` 三处都没写时，
++/// 由生效的增量编译开关（`incremental` 照同样三层盖，最后再由 [`CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE`] 盖）定。
+ /// `environment` 读环境变量（构建脚本交 `std::env::var`，测试交假的）。
+ ///
+ /// # Errors
+-/// 根清单读不了；profile 不是内置的四种、根清单里也没写；`inherits` 绕成了圈。
++/// 根清单读不了；profile 不是内置的四种、根清单里也没写；`inherits` 绕成了圈；`incremental` 或
++/// [`CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE`] 的值认不得。
+ pub fn effective_profile_lines(
+     root_manifest_text: &str,
+     profile_name: &str,
+@@ -110,8 +210,8 @@ pub fn effective_profile_lines(
+             .and_then(|settings| settings.get("inherits"))
+             .cloned();
+         match (builtin_profile(&current), inherited_from_the_manifest) {
+-            (Some((None, defaults)), _) => break defaults,
+-            (Some((Some(parent), _)), None) => current = parent.to_string(),
++            (Some(BuiltinProfile::Root(root)), _) => break root.defaults,
++            (Some(BuiltinProfile::InheritsBuiltin(parent)), None) => current = parent.to_string(),
+             (_, Some(parent)) => current = parent,
+             (None, None) => {
+                 return Err(format!(
+@@ -120,25 +220,42 @@ pub fn effective_profile_lines(
+             }
+         }
+     };
+-    let mut effective: BTreeMap<&str, String> = PROFILE_SETTING_KEYS
++    let mut effective: BTreeMap<&str, String> = root_defaults
+         .iter()
+-        .zip(root_defaults)
+-        .map(|(key, value)| (*key, value.to_string()))
++        .map(|(key, value)| (*key, (*value).to_string()))
+         .collect();
+     for profile in chain.iter().rev() {
+         if let Some(settings) = written.get(profile) {
+-            for key in PROFILE_SETTING_KEYS {
++            for key in PROFILE_SETTINGS_READ {
+                 if let Some(value) = settings.get(key) {
+                     effective.insert(key, value.clone());
+                 }
+             }
+         }
+     }
+-    for key in PROFILE_SETTING_KEYS {
++    for key in PROFILE_SETTINGS_READ {
+         if let Some(value) = environment(&profile_environment_variable(profile_name, key)) {
+             effective.insert(key, value);
+         }
+     }
++    let profile_incremental_text = effective
++        .remove(INCREMENTAL_SETTING_KEY)
++        .expect("内置根 profile 的默认值里有 incremental，上面只往里盖、不删");
++    let is_incremental = incremental_compilation_is_on(
++        &profile_incremental_text,
++        environment(CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE),
++    )?;
++    if !effective.contains_key(CODEGEN_UNITS_SETTING_KEY) {
++        let codegen_units_by_default = if is_incremental {
++            CODEGEN_UNITS_WHEN_INCREMENTAL
++        } else {
++            CODEGEN_UNITS_WHEN_NOT_INCREMENTAL
++        };
++        effective.insert(
++            CODEGEN_UNITS_SETTING_KEY,
++            codegen_units_by_default.to_string(),
++        );
++    }
+     let mut lines = vec![format!("profile: {profile_name}")];
+     lines.extend(
+         PROFILE_SETTING_KEYS
+@@ -207,7 +324,7 @@ mod tests {
+     fn the_release_profile_takes_the_root_manifest_over_the_builtin_defaults() {
+         let lines =
+             effective_profile_lines(ROOT_MANIFEST, "release", &no_environment).expect("算得出");
+-        // 根清单里的 `debug = true` 不出行；`codegen-units` 取内置默认
++        // 根清单里的 `debug = true` 不出行；`codegen-units` 没写，由 release 内置的不增量定
+         assert_eq!(
+             lines,
+             [
+@@ -238,31 +355,228 @@ mod tests {
+         .expect("算得出")
+     }
+ 
++    /// 这个 profile 在给定的根清单与环境变量下的 `profile.codegen-units` 那一行。
++    fn codegen_units_line_of(
++        root_manifest_text: &str,
++        profile_name: &str,
++        environment: &dyn Fn(&str) -> Option<String>,
++    ) -> String {
++        effective_profile_lines(root_manifest_text, profile_name, environment)
++            .expect("算得出")
++            .into_iter()
++            .find(|line| line.starts_with("profile.codegen-units: "))
++            .expect("codegen-units 是进键的设置，每份生效值都有这一行")
++    }
++
+     #[test]
+-    fn debug_and_incremental_leave_the_profile_lines_byte_for_byte_unchanged() {
++    fn debug_leaves_the_profile_lines_byte_for_byte_unchanged() {
+         assert_eq!(
+             release_lines_of("debug = true\n"),
+             release_lines_of("debug = false\n"),
+             "只差 debug"
+         );
+-        assert_eq!(
+-            release_lines_of("debug = 2\nincremental = true\n"),
+-            release_lines_of("debug = 2\nincremental = false\n"),
+-            "只差 incremental"
+-        );
+         let without_environment = release_lines_of("debug = 2\n");
+         let with_environment =
+             effective_profile_lines(&release_manifest_with("debug = 2\n"), "release", &|name| {
+-                matches!(
+-                    name,
+-                    "CARGO_PROFILE_RELEASE_DEBUG" | "CARGO_PROFILE_RELEASE_INCREMENTAL"
+-                )
+-                .then(|| "true".to_string())
++                (name == "CARGO_PROFILE_RELEASE_DEBUG").then(|| "true".to_string())
+             })
+             .expect("算得出");
+         assert_eq!(
+             without_environment, with_environment,
+-            "只差 CARGO_PROFILE_RELEASE_DEBUG 与 CARGO_PROFILE_RELEASE_INCREMENTAL"
++            "只差 CARGO_PROFILE_RELEASE_DEBUG"
++        );
++    }
++
++    #[test]
++    fn incremental_in_the_root_manifest_changes_the_codegen_units_line_and_has_no_line_of_its_own()
++    {
++        let incremental = release_lines_of("debug = 2\nincremental = true\n");
++        let not_incremental = release_lines_of("debug = 2\nincremental = false\n");
++        assert_ne!(
++            incremental, not_incremental,
++            "只差 incremental：codegen-units 没写时生效的切法不同"
++        );
++        assert!(
++            incremental.contains(&"profile.codegen-units: 256".to_string()),
++            "{incremental:?}"
++        );
++        assert!(
++            not_incremental.contains(&"profile.codegen-units: 16".to_string()),
++            "{not_incremental:?}"
++        );
++        assert!(
++            !incremental
++                .iter()
++                .chain(&not_incremental)
++                .any(|line| line.starts_with("profile.incremental")),
++            "incremental 自己不出行：{incremental:?} {not_incremental:?}"
++        );
++    }
++
++    #[test]
++    fn an_explicit_codegen_units_is_not_changed_by_incremental() {
++        assert_eq!(
++            release_lines_of("codegen-units = 4\nincremental = true\n"),
++            release_lines_of("codegen-units = 4\nincremental = false\n"),
++            "根清单写了 codegen-units，只差 incremental"
++        );
++        let manifest_with_incremental = release_manifest_with("incremental = true\n");
++        assert_eq!(
++            codegen_units_line_of(&manifest_with_incremental, "release", &|name| {
++                (name == "CARGO_PROFILE_RELEASE_CODEGEN_UNITS").then(|| "4".to_string())
++            }),
++            "profile.codegen-units: 4",
++            "环境变量写了 codegen-units，根清单开了增量"
++        );
++        assert_eq!(
++            codegen_units_line_of(
++                &release_manifest_with("codegen-units = 4\n"),
++                "release",
++                &|name| {
++                    (name == CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE).then(|| "1".to_string())
++                }
++            ),
++            "profile.codegen-units: 4",
++            "根清单写了 codegen-units，CARGO_INCREMENTAL 强开增量"
++        );
++    }
++
++    #[test]
++    fn the_builtin_profiles_take_codegen_units_from_their_default_incremental() {
++        for (profile_name, expected_line) in [
++            ("dev", "profile.codegen-units: 256"), // naming-lint:external cargo 定的构建档名：调试档叫 dev
++            ("test", "profile.codegen-units: 256"),
++            ("release", "profile.codegen-units: 16"),
++            ("bench", "profile.codegen-units: 16"),
++        ] {
++            assert_eq!(
++                codegen_units_line_of("[workspace]\n", profile_name, &no_environment),
++                expected_line,
++                "{profile_name} 什么都没写"
++            );
++        }
++    }
++
++    #[test]
++    fn the_profile_incremental_environment_variable_overrides_the_root_manifest() {
++        let manifest_turning_incremental_off = release_manifest_with("incremental = false\n");
++        assert_eq!(
++            codegen_units_line_of(&manifest_turning_incremental_off, "release", &|name| {
++                (name == "CARGO_PROFILE_RELEASE_INCREMENTAL").then(|| "true".to_string())
++            }),
++            "profile.codegen-units: 256",
++            "根清单关增量、CARGO_PROFILE_RELEASE_INCREMENTAL 开"
++        );
++        assert_eq!(
++            codegen_units_line_of("[workspace]\n", "dev", &|name| {
++                (name == "CARGO_PROFILE_DEV_INCREMENTAL").then(|| "false".to_string())
++            }),
++            "profile.codegen-units: 16",
++            "dev 内置开增量、CARGO_PROFILE_DEV_INCREMENTAL 关"
++        );
++    }
++
++    #[test]
++    fn cargo_incremental_overrides_the_profile_and_its_environment_variable() {
++        let manifest_turning_incremental_on = release_manifest_with("incremental = true\n");
++        assert_eq!(
++            codegen_units_line_of(&manifest_turning_incremental_on, "release", &|name| {
++                match name {
++                    "CARGO_PROFILE_RELEASE_INCREMENTAL" => Some("true".to_string()),
++                    CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE => Some("0".to_string()),
++                    _ => None,
++                }
++            }),
++            "profile.codegen-units: 16",
++            "根清单与 CARGO_PROFILE_RELEASE_INCREMENTAL 都开、CARGO_INCREMENTAL=0"
++        );
++        assert_eq!(
++            codegen_units_line_of("[workspace]\n", "release", &|name| {
++                (name == CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE).then(|| "1".to_string())
++            }),
++            "profile.codegen-units: 256",
++            "release 内置关增量、CARGO_INCREMENTAL=1"
++        );
++    }
++
++    #[test]
++    fn an_unrecognized_incremental_value_is_an_error() {
++        assert!(
++            effective_profile_lines(
++                &release_manifest_with("incremental = \"sometimes\"\n"),
++                "release",
++                &no_environment
++            )
++            .is_err(),
++            "根清单的 incremental 不是 true / false"
++        );
++        assert!(
++            effective_profile_lines("[workspace]\n", "dev", &|name| {
++                (name == CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE).then(|| "yes".to_string())
++            })
++            .is_err(),
++            "CARGO_INCREMENTAL 不是 1 / 0"
++        );
++    }
++
++    #[test]
++    fn the_environment_variables_read_name_incremental_and_cargo_incremental() {
++        let names = environment_variables_the_profile_lines_read("release");
++        for expected in [
++            "CARGO_PROFILE_RELEASE_CODEGEN_UNITS",
++            "CARGO_PROFILE_RELEASE_INCREMENTAL",
++            CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE,
++        ] {
++            assert!(
++                names.contains(&expected.to_string()),
++                "{expected}：{names:?}"
++            );
++        }
++    }
++
++    /// 验证包与产品 GPU 测试包的构建脚本按字面路径编进测试二进制（取法同 `build_features` 测试里的 `CORE_BUILD_SCRIPT_TEXT`）。
++    const VERIFICATION_BUILD_SCRIPT_TEXT: &str = include_str!(concat!(
++        env!("CARGO_MANIFEST_DIR"),
++        "/../singlefs-verification/build.rs"
++    ));
++    const BACKGROUND_GPU_TESTS_BUILD_SCRIPT_TEXT: &str = include_str!(concat!(
++        env!("CARGO_MANIFEST_DIR"),
++        "/../singlefs-background-gpu-tests/build.rs"
++    ));
++
++    /// 构建脚本报 `cargo:rerun-if-env-changed` 的只有一处，就是对 [`environment_variables_the_profile_lines_read`] 交的清单逐个报：
++    /// 报的变量与 profile 行读的变量是同一份，漏报一个（例 `CARGO_INCREMENTAL`）它变了构建脚本不重跑、键还是旧的。
++    fn assert_the_build_script_reports_every_environment_variable_the_profile_lines_read(
++        build_script_label: &str,
++        build_script_text: &str,
++    ) {
++        let reporting_loop = "    for environment_variable_name in environment_variables_the_profile_lines_read(&profile_name) {\n        println!(\"cargo:rerun-if-env-changed={environment_variable_name}\");\n    }\n";
++        assert_eq!(
++            build_script_text.matches(reporting_loop).count(),
++            1,
++            "{build_script_label} 的构建脚本对 environment_variables_the_profile_lines_read 交的清单逐个报 rerun-if-env-changed"
++        );
++        assert_eq!(
++            build_script_text.matches("rerun-if-env-changed").count(),
++            1,
++            "{build_script_label} 的构建脚本报 rerun-if-env-changed 的只有那一个循环"
++        );
++    }
++
++    #[test]
++    fn the_verification_build_script_reports_every_environment_variable_the_profile_lines_read() {
++        assert_the_build_script_reports_every_environment_variable_the_profile_lines_read(
++            "验证包",
++            VERIFICATION_BUILD_SCRIPT_TEXT,
++        );
++    }
++
++    #[test]
++    fn the_background_gpu_tests_build_script_reports_every_environment_variable_the_profile_lines_read(
++    ) {
++        assert_the_build_script_reports_every_environment_variable_the_profile_lines_read(
++            "产品 GPU 测试包",
++            BACKGROUND_GPU_TESTS_BUILD_SCRIPT_TEXT,
+         );
+     }
+ 
+diff --git a/crates/singlefs-unit-graph/src/closure.rs b/crates/singlefs-unit-graph/src/closure.rs
+index 9c6fcc3b7..765d22b3c 100644
+--- a/crates/singlefs-unit-graph/src/closure.rs
++++ b/crates/singlefs-unit-graph/src/closure.rs
+@@ -23,10 +23,12 @@
+ //! R-裸名同一个目标里按模块筛（`crates/` 下的包与工作区外的 crate 一样，各一个弄坏开关）：只连单元所在模块看得见的那几份
+ //! （`candidates_seen_from_the_module_of_the_unit`：本模块定义的、经 use 引进的、glob use 的模块里的、写成 `模块::名` 的），点不准的退回全连；
+ //! 名字是 use 改名的原名、单元是 `macro_rules!`（体里的名字在调用处解）的不筛。跨目标的只认 `pub`、不按模块筛。
+-//! use 引进的名字要 use 路径恰好点到候选所在的模块才算点准：路径点到的模块里没有这个名字的候选，名字是那个模块经 `pub use` 转出来的，落在哪一份看不出，退回全连。
++//! use 引进的名字要 use 路径恰好点到候选所在的模块才算点准：路径点到的模块里没有这个名字的候选，名字是那个模块经 `pub use` 转出来的，落在哪一份看不出，退回全连；
++//! 点到的候选带条件编译、或那个模块另有 use 按名字引进它（cfg 互斥的两支），相对路径的首段是本作用域里别的 use 引进的名字（含 `as` 改名），同样退回全连。
+ //! R-裸名局部绑定遮住同名函数（一个弄坏开关；跨目标的同样遮）：函数单元里，名字每一处都是局部绑定或落在绑定的作用域里的
+ //! （`is_bare_name_only_a_local_binding_of_the_function`），不往外连同名的函数。只遮函数：`let` 写成常量、静态量、单元结构体的名字是拿它当模式，
+-//! 不是新绑定（rustc 对静态量与元组结构体报 E0530），这几种照连。
++//! 不是新绑定（rustc 对静态量与元组结构体报 E0530），这几种照连。落在宏调用括号里的名字照连同名函数，只有标准库那 16 个就地求值实参的宏
++//! （`STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE`：格式化、打印、写、`panic!`、断言一族与 `vec!`）的括号里照算局部。
+ //! 拒算：单元自己带的（`rust_items` 切分时记下）、链接到的文件切不全的、数据文件读不了的、构建脚本或 bin 找不到的、
+ //! proc-macro crate、cfg 谓词判不了的、工具链的目标三元组查不出的、WGSL 外名没有着落的，全部收进 `ClosureOutcome::refusals`；有一条拒算就不交键。
+ //! WGSL 外名（`.wgsl` 里用到、模块里没定义的名字）的着落（`WgslExternalNameSources::supply`）：整名是闭包里某个 Rust 串字面量的一个词；
+@@ -63,7 +65,10 @@ use crate::lexer::{
+ };
+ use crate::manifest::DependencySection;
+ use crate::rule_switches::{BrokenRule, RuleSwitches};
+-use crate::rust_items::{normalized_path, references_of_tokens, test_name_pieces_of_texts};
++use crate::rust_items::{
++    extern_block_attributes_name_link, normalized_path, references_of_tokens,
++    test_name_pieces_of_texts,
++};
+ use crate::sha256::{sha256_of, Sha256Digest};
+ use crate::shell_sources::ShellNormalizationFailure;
+ use crate::units::{
+@@ -902,6 +907,9 @@ const ALWAYS_NAMED_TYPES: [&str; 23] = [
+     "f64", "bool", "char", "str", "String", "Vec", "Option", "Result", "Box", "Self",
+ ];
+ 
++/// 构建脚本叫 cargo 多链接一个库的指令名（`cargo:rustc-link-lib=…`、`cargo::rustc-link-lib=…` 里都有它）。
++const RUSTC_LINK_LIBRARY_INSTRUCTION: &str = "rustc-link-lib";
++
+ /// R-裸名按模块筛候选时，路径根名是这几个的指标准库，不点本目标里的哪一份（另几个是看得见的别的 crate 的库名）。
+ const PATH_ROOTS_OF_THE_STANDARD_CRATES: [&str; 3] = ["std", "core", "alloc"];
+ 
+@@ -1125,11 +1133,34 @@ fn is_statement_let_binding_at(source: &str, tokens: &[Token], name_position: us
+         }
+ }
+ 
++/// R-裸名局部绑定：名字落在这几个标准库宏的调用括号里，照算局部。它们把实参当表达式就地求值，不把实参接在路径后面、
++/// 不放进嵌套条目里；别的宏（工作区的、外部 crate 的，标准库里不在这张表上的）把实参展开到哪看不出，落在它们调用括号里的名字不算遮住。
++const STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE: [&str; 16] = [
++    "format",
++    "format_args",
++    "print",
++    "println",
++    "eprint",
++    "eprintln",
++    "write",
++    "writeln",
++    "panic",
++    "assert",
++    "assert_eq",
++    "assert_ne",
++    "debug_assert",
++    "debug_assert_eq",
++    "debug_assert_ne",
++    "vec",
++];
++
+ /// 还开着的一层括号，只记判局部绑定要的那几样。
+ #[derive(Clone, Copy)]
+ struct OpenDelimiterOfTheBindingScan {
+     is_brace: bool,
+     is_inside_a_macro_call: bool,
++    /// 这一层落在某个不在 [`STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE`] 里的宏的调用括号里（外层落在里面的算）。
++    is_inside_a_macro_call_that_may_move_its_arguments: bool,
+     /// 这一层此刻看得见 `name` 的局部绑定（外层绑定了的算）。
+     is_name_bound: bool,
+     /// 这一层有一条 `let 名` 还没走到它的 `;`：初始值里的 `名` 指外面的，走到 `;` 才算绑定了。
+@@ -1138,8 +1169,9 @@ struct OpenDelimiterOfTheBindingScan {
+ 
+ /// 函数单元 `tokens` 里 `name` 只是局部绑定：至少有一处绑定（语句开头的 `let [mut] 名`，或参数），别的每一处都落在绑定的作用域里。块级作用域按花括号认：
+ /// `let` 从它的 `;` 起到外层花括号收尾，参数从参数表的 `)` 起到单元收尾。这几样不算遮住（宁可多连）：绑定之前或作用域之外出现的、`let` 初始值里的；
+-/// 带路径的（前后挨 `::`）、宏名（后接 `!` 与开括号）；格式串捕获（`{名}`）在作用域外的；宏调用括号里的 `let`（展开成什么看不出，不当绑定；
+-/// 作用域里写在宏调用实参里的名字照算局部的）；解构、`if let`、`match`、`for`、闭包参数绑定的不认（这几处的名字按「作用域外」算）；函数体里有嵌套条目的词
++/// 带路径的（前后挨 `::`）、宏名（后接 `!` 与开括号）；格式串捕获（`{名}`）在作用域外的；宏调用括号里的 `let`（展开成什么看不出，不当绑定）；
++/// 落在宏调用括号里的名字（宏可能把它接在路径后面或放进嵌套条目，运行时解到同名函数），只有
++/// [`STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE`] 那几个宏的括号里、在作用域里的照算局部；解构、`if let`、`match`、`for`、闭包参数绑定的不认（这几处的名字按「作用域外」算）；函数体里有嵌套条目的词
+ /// （`WORDS_STARTING_A_NESTED_ITEM`）的。单个 `.` 后面的是字段或方法，不指函数，不看；函数自己的名字不看。
+ fn is_bare_name_only_a_local_binding_of_the_function(
+     source: &str,
+@@ -1159,6 +1191,7 @@ fn is_bare_name_only_a_local_binding_of_the_function(
+     let mut open_delimiters = vec![OpenDelimiterOfTheBindingScan {
+         is_brace: false,
+         is_inside_a_macro_call: false,
++        is_inside_a_macro_call_that_may_move_its_arguments: false,
+         is_name_bound: false,
+         is_let_waiting_for_its_semicolon: false,
+     }];
+@@ -1185,10 +1218,16 @@ fn is_bare_name_only_a_local_binding_of_the_function(
+                     let follows_a_macro_name = position >= 2
+                         && text_at(position - 1) == "!"
+                         && tokens[position - 2].kind == TokenKind::Identifier;
++                    let opens_a_macro_call_that_may_move_its_arguments = follows_a_macro_name
++                        && !STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE
++                            .contains(&identifier_name(text_at(position - 2)));
+                     open_delimiters.push(OpenDelimiterOfTheBindingScan {
+                         is_brace: text == "{",
+                         is_inside_a_macro_call: innermost.is_inside_a_macro_call
+                             || follows_a_macro_name,
++                        is_inside_a_macro_call_that_may_move_its_arguments: innermost
++                            .is_inside_a_macro_call_that_may_move_its_arguments
++                            || opens_a_macro_call_that_may_move_its_arguments,
+                         is_name_bound: innermost.is_name_bound,
+                         is_let_waiting_for_its_semicolon: false,
+                     });
+@@ -1248,6 +1287,9 @@ fn is_bare_name_only_a_local_binding_of_the_function(
+                 if is_after_a_path_separator || is_before_a_path_separator || is_a_macro_name {
+                     return false;
+                 }
++                if innermost.is_inside_a_macro_call_that_may_move_its_arguments {
++                    return false;
++                }
+                 if !innermost.is_name_bound {
+                     return false;
+                 }
+@@ -1622,10 +1664,10 @@ impl<'workspace> ClosureRun<'workspace> {
+                 let visible_crate = workspace.targets[visible_target.0].crate_index;
+                 let seen_from_the_module: Vec<UnitIndex>;
+                 let mut candidates: &[UnitIndex] = found;
+-                // 同一个目标里只连这个单元所在模块看得见的那几份（文件头「R-裸名」）：crates/ 下的包与工作区外的 crate 一样
++                // 同一个目标里只连这个单元所在模块看得见的那几份（文件头「R-裸名」）：工作区成员与工作区外的 crate 一样
+                 // （验证包里 CPU 判器的单元经 use 从格式库引进 SLOT_BYTES，不连到 gpu_unit_checks 里私有的同名常量）
+                 let links_by_module = match workspace.crates[visible_crate.0].origin {
+-                    CrateOrigin::UnderTheCratesDirectory => links_crates_directory_names_by_module,
++                    CrateOrigin::WorkspaceMember => links_crates_directory_names_by_module,
+                     CrateOrigin::PathDependencyOutsideTheWorkspace => {
+                         // 工作区外的 crate 按调用关系连（文件头「工作区外的 path 依赖」）：从别的包连进来，这个名字要在工作区里经 use 或路径
+                         // 从它引进来过（验证包的 run 字段不连到 prune-server 的 command_line::run）
+@@ -1720,7 +1762,8 @@ impl<'workspace> ClosureRun<'workspace> {
+     /// 单元里写成 `前缀::name`、前缀是候选所在模块末段的（前缀是 `super` 时按整条路径里 `super` 的个数往上数层）。
+     /// use 路径或 `…::name` 整条路径的根名在 `roots_naming_another_crate` 里的（别的 crate 的库名、`std`、`core`、`alloc`）指的是别的 crate，
+     /// 不点这个目标里的哪一份，跳过这一处。
+-    /// 认不出落在哪一份的退回全连：use 的某一支或前缀一份都没点到（经 `pub use` 转出来的）、这条 use 里找不到引进 `name` 的那一支、单元里另有 `use`（函数体里的）、`name` 后面接 `!` 与开括号。
++    /// 认不出落在哪一份的退回全连：use 的某一支或前缀一份都没点到（经 `pub use` 转出来的）、这条 use 里找不到引进 `name` 的那一支、单元里另有 `use`（函数体里的）、`name` 后面接 `!` 与开括号；
++    /// use 的一支点到的候选带条件编译、或候选所在模块另有 use 按名字引进 `name`（cfg 互斥的另一支可能是 `pub use` 转来的）；use 的相对路径首段在本作用域被别的 use 按名字引进（含 `as` 改名）。
+     /// 前缀是本目标的类型或 trait、或 `Self` 的是关联项（R-路径另管），跳过这一处。哪一样都不沾的（字段名、局部变量、impl 成员自己的名字）一份都不连。
+     fn candidates_seen_from_the_module_of_the_unit(
+         &self,
+@@ -1778,9 +1821,47 @@ impl<'workspace> ClosureRun<'workspace> {
+                 .collect();
+             (!found.is_empty()).then_some(found)
+         };
++        let uses_in_the_scope_of_the_unit: &[UnitIndex] = workspace
++            .indexes
++            .uses_by_scope
++            .get(&(unit.file, unit.local_module_path.clone()))
++            .map_or(&[][..], Vec::as_slice);
++        // 作用域 `uses` 里除 `except_use` 之外有一条 use 按名字引进 `imported_name`（`as` 改出的名字也算；glob 不算）
++        let is_imported_by_another_use =
++            |uses: &[UnitIndex], except_use: Option<UnitIndex>, imported_name: &str| {
++                uses.iter().any(|other_use| {
++                    Some(*other_use) != except_use
++                        && workspace.units[other_use.0]
++                            .imports
++                            .as_ref()
++                            .is_some_and(|imports| {
++                                imports
++                                    .names
++                                    .iter()
++                                    .any(|imported| imported == imported_name)
++                            })
++                })
++            };
++        // 候选带条件编译：它自己（连外层行内模块、impl 头，`cfg_attr` 里套的 `cfg` 也算）的条件，或它所在文件经哪条 `mod` 连进来带条件
++        let is_conditionally_compiled = |candidate: UnitIndex| {
++            let candidate_unit = &workspace.units[candidate.0];
++            !candidate_unit.conditions.is_empty()
++                || workspace
++                    .membership(candidate_unit.file, target)
++                    .is_some_and(|membership| {
++                        membership
++                            .condition_alternatives
++                            .iter()
++                            .any(|alternative| !alternative.is_empty())
++                    })
++        };
+         // use 的一支路径（不含名字本身）恰好点到的候选（下标）；一份都没点到交 None。
+-        // 恰好点到才算：点到的模块里自己定义的名字压过它 glob 转出来的；模块里没有这个名字的候选，名字可能是它经 `pub use` 转出来的
+-        let placed_by_the_use_path = |path: &[&str]| -> Option<BTreeSet<usize>> {
++        // 恰好点到才算：点到的模块里自己定义的名字压过它 glob 转出来的；模块里没有这个名字的候选，名字可能是它经 `pub use` 转出来的。
++        // 点到的候选带条件编译、或候选所在模块另有 use 按名字引进它，名字可能是 cfg 互斥的另一支 `pub use` 转来的，交 None 退回全连；
++        // 相对路径的首段在本作用域被别的 use 按名字引进（含 `as` 改名），首段真指的模块看不出，交 None 退回全连。`path_use` 是这一支所在的 use
++        let placed_by_the_use_path = |path: &[&str],
++                                      path_use: UnitIndex|
++         -> Option<BTreeSet<usize>> {
+             let leading_supers = path
+                 .iter()
+                 .take_while(|segment| **segment == "super")
+@@ -1797,6 +1878,17 @@ impl<'workspace> ClosureRun<'workspace> {
+                 ),
+                 Some(_) | None => None,
+             };
++            if exact_module.is_none()
++                && path.first().copied().is_some_and(|first_segment| {
++                    is_imported_by_another_use(
++                        uses_in_the_scope_of_the_unit,
++                        Some(path_use),
++                        first_segment,
++                    )
++                })
++            {
++                return None;
++            }
+             let found: BTreeSet<usize> = candidate_modules
+                 .iter()
+                 .enumerate()
+@@ -1809,6 +1901,29 @@ impl<'workspace> ClosureRun<'workspace> {
+                 })
+                 .map(|(candidate_position, _)| candidate_position)
+                 .collect();
++            let may_be_re_exported_in_a_conditional_branch =
++                found.iter().any(|candidate_position| {
++                    let candidate = candidates[*candidate_position];
++                    let candidate_unit = &workspace.units[candidate.0];
++                    is_conditionally_compiled(candidate)
++                        || workspace
++                            .indexes
++                            .uses_by_scope
++                            .get(&(
++                                candidate_unit.file,
++                                candidate_unit.local_module_path.clone(),
++                            ))
++                            .is_some_and(|uses_of_the_candidate_module| {
++                                is_imported_by_another_use(
++                                    uses_of_the_candidate_module,
++                                    Some(path_use),
++                                    name,
++                                )
++                            })
++                });
++            if may_be_re_exported_in_a_conditional_branch {
++                return None;
++            }
+             (!found.is_empty()).then_some(found)
+         };
+         let mut is_placement_unknown = false;
+@@ -1861,7 +1976,7 @@ impl<'workspace> ClosureRun<'workspace> {
+                     .then(|| {
+                         paths_bringing_in_the_name
+                             .iter()
+-                            .map(|path| placed_by_the_use_path(path))
++                            .map(|path| placed_by_the_use_path(path, *use_index))
+                             .collect::<Option<Vec<BTreeSet<usize>>>>()
+                     })
+                     .flatten()
+@@ -2235,6 +2350,39 @@ impl<'workspace> ClosureRun<'workspace> {
+         }
+     }
+ 
++    /// 这个目标链接时可能多出 C 库之外的库：目标里有一个 `extern` 块的属性里有 `link`（`#[link(…)]`、`cfg_attr` 里套的，
++    /// 不管它进不进闭包：`link` 对整个产物生效），或它所在包的构建脚本（编进构建脚本目标的每份文件）里出现 [`RUSTC_LINK_LIBRARY_INSTRUCTION`]。
++    fn target_may_link_libraries_beyond_the_system_library(&self, target: TargetIndex) -> bool {
++        let workspace = self.workspace;
++        let has_an_extern_block_naming_link = workspace.units.iter().any(|unit| {
++            unit.kind == UnitKind::ExternBlock
++                && workspace.membership(unit.file, target).is_some()
++                && unit.token_range.is_some_and(|(first_token, end_token)| {
++                    let file = &workspace.files[unit.file.0];
++                    extern_block_attributes_name_link(
++                        &file.source,
++                        &file.tokens[first_token..end_token],
++                    )
++                })
++        });
++        let crate_index = workspace.targets[target.0].crate_index;
++        let build_script_links_a_library = workspace
++            .target_of_crate(crate_index, TargetKind::BuildScript, None)
++            .is_some_and(|build_script| {
++                workspace
++                    .files
++                    .iter()
++                    .enumerate()
++                    .any(|(file_position, file)| {
++                        workspace
++                            .membership(FileIndex(file_position), build_script)
++                            .is_some()
++                            && file.source.contains(RUSTC_LINK_LIBRARY_INSTRUCTION)
++                    })
++            });
++        has_an_extern_block_naming_link || build_script_links_a_library
++    }
++
+     fn follow_reads(&mut self, unit_index: UnitIndex, target: TargetIndex) {
+         let workspace = self.workspace;
+         let unit = &workspace.units[unit_index.0];
+@@ -2323,6 +2471,16 @@ impl<'workspace> ClosureRun<'workspace> {
+                 SourceRead::ChildTestProcess { .. } => {}
+                 // 拒不拒算要看入口，在 `finish` 判
+                 SourceRead::OwnProgramRestart { .. } => {}
++                SourceRead::ExternBlockOfListedSystemLibraryCalls { line, fragment } => {
++                    if self.target_may_link_libraries_beyond_the_system_library(target) {
++                        self.refusals.insert(Refusal {
++                            file: crate::units::RefusalFile::WorkspaceSourceFile(unit.file),
++                            line: *line,
++                            form: RefusalForm::ExternalFunctionInterface,
++                            fragment: fragment.clone(),
++                        });
++                    }
++                }
+                 SourceRead::BinaryExecutable { binary_name, line } => {
+                     match workspace.target_of_crate(
+                         crate_index,
+@@ -2505,6 +2663,7 @@ impl<'workspace> ClosureRun<'workspace> {
+                 | SourceRead::BinaryExecutable { .. }
+                 | SourceRead::Directory { .. }
+                 | SourceRead::OwnProgramRestart { .. }
++                | SourceRead::ExternBlockOfListedSystemLibraryCalls { .. }
+                 | SourceRead::ChildTestProcess { .. } => false,
+             });
+             if includes_a_defining_file {
+diff --git a/crates/singlefs-unit-graph/src/manifest.rs b/crates/singlefs-unit-graph/src/manifest.rs
+index 0f053bd19..45001fb1e 100644
+--- a/crates/singlefs-unit-graph/src/manifest.rs
++++ b/crates/singlefs-unit-graph/src/manifest.rs
+@@ -261,22 +261,42 @@ impl TomlReader<'_> {
+     }
+ }
+ 
++/// 整份 TOML 读出来的样子：每条键值，与每个表头的路径（`[表]` 与 `[[数组表]]` 都算，按出现的次序，同一个表头出现几次记几次）。
++/// 只写表头、底下没有键的表只在 `table_headers` 里：它在不在，`entries` 看不出来。
++#[derive(Clone, Debug)]
++pub struct TomlDocument {
++    pub entries: Vec<TomlEntry>,
++    pub table_headers: Vec<Vec<String>>,
++}
++
+ /// 把整份 `Cargo.toml` 读成一串键值。
+ ///
+ /// # Errors
+ /// 表头、键、串、数组或内联表写坏了，交出错的行号与原因。
+ pub fn parse_toml_entries(text: &str) -> Result<Vec<TomlEntry>, ManifestError> {
++    parse_toml_document(text).map(|document| document.entries)
++}
++
++/// 把整份 `Cargo.toml` 读成键值与表头（[`TomlDocument`]）。
++///
++/// # Errors
++/// 表头、键、串、数组或内联表写坏了，交出错的行号与原因。
++pub fn parse_toml_document(text: &str) -> Result<TomlDocument, ManifestError> {
+     let mut reader = TomlReader {
+         bytes: text.as_bytes(),
+         position: 0,
+     };
+     let mut entries = Vec::new();
++    let mut table_headers: Vec<Vec<String>> = Vec::new();
+     let mut table_path: Vec<String> = Vec::new();
+     let mut table_occurrence = 0usize;
+     loop {
+         reader.skip_blanks_newlines_and_comments();
+         let Some(byte) = reader.peek() else {
+-            return Ok(entries);
++            return Ok(TomlDocument {
++                entries,
++                table_headers,
++            });
+         };
+         if byte == b'[' {
+             let is_array_table = reader.bytes.get(reader.position + 1) == Some(&b'[');
+@@ -288,6 +308,7 @@ pub fn parse_toml_entries(text: &str) -> Result<Vec<TomlEntry>, ManifestError> {
+                 return Err(reader.failure("表头没闭上"));
+             }
+             reader.position += closing.len();
++            table_headers.push(table_path.clone());
+             table_occurrence += 1;
+             continue;
+         }
+@@ -437,6 +458,27 @@ fn apply_dependency_field(dependency: &mut Dependency, field: &str, value: &Toml
+ /// # Errors
+ /// TOML 读不了，或没有 `[package] name`。
+ pub fn parse_crate_manifest(text: &str) -> Result<CrateManifest, ManifestError> {
++    read_crate_manifest(text, None)
++}
++
++/// 读一份 `Cargo.toml`；没写 `[package] name`（整个没有 `[package]` 也算）时包名取 `default_package_name`，不报错
++/// （`scripts/gate/lib_function_units.py` 的 `RustCrate` 取包名那一行：`package.get("name", 目录名或 "root")`）。
++///
++/// # Errors
++/// TOML 读不了。
++pub fn parse_crate_manifest_with_default_package_name(
++    text: &str,
++    default_package_name: &str,
++) -> Result<CrateManifest, ManifestError> {
++    read_crate_manifest(text, Some(default_package_name))
++}
++
++/// `parse_crate_manifest` 与 `parse_crate_manifest_with_default_package_name` 共用的读法：没写 `[package] name` 时取
++/// `default_package_name`，它也是 `None` 才报错。
++fn read_crate_manifest(
++    text: &str,
++    default_package_name: Option<&str>,
++) -> Result<CrateManifest, ManifestError> {
+     let entries = parse_toml_entries(text)?;
+     let mut package_name = None;
+     let mut library: Option<DeclaredTarget> = None;
+@@ -533,10 +575,12 @@ pub fn parse_crate_manifest(text: &str) -> Result<CrateManifest, ManifestError>
+             }
+         }
+     }
+-    let package_name = package_name.ok_or(ManifestError {
+-        line: 1,
+-        reason: "没有 [package] name".to_string(),
+-    })?;
++    let package_name = package_name
++        .or_else(|| default_package_name.map(str::to_string))
++        .ok_or(ManifestError {
++            line: 1,
++            reason: "没有 [package] name".to_string(),
++        })?;
+     let declared_of = |section: &str| -> Vec<DeclaredTarget> {
+         declared_by_occurrence
+             .iter()
+diff --git a/crates/singlefs-unit-graph/src/rust_items.rs b/crates/singlefs-unit-graph/src/rust_items.rs
+index d9b4fe6c5..15f8a5f41 100644
+--- a/crates/singlefs-unit-graph/src/rust_items.rs
++++ b/crates/singlefs-unit-graph/src/rust_items.rs
+@@ -50,6 +50,10 @@ const BUILD_SCRIPT_OUTPUT_DIRECTORY_VARIABLE: &str = "OUT_DIR";
+ /// 清单目录拼出的目录绑到名字、名字的用法再绑到名字，最多跟这么多层（再深的拒算）。
+ const DEEPEST_DIRECTORY_BINDING_CHAIN: usize = 4;
+ 
++/// 仓根下收得成目录数据单元的那一层目录的名字：折出的目录落在 `<仓根>/crates/` 之下（不是它本身）才收
++/// （与 `scripts/gate/lib_function_units.py` 的 `is_data_directory` 认的 `crates/` 是同一层）。
++const DATA_DIRECTORIES_PARENT_UNDER_THE_REPOSITORY_ROOT: &str = "crates";
++
+ /// 单元里出现这几个词算起了子进程：此时 `current_exe()` 折不出要点名的那一条测试、路径又不是一个字不改地交给 `Command::new`（那一形看入口，
+ /// [`SourceRead::OwnProgramRestart`]）就拒算 `current-exe`；一个都没有的只是在问路径，不拒算（与 `scripts/gate/lib_function_units.py` 的 `SPAWNING_WORDS` 同一份）。
+ const SPAWNING_WORDS: [&str; 7] = [
+@@ -62,8 +66,9 @@ const SPAWNING_WORDS: [&str; 7] = [
+     "execvp",
+ ];
+ 
+-/// 不带 `#[link]` 的 `extern "C"` 块里只声明这几个符号时不拒算（`extern_block_declares_only_listed_system_library_calls`）：C 库的系统调用封装，
++/// 属性里没有 `link` 的 `extern "C"` 块里只声明这几个符号时，切分不拒算（`extern_block_declares_only_listed_system_library_calls`）：C 库的系统调用封装，
+ /// 标准库的文件读写走的是同一层，换 C 库影响它们的程度与 `std::fs` 相同。名单只收仓里真在用的。
++/// 闭包里再看它编进的目标：另有块的属性里有 `link`、或包的构建脚本写了 `rustc-link-lib` 的照拒算（[`SourceRead::ExternBlockOfListedSystemLibraryCalls`]）。
+ /// 与 `scripts/gate/lib_function_units.py` 同一份。
+ const SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS: [&str; 2] = ["pwrite", "fdatasync"];
+ 
+@@ -126,6 +131,9 @@ pub struct RustFileInput<'input> {
+     pub source: &'input str,
+     pub file_directory: &'input Path,
+     pub manifest_directory: Option<&'input Path>,
++    /// 工作区的仓根（规范化的绝对路径）：目录数据单元只收 `<仓根>/crates/` 之下的目录，清单目录不在 `crates/` 下的成员
++    /// （仓根下一层的包、仓根自己那个包）拼出自己的目录照样拒算。
++    pub repository_root: &'input Path,
+     pub switches: &'input RuleSwitches,
+ }
+ 
+@@ -467,6 +475,8 @@ struct NewUnit {
+     implementation: Option<ImplementationShape>,
+     module_declaration: Option<ModuleDeclarationShape>,
+     extra_refusals: Vec<RefusalForm>,
++    /// `extern` 块只声明登记的 C 库调用：`push_unit` 记一条 [`SourceRead::ExternBlockOfListedSystemLibraryCalls`]。
++    is_extern_block_of_listed_system_library_calls: bool,
+ }
+ 
+ impl NewUnit {
+@@ -491,10 +501,22 @@ impl NewUnit {
+             implementation: None,
+             module_declaration: None,
+             extra_refusals: Vec::new(),
++            is_extern_block_of_listed_system_library_calls: false,
+         }
+     }
+ }
+ 
++/// `extern` 块单元的词法单元（从它的外属性起）里，`extern` 之前的属性有没有 `link` 这个词：`#[link(…)]`、
++/// `#[cfg_attr(条件, link(…))]` 里的都算（`link_name` 是别的词，不算）。带它的块改链接的库。
++pub(crate) fn extern_block_attributes_name_link(source: &str, block_tokens: &[Token]) -> bool {
++    block_tokens
++        .iter()
++        .take_while(|token| {
++            !(token.kind == TokenKind::Identifier && token_text(source, token) == "extern")
++        })
++        .any(|token| token.kind == TokenKind::Identifier && token_text(source, token) == "link")
++}
++
+ /// 条目级宏调用的位置：最后一段名字、`!` 与开括号。
+ struct MacroInvocationShape {
+     macro_name: String,
+@@ -512,7 +534,7 @@ enum IncludeArgument {
+ /// 运行期按清单目录拼路径读，折出来的一样（拼出的目录绑到一个名字上时，那个名字的每一处用法各折一样）。
+ enum RuntimeFold {
+     File(PathBuf),
+-    /// `crates/` 之下（不是 `crates/` 本身）的一个目录：整个目录当一个数据单元。
++    /// `<仓根>/crates/` 之下（不是 `crates/` 本身）的一个目录：整个目录当一个数据单元。
+     Directory(PathBuf),
+     Missing(PathBuf),
+     NotFoldable,
+@@ -693,6 +715,7 @@ struct RustScanner<'scan> {
+     file: FileIndex,
+     file_directory: &'scan Path,
+     manifest_directory: Option<&'scan Path>,
++    repository_root: &'scan Path,
+     switches: &'scan RuleSwitches,
+     tokens: &'scan [Token],
+     closes: &'scan [Option<usize>],
+@@ -1206,15 +1229,17 @@ impl<'scan> RustScanner<'scan> {
+             .map_or("", |previous| self.text_of(previous))
+     }
+ 
+-    /// 折出的目录落在清单目录的上一级（`crates/`）之下、又不是它本身：目录数据单元；仓根、`crates/` 之外与 `crates/` 整个照旧拒算。
++    /// 折出的目录落在 `<仓根>/crates/` 之下、又不是它本身：目录数据单元（与 `scripts/gate/lib_function_units.py` 的 `is_data_directory`
++    /// 同一条）。仓根、根外、`crates/` 整个与 `crates/` 之外的目录拒算；清单目录的上一级不一定是 `crates/`（仓根下一层的成员、
++    /// 仓根自己那个包），所以按仓根认，不按清单目录认。
+     fn directory_fold(&self, folded: PathBuf) -> RuntimeFold {
+-        match self.manifest_directory.and_then(Path::parent) {
+-            Some(crates_directory)
+-                if folded.starts_with(crates_directory) && folded != crates_directory =>
+-            {
+-                RuntimeFold::Directory(folded)
+-            }
+-            Some(_) | None => RuntimeFold::NotFoldable,
++        let crates_directory = self
++            .repository_root
++            .join(DATA_DIRECTORIES_PARENT_UNDER_THE_REPOSITORY_ROOT);
++        if folded.starts_with(&crates_directory) && folded != crates_directory {
++            RuntimeFold::Directory(folded)
++        } else {
++            RuntimeFold::NotFoldable
+         }
+     }
+ 
+@@ -1644,9 +1669,21 @@ impl<'scan> RustScanner<'scan> {
+     }
+ 
+     /// `last_token` 是一个表达式的最后一个词法单元时，这个表达式是否一定不交值：写成 `panic!(…)`、`…process::exit(…)`，或以它们收尾的块。
++    /// 块只认紧跟闭包参数（开括号前面是 `|`）与紧跟 `=>` 的那两种：块前面是 `else`、`)`、`if` 的条件这类的，是分支里的一支，别的分支可能交值。
+     fn expression_ending_at_diverges(&self, last_token: usize, first_allowed: usize) -> bool {
+         match self.text_of(last_token) {
+             "}" => {
++                let Some(open) = (first_allowed..last_token).rev().find(|position| {
++                    self.text_of(*position) == "{" && self.closes[*position] == Some(last_token)
++                }) else {
++                    return false;
++                };
++                let follows_closure_parameters = self.text_before(open) == "|";
++                let follows_a_match_arrow =
++                    open >= 2 && self.text_of(open - 1) == ">" && self.text_of(open - 2) == "=";
++                if !(follows_closure_parameters || follows_a_match_arrow) {
++                    return false;
++                }
+                 let before_the_brace = last_token.saturating_sub(1);
+                 let last_inside = if self.text_of(before_the_brace) == ";" {
+                     before_the_brace.saturating_sub(1)
+@@ -1756,7 +1793,8 @@ impl<'scan> RustScanner<'scan> {
+     }
+ 
+     /// `current_exe()` 的路径是不是一个字不改地交给了 `Command::new`：起的就是这个程序文件本身。两种写法：就地写在 `Command::new(…)` 的括号里；
+-    /// 或绑给 `let` 名字（同一个单元里这个名字不再 `let`），名字的每一处用法只是 `Command::new(名字)`、`Command::new(&名字)` 与 `名字.display()`，至少起一次。
++    /// 或绑给 `let` 名字（同一个单元里这个名字不再 `let`），名字的每一处用法最内的那一层花括号就是这条 `let` 所在的那一层（不进更深的块、不出这个块）、只是
++    /// `Command::new(名字)`、`Command::new(&名字)` 与 `名字.display()`，至少起一次。
+     /// 拿路径拼别的路径（`.parent()`、`.with_file_name(…)`、`.join(…)`）、交给别的函数、当参数交给别的程序（`Command::new("sh").arg(名字)`）的不算：
+     /// 那样起的可能是别的程序。
+     fn own_program_path_is_handed_to_command_unchanged(
+@@ -1790,7 +1828,24 @@ impl<'scan> RustScanner<'scan> {
+         if is_bound_again {
+             return false;
+         }
++        // 每一处用法最内的那一层花括号都要是这条 `let` 所在的那一层：出了这个块的同名用法指的是别的绑定；
++        // 进了更深的块（`if`、循环、闭包体）的用法走不走得到、块里起的是不是它，看不出
++        let innermost_brace_around = |index: usize| {
++            (0..index).rev().find(|position| {
++                self.text_of(*position) == "{"
++                    && self.closes[*position].is_some_and(|close| close > index)
++            })
++        };
++        let Some(block_of_the_let) = innermost_brace_around(expression_start) else {
++            return false;
++        };
+         let uses = self.uses_of_the_binding(&name, expression_end, unit_end);
++        if uses
++            .iter()
++            .any(|use_index| innermost_brace_around(*use_index) != Some(block_of_the_let))
++        {
++            return false;
++        }
+         let is_handed_to_command = |use_index: usize| {
+             let open = if self.text_before(use_index) == "&" {
+                 use_index - 2
+@@ -1812,7 +1867,8 @@ impl<'scan> RustScanner<'scan> {
+                 .all(|use_index| is_handed_to_command(*use_index) || is_only_displayed(*use_index))
+     }
+ 
+-    /// `extern` 块（`keyword_index` 是 `extern`，块在 `open..close`）不用拒算：ABI 是 `"C"`，条目前面没有 `#[link…]`，块里只有 `fn` 声明，
++    /// `extern` 块（`keyword_index` 是 `extern`，块在 `open..close`）切分时不用拒算：ABI 是 `"C"`，条目前面的属性里没有 `link` 这个词
++    /// （[`extern_block_attributes_name_link`]），块里只有 `fn` 声明，
+     /// 每条的前面最多一个 `#[link_name = "…"]`、符号（`link_name` 或函数名）都在 [`SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS`] 里，至少声明一条。
+     /// 有 `static`、别的属性、`safe fn` 这类写法的一律不算。
+     fn extern_block_declares_only_listed_system_library_calls(
+@@ -1827,11 +1883,8 @@ impl<'scan> RustScanner<'scan> {
+         {
+             return false;
+         }
+-        let has_link_attribute = (item_start..keyword_index).any(|index| {
+-            self.text_of(index) == "#"
+-                && self.text_of(index + 1) == "["
+-                && self.text_of(index + 2) == "link"
+-        });
++        let has_link_attribute =
++            extern_block_attributes_name_link(self.source, &self.tokens[item_start..keyword_index]);
+         if has_link_attribute {
+             return false;
+         }
+@@ -2133,10 +2186,16 @@ impl<'scan> RustScanner<'scan> {
+         let references = references_of_tokens(self.source, unit_tokens, signature_end);
+         let condition_predicates_in_the_tokens =
+             condition_predicates_written_in_tokens(self.source, unit_tokens);
+-        let (reads, mut refusals) = self.reads_and_refusals_of(first, end);
++        let (mut reads, mut refusals) = self.reads_and_refusals_of(first, end);
+         for form in &new_unit.extra_refusals {
+             refusals.push(self.refusal(*form, first, self.fragment(first, end)));
+         }
++        if new_unit.is_extern_block_of_listed_system_library_calls {
++            reads.push(SourceRead::ExternBlockOfListedSystemLibraryCalls {
++                line: self.line_of(first),
++                fragment: self.fragment(first, end),
++            });
++        }
+         let declared_names = new_unit
+             .declared_names
+             .unwrap_or_else(|| vec![new_unit.name.clone()]);
+@@ -2498,12 +2557,14 @@ impl<'scan> RustScanner<'scan> {
+                         true,
+                     );
+                     new_unit.declared_names = Some(self.extern_block_declared_names(open, close));
+-                    if !self.extern_block_declares_only_listed_system_library_calls(
++                    if self.extern_block_declares_only_listed_system_library_calls(
+                         item_start,
+                         keyword_index,
+                         open,
+                         close,
+                     ) {
++                        new_unit.is_extern_block_of_listed_system_library_calls = true;
++                    } else {
+                         new_unit
+                             .extra_refusals
+                             .push(RefusalForm::ExternalFunctionInterface);
+@@ -3037,6 +3098,7 @@ pub fn parse_rust_file(input: &RustFileInput) -> ParsedRustFile {
+         file: input.file,
+         file_directory: input.file_directory,
+         manifest_directory: input.manifest_directory,
++        repository_root: input.repository_root,
+         switches: input.switches,
+         tokens: &lexed.tokens,
+         closes: &closes,
+@@ -3094,6 +3156,7 @@ mod tests {
+             source,
+             file_directory: Path::new("/nonexistent"),
+             manifest_directory: None,
++            repository_root: Path::new("/nonexistent"),
+             switches: &switches,
+         })
+     }
+@@ -3106,7 +3169,7 @@ mod tests {
+             .collect()
+     }
+ 
+-    /// `use a::b as c;`：进当前模块可用名字集的只有别名 `c`，原名 `b` 不进（早先 `b` 也被记进去，别处同名的条目会被误认成命中了这条 use）。
++    /// `use a::b as c;`：进当前模块可用名字集的只有别名 `c`，原名 `b` 不进（`b` 记进去的话，别处同名的条目会被误认成命中了这条 use）。
+     #[test]
+     fn use_with_an_alias_brings_only_the_alias_into_the_module_names() {
+         let parsed = parse("use a::b as c;\n");
+diff --git a/crates/singlefs-unit-graph/src/units.rs b/crates/singlefs-unit-graph/src/units.rs
+index 694d16b94..204137586 100644
+--- a/crates/singlefs-unit-graph/src/units.rs
++++ b/crates/singlefs-unit-graph/src/units.rs
+@@ -279,6 +279,11 @@ pub enum SourceRead {
+     /// [`SourceRead::ChildTestProcess`] 那一形：起的就是在跑的这个程序。入口是一个 bin 的 `fn main`、不按测试编的时候它再进一次
+     /// 已在闭包里的 `main`，不算新代码；别的入口（在跑的是 libtest，参数选中哪条测试说不清）拒算 `current-exe`，`fragment` 是那一条的原样片段。
+     OwnProgramRestart { line: u32, fragment: String },
++    /// `extern "C"` 块属性里没有 `link`、只声明登记的 C 库调用（`rust_items` 的
++    /// `extern_block_declares_only_listed_system_library_calls`）：这个块自己不改链接的库。放不放行要看它编进的那个目标——
++    /// 同一个目标里另有 `extern` 块的属性里有 `link`、或那个包的构建脚本里写了 `rustc-link-lib`，链接时多出的库可能导出同名符号，
++    /// 闭包里拒算 `extern-function-interface`（`follow_reads` 判），`line`、`fragment` 是那个块的。
++    ExternBlockOfListedSystemLibraryCalls { line: u32, fragment: String },
+     /// `Command::new(current_exe())` 起本测试二进制的一个子进程，参数里 `--exact` 后面跟着的测试名：闭包里解到入口目标里那个
+     /// `#[test] fn`，连一条边（`current-exe-child`）。解不出来时照旧拒算 `current-exe`，`fragment` 就是那一条的原样片段。
+     ChildTestProcess {
+diff --git a/crates/singlefs-unit-graph/src/workspace.rs b/crates/singlefs-unit-graph/src/workspace.rs
+index eda3420fc..737393a2a 100644
+--- a/crates/singlefs-unit-graph/src/workspace.rs
++++ b/crates/singlefs-unit-graph/src/workspace.rs
+@@ -15,7 +15,8 @@ use std::sync::OnceLock;
+ use crate::conditional_compilation::Predicate;
+ use crate::lexer::{identifier_name, token_text, Token, TokenKind};
+ use crate::manifest::{
+-    parse_crate_manifest, BuildScriptDeclaration, CrateManifest, DeclaredTarget, ManifestError,
++    parse_crate_manifest_with_default_package_name, parse_toml_document, BuildScriptDeclaration,
++    CrateManifest, DeclaredTarget, ManifestError, TomlValue,
+ };
+ use crate::rule_switches::{BrokenRule, RuleSwitches};
+ use crate::rust_items::{is_keyword, normalized_path, parse_rust_file, RustFileInput};
+@@ -156,12 +157,14 @@ pub struct WorkspaceCrate {
+     pub origin: CrateOrigin,
+ }
+ 
+-/// 一个 crate 是怎么收进来的：工作区成员（`crates/` 下的），还是顺 path 依赖收进来的工作区外 crate（`prune-server/` 这一类）。
++/// 一个 crate 是怎么收进来的：工作区成员（`directories_of_the_workspace_members` 收的：根清单 `members` 展开的，
++/// `gpu-verification-server/` 这样不在 `crates/` 下的也算；根清单没有 `[workspace]` 时是 `crates/` 下的；根清单带 `[package]` 时的仓根），
++/// 还是顺 path 依赖收进来的工作区外 crate（`prune-server/` 这一类）。
+ /// 工作区外的按调用关系连，不按同名连（`closure` 的 `follow_bare_names`；与 `scripts/gate/lib_function_units.py` 的
+ /// `RustCrate.outside_workspace` 同一个分法）。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub enum CrateOrigin {
+-    UnderTheCratesDirectory,
++    WorkspaceMember,
+     PathDependencyOutsideTheWorkspace,
+ }
+ 
+@@ -428,7 +431,7 @@ fn names_reaching_crates_outside_the_workspace(
+     let mut reaching = HashMap::new();
+     for (crate_position, workspace_crate) in crates.iter().enumerate() {
+         match workspace_crate.origin {
+-            CrateOrigin::UnderTheCratesDirectory => {}
++            CrateOrigin::WorkspaceMember => {}
+             CrateOrigin::PathDependencyOutsideTheWorkspace => {
+                 let outside_crate = CrateIndex(crate_position);
+                 reaching.insert(
+@@ -608,7 +611,6 @@ pub struct Workspace {
+ pub enum WorkspaceError {
+     RootUnreadable { path: PathBuf, reason: String },
+     ManifestUnreadable { path: PathBuf, error: ManifestError },
+-    NoCrates { path: PathBuf },
+ }
+ 
+ impl fmt::Display for WorkspaceError {
+@@ -624,13 +626,6 @@ impl fmt::Display for WorkspaceError {
+                 error.line,
+                 error.reason
+             ),
+-            WorkspaceError::NoCrates { path } => {
+-                write!(
+-                    formatter,
+-                    "{} 底下没有一个带 Cargo.toml 的 crate 目录",
+-                    path.display()
+-                )
+-            }
+         }
+     }
+ }
+@@ -730,6 +725,7 @@ fn parse_one_file(
+     file: FileIndex,
+     entry: &FileEntry,
+     crates: &[WorkspaceCrate],
++    repository_root: &Path,
+     switches: &RuleSwitches,
+     origin: SourceOrigin<'_>,
+ ) -> ParsedSource {
+@@ -745,6 +741,7 @@ fn parse_one_file(
+                 source: &source,
+                 file_directory: &file_directory,
+                 manifest_directory: Some(&crates[entry.crate_index.0].directory),
++                repository_root,
+                 switches,
+             });
+             let mut file_level_refusals = parsed.file_level_refusals;
+@@ -774,6 +771,7 @@ fn parse_one_file(
+ fn parse_files_in_parallel(
+     entries: &[FileEntry],
+     crates: &[WorkspaceCrate],
++    repository_root: &Path,
+     threads: NonZeroUsize,
+     switches: &RuleSwitches,
+     origin: SourceOrigin<'_>,
+@@ -795,7 +793,15 @@ fn parse_files_in_parallel(
+                         .enumerate()
+                         .map(|(offset, entry)| {
+                             let file = FileIndex(chunk_index * chunk_length + offset);
+-                            (file, parse_one_file(file, entry, crates, switches, origin))
++                            let parsed = parse_one_file(
++                                file,
++                                entry,
++                                crates,
++                                repository_root,
++                                switches,
++                                origin,
++                            );
++                            (file, parsed)
+                         })
+                         .collect::<Vec<(FileIndex, ParsedSource)>>()
+                 })
+@@ -1360,10 +1366,332 @@ fn build_indexes(
+     indexes
+ }
+ 
+-/// 装一个工作区：`root` 是仓根或 `crates/` 目录。
++/// 根清单 `[workspace]` 里收成员用的两样：`members` 的每一条通配与 `exclude` 逐字点名的路径（都从仓根算）。
++struct WorkspaceMemberPatterns {
++    members: Vec<String>,
++    exclude: Vec<String>,
++}
++
++impl WorkspaceMemberPatterns {
++    /// `members` 与 `exclude` 都还没读到。
++    fn nothing_listed() -> Self {
++        WorkspaceMemberPatterns {
++            members: Vec::new(),
++            exclude: Vec::new(),
++        }
++    }
++}
++
++/// 根清单里决定工作区成员的那几样。
++struct RootManifestMembership {
++    /// python 那一份的 `workspace` 非空时是 `Some`（它按字典真假判）：`workspace` 底下至少一个键，或有 `[workspace.metadata]`
++    /// 这类子表头（只写表头、底下没有键也算：字典里有一张空子表）。只写 `[workspace]`、底下没有键的是空表，与没有同样算。
++    workspace: Option<WorkspaceMemberPatterns>,
++    /// 根清单有 `package` 这一节（python 判 `"package" in manifest`）：仓根自己也是一个成员。只写表头、底下没有键的
++    /// `[package]` 也算。
++    root_is_a_package: bool,
++}
++
++/// 一个 TOML 数组里的每个串（不是数组、不是串的元素不算）。
++fn texts_in_the_array(value: &TomlValue) -> Vec<String> {
++    match value {
++        TomlValue::Array(elements) => elements
++            .iter()
++            .filter_map(|element| match element {
++                TomlValue::Text(text) => Some(text.clone()),
++                TomlValue::Boolean(_)
++                | TomlValue::Array(_)
++                | TomlValue::InlineTable(_)
++                | TomlValue::Unparsed(_) => None,
++            })
++            .collect(),
++        TomlValue::Text(_)
++        | TomlValue::Boolean(_)
++        | TomlValue::InlineTable(_)
++        | TomlValue::Unparsed(_) => Vec::new(),
++    }
++}
++
++/// 读仓根的 `Cargo.toml`（没有这份文件就是既没有 `[workspace]` 也没有 `[package]`）。
++///
++/// # Errors
++/// 根清单在而读不了，或 TOML 写坏了。
++fn read_root_manifest_membership(
++    repository_root: &Path,
++) -> Result<RootManifestMembership, WorkspaceError> {
++    let manifest_path = repository_root.join("Cargo.toml");
++    let mut membership = RootManifestMembership {
++        workspace: None,
++        root_is_a_package: false,
++    };
++    if !manifest_path.is_file() {
++        return Ok(membership);
++    }
++    let text = std::fs::read_to_string(&manifest_path).map_err(|error| {
++        WorkspaceError::RootUnreadable {
++            path: manifest_path.clone(),
++            reason: error.to_string(),
++        }
++    })?;
++    let document =
++        parse_toml_document(&text).map_err(|error| WorkspaceError::ManifestUnreadable {
++            path: manifest_path.clone(),
++            error,
++        })?;
++    // 只写表头、底下没有键的节，python 照样读出一张表：`[package]` 让 `"package" in manifest` 成立；`[workspace.metadata]` 这类
++    // 子表头让 `workspace` 里有一张子表、非空。底下有键的节由下面逐条键值再认一遍
++    for table_header in &document.table_headers {
++        let header: Vec<&str> = table_header.iter().map(String::as_str).collect();
++        if header.first() == Some(&"package") {
++            membership.root_is_a_package = true;
++        }
++        if matches!(header.as_slice(), ["workspace", _sub_table, ..])
++            && membership.workspace.is_none()
++        {
++            membership.workspace = Some(WorkspaceMemberPatterns::nothing_listed());
++        }
++    }
++    for entry in &document.entries {
++        // 表头与键连起来看：`[workspace] members = …`、顶层的 `workspace.members = …` 与内联表 `workspace = { … }` 同义
++        let full_key_path: Vec<&str> = entry
++            .table_path
++            .iter()
++            .chain(entry.key_path.iter())
++            .map(String::as_str)
++            .collect();
++        match full_key_path.as_slice() {
++            ["workspace", key_below_the_workspace @ ..] => {
++                let patterns = membership
++                    .workspace
++                    .get_or_insert_with(WorkspaceMemberPatterns::nothing_listed);
++                let fields: Vec<(&str, &TomlValue)> = match (key_below_the_workspace, &entry.value)
++                {
++                    ([], TomlValue::InlineTable(pairs)) => pairs
++                        .iter()
++                        .map(|(field, value)| (field.as_str(), value))
++                        .collect(),
++                    ([field], value) => vec![(*field, value)],
++                    _ => Vec::new(),
++                };
++                for (field, value) in fields {
++                    match field {
++                        "members" => patterns.members = texts_in_the_array(value),
++                        "exclude" => patterns.exclude = texts_in_the_array(value),
++                        _ => {}
++                    }
++                }
++            }
++            ["package", ..] => membership.root_is_a_package = true,
++            _ => {}
++        }
++    }
++    Ok(membership)
++}
++
++/// `[` 之后、配对的 `]` 之前那一段：配括号里的一个字符（`!` 起头取反，`a-z` 是区间）。
++struct BracketExpression {
++    is_negated: bool,
++    character_ranges: Vec<(char, char)>,
++}
++
++impl BracketExpression {
++    fn admits(&self, character: char) -> bool {
++        let is_listed = self
++            .character_ranges
++            .iter()
++            .any(|(lowest, highest)| (*lowest..=*highest).contains(&character));
++        is_listed != self.is_negated
++    }
++}
++
++/// 把 `[` 之后的模式读成一个括号表达式，交回它与配对的 `]` 之后剩下的模式；没有配对的 `]` 交 `None`（那个 `[` 当字面）。
++/// 紧跟在 `[` 或 `[!` 后面的 `]` 是括号里的字面，不算配对（python `fnmatch.translate` 同一个读法）。
++fn bracket_expression_after_the_opening(
++    after_opening: &[char],
++) -> Option<(BracketExpression, &[char])> {
++    let is_negated = after_opening.first() == Some(&'!');
++    let body_start = usize::from(is_negated);
++    let search_start = if after_opening.get(body_start) == Some(&']') {
++        body_start + 1
++    } else {
++        body_start
++    };
++    let closing = search_start
++        + after_opening
++            .get(search_start..)?
++            .iter()
++            .position(|character| *character == ']')?;
++    let body = after_opening.get(body_start..closing)?;
++    let mut character_ranges = Vec::new();
++    let mut position = 0usize;
++    // 每一轮读掉一个字符或一个区间（三个字符），position 只增不减，读到 body 末尾为止
++    while let Some(&lowest) = body.get(position) {
++        match (body.get(position + 1), body.get(position + 2)) {
++            (Some(&'-'), Some(&highest)) => {
++                character_ranges.push((lowest, highest));
++                position += 3;
++            }
++            _ => {
++                character_ranges.push((lowest, lowest));
++                position += 1;
++            }
++        }
++    }
++    let rest = after_opening.get(closing + 1..)?;
++    Some((
++        BracketExpression {
++            is_negated,
++            character_ranges,
++        },
++        rest,
++    ))
++}
++
++/// 一节通配配不配一个名字：`*` 配任意几个字符（含零个）、`?` 配一个字符、`[…]` 见 [`BracketExpression`]，别的字符逐字配
++/// （python `fnmatch` 在 POSIX 上的读法，大小写敏感）。
++fn component_pattern_matches(pattern: &[char], name: &[char]) -> bool {
++    let Some((&pattern_head, pattern_rest)) = pattern.split_first() else {
++        return name.is_empty();
++    };
++    let first_name_character_and_rest = name.split_first();
++    match pattern_head {
++        '*' => (0..=name.len()).any(|skipped_characters| {
++            name.get(skipped_characters..)
++                .is_some_and(|name_rest| component_pattern_matches(pattern_rest, name_rest))
++        }),
++        '?' => first_name_character_and_rest
++            .is_some_and(|(_, name_rest)| component_pattern_matches(pattern_rest, name_rest)),
++        '[' => match bracket_expression_after_the_opening(pattern_rest) {
++            Some((bracket, after_the_bracket)) => {
++                first_name_character_and_rest.is_some_and(|(&character, name_rest)| {
++                    bracket.admits(character)
++                        && component_pattern_matches(after_the_bracket, name_rest)
++                })
++            }
++            None => first_name_character_and_rest.is_some_and(|(&character, name_rest)| {
++                character == '[' && component_pattern_matches(pattern_rest, name_rest)
++            }),
++        },
++        literal => first_name_character_and_rest.is_some_and(|(&character, name_rest)| {
++            character == literal && component_pattern_matches(pattern_rest, name_rest)
++        }),
++    }
++}
++
++/// 一个目录里配得上这一节通配的条目。名字以 `.` 起头的条目只在这一节自己也以 `.` 起头时才配（python `glob` 的读法）；
++/// 目录读不了就是一个都没有。
++fn entries_matching_the_component(directory: &Path, component: &str) -> Vec<PathBuf> {
++    let Ok(entries) = std::fs::read_dir(directory) else {
++        return Vec::new();
++    };
++    let pattern: Vec<char> = component.chars().collect();
++    let matches_hidden_names = component.starts_with('.');
++    entries
++        .filter_map(Result::ok)
++        .filter(|entry| {
++            let name = entry.file_name().to_string_lossy().into_owned();
++            let name_characters: Vec<char> = name.chars().collect();
++            (matches_hidden_names || !name.starts_with('.'))
++                && component_pattern_matches(&pattern, &name_characters)
++        })
++        .map(|entry| entry.path())
++        .collect()
++}
++
++/// 根清单 `members` 里的一条照 python `glob.glob(os.path.join(仓根, 这一条))` 展开：按 `/` 逐节往下，带 `*`、`?`、`[` 的那一节
++/// 配上一层目录里的条目，别的节原样接上（存不存在、有没有 `Cargo.toml` 由调用方核）。
++fn paths_matching_the_member_pattern(repository_root: &Path, member_pattern: &str) -> Vec<PathBuf> {
++    let mut matched = vec![repository_root.to_path_buf()];
++    for component in member_pattern
++        .split('/')
++        .filter(|component| !component.is_empty())
++    {
++        let is_wildcard = component.contains(['*', '?', '[']);
++        matched = matched
++            .into_iter()
++            .flat_map(|base| {
++                if is_wildcard {
++                    entries_matching_the_component(&base, component)
++                } else {
++                    vec![base.join(component)]
++                }
++            })
++            .collect();
++    }
++    matched
++}
++
++/// 工作区成员的目录（规范化的绝对路径，排好序），与 `scripts/gate/lib_function_units.py` 的 `discover_rust_crates` 收成员的那一段
++/// 同一条规则：根清单的 `workspace` 非空（[`RootManifestMembership`]）时，`members` 的每一条照通配展开，去掉 `exclude` 点名的与底下
++/// 没有 `Cargo.toml` 的；没有时取 `crates_directory` 底下有 `Cargo.toml` 的目录（`crates_directory` 不在就是一个也没有）。根清单有
++/// `package` 这一节时仓根自己也是一个成员。一个成员都收不出就是一个空的工作区，交空列表（python 那一份同样）。
+ ///
+ /// # Errors
+-/// 根目录读不了、没有 crate、或某份 `Cargo.toml` 读不了。
++/// 根清单读不了，或 `crates_directory` 在而读不了。
++fn directories_of_the_workspace_members(
++    repository_root: &Path,
++    crates_directory: &Path,
++) -> Result<Vec<PathBuf>, WorkspaceError> {
++    let membership = read_root_manifest_membership(repository_root)?;
++    let mut member_directories: BTreeSet<PathBuf> = BTreeSet::new();
++    match &membership.workspace {
++        Some(patterns) => {
++            let excluded: BTreeSet<PathBuf> = patterns
++                .exclude
++                .iter()
++                .map(|path| normalized_path(&repository_root.join(path)))
++                .collect();
++            for member_pattern in &patterns.members {
++                for matched in paths_matching_the_member_pattern(repository_root, member_pattern) {
++                    let directory = normalized_path(&matched);
++                    if !excluded.contains(&directory) && directory.join("Cargo.toml").is_file() {
++                        member_directories.insert(directory);
++                    }
++                }
++            }
++        }
++        None => {
++            if crates_directory.is_dir() {
++                let entries = std::fs::read_dir(crates_directory).map_err(|error| {
++                    WorkspaceError::RootUnreadable {
++                        path: crates_directory.to_path_buf(),
++                        reason: error.to_string(),
++                    }
++                })?;
++                member_directories.extend(
++                    entries
++                        .filter_map(Result::ok)
++                        .map(|entry| normalized_path(&entry.path()))
++                        .filter(|directory| directory.join("Cargo.toml").is_file()),
++                );
++            }
++        }
++    }
++    if membership.root_is_a_package {
++        member_directories.insert(repository_root.to_path_buf());
++    }
++    Ok(member_directories.into_iter().collect())
++}
++
++/// 一个 crate 的 `Cargo.toml` 没写 `[package] name` 时的包名：它的目录名，仓根自己取 `root`（`scripts/gate/lib_function_units.py`
++/// 的 `RustCrate` 取包名那一行：`posixpath.basename(相对仓根的目录) or "root"`，仓根的相对目录是空串）。`crate_directory` 与
++/// `repository_root` 都是规范化的绝对路径。
++fn default_package_name_of(crate_directory: &Path, repository_root: &Path) -> String {
++    match crate_directory.file_name() {
++        Some(directory_name) if crate_directory != repository_root => {
++            directory_name.to_string_lossy().into_owned()
++        }
++        Some(_) | None => "root".to_string(),
++    }
++}
++
++/// 装一个工作区：`root` 是仓根或 `crates/` 目录。底下有 `crates/` 目录或有根清单 `Cargo.toml` 的是仓根（python 那一份把传进来的
++/// 目录当仓根，根上有 `Cargo.toml` 就读它）；两样都没有的是 `crates/` 目录本身，仓根取它的上一层。工作区成员照
++/// `directories_of_the_workspace_members` 收，一个都收不到就是一个空的工作区；`Cargo.toml` 没写 `[package] name` 的 crate 照
++/// `default_package_name_of` 取名。
++///
++/// # Errors
++/// 根目录读不了，或某份 `Cargo.toml`（根清单也算）读不了。
+ pub fn load_workspace(
+     root: &Path,
+     threads: NonZeroUsize,
+@@ -1374,7 +1702,9 @@ pub fn load_workspace(
+             path: root.to_path_buf(),
+             reason: error.to_string(),
+         })?;
+-    let (crates_directory, repository_root) = if canonical_root.join("crates").is_dir() {
++    let is_the_repository_root =
++        canonical_root.join("crates").is_dir() || canonical_root.join("Cargo.toml").is_file();
++    let (crates_directory, repository_root) = if is_the_repository_root {
+         (canonical_root.join("crates"), canonical_root.clone())
+     } else {
+         let parent = canonical_root
+@@ -1382,32 +1712,16 @@ pub fn load_workspace(
+             .map_or_else(|| canonical_root.clone(), Path::to_path_buf);
+         (canonical_root.clone(), parent)
+     };
+-    let mut crate_directories: Vec<PathBuf> = std::fs::read_dir(&crates_directory)
+-        .map_err(|error| WorkspaceError::RootUnreadable {
+-            path: crates_directory.clone(),
+-            reason: error.to_string(),
+-        })?
+-        .filter_map(Result::ok)
+-        .map(|entry| entry.path())
+-        .filter(|path| path.is_dir() && path.join("Cargo.toml").is_file())
+-        .collect();
+-    crate_directories.sort();
+-    if crate_directories.is_empty() {
+-        return Err(WorkspaceError::NoCrates {
+-            path: crates_directory,
+-        });
+-    }
++    let crate_directories =
++        directories_of_the_workspace_members(&repository_root, &crates_directory)?;
+     let mut crates = Vec::new();
+-    // 收完 `crates/` 下的以后，顺各 crate 清单的 path 依赖（普通、开发、构建三种）广度优先收落在仓根底下、有 `Cargo.toml` 的目录
++    // 收完工作区成员以后，顺各 crate 清单的 path 依赖（普通、开发、构建三种）广度优先收落在仓根底下、有 `Cargo.toml` 的目录
+     // （根清单 exclude 里的 `prune-server/` 这一类自己是工作区根的独立工程）；`.`、`..` 起头的、落在仓根外的、清单里写成绝对路径的不收。
+     // 与 `scripts/gate/lib_function_units.py` 的 `discover_rust_crates` 同一条规则。弄坏开关 path-dependencies-outside-the-workspace：不收
+     let follows_path_dependencies =
+         switches.is_intact(BrokenRule::PathDependenciesOutsideTheWorkspace);
+-    let mut known_directories: BTreeSet<PathBuf> = crate_directories
+-        .iter()
+-        .map(|directory| normalized_path(directory.as_path()))
+-        .collect();
+-    // `crates/` 下的是工作区成员；之后顺 path 依赖收进来的是工作区外的（`CrateOrigin`）
++    let mut known_directories: BTreeSet<PathBuf> = crate_directories.iter().cloned().collect();
++    // 工作区成员之外、顺 path 依赖收进来的是工作区外的（`CrateOrigin`）
+     let workspace_member_directories = known_directories.clone();
+     let mut pending_directories: VecDeque<PathBuf> = crate_directories.into_iter().collect();
+     while let Some(directory) = pending_directories.pop_front() {
+@@ -1418,11 +1732,14 @@ pub fn load_workspace(
+                 reason: error.to_string(),
+             }
+         })?;
+-        let manifest =
+-            parse_crate_manifest(&text).map_err(|error| WorkspaceError::ManifestUnreadable {
+-                path: manifest_path.clone(),
+-                error,
+-            })?;
++        let manifest = parse_crate_manifest_with_default_package_name(
++            &text,
++            &default_package_name_of(&directory, &repository_root),
++        )
++        .map_err(|error| WorkspaceError::ManifestUnreadable {
++            path: manifest_path.clone(),
++            error,
++        })?;
+         let crate_identifier = manifest
+             .library
+             .as_ref()
+@@ -1452,7 +1769,7 @@ pub fn load_workspace(
+             }
+         }
+         let origin = if workspace_member_directories.contains(&normalized_path(&directory)) {
+-            CrateOrigin::UnderTheCratesDirectory
++            CrateOrigin::WorkspaceMember
+         } else {
+             CrateOrigin::PathDependencyOutsideTheWorkspace
+         };
+@@ -1464,10 +1781,24 @@ pub fn load_workspace(
+             origin,
+         });
+     }
++    // 仓根自己是成员（根清单带 `[package]`）时，它底下别的 crate 目录里的文件归那个 crate、不再算进仓根这一个
++    // （与 `scripts/gate/lib_function_units.py` 的 `RustWorkspace.all_files` 同一条规则）
++    let directories_of_the_crates_below_the_root: Vec<PathBuf> = crates
++        .iter()
++        .map(|workspace_crate| normalized_path(&workspace_crate.directory))
++        .filter(|directory| *directory != repository_root)
++        .collect();
+     let mut entries = Vec::new();
+     for (crate_position, workspace_crate) in crates.iter().enumerate() {
+         let mut found = Vec::new();
+         collect_source_files(&workspace_crate.directory, &mut found);
++        if normalized_path(&workspace_crate.directory) == repository_root {
++            found.retain(|absolute_path| {
++                !directories_of_the_crates_below_the_root
++                    .iter()
++                    .any(|directory| absolute_path.starts_with(directory))
++            });
++        }
+         for absolute_path in found {
+             let language = if absolute_path
+                 .extension()
+@@ -1517,6 +1848,7 @@ fn assemble_workspace(
+     let parsed = parse_files_in_parallel(
+         &entries,
+         &crates,
++        &repository_root,
+         loading.threads,
+         loading.switches,
+         loading.origin,
+diff --git a/crates/singlefs-unit-graph/tests/unit_graph_local_bindings_shadow_same_named_functions.rs b/crates/singlefs-unit-graph/tests/unit_graph_local_bindings_shadow_same_named_functions.rs
+index 0fa0f1d33..538815e34 100644
+--- a/crates/singlefs-unit-graph/tests/unit_graph_local_bindings_shadow_same_named_functions.rs
++++ b/crates/singlefs-unit-graph/tests/unit_graph_local_bindings_shadow_same_named_functions.rs
+@@ -1,6 +1,9 @@
+ //! R-裸名局部绑定遮住同名函数（`src/closure.rs` 文件头「R-裸名局部绑定遮住同名函数」）：函数里名字每一处都是 `let` 或参数绑定的、或落在绑定的作用域里的，
+-//! 不往外连同名函数；认不准的（绑定之前调了、初始值里调了、块外调了、带路径的、函数体里有嵌套条目的、宏调用括号里的 `let`、`if let`、作用域外的格式串捕获）照连。
+-//! 夹具只切词、不编译。真仓的形状是 `let main = SamplingPoint::Main;`，名字写进宏调用实参与闭包：不连可执行文件自己的 `fn main`。
++//! 不往外连同名函数；认不准的（绑定之前调了、初始值里调了、块外调了、带路径的、函数体里有嵌套条目的、宏调用括号里的 `let`、`if let`、作用域外的格式串捕获、
++//! 落在名单外的宏调用括号里的）照连。名单是 `src/closure.rs` 的 `STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE`（标准库那 16 个就地求值实参的宏），
++//! 名单每一项、名单外的宏与宏调用括号里的 `let` 这几形的用例在 `unit_graph_shapes_that_hide_the_callee_widen_the_closure_or_refuse_the_key.rs`。
++//! 夹具只切词、不编译。真仓的形状是 `let main = SamplingPoint::Main;`，名字写进名单里的 `format!` 的实参与闭包：不连可执行文件自己的 `fn main`；
++//! 写进名单外的宏（工作区的、外部 crate 的）括号里的照连。
+ //! 每条用例改被它点名的那个同名条目，判入口的键变不变；弄坏开关 `local-bindings-shadow-same-named-functions`（`src/rule_switches.rs`）打开时遮住的也连。
+ 
+ mod common_fixture_workspace;
+@@ -115,13 +118,6 @@ pub fn binds_the_name_of_a_constant() -> u32 {
+     LIMIT
+ }
+ 
+-pub fn lets_inside_a_macro_call() -> u32 {
+-    wrapped! {
+-        let helper_total = 7;
+-        helper_total
+-    }
+-}
+-
+ pub fn if_let_binds_the_name_and_a_later_statement_calls_the_function() -> u32 {
+     if let helper_total = pick(1) {
+     }
+@@ -484,19 +480,6 @@ fn let_with_the_name_of_a_constant_links_the_constant() {
+     );
+ }
+ 
+-/// 场景：宏调用括号里写 `let helper_total = 7;`，展开成什么看不出。预期：改函数键变。
+-#[test]
+-fn let_inside_a_macro_call_does_not_shadow() {
+-    assert_eq!(
+-        expectation_with_every_rule_intact(
+-            "fshadow::lets_inside_a_macro_call",
+-            EDIT_OF_THE_SAME_NAMED_FUNCTION
+-        ),
+-        KeyExpectation::Changes,
+-        "宏调用括号里的 let 不当绑定"
+-    );
+-}
+-
+ /// 场景：`if let helper_total = …` 的绑定只在 if 块里，后面的语句调同名函数。预期：改函数键变。
+ #[test]
+ fn an_if_let_does_not_bind_the_name_for_the_later_statements() {
+@@ -523,7 +506,7 @@ fn format_capture_before_the_let_links_the_function() {
+     );
+ }
+ 
+-/// 场景（真仓 `let main = SamplingPoint::Main;` 的形状）：绑定之后名字写进宏调用实参、闭包与格式串捕获。预期：改同名函数键不变。
++/// 场景（真仓 `let main = SamplingPoint::Main;` 的形状）：绑定之后名字写进名单里的 `format!` 的实参、闭包与格式串捕获。预期：改同名函数键不变。
+ #[test]
+ fn let_used_in_macro_arguments_closures_and_captures_shadows_the_function() {
+     assert_eq!(
+@@ -532,7 +515,7 @@ fn let_used_in_macro_arguments_closures_and_captures_shadows_the_function() {
+             EDIT_OF_THE_SAME_NAMED_FUNCTION
+         ),
+         KeyExpectation::StaysTheSame,
+-        "作用域里宏调用实参、闭包、格式串捕获里的名字都是局部变量"
++        "作用域里名单里的宏的调用实参、闭包、格式串捕获里的名字都是局部变量"
+     );
+ }
+ 
+diff --git a/crates/singlefs-unit-graph/tests/unit_graph_manifest_directory_reads_under_crates_become_directory_data_units.rs b/crates/singlefs-unit-graph/tests/unit_graph_manifest_directory_reads_under_crates_become_directory_data_units.rs
+index d4af149df..7e6a5a7f9 100644
+--- a/crates/singlefs-unit-graph/tests/unit_graph_manifest_directory_reads_under_crates_become_directory_data_units.rs
++++ b/crates/singlefs-unit-graph/tests/unit_graph_manifest_directory_reads_under_crates_become_directory_data_units.rs
+@@ -1,9 +1,10 @@
+-//! 目录数据单元（批次 `records/2026-10-26-checker欠账C896-C897-C914.md#5` 的 5g 规则 B）：按 `env!("CARGO_MANIFEST_DIR")` 拼出的是
+-//! `crates/` 之下（不是 `crates/` 本身）的一个目录时，整个目录（递归）记一个 `data-directory` 数据单元，不拒算；指纹是目录下每份文件
+-//! 按相对路径排好、逐份一行「相对路径 \t 内容的 SHA-256」、每行以换行收尾的整段 SHA-256。拼出的目录绑到 `let` 名字上时看名字的每一处
+-//! 用法（`.parent()` 这类往外走的照旧拒算）；私有的 `const 名字: &str = env!("CARGO_MANIFEST_DIR");` 按 `Path::new(名字)` 的用法折。
+-//! 仓根、`crates/` 之外的目录与 `crates/` 整个照旧拒算 `runtime-read-path-not-literal`。
+-//! 夹具：`fscan` 读自己的 `tables/` 与兄弟包 `fother` 的 `src/`，各种读法各是一个入口函数。
++//! 目录数据单元：按 `env!("CARGO_MANIFEST_DIR")` 拼出的是仓根 `crates/` 之下（不是 `crates/` 本身）的一个目录时，整个目录（递归）
++//! 记一个 `data-directory` 数据单元，不拒算；指纹是目录下每份文件按相对路径排好、逐份一行「相对路径 \t 内容的 SHA-256」、每行以换行
++//! 收尾的整段 SHA-256。拼出的目录绑到 `let` 名字上时看名字的每一处用法（`.parent()` 这类往外走的拒算）；私有的
++//! `const 名字: &str = env!("CARGO_MANIFEST_DIR");` 按 `Path::new(名字)` 的用法折。
++//! 仓根、`crates/` 之外的目录、`crates/` 整个，与清单目录不在 `crates/` 下的工作区成员读自己的目录，都拒算 `runtime-read-path-not-literal`
++//! （`scripts/gate/lib_function_units.py` 的 `is_data_directory` 同样只收 `crates/` 之下的目录）。
++//! 夹具：`fscan` 读自己的 `tables/` 与兄弟包 `fother` 的 `src/`，各种读法各是一个入口函数；`foutside` 是根清单点名的、在仓根下一层的成员。
+ 
+ mod common_fixture_workspace;
+ 
+@@ -203,3 +204,65 @@ fn directory_outside_crates_is_still_refused() {
+ fn bound_package_root_that_goes_to_its_parent_is_still_refused() {
+     assert_refused_as_runtime_path("fscan::repository_root_through_parent", 33);
+ }
++
++const OUTSIDE_MEMBER_FILE: &str = "foutside/src/lib.rs";
++
++/// `foutside` 的库：清单目录在仓根下一层、不在 `crates/` 下（`gpu-verification-server` 同形），整个清单目录交给 `read_dir`。
++/// 行号进断言：改它要跟着改断言里的行号。
++const OUTSIDE_MEMBER_LIBRARY: &str = r#"use std::path::PathBuf;
++
++pub fn own_directory_count() -> usize {
++    std::fs::read_dir(PathBuf::from(env!("CARGO_MANIFEST_DIR"))).map(Iterator::count).unwrap_or(0)
++}
++"#;
++
++/// 根清单点名 `foutside` 当工作区成员（它在仓根下一层，不在 `crates/` 下）。
++fn tree_with_a_member_outside_crates(label: &str) -> FixtureTree {
++    FixtureTree::materialize(
++        label,
++        &[
++            ("Cargo.toml", "[workspace]\nmembers = [\"foutside\"]\n"),
++            (
++                "foutside/Cargo.toml",
++                "[package]\nname = \"foutside\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
++            ),
++            (OUTSIDE_MEMBER_FILE, OUTSIDE_MEMBER_LIBRARY),
++            ("foutside/notes.txt", "成员目录里、源码之外的一份说明\n"),
++            ("Cargo.lock", "# 夹具不解析依赖\n"),
++        ],
++    )
++}
++
++const OUTSIDE_MEMBER_ENTRY: EntrySpecification = entry("foutside::own_directory_count");
++
++/// 场景：清单目录在仓根下一层的成员 `foutside`，`PathBuf::from(env!("CARGO_MANIFEST_DIR"))` 整个交给 `read_dir`（清单目录的上一级是
++/// 仓根、不是 `crates/`）。预期：闭包里没有 `data-directory` 行，拒算 `runtime-read-path-not-literal`、落在 `env!` 那一行
++/// （`scripts/gate/lib_function_units.py` 的 `is_data_directory` 不收这个目录，`runtime_manifest_path` 记 `runtime-path`）。
++#[test]
++fn manifest_directory_of_a_member_outside_crates_is_refused_instead_of_a_directory_data_unit() {
++    let tree = tree_with_a_member_outside_crates("directory-member-outside-crates");
++    let switches = RuleSwitches::every_rule_intact();
++    let workspace = workspace_of(tree.root(), &switches);
++    let outcome = closure_with_triple(
++        &workspace,
++        &OUTSIDE_MEMBER_ENTRY,
++        &switches,
++        HOST_TARGET_TRIPLE,
++    )
++    .expect("入口找得到");
++    let lines = closure_lines(&workspace, &outcome, None);
++    assert!(
++        !lines
++            .iter()
++            .any(|line| line.starts_with("data-directory\t")),
++        "crates/ 之外的成员读自己的清单目录：不收成目录数据单元：{lines:?}"
++    );
++    let reason = key_text(&tree, &OUTSIDE_MEMBER_ENTRY)
++        .expect_err("crates/ 之外的成员读自己的清单目录要拒算");
++    assert!(
++        reason.contains(&format!(
++            "refused\truntime-read-path-not-literal\t{OUTSIDE_MEMBER_FILE}:4\t"
++        )),
++        "拒算 runtime-read-path-not-literal、落在 env! 那一行（第 4 行）：{reason}"
++    );
++}
+diff --git a/crates/singlefs-unit-graph/tests/unit_graph_own_program_restart_is_keyed_only_from_the_main_of_a_bin.rs b/crates/singlefs-unit-graph/tests/unit_graph_own_program_restart_is_keyed_only_from_the_main_of_a_bin.rs
+index 5bfc18abe..a2eaae3dc 100644
+--- a/crates/singlefs-unit-graph/tests/unit_graph_own_program_restart_is_keyed_only_from_the_main_of_a_bin.rs
++++ b/crates/singlefs-unit-graph/tests/unit_graph_own_program_restart_is_keyed_only_from_the_main_of_a_bin.rs
+@@ -37,6 +37,18 @@ const RESTART_WRITTEN_IN_COMMAND_NEW: &str = r#"fn restart() {
+     command.status().expect("起得来");
+ }"#;
+ 
++/// 用法都与 `let` 同层：`名字.display()` 写在函数体那一层的 `eprintln!` 里。
++const RESTART_BOUND_WITH_A_DIVERGING_FALLBACK_USED_AT_THE_LEVEL_OF_THE_LET: &str = r#"fn restart() {
++    let this_program = std::env::current_exe().unwrap_or_else(|error| {
++        eprintln!("取不到路径：{error}");
++        std::process::exit(78)
++    });
++    eprintln!("起 {}", this_program.display());
++    let status = std::process::Command::new(&this_program).arg("role").status();
++    drop(status);
++}"#;
++
++/// `名字.display()` 写在起子进程失败时那个闭包的块里，比 `let` 深一层（E16 第五跑 `run_every_mode_in_child_processes` 的形状之一）。
+ const RESTART_BOUND_WITH_A_DIVERGING_FALLBACK: &str = r#"fn restart() {
+     let this_program = std::env::current_exe().unwrap_or_else(|error| {
+         eprintln!("取不到路径：{error}");
+@@ -116,15 +128,26 @@ fn bin_main_restarting_itself_inside_command_new_is_keyed_and_follows_the_role_o
+     );
+ }
+ 
+-/// 场景：路径绑给 `let`、失败时闭包 `process::exit`，用法只有 `Command::new(&名字)` 与 `名字.display()`（E16 第五跑的形状）。预期：同上。
++/// 场景：路径绑给 `let`、失败时闭包 `process::exit`，用法只有 `Command::new(&名字)` 与 `名字.display()`，`名字.display()` 写在起子进程失败时
++/// 那个闭包的块里、比 `let` 深一层（E16 第五跑的形状）。预期：拒算 `current-exe`（用法与 `let` 不同层）。
+ #[test]
+-fn bin_main_restarting_itself_through_a_binding_with_a_diverging_fallback_is_keyed() {
+-    assert_keyed_from_main_and_follows_the_role_of_the_child(
++fn bin_main_restarting_itself_through_a_binding_displayed_inside_a_deeper_block_is_refused() {
++    assert_refused_from_main(
+         "restart-bound-diverging-fallback",
+         RESTART_BOUND_WITH_A_DIVERGING_FALLBACK,
+     );
+ }
+ 
++/// 场景：路径绑给 `let`、失败时闭包 `process::exit`，用法只有 `Command::new(&名字)` 与 `名字.display()`，都与 `let` 同层。
++/// 预期：算得出键，键跟角色函数变。
++#[test]
++fn bin_main_restarting_itself_through_a_binding_used_at_the_level_of_the_let_is_keyed() {
++    assert_keyed_from_main_and_follows_the_role_of_the_child(
++        "restart-bound-used-at-the-level-of-the-let",
++        RESTART_BOUND_WITH_A_DIVERGING_FALLBACK_USED_AT_THE_LEVEL_OF_THE_LET,
++    );
++}
++
+ /// 场景：`let 名字 = match current_exe() { Ok(名字) => 名字, Err(…) => return … };`（E162 断电装置的形状）。预期：同上。
+ #[test]
+ fn bin_main_restarting_itself_through_a_match_returning_on_error_is_keyed() {
+diff --git a/crates/singlefs-unit-graph/tests/unit_graph_shapes_that_hide_the_callee_widen_the_closure_or_refuse_the_key.rs b/crates/singlefs-unit-graph/tests/unit_graph_shapes_that_hide_the_callee_widen_the_closure_or_refuse_the_key.rs
+new file mode 100644
+index 000000000..82d257798
+--- /dev/null
++++ b/crates/singlefs-unit-graph/tests/unit_graph_shapes_that_hide_the_callee_widen_the_closure_or_refuse_the_key.rs
+@@ -0,0 +1,1064 @@
++//! 几种看不出运行时调到谁的写法：闭包要收宽（照连同名函数、退回全连），或者拒算，不许静默少收（D13（验证路线） 已定项 17
++//! 「收不全的那一份拒算键、照跑，不静默少收」「键过窄…同样算违反」）。
++//! - 宏调用括号里的名字（`src/closure.rs` 的 `is_bare_name_only_a_local_binding_of_the_function`）：工作区的宏可能把它接在路径后面、放进嵌套条目，
++//!   照连同名函数；只有标准库那 16 个就地求值实参的宏（`STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE`）的括号里照算局部，
++//!   名单每一项各一条用例；名单外的标准库宏（`dbg!`）照连。
++//! - use 路径点准候选（`candidates_seen_from_the_module_of_the_unit`）：点到的候选带条件编译、那个模块另有 use 按名字引进它、
++//!   相对路径首段是本作用域里别的 use 引进的名字，退回全连。
++//! - 程序起自己（`src/rust_items.rs` 的 `own_program_path_is_handed_to_command_unchanged`、`expression_ending_at_diverges`）：用法出了 `let` 所在的块、
++//!   进了比 `let` 更深的块、失败时的闭包以 `if … else` 收尾的，不算起自己，拒算 `current-exe`。
++//! - `extern` 块名单（`extern_block_declares_only_listed_system_library_calls` 与闭包的 `follow_reads`）：属性里任何位置有 `link`、同一个目标里
++//!   另有块带 `link`、包的构建脚本写了 `rustc-link-lib` 的，拒算 `extern-function-interface`。
++//!
++//! 夹具只切词、不编译；判的是闭包里有没有点名的单元、拒算行点没点名那一形。
++
++mod common_fixture_workspace;
++
++use common_fixture_workspace::{
++    closure_with_triple, key_of, workspace_of, EntrySpecification, FixtureTree, HOST_TARGET_TRIPLE,
++};
++use singlefs_unit_graph::rule_switches::RuleSwitches;
++
++const NO_DEPENDENCY_RESOLUTION: (&str, &str) = ("Cargo.lock", "# 夹具不解析依赖\n");
++
++/// 入口闭包里各 Rust 单元的限定名；闭包收不起来就 panic。
++fn closure_unit_names(tree: &FixtureTree, entry: &EntrySpecification) -> Vec<String> {
++    let switches = RuleSwitches::every_rule_intact();
++    let workspace = workspace_of(tree.root(), &switches);
++    let outcome = closure_with_triple(&workspace, entry, &switches, HOST_TARGET_TRIPLE)
++        .unwrap_or_else(|error| panic!("{} 的闭包收得起来：{error}", entry.entry_path));
++    outcome
++        .units
++        .iter()
++        .map(|unit_index| workspace.units[unit_index.0].qualified_name.clone())
++        .collect()
++}
++
++/// 入口的键：拒算交 `Err`（带拒算行）。
++fn key_verdict(tree: &FixtureTree, entry: &EntrySpecification) -> Result<String, String> {
++    let switches = RuleSwitches::every_rule_intact();
++    key_of(&workspace_of(tree.root(), &switches), entry, &switches).map(|key| key.hexadecimal())
++}
++
++fn library_entry(entry_path: &'static str) -> EntrySpecification {
++    EntrySpecification {
++        entry_path,
++        target: "lib",
++        conditions: &[],
++    }
++}
++
++const MACRO_FILE: &str = "crates/fshadow/src/lib.rs";
++
++/// 宏把实参接在路径后面、把实参块放进嵌套函数的两个入口与一个对照入口，加标准库宏、宏里块中的 `let`、改名原名与区间几个入口。
++const MACRO_LIBRARY: &str = r#"use std::fmt::Write;
++
++macro_rules! call_through_the_module_path {
++    ($function:ident) => {
++        self::$function()
++    };
++}
++
++macro_rules! call_inside_a_nested_function {
++    ($body:block) => {{
++        fn nested() -> u32 $body
++        nested()
++    }};
++}
++
++fn helper_total() -> u32 {
++    7
++}
++
++pub fn entry_through_the_module_path() -> u32 {
++    let helper_total = 1u32;
++    call_through_the_module_path!(helper_total) + helper_total
++}
++
++pub fn entry_inside_a_nested_function() -> u32 {
++    let helper_total = 1u32;
++    helper_total + call_inside_a_nested_function!({ helper_total() })
++}
++
++pub fn entry_without_a_binding() -> u32 {
++    helper_total()
++}
++
++pub fn local_name_in_format() -> String {
++    let helper_total = 1u32;
++    format!("{}", helper_total)
++}
++
++pub fn local_name_in_format_args() -> String {
++    let helper_total = 1u32;
++    let text = format_args!("{}", helper_total).to_string();
++    text
++}
++
++pub fn local_name_in_print() -> u32 {
++    let helper_total = 1u32;
++    print!("{}", helper_total);
++    0
++}
++
++pub fn local_name_in_println() -> u32 {
++    let helper_total = 1u32;
++    println!("{}", helper_total);
++    0
++}
++
++pub fn local_name_in_eprint() -> u32 {
++    let helper_total = 1u32;
++    eprint!("{}", helper_total);
++    0
++}
++
++pub fn local_name_in_eprintln() -> u32 {
++    let helper_total = 1u32;
++    eprintln!("{}", helper_total);
++    0
++}
++
++pub fn local_name_in_write() -> String {
++    let helper_total = 1u32;
++    let mut text = String::new();
++    write!(text, "{}", helper_total).expect("写得进串");
++    text
++}
++
++pub fn local_name_in_writeln() -> String {
++    let helper_total = 1u32;
++    let mut text = String::new();
++    writeln!(text, "{}", helper_total).expect("写得进串");
++    text
++}
++
++pub fn local_name_in_panic() -> u32 {
++    let helper_total = 1u32;
++    panic!("{}", helper_total)
++}
++
++pub fn local_name_in_assert() -> u32 {
++    let helper_total = 1u32;
++    assert!(helper_total > 0);
++    0
++}
++
++pub fn local_name_in_assert_eq() -> u32 {
++    let helper_total = 1u32;
++    assert_eq!(helper_total, 1);
++    0
++}
++
++pub fn local_name_in_assert_ne() -> u32 {
++    let helper_total = 1u32;
++    assert_ne!(helper_total, 2);
++    0
++}
++
++pub fn local_name_in_debug_assert() -> u32 {
++    let helper_total = 1u32;
++    debug_assert!(helper_total > 0);
++    0
++}
++
++pub fn local_name_in_debug_assert_eq() -> u32 {
++    let helper_total = 1u32;
++    debug_assert_eq!(helper_total, 1);
++    0
++}
++
++pub fn local_name_in_debug_assert_ne() -> u32 {
++    let helper_total = 1u32;
++    debug_assert_ne!(helper_total, 2);
++    0
++}
++
++pub fn local_name_in_vec() -> Vec<u32> {
++    let helper_total = 1u32;
++    vec![helper_total]
++}
++
++pub fn local_name_in_dbg() -> u32 {
++    let helper_total = 1u32;
++    dbg!(helper_total)
++}
++
++pub fn let_inside_a_block_of_the_vector_macro() -> Vec<u32> {
++    vec![{
++        let helper_total = 7;
++        helper_total
++    }]
++}
++
++pub mod aliased {
++    pub fn helper_total() -> u32 {
++        9
++    }
++}
++
++use crate::aliased::helper_total as aliased_total;
++
++pub fn calls_through_an_alias_and_binds_the_original_name() -> u32 {
++    let helper_total = 1;
++    aliased_total() + helper_total
++}
++
++pub fn calls_the_function_in_a_range_before_the_let() -> u32 {
++    let mut sum = 0;
++    for step in sum..helper_total() {
++        sum += step;
++    }
++    let helper_total = sum;
++    helper_total
++}
++"#;
++
++fn macro_tree(label: &str) -> FixtureTree {
++    FixtureTree::materialize(
++        label,
++        &[
++            (
++                "crates/fshadow/Cargo.toml",
++                "[package]\nname = \"fshadow\"\n",
++            ),
++            (MACRO_FILE, MACRO_LIBRARY),
++            NO_DEPENDENCY_RESOLUTION,
++        ],
++    )
++}
++
++/// 场景：宏把实参接在 `self::` 后面（`self::$function()`），实参是外层的同名局部变量。预期：闭包有 `fn helper_total`。
++#[test]
++fn name_spliced_after_a_path_by_a_workspace_macro_links_the_function() {
++    let tree = macro_tree("macro-spliced-after-a-path");
++    let names = closure_unit_names(
++        &tree,
++        &library_entry("fshadow::entry_through_the_module_path"),
++    );
++    assert!(
++        names.iter().any(|name| name == "fshadow::helper_total"),
++        "宏展开成 self::helper_total()，运行时调的是函数：{names:?}"
++    );
++}
++
++/// 场景：宏把实参块放进嵌套的 `fn nested()`，块里调同名函数。预期：闭包有 `fn helper_total`。
++#[test]
++fn name_in_a_block_moved_into_a_nested_function_by_a_workspace_macro_links_the_function() {
++    let tree = macro_tree("macro-moved-into-a-nested-function");
++    let names = closure_unit_names(
++        &tree,
++        &library_entry("fshadow::entry_inside_a_nested_function"),
++    );
++    assert!(
++        names.iter().any(|name| name == "fshadow::helper_total"),
++        "嵌套条目看不见外层局部变量，块里的 helper_total() 是函数：{names:?}"
++    );
++}
++
++/// 场景（对照）：没有局部绑定，直接调同名函数。预期：闭包有 `fn helper_total`。
++#[test]
++fn call_without_a_binding_links_the_function_in_the_macro_fixture() {
++    let tree = macro_tree("macro-control-without-a-binding");
++    let names = closure_unit_names(&tree, &library_entry("fshadow::entry_without_a_binding"));
++    assert!(
++        names.iter().any(|name| name == "fshadow::helper_total"),
++        "对照入口连不上就说明夹具本身连不上：{names:?}"
++    );
++}
++
++/// 局部变量 `helper_total` 只写进名单里那一个标准库宏的括号里：闭包没有 `fn helper_total`（宏就地求值实参，括号里的是局部变量）。
++fn assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++    macro_name: &str,
++    entry_path: &'static str,
++) {
++    let tree = macro_tree(&format!("macro-listed-standard-macro-{macro_name}"));
++    let names = closure_unit_names(&tree, &library_entry(entry_path));
++    assert!(
++        !names.iter().any(|name| name == "fshadow::helper_total"),
++        "{macro_name}! 就地求值实参，括号里的 helper_total 是局部变量：{names:?}"
++    );
++}
++
++/// 场景：局部变量只写进 `format!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_format_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "format",
++        "fshadow::local_name_in_format",
++    );
++}
++
++/// 场景：局部变量只写进 `format_args!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_the_format_arguments_macro_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "format_args",
++        "fshadow::local_name_in_format_args",
++    );
++}
++
++/// 场景：局部变量只写进 `print!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_print_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "print",
++        "fshadow::local_name_in_print",
++    );
++}
++
++/// 场景：局部变量只写进 `println!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_println_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "println",
++        "fshadow::local_name_in_println",
++    );
++}
++
++/// 场景：局部变量只写进 `eprint!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_eprint_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "eprint",
++        "fshadow::local_name_in_eprint",
++    );
++}
++
++/// 场景：局部变量只写进 `eprintln!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_eprintln_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "eprintln",
++        "fshadow::local_name_in_eprintln",
++    );
++}
++
++/// 场景：局部变量只写进 `write!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_write_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "write",
++        "fshadow::local_name_in_write",
++    );
++}
++
++/// 场景：局部变量只写进 `writeln!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_writeln_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "writeln",
++        "fshadow::local_name_in_writeln",
++    );
++}
++
++/// 场景：局部变量只写进 `panic!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_panic_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "panic",
++        "fshadow::local_name_in_panic",
++    );
++}
++
++/// 场景：局部变量只写进 `assert!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_assert_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "assert",
++        "fshadow::local_name_in_assert",
++    );
++}
++
++/// 场景：局部变量只写进 `assert_eq!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_the_assert_equal_macro_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "assert_eq",
++        "fshadow::local_name_in_assert_eq",
++    );
++}
++
++/// 场景：局部变量只写进 `assert_ne!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_assert_ne_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "assert_ne",
++        "fshadow::local_name_in_assert_ne",
++    );
++}
++
++/// 场景：局部变量只写进 `debug_assert!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_debug_assert_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "debug_assert",
++        "fshadow::local_name_in_debug_assert",
++    );
++}
++
++/// 场景：局部变量只写进 `debug_assert_eq!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_the_debug_assert_equal_macro_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "debug_assert_eq",
++        "fshadow::local_name_in_debug_assert_eq",
++    );
++}
++
++/// 场景：局部变量只写进 `debug_assert_ne!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_debug_assert_ne_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "debug_assert_ne",
++        "fshadow::local_name_in_debug_assert_ne",
++    );
++}
++
++/// 场景：局部变量只写进 `vec!` 的括号里。预期：闭包没有 `fn helper_total`。
++#[test]
++fn local_name_in_vec_shadows_the_function() {
++    assert_local_name_in_the_listed_standard_macro_shadows_the_function(
++        "vec",
++        "fshadow::local_name_in_vec",
++    );
++}
++
++/// 场景：局部变量只写进 `dbg!` 的括号里（标准库宏，不在名单上）。预期：闭包有 `fn helper_total`（名单外的宏照连）。
++#[test]
++fn local_name_in_a_standard_macro_outside_the_list_links_the_function() {
++    let tree = macro_tree("macro-standard-macro-outside-the-list");
++    let names = closure_unit_names(&tree, &library_entry("fshadow::local_name_in_dbg"));
++    assert!(
++        names.iter().any(|name| name == "fshadow::helper_total"),
++        "dbg! 不在名单上，括号里的 helper_total 照连同名函数：{names:?}"
++    );
++}
++
++/// 场景：`vec![{ let helper_total = 7; helper_total }]`，`let` 写在标准库宏括号里的块中。预期：闭包有 `fn helper_total`（宏调用括号里的 `let` 不当绑定）。
++#[test]
++fn let_inside_a_block_of_a_listed_standard_macro_does_not_shadow() {
++    let tree = macro_tree("macro-let-inside-a-block-of-vec");
++    let names = closure_unit_names(
++        &tree,
++        &library_entry("fshadow::let_inside_a_block_of_the_vector_macro"),
++    );
++    assert!(
++        names.iter().any(|name| name == "fshadow::helper_total"),
++        "宏调用括号里（套在块里也算）的 let 不当绑定：{names:?}"
++    );
++}
++
++/// 场景：`use crate::aliased::helper_total as aliased_total;`，函数调 `aliased_total()`、又有局部变量 `helper_total`。预期：闭包有 `fn aliased::helper_total`。
++#[test]
++fn alias_original_bound_as_a_local_name_still_links_the_aliased_function() {
++    let tree = macro_tree("macro-alias-original-bound-locally");
++    let names = closure_unit_names(
++        &tree,
++        &library_entry("fshadow::calls_through_an_alias_and_binds_the_original_name"),
++    );
++    assert!(
++        names
++            .iter()
++            .any(|name| name == "fshadow::aliased::helper_total"),
++        "改名的原名不是这个单元写的名字，局部绑定遮不住它：{names:?}"
++    );
++}
++
++/// 场景：`let` 之前在区间 `sum..helper_total()` 里调同名函数。预期：闭包有 `fn helper_total`（`..` 后面的不是字段）。
++#[test]
++fn call_in_a_range_before_the_let_links_the_function() {
++    let tree = macro_tree("macro-range-before-the-let");
++    let names = closure_unit_names(
++        &tree,
++        &library_entry("fshadow::calls_the_function_in_a_range_before_the_let"),
++    );
++    assert!(
++        names.iter().any(|name| name == "fshadow::helper_total"),
++        "区间的 `..` 不是单个点，后面的 helper_total() 指函数：{names:?}"
++    );
++}
++
++/// `backend` 里的 `checksum` 只在 `fast` 下编，不开时经 `pub use` glob 转 `portable` 的。
++/// 转的那一条写成 glob 而不按名字引进 `checksum`：按名字引进的会让「候选所在模块另有 use 引进同名」那一支也成立，
++/// 盖住「候选自己带条件编译」这一支，只靠条件编译退回全连的那一形就测不出来。
++const CONDITIONAL_CANDIDATE_LIBRARY: &str = r#"pub mod backend {
++    #[cfg(feature = "fast")]
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.len() as u32
++    }
++
++    #[cfg(not(feature = "fast"))]
++    pub use crate::portable::*;
++}
++
++pub mod portable {
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.iter().map(|byte| u32::from(*byte)).sum()
++    }
++}
++
++use crate::backend::checksum;
++
++pub fn entry_point(data: &[u8]) -> u32 {
++    checksum(data)
++}
++"#;
++
++/// `backend` 里的候选是条目级宏调用 `fmacros::make_checksum!()`：它展开成不带条件的花括号结构体 `checksum`（只占类型命名空间），
++/// 按宏体顶层按字面写出的条目名登在 `checksum` 名下；同一个模块另有 `pub use crate::portable::checksum`（值命名空间的函数）。
++/// 候选不带条件、所在文件也不经带条件的 `mod` 连进来，退回全连只能靠「候选所在模块另有 use 引进同名」那一支。
++/// 候选的词法单元里不写 `checksum`：自己写着这个名字的候选（结构体、函数、括号里点名它的宏调用）连进闭包之后，在 `backend` 里按名字解它，
++/// 经那条 `pub use` 照样连到 `portable::checksum`，盖住这一支。宏定义在另一个包 `fmacros` 里：宏定义单元的宏体裸名在调用处解、一律全连，
++/// 定义在 `fswap` 里会把 `portable::checksum` 从那一边连进闭包；定义在 `fmacros` 里只在 `fmacros` 看得见的目标里找，碰不到 `fswap`。
++const RE_IMPORTING_MODULE_LIBRARY: &str = r#"pub mod backend {
++    fmacros::make_checksum!();
++
++    pub use crate::portable::checksum;
++}
++
++pub mod portable {
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.iter().map(|byte| u32::from(*byte)).sum()
++    }
++}
++
++use crate::backend::checksum;
++
++pub fn entry_point(data: &[u8]) -> u32 {
++    checksum(data)
++}
++"#;
++
++/// `fmacros` 的 `make_checksum!` 展开成花括号结构体 `checksum`（宏体顶层按字面写出的条目名）。
++const CHECKSUM_STRUCT_MACRO_LIBRARY: &str = r#"#[macro_export]
++macro_rules! make_checksum {
++    () => {
++        pub struct checksum {
++            pub total: u32,
++        }
++    };
++}
++"#;
++
++/// `backend` 有两份：开 `fast` 时是 `backend.rs` 那个文件，不开时是行内模块、经 `pub use` 转 `portable` 的。
++const CONDITIONAL_FILE_MODULE_LIBRARY: &str = r#"#[cfg(feature = "fast")]
++mod backend;
++
++#[cfg(not(feature = "fast"))]
++pub mod backend {
++    pub use crate::portable::checksum;
++}
++
++pub mod portable {
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.iter().map(|byte| u32::from(*byte)).sum()
++    }
++}
++
++use crate::backend::checksum;
++
++pub fn entry_point(data: &[u8]) -> u32 {
++    checksum(data)
++}
++"#;
++
++const CONDITIONAL_FILE_MODULE_BACKEND: &str =
++    "pub fn checksum(data: &[u8]) -> u32 {\n    data.len() as u32\n}\n";
++
++fn swap_tree(label: &str, library: &str, extra_files: &[(&str, &str)]) -> FixtureTree {
++    let mut files = vec![
++        (
++            "crates/fswap/Cargo.toml",
++            "[package]\nname = \"fswap\"\n\n[features]\nfast = []\n",
++        ),
++        ("crates/fswap/src/lib.rs", library),
++        NO_DEPENDENCY_RESOLUTION,
++    ];
++    files.extend_from_slice(extra_files);
++    FixtureTree::materialize(label, &files)
++}
++
++/// 场景：use 点到的 `backend::checksum` 带 `#[cfg(feature = "fast")]`，同一个模块不开 `fast` 时经 glob 转 `portable`，不开 `fast`。预期：闭包有 `fn portable::checksum`。
++#[test]
++fn use_pointing_at_a_conditionally_compiled_candidate_links_the_re_exported_one_too() {
++    let tree = swap_tree(
++        "use-conditional-candidate",
++        CONDITIONAL_CANDIDATE_LIBRARY,
++        &[],
++    );
++    let names = closure_unit_names(&tree, &library_entry("fswap::entry_point"));
++    assert!(
++        names.iter().any(|name| name == "fswap::portable::checksum"),
++        "候选带 cfg，名字可能是 cfg 互斥的 pub use 转来的：{names:?}"
++    );
++}
++
++/// 场景：use 点到的 `backend` 里候选是 `fmacros::make_checksum!()` 展开的花括号结构体 `checksum`，同一个模块另有 `pub use crate::portable::checksum`。预期：闭包有 `fn portable::checksum`。
++#[test]
++fn use_pointing_at_a_module_that_also_imports_the_name_links_the_imported_one_too() {
++    let tree = FixtureTree::materialize(
++        "use-module-re-importing",
++        &[
++            (
++                "crates/fswap/Cargo.toml",
++                "[package]\nname = \"fswap\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\nfmacros = { path = \"../fmacros\" }\n",
++            ),
++            ("crates/fswap/src/lib.rs", RE_IMPORTING_MODULE_LIBRARY),
++            (
++                "crates/fmacros/Cargo.toml",
++                "[package]\nname = \"fmacros\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
++            ),
++            ("crates/fmacros/src/lib.rs", CHECKSUM_STRUCT_MACRO_LIBRARY),
++            NO_DEPENDENCY_RESOLUTION,
++        ],
++    );
++    let names = closure_unit_names(&tree, &library_entry("fswap::entry_point"));
++    assert!(
++        names.iter().any(|name| name == "fswap::portable::checksum"),
++        "候选所在模块另有 use 引进同名的，落在哪一份看不出：{names:?}"
++    );
++}
++
++/// 场景：use 点到的 `backend::checksum` 在 `#[cfg(feature = "fast")] mod backend;` 连进来的文件里，不开 `fast`。预期：闭包有 `fn portable::checksum`。
++#[test]
++fn use_pointing_at_a_candidate_in_a_conditionally_declared_file_links_the_re_exported_one_too() {
++    let tree = swap_tree(
++        "use-conditional-file-module",
++        CONDITIONAL_FILE_MODULE_LIBRARY,
++        &[(
++            "crates/fswap/src/backend.rs",
++            CONDITIONAL_FILE_MODULE_BACKEND,
++        )],
++    );
++    let names = closure_unit_names(&tree, &library_entry("fswap::entry_point"));
++    assert!(
++        names.iter().any(|name| name == "fswap::portable::checksum"),
++        "候选所在文件经带 cfg 的 mod 连进来，同样算带条件：{names:?}"
++    );
++}
++
++/// `use crate::deep::real as short; use short::helper_total;`，别处另有 `other::short`。
++const MODULE_ALIAS_LIBRARY: &str = r#"pub mod deep {
++    pub mod real {
++        pub fn helper_total() -> u32 {
++            7
++        }
++    }
++}
++
++pub mod other {
++    pub mod short {
++        pub fn helper_total() -> u32 {
++            8
++        }
++    }
++}
++
++use crate::deep::real as short;
++use short::helper_total;
++
++pub fn entry_point() -> u32 {
++    helper_total()
++}
++"#;
++
++/// 场景：相对路径 `short::helper_total` 的首段是 `use … as short` 改出来的名字。预期：闭包有 `fn deep::real::helper_total`。
++#[test]
++fn relative_use_path_starting_with_a_module_alias_links_the_aliased_module() {
++    let tree = FixtureTree::materialize(
++        "use-relative-path-through-module-alias",
++        &[
++            ("crates/falias/Cargo.toml", "[package]\nname = \"falias\"\n"),
++            ("crates/falias/src/lib.rs", MODULE_ALIAS_LIBRARY),
++            NO_DEPENDENCY_RESOLUTION,
++        ],
++    );
++    let names = closure_unit_names(&tree, &library_entry("falias::entry_point"));
++    assert!(
++        names
++            .iter()
++            .any(|name| name == "falias::deep::real::helper_total"),
++        "首段 short 是改名的 deep::real，真去处看不出就退回全连：{names:?}"
++    );
++}
++
++/// `use crate::first::old_total as helper_total;`，`first`、`second` 各有一个 `helper_total`。
++const ALIAS_LEAF_LIBRARY: &str = r#"pub mod first {
++    pub fn old_total() -> u32 {
++        1
++    }
++
++    pub fn helper_total() -> u32 {
++        2
++    }
++}
++
++pub mod second {
++    pub fn helper_total() -> u32 {
++        3
++    }
++}
++
++use crate::first::old_total as helper_total;
++
++pub fn entry_point() -> u32 {
++    helper_total()
++}
++"#;
++
++/// 场景：`原名 as 名` 那一支的叶子是别名。预期：两份 `helper_total` 都在闭包里（退回全连），改名的原名 `old_total` 也在。
++#[test]
++fn alias_leaf_of_a_use_falls_back_to_every_same_named_function() {
++    let tree = FixtureTree::materialize(
++        "use-alias-leaf",
++        &[
++            (
++                "crates/fdiverge/Cargo.toml",
++                "[package]\nname = \"fdiverge\"\n",
++            ),
++            ("crates/fdiverge/src/lib.rs", ALIAS_LEAF_LIBRARY),
++            NO_DEPENDENCY_RESOLUTION,
++        ],
++    );
++    let names = closure_unit_names(&tree, &library_entry("fdiverge::entry_point"));
++    for expected in [
++        "fdiverge::first::helper_total",
++        "fdiverge::second::helper_total",
++        "fdiverge::first::old_total",
++    ] {
++        assert!(
++            names.iter().any(|name| name == expected),
++            "{expected} 要在闭包里：{names:?}"
++        );
++    }
++}
++
++/// 一条 use 里两支引进同一个名字（glob 经 `prelude` 转出来的一支、指名 `layout` 的一支），再加 `r#` 写的名字引进的一条 use。
++const MIXED_BRANCHES_LIBRARY: &str = r#"pub mod items {
++    pub const MARK: u32 = 1;
++}
++
++pub mod prelude {
++    pub use crate::items::*;
++}
++
++pub mod layout {
++    pub const MARK: u32 = 2;
++}
++
++pub mod consumer_of_two_branches {
++    use crate::{layout::MARK, prelude::*};
++    pub fn read_mark() -> u32 {
++        MARK
++    }
++}
++
++pub mod counting {
++    pub fn r#total() -> u32 {
++        1
++    }
++}
++
++pub mod spare_counting {
++    pub fn r#total() -> u32 {
++        2
++    }
++}
++
++pub mod consumer_of_a_raw_name {
++    use crate::counting::r#total;
++    pub fn read_total() -> u32 {
++        r#total()
++    }
++}
++"#;
++
++fn mixed_branches_tree(label: &str) -> FixtureTree {
++    FixtureTree::materialize(
++        label,
++        &[
++            ("crates/fmixed/Cargo.toml", "[package]\nname = \"fmixed\"\n"),
++            ("crates/fmixed/src/lib.rs", MIXED_BRANCHES_LIBRARY),
++            NO_DEPENDENCY_RESOLUTION,
++        ],
++    )
++}
++
++/// 场景：`use crate::{layout::MARK, prelude::*};`，glob 那一支点到的 `prelude` 里没有 `MARK` 的候选。预期：整条 use 退回全连，闭包有 `items::MARK`。
++#[test]
++fn use_whose_glob_branch_points_nowhere_falls_back_though_another_branch_points_at_a_candidate() {
++    let tree = mixed_branches_tree("use-two-branches");
++    let names = closure_unit_names(
++        &tree,
++        &library_entry("fmixed::consumer_of_two_branches::read_mark"),
++    );
++    assert!(
++        names.iter().any(|name| name == "fmixed::items::MARK"),
++        "每一支都点到才算点准，glob 那一支点不到就整条退回全连：{names:?}"
++    );
++}
++
++/// 场景：`use crate::counting::r#total;`，use 里的叶子写成 `r#total`、与名字 `total` 字面对不上。预期：退回全连，闭包有 `counting::total`。
++#[test]
++fn use_whose_leaf_is_written_as_a_raw_identifier_falls_back_to_every_candidate() {
++    let tree = mixed_branches_tree("use-raw-identifier-leaf");
++    let names = closure_unit_names(
++        &tree,
++        &library_entry("fmixed::consumer_of_a_raw_name::read_total"),
++    );
++    assert!(
++        names.iter().any(|name| name == "fmixed::counting::total"),
++        "引进名单里有、use 里找不到那一支，退回全连：{names:?}"
++    );
++}
++
++const RESTART_MANIFEST: (&str, &str) = (
++    "crates/frestart/Cargo.toml",
++    "[package]\nname = \"frestart\"\n",
++);
++const RESTART_MAIN_FILE: &str = "crates/frestart/src/main.rs";
++
++const RESTART_MAIN_ENTRY: EntrySpecification = EntrySpecification {
++    entry_path: "frestart::main",
++    target: "bin:frestart",
++    conditions: &[],
++};
++
++/// 块里那个 `exe` 是 `current_exe()`，块外交给 `Command::new` 的是 `worker_path()`。
++const SHADOWED_BINDING_MAIN: &str = r#"fn worker_path() -> std::path::PathBuf {
++    std::env::current_exe().unwrap().with_file_name("worker")
++}
++
++fn main() {
++    let exe = worker_path();
++    {
++        let exe = std::env::current_exe().unwrap();
++        eprintln!("launcher at {}", exe.display());
++    }
++    std::process::Command::new(&exe).status().unwrap();
++}
++"#;
++
++const WORKER_MAIN: &str = "fn worker_role() -> u32 {\n    3\n}\n\nfn main() {\n    std::process::exit(worker_role() as i32);\n}\n";
++
++/// `unwrap_or_else` 的闭包以 `if … { 路径 } else { panic!() }` 收尾。
++const ARGUMENT_FALLBACK_MAIN: &str = r#"fn main() {
++    let this_program = std::env::current_exe().unwrap_or_else(|_| {
++        if let Some(first_argument) = std::env::args_os().next() {
++            std::path::PathBuf::from(first_argument)
++        } else {
++            panic!("拿不到程序路径")
++        }
++    });
++    if std::env::args().count() > 1 {
++        return;
++    }
++    std::process::Command::new(&this_program)
++        .arg("role")
++        .status()
++        .unwrap();
++}
++"#;
++
++/// `match` 的 `Err` 分支是 `=>` 后面以 `process::exit` 收尾的块。
++const MATCH_ARM_BLOCK_MAIN: &str = r#"fn role_body() -> u32 {
++    1
++}
++
++fn main() {
++    if std::env::args().count() > 1 {
++        role_body();
++        return;
++    }
++    let executable = match std::env::current_exe() {
++        Ok(executable) => executable,
++        Err(error) => {
++            eprintln!("取不到路径：{error}");
++            std::process::exit(78)
++        }
++    };
++    std::process::Command::new(&executable)
++        .arg("role")
++        .status()
++        .expect("起得来");
++}
++"#;
++
++/// `let` 写在 `main` 的函数体里，`Command::new(&exe)` 写在更深一层的 `if` 块里。
++const USE_IN_A_DEEPER_BLOCK_MAIN: &str = r#"fn main() {
++    let exe = std::env::current_exe().expect("路径");
++    if std::env::args().count() == 1 {
++        std::process::Command::new(&exe).arg("role").status().expect("起得来");
++    }
++}
++"#;
++
++/// 路径只拿来显示，起的是别的程序。
++const PATH_ONLY_DISPLAYED_MAIN: &str = r#"fn main() {
++    let exe = std::env::current_exe().expect("路径");
++    eprintln!("from {}", exe.display());
++    std::process::Command::new("true").status().expect("起得来");
++}
++"#;
++
++fn restart_tree(label: &str, main_source: &str, extra_files: &[(&str, &str)]) -> FixtureTree {
++    let mut files = vec![
++        RESTART_MANIFEST,
++        (RESTART_MAIN_FILE, main_source),
++        NO_DEPENDENCY_RESOLUTION,
++    ];
++    files.extend_from_slice(extra_files);
++    FixtureTree::materialize(label, &files)
++}
++
++fn assert_refused_as_current_exe_in_the_main_file(verdict: Result<String, String>) {
++    let reason = verdict.expect_err("起的可能是别的程序，拒算");
++    assert!(
++        reason.contains("refused\tcurrent-exe\tcrates/frestart/src/main.rs:"),
++        "拒算行点名 current-exe 与 main.rs：{reason}"
++    );
++}
++
++/// 场景：`current_exe()` 绑在内层块的 `exe` 上，块外交给 `Command::new(&exe)` 的是外层另一个 `exe`。预期：拒算 `current-exe`。
++#[test]
++fn binding_inside_a_block_with_the_use_after_the_block_is_refused_as_current_exe() {
++    let tree = restart_tree(
++        "restart-shadowed-binding",
++        SHADOWED_BINDING_MAIN,
++        &[("crates/frestart/src/bin/worker.rs", WORKER_MAIN)],
++    );
++    assert_refused_as_current_exe_in_the_main_file(key_verdict(&tree, &RESTART_MAIN_ENTRY));
++}
++
++/// 场景：`let exe = current_exe()…;` 在函数体那一层，`Command::new(&exe)` 在更深一层的 `if` 块里（用法与 `let` 不同层）。预期：拒算 `current-exe`。
++#[test]
++fn use_in_a_deeper_block_than_the_let_is_refused_as_current_exe() {
++    let tree = restart_tree(
++        "restart-use-in-a-deeper-block",
++        USE_IN_A_DEEPER_BLOCK_MAIN,
++        &[],
++    );
++    assert_refused_as_current_exe_in_the_main_file(key_verdict(&tree, &RESTART_MAIN_ENTRY));
++}
++
++/// 场景：失败时的闭包以 `if … else { panic!() }` 收尾，`if` 那一支交回 `argv[0]`。预期：拒算 `current-exe`。
++#[test]
++fn fallback_closure_ending_in_an_if_else_is_refused_as_current_exe() {
++    let tree = restart_tree("restart-argument-fallback", ARGUMENT_FALLBACK_MAIN, &[]);
++    assert_refused_as_current_exe_in_the_main_file(key_verdict(&tree, &RESTART_MAIN_ENTRY));
++}
++
++/// 场景：`match current_exe()` 的 `Err` 分支是 `=> { …; process::exit(78) }`。预期：从 bin 的 `main` 算得出键，改角色函数键变。
++#[test]
++fn match_arm_block_ending_in_process_exit_is_keyed_from_the_main_of_the_bin() {
++    let tree = restart_tree("restart-match-arm-block", MATCH_ARM_BLOCK_MAIN, &[]);
++    let kept = key_verdict(&tree, &RESTART_MAIN_ENTRY)
++        .unwrap_or_else(|reason| panic!("`=>` 后面一定不交值的块，起的就是这个程序：{reason}"));
++    tree.replace_exactly_once(
++        RESTART_MAIN_FILE,
++        "fn role_body() -> u32 {\n    1",
++        "fn role_body() -> u32 {\n    2",
++    );
++    let after_the_edit =
++        key_verdict(&tree, &RESTART_MAIN_ENTRY).expect("改了角色的函数体照样算得出键");
++    assert_ne!(kept, after_the_edit, "子进程那个角色跑的函数改了，键要变");
++}
++
++/// 场景：`current_exe()` 的路径只拿来显示，同一个单元里 `Command::new("true")` 起别的程序。预期：拒算 `current-exe`。
++#[test]
++fn path_only_displayed_while_another_program_starts_is_refused_as_current_exe() {
++    let tree = restart_tree("restart-path-only-displayed", PATH_ONLY_DISPLAYED_MAIN, &[]);
++    assert_refused_as_current_exe_in_the_main_file(key_verdict(&tree, &RESTART_MAIN_ENTRY));
++}
++
++const EXTERN_LIBRARY_FILE: &str = "crates/fextern/src/lib.rs";
++
++fn extern_tree(label: &str, library: &str, extra_files: &[(&str, &str)]) -> FixtureTree {
++    let mut files = vec![
++        (
++            "crates/fextern/Cargo.toml",
++            "[package]\nname = \"fextern\"\n",
++        ),
++        (EXTERN_LIBRARY_FILE, library),
++        NO_DEPENDENCY_RESOLUTION,
++    ];
++    files.extend_from_slice(extra_files);
++    FixtureTree::materialize(label, &files)
++}
++
++fn assert_refused_as_extern_function_interface(verdict: Result<String, String>) {
++    let reason = verdict.expect_err("链接时可能多出别的库，拒算");
++    assert!(
++        reason.contains("refused\textern-function-interface\tcrates/fextern/src/lib.rs:"),
++        "拒算行点名 extern-function-interface 与夹具文件：{reason}"
++    );
++}
++
++const EXTERN_ENTRY: EntrySpecification = EntrySpecification {
++    entry_path: "fextern::entry_point",
++    target: "lib",
++    conditions: &[],
++};
++
++/// 场景：块前面写 `#[cfg_attr(target_os = "linux", link(name = "fakesync"))]`。预期：拒算。
++#[test]
++fn link_inside_a_conditional_configuration_attribute_on_the_block_is_refused() {
++    let tree = extern_tree(
++        "extern-link-through-cfg-attr",
++        "#[cfg_attr(target_os = \"linux\", link(name = \"fakesync\"))]\nextern \"C\" {\n    fn fdatasync(fd: i32) -> i32;\n}\n\npub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n",
++        &[],
++    );
++    assert_refused_as_extern_function_interface(key_verdict(&tree, &EXTERN_ENTRY));
++}
++
++/// 场景：同一个目标里另一个空块带 `#[link(name = "fakesync")]`，没人点名它。预期：名单里的块照样拒算。
++#[test]
++fn link_on_another_extern_block_of_the_target_refuses_the_listed_block() {
++    let tree = extern_tree(
++        "extern-link-on-another-block",
++        "#[link(name = \"fakesync\")]\nextern \"C\" {}\n\nextern \"C\" {\n    fn fdatasync(fd: i32) -> i32;\n}\n\npub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n",
++        &[],
++    );
++    assert_refused_as_extern_function_interface(key_verdict(&tree, &EXTERN_ENTRY));
++}
++
++/// 场景：包的构建脚本打 `cargo:rustc-link-lib=fakesync`，库里的块只声明名单里的符号。预期：拒算。
++#[test]
++fn build_script_linking_a_library_refuses_the_listed_block() {
++    let tree = extern_tree(
++        "extern-build-script-link",
++        "extern \"C\" {\n    fn fdatasync(fd: i32) -> i32;\n}\n\npub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n",
++        &[(
++            "crates/fextern/build.rs",
++            "fn main() {\n    println!(\"cargo:rustc-link-lib=fakesync\");\n}\n",
++        )],
++    );
++    assert_refused_as_extern_function_interface(key_verdict(&tree, &EXTERN_ENTRY));
++}
++
++/// 场景（对照）：只声明 `pwrite`、`fdatasync`，哪里都没有 `link`，构建脚本不加库。预期：算得出键。
++#[test]
++fn listed_calls_without_any_link_are_still_keyed() {
++    let tree = extern_tree(
++        "extern-listed-without-link",
++        "extern \"C\" {\n    fn pwrite(fd: i32, buf: *const u8, count: usize, offset: i64) -> isize;\n    fn fdatasync(fd: i32) -> i32;\n}\n\npub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n",
++        &[(
++            "crates/fextern/build.rs",
++            "fn main() {\n    println!(\"cargo:rerun-if-changed=build.rs\");\n}\n",
++        )],
++    );
++    key_verdict(&tree, &EXTERN_ENTRY)
++        .unwrap_or_else(|reason| panic!("名单里的 C 库调用、没有 link，不拒算：{reason}"));
++}
++
++/// 场景：声明前面的属性是 `#[doc = "fdatasync"]`（`link_name` 之外的属性）。预期：拒算。
++#[test]
++fn another_attribute_on_a_declaration_is_refused() {
++    let tree = extern_tree(
++        "extern-another-attribute",
++        "extern \"C\" {\n    #[doc = \"fdatasync\"]\n    fn fdatasync_raw(fd: i32) -> i32;\n}\n\npub fn entry_point() -> i32 {\n    unsafe { fdatasync_raw(3) }\n}\n",
++        &[],
++    );
++    assert_refused_as_extern_function_interface(key_verdict(&tree, &EXTERN_ENTRY));
++}
+diff --git a/crates/singlefs-verification/build.rs b/crates/singlefs-verification/build.rs
+index b911dc517..23846da3b 100644
+--- a/crates/singlefs-verification/build.rs
++++ b/crates/singlefs-verification/build.rs
+@@ -28,9 +28,9 @@ use singlefs_unit_graph::build_features::{
+     features_enabled_on_the_dependencies, features_of_the_crate_being_built,
+ };
+ use singlefs_unit_graph::build_toolchain::{
+-    effective_profile_lines, profile_environment_variable,
++    effective_profile_lines, environment_variables_the_profile_lines_read,
+     profile_name_of_the_build_script_profile_variable, toolchain_lines_of_the_build,
+-    BuildToolchainInputs, PROFILE_SETTING_KEYS,
++    BuildToolchainInputs,
+ };
+ use singlefs_unit_graph::entry_groups::{
+     entry_group_key_not_following_the_listed_units,
+@@ -283,10 +283,9 @@ fn main() {
+             .collect::<Vec<String>>()
+             .join(",")
+     );
+-    for setting_key in PROFILE_SETTING_KEYS {
+-        println!(
+-            "cargo:rerun-if-env-changed={}",
+-            profile_environment_variable(&profile_name, setting_key)
+-        );
++    // profile 的生效值读到的每个环境变量都报：其中任一个变了（含定 `codegen-units` 缺省值的 `CARGO_PROFILE_<名>_INCREMENTAL` 与
++    // `CARGO_INCREMENTAL`），构建脚本重跑、键重算
++    for environment_variable_name in environment_variables_the_profile_lines_read(&profile_name) {
++        println!("cargo:rerun-if-env-changed={environment_variable_name}");
+     }
+ }
+diff --git a/crates/singlefs-unit-graph/tests/unit_graph_workspace_members_come_from_the_root_manifest_as_in_the_python_implementation.rs b/crates/singlefs-unit-graph/tests/unit_graph_workspace_members_come_from_the_root_manifest_as_in_the_python_implementation.rs
+new file mode 100644
+index 000000000..31a0359bc
+--- /dev/null
++++ b/crates/singlefs-unit-graph/tests/unit_graph_workspace_members_come_from_the_root_manifest_as_in_the_python_implementation.rs
+@@ -0,0 +1,416 @@
++//! 工作区成员照根清单收（`src/workspace.rs` 的 `directories_of_the_workspace_members`），与 `scripts/gate/lib_function_units.py` 的
++//! `discover_rust_crates` 同一条规则：`[workspace] members` 逐条照通配展开（`*`、`?`、`[…]`，`*` 不配 `.` 起头的名字），去掉
++//! `exclude` 点名的与底下没有 `Cargo.toml` 的；只写子表头的 `[workspace.metadata]` 也让 `workspace` 非空；根清单带 `[package]`（只写
++//! 表头也算）时仓根自己也是一个成员，它底下别的 crate 目录里的文件归那个 crate；没写 `[package] name` 的包取目录名、仓根取 `root`；
++//! 一个成员都收不到就是空的工作区、不报错；传进来的目录有根清单而没有 `crates/` 的照样当仓根。
++//! 每条用例里写的期望集合是照那段 python 规则在同一棵夹具树上逐条推出来的。
++
++mod common_fixture_workspace;
++
++use common_fixture_workspace::{workspace_of, FixtureTree};
++use singlefs_unit_graph::rule_switches::RuleSwitches;
++use singlefs_unit_graph::workspace::CrateOrigin;
++use singlefs_unit_graph::Workspace;
++
++/// 根清单的 `members` 里有 `crates/` 外的 `service`、一条 `crates/*`、一条 `?`、一条 `[…]` 与一条不存在的 `missing`；`exclude` 点名
++/// `crates/excluded`。`crates/.hidden` 有清单而 `*` 不配它，`crates/notes` 没有清单，`tools/guild` 不在 `[bc]` 里；`crates/beta` 经
++/// path 依赖接到工作区外的 `vendored`。
++const MEMBER_PATTERN_FIXTURE: [(&str, &str); 20] = [
++    (
++        "Cargo.toml",
++        "[workspace]\nmembers = [\"crates/*\", \"service\", \"tools/rend?r\", \"tools/[bc]uild\", \"missing\"]\nexclude = [\"crates/excluded\"]\n",
++    ),
++    ("crates/alpha/Cargo.toml", "[package]\nname = \"alpha\"\n"),
++    ("crates/alpha/src/lib.rs", "pub fn alpha_value() -> u32 {\n    1\n}\n"),
++    (
++        "crates/beta/Cargo.toml",
++        "[package]\nname = \"beta\"\n\n[dependencies]\nvendored = { path = \"../../vendored\" }\n",
++    ),
++    ("crates/beta/src/lib.rs", "pub fn beta_value() -> u32 {\n    vendored::vendored_value()\n}\n"),
++    ("crates/excluded/Cargo.toml", "[package]\nname = \"excluded\"\n"),
++    ("crates/excluded/src/lib.rs", "pub fn excluded_value() -> u32 {\n    3\n}\n"),
++    ("crates/.hidden/Cargo.toml", "[package]\nname = \"hidden\"\n"),
++    ("crates/.hidden/src/lib.rs", "pub fn hidden_value() -> u32 {\n    4\n}\n"),
++    ("crates/notes/readme.txt", "这个目录没有清单\n"),
++    ("service/Cargo.toml", "[package]\nname = \"service\"\n"),
++    ("service/src/lib.rs", "pub fn service_value() -> u32 {\n    5\n}\n"),
++    ("tools/render/Cargo.toml", "[package]\nname = \"render\"\n"),
++    ("tools/render/src/lib.rs", "pub fn render_value() -> u32 {\n    6\n}\n"),
++    ("tools/build/Cargo.toml", "[package]\nname = \"build\"\n"),
++    ("tools/build/src/lib.rs", "pub fn build_value() -> u32 {\n    7\n}\n"),
++    ("tools/guild/Cargo.toml", "[package]\nname = \"guild\"\n"),
++    ("tools/guild/src/lib.rs", "pub fn guild_value() -> u32 {\n    8\n}\n"),
++    ("vendored/Cargo.toml", "[package]\nname = \"vendored\"\n"),
++    ("vendored/src/lib.rs", "pub fn vendored_value() -> u32 {\n    9\n}\n"),
++];
++
++/// 照 python 规则推出的 crate 集合（包名，怎么收进来的），按包名排好。
++fn expected_crates_of_the_member_pattern_fixture() -> Vec<(String, CrateOrigin)> {
++    vec![
++        ("alpha".to_string(), CrateOrigin::WorkspaceMember),
++        ("beta".to_string(), CrateOrigin::WorkspaceMember),
++        ("build".to_string(), CrateOrigin::WorkspaceMember),
++        ("render".to_string(), CrateOrigin::WorkspaceMember),
++        ("service".to_string(), CrateOrigin::WorkspaceMember),
++        (
++            "vendored".to_string(),
++            CrateOrigin::PathDependencyOutsideTheWorkspace,
++        ),
++    ]
++}
++
++/// 装出来的工作区里每个 crate 的（包名，怎么收进来的），按包名排好。
++fn crates_by_package_name(workspace: &Workspace) -> Vec<(String, CrateOrigin)> {
++    let mut crates: Vec<(String, CrateOrigin)> = workspace
++        .crates
++        .iter()
++        .map(|workspace_crate| (workspace_crate.package_name.clone(), workspace_crate.origin))
++        .collect();
++    crates.sort_by_key(|(package_name, _)| package_name.clone());
++    crates
++}
++
++#[test]
++fn members_outside_the_crates_directory_globs_and_exclusions_follow_the_root_manifest() {
++    let tree = FixtureTree::materialize("workspace-members-from-the-root", &MEMBER_PATTERN_FIXTURE);
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        expected_crates_of_the_member_pattern_fixture(),
++        "service 在 crates/ 外照样是成员；crates/* 收 alpha 与 beta、不收 exclude 点名的 excluded、不收 . 起头的 .hidden；\
++         rend?r 收 render，[bc]uild 收 build、不收 guild；missing 不存在；vendored 是 beta 的 path 依赖、在工作区外"
++    );
++    assert!(
++        workspace
++            .files
++            .iter()
++            .any(|file| file.relative_path == "service/src/lib.rs"),
++        "crates/ 外的成员 service 的源码要切进工作区"
++    );
++}
++
++/// 根传的是 `crates/` 目录本身：仓根取它的上一层，成员照上一层的根清单收，与传仓根收出来的相同。
++#[test]
++fn passing_the_crates_directory_collects_the_same_members_as_passing_the_repository_root() {
++    let tree = FixtureTree::materialize("workspace-members-from-crates", &MEMBER_PATTERN_FIXTURE);
++    let workspace = workspace_of(
++        &tree.root().join("crates"),
++        &RuleSwitches::every_rule_intact(),
++    );
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        expected_crates_of_the_member_pattern_fixture(),
++        "传 crates/ 时同样照仓根的根清单收成员"
++    );
++}
++
++/// 根清单带 `[package]`、`workspace` 写成内联表：仓根自己是成员 `rooted`，`crates/alpha` 照 `members` 收；仓根那个 crate 不把
++/// `crates/alpha/` 底下的文件再收一遍。
++const ROOT_PACKAGE_FIXTURE: [(&str, &str); 4] = [
++    (
++        "Cargo.toml",
++        "workspace = { members = [\"crates/*\"] }\n\n[package]\nname = \"rooted\"\n",
++    ),
++    ("src/lib.rs", "pub fn rooted_value() -> u32 {\n    10\n}\n"),
++    ("crates/alpha/Cargo.toml", "[package]\nname = \"alpha\"\n"),
++    (
++        "crates/alpha/src/lib.rs",
++        "pub fn alpha_value() -> u32 {\n    1\n}\n",
++    ),
++];
++
++#[test]
++fn root_package_is_a_member_and_leaves_the_files_of_the_crates_below_it_to_them() {
++    let tree = FixtureTree::materialize("workspace-members-root-package", &ROOT_PACKAGE_FIXTURE);
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        vec![
++            ("alpha".to_string(), CrateOrigin::WorkspaceMember),
++            ("rooted".to_string(), CrateOrigin::WorkspaceMember),
++        ],
++        "根清单带 [package] 时仓根是成员；内联表写的 workspace.members 照样收 crates/alpha"
++    );
++    let mut files_with_their_package: Vec<(String, String)> = workspace
++        .files
++        .iter()
++        .map(|file| {
++            (
++                file.relative_path.clone(),
++                workspace.crates[file.crate_index.0].package_name.clone(),
++            )
++        })
++        .collect();
++    files_with_their_package.sort();
++    assert_eq!(
++        files_with_their_package,
++        vec![
++            ("crates/alpha/src/lib.rs".to_string(), "alpha".to_string()),
++            ("src/lib.rs".to_string(), "rooted".to_string()),
++        ],
++        "每份文件只归一个 crate：crates/alpha/ 底下的归 alpha，不再算进仓根那个 crate"
++    );
++}
++
++/// 装出来的工作区里每份文件（相对仓根的路径），排好序。
++fn relative_paths_of_the_files(workspace: &Workspace) -> Vec<String> {
++    let mut relative_paths: Vec<String> = workspace
++        .files
++        .iter()
++        .map(|file| file.relative_path.clone())
++        .collect();
++    relative_paths.sort();
++    relative_paths
++}
++
++/// 根上有带 `[workspace]` 的根清单、没有 `crates/` 目录。python 那一份把传进来的目录当仓根：`workspace` 非空，`exclude` 是
++/// `{"tools/retired"}`；`service` 展开成 `service`（有清单，收）；`tools/*` 排好序展开成 `tools/render`（收）与 `tools/retired`（exclude
++/// 点名，不收）；`loose` 不在 `members` 里；没有 `[package]`。推出的成员是 render 与 service，文件路径从这棵树的根算。
++const ROOT_MANIFEST_WITHOUT_A_CRATES_DIRECTORY_FIXTURE: [(&str, &str); 9] = [
++    (
++        "Cargo.toml",
++        "[workspace]\nmembers = [\"service\", \"tools/*\"]\nexclude = [\"tools/retired\"]\n",
++    ),
++    ("service/Cargo.toml", "[package]\nname = \"service\"\n"),
++    (
++        "service/src/lib.rs",
++        "pub fn service_value() -> u32 {\n    5\n}\n",
++    ),
++    ("tools/render/Cargo.toml", "[package]\nname = \"render\"\n"),
++    (
++        "tools/render/src/lib.rs",
++        "pub fn render_value() -> u32 {\n    6\n}\n",
++    ),
++    (
++        "tools/retired/Cargo.toml",
++        "[package]\nname = \"retired\"\n",
++    ),
++    (
++        "tools/retired/src/lib.rs",
++        "pub fn retired_value() -> u32 {\n    11\n}\n",
++    ),
++    ("loose/Cargo.toml", "[package]\nname = \"loose\"\n"),
++    (
++        "loose/src/lib.rs",
++        "pub fn loose_value() -> u32 {\n    12\n}\n",
++    ),
++];
++
++#[test]
++fn root_manifest_without_a_crates_directory_is_read_as_the_repository_root() {
++    let tree = FixtureTree::materialize(
++        "workspace-members-without-crates",
++        &ROOT_MANIFEST_WITHOUT_A_CRATES_DIRECTORY_FIXTURE,
++    );
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        vec![
++            ("render".to_string(), CrateOrigin::WorkspaceMember),
++            ("service".to_string(), CrateOrigin::WorkspaceMember),
++        ],
++        "没有 crates/ 而有根清单的目录是仓根：成员照它的 members 收 service 与 render，不收 exclude 点名的 retired、不在 members 里的 loose"
++    );
++    assert_eq!(
++        relative_paths_of_the_files(&workspace),
++        vec![
++            "service/src/lib.rs".to_string(),
++            "tools/render/src/lib.rs".to_string(),
++        ],
++        "文件路径从传进来的这一层算起"
++    );
++}
++
++/// 根清单 `[workspace]` 有键，`members` 只有 `plugins/*`，而 `plugins/` 底下唯一的目录没有清单；`crates/alpha` 有清单。python 那一份：
++/// `workspace` 非空，`plugins/*` 展开成 `plugins/notes`、没有 `Cargo.toml`，不收；有 `workspace` 就不走读 `crates/` 那一支，alpha 不收；
++/// 没有 `[package]`。推出的成员是空列表，顺 path 依赖也收不到别的：一个 crate、一份文件都没有，不报错。
++const WORKSPACE_WITHOUT_ANY_MEMBER_FIXTURE: [(&str, &str); 4] = [
++    (
++        "Cargo.toml",
++        "[workspace]\nresolver = \"2\"\nmembers = [\"plugins/*\"]\n",
++    ),
++    ("plugins/notes/readme.txt", "这个目录没有清单\n"),
++    ("crates/alpha/Cargo.toml", "[package]\nname = \"alpha\"\n"),
++    (
++        "crates/alpha/src/lib.rs",
++        "pub fn alpha_value() -> u32 {\n    1\n}\n",
++    ),
++];
++
++#[test]
++fn workspace_whose_members_expand_to_nothing_is_an_empty_workspace() {
++    let tree = FixtureTree::materialize(
++        "workspace-members-expand-to-nothing",
++        &WORKSPACE_WITHOUT_ANY_MEMBER_FIXTURE,
++    );
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        Vec::<(String, CrateOrigin)>::new(),
++        "members 一个都展开不出：空的工作区，不退回读 crates/"
++    );
++    assert_eq!(
++        relative_paths_of_the_files(&workspace),
++        Vec::<String>::new(),
++        "空的工作区里没有文件"
++    );
++}
++
++/// 根清单只有 `[package]`、没有 `crates/` 目录。python 那一份：没有 `workspace`，`crates/` 不在，读 `crates/` 那一支收不到；
++/// `"package" in manifest` 成立，仓根是成员。推出的成员只有仓根这一个 standalone。
++const ROOT_PACKAGE_WITHOUT_A_CRATES_DIRECTORY_FIXTURE: [(&str, &str); 2] = [
++    ("Cargo.toml", "[package]\nname = \"standalone\"\n"),
++    (
++        "src/lib.rs",
++        "pub fn standalone_value() -> u32 {\n    13\n}\n",
++    ),
++];
++
++#[test]
++fn root_package_without_a_crates_directory_is_the_only_member() {
++    let tree = FixtureTree::materialize(
++        "workspace-members-root-package-only",
++        &ROOT_PACKAGE_WITHOUT_A_CRATES_DIRECTORY_FIXTURE,
++    );
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        vec![("standalone".to_string(), CrateOrigin::WorkspaceMember)],
++        "没有 workspace、没有 crates/：仓根那个包是唯一的成员，crates/ 不在不算读不了"
++    );
++    assert_eq!(
++        relative_paths_of_the_files(&workspace),
++        vec!["src/lib.rs".to_string()],
++        "仓根那个包的文件从仓根算起"
++    );
++}
++
++/// 根清单只写一行表头 `[package]`、底下没有键；`crates/unnamed-member` 的清单有 `[package]` 而没写 `name`。python 那一份
++/// （`discover_rust_crates` 与 `RustCrate.__init__`）：根清单读出 `{"package": {}}`，没有 `workspace`；`crates/` 在，`unnamed-member` 底下有
++/// 清单，收进 `crates/unnamed-member`；`"package" in manifest` 成立，在最前插进仓根 `""`。包名取 `package.get("name",
++/// posixpath.basename(directory) or "root")`：仓根的 `basename("")` 是空串，取 `root`；`crates/unnamed-member` 取 `unnamed-member`。
++/// 库名取包名把 `-` 换成 `_`：`root` 与 `unnamed_member`。仓根那个 crate 不收 `crates/unnamed-member/` 底下的文件。
++const BARE_PACKAGE_HEADER_AND_UNNAMED_PACKAGES_FIXTURE: [(&str, &str); 4] = [
++    ("Cargo.toml", "[package]\n"),
++    ("src/lib.rs", "pub fn root_value() -> u32 {\n    14\n}\n"),
++    (
++        "crates/unnamed-member/Cargo.toml",
++        "[package]\nversion = \"0.1.0\"\n",
++    ),
++    (
++        "crates/unnamed-member/src/lib.rs",
++        "pub fn unnamed_member_value() -> u32 {\n    15\n}\n",
++    ),
++];
++
++#[test]
++fn bare_package_header_makes_the_root_a_member_and_unnamed_packages_take_the_directory_name() {
++    let tree = FixtureTree::materialize(
++        "workspace-members-bare-package-header",
++        &BARE_PACKAGE_HEADER_AND_UNNAMED_PACKAGES_FIXTURE,
++    );
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        vec![
++            ("root".to_string(), CrateOrigin::WorkspaceMember),
++            ("unnamed-member".to_string(), CrateOrigin::WorkspaceMember),
++        ],
++        "只写表头的 [package] 也让仓根成为成员；没写 name 的包取目录名，仓根取 root"
++    );
++    let mut crate_identifiers: Vec<String> = workspace
++        .crates
++        .iter()
++        .map(|workspace_crate| workspace_crate.crate_identifier.clone())
++        .collect();
++    crate_identifiers.sort();
++    assert_eq!(
++        crate_identifiers,
++        vec!["root".to_string(), "unnamed_member".to_string()],
++        "库名照取出来的包名把 - 换成 _"
++    );
++    let mut files_with_their_package: Vec<(String, String)> = workspace
++        .files
++        .iter()
++        .map(|file| {
++            (
++                file.relative_path.clone(),
++                workspace.crates[file.crate_index.0].package_name.clone(),
++            )
++        })
++        .collect();
++    files_with_their_package.sort();
++    assert_eq!(
++        files_with_their_package,
++        vec![
++            (
++                "crates/unnamed-member/src/lib.rs".to_string(),
++                "unnamed-member".to_string()
++            ),
++            ("src/lib.rs".to_string(), "root".to_string()),
++        ],
++        "仓根那个包只收自己的 src/lib.rs，crates/unnamed-member/ 底下的归 unnamed-member"
++    );
++}
++
++/// 根清单只写一行子表头 `[workspace.metadata]`；`crates/alpha` 有清单。python 那一份：根清单读出 `{"workspace": {"metadata": {}}}`，
++/// `workspace` 是一张带一张空子表的字典、为真；`members` 没写，展开不出成员；有 `workspace` 就不走读 `crates/` 那一支，alpha 不收；
++/// 没有 `package`。推出的成员是空列表：一个 crate、一份文件都没有，不报错。
++const WORKSPACE_SUB_TABLE_HEADER_ONLY_FIXTURE: [(&str, &str); 3] = [
++    ("Cargo.toml", "[workspace.metadata]\n"),
++    ("crates/alpha/Cargo.toml", "[package]\nname = \"alpha\"\n"),
++    (
++        "crates/alpha/src/lib.rs",
++        "pub fn alpha_value() -> u32 {\n    1\n}\n",
++    ),
++];
++
++#[test]
++fn workspace_sub_table_header_alone_is_a_workspace_without_members() {
++    let tree = FixtureTree::materialize(
++        "workspace-members-sub-table-header-only",
++        &WORKSPACE_SUB_TABLE_HEADER_ONLY_FIXTURE,
++    );
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        Vec::<(String, CrateOrigin)>::new(),
++        "只写 [workspace.metadata] 的根清单有 workspace：不退回读 crates/，members 没写就一个成员都没有"
++    );
++    assert_eq!(
++        relative_paths_of_the_files(&workspace),
++        Vec::<String>::new(),
++        "空的工作区里没有文件"
++    );
++}
++
++/// 没有根清单；`crates/` 底下唯一的目录没有清单；`loose/` 有清单而不在 `crates/` 下。python 那一份：根清单不在，读成 `{}`，没有
++/// `workspace`；`crates/` 在，`crates/notes` 底下没有 `Cargo.toml`，不收；没有 `package`；`loose` 不在任何一支里。推出的成员是空列表，
++/// 顺 path 依赖也收不到别的：一个 crate、一份文件都没有，不报错。
++const NO_WORKSPACE_AND_NO_MEMBER_FIXTURE: [(&str, &str); 3] = [
++    ("crates/notes/readme.txt", "这个目录没有清单\n"),
++    ("loose/Cargo.toml", "[package]\nname = \"loose\"\n"),
++    (
++        "loose/src/lib.rs",
++        "pub fn loose_value() -> u32 {\n    12\n}\n",
++    ),
++];
++
++#[test]
++fn without_a_workspace_collecting_no_member_is_an_empty_workspace() {
++    let tree = FixtureTree::materialize(
++        "workspace-members-none-without-a-workspace",
++        &NO_WORKSPACE_AND_NO_MEMBER_FIXTURE,
++    );
++    let workspace = workspace_of(tree.root(), &RuleSwitches::every_rule_intact());
++    assert_eq!(
++        crates_by_package_name(&workspace),
++        Vec::<(String, CrateOrigin)>::new(),
++        "没有 workspace、crates/ 底下没有带清单的目录、没有 package：空的工作区，不报错，也不收 crates/ 外的 loose"
++    );
++    assert_eq!(
++        relative_paths_of_the_files(&workspace),
++        Vec::<String>::new(),
++        "空的工作区里没有文件"
++    );
++}

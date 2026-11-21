@@ -1,0 +1,666 @@
+--- originals/crates/singlefs-core/src/lib.rs
++++ copy/crates/singlefs-core/src/lib.rs
+@@ -41,6 +41,7 @@
+ pub mod mounted_read;
+ pub mod mounted_session;
+ pub mod pointer;
++pub mod publish_change_probe;
+ pub mod records;
+ pub mod recovery;
+ pub mod region_scan;
+--- originals/crates/singlefs-core/src/allocator.rs
++++ copy/crates/singlefs-core/src/allocator.rs
+@@ -6450,3 +6450,99 @@
+         }
+     }
+ }
++
++/// 发布路径探针（`crate::publish_change_probe`）数的分配器那一侧：发布前后空闲图上变了几槽、几段，与几样随池涨的集合此刻多大。
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
++pub struct AllocatorChangeCount {
++    pub records_in_the_allocator: u64,
++    pub slots_in_the_free_maps: u64,
++    /// 四种逐槽的位（已分配、影子账隔离、抬 F 扣住、罩在未释放记录下）有一种变了的槽数，各盘相加。
++    pub slots_whose_bits_changed: u64,
++    /// 同上，按每 4096 槽一块数碰到的块数，各盘相加。
++    pub bitmap_blocks_of_4096_slots_touched: u64,
++    /// 六种逐段的计数有一种变了的段数，各盘相加。
++    pub segments_whose_counters_changed: u64,
++    pub segments_in_the_free_maps: u64,
++    /// 各盘 `segments_with_an_unblocked_slot_pair` 的项数之和。
++    pub segments_with_an_unblocked_slot_pair: u64,
++    /// 各盘 `segments_reclaimed_not_yet_discarded` 的项数之和。
++    pub segments_reclaimed_not_yet_discarded: u64,
++    pub cluster_segments: u64,
++    pub reclaimed_placements: u64,
++    /// 根环里被抛弃根的账带着的落点数之和。
++    pub placements_of_abandoned_roots_in_the_root_ring: u64,
++}
++
++impl PoolAllocator {
++    /// 这一份分配器比 `before` 变了多少、几样集合多大（探针用，只读）。
++    #[must_use]
++    pub fn change_count_since(&self, before: &PoolAllocator) -> AllocatorChangeCount {
++        let as_count = |value: usize| u64::try_from(value).expect("个数");
++        let mut count = AllocatorChangeCount {
++            records_in_the_allocator: as_count(self.records.len()),
++            cluster_segments: as_count(self.cluster_segments.len()),
++            reclaimed_placements: as_count(self.reclaimed.len()),
++            ..AllocatorChangeCount::default()
++        };
++        if let Some(ring) = &self.root_ring {
++            count.placements_of_abandoned_roots_in_the_root_ring = ring
++                .occupants
++                .values()
++                .map(|occupant| match occupant {
++                    RootRingOccupant::AbandonedRoot {
++                        referenced_placements,
++                        ..
++                    } => as_count(referenced_placements.len()),
++                    _ => 0,
++                })
++                .sum();
++        }
++        for (after, earlier) in self.devices.iter().zip(&before.devices) {
++            count.slots_in_the_free_maps += as_count(after.allocated.len());
++            count.segments_in_the_free_maps += as_count(after.used_per_segment.len());
++            count.segments_with_an_unblocked_slot_pair +=
++                as_count(after.segments_with_an_unblocked_slot_pair.len());
++            count.segments_reclaimed_not_yet_discarded +=
++                as_count(after.segments_reclaimed_not_yet_discarded.len());
++            let mut blocks: BTreeSet<usize> = BTreeSet::new();
++            for slot in 0..after.allocated.len().min(earlier.allocated.len()) {
++                let differs = after.allocated.get(slot) != earlier.allocated.get(slot)
++                    || after.isolated.get(slot) != earlier.isolated.get(slot)
++                    || after.held_until_floor_takes_effect.get(slot)
++                        != earlier.held_until_floor_takes_effect.get(slot)
++                    || after.is_under_an_unreleased_record.get(slot)
++                        != earlier.is_under_an_unreleased_record.get(slot);
++                if differs {
++                    count.slots_whose_bits_changed += 1;
++                    blocks.insert(slot / 4096);
++                }
++            }
++            count.bitmap_blocks_of_4096_slots_touched += as_count(blocks.len());
++            for segment in 0..after
++                .used_per_segment
++                .len()
++                .min(earlier.used_per_segment.len())
++            {
++                let differs = after.used_per_segment.get(segment)
++                    != earlier.used_per_segment.get(segment)
++                    || after.unreleased_per_segment.get(segment)
++                        != earlier.unreleased_per_segment.get(segment)
++                    || after.isolated_per_segment.get(segment)
++                        != earlier.isolated_per_segment.get(segment)
++                    || after.held_per_segment.get(segment) != earlier.held_per_segment.get(segment)
++                    || after.unblocked_slot_pairs_per_segment.get(segment)
++                        != earlier.unblocked_slot_pairs_per_segment.get(segment)
++                    || after
++                        .slot_pairs_without_an_unreleased_record_per_segment
++                        .get(segment)
++                        != earlier
++                            .slot_pairs_without_an_unreleased_record_per_segment
++                            .get(segment);
++                if differs {
++                    count.segments_whose_counters_changed += 1;
++                }
++            }
++        }
++        count
++    }
++}
+--- originals/crates/singlefs-core/src/transaction.rs
++++ copy/crates/singlefs-core/src/transaction.rs
+@@ -13211,6 +13211,7 @@
+     refuse_while_a_publish_is_frozen(allocator)?;
+     // 整个分配器拷一份、失败就换回去：第一版每次发布约 450 KiB 的拷贝（两盘各一张 211968 位的位图），换来失败路径不留半新的池。
+     let allocator_before_this_publish = allocator.clone();
++    let allocator_before_this_publish_for_the_probe = allocator_before_this_publish.clone();
+     let built = prepare_the_version_publish_relocating_units(
+         pool,
+         allocator,
+@@ -13244,9 +13245,16 @@
+         PoolVersion::of_a_version_of_trees(output),
+     )
+     .map(|version| {
+-        version
++        let output = version
+             .into_version_of_trees()
+-            .expect("交给落盘的是有树的一版，交回的就是它（`PoolVersion::with_writes` 不换成员）")
++            .expect("交给落盘的是有树的一版，交回的就是它（`PoolVersion::with_writes` 不换成员）");
++        crate::publish_change_probe::count_the_publish(
++            previous,
++            &output,
++            &allocator_before_this_publish_for_the_probe,
++            allocator,
++        );
++        output
+     })
+     .map_err(Refusal::from)
+ }
+--- originals/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
++++ copy/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
+@@ -2025,6 +2025,8 @@
+     progress: &'progress mut dyn FnMut(&str),
+     phase_in_progress: Option<PhaseInProgress>,
+     timings: Vec<TimingOfAConstructionPhase>,
++    /// 发布路径探针（`singlefs_core::publish_change_probe`）按阶段取走的结果行（`name=publish_change_probe*` 的字段）。
++    probe_lines: Vec<(String, String)>,
+ }
+ 
+ impl<'progress> ConstructionClock<'progress> {
+@@ -2041,11 +2043,19 @@
+             progress,
+             phase_in_progress: None,
+             timings: Vec::new(),
++            probe_lines: Vec::new(),
+         }
+     }
+ 
+     /// 开一个阶段：它至多几步、开始时已发成几版（造池那一串的累计）。
+     fn begin(&mut self, phase: ConstructionPhase, planned_steps_at_most: u64, publishes: u64) {
++        let counted_between_the_phases = singlefs_core::publish_change_probe::take_the_counts();
++        if !counted_between_the_phases.is_empty() {
++            self.probe_lines.extend(probe_lines_of_the_phase(
++                &format!("before_{}", phase.name()),
++                &counted_between_the_phases,
++            ));
++        }
+         let now = Instant::now();
+         self.phase_in_progress = Some(PhaseInProgress {
+             phase,
+@@ -2079,6 +2089,9 @@
+     ) {
+         self.report_if_the_interval_passed();
+         if let Some(phase) = self.phase_in_progress.take() {
++            let counted = singlefs_core::publish_change_probe::take_the_counts();
++            self.probe_lines
++                .extend(probe_lines_of_the_phase(phase.phase.name(), &counted));
+             let timing =
+                 TimingOfAConstructionPhase::of_the_phase(phase, devices, version, publishes);
+             self.timings.push(timing);
+@@ -2115,6 +2128,157 @@
+     }
+ }
+ 
++/// 探针那三张表各取哪一样（[`probe_lines_of_the_phase`] 的分布行逐表走）。
++fn probe_units_of(
++    count: &singlefs_core::publish_change_probe::PublishChangeCount,
++) -> &singlefs_core::publish_change_probe::TableChange {
++    &count.units
++}
++fn probe_mapping_entries_of(
++    count: &singlefs_core::publish_change_probe::PublishChangeCount,
++) -> &singlefs_core::publish_change_probe::TableChange {
++    &count.mapping_entries
++}
++fn probe_allocation_records_of(
++    count: &singlefs_core::publish_change_probe::PublishChangeCount,
++) -> &singlefs_core::publish_change_probe::TableChange {
++    &count.allocation_records
++}
++
++/// 已排好的一列数里取最小、中位（第 ⌊n ÷ 2⌋ 个）、最大；空列交 0。
++fn probe_spread(sorted: &[f64]) -> (f64, f64, f64) {
++    match (sorted.first(), sorted.last()) {
++        (Some(least), Some(most)) => (*least, sorted[sorted.len() / 2], *most),
++        _ => (0.0, 0.0, 0.0),
++    }
++}
++
++/// 一个阶段里探针数下的发布：每次发布一行 `publish_change_probe_row`，每张表一行分布 `publish_change_probe_phase`
++/// （改到的条数 d、这一版条数 N = 两版里大的那个、d ÷ N，按 64 条与 256 条一块要拷的条数占 N 的比：碰到的块数 × 块长 + ⌈N ÷ 块长⌉ 个块指针）。
++fn probe_lines_of_the_phase(
++    phase: &str,
++    counted: &[singlefs_core::publish_change_probe::PublishChangeCount],
++) -> Vec<(String, String)> {
++    let mut lines = Vec::new();
++    for count in counted {
++        let table = |name: &str, change: &singlefs_core::publish_change_probe::TableChange| {
++            format!(
++                "{name}_before={} {name}_after={} {name}_added={} {name}_removed={} {name}_changed={} {name}_blocks64={} {name}_blocks256={}",
++                change.entries_before,
++                change.entries_after,
++                change.added,
++                change.removed,
++                change.changed,
++                change.touched_blocks_of_64,
++                change.touched_blocks_of_256
++            )
++        };
++        let allocator = &count.allocator;
++        lines.push((
++            "publish_change_probe_row".to_string(),
++            format!(
++                "phase={phase} txg={} had_a_previous_version={} {} {} {} rewritten_roles={} units_carried_under_a_new_role={} \
++                 repeated_roles={} descents_within_a_role_kind={} order_flips_among_common_roles={} relocated_units={} \
++                 allocator_records={} free_map_slots={} free_map_slots_changed={} free_map_blocks4096_touched={} free_map_segments={} \
++                 free_map_segments_changed={} segments_with_an_unblocked_slot_pair={} segments_reclaimed_not_yet_discarded={} \
++                 cluster_segments={} reclaimed_placements={} abandoned_root_placements={}",
++                count.txg,
++                count.had_a_previous_version,
++                table("units", &count.units),
++                table("mapping", &count.mapping_entries),
++                table("records", &count.allocation_records),
++                count.rewritten_roles,
++                count.units_carried_under_a_new_role,
++                count.repeated_roles,
++                count.descents_within_a_role_kind,
++                count.order_flips_among_common_roles,
++                count.relocated_units,
++                allocator.records_in_the_allocator,
++                allocator.slots_in_the_free_maps,
++                allocator.slots_whose_bits_changed,
++                allocator.bitmap_blocks_of_4096_slots_touched,
++                allocator.segments_in_the_free_maps,
++                allocator.segments_whose_counters_changed,
++                allocator.segments_with_an_unblocked_slot_pair,
++                allocator.segments_reclaimed_not_yet_discarded,
++                allocator.cluster_segments,
++                allocator.reclaimed_placements,
++                allocator.placements_of_abandoned_roots_in_the_root_ring,
++            ),
++        ));
++    }
++    let tables: [(
++        &str,
++        fn(
++            &singlefs_core::publish_change_probe::PublishChangeCount,
++        ) -> &singlefs_core::publish_change_probe::TableChange,
++    ); 3] = [
++        ("units", probe_units_of),
++        ("mapping", probe_mapping_entries_of),
++        ("records", probe_allocation_records_of),
++    ];
++    for (name, table_of) in tables {
++        let with_a_previous: Vec<&singlefs_core::publish_change_probe::TableChange> = counted
++            .iter()
++            .filter(|count| count.had_a_previous_version)
++            .map(table_of)
++            .collect();
++        let sorted_column =
++            |value: &dyn Fn(&singlefs_core::publish_change_probe::TableChange) -> f64| {
++                let mut column: Vec<f64> = with_a_previous
++                    .iter()
++                    .map(|change| value(*change))
++                    .collect();
++                column.sort_by(f64::total_cmp);
++                column
++            };
++        let entries = |change: &singlefs_core::publish_change_probe::TableChange| {
++            change.entries_before.max(change.entries_after).max(1) as f64
++        };
++        let (d_min, d_median, d_max) = probe_spread(&sorted_column(
++            &|change: &singlefs_core::publish_change_probe::TableChange| {
++                change.changed_entries() as f64
++            },
++        ));
++        let (n_min, n_median, n_max) = probe_spread(&sorted_column(
++            &|change: &singlefs_core::publish_change_probe::TableChange| entries(change),
++        ));
++        let (r_min, r_median, r_max) = probe_spread(&sorted_column(
++            &|change: &singlefs_core::publish_change_probe::TableChange| {
++                change.changed_entries() as f64 / entries(change)
++            },
++        ));
++        let copy_ratio =
++            |block: f64,
++             touched: u64,
++             change: &singlefs_core::publish_change_probe::TableChange| {
++                (touched as f64 * block + (entries(change) / block).ceil()) / entries(change)
++            };
++        let (_, c64_median, c64_max) = probe_spread(&sorted_column(
++            &|change: &singlefs_core::publish_change_probe::TableChange| {
++                copy_ratio(64.0, change.touched_blocks_of_64, change)
++            },
++        ));
++        let (_, c256_median, c256_max) = probe_spread(&sorted_column(
++            &|change: &singlefs_core::publish_change_probe::TableChange| {
++                copy_ratio(256.0, change.touched_blocks_of_256, change)
++            },
++        ));
++        lines.push((
++            "publish_change_probe_phase".to_string(),
++            format!(
++                "phase={phase} table={name} publishes_counted={} publishes_with_a_previous_version={} d_min={d_min} d_median={d_median} \
++                 d_max={d_max} n_min={n_min} n_median={n_median} n_max={n_max} d_over_n_min={r_min:.6} d_over_n_median={r_median:.6} \
++                 d_over_n_max={r_max:.6} copy64_over_n_median={c64_median:.6} copy64_over_n_max={c64_max:.6} \
++                 copy256_over_n_median={c256_median:.6} copy256_over_n_max={c256_max:.6}",
++                counted.len(),
++                with_a_previous.len(),
++            ),
++        ));
++    }
++    lines
++}
++
+ /// 建池会话发一次用户改动：交回发成的版数与推的抬 F 串数。
+ fn publish_while_constructing(
+     session: &mut MountedSession,
+@@ -8258,6 +8422,16 @@
+                     .map_or_else(|| "unread".to_string(), |bytes| bytes.to_string()),
+             ),
+         );
++        for (name, fields) in &clock.probe_lines {
++            product.emit(
++                name,
++                &format!(
++                    "tier={} live_data_units={live_data_units} chunks={} {fields}",
++                    command.tier.name(),
++                    command.storage.name(),
++                ),
++            );
++        }
+         for timing in &construction.phases {
+             product.emit(
+                 "construction_phase",
+--- /dev/null
++++ copy/crates/singlefs-core/src/publish_change_probe.rs
+@@ -0,0 +1,306 @@
++//! 发布路径上只数、不改的探针：每次带树的发布落盘成了之后，拿上一版与这一版逐表比，数这次在 `units`、中央映射条目、
++//! 分配记录三张表上各改到几条（加、删、值变），与按键次序切成 64 条与 256 条一块时碰到几块；再数分配器在发布前后
++//! 空闲图上变了几槽、几段，与分配器里几样随池涨的集合此刻多大。数完存进进程里的一张表，由装置按造池阶段取走。
++//! 不读盘、不写盘、不改分配器与版本：只读两版与两份分配器。
++
++use crate::allocator::{AllocatorChangeCount, PoolAllocator};
++use crate::transaction::{TransactionOutput, TransactionUnit};
++use std::collections::{BTreeSet, HashMap};
++use std::sync::Mutex;
++
++/// 一张按键有序的表在一次发布里的变化。
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
++pub struct TableChange {
++    pub entries_before: u64,
++    pub entries_after: u64,
++    pub added: u64,
++    pub removed: u64,
++    pub changed: u64,
++    /// 按上一版的键次序每 64 条一块，加、删、值变落到的块数（加的按插入点算）。
++    pub touched_blocks_of_64: u64,
++    /// 同上，每 256 条一块。
++    pub touched_blocks_of_256: u64,
++}
++
++impl TableChange {
++    /// 这次改到的条数：加、删、值变之和。
++    #[must_use]
++    pub fn changed_entries(&self) -> u64 {
++        self.added + self.removed + self.changed
++    }
++}
++
++/// 一次带树的发布数出来的东西。
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct PublishChangeCount {
++    pub txg: u64,
++    pub had_a_previous_version: bool,
++    /// 按角色当键：键是 `TransactionUnit` 的派生次序，值是（落点, 字节那份 `Arc` 的地址）。
++    pub units: TableChange,
++    /// 中央映射条目：映射 key 到第一份位置项的槽（进映射的角色取它在 `units` 里的落点，加上留给快照的条目）。
++    pub mapping_entries: TableChange,
++    /// 分配记录：键是 (设备, 槽号)，值是整条记录。
++    pub allocation_records: TableChange,
++    /// 这次真写出的角色数（`rewritten`）。
++    pub rewritten_roles: u64,
++    /// 落点与字节都与上一版某一项相同、角色却换了的项数（照抄的单元换了位置寻址的角色）。
++    pub units_carried_under_a_new_role: u64,
++    /// 这一版 `units` 里同一个角色第二次及以后出现的项数。
++    pub repeated_roles: u64,
++    /// 这一版 `units` 里相邻两项同一种角色、前一项的派生次序大于后一项的次数。
++    pub descents_within_a_role_kind: u64,
++    /// 两版都有的角色，按这一版的次序排、看它们在上一版里的下标，相邻两项下标往回走的次数。
++    pub order_flips_among_common_roles: u64,
++    /// 这次搬走的单元数（整理的一批）。
++    pub relocated_units: u64,
++    pub allocator: AllocatorChangeCount,
++}
++
++static COUNTS: Mutex<Vec<PublishChangeCount>> = Mutex::new(Vec::new());
++
++/// 取走到此刻为止数下的全部发布（按发布的次序），表清空。
++///
++/// # Panics
++/// 表的锁中毒：持锁的两处只做推入与整表取走。
++#[must_use]
++pub fn take_the_counts() -> Vec<PublishChangeCount> {
++    std::mem::take(&mut *COUNTS.lock().expect("探针表的锁"))
++}
++
++/// 两份按键升序、键各不相同的表逐条比。
++fn change_of_sorted_tables<Key: Ord, Value: PartialEq>(
++    before: &[(Key, Value)],
++    after: &[(Key, Value)],
++) -> TableChange {
++    let mut change = TableChange {
++        entries_before: u64::try_from(before.len()).expect("条数"),
++        entries_after: u64::try_from(after.len()).expect("条数"),
++        ..TableChange::default()
++    };
++    let mut blocks_of_64: BTreeSet<usize> = BTreeSet::new();
++    let mut blocks_of_256: BTreeSet<usize> = BTreeSet::new();
++    let mut mark = |rank: usize| {
++        blocks_of_64.insert(rank / 64);
++        blocks_of_256.insert(rank / 256);
++    };
++    let (mut index_before, mut index_after) = (0, 0);
++    // 迭代上界是两份表的条数之和：每一轮至少往前走一份。
++    while index_before < before.len() || index_after < after.len() {
++        match (before.get(index_before), after.get(index_after)) {
++            (Some(old), Some(new)) => match old.0.cmp(&new.0) {
++                std::cmp::Ordering::Less => {
++                    change.removed += 1;
++                    mark(index_before);
++                    index_before += 1;
++                }
++                std::cmp::Ordering::Greater => {
++                    change.added += 1;
++                    mark(index_before);
++                    index_after += 1;
++                }
++                std::cmp::Ordering::Equal => {
++                    if old.1 != new.1 {
++                        change.changed += 1;
++                        mark(index_before);
++                    }
++                    index_before += 1;
++                    index_after += 1;
++                }
++            },
++            (Some(_), None) => {
++                change.removed += 1;
++                mark(index_before);
++                index_before += 1;
++            }
++            (None, Some(_)) => {
++                change.added += 1;
++                mark(index_before);
++                index_after += 1;
++            }
++            (None, None) => break,
++        }
++    }
++    change.touched_blocks_of_64 = u64::try_from(blocks_of_64.len()).expect("块数");
++    change.touched_blocks_of_256 = u64::try_from(blocks_of_256.len()).expect("块数");
++    change
++}
++
++/// `units` 按角色当键排好：同一角色取最先那一项（与 `FirstEntryOfEachIdentity` 同一项）。值是（落点, 字节那份的地址）。
++fn units_keyed_by_role(version: &TransactionOutput) -> Vec<(TransactionUnit, (u64, usize))> {
++    let mut seen: BTreeSet<TransactionUnit> = BTreeSet::new();
++    let mut table: Vec<(TransactionUnit, (u64, usize))> = Vec::with_capacity(version.units.len());
++    for unit in &version.units {
++        if seen.insert(unit.identity) {
++            table.push((unit.identity, (unit.slot.0, unit.bytes.as_ptr() as usize)));
++        }
++    }
++    table.sort_by_key(|(role, _)| *role);
++    table
++}
++
++/// 中央映射条目按映射 key 排好：进映射的角色取它在 `units` 里的落点，加上留给快照的那几条（第一份位置项的槽）。
++fn mapping_entries_keyed_by_mapping_key(version: &TransactionOutput) -> Vec<(Vec<u8>, u64)> {
++    let mut slot_of_role: HashMap<TransactionUnit, u64> =
++        HashMap::with_capacity(version.units.len());
++    for unit in &version.units {
++        slot_of_role.entry(unit.identity).or_insert(unit.slot.0);
++    }
++    let mut table: Vec<(Vec<u8>, u64)> = version
++        .mapped_units
++        .iter()
++        .map(|(role, key)| {
++            (
++                key.clone(),
++                slot_of_role.get(role).copied().unwrap_or(u64::MAX),
++            )
++        })
++        .chain(
++            version
++                .mapping_entries_kept_for_the_snapshots
++                .iter()
++                .map(|(key, locations)| (key.clone(), locations[0].slot.0)),
++        )
++        .collect();
++    table.sort();
++    table.dedup_by(|later, earlier| later.0 == earlier.0);
++    table
++}
++
++/// 分配记录按 (设备, 槽号) 排好（版本里本来就按这个次序，这里再排一次不依赖它）。
++fn allocation_records_keyed_by_device_and_slot(
++    version: &TransactionOutput,
++) -> Vec<((u32, u64), crate::allocator::AllocationRecord)> {
++    let mut table: Vec<((u32, u64), crate::allocator::AllocationRecord)> = version
++        .allocation_records
++        .iter()
++        .map(|record| (record.sort_key(), *record))
++        .collect();
++    table.sort_by_key(|(key, _)| *key);
++    table
++}
++
++/// 角色次序那三样：重复的角色、同一种角色里派生次序往回走、两版共有角色的相对次序翻转。
++fn order_of_the_roles(
++    previous: Option<&TransactionOutput>,
++    output: &TransactionOutput,
++) -> (u64, u64, u64) {
++    let mut seen: BTreeSet<TransactionUnit> = BTreeSet::new();
++    let mut repeated = 0u64;
++    for unit in &output.units {
++        if !seen.insert(unit.identity) {
++            repeated += 1;
++        }
++    }
++    let descents = u64::try_from(
++        output
++            .units
++            .windows(2)
++            .filter(|pair| {
++                std::mem::discriminant(&pair[0].identity)
++                    == std::mem::discriminant(&pair[1].identity)
++                    && pair[0].identity > pair[1].identity
++            })
++            .count(),
++    )
++    .expect("次数");
++    let flips = previous.map_or(0, |previous_version| {
++        let mut position_before: HashMap<TransactionUnit, usize> = HashMap::new();
++        for (position, unit) in previous_version.units.iter().enumerate() {
++            position_before.entry(unit.identity).or_insert(position);
++        }
++        let mut seen_after: BTreeSet<TransactionUnit> = BTreeSet::new();
++        let positions: Vec<usize> = output
++            .units
++            .iter()
++            .filter(|unit| seen_after.insert(unit.identity))
++            .filter_map(|unit| position_before.get(&unit.identity).copied())
++            .collect();
++        u64::try_from(
++            positions
++                .windows(2)
++                .filter(|pair| pair[0] > pair[1])
++                .count(),
++        )
++        .expect("次数")
++    });
++    (repeated, descents, flips)
++}
++
++/// 照抄的单元换了角色：这一版里落点与字节那份都和上一版某一项相同、角色却不同的项数。
++fn units_carried_under_a_new_role(previous: &TransactionOutput, output: &TransactionOutput) -> u64 {
++    let mut before: HashMap<(u64, usize), TransactionUnit> =
++        HashMap::with_capacity(previous.units.len());
++    for unit in &previous.units {
++        before
++            .entry((unit.slot.0, unit.bytes.as_ptr() as usize))
++            .or_insert(unit.identity);
++    }
++    u64::try_from(
++        output
++            .units
++            .iter()
++            .filter(|unit| {
++                before
++                    .get(&(unit.slot.0, unit.bytes.as_ptr() as usize))
++                    .is_some_and(|role_before| *role_before != unit.identity)
++            })
++            .count(),
++    )
++    .expect("项数")
++}
++
++/// 一次带树的发布落盘成了之后调：上一版（没有就当空表）对这一版逐表比，分配器发布前后比，记进进程里的表。
++///
++/// # Panics
++/// 表的锁中毒（同 [`take_the_counts`]）。
++pub(crate) fn count_the_publish(
++    previous: Option<&TransactionOutput>,
++    output: &TransactionOutput,
++    allocator_before_this_publish: &PoolAllocator,
++    allocator_after_this_publish: &PoolAllocator,
++) {
++    let empty_units: Vec<(TransactionUnit, (u64, usize))> = Vec::new();
++    let empty_mapping: Vec<(Vec<u8>, u64)> = Vec::new();
++    let empty_records: Vec<((u32, u64), crate::allocator::AllocationRecord)> = Vec::new();
++    let units_after = units_keyed_by_role(output);
++    let mapping_after = mapping_entries_keyed_by_mapping_key(output);
++    let records_after = allocation_records_keyed_by_device_and_slot(output);
++    let (units, mapping_entries, allocation_records, carried_under_a_new_role) = match previous {
++        Some(previous_version) => (
++            change_of_sorted_tables(&units_keyed_by_role(previous_version), &units_after),
++            change_of_sorted_tables(
++                &mapping_entries_keyed_by_mapping_key(previous_version),
++                &mapping_after,
++            ),
++            change_of_sorted_tables(
++                &allocation_records_keyed_by_device_and_slot(previous_version),
++                &records_after,
++            ),
++            units_carried_under_a_new_role(previous_version, output),
++        ),
++        None => (
++            change_of_sorted_tables(&empty_units, &units_after),
++            change_of_sorted_tables(&empty_mapping, &mapping_after),
++            change_of_sorted_tables(&empty_records, &records_after),
++            0,
++        ),
++    };
++    let (repeated_roles, descents_within_a_role_kind, order_flips_among_common_roles) =
++        order_of_the_roles(previous, output);
++    let count = PublishChangeCount {
++        txg: output.root.checkpoint_txg.0,
++        had_a_previous_version: previous.is_some(),
++        units,
++        mapping_entries,
++        allocation_records,
++        rewritten_roles: u64::try_from(output.rewritten.len()).expect("角色数"),
++        units_carried_under_a_new_role: carried_under_a_new_role,
++        repeated_roles,
++        descents_within_a_role_kind,
++        order_flips_among_common_roles,
++        relocated_units: u64::try_from(output.units_relocated_by_this_publish.len())
++            .expect("单元数"),
++        allocator: allocator_after_this_publish.change_count_since(allocator_before_this_publish),
++    };
++    COUNTS.lock().expect("探针表的锁").push(count);
++}

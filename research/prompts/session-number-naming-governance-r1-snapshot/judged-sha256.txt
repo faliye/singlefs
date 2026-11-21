@@ -1,0 +1,6 @@
+ba890c0827ffa42c9d2c76c628dfd4da5c4417319f382a8ac6983aca82f4b7f1  research/prompts/_session-number-naming-governance-r1-body.md
+09e5d8e4e21dcfba551bfdf8fc79562bea620d8b2e96545a1d780033054b68c9  .claude/rules/writing-discipline-by-review.md
+f4b8717fb9b40501425f4453b3b5b08b13d22783c2624be333f9e60e30fbbab5  .claude/agent-common.md
+c319df05c46224d7bb81a4b58b88809537b9f0afe4ed95b64a9723cba3625229  .claude/hooks/session-number-stop-check.sh
+64dcb1b088974c9c32a8faa465c9bb1a41d2a592ed5f0c9314752dbddf08d543  .claude/settings.json
+a5ace4711e9e6281257fba3d258913bb43d4388dc82a5ba132e68a9e156f5dd4  .claude/gate.d/code-tooling.sh

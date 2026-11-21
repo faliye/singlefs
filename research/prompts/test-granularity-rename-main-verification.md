@@ -9,14 +9,14 @@ harness 用例拆成一场景一条与重档标记、checker 档测试文件第�
 
 - `crates/singlefs-checker/src/walk.rs`
 - `crates/singlefs-checker-tier/src/bad_disk_input.rs`
-- `crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs`
-- `crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs`
-- `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`
-- `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs`
-- `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs`
-- `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs`
-- `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs`
-- `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs`
+- `crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs`
+- `crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump.rs`
+- `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`
+- `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs`
+- `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs`
+- `crates/singlefs-verification/src/bin/new_pool_file_creation_device_log_check.rs`
+- `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs`
+- `crates/singlefs-implementation-experiments/src/bin/new_pool_file_creation_region_bytes.rs`
 - `crates/singlefs-checker-tier/src/crash_injection.rs`
 - `crates/singlefs-checker-tier/src/crash.rs`
 - `crates/singlefs-checker-tier/src/on_device_modes.rs`

@@ -8,7 +8,7 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；变体驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
+英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`，不另起新装置；变体驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
 
 主 agent 给的问题（逐字，派发提示里的几行）：
 
@@ -50,7 +50,7 @@
 ```markdown
 #### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」
 
-**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 不是产品调用方。四个里程碑依次是：
+**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 不是产品调用方。四个里程碑依次是：
 
 | 里程碑 | 义务 | 落点 |
 |---|---|---|
@@ -463,7 +463,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 **后一段的根**：第二段（驱动）在第一段收尾的根上跑：第一段的根原地 `sha256sum -c` 那份清单退 0 之后整份 `cp -a`，只盖上第一段改完的装置与 `crates/mutations.tsv`（同 r3 登记第三节「后几段的根」）。主工作区在两段之间被别人改，不进这份根。
 
-**装置写在哪（写死）**：入库装置，改 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 这一份。理由：两行问的都是 `crates/` 今天这份 `choose_root`、`scan_journal`、`replay_journal` 串起来在带故障的历史上的性质与这份代码的变体，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外同原登记第三节）。判据一侧与生成器（含可写挂载那道闸、取号、轮换）只用本地常量与生成时记下的真相，不调 core 的判定函数定期望。r3 登记第三节那张本地常量表照旧；这一次新读的 `crates/` 常量逐个改成本地常量加回比断言（不许直接引）：
+**装置写在哪（写死）**：入库装置，改 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 这一份。理由：两行问的都是 `crates/` 今天这份 `choose_root`、`scan_journal`、`replay_journal` 串起来在带故障的历史上的性质与这份代码的变体，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外同原登记第三节）。判据一侧与生成器（含可写挂载那道闸、取号、轮换）只用本地常量与生成时记下的真相，不调 core 的判定函数定期望。r3 登记第三节那张本地常量表照旧；这一次新读的 `crates/` 常量逐个改成本地常量加回比断言（不许直接引）：
 
 | 本地常量 | 值 | 回比断言对着的 crates 东西 |
 |---|---|---|
@@ -1031,7 +1031,7 @@ KA（`anchors_r3_ka.py`，同 r3）：125 态，没有一条自证过的根的 1
 
 只收严或补充，第一至十一节的判据、臂、数一个字不改。
 
-- 装置：入库装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，在草稿目录的副本上改、经 `scripts/hosts/compile-then-swap.py` 编过再整份换进主工作区，今天 sha256 `0608bda031dc90f982ddb06150079518d274ac69d773765c3acf095f1972774f`，17 622 行（改前 `acd76c37…`、13 577 行）。r1、r2、r3 三档的代码一行没动，只改了三处：`--profile r4` 当 r3 档解析（其余族与 r3 档相同、`--family root_choice_faults` 要 r4 档）、`main` 加这一族的分派、`USAGE` 与一条档解析的单测里「r4 必须报错」换成「r5 必须报错、r4 与 r3 同」。新增的单测 10 条，在 `mod root_choice_fault_tests` 里。
+- 装置：入库装置 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`，在草稿目录的副本上改、经 `scripts/hosts/compile-then-swap.py` 编过再整份换进主工作区，今天 sha256 `0608bda031dc90f982ddb06150079518d274ac69d773765c3acf095f1972774f`，17 622 行（改前 `acd76c37…`、13 577 行）。r1、r2、r3 三档的代码一行没动，只改了三处：`--profile r4` 当 r3 档解析（其余族与 r3 档相同、`--family root_choice_faults` 要 r4 档）、`main` 加这一族的分派、`USAGE` 与一条档解析的单测里「r4 必须报错」换成「r5 必须报错、r4 与 r3 同」。新增的单测 10 条，在 `mod root_choice_fault_tests` 里。
 - 根：开工那一刻主工作区的拷贝清单 `/tmp/claude-1000/e165-r4-segment1b/root-manifest-at-start.sha256`（246 个文件，清单 sha256 `6c7d4e235597fdc2bb2f7d5aed6958e2156097b102bca3855d11a6f1bf6d05b8`）；盖上改完的装置与加了 18 行的 `crates/mutations.tsv`（今天 sha256 `db2981d0d6fccb1a65bdf701897d4475302ec1ba8cd87501fa1374d191bd9349`）之后的清单 `root-manifest-after-overlay.sha256`（246 个文件，清单 sha256 `0423abbbbc76fcc63557fd6d9b9e5bde1900ecfad757b78e5d5f6b8116ec23a5`），两份清单只有这两个文件不同；根上 `cargo build --release`，`CARGO_TARGET_DIR=/tmp/claude-1000/e165-r4-segment1b/target-root`，二进制 sha256 `800e57325fc2e58c4296edc1286c02af3da31085512050e4bdeeb6930fb9aa2c`。跑产物前核过（TH10）：根与主工作区的 `mount.rs` `444610b4…`、`transaction.rs` `67d6470f…`、`recovery.rs` `264664af…`、`lib.rs` `40cd99b5…`、`journal.rs` `d12f9a93…` 都与第三节写的相同。
 - 登记没写死、装置这样做的（都不改判据）：
   1. 阳性对照与生成器一侧的计数、本地择根序的七种读数（今天的序、v1823、v1824、v1825、v1826、v1822、KF1 的「取键最小的根」）、KF2、KF4 的假结局读数，都在真实现那一遍枚举里顺带算，不像 r3 那样每个假结局另枚举一遍；假结局的落点都走 `fault_criteria_of_a_landing`，与真实现的结局读同一段判据。KJ0 的对照是在 KF M = 1、U = 0 枚举次序里第 0 个历史、被判时无故障那一态上用一个假的 panic 结局走同一段 KJ0 计数。
@@ -1048,7 +1048,7 @@ KA（`anchors_r3_ka.py`，同 r3）：125 态，没有一条自证过的根的 1
 
 修订 2 里有两处是第一遍的值、第二段又出了一件修订 2 没写的事，补在这里；第一至十一节与修订 1、2 的文字一个字不改。
 
-- 装置终版：`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 今天（现查）sha256 `4ecfa61fda6e2c0764e748533bba37abcfbed86c4c7129dac67d7f80539ac031`，17 623 行。修订 2 写的 `0608bda0…` 与 17 622 行是第一遍的；第二遍（最后一次源码改动之后）与第二段在根上编的二进制用的都是终版。
+- 装置终版：`crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 今天（现查）sha256 `4ecfa61fda6e2c0764e748533bba37abcfbed86c4c7129dac67d7f80539ac031`，17 623 行。修订 2 写的 `0608bda0…` 与 17 622 行是第一遍的；第二遍（最后一次源码改动之后）与第二段在根上编的二进制用的都是终版。
 - `crates/mutations.tsv` 里 9.2 的 18 行：今天（现查）在第 1994 至 2011 行，名字都以「E165 r4 第一段」起头（`grep -c 'E165 r4 第一段' crates/mutations.tsv` 得 18）；修订 2 写的第 1995 至 2012 行是第一段根里那份的行号，主工作区的表后来被别的会话改过，今天 2025 行、sha256 `de0c12fdb20263e84f597fda777ddfe65f08ad9af72136f6fd44fcc6245eb79c`。第二段的驱动与变体选行用的是根里那份（2012 行、sha256 `db2981d0d6fccb1a65bdf701897d4475302ec1ba8cd87501fa1374d191bd9349`，第二段产物 `config` 行的 `table_sha256`），v1822 至 v1827 在根里与今天的主工作区里都是第 1821 至 1826 行。
 - 驱动：`scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` 的 r4 模式由主 agent 装进仓（sha256 `3428a78ee8d41be830905e6595e3212cfa36acc49805adb45deab9f16cd06c56`，3 365 行；修订 2 写的是镜像，没装）。`--selftest` 84 项全过、五个 r4 弄坏开关（`r4itemsmissing`、`r4firstredswap`、`r4kgcountsasred`、`r4kgpinunchecked`、`r4noprofile`）各红，是主 agent 在派发提示里写的读数，没有入库的输出文件，执行员没重跑。
 - 第二段的跑法与那一次内存撞顶：第一趟 `--jobs 2 --threads 3`、内存上限 4G，tsv-1823 的变体二进制被内存包装拒（退出码 250，驱动记「没得出结果」，那一次输出不算结果，TV8），别的五个变体与开头收尾基线得出结果，第一趟因此没有写收尾三行；第二趟（补跑）内存上限换 8G、`--jobs 1 --threads 6`，只补 tsv-1823，tsv-1824、tsv-1825、tsv-1826 取第一趟存在草稿目录里的单项结果（驱动的 `stored_record`，不重跑），开头与收尾基线两趟各编各跑一遍，两趟日志里都写了「已还原，基线与开头逐字相同」、没有报基线与第一段产物不同（驱动不同退 6）。所以产物里 v1824（tsv-1823）这一行是 6 线程跑的，别的五行是 3 线程跑的；计数与线程数无关由第一段两遍（6 与 3 线程整份逐字节相同）与产物 `baseline` 行的 `rows_identical_to_segment1_product=true`（基线 3309 行逐行等于第一段产物）这两条保住，不是这一段新量的。两趟的驱动日志原样入库：`research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-driver-log.out`。「线程与内存」写的第二段默认内存上限 1G 不够用：驱动 r4 模式的默认是 4G（驱动文件头），第一趟用它撞了顶（撞的是 tsv-1823 那一个二进制；第一段整遍峰值约 1.66 GB，tsv-1823 为什么超 4G 没查），补跑与复跑行取 8G。
@@ -1082,7 +1082,7 @@ KA（`anchors_r3_ka.py`，同 r3）：125 态，没有一条自证过的根的 1
 | `crates/singlefs-core/src/journal.rs` | 与 r3 第二段冻结根那份的 `diff` 前 20 行；grep `pub fn parse` |
 | `crates/singlefs-core/src/system_configuration.rs`、`make_filesystem.rs`、`crates/singlefs-format/src/lib.rs` | 705–720；grep 命中的 46、644 行；grep 命中的 235 行 |
 | `crates/mutations.tsv` | 1820–1829（`awk` 取第一列）；六个名字的 grep 与原文核对 |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 只算了 sha256、数了行数，内容没读（它们今天的结构以 r3 登记修订 1–3 的描述为准） |
+| `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`、`scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 只算了 sha256、数了行数，内容没读（它们今天的结构以 r3 登记修订 1–3 的描述为准） |
 | `scripts/experiment-apparatus/replay.sh` | grep `e165` 的命中行（222–234、537–547） |
 | `scripts/kb/quote-kb.py`、`scripts/kb/replace-once.py` | `--help` 的用法段 |
 | `/tmp/claude-1000/e165-r3-designer/` | 目录清单；`anchors_r3_k.py` 全文与 `anchors_r3_k.out` 前 5 行；`anchors_r3_ka.py` 全文 |

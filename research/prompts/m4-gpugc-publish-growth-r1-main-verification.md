@@ -1,6 +1,6 @@
 # m4-gpugc-publish-growth-r1 判决：核心层每次发布的代价随版本涨，定位、外推与改法（2026-11-06）
 
-被判的文件（开工快照 `research/prompts/m4-gpugc-publish-growth-r1-snapshot/judged-sha256.txt`）：`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/mounted_session.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-core/src/allocation_record_tree.rs`、`crates/singlefs-core/src/lib.rs`、`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs`。正文 `research/prompts/_m4-gpugc-publish-growth-r1-body.md`，背景 `research/prompts/_m4-gpugc-publish-growth-r1-background.md`。
+被判的文件（开工快照 `research/prompts/m4-gpugc-publish-growth-r1-snapshot/judged-sha256.txt`）：`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/mounted_session.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-core/src/allocation_record_tree.rs`、`crates/singlefs-core/src/lib.rs`、`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`。正文 `research/prompts/_m4-gpugc-publish-growth-r1-body.md`，背景 `research/prompts/_m4-gpugc-publish-growth-r1-background.md`。
 
 ## 一、腿与核查
 

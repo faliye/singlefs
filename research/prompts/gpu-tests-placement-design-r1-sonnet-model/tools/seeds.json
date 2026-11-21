@@ -1,0 +1,5 @@
+{"crash_library":["PairingJudged","DisposableLibrary","TheOneLibraryKeptForThisProcess","RunStage","pairing_input_through_the_pairing_library","pairing_input_and_reference_through_the_pairing_library","pairing_conclusion_reused_or_judged","pairing_input_and_reference_through_the_library_under_the_recording_key","recording_key_of_the_pairing_input_and_the_reference_units","toolchain_of_this_process","CrashLibrary","CrashLibraryClass","ItemName","PairingConclusionSource","RecordingKeyOfThisRun","StageOutcome"],
+"verdict_store":["PairingAgreement"],
+"crash_identity":["judging_units_key","judging_units_key_of_the_group_in_the_table_text","JudgingUnits","JudgingUnitsKey"],
+"sha256":["DIGEST_BYTES"],
+"gpu_card_configuration":["cards_handed_over_or_leased_on_demand","CardLeaseChannelOfTheCaller"]}

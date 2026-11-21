@@ -1,0 +1,13 @@
+SKIP(not cargo test): bash .claude/gate.d/formal-verification.sh --item must-red:gpu-score-binary-skips-entry --
+SKIP(not cargo test): bash .claude/gate.d/formal-verification.sh --item must-red:gpu-gc-G01 --item must-red:gpu-
+package=singlefs-replay-prefix target=gpu_gc_arithmetic_matches_wide_integer_reference names=4 declared_scope=4 found_as_test_fn=4 missing=[] duplicates=[]
+  test_fns_in_file=4 unlisted=[]
+package=singlefs-replay-prefix target=gpu_gc_capacity_matches_independent_reference names=5 declared_scope=5 found_as_test_fn=5 missing=[] duplicates=[]
+  test_fns_in_file=5 unlisted=[]
+package=singlefs-background-gpu target=--lib names=82 declared_scope=82 found_as_test_fn=82 missing=[] duplicates=[]
+  module two_kernel_reconciliation: listed=7 test_fns_in_file=7 unlisted=[]
+  module memory_limit_and_chunks: listed=36 test_fns_in_file=36 unlisted=[]
+  module live_slot_kernels: listed=23 test_fns_in_file=23 unlisted=[]
+  module region_record_kernels: listed=16 test_fns_in_file=16 unlisted=[]
+package=singlefs-background-gpu target=gpu_gc_formal_contracts_through_the_host names=2 declared_scope=2 found_as_test_fn=2 missing=[] duplicates=[]
+  test_fns_in_file=2 unlisted=[]

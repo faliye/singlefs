@@ -1,0 +1,3 @@
+c76d94e11fd2bb93c94447e7a38060e6703b678474a95a40c264c76fae0489e4  research/prompts/_judging-closure-and-real-card-instance-code-r1-body.md
+2ada7157b3771d8a0eb295e8327081d9dcbed1ec77f8db32d1124f5b6b14d688  .claude/rules/verification.md
+8322a0f9d117f67fc12474fb4e81fb4205b8b3386ab9f0eea8fc0f9d060c174a  .claude/rules/code-discipline-by-review.md

@@ -4,7 +4,7 @@
 
 **这是新一次跑，不是前几次的续段**：前几次的 `r2-*`、`r3-*`、`r4-*` 模式一个字不改；这一次的模式一律以 `r5-` 起头，调用它们的函数时不改语义，要改就复制一份给 `r5-*` 用。前几次的读数不带进这一次的任何判据（第四节只记它们存在过）。
 
-装置写在哪（写死）：**入库装置**（装置走 `crates/` 这份代码，不走 `scripts/experiment-apparatus/` 的独立手写模型）。理由：岔路单第 1 行问的是「`crates/` 今天这份可写挂载在被抛弃根的账读不出时做了什么」，量的是 `crates/` 这份代码的性质，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外）。执行员改写 `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs`，不新建 bin（要复用的 `bootstrap`、`enumerate`、`apply_*`、`run_instrumented_mount_writable`、`abandoned_roots_on` 等都是该文件的私有函数）。装置要读 `crates/` 的哪些常量见 5.6：一律改成本地常量加回比断言，不直接引。
+装置写在哪（写死）：**入库装置**（装置走 `crates/` 这份代码，不走 `scripts/experiment-apparatus/` 的独立手写模型）。理由：岔路单第 1 行问的是「`crates/` 今天这份可写挂载在被抛弃根的账读不出时做了什么」，量的是 `crates/` 这份代码的性质，另写一份独立模型答不了（`.claude/rules/implementation-first.md` 第 4 条的例外）。执行员改写 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs`，不新建 bin（要复用的 `bootstrap`、`enumerate`、`apply_*`、`run_instrumented_mount_writable`、`abandoned_roots_on` 等都是该文件的私有函数）。装置要读 `crates/` 的哪些常量见 5.6：一律改成本地常量加回比断言，不直接引。
 
 装置走不走崩溃判段：这一次的模式不调 `GivenStatesEngine`、`crash_amplification` 的入口，也不走崩溃点重放判段，不打 `NOT_RUN` 行。该 bin 本来就带 `--features gpu` 编（文件头 `task-server-gpu-arguments` 点名的是别的模式），所以登记里起它的 `cargo run` 照旧带 `--features gpu`；文件头那一行不改（`r5-` 模式不在其中）。判据 V0：装置的标准输出与它写出的每份产物里 `grep -c NOT_RUN` 合计得 0；不满足的那一份按本次未跑报。
 
@@ -16,7 +16,7 @@
 
 > 1. 缺口：账读不出 × 多条历史 × 多个几何点的枚举现在没人测。调查报告 /home/fy5090/.local/share/singlefs/work/e158-abandoned-root-coverage/result.md（先整份读）：今天还产生被抛弃根的只剩系统配置没见证到的那一形（recovery.rs:2034、mount.rs:9889-9893、:6436、recovery.rs:2368-2376），见证过的那一形被 C554 乙拒可写（mount.rs:407、:9265-9289）；r2 Q1-0 从 56 节点变 0 就是 C554 乙合入造成的。8 条写死历史的用例罩着单条路径（报告第二节）。
 >
-> 2. 造法：crates/singlefs-verification/src/bin/e158_root_choice_repair.rs 第 23888、23919 行上下测试模块里已有不清零的藏见证造法。验收：登记写明新枚举怎么用这个造法在如实账本（账本函数 `ledger_after_a_rollback_published_forward`）上枚举；几何点至少 G0、S16、小环、S4 四档（第 3 节量到这四档的规模：1371 与 15956 节点）；枚举域规模先给推的上界。
+> 2. 造法：crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs 第 23888、23919 行上下测试模块里已有不清零的藏见证造法。验收：登记写明新枚举怎么用这个造法在如实账本（账本函数 `ledger_after_a_rollback_published_forward`）上枚举；几何点至少 G0、S16、小环、S4 四档（第 3 节量到这四档的规模：1371 与 15956 节点）；枚举域规模先给推的上界。
 >
 > 3. 判法：跑前写死结构化判据，不写 exact 比对空域的那种；至少含：造出被抛弃根的节点数大于 0（等于 0 判作废，防空域再次发生），读不出时计数与隔离槽判定（对着 8 条用例的断言，比如 an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping 的计数 1、隔离 14 槽、到 txg 31 不复用，逐条泛化还是逐条不泛化，写明）、PC1-a、PC1-b、PC1-c 在这条造法下应当 pass 且 not_constructible 判作废。翻面观测与失败条款写死。
 >
@@ -287,7 +287,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | 现算函数 | `mount.rs:2699`（`placements_referenced_by_root_computed_from_the_mapping`）、`mount.rs:2768`（`placements_referenced_by_root`） | 账读不出时的现算与账读得出时的取落点 |
 | 见证过的那一形被拒 | `mount.rs:407`（`PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion`）、`mount.rs:9265` 起 | N-配置判真、重读一次仍真，拒可写（C554 乙）；因此只有「系统配置没见证到最新根」那一形还造得出被抛弃根 |
 | 槽序 | `crates/singlefs-core/src/root_ring.rs:167`（`target_for_publish`） | 区域 = txg mod 3，槽 = (txg div 3) mod S |
-| 装置造法 | `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:23866`（`newest_system_configuration_slot_offset`）、`:23888`（`system_configuration_slot_before_the_rotation_of_the_newest_publish`）、`:23919`（`with_the_rotation_after_the_newest_publish_not_written`） | 每块盘最新系统配置槽写成「另一槽内容、世代号改成 g − 2」，两槽都自证得过；注释写明不清零（清零之后可写挂载照 C971 判不出拒可写）；`checked_sub(2)` 在世代号 < 2 时 `expect` panic |
+| 装置造法 | `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/fifth_run_domain_and_units.rs:6`（`newest_system_configuration_slot_offset`）、`:23888`（`system_configuration_slot_before_the_rotation_of_the_newest_publish`）、`:23919`（`with_the_rotation_after_the_newest_publish_not_written`） | 每块盘最新系统配置槽写成「另一槽内容、世代号改成 g − 2」，两槽都自证得过；注释写明不清零（清零之后可写挂载照 C971 判不出拒可写）；`checked_sub(2)` 在世代号 < 2 时 `expect` panic |
 | 抛弃步的落点 | 同文件 `:6710`（`unreadable_ranges_of_the_abandonment`，要 `SecondRunHistory` 的 `pool`、`timeline`）、`:6190`（`run_instrumented_mount_writable`）、`:6856`（`abandoned_roots_on`，装置与 `crates/` 双判并比） | b ∈ {EveryRecord、FirstNamedUnit、FirstCopyOfTheFirstNamedUnit}；故障形态 read_fails 与 reads_zeros |
 | 枚举与如实账本 | 同文件 `:444`（`bootstrap`）、`:794`（`enumerate`）、`:604`（`ledger_after_a_rollback_published_forward`）、`:645`（`apply_mount_rollback`）、`:550`（`apply_mount_writable`）、`:501`（`apply_overwrite`） | 深度优先 W、M、R(j)；回退是向前发布，账什么都不截 |
 | 现成阳性对照 | 同文件 `:7701`（`abandonment_step_node_list`）、`:7846`（`run_ledger_positive_controls`，PC1-a/b/c） | 现在从 H1c 的抛弃步（`second_run_start` 起的历史）取节点；抛弃步不加 `with_the_rotation_after_the_newest_publish_not_written` |
@@ -631,7 +631,7 @@ F1 至 F4 不在产物行里打标签，由读的人按第十节的触发观测�
 
 ### 12.6　装置在第一段（非最终）产物之前的四处改动（写于 2026-11-10，落笔在那三份产物之后；原判据一字不动，只改名字与计数口径，没有收严也没有放宽任何门槛）
 
-时点：装置文件 `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 的修改时间在 2026-11-09，早于同日 today、一线程、skip 那三份当时的产物（先后按文件修改时间，当时现查）。依据：主 agent 在派发提示里写的「主 agent 在上一段报告之后改过装置」四条，与单测任务 11419、11428 的读数（主 agent 转述，没读到这两个任务的日志）。那三份产物不是最终产物，最终产物在冻结树上重出（见 12.7）。
+时点：装置文件 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 的修改时间在 2026-11-09，早于同日 today、一线程、skip 那三份当时的产物（先后按文件修改时间，当时现查）。依据：主 agent 在派发提示里写的「主 agent 在上一段报告之后改过装置」四条，与单测任务 11419、11428 的读数（主 agent 转述，没读到这两个任务的日志）。那三份产物不是最终产物，最终产物在冻结树上重出（见 12.7）。
 
 1. 结果行键改名（门禁 data-names 判的）：s → slots_per_region；n_c → constructed_nodes；tag_test_n_c → tag_test_constructed_nodes；n_c_positive → constructed_nodes_positive；reuse_final_max → reuse_final_maximum；a3_twin_isolates_fewer_than_exclusive → twin_isolates_fewer_than_exclusive。登记正文的字段名已同步（12.3 表里已是新名）。判据里的 N_c、A3 是登记的称呼，不动。
 2. r5_q0 行去掉随线程数变的工作单元数 units（r5_run_parameters 行仍有）。理由：它随线程数与切深变，留在 Q0 行里，一线程趟与 31 线程趟的结果行逐行比较（Q8）就不会相同。
@@ -675,7 +675,7 @@ F1 至 F4 不在产物行里打标签，由读的人按第十节的触发观测�
 - kb：`.claude/kb/checks-owed.md` 757、339、362（整行，经 `quote-kb.py` 抄进第二节）；`.claude/kb/decisions/28-挂载期承诺量.md` 16–73、`23-journal的角色与格式.md` 357–470（同上）；E158 实验页只读标题行（`grep -n '^#'`，1703 行页面其余一行未读，结果与结论一字未读）。
 - `crates/singlefs-core/src`：`mount.rs` 407、1690–1900、2699、2768、9265、9289、9889、9893、6436（后几处只取行内容核对）；`recovery.rs` 2034、2051、2054、2357、2368、2376（核对行内容）；`root_ring.rs` 160–200；`grep -n 'pub fn mount_writable'` 命中行；`grep -n 'abandoned_roots_unreadable' mount.rs` 命中行。
 - `crates/singlefs-verification/src/heavy_threads.rs` 1–34、125–158；`memory_pool.rs` 的 `SparseDevice`、`MemoryPool` 定义（`grep -A`）。
-- `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs`（26269 行）：1–140、285–384、444–500、560–720、740–880、940–970、1125–1200、2160–2262、2363–2470、5684–5690、5968–6110、6180–6235、6377–6412、6687–6790、6817–6892、7380–7570、7685–8030、8142–8147、17535–17537、17601–17641、23440–23600、23850–23990、25960–26269，另 `grep -n '^fn \|^struct \|^enum \|^const '` 的清单、`grep -n 'thread'` 命中行。
+- `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs`（26269 行）：1–140、285–384、444–500、560–720、740–880、940–970、1125–1200、2160–2262、2363–2470、5684–5690、5968–6110、6180–6235、6377–6412、6687–6790、6817–6892、7380–7570、7685–8030、8142–8147、17535–17537、17601–17641、23440–23600、23850–23990、25960–26269，另 `grep -n '^fn \|^struct \|^enum \|^const '` 的清单、`grep -n 'thread'` 命中行。
 - 测试：`crates/singlefs-verification/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 1–80 与 `grep -n 'fn \|assert'` 命中行；`tests/common_images_for_the_given_states_engine/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 1–60、255–330、360–423。
 - 工具与表：`scripts/kb/claim-experiment.sh` 1–40；`scripts/kb/quote-kb.py` 1–50；`scripts/kb/replace-once.py` 1–30；`scripts/hosts/capped.sh` 1–60；`.claude/gate.d/replay-comparison-units.tsv` 1–20；`scripts/mutation/tables/e158_r4_arm_mutations.tsv` 1–5、`e158_arms.tsv` 1–3（只读头注释）。
 

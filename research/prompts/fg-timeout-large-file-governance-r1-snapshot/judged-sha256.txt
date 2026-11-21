@@ -1,0 +1,4 @@
+57b7328e31dcc31e04ba9dea4f51ac269f04345baafd8d9df96f68dea333f99d  research/prompts/_fg-timeout-large-file-governance-r1-body.md
+b7627f140769db592146c5b985c6b4f3cb084271ca22c4c5fe77e67d7102a3cc  .claude/hooks/bash-command-detector.sh
+7889c9681808ed6fbde3766cbe28fd036b70ee46c8c3e8f7d70a8ab2d2054e07  scripts/gate/large-file-check.py
+c93670a745348fd3c0beb95c3a3b0674273b69bc678ee97fc958cf9e08731f7e  .claude/agent-common.md

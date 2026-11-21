@@ -27,11 +27,11 @@
   - `crates/singlefs-core/src/mount.rs`
   - `crates/singlefs-core/src/transaction.rs`
 - harness：
-  - `crates/singlefs-harness/src/bin/first_transaction_on_device.rs`
+  - `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs`
   - `crates/singlefs-harness/src/fault_injection.rs`
   - `crates/singlefs-harness/src/history.rs`
   - `crates/singlefs-harness/src/model_comparison.rs`
-- **不判**：`crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs`，E156 装置，由实验页判。
+- **不判**：`crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`，E156 装置，由实验页判。
 
 **这一轮判的定义**：
 - `.claude/agent-common.md`

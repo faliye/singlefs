@@ -10,7 +10,7 @@
 
 ## 一、问题
 
-英文名：checkpoint_cost_against_empty_publish_cost（照抄 r1 第一节；装置是入库装置 `crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs`，r1 写成 `crates/singlefs-checker-tier/src/bin/…` 的那一处，今天在 `crates/singlefs-verification/` 下，路径迁移登记在 `.claude/gate.d/path-moves.tsv` 第 26 行；装置不改，不另起新装置）。
+英文名：checkpoint_cost_against_empty_publish_cost（照抄 r1 第一节；装置是入库装置 `crates/singlefs-implementation-experiments/src/bin/e173_checkpoint_cost_against_empty_publish_cost/main.rs`，r1 写成 `crates/singlefs-checker-tier/src/bin/…` 的那一处，今天在 `crates/singlefs-verification/` 下，路径迁移登记在 `.claude/gate.d/path-moves.tsv` 第 26 行；装置不改，不另起新装置）。
 
 主 agent 给的问题（派发提示逐字）：
 
@@ -68,7 +68,7 @@
 
 ## 三、实现今天的样子
 
-- 装置：`crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs`（2832 行）。`main` 第 2427 行；准入判法 `preflight` 第 2365 行（头一句，`admission: always`）；本地常量回比 `check_local_constants_against_the_crates` 第 2088 行（停机条款 S4）；锚点 `check_the_anchors` 第 2182 行（V3）；每个几何的阳性对照 `positive_control_row_and_holds` 第 1744 行（PC7 的产物行）；G-min 的找法 `smallest_completed_trial` 第 2304 行与 `main` 第 2474–2491 行；一次试跑一行 `trial_row` 第 2412 行（字段 `end=`、`refusals=`、`first_refusal=`，被拒的结局名从这几处进产物，`variant_name_of` 第 252 行只取成员名几层、不带数）；X5 的 `excess_slots` 第 1897 行；`completes_the_history` 第 1184 行。
+- 装置：`crates/singlefs-implementation-experiments/src/bin/e173_checkpoint_cost_against_empty_publish_cost/main.rs`（2832 行）。`main` 第 2427 行；准入判法 `preflight` 第 2365 行（头一句，`admission: always`）；本地常量回比 `check_local_constants_against_the_crates` 第 2088 行（停机条款 S4）；锚点 `check_the_anchors` 第 2182 行（V3）；每个几何的阳性对照 `positive_control_row_and_holds` 第 1744 行（PC7 的产物行）；G-min 的找法 `smallest_completed_trial` 第 2304 行与 `main` 第 2474–2491 行；一次试跑一行 `trial_row` 第 2412 行（字段 `end=`、`refusals=`、`first_refusal=`，被拒的结局名从这几处进产物，`variant_name_of` 第 252 行只取成员名几层、不带数）；X5 的 `excess_slots` 第 1897 行；`completes_the_history` 第 1184 行。
 - 被测代码里这一次变了的地方：`crates/singlefs-core/src/mounted_session.rs` 的 `UserChangeRefused::NoSpaceAfterRaisingTheFloor`（第 657 行，推满仍不够）与 `NoSpaceEvenWithEverythingAFloorRaiseCouldRelease`（第 661 行，抬 F 之前先算判出放不下，枚举成员的文档在第 658–660 行，结构体第 693 行）。装置不改。
 - 复跑表：`scripts/experiment-apparatus/replay.sh` 第 2921 行 `E173|@driver_e173_checkpoint_cost||e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out|exact`；驱动 `driver_e173_checkpoint_cost` 第 4284–4286 行：`cargo run -q --release -p singlefs-verification ${CHECKER_TIER_FEATURES[@]+"${CHECKER_TIER_FEATURES[@]}"} --bin e173_checkpoint_cost_against_empty_publish_cost -- segment-one`。该驱动点到 `CHECKER_TIER_FEATURES`，按 `replay.sh` 文件头第 4–6 行的「按需领卡」由脚本自己领卡，登记不写卡。
 - 这个装置不走崩溃判段（不调 `crash_amplification` 的 `run_from_environment` 一族、`GivenStatesEngine` 一类入口），登记第 3 步那条「`task-server-gpu-arguments` 头」与「按 `--features gpu` 起」对它不适用，起法就是复跑表那一行；装置自己也不打 `NOT_RUN` 行，第十一节仍留一条 `grep -c NOT_RUN` 当防线。
@@ -89,7 +89,7 @@
 
 ## 五、臂、阳性对照、真实基线
 
-**装置写在哪（写死）：入库装置**，就是 `crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs`，不改、不另写独立模型。理由同 r1 第五节：问的是「`crates/` 这份代码在今天的真盘面上算出的 ckpt_cost 与一次空发布真写出的固定点，产物与上一次差在哪」，另写一份独立模型答不了。因为装置不改，也就没有「本地常量加回比」要新写：它读 `crates/` 的那几个常量（`SLOT_BYTES`、`DATA_UNIT_BYTES`、分配记录树的叶罩槽数与内部扇出、根环区数、每区槽数范围等）早已是本地常量加回比（r1 第五节），由装置开跑头一步 `check_local_constants_against_the_crates` 判，不符打 `name=stop clause=s4_local_constant_differs_from_the_crates` 退 3（第十一节 S4）。
+**装置写在哪（写死）：入库装置**，就是 `crates/singlefs-implementation-experiments/src/bin/e173_checkpoint_cost_against_empty_publish_cost/main.rs`，不改、不另写独立模型。理由同 r1 第五节：问的是「`crates/` 这份代码在今天的真盘面上算出的 ckpt_cost 与一次空发布真写出的固定点，产物与上一次差在哪」，另写一份独立模型答不了。因为装置不改，也就没有「本地常量加回比」要新写：它读 `crates/` 的那几个常量（`SLOT_BYTES`、`DATA_UNIT_BYTES`、分配记录树的叶罩槽数与内部扇出、根环区数、每区槽数范围等）早已是本地常量加回比（r1 第五节），由装置开跑头一步 `check_local_constants_against_the_crates` 判，不符打 `name=stop clause=s4_local_constant_differs_from_the_crates` 退 3（第十一节 S4）。
 
 **臂：没有**。这是同臂（r1 第一段本来就没有臂，r1 第五节「第一段要做的（入库装置，没有臂）」）、同输入类型下换了产品代码的重跑，不新加臂（派发提示：「照实验页原登记，不新加臂」）；r1 第二段两条臂（代码读法、条款读法）在模型上跑，不在这一次。不适用的格（臂的定义、支持各臂的人认的样子）写明：没有臂，这一格不适用。
 
@@ -192,7 +192,7 @@
 |---|---|---|---|---|---|---|
 | 1 | `e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out` | `85bed2435162a532566e64a1fc73bcaf4ab1f8c6a26b1b7a03c76135c89b07d9` | 3523 | `replay.sh:2921`（驱动 `driver_e173_checkpoint_cost`，exact，行项 `E173.4`）；原件已入库（提交 `4964b76b8`），工作区在 `research/results/` | `e173-checkpoint-cost-against-empty-publish-cost-2026-11-13-r2.out` | 比的是 R1 的差：留存与新产物逐行比，只比不要求相同；旧产物不覆盖、不改名 |
 
-**复跑表那一行怎么换**（执行员做，在新产物落盘、R1–R9 出完之后；不在之前）：`scripts/experiment-apparatus/replay.sh` 第 2921 行第 4 列由 `e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out` 换成 `e173-checkpoint-cost-against-empty-publish-cost-2026-11-13-r2.out`，别的列不动（`E173|@driver_e173_checkpoint_cost||<新名>|exact`）；驱动上方第 4281–4283 行那段注释补一句指到本登记 `research/prompts/e173-r2-prereg.md`；驱动本身（第 4284–4286 行）不改。新产物是 `replay.sh` 在 `REPLAY_OUT` 下留的那份原始输出（含准入头）整份复制，不手改一个字符。旧产物留在 `research/results/`，下一次提交由归档那一步处理，本登记不删。机读表 `.claude/gate.d/replay-comparison-units.tsv`：E173 现在一行都没有；这一行要登记就要在 `crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs` 里有一个单元表的单元名（该装置没有单元表，`formal_run_units` 这一类数组不在它里面），没有就照该表文件头写一行「不登记的比对对象」并挂一个开着的欠账号：**怎么登记待主 agent 定**（第一页「要主 agent 认的项」第 2 条）。登记之前 replay-comparison-units 格对这一行判红，执行员的报告里写明。
+**复跑表那一行怎么换**（执行员做，在新产物落盘、R1–R9 出完之后；不在之前）：`scripts/experiment-apparatus/replay.sh` 第 2921 行第 4 列由 `e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out` 换成 `e173-checkpoint-cost-against-empty-publish-cost-2026-11-13-r2.out`，别的列不动（`E173|@driver_e173_checkpoint_cost||<新名>|exact`）；驱动上方第 4281–4283 行那段注释补一句指到本登记 `research/prompts/e173-r2-prereg.md`；驱动本身（第 4284–4286 行）不改。新产物是 `replay.sh` 在 `REPLAY_OUT` 下留的那份原始输出（含准入头）整份复制，不手改一个字符。旧产物留在 `research/results/`，下一次提交由归档那一步处理，本登记不删。机读表 `.claude/gate.d/replay-comparison-units.tsv`：E173 现在一行都没有；这一行要登记就要在 `crates/singlefs-implementation-experiments/src/bin/e173_checkpoint_cost_against_empty_publish_cost/main.rs` 里有一个单元表的单元名（该装置没有单元表，`formal_run_units` 这一类数组不在它里面），没有就照该表文件头写一行「不登记的比对对象」并挂一个开着的欠账号：**怎么登记待主 agent 定**（第一页「要主 agent 认的项」第 2 条）。登记之前 replay-comparison-units 格对这一行判红，执行员的报告里写明。
 
 ## 十二、修订
 
@@ -220,7 +220,7 @@
 - `.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md` 第 1–60 行、第 330–356 行（含第一段读数 X3 九行里前六行的数，第四节第 2 条已列；读了该页第 1 次重跑一节的现状句，其中有结论，已如实列在第四节）。其余各节没读。
 - `.claude/kb/decisions/16-发布语义.md` 第 270–293 行（`quote-kb.py` 整段抄进第二节），第 276 行单独读了一遍；另 grep `已定项 10`、`射程`、`抬 F 之前先算` 命中第 42、54、113、270、276、287 行（只看了行首，没读内容）。
 - r1 登记取出来的那份（`git show 59ce5a865:research/prompts/e173-r1-prereg.md` 存到草稿目录 `r1.md`，697 行）：第 1–34 行、第 218–372 行（大半）、第 505–604 行、第 664–697 行。
-- `crates/singlefs-verification/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs` 第 1–60、245–285、2300–2404、2405–2520 行，grep 命中第 251、252、854、997、1184、1241、1744、1897、2088、2182、2284、2304、2315、2365、2412、2427、2437–2491 行。
+- `crates/singlefs-implementation-experiments/src/bin/e173_checkpoint_cost_against_empty_publish_cost/main.rs` 第 1–60、245–285、2300–2404、2405–2520 行，grep 命中第 251、252、854、997、1184、1241、1744、1897、2088、2182、2284、2304、2315、2365、2412、2427、2437–2491 行。
 - `crates/singlefs-core/src/mounted_session.rs` grep 命中第 7、260、655–662、666、674、693、723 行。
 - `scripts/experiment-apparatus/replay.sh` 第 1–40、2915–2923、4270–4330 行，grep 命中第 2184、2524、2614、5212、5216、5225 行；`.claude/gate.d/replay-comparison-units.tsv` 第 1–25 行；`scripts/gate/admission.py` 第 1–80 行；`research/prompts/e168-r1-prereg.md` 第 732–770 行、`research/prompts/e165-r7-prereg.md` 第 1–30 行（只看了重跑登记与比对对象表的写法）；`scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs` grep 命中第 3375、3383、3880 行；`.claude/kb/checks-owed.md` 第 426 行；`.claude/gate.d/path-moves.tsv` 第 26 行；`.claude/heavy-thread-default`。
 - 没读：`research/results/` 下任何产物的内容（只对留存产物取了 `sha256sum` 与 `wc -l`、`ls -l`、`git ls-files`）、`.claude/kb/experiments/` 下别的实验页、`records/`。全仓搜条款与用词没做（用不上）。

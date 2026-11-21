@@ -3,8 +3,8 @@
 <!-- doc-lint:not-numbers B1 B2 B3 B4 C1 C2 C3 C4 -->
 
 被判的文件（第一轮判决第三节的改法，逐块见改动全文 `research/prompts/_m3-formal-code-b37-r2-diff.md`）：
-- `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`（内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`）；
-- `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs`（三处注释）；
+- `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`（内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`）；
+- `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs`（三处注释）；
 - `crates/singlefs-checker/src/image.rs`（第 212 行注释）；
 - `crates/mutations.tsv`（本批四行）。
 

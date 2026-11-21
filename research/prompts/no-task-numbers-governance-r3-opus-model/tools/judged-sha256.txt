@@ -1,0 +1,7 @@
+62a1ac00e6368ba29d0563645ad6d858b5efb355602b8dd90e28869460640114  .claude/gate.d/lib-forbidden-notations.py
+daf7b813a66a2d9b98179a09d778aa110c6191f221fad0ee70df6f27e404c08e  .claude/hooks/write-guard.sh
+b5d024dbfa600d063a39708f47ba3c88467702fedb6407e1b66a75b361ab340d  .claude/hooks/bash-command-detector.sh
+7159f8eb71000e32b0d377c8c2bec6aa374b1e369ccf7c6b425222316e34169e  .claude/hooks/runner-dispatch-guard.sh
+bb8f3680b0af114be6a7dc3821880f306a26d5e16f806178134683d4e052c297  .claude/gate.d/doc-text.sh
+a3ee71e724502c95496e9058cddb26c17a793404615d02984b77471f75e5de39  scripts/kb/lib_notation_check.py
+727cce98924a872dbd3ec798ca6782a7cfe4b2b481ae4a443a09889ec1edf8d3  scripts/kb/replace-once.py

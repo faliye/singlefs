@@ -1,0 +1,10 @@
+[package]
+name = "gpu-wait-outside-the-lock-r2-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "设计三方 m4-gpu-wait-outside-the-lock-design-r2 辩方腿的探针：回锁复核只比活意图时，前台改动的种类放开扫，丢失会不会出现"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-verification = { path = "../singlefs-verification", default-features = false }

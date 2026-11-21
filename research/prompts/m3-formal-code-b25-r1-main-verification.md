@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers K1 K2 K3 V4 V9 V11 V17 V18 V19 S1 S13 Q1 Q4 Q5 KX1 KX2 KX4 KM1 KM2 KM7 T01 T02 T13 -->
 
-被判的文件：`crates/singlefs-harness/src/model.rs`、`crates/singlefs-harness/src/model_comparison.rs`、`crates/singlefs-harness/tests/model_compares_inode_creations_across_two_inode_leaf_containers.rs`（25-1）；`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`（整份，25-3a 与 25-3 的改动连同之前那一版一起点名）、`crates/singlefs-checker-tier/Cargo.toml`、`Cargo.lock`（25-3a）；`crates/mutations.tsv` 里「O1 跨叶容器」3 行与「E171R1 装置」28 行。
+被判的文件：`crates/singlefs-harness/src/model.rs`、`crates/singlefs-harness/src/model_comparison.rs`、`crates/singlefs-harness/tests/model_compares_inode_creations_across_two_inode_leaf_containers.rs`（25-1）；`crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`（整份，25-3a 与 25-3 的改动连同之前那一版一起点名）、`crates/singlefs-checker-tier/Cargo.toml`、`Cargo.lock`（25-3a）；`crates/mutations.tsv` 里「O1 跨叶容器」3 行与「E171R1 装置」28 行。
 
 ## 一、这一轮的材料与证据
 

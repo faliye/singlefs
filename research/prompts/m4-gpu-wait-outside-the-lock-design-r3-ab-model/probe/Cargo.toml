@@ -1,0 +1,11 @@
+[package]
+name = "gpu-wait-outside-the-lock-r3-ab-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "m4-gpu-wait-outside-the-lock 第三轮判决「三、改法」第 5、7 条的 A/B 探针：回锁重排计划四臂、回锁那一次发布重判回退门两臂"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-verification = { path = "../singlefs-verification", default-features = false }

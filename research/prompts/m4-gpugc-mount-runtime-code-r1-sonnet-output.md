@@ -41,7 +41,7 @@
 - 推翻：补一个起线程的真卡用例并在批中途让前台调 `accept`，量到的等待超过 `WAIT_LIMIT` 的若干倍，则这里的「一批之内持锁」就是实测的饿死。
 
 **5. E202 与七·4 的测试走不走运行库——不走，差别在门、备忘、破例、预算、放锁五样。**
-- E202 装置不引运行库：它调核心层的 `run_compaction_in_the_background`（`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs:4732`、`:6363`、`:7894`），挂载用 `mount_writable_with_background_compute_settings`（`:4295`），开关装的是 `CompactionRunForcing::ForcedToStartForTests` 与 `ForcedForTests` 批大小（`:3343-3347`）。
+- E202 装置不引运行库：它调核心层的 `run_compaction_in_the_background`（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/lockstep_runs.rs:50`、`:6363`、`:7894`），挂载用 `mount_writable_with_background_compute_settings`（`:4295`），开关装的是 `CompactionRunForcing::ForcedToStartForTests` 与 `ForcedForTests` 批大小（`:3343-3347`）。
 - 所以 E202 量的是「整趟一次持锁、没有回退门、没有备忘、没有破例、不读挂载预算」的 GPU 对 CPU 主机 CPU 时间，不是运行库每次发布放锁、每次发布前读一遍根环（回退门）的那一条路。门每次发布读 3S 个根槽与它们的树表（`crates/singlefs-core/src/mount.rs:4251-4308`），这部分代价 E202 没算进去，两个后端都有，不改对照的符号，但绝对值偏低。推的，没量过。
 - 七·4 一族测试里用 `ForcedToStartForTests` 的：`grep -rl` 在 `crates/` 下命中 12 份（量的：含 `compaction_plan.rs`、`mounted_session.rs`、`e202_gpu_cpu_gc_comparison.rs` 与 8 份验证包测试）。它们钉的是「一趟怎么推」，不是产品路径（见 T2 第 6 点）。
 

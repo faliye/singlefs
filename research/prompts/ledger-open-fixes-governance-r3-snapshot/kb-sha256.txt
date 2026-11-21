@@ -1,0 +1,5 @@
+9831241250b15ee0059630ed06221a74c10552e10e1e6601c3b7662c104b4adf  .claude/kb/experiments/185-GC一批搬迁的挂钟拆分.md
+3c7d2ffcef848a873d4958c6caee90a5210113729dda95a7d8445ec2ecd35a13  .claude/kb/experiments/158-择根与修复四岔路.md
+e91260b3cc1209d6a18e9c0cbaff97ac49ce02dbb378a3127d7cfe8302ff6bc8  .claude/kb/experiments/180-准入读数与真可写量.md
+8ab35c251914cdc5197e1a9acf9c0799b315958f74c61f0eb4604cb46901a67b  .claude/kb/experiments/202-GPU与CPU两种模式GC对照组.md
+f46d000d9cde86503882199d48142b00bcb16a83c5421a71b71f3002d5ad31ed  .claude/kb/tooling.md

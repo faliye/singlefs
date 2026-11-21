@@ -31,7 +31,7 @@
 | `crates/singlefs-core/src/mounted_session.rs` | 照旧（核查第 3、4 条） |
 | `crates/singlefs-core/src/recovery.rs` | 照旧（只是类型跟着改，腿与主 agent 都没找到读身份或改内容的地方） |
 | `crates/singlefs-core/src/instance_table_sweep.rs` | 照旧（同上） |
-| `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs` | 照旧（只改两条测试名） |
+| `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs` | 照旧（只改两条测试名） |
 | `crates/singlefs-background-gpu/src/adapter_inventory.rs` | 照旧（`GIBIBYTE` 去重成一份，值同） |
 | `crates/singlefs-background-gpu/src/background_gpu_compute.rs` | 照旧（测试条目改名） |
 | `crates/singlefs-background-gpu/src/checksum_kernels.rs` | 照旧（测试条目改名） |

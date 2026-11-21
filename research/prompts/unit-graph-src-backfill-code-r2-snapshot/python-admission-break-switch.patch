@@ -1,0 +1,72 @@
+--- /home/fy5090/.local/share/singlefs/work/admission-break-switch-profile/base/scripts/gate/admission.py
++++ /home/fy5090/.local/share/singlefs/work/admission-break-switch-profile/merged/scripts/gate/admission.py
+@@ -395,7 +395,6 @@
+       「单元键：RUSTFLAGS 加 -C target-cpu=native（E02）」「单元键：.cargo/config.toml 只改注释键不变（N42）、改 rustflags 的值键变：只改注释 Tr」
+       「单元键：cargo 配置 runner 写 `bash tools/runner.sh`，参数里的脚本（.cargo 那一层下）改一个字」
+       「单元键：cargo 配置 runner 写 `bash package-runner.sh`，脚本只在登记用例的包目录 crates/demo 下，改一个字」（runner 指的脚本的内容摘要也在构建环境那几行里）
+-      「单元键：编译档里别的设置照进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true（按整个键名比）」「单元键：编译档里别的设置照进键：环境变量 CARGO_PROFILE_RELEASE_OPT_LEVEL=2」（编译档的环境变量也是构建环境的生效值）
+       「单元键：构建环境只收改结局的设置：CARGO_BUILD_INCREMENTAL 与 [build] incremental 两种取值键相同、[alias] 加一条键不变，[profile.release] 改一项键变」
+   ADMISSION_BREAK=build-environment-lines-names-only  子命令 build-environment-lines 只打名字、不打内容的 sha256
+       「自证：unit-key：」
+@@ -627,6 +626,10 @@
+       「自证：unit-key：」
+       「单元键：编译档里 incremental 经 codegen-units 的缺省值进键：清单 [profile.release] 加 incremental = true」
+       「单元键：编译档里 incremental 经 codegen-units 的缺省值进键：环境变量 CARGO_PROFILE_RELEASE_INCREMENTAL=true」「单元键：编译档里 incremental 经 codegen-units 的缺省值进键：环境变量 CARGO_INCREMENTAL=1」
++  ADMISSION_BREAK=profile-environment-unread  环境变量 CARGO_PROFILE_<档>_* 算键时不读（构建环境那几行与编译档的生效值两处都不读；编译档的环境变量两处各进一回，只关一处另一处照进）
++      「自证：unit-key：」
++      「单元键：编译档里别的设置照进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true（按整个键名比）」「单元键：编译档里别的设置照进键：环境变量 CARGO_PROFILE_RELEASE_OPT_LEVEL=2」
++      「单元键：编译档里 incremental 经 codegen-units 的缺省值进键：环境变量 CARGO_PROFILE_RELEASE_INCREMENTAL=true」
+   ADMISSION_BREAK=withdrawal-owed-unrecorded  记红时 prune-server 不可用：plan-failure --red 收到 verdict-record 退 75 只退 75、不记欠撤，verdict-plan / test-plan 开跑也不读欠撤
+       「自证：reuse-fix：」
+       （同一把键原有的绿留着、下一趟照复用）
+@@ -877,6 +880,7 @@
+ PROFILE_SETTING_TABLES = ("package", "build-override")   # [profile.<名>] 底下照同一组键写设置的两层（package.<包>、build-override）
+ PROFILE_DEBUG_KEYED_BREAK = "profile-debug-keyed"
+ PROFILE_INCREMENTAL_IGNORED_BREAK = "profile-incremental-ignored"
++PROFILE_ENVIRONMENT_UNREAD_BREAK = "profile-environment-unread"
+ BUILD_ENVIRONMENT_ALL_SETTINGS_BREAK = "build-environment-all-settings"
+ BUILD_ENVIRONMENT_PROGRAM_VARIABLES = ("RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTC_WRAPPER", "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER")
+ BUILD_ENVIRONMENT_PROGRAM_VARIABLE_FORMS = (re.compile(r"^CARGO_TARGET_.+_RUNNER$"),)
+@@ -1247,6 +1251,14 @@
+     return variable.startswith("CARGO_PROFILE_") and any(variable.endswith("_" + name.upper().replace("-", "_")) for name in profile_settings_left_out())
+ 
+ 
++def environment_read_for_key(environment):
++    """算键读的环境变量：构建环境那几行（build_environment_setting_lines）与编译档的生效值（profile_lines）都从它取。
++    编译档的 CARGO_PROFILE_<档>_* 在这两处各进一回；弄坏开关 profile-environment-unread 下两处都不读它们。"""
++    if break_is_set(PROFILE_ENVIRONMENT_UNREAD_BREAK):
++        return {name: value for name, value in environment.items() if not name.startswith("CARGO_PROFILE_")}
++    return environment
++
++
+ def configuration_affecting_output(merged):
+     """合成好的 cargo 配置里改编出结果的那几张表（文件头「单元键」工具链行）：build（去掉 jobs、target-dir、incremental）、target、
+     profile（各档去掉 debug、incremental，keyed_profile_settings）、env；[alias]、[net]、[http]、[term] 这类不进。弄坏开关 build-environment-all-settings 下整份交回。"""
+@@ -1428,7 +1440,7 @@
+         lines.append(f"cargo -V: {output}")
+         if not break_is_set("skip-build-environment"):
+             try:
+-                lines += build_environment_setting_lines(closure_root, self.environment)
++                lines += build_environment_setting_lines(closure_root, environment_read_for_key(self.environment))
+             except InputManifestError as error:
+                 raise UnitKeyError(f"构建环境读不出：{error}") from error
+         self.toolchains[closure_root] = sorted(lines)
+@@ -1638,7 +1650,7 @@
+     out = []
+     flattened_setting_lines(f"profile.{profile}", keyed_profile_settings((sections.get("profile") or {}).get(profile) or {}), out)
+     try:
+-        effective = function_units().effective_profile_lines(sections, profile, environment, break_is_set(PROFILE_INCREMENTAL_IGNORED_BREAK))
++        effective = function_units().effective_profile_lines(sections, profile, environment_read_for_key(environment), break_is_set(PROFILE_INCREMENTAL_IGNORED_BREAK))
+     except ValueError as error:
+         raise UnitKeyError(f"编译档 {profile} 的生效值算不出（{error}）") from error
+     return lines + [f"setting {line}" for line in out] + effective
+@@ -6090,7 +6102,8 @@
+         # 编译档的 debug 不进键（文件头「单元键」工具链行、PROFILE_SETTINGS_LEFT_OUT），清单、环境变量、cargo 配置三处各写一回；incremental 的原文行不进，
+         # 改由它定的 codegen-units 缺省值进键（没写 codegen-units 时开增量 256、关 16；profile_lines），清单、环境变量 CARGO_PROFILE_<档>_INCREMENTAL、CARGO_INCREMENTAL 各一格；
+         # 别的编译档设置照进（按整个键名比，debug-assertions 不因前缀是 debug 被去掉）。弄坏开关 profile-debug-keyed 下 debug 那三格转红，
+-        # profile-incremental-ignored 下 incremental 那三格转红
++        # profile-incremental-ignored 下 incremental 那三格转红；编译档的环境变量（opt-level、debug-assertions、incremental）在构建环境行与生效值两处各进一回，
++        # profile-environment-unread 两处都不读，下面写 CARGO_PROFILE_RELEASE_OPT_LEVEL、_DEBUG_ASSERTIONS、_INCREMENTAL 的三格转红
+         every_test = ["test_t", "test_u", "test_v"]
+         manifest = os.path.join(work, "Cargo.toml")
+         cell("编译档里 debug 不进键：清单 [profile.release] 加 debug = 2", manifest, "overflow-checks = true\n", "overflow-checks = true\ndebug = 2\n", [])

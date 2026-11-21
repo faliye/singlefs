@@ -50,7 +50,7 @@
 - 乙（checker 档）：
   - 两份切口新用例各加一形方括号宏调用（B2、B3 要红）；
   - 六种合法写法（`g16`、`g17`、`g19`、`g20`、`N16`、`G14h`）写进故意拒的写法、各写为什么；
-  - `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs` 内联测试 `publish_writes_line_gives_the_total_then_every_kind_in_report_order_with_zeros` 的钉值补上 `retirement_tree_node_write_calls=0 retirement_tree_node_written_bytes=0`（删除线合后快档那一条红）。
+  - `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs` 内联测试 `publish_writes_line_gives_the_total_then_every_kind_in_report_order_with_zeros` 的钉值补上 `retirement_tree_node_write_calls=0 retirement_tree_node_written_bytes=0`（删除线合后快档那一条红）。
 - 两件合入后与形式化线第 46 批（E165 装置内联测试与变异行第 3639–3640 行，已在主工作区）合成一批走一轮代码轮。E171 乙类常量换新值照 E171 第 8 次修订 8.2 等全部各线合完再做，不进第二十六块。
 
 ## 回看决策

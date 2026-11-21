@@ -1,0 +1,13 @@
+414	write-intersection-empty-has-zero-length	segments=6	hits=1	source_line=171	proof_errors=2	landing=bytes_in_unit,checked_bytes_in_indexed_unit
+415	indexed-intersection-empty-has-zero-length	segments=6	hits=1	source_line=221	proof_errors=1	landing=checked_bytes_in_indexed_unit
+416	write-intersection-one-byte-is-not-dropped	segments=6	hits=1	source_line=187	proof_errors=1	landing=bytes_in_unit
+502	file-range-witness-is-checked	segments=6	hits=1	source_line=277	proof_errors=1	landing=witness_file_range_boundaries
+503	gpu-score-candidate-window-first-not-after-past	segments=6	hits=1	source_line=121	proof_errors=1	landing=lemma_candidate_window_keeps_every_contribution
+504	gpu-score-candidate-window-holds-only-the-device	segments=6	hits=1	source_line=118	proof_errors=1	landing=lemma_candidate_window_keeps_every_contribution
+505	gpu-score-theorem-first-is-the-candidate-lower-bound	segments=6	hits=1	source_line=220	proof_errors=2	landing=theorem_sorted_search_equals_full_record_walk
+506	gpu-score-theorem-past-is-the-end-lower-bound	segments=6	hits=1	source_line=221	proof_errors=2	landing=theorem_sorted_search_equals_full_record_walk
+507	gpu-score-theorem-window-may-be-empty	segments=6	hits=1	source_line=216	proof_errors=1	landing=theorem_sorted_search_equals_full_record_walk
+508	gpu-gc-witness-record-slice-sum-value	segments=6	hits=1	source_line=345	proof_errors=1	landing=witness_gpu_gc_protocol_and_score_premises
+509	gpu-gc-witness-first-disagreement-count-value	segments=6	hits=1	source_line=346	proof_errors=1	landing=witness_gpu_gc_protocol_and_score_premises
+510	overwrite-exact-keeps-the-length	segments=6	hits=1	source_line=123	proof_errors=1	landing=lemma_overwrite_changes_exactly_the_requested_bytes
+511	overwrite-exact-empty-request-keeps-the-file	segments=6	hits=1	source_line=131	proof_errors=1	landing=lemma_overwrite_changes_exactly_the_requested_bytes

@@ -10,7 +10,7 @@
 
 - 被判的文件：`crates/singlefs-device-library/src/lib.rs`（快照 sha256 `60dd1dfd…`）。文件头写着协议：`read`、`write`、`write-many <条数>` 三种请求，三种都可能回 `failed <退出码> <一句>`，装置照退出码退。
 - 管道那一头（转交给 prune-server 的一侧）：`scripts/experiment-apparatus/device-code-key.py` 文件头第 53–57 行写 `write-many` 的服务侧：整批读全、核全之后才动手，每条照 `write` 记账（写过的键、复用哨兵），再经客户端 `write_many` 一次写服务；有一条相对键不合整批一条都不写；条数至少 1。它的弄坏开关在同一文件头第 141–152 行（`write-many-first-entry-only` 等六个）。这份脚本不是这一轮被判的文件，当上下文读。
-- 调用方：`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:24484` `self.store.write_many(&items);`（E158 按单位成批写）。
+- 调用方：`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/fifth_run_judgement_library.rs:132` `self.store.write_many(&items);`（E158 按单位成批写）。
 - 变异行：`crates/mutations.tsv` 第 7393–7399 行（判定库口子 write-many 七条）与第 7401、7405 行（E158 调用侧）。
 - 测试：`crates/singlefs-device-library/src/lib.rs` 的 `mod tests` 新加三条：`write_many_announces_the_count_and_each_length_in_bytes_and_takes_one_written_for_the_whole_batch`、`write_many_of_nothing_sends_no_request_and_takes_no_reply`、`write_many_in_memory_stores_every_entry_and_counts_one_call_per_non_empty_batch`。
 - 压着的条款：`.claude/rules/verification.md`「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」（装置不开本地库，读写经服务）；同一份规则「一个门禁：两种跑法」里复用与「一块判完才落盘，写入是原子的」（`.claude/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」）。
@@ -28,7 +28,7 @@
 
 ### 检查单：走不到的理由二次查实
 
-这一份没有新加 `todo!`、`unreachable!`、`assert!`。新加的 `panic!` 有两处：`count_write_many_calls` 在 `Backend::Relay` 上 `panic!("单测只数内存那一种")`，测试辅助 `replies_left_unread` 在 `Backend::Memory` 上 panic（在 `mod tests` 里）。主 agent 判前一处走不到：`count_write_many_calls` 全仓只在单测里调：本包 `mod tests` 一处、`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 第 30030、30043 行两处（在同文件第 29232 行 `#[cfg(test)]` 之后）（腿现跑 `grep -rn count_write_many_calls crates scripts` 核）。新加的 `expect` 两处是锁没中毒（`"转交判定库的锁没有中毒"`、`"单测内存库的锁没有中毒"`）。腿逐处追调用点判「走不到」成不成立。
+这一份没有新加 `todo!`、`unreachable!`、`assert!`。新加的 `panic!` 有两处：`count_write_many_calls` 在 `Backend::Relay` 上 `panic!("单测只数内存那一种")`，测试辅助 `replies_left_unread` 在 `Backend::Memory` 上 panic（在 `mod tests` 里）。主 agent 判前一处走不到：`count_write_many_calls` 全仓只在单测里调：本包 `mod tests` 一处、`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 第 30030、30043 行两处（在同文件第 29232 行 `#[cfg(test)]` 之后）（腿现跑 `grep -rn count_write_many_calls crates scripts` 核）。新加的 `expect` 两处是锁没中毒（`"转交判定库的锁没有中毒"`、`"单测内存库的锁没有中毒"`）。腿逐处追调用点判「走不到」成不成立。
 
 ### 检查单：类型与名字
 
@@ -133,7 +133,7 @@ G0（主几何点）、P331（打中判据）、P332（违例判据） 是本页
 
 **更正**：「2026-09-26（第 2 次跑第一段）」历史条写过「岔路单第 3 行不再量」，与现状不符。岔路单第 3 行这五行（`all` 与 q3-1 四档）一直在 `scripts/experiment-apparatus/replay.sh` 复跑表里，这一次按新账本重出，问的是新判据 `content_differs_from_its_effective_root`。作废的只有 C332（回退实例两个根都读不出时回退被撤销） 正文钉的那句「2 个故障就能撤销回退」（回退改成向前发布之后产品没有这个动作，2026-09-25 session s10 一节已记测不出）与 q1 三行。
 
-**做了什么**：装置账本由「截断时间线」改成如实账本，只改 `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs`，产品代码 `crates/singlefs-core` 没动；旧账本那条路与两个注入开关（`E158_ROLLBACK_LEDGER`、`E158_INJECT`）删了。五份新产物：`e158-root-choice-repair-2026-11-09-segment1-rerun.out`（85 行，其中 73 行是 `E7RESULT`，另 12 行是 `N1_DONE`）、`e158-root-choice-repair-2026-11-09-q3-1-g0.out`（66 行）、`e158-root-choice-repair-2026-11-09-q3-1-s16.out`（66 行）、`e158-root-choice-repair-2026-11-09-q3-1-small-ring.out`（67 行）、`e158-root-choice-repair-2026-11-09-q3-1-s4.out`（66 行），每份末行 `E7RESULT name=done emitted=` 的数等于该份 `E7RESULT` 行的行数；`replay.sh` 的 E158 五行改指它们，2026-09-25 的各份留在 git 历史里。
+**做了什么**：装置账本由「截断时间线」改成如实账本，只改 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs`，产品代码 `crates/singlefs-core` 没动；旧账本那条路与两个注入开关（`E158_ROLLBACK_LEDGER`、`E158_INJECT`）删了。五份新产物：`e158-root-choice-repair-2026-11-09-segment1-rerun.out`（85 行，其中 73 行是 `E7RESULT`，另 12 行是 `N1_DONE`）、`e158-root-choice-repair-2026-11-09-q3-1-g0.out`（66 行）、`e158-root-choice-repair-2026-11-09-q3-1-s16.out`（66 行）、`e158-root-choice-repair-2026-11-09-q3-1-small-ring.out`（67 行）、`e158-root-choice-repair-2026-11-09-q3-1-s4.out`（66 行），每份末行 `E7RESULT name=done emitted=` 的数等于该份 `E7RESULT` 行的行数；`replay.sh` 的 E158 五行改指它们，2026-09-25 的各份留在 git 历史里。
 
 **① 11907 条假违例的原因与账本修法**：中间一版装置（回退按「截断时间线」记账，任务 10904 的输出里 `pairs=70470 pairs_with_any_violation=11907`，原始输出未留存于仓内）在 G0（主几何点） 上报 weight=0 的 104 条、weight=1 继承的 1510 条、weight=2 继承的 10293 条违例，合计 11907 条。全是装置账本造成的，产品没读错：`mount_rollback` 先做一次可写挂载，真写下一行与暖机的几条根（内容是回退之前的），旧账本把这几条根记成回退目标的内容，又把时间线截到目标；之后再回退到这几条根之一，产品读回它们的真内容（对的），账上那一段已被截掉，V2 判「不在时间线上」。另一处错：旧账本不记回退那条根，下一步被 S5 拒绝（G0 上 M 被拒 76 次、R 被拒 303 次），枚举域被悄悄剪小（G0 节点 679，如实是 1371）。只按账本规则写的算术模型逐数对上了 G0 的 15 个数，含 104 / 1510 / 10293。修法是如实账本：回退是一次向前发布（D23（journal 的角色与格式） 同一份文件里「管理员回退是挂着时的一次向前发布」），时间线整条留着；写行与暖机的根按回退之前最新根的内容记，回退那条根按目标的内容记并追加；`abandoned` 恒空；目标不在时间线上、或所选根不是时间线尾的挂载，按 S5 拒绝，计入 `e158_ledger_diagnostics_refused`（G0 上 402 次）。
 
@@ -226,7 +226,7 @@ E7RESULT name=pc3_overall_verdict verdict=not_applicable reason="GEOMETRY_PRIMAR
 
 **装置与口径**：
 
-- 入库装置 `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 的 `r4-*` 模式（`r4-seg1` 至 `r4-seg5`、`r4-bases`、`r4-compare`），确定性（同一个二进制跑两遍逐字节一致只说明没有隐藏状态，第四段执行员拿今天那一臂重跑一次 `cmp` 过）。装置自己记账、自己解码（根槽、系统配置槽、记录经 `singlefs_checker`），与 `crates/` 交回的逐项对拍（S4，每族 `s4_mismatches=0`）。
+- 入库装置 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 的 `r4-*` 模式（`r4-seg1` 至 `r4-seg5`、`r4-bases`、`r4-compare`），确定性（同一个二进制跑两遍逐字节一致只说明没有隐藏状态，第四段执行员拿今天那一臂重跑一次 `cmp` 过）。装置自己记账、自己解码（根槽、系统配置槽、记录经 `singlefs_checker`），与 `crates/` 交回的逐项对拍（S4，每族 `s4_mismatches=0`）。
 - 底座：开跑条件 C0 那份快照（对 `crates` 做一次 `cp -a`，底座认定的四个 `singlefs-core` 文件 sha256 逐个对上；登记修订第 1 条）。**今天那一臂 = 快照原样**；十八条臂各自一份副本，从那一次 `cp -a` 派生，改法是 `scripts/mutation/tables/e158_arms.tsv` 里以 `r4 ` 打头的 18 行。
 - 十八条臂：今天；甲-配置、甲-配置续、甲-槽；乙-配置、乙-配置续、乙-槽；乙-窄读-配置、乙-窄读-配置续、乙-窄读-槽；丙-配置、丙-配置续（主族十二条）；乙 三臂与乙-窄读 三臂各一条 R = 3（`-three-rounds`，只跑第五段）。乙-窄读 是 5.5 主 agent 认定第 1 项另立的对照臂：只重读根环槽、系统配置槽与点名单元，把 journal 环范围内读回全零的落点当空槽收进缓存（登记修订第 5 条）。
 - 五段：第一段 H1d、H1e 与 PC-N-环、PC-N-盖、PC-O、PC-丢写、PC-N0、PC-多读；第二段实七-甲、实七-乙、实八、H-随（30 段）、H-随全（68 段，只进多拒、多读）与 PC-随；第三段 H1f、H1g；第四段 L0–L6 与 PC-多拒、PC-22、PC-554；第五段几何敏感性（G_S4、G_S16、G_默认、G_小环、k = 2、R = 3）。前四段除第二段外都在 G0（主几何点）上，第二段的历史由 harness 的生成器定几何（4 GiB 盘）。
@@ -554,7 +554,7 @@ E7RESULT name=r4_f11 cells=1552 cells_differing_outside_o1_and_cell_22=0 verdict
 
 「2026-09-26：第 2 次跑第一段（重跑登记 `e158-r2-prereg.md`）」这一节是第 2 次跑第一段的记录（现状在「2026-09-27：第 4 次跑」一节）。它之后、「影响的决策」之前的各节都是第一次跑（跑前登记 `e158-preregistration.md`）的记录：那次的「被抛弃根」全靠挂载时回退造，今天的代码里没有那条路（D23（journal 的角色与格式） 已定项 14「管理员回退是挂着时的一次向前发布」），那几节的读数不带进第 2 次跑。H1c、H1d、Q1-0、K0–K4、op1 的三种入口调用、S0–S6、F1–F12 是重跑登记自己的代号，登记位在那份文件里。
 
-**做了什么**：入库装置 `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 加了第 2 次跑那一节（模式 `r2-all` 等；第一次跑的各模式与 `replay.sh` 里它们那几行原样留着），在八份副本上各跑一次 `r2-all`：今天那一臂（工作树）、A1（岔路单第 1 行 (a)）、甲-txg、乙F-留环、乙-留环、乙-只配置、丁-留环、丁-只配置（岔路单第 2 行六臂）。七份臂副本都从同一次快照（`git rev-parse HEAD` = 73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321，快照时 `crates/` 与工作树逐文件 sha256 相同）`cp -a` 出来，按 `scripts/mutation/tables/e158_arms.tsv` 逐行套用（每行旧串在副本里恰好命中一次，S2），臂改动之外的 `crates/` 与快照逐文件相同（S4），七份都编得过（S3）。岔路单第 1 行的 (b) 原形、(b) 含链、(c) 不在 `crates/` 里实现（重跑登记第三节末句），从今天那一臂的计数推出（重跑登记 12.1 第 2 条）。开跑前的停机条款 S0、S1 按登记第一节、第三节的行号逐项重读 `crates/singlefs-core`（`first_txg_of_new_instance` 在 `mount.rs:599`、`isolate_slots_referenced_only_by_abandoned_roots` 在 `:684`、账读不出只计数在 `:714`、`MountSpaceAdmission` 在 `:370`、写行之后推在 `:2744`、`unmount` 在 `:1349`），与登记写的一致、行号没漂。登记修订 7 条写在重跑登记 12.1，都在产物之前。
+**做了什么**：入库装置 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 加了第 2 次跑那一节（模式 `r2-all` 等；第一次跑的各模式与 `replay.sh` 里它们那几行原样留着），在八份副本上各跑一次 `r2-all`：今天那一臂（工作树）、A1（岔路单第 1 行 (a)）、甲-txg、乙F-留环、乙-留环、乙-只配置、丁-留环、丁-只配置（岔路单第 2 行六臂）。七份臂副本都从同一次快照（`git rev-parse HEAD` = 73ba4a4c019b9e3fc9c92f3122bfbbdaee93c321，快照时 `crates/` 与工作树逐文件 sha256 相同）`cp -a` 出来，按 `scripts/mutation/tables/e158_arms.tsv` 逐行套用（每行旧串在副本里恰好命中一次，S2），臂改动之外的 `crates/` 与快照逐文件相同（S4），七份都编得过（S3）。岔路单第 1 行的 (b) 原形、(b) 含链、(c) 不在 `crates/` 里实现（重跑登记第三节末句），从今天那一臂的计数推出（重跑登记 12.1 第 2 条）。开跑前的停机条款 S0、S1 按登记第一节、第三节的行号逐项重读 `crates/singlefs-core`（`first_txg_of_new_instance` 在 `mount.rs:599`、`isolate_slots_referenced_only_by_abandoned_roots` 在 `:684`、账读不出只计数在 `:714`、`MountSpaceAdmission` 在 `:370`、写行之后推在 `:2744`、`unmount` 在 `:1349`），与登记写的一致、行号没漂。登记修订 7 条写在重跑登记 12.1，都在产物之前。
 
 **前提 1–3（问题单第一节）三条都成立**：
 
@@ -679,7 +679,7 @@ PC1-c 那一行就是 C554（崩溃恢复抛弃的根暂时读不出时影子账
 
 | 差异 | 旧（2026-09-23） | 新 | 原因 |
 |---|---|---|---|
-| `h3_family_summary` 与同一段里另一行结果（`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 里打 `N1_DONE` 的那一行，GEOMETRY_PRIMARY/S16/小环） | histories=856，peak_roots_live=7 | histories=1822，peak_roots_live=10 | 回退到无文件版本的根现在能走到，树变大，派生量（`leaf_count`/`error_count` 等）跟着变 |
+| `h3_family_summary` 与同一段里另一行结果（`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 里打 `N1_DONE` 的那一行，GEOMETRY_PRIMARY/S16/小环） | histories=856，peak_roots_live=7 | histories=1822，peak_roots_live=10 | 回退到无文件版本的根现在能走到，树变大，派生量（`leaf_count`/`error_count` 等）跟着变 |
 | `h3_family_summary`（S4） | histories=7264 | histories=14252 | 与 GEOMETRY_PRIMARY/S16/小环 那一行同一个原因 |
 | `h3_family_pruned_branch_category` | `RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion`（`crates::MountError` 的一个已删除变体） | 「现行版本没有文件」（**装置自己** `apply_overwrite` 的守卫，不是 `crates/` 的拒绝） | 拒绝从 `crates/` 移走后，装置在「回退到无文件版本之后再做一次覆盖写」时自己的守卫接手报错，错误分类逻辑按字符串首词抓取字面对上了 |
 | `pc3` 的 `path` | `RollbackTo(1, 3)` | `RollbackTo(0, 0)` | PC3 取「按固定次序第一个满足 events_live≥1 的历史」，`(0,0)` 现在合法且排在更前；**核心断言不变**：`expected_root=(1,6)`，`recover`/`mount_writable` 两处仍 `verdict=pass` |
@@ -877,7 +877,7 @@ E7RESULT name=q1_3_persistence_cost_values geometry=GEOMETRY_PRIMARY(S=8,ring=3M
 
 **（续，session s4）：岔路单第 2 行 ①②——H2 主族穷举下界 + Q2-2a 有真数了**
 
-写了 Q2-1 的新装置代码（`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 新增约 550 行）：
+写了 Q2-1 的新装置代码（`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 新增约 550 行）：
 Φ2 证据项枚举（`evidence_items_at`：根环里每个存着自证根的槽，权重 1；journal 环里每一条至少一份
 自证的记录，权重 = 自证的份数）、权重从小到大的穷举下界搜索（`candidate_fault_sets_of_weight` +
 `search_minimum_weight_that_triggers_rootback`，根槽权重 1、记录权重 2，逐权重把两边组合叉乘）、
@@ -1437,7 +1437,7 @@ Q3-1 四个几何点各占一行（`driver_e158_q3_1_g0` / `_s16` / `_small_ring
 `/tmp/claude-1000/e158-s3/replay-e158-3.log`）。候选 (a)=A1 副本的同一份数**不登记进 `replay.sh`**
 （产物 `e158-root-choice-repair-2026-09-24-q1-g0-a1-arm.out`，副本上的数；复跑要先按
 `scripts/mutation/tables/e158_arms.tsv` 在草稿目录重建 A1 副本、把
-`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 原样拷进去、`cargo build --release`、
+`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 原样拷进去、`cargo build --release`、
 跑 `-- q1-g0`）。单测：`cargo test -p singlefs-verification --bin e158_root_choice_repair` → `16 passed; 0 failed`
 （12 条到 session s3 第一段为止 + 4 条 session s3 第二段新增：`fault_targets_for_both_copies_hits_both_devices`、
 `fault_severity_fault_count_matches_the_prereg_table`、`error_member_of_debug_extracts_the_variant_name`、
@@ -1458,7 +1458,7 @@ e158_root_choice_repair` → `22 passed; 0 failed`（新增 6 条，见「sessio
 甲-txg 臂的同一份数**不登记进 `replay.sh`**（产物 `e158-root-choice-repair-2026-09-24-q2-1-g0-jia-txg-arm.out`
 与 `e158-root-choice-repair-2026-09-24-q2-2a-g0-jia-txg-arm.out`，副本上的数；复跑要先按
 `scripts/mutation/tables/e158_arms.tsv` 甲-txg 那一行在草稿目录重建副本、把
-`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 原样拷进去、`cargo build --release`、
+`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 原样拷进去、`cargo build --release`、
 分别跑 `-- q2-1-g0`、`-- q2-2a-g0`）。
 
 ````

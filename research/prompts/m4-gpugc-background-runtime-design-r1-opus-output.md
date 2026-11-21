@@ -277,7 +277,7 @@ match compaction.start_judgement { DueAfterAUserChange => 至多一批, NotDue =
 - 所以运行库要有一个**不起线程、由调用方一拍一拍推**的入口（钟、前台 fsync、要不要起跑都可摆），周期线程只是它外面的一个循环。崩溃枚举、块序列比对、必红世界走拍子；真线程只做少数冒烟（真盘、真卡、真钟）。线程循环那几行没有崩溃点要枚举，但要有用例钉它：停得下、panic 之后前台拿到错误、卸载等得到。
 - 块序列逐字节相同只在拍子下有意义：真线程下 GC 与前台的次序取决于调度，两次跑本来就不同。七·4 的比对继续走拍子，CPU 与 GPU 用同一串拍。真卡一臂放真卡测试（特性 `tests-on-a-real-gpu`）。验证包不依赖产品 GPU 包这条不动，今天走测试替身；要真卡比块序列得放在产品 GPU 包的测试或 `src/bin` 装置里。
 - 现有用例全强制开关，产品值那条路没有一条用例：`CompactionSwitches::PRODUCT` 不改、水位真越线、拍子推，GC 发布。**A1 就靠它变红**。
-- E202 已经有一份手写的线程与调用方：「struct CallerOfTheConcurrentRun<'run> {」（`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs:6117`）。它量的前台 fsync 延迟走不走那把锁我没读完。要改接运行库：七·5 要报的「前台 fsync 延迟」若不含等锁，C1 那个尾部量不到，对照组的结论就是错的。
+- E202 已经有一份手写的线程与调用方：「struct CallerOfTheConcurrentRun<'run> {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/command_opening_and_construction_lines.rs:108`）。它量的前台 fsync 延迟走不走那把锁我没读完。要改接运行库：七·5 要报的「前台 fsync 延迟」若不含等锁，C1 那个尾部量不到，对照组的结论就是错的。
 
 ### 验收清单（缺一条算没接上）
 

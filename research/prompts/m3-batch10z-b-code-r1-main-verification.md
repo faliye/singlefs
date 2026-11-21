@@ -29,7 +29,7 @@
 | K2-1 记着的落点掉出影子账 | 攻方 X1 540 段、F1 2070 段（多次抬 F、挂着时管理员回退之后再抬 F、写掉那一槽之后换类）checker 0 红；正推：表里记着的没找到掉出。正推读码两处缺口（挂载时凭据放行记空串、影子账关着时记空串），没造 | 没打中（攻方一次抽样） |
 | K2-2 第 1 形（K4-1 的 R） | **两腿都量到白拒**：挂上之后 R 的账读坏，照今天读盘照 B，正推 19 / 19、攻方 285 / 285 被拒；改用 C 那一圈按槽记的落点，正推 10 / 10 做成、攻方 0 / 285 拒。两臂 checker 都 0 红，正推两臂都做成的 25 例隔离槽逐槽相同。只量了 384 槽小盘一档 | **打中（H2）**，用户 2026-10-08 定（第三节） |
 | K2-2 第 2–4 形 | 第 2 形照拒是用例钉着的处置；第 3、4 形推的、没造 | 记下 |
-| K2-3 `abandoned_roots_unreadable` | 攻方：读这个数的只有实验装置打印。正推读码推出 `crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 的 `mount_writable_then_raise_floor_reaches_the_injected_fault` 会红。主 agent 在冻结副本拷贝上跑：`test result: FAILED. 0 passed; 1 failed`，红在第 22910 行「抬 F 重算影子账要数到这条读不出账的被抛弃根，得到 Some(0)（不注入时 Some(0)）」 | **打中**（这一批带进来的 checker 档红，实现员报告没提、合后验证没跑 checker 档），并进下一批 |
+| K2-3 `abandoned_roots_unreadable` | 攻方：读这个数的只有实验装置打印。正推读码推出 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 的 `mount_writable_then_raise_floor_reaches_the_injected_fault` 会红。主 agent 在冻结副本拷贝上跑：`test result: FAILED. 0 passed; 1 failed`，红在第 22910 行「抬 F 重算影子账要数到这条读不出账的被抛弃根，得到 Some(0)（不注入时 Some(0)）」 | **打中**（这一批带进来的 checker 档红，实现员报告没提、合后验证没跑 checker 档），并进下一批 |
 | K3 判别力 | 正推 21 条自造变异 5 条全绿（三类槽交空落点 m5、m8、m20，关掉抬 F 那一遍从映射现算 m19，m18 判等价）；新用例只断言没拒、计数 0、checker 不红，不断言隔离了什么（m1、m2 只被旧用例抓）。攻方 M7「表里记着空串时改成读盘」15 份二进制加慢档全绿；M11「抬 F 那一遍不从映射现算」默认档全绿、只有一条慢档红；LR2 第 772 行文档句「抬 F 的影子账从映射现算」这一批之后不再是实话 | 打中，补用例与变异 |
 
 ## 三、用户定案

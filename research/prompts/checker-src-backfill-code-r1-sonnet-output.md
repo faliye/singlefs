@@ -227,7 +227,7 @@
 ## 7. 本轮之外、主 agent 要知道的
 
 1. **kb 里一处旧成员名**：「改名 `DataUnitVersionsTiedOnTheTotalOrderKeyOfI18`」（`.claude/kb/checks-owed.md:961`，同一行的 `…TieOnTheTotalOrderKeyOfI18` 是同一个旧名），三语副本 `.en.md`、`.ja.md` 同有（`grep -rIlF` 在 `.claude/kb/` 里命中三份）。旧名在代码里已不存在，这一行是对着已删名字的叙述。不在这五份文件里，不归我改。
-2. **实验装置对 CRC 查表函数计时**：`crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs` 的 `replay_unit_check` 对每个单元调「black_box(singlefs_checker::crc32_castagnoli_table(bytes));」（`crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs:1722`）。复用之后，同一进程里重复算同一段内容的那一遍测到的是记录命中的代价（指纹加逐字节比对），不是查表 CRC 的代价；E161 以前的读数是没有复用时量的。这个装置的结论依赖哪些读数我没查，推的：装置的读数与实现对不上时两边都查（`.claude/rules/implementation-first.md` 第 4 条）。要不要为它给这个调用换成不经复用的写法，主 agent 判。
+2. **实验装置对 CRC 查表函数计时**：`crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs` 的 `replay_unit_check` 对每个单元调「black_box(singlefs_checker::crc32_castagnoli_table(bytes));」（`crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/unit_check_replay_and_state_clocks.rs:9`）。复用之后，同一进程里重复算同一段内容的那一遍测到的是记录命中的代价（指纹加逐字节比对），不是查表 CRC 的代价；E161 以前的读数是没有复用时量的。这个装置的结论依赖哪些读数我没查，推的：装置的读数与实现对不上时两边都查（`.claude/rules/implementation-first.md` 第 4 条）。要不要为它给这个调用换成不经复用的写法，主 agent 判。
 3. **复用的耗时收益没量**：`crates/singlefs-checker/src/lib.rs:57-60` 与 `crates/singlefs-checker/src/lib.rs:115` 的注释写「几十到几百个 16 KiB 的单元」「相邻崩溃状态只差一次写，绝大多数单元逐字节相同」，没有读数；复用收益与内存上界都没量，推的。
 
 ## 8. 要主 agent 跑的命令

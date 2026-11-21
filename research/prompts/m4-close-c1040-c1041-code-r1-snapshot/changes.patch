@@ -1,0 +1,1597 @@
+diff --git a/crates/singlefs-checker/src/image.rs b/crates/singlefs-checker/src/image.rs
+index 112baa8c9..6c6b86254 100644
+--- a/crates/singlefs-checker/src/image.rs
++++ b/crates/singlefs-checker/src/image.rs
+@@ -4,11 +4,11 @@
+ use std::collections::{BTreeMap, BTreeSet};
+ 
+ use singlefs_format::{
+-    CLUSTER_SEGMENT_SLOTS, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, JOURNAL_RECORD_BYTES,
+-    JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, ROOT_RECORD_BYTES, ROOT_RING_BASE_SLOT,
+-    ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS,
+-    ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM, SLOT_BYTES,
+-    SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
++    CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES,
++    JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, LOC_ENTRY,
++    ROOT_RECORD_BYTES, ROOT_RING_BASE_SLOT, ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP,
++    ROOT_RING_REGIONS, ROOT_RING_SLOTS_PER_REGION_MAXIMUM, ROOT_RING_SLOTS_PER_REGION_MINIMUM,
++    SLOT_BYTES, SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
+ };
+ 
+ use crate::{
+@@ -1029,6 +1029,68 @@ pub enum RefusedSystemConfigurationValue {
+     /// （`singlefs_core::recovery` 的 `system_configuration_values_this_reader_accepts`），逐档读到它整池拒；
+     /// 别的读法上可择的槽照旧由 [`judge_journal_ring_geometry_fields_agree`] 按 I-8.1 判。
+     JournalRingGeometryFieldDisagrees(JournalRingGeometryFieldThatDisagrees),
++    /// 单元几何四格里第一个与格式常量不等的那一格（[`unit_geometry_field_that_disagrees`]）：自证过的槽在 [`geometry_of`] 之前判，
++    /// 实现那张「读者不收之值」表里排在加密类型之后的同四格（`singlefs_core::recovery` 的 `system_configuration_values_this_reader_accepts`）。
++    UnitGeometryFieldDisagrees(UnitGeometryFieldThatDisagrees),
++}
++
++/// 系统配置几何段紧跟节点大小（301）的单元几何字段：单元大小 305、落点粒度 309、位置条目宽 313 各 4 字节；
++/// `physical_block_size`（317）之后是扩展点声明值 N 321，4 字节（`.claude/kb/layout/01-first-txn.md` 一的字段表）。
++const SYSTEM_CONFIGURATION_UNIT_BYTES_OFFSET: usize = 305;
++const SYSTEM_CONFIGURATION_SLOT_GRANULARITY_BYTES_OFFSET: usize = 309;
++const SYSTEM_CONFIGURATION_LOCATION_ENTRY_BYTES_OFFSET: usize = 313;
++const SYSTEM_CONFIGURATION_EXTENSION_POINT_DECLARED_BYTES_OFFSET: usize = 321;
++/// 这一版读者收的扩展点声明值 N：第一版 N = 0（D21（权威态与派生态的分界） 已定项 8）。checker 自己写一份，不引实现。
++const EXTENSION_POINT_DECLARED_BYTES_THIS_CHECKER_READS: u32 = 0;
++
++/// 单元几何四格里哪一格与格式常量不等，次序与实现判这四格的次序相同（字段表次序）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum UnitGeometryFieldThatDisagrees {
++    /// 槽里的单元大小不等于格式常量 `DATA_UNIT_BYTES`。
++    UnitBytesNotTheFormatConstant,
++    /// 槽里的落点粒度不等于格式常量 `SLOT_BYTES`。
++    SlotGranularityBytesNotTheFormatConstant,
++    /// 槽里的位置条目宽不等于格式常量 `LOC_ENTRY`。
++    LocationEntryBytesNotTheFormatConstant,
++    /// 槽里的扩展点声明值 N 不是第一版的 0。
++    ExtensionPointDeclaredBytesNotTheFirstVersionValue,
++}
++
++/// 单元几何四格（D21（权威态与派生态的分界） 已定项 16「单元几何在挂载时求值一次」、已定项 8「N 住系统配置，第一版 N = 0」；C1041）：
++/// 单元大小、落点粒度、位置条目宽各等于格式常量，扩展点声明值 N 等于 0，按字段表次序判，交回第一个不等的；四格都等交回 None。
++/// checker 走读单元、按落点算偏移、切位置条目都按格式常量走，槽里这四格与常量不等时这份系统配置说的不是 checker 判的那个几何。
++///
++/// # Panics
++/// 槽短于偏移 325：调用方读的是整槽 4096 字节，[`crate::check_system_configuration_slot`] 判过槽宽才调这里。
++#[must_use]
++pub fn unit_geometry_field_that_disagrees(slot: &[u8]) -> Option<UnitGeometryFieldThatDisagrees> {
++    if u64::from(read_u32(slot, SYSTEM_CONFIGURATION_UNIT_BYTES_OFFSET)) != DATA_UNIT_BYTES {
++        return Some(UnitGeometryFieldThatDisagrees::UnitBytesNotTheFormatConstant);
++    }
++    if u64::from(read_u32(
++        slot,
++        SYSTEM_CONFIGURATION_SLOT_GRANULARITY_BYTES_OFFSET,
++    )) != SLOT_BYTES
++    {
++        return Some(UnitGeometryFieldThatDisagrees::SlotGranularityBytesNotTheFormatConstant);
++    }
++    if u64::from(read_u32(
++        slot,
++        SYSTEM_CONFIGURATION_LOCATION_ENTRY_BYTES_OFFSET,
++    )) != LOC_ENTRY
++    {
++        return Some(UnitGeometryFieldThatDisagrees::LocationEntryBytesNotTheFormatConstant);
++    }
++    if read_u32(
++        slot,
++        SYSTEM_CONFIGURATION_EXTENSION_POINT_DECLARED_BYTES_OFFSET,
++    ) != EXTENSION_POINT_DECLARED_BYTES_THIS_CHECKER_READS
++    {
++        return Some(
++            UnitGeometryFieldThatDisagrees::ExtensionPointDeclaredBytesNotTheFirstVersionValue,
++        );
++    }
++    None
+ }
+ 
+ /// I-8.1（环几何够大） 三个字段等式里的哪一格不成立，次序与实现判这三格的次序相同。
+@@ -1193,6 +1255,12 @@ fn read_system_configuration_slot(
+         Ok(view) => view,
+         Err(verdict) => return refused_or_not_choosable(verdict),
+     };
++    if let Some(disagreeing_field) = unit_geometry_field_that_disagrees(&bytes) {
++        return SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses {
++            offset_in_bytes,
++            refused: RefusedSystemConfigurationValue::UnitGeometryFieldDisagrees(disagreeing_field),
++        };
++    }
+     match geometry_of(&bytes, &view) {
+         Ok(geometry) => SystemConfigurationSlotReading::Usable(view, geometry),
+         Err(verdict) => refused_or_not_choosable(verdict),
+@@ -2104,6 +2172,11 @@ mod tests {
+     /// 系统配置字段表里 R、S 两字节的偏移（`geometry_of` 读 `slot[361]`、`slot[362]`）。
+     const REGIONS_OFFSET: usize = 361;
+     const SLOTS_PER_REGION_OFFSET: usize = 362;
++    /// 系统配置几何段单元几何四格的偏移：单元大小、落点粒度、位置条目宽、扩展点声明值 N（用例自己按字段表写一份，不取被测的常量）。
++    const UNIT_BYTES_OFFSET: usize = 305;
++    const SLOT_GRANULARITY_BYTES_OFFSET: usize = 309;
++    const LOCATION_ENTRY_BYTES_OFFSET: usize = 313;
++    const EXTENSION_POINT_DECLARED_BYTES_OFFSET: usize = 321;
+     /// 系统配置自举头里 incompat 位图第一个字节的偏移（magic 4、格式版本 2 之后）。
+     const INCOMPAT_FIRST_BYTE_OFFSET: usize = 6;
+     /// 系统配置整槽校验和与根记录自证校验和的偏移（D22（单元原子性怎么合成） 已定项 7 / 已定项 9 的字段表）。
+@@ -2172,6 +2245,21 @@ mod tests {
+             301,
+             u32::try_from(singlefs_format::NODE_BYTES).expect("16384"),
+         );
++        put_u32(
++            &mut slot,
++            UNIT_BYTES_OFFSET,
++            u32::try_from(DATA_UNIT_BYTES).expect("32768"),
++        );
++        put_u32(
++            &mut slot,
++            SLOT_GRANULARITY_BYTES_OFFSET,
++            u32::try_from(SLOT_BYTES).expect("16384"),
++        );
++        put_u32(
++            &mut slot,
++            LOCATION_ENTRY_BYTES_OFFSET,
++            u32::try_from(LOC_ENTRY).expect("14"),
++        );
+         put_u32(&mut slot, 317, ROOT_SLOT_BYTES);
+         put_u64(&mut slot, 325, JOURNAL_RING_START_SLOT);
+         put_u64(&mut slot, 333, JOURNAL_RING_BYTES);
+@@ -2282,13 +2370,24 @@ mod tests {
+     fn assert_device_one_slot_zero_refuses_the_whole_pool_naming(
+         pool: &DevicesInMemory,
+         refused: crate::Verdict,
++    ) {
++        assert_device_one_slot_zero_refuses_the_whole_pool_as(
++            pool,
++            &RefusedSystemConfigurationValue::RefusedByTheSlotChecks(refused),
++        );
++    }
++
++    /// 同 [`assert_device_one_slot_zero_refuses_the_whole_pool_naming`]，盘 1 槽 0 读成带 `refused` 的不收之值（拒在哪一格由调用方给全）。
++    fn assert_device_one_slot_zero_refuses_the_whole_pool_as(
++        pool: &DevicesInMemory,
++        refused: &RefusedSystemConfigurationValue,
+     ) {
+         let readings = system_configuration_slot_readings(pool);
+         assert_eq!(
+-            readings[1].1[0],
+-            SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses {
++            &readings[1].1[0],
++            &SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses {
+                 offset_in_bytes: 0,
+-                refused: RefusedSystemConfigurationValue::RefusedByTheSlotChecks(refused.clone()),
++                refused: refused.clone(),
+             },
+             "盘 1 槽 0 自证过、带这一版读者不收的值，点名 {refused:?}，不是这一槽不可择"
+         );
+@@ -2341,6 +2440,63 @@ mod tests {
+         );
+     }
+ 
++    /// C1041：盘 1 槽 0 的单元几何四格之一改一个值、重封，读成拒在那一格的不收之值、整池不作保。
++    fn assert_one_unit_geometry_field_rewritten_refuses_the_whole_pool(
++        offset_in_the_slot: usize,
++        rewritten_value: u32,
++        expected: UnitGeometryFieldThatDisagrees,
++    ) {
++        let mut pool = pool_holding_only_first_version_values();
++        rewrite_and_reseal_device_one_slot_zero(&mut pool, |slot| {
++            put_u32(slot, offset_in_the_slot, rewritten_value);
++        });
++        assert_device_one_slot_zero_refuses_the_whole_pool_as(
++            &pool,
++            &RefusedSystemConfigurationValue::UnitGeometryFieldDisagrees(expected),
++        );
++    }
++
++    /// C1041 单元大小：盘 1 槽 0 偏移 305 写 65536（格式常量 32768 的两倍）。
++    #[test]
++    fn slot_declaring_a_unit_size_other_than_the_format_constant_refuses_the_whole_pool() {
++        assert_one_unit_geometry_field_rewritten_refuses_the_whole_pool(
++            UNIT_BYTES_OFFSET,
++            65536,
++            UnitGeometryFieldThatDisagrees::UnitBytesNotTheFormatConstant,
++        );
++    }
++
++    /// C1041 落点粒度：盘 1 槽 0 偏移 309 写 4096（格式常量 16384 之外）。
++    #[test]
++    fn slot_declaring_a_slot_granularity_other_than_the_format_constant_refuses_the_whole_pool() {
++        assert_one_unit_geometry_field_rewritten_refuses_the_whole_pool(
++            SLOT_GRANULARITY_BYTES_OFFSET,
++            4096,
++            UnitGeometryFieldThatDisagrees::SlotGranularityBytesNotTheFormatConstant,
++        );
++    }
++
++    /// C1041 位置条目宽：盘 1 槽 0 偏移 313 写 15（格式常量 14 加一）。
++    #[test]
++    fn slot_declaring_a_location_entry_width_other_than_the_format_constant_refuses_the_whole_pool()
++    {
++        assert_one_unit_geometry_field_rewritten_refuses_the_whole_pool(
++            LOCATION_ENTRY_BYTES_OFFSET,
++            15,
++            UnitGeometryFieldThatDisagrees::LocationEntryBytesNotTheFormatConstant,
++        );
++    }
++
++    /// C1041 扩展点声明值 N：盘 1 槽 0 偏移 321 写 1（第一版只收 0）。
++    #[test]
++    fn slot_declaring_a_non_zero_extension_point_size_refuses_the_whole_pool() {
++        assert_one_unit_geometry_field_rewritten_refuses_the_whole_pool(
++            EXTENSION_POINT_DECLARED_BYTES_OFFSET,
++            1,
++            UnitGeometryFieldThatDisagrees::ExtensionPointDeclaredBytesNotTheFirstVersionValue,
++        );
++    }
++
+     /// C663 S：盘 1 槽 0 的每区槽数写 17（区间 [4, 16] 之外）、重封——D22（单元原子性怎么合成） 已定项 2「越界整池拒绝挂载」，
+     /// 不再是「这一槽不可择」、别的槽照择。
+     #[test]
+diff --git a/crates/singlefs-core/src/make_filesystem.rs b/crates/singlefs-core/src/make_filesystem.rs
+index 1cb0db1ee..850ce3345 100644
+--- a/crates/singlefs-core/src/make_filesystem.rs
++++ b/crates/singlefs-core/src/make_filesystem.rs
+@@ -27,7 +27,9 @@ use crate::allocator::{
+     DeviceFreeMap, Placement, PoolAllocator, RootRingOccupancy, RootRingOccupant, UnitAreaStart,
+     UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
+ };
+-use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
++use crate::block_device::{
++    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
++};
+ use crate::bytes::ByteWriter;
+ use crate::checksum::crc32_castagnoli;
+ use crate::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
+@@ -209,6 +211,15 @@ pub enum MakeFilesystemError {
+     RegionDevicesNotTheFirstVersionLayout {
+         region_devices: [DeviceIdentity; 3],
+     },
++    /// 参数里的 `physical_block_size`（根槽宽，写进系统配置偏移 317）不是盘 `device` 这一刻探测到的值
++    /// （[`BlockDevice::probe_physical_block_size`]；D22（单元原子性怎么合成） 已定项 2 根槽宽一格「调用方给的 `physical_block_size`
++    /// 与 mkfs 时探测到的不同就拒绝 mkfs」，C1040）：照参数写出的池，可写与只读挂载逐盘比探测值都会拒（D12（目标介质） 已定项 4）。
++    /// 按盘表次序报第一块不等的盘；几何判定都过了才判这一条，同样在任何写之前，盘上一个字节都没动。
++    PhysicalBlockSizeParameterDiffersFromTheProbedValue {
++        device: DeviceIdentity,
++        probed_physical_block_size: PhysicalBlockSizeInBytes,
++        physical_block_size_in_the_parameters: u32,
++    },
+     /// 第一版 mkfs 按固定结构槽距算出的默认每区槽数 S 小于 5（[`first_version_make_filesystem_geometry`]，D22（单元原子性怎么合成）
+     /// 已定项 16 第 3 句「小于 5 拒绝 mkfs」）：算几何那一步就交回，盘上一个字节都没动。显式给 S 的建池入口（[`make_filesystem`]
+     /// 照 `geometry` 里的 S 写）不出这一个。
+@@ -591,12 +602,33 @@ pub fn first_version_make_filesystem_geometry(
+     })
+ }
+ 
++/// 按盘表次序逐块探测 `physical_block_size`，交回第一块探测值不是参数里那个的盘
++/// （[`MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue`]；D22（单元原子性怎么合成） 已定项 2 根槽宽一格，C1040）；
++/// 每块盘都等于参数交回 None。只调探测，不读盘、不写盘。迭代次数的上界是盘数，唯一的提前出口是第一块不等的盘。
++fn first_device_probing_a_physical_block_size_other_than_the_parameter<Device: BlockDevice>(
++    parameters: &MakeFilesystemParameters,
++    devices: &[(DeviceIdentity, Device)],
++) -> Option<MakeFilesystemError> {
++    let physical_block_size_in_the_parameters = parameters.geometry.physical_block_size;
++    devices.iter().find_map(|(device, block_device)| {
++        let probed_physical_block_size = block_device.probe_physical_block_size();
++        (probed_physical_block_size.0 != physical_block_size_in_the_parameters).then_some(
++            MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue {
++                device: *device,
++                probed_physical_block_size,
++                physical_block_size_in_the_parameters,
++            },
++        )
++    })
++}
++
+ /// 内层入口：对两块设备做 mkfs，fsid 照调用方给的 `parameters.filesystem_identifier` 写，不另取。给测试、装置、崩溃点重放
+ /// 与 C484、C651 的回归用例用（同参数同 fsid 两次逐字节相同）；对外的入口是 [`make_filesystem_drawing_the_filesystem_identifier`]。
+ /// `devices` 里每块盘的身份由调用方给（位置条目按设备身份升序）。
+ ///
+ /// # Errors
+-/// 几何判定不过（都在任何写之前），或底层块设备错。
++/// 几何判定不过、参数里的 `physical_block_size` 不是某块盘探测到的值
++/// （[`MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue`]；都在任何写之前），或底层块设备错。
+ pub fn make_filesystem<Device: BlockDevice>(
+     parameters: &MakeFilesystemParameters,
+     devices: &mut [(DeviceIdentity, Device)],
+@@ -613,6 +645,11 @@ pub fn make_filesystem<Device: BlockDevice>(
+         .map(|(identity, device)| (*identity, device.size_in_bytes()))
+         .collect();
+     let unit_area_start = check_geometry(parameters, &sizes)?;
++    if let Some(refusal) =
++        first_device_probing_a_physical_block_size_other_than_the_parameter(parameters, devices)
++    {
++        return Err(refusal);
++    }
+     let instance_table_placement = instance_table_placement_at(unit_area_start);
+     let tree_table_genesis_placement = tree_table_genesis_placement_at(unit_area_start);
+     let identities: Vec<DeviceIdentity> = sizes.iter().map(|(identity, _)| *identity).collect();
+diff --git a/crates/singlefs-core/src/mount.rs b/crates/singlefs-core/src/mount.rs
+index 8fd467316..247c5b4ac 100644
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -29,7 +29,7 @@ use crate::background_compute::{
+     BackgroundComputeSettingsRefused, BackgroundGcCpuCompensationThreshold,
+     BackgroundGpuComputeHandle, BACKGROUND_GC_CPU_COMPENSATION_THRESHOLD_BY_DEFAULT,
+ };
+-use crate::block_device::BlockDevice;
++use crate::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
+ use crate::checksum::crc32_castagnoli;
+ use crate::compaction_plan::{
+     root_ring_slots_left_by_a_compaction_publish, CompactionBatchSize, CompactionMountParameters,
+@@ -302,7 +302,9 @@ pub enum MountError {
+     /// 系统不可变配置不一致：`disagreeing_fields` 按字段表次序列出参数里不一致的每一项（代码审阅第 17 条）；`disagreeing_device_table`
+     /// 列出盘表不一致的那几项——交进来的盘数与系统配置里的设备数 `devs` 不同、某块盘自证过的系统配置里的本盘设备号不是盘表给它的身份
+     /// （[`DeviceTableDisagreement`]）；挂着之后收盘表的入口另报交进来的某块盘两槽一份本池自证过的系统配置都没有
+-    /// （[`DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn`]，代码三方 m2-closeout-code-r1 Z3-A 乙）。
++    /// （[`DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn`]，代码三方 m2-closeout-code-r1 Z3-A 乙）；
++    /// 某块盘这一刻探测到的 `physical_block_size` 不是系统配置记着的那个，同样报在盘表那一张里
++    /// （[`DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration`]，D12（目标介质） 已定项 4，C1040）。
+     /// 两张清单至少一张不空。系统不可变配置 mkfs 之后不可改
+     /// （D22（单元原子性怎么合成） 已定项 26 第一档），写入口按择到的那一份建（取号、写行、暖机、推抬 F 的系统配置写、
+     /// 根槽与 journal 记录的落点都从它来），系统配置槽写又按盘表逐项写设备数与本盘设备号；两边不一致说明调用方拿错了池、参数或盘，
+@@ -757,6 +759,15 @@ pub enum DeviceTableDisagreement {
+     /// 真盘从此缺这一串（那一轮攻方用例：卸载报成功、空盘收到 28 次写，之后真盘再挂可写被拒、池级 checker 红 4 条）。
+     /// 可写挂载不报这一项：它在见证读里判不出、拒可写（`MountError::NewerStateStillUnreadableAfterOneReread`，C331 取甲）。
+     NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn { identity_handed_in: DeviceIdentity },
++    /// 盘表把这块盘标成 `identity_handed_in`，这一刻探测到的 `physical_block_size`（[`BlockDevice::probe_physical_block_size`]）不是择到的那份
++    /// 系统配置记着的 mkfs 时的 `physical_block_size`（偏移 317，根槽宽，D22（单元原子性怎么合成） 已定项 2「挂载时逐设备复算比对」）：
++    /// D12（目标介质） 已定项 4 比对清单第一行「对不上 ⇒ 拒绝可写挂载」，C1040。每块盘各比一次、不等的各报一项；每块盘都等于同一个记录值，
++    /// 两盘之间也就相等（D22（单元原子性怎么合成） 已定项 15「第一版退化成各盘互比」那一半由此落下）。只调探测、不读盘、不写盘。
++    PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration {
++        identity_handed_in: DeviceIdentity,
++        probed_physical_block_size: PhysicalBlockSizeInBytes,
++        physical_block_size_in_the_system_configuration: u32,
++    },
+ }
+ 
+ /// 盘表把一块盘标成 `identity_handed_in`，它一份自证过的系统配置槽（本池的 fsid、整槽校验和过）里记的本盘设备号是
+@@ -7547,7 +7558,8 @@ fn parameters_of_the_system_configuration(
+ 
+ /// 交进来的盘表与盘上择到的那份系统配置不一致的几项（[`DeviceTableDisagreement`]）：盘数不是 `devs` 的一项，
+ /// 再按盘表次序、每块盘自证过的系统配置槽（本池的 fsid、整槽校验和过，`recovery::verified_system_configuration_slots`）里
+-/// 记的本盘设备号不是盘表给它的身份的各一项（一块盘上同一个号只报一次）。读每块盘的两个系统配置槽，不写盘。
++/// 记的本盘设备号不是盘表给它的身份的各一项（一块盘上同一个号只报一次），再按盘表次序、探测到的 `physical_block_size` 不是系统配置记着的那个的各一项
++/// （[`physical_block_sizes_probed_on_the_devices_differing_from_the_system_configuration`]）。读每块盘的两个系统配置槽，不写盘。
+ /// 调用方先判过盘表里没有重复身份（按身份读盘，重复了读的是哪一块说不清）。
+ ///
+ /// 循环：按盘表逐块（轮数 = 盘表项数），每块读两槽；跨轮只往交回的清单里追加，没有提前出口。
+@@ -7587,9 +7599,43 @@ fn device_table_disagreeing_with<Device: BlockDevice>(
+             },
+         ),
+     );
++    disagreements.extend(
++        physical_block_sizes_probed_on_the_devices_differing_from_the_system_configuration(
++            devices,
++            system_configuration,
++        ),
++    );
+     disagreements
+ }
+ 
++/// 按盘表次序逐块探测 `physical_block_size`，与择到的那份系统配置记着的（mkfs 时的 `physical_block_size`）不等的各报一项
++/// （[`DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration`]；D12（目标介质） 已定项 4，C1040）。
++/// 只调探测，不读盘、不写盘。
++///
++/// 循环：按盘表逐块（轮数 = 盘表项数），跨轮只往交回的清单里追加，没有提前出口。
++fn physical_block_sizes_probed_on_the_devices_differing_from_the_system_configuration<
++    Device: BlockDevice,
++>(
++    devices: &[(DeviceIdentity, Device)],
++    system_configuration: &crate::system_configuration::SystemConfiguration,
++) -> Vec<DeviceTableDisagreement> {
++    let physical_block_size_in_the_system_configuration =
++        system_configuration.immutable.sizes.physical_block_size;
++    devices
++        .iter()
++        .filter_map(|(identity_handed_in, device)| {
++            let probed_physical_block_size = device.probe_physical_block_size();
++            (probed_physical_block_size.0 != physical_block_size_in_the_system_configuration).then_some(
++                DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration {
++                    identity_handed_in: *identity_handed_in,
++                    probed_physical_block_size,
++                    physical_block_size_in_the_system_configuration,
++                },
++            )
++        })
++        .collect()
++}
++
+ /// 写入口用的参数：盘上择到的那份系统配置里的 mkfs 参数（[`parameters_of_the_system_configuration`]）。调用方交进来的参数与它逐项比，
+ /// 交进来的盘表与它的设备数、每块盘的本盘设备号比（[`device_table_disagreeing_with`]），有一项不同就拒
+ /// （[`MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration`]）。读每块盘的两个系统配置槽，不写盘。
+diff --git a/crates/singlefs-core/src/recovery.rs b/crates/singlefs-core/src/recovery.rs
+index d7d3e72cf..7731ae8ae 100644
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -16,7 +16,7 @@ use singlefs_format::{
+     ACCOUNTING_ENTRY_BYTES, CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES,
+     FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES, INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES,
+     JOURNAL_RECORD_BYTES, JOURNAL_RING_START_SLOT, JOURNAL_SAFETY_FACTOR, LINEAGE_RECORD_BYTES,
+-    MAPPING_ENTRY_BYTES, NODE_BYTES, RETIREMENT_RECORD_BYTES, ROOT_RECORD_BYTES,
++    LOC_ENTRY, MAPPING_ENTRY_BYTES, NODE_BYTES, RETIREMENT_RECORD_BYTES, ROOT_RECORD_BYTES,
+     ROOT_RING_CHUNK_BYTES, ROOT_RING_PRIME_STEP, ROOT_RING_REGIONS, SLOT_BYTES,
+     SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, SYSTEM_CONFIGURATION_SLOT_BYTES, TOMBSTONE_RECORD_BYTES,
+ };
+@@ -100,7 +100,9 @@ use crate::system_configuration::{
+     journal_in_flight_record_limit_fits_its_four_byte_field,
+     journal_ring_geometry_fields_recorded_in_the_slot, root_ring_region_count_recorded_in_the_slot,
+     root_ring_region_stride_fields_recorded_in_the_slot, unit_area_start_slot_recorded_in_the_slot,
+-    IncompatBitmap, SystemConfiguration, SystemConfigurationSlotRefusal, SystemImmutableSizes,
++    unit_geometry_fields_recorded_in_the_slot, IncompatBitmap, SystemConfiguration,
++    SystemConfigurationSlotRefusal, SystemImmutableSizes,
++    EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION,
+     JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION, ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION,
+ };
+ use crate::tombstone_tree::TombstoneContainerIndexInTree;
+@@ -1249,6 +1251,30 @@ pub enum SystemConfigurationValueOutsideWhatThisReaderAccepts {
+     FormatVersionNotRecognized { format_version: u16 },
+     /// 加密类型不是 0（关）：加密不进第一个可运行版本（D9（加密） 已定项 10），1、2 是登记过的算法、别的码不认识，都不收。
+     EncryptionTypeNotOff { encryption_type: u8 },
++    /// 同一槽记着的单元大小（偏移 305 的 4 字节）不是格式常量 `DATA_UNIT_BYTES`（32768）：core 读写单元按格式常量走，字段与常量不等时
++    /// 两边说的不是同一个单元几何（D21（权威态与派生态的分界） 已定项 16「单元几何在挂载时求值一次」）。几何四格（单元大小、落点粒度、
++    /// 位置条目宽、扩展点声明值 N）排在加密类型之后、槽距之前，按字段表次序判，第一个不等的报出来（[`unit_geometry_fields_of_the_format`]）。
++    UnitBytesNotTheFormatConstant {
++        recorded_unit_bytes: u32,
++        format_unit_bytes: u64,
++    },
++    /// 同一槽记着的落点粒度（偏移 309 的 4 字节）不是格式常量 `SLOT_BYTES`（16384），处置同 [`Self::UnitBytesNotTheFormatConstant`]。
++    SlotGranularityBytesNotTheFormatConstant {
++        recorded_slot_granularity_bytes: u32,
++        format_slot_granularity_bytes: u64,
++    },
++    /// 同一槽记着的位置条目宽（偏移 313 的 4 字节）不是格式常量 `LOC_ENTRY`（14），处置同 [`Self::UnitBytesNotTheFormatConstant`]。
++    LocationEntryBytesNotTheFormatConstant {
++        recorded_location_entry_bytes: u32,
++        format_location_entry_bytes: u64,
++    },
++    /// 同一槽记着的扩展点声明值 N（偏移 321 的 4 字节）不是第一版写的 0
++    /// （`system_configuration::EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION`，D21（权威态与派生态的分界） 已定项 8），
++    /// 处置同 [`Self::UnitBytesNotTheFormatConstant`]。
++    ExtensionPointDeclaredBytesNotTheFirstVersionValue {
++        recorded_extension_point_declared_bytes: u32,
++        first_version_extension_point_declared_bytes: u32,
++    },
+     /// 固定结构槽距落在格式允许的区间之外：不小于 4096、槽 1 整槽落在同一槽自述的根环起点之前（D22（单元原子性怎么合成） 已定项 16
+     /// 第 5 句；根环起点字段 × 16384 − 4096 是上界，[`largest_fixed_structure_slot_spacing_under_the_root_ring_base`]；根环起点不到一个
+     /// 系统配置槽宽时一档槽距都不收）。槽距是根槽宽的上界，这一条先于根槽宽判；也先于根环起点等不等第一版常量那一判，
+@@ -1388,7 +1414,7 @@ fn largest_fixed_structure_slot_spacing_under_the_root_ring_base(
+ }
+ 
+ /// 一槽自证得过的系统配置，逐个判这个读者收不收它的池级不可变字段（[`SystemConfigurationValueOutsideWhatThisReaderAccepts`] 各成员的出处）。
+-/// 次序：格式版本、加密类型、槽距、根槽宽、根环起点、journal 环起点、根环区域数 R、根环区域步长 P、chunk、S × 槽距（[`root_ring_regions_fit_their_stride`]）、
++/// 次序：格式版本、加密类型、单元几何四格（[`unit_geometry_fields_of_the_format`]）、槽距、根槽宽、根环起点、journal 环起点、根环区域数 R、根环区域步长 P、chunk、S × 槽距（[`root_ring_regions_fit_their_stride`]）、
+ /// 环长、单元区起点——根槽宽的上界是槽距，所以槽距先判；
+ /// 槽距的上界取同一槽自述的根环起点，所以根环起点落在槽 1 之前的那一格报成槽距越界、与 checker 的 I-7.13 同一格，之后才判它等不等
+ /// 第一版常量；环末端对单元区起点那一判先于起点是不是环长现算的那个，与 checker 的环长判法（`journal_ring_bytes_lie_in_the_supported_range`）报同一格。
+@@ -1412,6 +1438,7 @@ fn system_configuration_values_this_reader_accepts(
+             },
+         );
+     }
++    unit_geometry_fields_of_the_format(slot)?;
+     let sizes = &system_configuration.immutable.sizes;
+     let fixed_structure_slot_spacing = u64::from(sizes.fixed_structure_slot_spacing);
+     if fixed_structure_slot_spacing < FIXED_STRUCTURE_SLOT_SPACING_MINIMUM_BYTES
+@@ -1501,6 +1528,50 @@ fn system_configuration_values_this_reader_accepts(
+     journal_ring_geometry_fields_recompute_from_the_ring_length(slot, sizes.journal_ring_bytes)
+ }
+ 
++/// 单元几何四格（D21（权威态与派生态的分界） 已定项 16、已定项 8；C1041）：单元大小、落点粒度、位置条目宽各等于格式常量，扩展点声明值 N
++/// 等于第一版的 0，按字段表次序判，第一个不等的报出来。排在加密类型之后、槽距之前（[`system_configuration_values_this_reader_accepts`]）。
++fn unit_geometry_fields_of_the_format(
++    slot: &[u8],
++) -> Result<(), SystemConfigurationValueOutsideWhatThisReaderAccepts> {
++    let recorded = unit_geometry_fields_recorded_in_the_slot(slot);
++    if u64::from(recorded.unit_bytes) != DATA_UNIT_BYTES {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitBytesNotTheFormatConstant {
++                recorded_unit_bytes: recorded.unit_bytes,
++                format_unit_bytes: DATA_UNIT_BYTES,
++            },
++        );
++    }
++    if u64::from(recorded.slot_granularity_bytes) != SLOT_BYTES {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::SlotGranularityBytesNotTheFormatConstant {
++                recorded_slot_granularity_bytes: recorded.slot_granularity_bytes,
++                format_slot_granularity_bytes: SLOT_BYTES,
++            },
++        );
++    }
++    if u64::from(recorded.location_entry_bytes) != LOC_ENTRY {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::LocationEntryBytesNotTheFormatConstant {
++                recorded_location_entry_bytes: recorded.location_entry_bytes,
++                format_location_entry_bytes: LOC_ENTRY,
++            },
++        );
++    }
++    if recorded.extension_point_declared_bytes
++        != EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION
++    {
++        return Err(
++            SystemConfigurationValueOutsideWhatThisReaderAccepts::ExtensionPointDeclaredBytesNotTheFirstVersionValue {
++                recorded_extension_point_declared_bytes: recorded.extension_point_declared_bytes,
++                first_version_extension_point_declared_bytes:
++                    EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION,
++            },
++        );
++    }
++    Ok(())
++}
++
+ /// 根环区域间距那三判（D22（单元原子性怎么合成） 已定项 16 第 1 句、I-7.13，用户 2026-10-22 定）：P、chunk 先判等于第一版常量，
+ /// 再判 S × 固定结构槽距 ≤ P × chunk（写 ≤ 收，首尾相接的区域收）。P × chunk 取格式常量：前两判过了，盘上那两个字段与它们相等。
+ /// 排在区域数 R 之后、环长之前（[`system_configuration_values_this_reader_accepts`]）；S × 槽距不溢出：S ≤ 16，槽距是 4 字节。
+diff --git a/crates/singlefs-core/src/system_configuration.rs b/crates/singlefs-core/src/system_configuration.rs
+index 7159d79d1..989b4ad58 100644
+--- a/crates/singlefs-core/src/system_configuration.rs
++++ b/crates/singlefs-core/src/system_configuration.rs
+@@ -46,6 +46,16 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
+ /// 几何段开头「节点大小」那 4 字节（字段表 `layout/01-first-txn.md` 一：加密预留 114 字节之后、单元大小之前）。
+ /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切。
+ const NODE_BYTES_OFFSET: u64 = 301;
++/// 几何段里紧跟节点大小的「单元大小」「落点粒度」「位置条目宽」三格各 4 字节（305、309、313），之后是 `physical_block_size` 4（317）
++/// 与「扩展点声明值 N」4（321；字段表 `layout/01-first-txn.md` 一）。写侧 [`SystemConfiguration::to_slot`] 写它们之前断言位置、
++/// 读侧 [`unit_geometry_fields_recorded_in_the_slot`] 按它们切。
++const UNIT_BYTES_OFFSET: u64 = 305;
++const SLOT_GRANULARITY_BYTES_OFFSET: u64 = 309;
++const LOCATION_ENTRY_BYTES_OFFSET: u64 = 313;
++const EXTENSION_POINT_DECLARED_BYTES_OFFSET: u64 = 321;
++/// 第一版写进、也只收的扩展点声明值 N（D21（权威态与派生态的分界） 已定项 8：N 住系统配置几何段，第一版 N = 0）。
++/// 读者择系统配置时拿槽里读到的与它比，不等整池拒（`recovery` 的 `system_configuration_values_this_reader_accepts`）。
++pub const EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION: u32 = 0;
+ /// 几何段里「根环区域数 R」那一字节（字段表 `layout/01-first-txn.md` 一：R 在 361）。写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、
+ /// 读侧 [`root_ring_region_count_recorded_in_the_slot`] 按它切。
+ const ROOT_RING_REGION_COUNT_OFFSET: u64 = 361;
+@@ -161,6 +171,42 @@ pub fn root_ring_region_stride_fields_recorded_in_the_slot(
+     }
+ }
+ 
++/// 一槽系统配置里记着的单元几何四格：单元大小、落点粒度、位置条目宽、扩展点声明值 N（偏移 305、309、313、321 各 4 字节，小端）。
++/// 写者照格式常量 `DATA_UNIT_BYTES`、`SLOT_BYTES`、`LOC_ENTRY` 与 [`EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION`] 写
++/// （[`SystemConfiguration::to_slot`]）；core 读写单元、算落点、切位置条目都按格式常量走，[`SystemConfiguration::parse_slot`] 不读它们；
++/// 读者择系统配置时拿它们与格式常量比，不等整池拒（`recovery` 的 `system_configuration_values_this_reader_accepts`；
++/// D21（权威态与派生态的分界） 已定项 16「单元几何在挂载时求值一次」、已定项 8「N 住系统配置」）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub struct UnitGeometryFieldsRecordedInTheSlot {
++    pub unit_bytes: u32,
++    pub slot_granularity_bytes: u32,
++    pub location_entry_bytes: u32,
++    pub extension_point_declared_bytes: u32,
++}
++
++/// 见 [`UnitGeometryFieldsRecordedInTheSlot`]。只切字节、不判值。
++///
++/// # Panics
++/// 槽短于 4096 字节：调用方先过了 [`SystemConfiguration::parse_slot`]（它判过槽宽）才调这里。
++#[must_use]
++pub fn unit_geometry_fields_recorded_in_the_slot(
++    slot: &[u8],
++) -> UnitGeometryFieldsRecordedInTheSlot {
++    let field_offset = |offset: u64| usize::try_from(offset).expect("字段表里的偏移装得进 usize");
++    UnitGeometryFieldsRecordedInTheSlot {
++        unit_bytes: ByteReader::at(slot, field_offset(UNIT_BYTES_OFFSET)).get_u32(),
++        slot_granularity_bytes: ByteReader::at(slot, field_offset(SLOT_GRANULARITY_BYTES_OFFSET))
++            .get_u32(),
++        location_entry_bytes: ByteReader::at(slot, field_offset(LOCATION_ENTRY_BYTES_OFFSET))
++            .get_u32(),
++        extension_point_declared_bytes: ByteReader::at(
++            slot,
++            field_offset(EXTENSION_POINT_DECLARED_BYTES_OFFSET),
++        )
++        .get_u32(),
++    }
++}
++
+ /// magic 与整槽校验和两关都过的槽自述的 fsid（偏移 102 起 16 字节）；两关有一关不过交回 `None`。不看 incompat 位与别的字段：
+ /// 可写挂载择系统配置时先按它筛掉别的池的槽（`recovery::choose_system_configuration_of_the_pool`，S3，C707）。
+ #[must_use]
+@@ -628,11 +674,15 @@ impl SystemConfiguration {
+             writer.put_u32(self.mutable.node_bytes());
+         });
+         slot.write(SlotFieldMutability::ImmutableConfiguration, |writer| {
++            writer.assert_position(UNIT_BYTES_OFFSET, "单元大小");
+             writer.put_u32(u32::try_from(DATA_UNIT_BYTES).expect("单元大小"));
++            writer.assert_position(SLOT_GRANULARITY_BYTES_OFFSET, "落点粒度");
+             writer.put_u32(u32::try_from(SLOT_BYTES).expect("落点粒度"));
++            writer.assert_position(LOCATION_ENTRY_BYTES_OFFSET, "位置条目宽度");
+             writer.put_u32(u32::try_from(LOC_ENTRY).expect("位置条目宽度"));
+             writer.put_u32(self.immutable.sizes.physical_block_size);
+-            writer.put_u32(0); // 扩展点声明值 N：第一版 0（D21（权威态与派生态的分界） 已定项 8）
++            writer.assert_position(EXTENSION_POINT_DECLARED_BYTES_OFFSET, "扩展点声明值 N");
++            writer.put_u32(EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION);
+             writer.assert_position(JOURNAL_RING_START_SLOT_OFFSET, "journal 环起点");
+             writer.put_u64(self.immutable.journal_ring_start_slot.0);
+             writer.put_u64(self.immutable.sizes.journal_ring_bytes);
+diff --git a/crates/singlefs-replay-prefix/src/README.md b/crates/singlefs-replay-prefix/src/README.md
+index c2ce422cd..074289428 100644
+--- a/crates/singlefs-replay-prefix/src/README.md
++++ b/crates/singlefs-replay-prefix/src/README.md
+@@ -190,6 +190,10 @@ task-server/task submit --manual -- cargo test -p singlefs-replay-prefix \
+ 
+ `checked_bytes_in_indexed_unit` 把地址换算与求交组合在同一证明中：外层 None 表示地址溢出，Some(None) 表示可表示区间内没有写入字节；Some(Some(...)) 给出两个相对偏移及正长度，并与数学上的逐字节交集等价。core 的 `bytes_written_into` 直接调用它，地址溢出时显式 panic，其余返回行为保持不变。
+ 
++`range_intersection_length` 用数学整数端点给出精确交集长度：最大起点到最小终点之间的正差，否则为零。`bytes_in_unit` 的空结果对应长度零，非空结果的 `length` 直接等于此规格；`checked_bytes_in_indexed_unit` 在地址可表示的外层 `Some` 内保留同样关联，单元端点使用数学乘法与加法。外层 `None` 仍只表示地址溢出，不能当作零长度交集。core 直接消费返回的 `length` 字段，因此该契约关联的是执行核给出的长度。
++
++`lemma_adjacent_unit_intersection_lengths_add_up` 证明在单元内合法分界时两侧交集长度相加等于整体，允许写区间为空或倒置。`lemma_split_write_intersection_lengths_add_up` 证明在写请求内合法分界时两段请求的交集长度相加等于整体，允许单元区间为空或倒置。无前提见证 `witness_intersection_length_partitions` 覆盖内部与两端分界、具体的 `4 = 1 + 3` 和 `4 = 2 + 2`、空与倒置区间及 u64 上界附近的单字节交集。规格与组合引理只涉及字节区间和返回长度，不代表缓冲区拷贝、设备 I/O 或持久化顺序已经精化到这些性质。
++
+ `lemma_rounded_size_bounds_written_unit_addresses` 将取整准入条件连接到单元地址安全性：正容量、取整后长度可表示且单元号小于 size 所需单元数时，该单元终点不溢出。size 之外保留的已有单元需要文件状态另给界限。无前提边界见证覆盖该引理及两个新入口。
+ 
+ 这一步没有封闭计划公开字段的不变量，也没有验证五类来源到 core 枚举的转换或实际 I/O。原有其它单元地址换算仍各由调用方负责。
+diff --git a/crates/singlefs-replay-prefix/src/file_range_proofs.rs b/crates/singlefs-replay-prefix/src/file_range_proofs.rs
+index 11b70963a..789b60ca5 100644
+--- a/crates/singlefs-replay-prefix/src/file_range_proofs.rs
++++ b/crates/singlefs-replay-prefix/src/file_range_proofs.rs
+@@ -153,14 +153,27 @@ pub open spec fn in_both_ranges(byte: int, write_start: u64, write_end: u64, uni
+     write_start <= byte < write_end && unit_start <= byte < unit_end
+ }
+ 
++/// 两个半开区间的精确交集长度；空区间、倒置区间与不相交区间的长度都是零。
++pub open spec fn range_intersection_length(
++    write_start: int, write_end: int, unit_start: int, unit_end: int,
++) -> int {
++    let intersection_start = if write_start > unit_start { write_start } else { unit_start };
++    let intersection_end = if write_end < unit_end { write_end } else { unit_end };
++    if intersection_start < intersection_end { intersection_end - intersection_start } else { 0 }
++}
++
+ /// 返回（单元内偏移，请求内偏移，长度）；None 恰好表示交集为空。也接受空或倒置的区间。
+ pub fn bytes_in_unit(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
+     -> (answer: Option<(u64, u64, u64)>)
+     ensures
+         match answer {
+-            None => forall|byte: int| !in_both_ranges(byte, write_start, write_end, unit_start, unit_end),
++            None => {
++                &&& range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int) == 0
++                &&& forall|byte: int| !in_both_ranges(byte, write_start, write_end, unit_start, unit_end)
++            },
+             Some((in_unit, in_write, length)) => {
+                 &&& length > 0
++                &&& length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int)
+                 &&& unit_start + in_unit as int == write_start + in_write as int
+                 &&& in_unit + length as int <= unit_end - unit_start
+                 &&& in_write + length as int <= write_end - write_start
+@@ -204,9 +217,13 @@ pub fn checked_bytes_in_indexed_unit(write_start: u64, write_end: u64, unit_inde
+             Some(intersection) => {
+                 &&& unit_index * capacity + capacity <= u64::MAX
+                 &&& match intersection {
+-                    None => forall|byte: int| !byte_in_write_and_indexed_unit(byte, write_start, write_end, unit_index, capacity),
++                    None => {
++                        &&& range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity) == 0
++                        &&& forall|byte: int| !byte_in_write_and_indexed_unit(byte, write_start, write_end, unit_index, capacity)
++                    },
+                     Some((in_unit, in_write, length)) => {
+                         &&& length > 0
++                        &&& length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity)
+                         &&& unit_index * capacity + in_unit == write_start + in_write as int
+                         &&& in_unit + length as int <= capacity
+                         &&& in_write + length as int <= write_end - write_start
+@@ -324,6 +341,54 @@ pub proof fn lemma_adjacent_units_partition_the_write(write_start: u64, write_en
+ {
+ }
+ 
++/// 合法单元分界两侧的交集长度之和等于整段交集长度；写区间可以为空或倒置。
++pub proof fn lemma_adjacent_unit_intersection_lengths_add_up(
++    write_start: int, write_end: int, unit_start: int, boundary: int, unit_end: int,
++)
++    requires unit_start <= boundary <= unit_end,
++    ensures
++        range_intersection_length(write_start, write_end, unit_start, unit_end)
++            == range_intersection_length(write_start, write_end, unit_start, boundary)
++                + range_intersection_length(write_start, write_end, boundary, unit_end),
++{
++}
++
++/// 合法请求分界两侧的交集长度之和等于整请求交集长度；单元区间可以为空或倒置。
++pub proof fn lemma_split_write_intersection_lengths_add_up(
++    write_start: int, split: int, write_end: int, unit_start: int, unit_end: int,
++)
++    requires write_start <= split <= write_end,
++    ensures
++        range_intersection_length(write_start, write_end, unit_start, unit_end)
++            == range_intersection_length(write_start, split, unit_start, unit_end)
++                + range_intersection_length(split, write_end, unit_start, unit_end),
++{
++}
++
++/// 无前提见证：内部与两端分界、空与倒置区间，以及 u64 上界附近的单字节交集。
++pub proof fn witness_intersection_length_partitions()
++    ensures
++        range_intersection_length(3, 7, 0, 8) == 4,
++        range_intersection_length(3, 7, 0, 4) == 1,
++        range_intersection_length(3, 7, 4, 8) == 3,
++        range_intersection_length(1, 9, 3, 7) == 4,
++        range_intersection_length(1, 5, 3, 7) == 2,
++        range_intersection_length(5, 9, 3, 7) == 2,
++        range_intersection_length(3, 3, 0, 8) == 0,
++        range_intersection_length(7, 3, 0, 8) == 0,
++        range_intersection_length(1, 9, 5, 5) == 0,
++        range_intersection_length(1, 9, 7, 3) == 0,
++        range_intersection_length(u64::MAX as int - 1, u64::MAX as int,
++            u64::MAX as int - 1, u64::MAX as int) == 1,
++{
++    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 4, 8);
++    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 0, 8);
++    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 8, 8);
++    lemma_split_write_intersection_lengths_add_up(1, 5, 9, 3, 7);
++    lemma_split_write_intersection_lengths_add_up(1, 1, 9, 3, 7);
++    lemma_split_write_intersection_lengths_add_up(1, 9, 9, 3, 7);
++}
++
+ } // verus!
+ 
+ #[cfg(test)]
+diff --git a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+index be50e7e0c..f46815c56 100644
+--- a/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
++++ b/crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
+@@ -321,7 +321,7 @@ indexed-range-exact-max-is-representable	crates/singlefs-replay-prefix/src/file_
+ indexed-range-product-overflow-is-refused	crates/singlefs-replay-prefix/src/file_range_proofs.rs	let start = unit_index.checked_mul(capacity)?;	let start = match unit_index.checked_mul(capacity) { None => return Some((0, 0)), Some(product) => product };	proof_errors=1	landing=checked_unit_byte_range
+ indexed-intersection-preserves-write-order	crates/singlefs-replay-prefix/src/file_range_proofs.rs	let intersection = bytes_in_unit(write_start, write_end, start, end);	let intersection = bytes_in_unit(write_end, write_start, start, end);	proof_errors=2	landing=checked_bytes_in_indexed_unit
+ indexed-intersection-uses-the-requested-unit	crates/singlefs-replay-prefix/src/file_range_proofs.rs	match checked_unit_byte_range(unit_index, capacity) {	match checked_unit_byte_range(unit_index + 1, capacity) {	proof_errors=3	landing=checked_bytes_in_indexed_unit
+-indexed-intersection-does-not-drop-written-bytes	crates/singlefs-replay-prefix/src/file_range_proofs.rs	let intersection = bytes_in_unit(write_start, write_end, start, end);	let intersection: Option<(u64, u64, u64)> = None;	proof_errors=1	landing=checked_bytes_in_indexed_unit
++indexed-intersection-does-not-drop-written-bytes	crates/singlefs-replay-prefix/src/file_range_proofs.rs	let intersection = bytes_in_unit(write_start, write_end, start, end);	let intersection: Option<(u64, u64, u64)> = None;	proof_errors=2	landing=checked_bytes_in_indexed_unit
+ indexed-range-proof-needs-rounded-admission	crates/singlefs-replay-prefix/src/file_range_proofs.rs	        covering_units(size, capacity) * capacity <= u64::MAX,	        true,	proof_errors=1	landing=lemma_rounded_size_bounds_written_unit_addresses
+ 
+ # 固定长度部分写字节模型：五项契约与三个关键前提。
+@@ -396,6 +396,14 @@ overwrite-composition-contract-lemma_a_contained_overwrite_folds_into_the_payloa
+ overwrite-composition-contract-witness_split_and_contained_overwrites	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	pub proof fn witness_split_and_contained_overwrites()\n    ensures\n	pub proof fn witness_split_and_contained_overwrites()\n    ensures\n        false,\n	proof_errors=1	landing=witness_split_and_contained_overwrites
+ overwrite-split-needs-suffix-offset	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        overwritten_bytes(overwritten_bytes(old, start, data.subrange(0, split)),\n            start + split, data.subrange(split, data.len() as int))\n            == overwritten_bytes(old, start, data),	        overwritten_bytes(overwritten_bytes(old, start, data.subrange(0, split)),\n            start, data.subrange(split, data.len() as int))\n            == overwritten_bytes(old, start, data),	proof_errors=1	landing=lemma_splitting_an_overwrite_preserves_the_result
+ overwrite-contained-needs-file-offset	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        overwritten_bytes(overwritten_bytes(old, start, data), start + offset, replacement)\n            == overwritten_bytes(old, start, overwritten_bytes(data, offset, replacement)),	        overwritten_bytes(overwritten_bytes(old, start, data), start, replacement)\n            == overwritten_bytes(old, start, overwritten_bytes(data, offset, replacement)),	proof_errors=1	landing=lemma_a_contained_overwrite_folds_into_the_payload
+-overwrite-split-needs-valid-boundary	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        0 <= split <= data.len(),\n		proof_errors=1	landing=lemma_splitting_an_overwrite_preserves_the_result
+-overwrite-contained-needs-payload-bounds	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        overwrite_fits(data, offset, replacement),\n		proof_errors=1	landing=lemma_a_contained_overwrite_folds_into_the_payload
++overwrite-split-needs-valid-boundary	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        0 <= split <= data.len(),\n		proof_errors=2	landing=lemma_splitting_an_overwrite_preserves_the_result
++overwrite-contained-needs-payload-bounds	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	        overwrite_fits(data, offset, replacement),\n		proof_errors=2	landing=lemma_a_contained_overwrite_folds_into_the_payload
+ overwrite-composition-witness-byte	crates/singlefs-replay-prefix/src/partial_write_proofs.rs	            == seq![1u8, 8, 20, 21, 11, 6],\n	            == seq![1u8, 8, 19, 21, 11, 6],\n	proof_errors=1	landing=witness_split_and_contained_overwrites
++intersection-length-contract-lemma_adjacent_unit_intersection_lengths_add_up	crates/singlefs-replay-prefix/src/file_range_proofs.rs	pub proof fn lemma_adjacent_unit_intersection_lengths_add_up(\n    write_start: int, write_end: int, unit_start: int, boundary: int, unit_end: int,\n)\n    requires unit_start <= boundary <= unit_end,\n    ensures\n	pub proof fn lemma_adjacent_unit_intersection_lengths_add_up(\n    write_start: int, write_end: int, unit_start: int, boundary: int, unit_end: int,\n)\n    requires unit_start <= boundary <= unit_end,\n    ensures\n        false,\n	proof_errors=1	landing=lemma_adjacent_unit_intersection_lengths_add_up
++intersection-length-contract-lemma_split_write_intersection_lengths_add_up	crates/singlefs-replay-prefix/src/file_range_proofs.rs	pub proof fn lemma_split_write_intersection_lengths_add_up(\n    write_start: int, split: int, write_end: int, unit_start: int, unit_end: int,\n)\n    requires write_start <= split <= write_end,\n    ensures\n	pub proof fn lemma_split_write_intersection_lengths_add_up(\n    write_start: int, split: int, write_end: int, unit_start: int, unit_end: int,\n)\n    requires write_start <= split <= write_end,\n    ensures\n        false,\n	proof_errors=1	landing=lemma_split_write_intersection_lengths_add_up
++intersection-length-contract-witness_intersection_length_partitions	crates/singlefs-replay-prefix/src/file_range_proofs.rs	pub proof fn witness_intersection_length_partitions()\n    ensures\n	pub proof fn witness_intersection_length_partitions()\n    ensures\n        false,\n	proof_errors=1	landing=witness_intersection_length_partitions
++intersection-length-unit-split-needs-valid-boundary	crates/singlefs-replay-prefix/src/file_range_proofs.rs	    requires unit_start <= boundary <= unit_end,\n		proof_errors=1	landing=lemma_adjacent_unit_intersection_lengths_add_up
++intersection-length-write-split-needs-valid-boundary	crates/singlefs-replay-prefix/src/file_range_proofs.rs	    requires write_start <= split <= write_end,\n		proof_errors=1	landing=lemma_split_write_intersection_lengths_add_up
++write-intersection-exact-length	crates/singlefs-replay-prefix/src/file_range_proofs.rs	length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int)	length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int) + 1	proof_errors=1	landing=bytes_in_unit
++indexed-intersection-exact-length	crates/singlefs-replay-prefix/src/file_range_proofs.rs	length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity)	length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity) + 1	proof_errors=1	landing=checked_bytes_in_indexed_unit
++intersection-length-witness-sum	crates/singlefs-replay-prefix/src/file_range_proofs.rs	        range_intersection_length(3, 7, 0, 8) == 4,	        range_intersection_length(3, 7, 0, 8) == 5,	proof_errors=1	landing=witness_intersection_length_partitions
+diff --git a/crates/singlefs-verification/src/memory_pool.rs b/crates/singlefs-verification/src/memory_pool.rs
+index 0cdd24c36..ba7207a90 100644
+--- a/crates/singlefs-verification/src/memory_pool.rs
++++ b/crates/singlefs-verification/src/memory_pool.rs
+@@ -743,6 +743,8 @@ impl RecordedGeometryForScanCandidates {
+ 
+ /// `reader` 读出的这块盘系统配置槽 0 自述的 journal 环长与单元区起始槽号（单元区起点随环长走，C475（非默认环长下单元区起点取编译期常量））。
+ /// 只看 `reader` 交出来的这一槽字节：崩溃镜像传它自己（基线叠上持久了的写），落成的池传池本身。
++/// 槽 0 过不了池级 checker 读槽那几关（`check_system_configuration_slot`、单元几何四格 `unit_geometry_field_that_disagrees`（C1041）、
++/// `geometry_of`）就不认它自述的几何，交 [`RecordedGeometryForScanCandidates::SlotZeroNotSelfDescribing`]。
+ fn recorded_geometry_in_the_slot_zero_read_through<Reader: PoolReader + ?Sized>(
+     reader: &Reader,
+     device: DeviceIdentity,
+@@ -752,6 +754,9 @@ fn recorded_geometry_in_the_slot_zero_read_through<Reader: PoolReader + ?Sized>(
+         .and_then(|slot| {
+             singlefs_checker::check_system_configuration_slot(&slot)
+                 .ok()
++                .filter(|_| {
++                    singlefs_checker::image::unit_geometry_field_that_disagrees(&slot).is_none()
++                })
+                 .and_then(|view| singlefs_checker::image::geometry_of(&slot, &view).ok())
+                 .map(
+                     |geometry| RecordedGeometryForScanCandidates::RecordedInSlotZero {
+diff --git a/crates/singlefs-verification/src/verification_read.rs b/crates/singlefs-verification/src/verification_read.rs
+index 86bd53ba5..c49fd1dc1 100644
+--- a/crates/singlefs-verification/src/verification_read.rs
++++ b/crates/singlefs-verification/src/verification_read.rs
+@@ -85,8 +85,15 @@ impl ImageReader for Reader<'_> {
+     }
+ }
+ 
++/// 解一个系统配置槽：magic、整槽校验和、incompat 位与 checker 另判的那几格（`check_system_configuration_slot`），单元几何四格
++/// （单元大小、落点粒度、位置条目宽等于格式常量，扩展点声明值 N 等于 0；`unit_geometry_field_that_disagrees`，C1041），
++/// 几何（`geometry_of`），journal 环三格等式。与 core 择系统配置（`system_configuration_values_this_reader_accepts`）、
++/// 池级 checker 读槽（`read_system_configuration_slot`）同判，哪一关不过都交 `Err(())`。
+ pub(crate) fn parse_system_configuration(slot: &[u8]) -> Result<SystemConfiguration, ()> {
+     let view = singlefs_checker::check_system_configuration_slot(slot).map_err(|_| ())?;
++    if singlefs_checker::image::unit_geometry_field_that_disagrees(slot).is_some() {
++        return Err(());
++    }
+     let geometry = singlefs_checker::image::geometry_of(slot, &view).map_err(|_| ())?;
+     configuration_from_view(&view, &geometry)
+ }
+@@ -1099,4 +1106,74 @@ mod tests {
+             "同盘较旧但未被抛弃的根不能压过该盘最新根的 F"
+         );
+     }
++
++    /// 单元几何四格（D21（权威态与派生态的分界） 已定项 16、已定项 8；C1041）：mkfs 写出的系统配置槽 0 这一读解得开（阳性对照）；
++    /// 单元大小 305、落点粒度 309、位置条目宽 313、扩展点声明值 N 321 各改一个值、整槽校验和重封，magic、校验和、incompat 那几关照样过，
++    /// 验证侧这一读要拒，与 core 择系统配置、池级 checker 读槽同判。偏移与改成的值用例自己写死，不从实现里取。
++    #[test]
++    fn independent_system_configuration_parse_refuses_a_slot_whose_unit_geometry_field_is_not_the_first_version_value(
++    ) {
++        use singlefs_core::block_device::BlockDevice;
++        use singlefs_core::checksum::wide_checksum_with_field_zeroed;
++        use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
++        use singlefs_core::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET;
++        use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
++
++        let parameters = MakeFilesystemParameters {
++            filesystem_identifier: *b"singlefs-readgeo",
++            region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++            geometry: SystemImmutableSizes {
++                physical_block_size: 512,
++                minimum_input_output_bytes: 0,
++                fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(0),
++                journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++                root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++            },
++        };
++        let mut devices = [0, 1].map(|device| {
++            (
++                DeviceIdentity(device),
++                SparseBlockDevice::new(4 << 30, PhysicalBlockSizeInBytes(512)),
++            )
++        });
++        make_filesystem(&parameters, &mut devices).expect("mkfs 收这一份几何");
++        let mut slot = vec![
++            0u8;
++            usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES)
++                .expect("SYSTEM_CONFIGURATION_SLOT_BYTES 是格式常量，装得进 usize")
++        ];
++        devices[0]
++            .1
++            .read_at(DeviceOffsetInBytes(0), &mut slot)
++            .expect("系统配置槽 0 在盘内");
++        assert!(
++            parse_system_configuration(&slot).is_ok(),
++            "mkfs 写出的系统配置槽 0 这一读解得开（阳性对照）"
++        );
++        for (field_offset, rewritten_value, field_named) in [
++            (305, 65_536, "单元大小"),
++            (309, 4096, "落点粒度"),
++            (313, 15, "位置条目宽"),
++            (321, 1, "扩展点声明值 N"),
++        ] {
++            let mut rewritten = slot.clone();
++            put(&mut rewritten, field_offset, rewritten_value, 4);
++            let digest = wide_checksum_with_field_zeroed(
++                &rewritten,
++                rewritten.len(),
++                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
++            );
++            rewritten
++                [SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
++                .copy_from_slice(&digest);
++            assert!(
++                singlefs_checker::check_system_configuration_slot(&rewritten).is_ok(),
++                "{field_named} 写成 {rewritten_value}、重封之后 magic、整槽校验和、incompat 那几关照样过：拒它的只能是四格那一判"
++            );
++            assert!(
++                parse_system_configuration(&rewritten).is_err(),
++                "{field_named} 写成 {rewritten_value} 的槽：验证侧解系统配置要拒，与 core、池级 checker 同判"
++            );
++        }
++    }
+ }
+diff --git a/crates/singlefs-verification/tests/core_review_geometry_back_chain_and_empty_inode.rs b/crates/singlefs-verification/tests/core_review_geometry_back_chain_and_empty_inode.rs
+index b38a49d48..9471a3da2 100644
+--- a/crates/singlefs-verification/tests/core_review_geometry_back_chain_and_empty_inode.rs
++++ b/crates/singlefs-verification/tests/core_review_geometry_back_chain_and_empty_inode.rs
+@@ -111,7 +111,12 @@ fn make_filesystem_on_patterned_devices(
+     let mut devices = Vec::new();
+     let mut images_before: Vec<SparseDevice> = Vec::new();
+     for identity in [DeviceIdentity(0), DeviceIdentity(1)] {
+-        let mut device = SparseBlockDevice::new(device_bytes, SECTOR_PHYSICAL_BLOCK_SIZE);
++        // 盘探测到的块宽取参数里的：mkfs 拒参数与探测值不同的盘（`MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue`），
++        // 这里各条用例判的是几何那几判，探测值与参数相等才走得到它们之后的那一步。
++        let mut device = SparseBlockDevice::new(
++            device_bytes,
++            PhysicalBlockSizeInBytes(parameters.geometry.physical_block_size),
++        );
+         for offset in offsets_carrying_the_pattern(device_bytes) {
+             device
+                 .image
+diff --git a/crates/singlefs-verification/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs b/crates/singlefs-verification/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+index 0a545de15..828592293 100644
+--- a/crates/singlefs-verification/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
++++ b/crates/singlefs-verification/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+@@ -242,6 +242,9 @@ fn assert_refused_as_swapped(refusal: Option<EntryRefusal>, entry: EntryAfterThe
+                     DeviceTableDisagreement::DeviceCountDiffersFromTheSystemConfiguration { .. }
+                     | DeviceTableDisagreement::NoSelfVerifiedSystemConfigurationOnTheDeviceHandedIn {
+                         ..
++                    }
++                    | DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration {
++                        ..
+                     } => panic!("{entry:?}：只该是本盘设备号不符，实际 {disagreement:?}"),
+                 })
+                 .collect()
+diff --git a/crates/singlefs-verification/tests/make_filesystem_refuses_a_physical_block_size_parameter_other_than_the_probed_one_before_any_write.rs b/crates/singlefs-verification/tests/make_filesystem_refuses_a_physical_block_size_parameter_other_than_the_probed_one_before_any_write.rs
+new file mode 100644
+index 000000000..99e1e3b3c
+--- /dev/null
++++ b/crates/singlefs-verification/tests/make_filesystem_refuses_a_physical_block_size_parameter_other_than_the_probed_one_before_any_write.rs
+@@ -0,0 +1,162 @@
++//! mkfs 逐盘探测 `physical_block_size`，调用方参数里的那个与任一块盘的探测值不同就拒、一个字节不写
++//! （D22（单元原子性怎么合成） 已定项 2 根槽宽一格「调用方给的 `physical_block_size` 与 mkfs 时探测到的不同就拒绝 mkfs」；C1040）。
++//! 照参数写出的池，挂载逐盘比探测值都会拒（D12（目标介质） 已定项 4），所以拒在 mkfs 这一步、盘上不留半份格式。
++//! 两块盘都探测 4096、参数 512 的一条；只有盘 1 探测 4096 的一条（判的是每一块盘，不只盘 0）；参数与探测都是 4096 的阳性对照一条。
++
++use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::make_filesystem::{
++    make_filesystem, MakeFilesystemError, MakeFilesystemParameters,
++};
++use singlefs_core::root_ring::RootRingSlotsPerRegion;
++use singlefs_core::system_configuration::SystemImmutableSizes;
++use singlefs_format::{
++    JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT, ROOT_RING_BASE_SLOT, SLOT_BYTES,
++};
++use singlefs_verification::memory_pool::{SparseBlockDevice, SparseDevice};
++use singlefs_verification::{RecordingBlockDevice, SharedStream};
++
++const DEVICE_BYTES: u64 = 4 << 30;
++const FILESYSTEM_IDENTIFIER: [u8; 16] = *b"singlefs-pbsmkfs";
++/// 盘上预先写的花样：mkfs 头几步会清零的三处（系统配置槽 0、根环基址、journal 环起点）各一段，清零与写都改得掉它。
++const PATTERN_BYTE: u8 = 0xA5;
++const PATTERN_BYTES: usize = 4096;
++
++/// 参数只差 `physical_block_size`：io_min 不声明，槽距 4096，根槽宽 512 与 4096 都过几何那几判。
++fn parameters_declaring(physical_block_size: u32) -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: FILESYSTEM_IDENTIFIER,
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size,
++            minimum_input_output_bytes: 0,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(0),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++/// 两块带花样的内存盘，盘 0、盘 1 各自探测到 `probed_physical_block_sizes` 里的那个块宽，外面包录制器、录进同一条流。
++/// 交回包好的盘与包之前两块盘的镜像（比「逐字节不变」用）。
++fn patterned_recorded_devices(
++    probed_physical_block_sizes: [u32; 2],
++    stream: &SharedStream,
++) -> (
++    Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)>,
++    Vec<SparseDevice>,
++) {
++    let mut images_before = Vec::new();
++    let devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
++        [DeviceIdentity(0), DeviceIdentity(1)]
++            .into_iter()
++            .zip(probed_physical_block_sizes)
++            .map(|(identity, probed_physical_block_size)| {
++                let mut device = SparseBlockDevice::new(
++                    DEVICE_BYTES,
++                    PhysicalBlockSizeInBytes(probed_physical_block_size),
++                );
++                for offset in [
++                    0,
++                    ROOT_RING_BASE_SLOT * SLOT_BYTES,
++                    JOURNAL_RING_START_SLOT * SLOT_BYTES,
++                ] {
++                    device
++                        .image
++                        .write(DeviceOffsetInBytes(offset), &[PATTERN_BYTE; PATTERN_BYTES]);
++                }
++                images_before.push(device.image.clone());
++                (
++                    identity,
++                    RecordingBlockDevice::with_shared_stream(identity, device, stream.clone()),
++                )
++            })
++            .collect();
++    (devices, images_before)
++}
++
++/// 在任何写之前拒：录制流一步都没有（写、写零、屏障都没发），两块盘与 mkfs 之前逐字节相同。
++fn assert_nothing_was_written(
++    stream: &SharedStream,
++    devices: &[(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)],
++    images_before: &[SparseDevice],
++    scenario_named: &str,
++) {
++    assert_eq!(
++        stream.operations().len(),
++        0,
++        "{scenario_named}：录制流里一步都没有"
++    );
++    for ((identity, device), before) in devices.iter().zip(images_before) {
++        assert!(
++            device.wrapped_device().image == *before,
++            "{scenario_named}：盘 {identity:?} 与 mkfs 之前逐字节相同"
++        );
++    }
++}
++
++/// 参数 512、两块盘都探测 4096：拒成参数与探测不同，点名盘 0（按盘表次序第一块不等的），带探测值 4096 与参数 512；一个字节不写。
++#[test]
++fn a_physical_block_size_parameter_of_512_on_devices_probing_4096_is_refused_before_any_write() {
++    let stream = SharedStream::retaining_contents();
++    let (mut devices, images_before) = patterned_recorded_devices([4096, 4096], &stream);
++    let result = make_filesystem(&parameters_declaring(512), &mut devices);
++    assert!(
++        matches!(
++            &result,
++            Err(
++                MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue {
++                    device: DeviceIdentity(0),
++                    probed_physical_block_size: PhysicalBlockSizeInBytes(4096),
++                    physical_block_size_in_the_parameters: 512,
++                }
++            )
++        ),
++        "参数 512、两块盘探测 4096：该拒成参数与探测不同、点名盘 0，实际 {:?}",
++        result.as_ref().err()
++    );
++    assert_nothing_was_written(&stream, &devices, &images_before, "参数 512、探测 4096");
++}
++
++/// 参数 512、盘 0 探测 512、盘 1 探测 4096：判的是每一块盘，拒成参数与探测不同、点名盘 1；一个字节不写。
++#[test]
++fn a_physical_block_size_parameter_matching_only_device_zero_is_refused_naming_device_one_before_any_write(
++) {
++    let stream = SharedStream::retaining_contents();
++    let (mut devices, images_before) = patterned_recorded_devices([512, 4096], &stream);
++    let result = make_filesystem(&parameters_declaring(512), &mut devices);
++    assert!(
++        matches!(
++            &result,
++            Err(
++                MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue {
++                    device: DeviceIdentity(1),
++                    probed_physical_block_size: PhysicalBlockSizeInBytes(4096),
++                    physical_block_size_in_the_parameters: 512,
++                }
++            )
++        ),
++        "参数 512、盘 0 探测 512、盘 1 探测 4096：该拒成参数与探测不同、点名盘 1，实际 {:?}",
++        result.as_ref().err()
++    );
++    assert_nothing_was_written(
++        &stream,
++        &devices,
++        &images_before,
++        "参数 512、盘 1 探测 4096",
++    );
++}
++
++/// 对照：参数与两块盘的探测值都是 4096，mkfs 照收。钉住「拒」只落在参数与探测不同的盘上。
++#[test]
++fn a_physical_block_size_parameter_equal_to_the_probed_value_on_every_device_still_makes_a_filesystem(
++) {
++    let stream = SharedStream::retaining_contents();
++    let (mut devices, _) = patterned_recorded_devices([4096, 4096], &stream);
++    let result = make_filesystem(&parameters_declaring(4096), &mut devices);
++    assert!(
++        result.is_ok(),
++        "参数与两块盘的探测值都是 4096：{:?}",
++        result.as_ref().err()
++    );
++}
+diff --git a/crates/singlefs-verification/tests/memory_pool_scan_candidates_do_not_take_the_geometry_of_a_slot_zero_carrying_a_refused_unit_geometry_field.rs b/crates/singlefs-verification/tests/memory_pool_scan_candidates_do_not_take_the_geometry_of_a_slot_zero_carrying_a_refused_unit_geometry_field.rs
+new file mode 100644
+index 000000000..14dc0c683
+--- /dev/null
++++ b/crates/singlefs-verification/tests/memory_pool_scan_candidates_do_not_take_the_geometry_of_a_slot_zero_carrying_a_refused_unit_geometry_field.rs
+@@ -0,0 +1,111 @@
++//! 内存池交给池级 checker 的扫描候选按盘上系统配置槽 0 自述的几何划（`memory_pool` 的 `recorded_geometry_in_the_slot_zero_read_through`）：
++//! 槽 0 的单元几何四格（单元大小 305、落点粒度 309、位置条目宽 313、扩展点声明值 N 321；D21（权威态与派生态的分界） 已定项 16、
++//! 已定项 8，C1041）有一格不是第一版的值时，这一槽与 core 择系统配置、池级 checker 读槽一样不算数，候选退到罩住任何合法几何的那一档。
++//! 看得出来的是 journal 扫描候选：认槽 0 时只罩自述的环（mkfs 清过的环里一个写过的扇区都没有，候选为空）；不认时从环起点罩到盘尾，
++//! 单元区里 mkfs 写的实例表与树表落进来、候选不空。偏移与改成的值用例自己写死，不从实现里取。
++
++use singlefs_checker::image::ImageReader;
++use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::checksum::wide_checksum_with_field_zeroed;
++use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
++use singlefs_core::root_ring::RootRingSlotsPerRegion;
++use singlefs_core::system_configuration::{
++    SystemImmutableSizes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
++};
++use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES};
++use singlefs_verification::memory_pool::{MemoryPool, SparseBlockDevice};
++
++const DEVICE_BYTES: u64 = 4 << 30;
++const PHYSICAL_BLOCK_SIZE: u32 = 512;
++
++/// mkfs 之后两块盘的镜像，按盘放进一个内存池（与崩溃点重放的基线池同一个类型）。
++fn memory_pool_after_make_filesystem() -> MemoryPool {
++    let parameters = MakeFilesystemParameters {
++        filesystem_identifier: *b"singlefs-scangeo",
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size: PHYSICAL_BLOCK_SIZE,
++            minimum_input_output_bytes: 0,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(0),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    };
++    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
++        .map(|device_number| {
++            (
++                DeviceIdentity(device_number),
++                SparseBlockDevice::new(DEVICE_BYTES, PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_SIZE)),
++            )
++        })
++        .collect();
++    make_filesystem(&parameters, &mut devices).expect("mkfs 收这一份几何");
++    MemoryPool {
++        devices: devices
++            .into_iter()
++            .map(|(identity, device)| (identity, device.image))
++            .collect(),
++        device_size_in_bytes: DEVICE_BYTES,
++    }
++}
++
++/// 内存池盘 0 的系统配置槽 0 里 `offset_in_the_slot` 起的 4 字节改成 `rewritten_value`（小端）、整槽校验和重封。
++fn rewrite_a_field_of_slot_zero_on_device_zero(
++    pool: &mut MemoryPool,
++    offset_in_the_slot: usize,
++    rewritten_value: u32,
++) {
++    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
++    let device_zero = pool
++        .devices
++        .get_mut(&DeviceIdentity(0))
++        .expect("池里有盘 0");
++    let mut slot = device_zero.read(DeviceOffsetInBytes(0), slot_bytes);
++    slot[offset_in_the_slot..offset_in_the_slot + 4]
++        .copy_from_slice(&rewritten_value.to_le_bytes());
++    let digest =
++        wide_checksum_with_field_zeroed(&slot, slot_bytes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET);
++    slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
++        .copy_from_slice(&digest);
++    device_zero.write(DeviceOffsetInBytes(0), &slot);
++}
++
++/// 槽 0 四格都是第一版的值时 journal 候选为空（阳性对照）；四格各改一个值（各在池的一份拷贝上），这块盘的 journal 候选都不空，
++/// 拷贝的槽 0 照样过 magic、整槽校验和、incompat 那几关。
++#[test]
++fn journal_scan_candidates_reach_past_the_recorded_ring_when_slot_zero_carries_a_unit_geometry_field_other_than_the_first_version_value(
++) {
++    let pool = memory_pool_after_make_filesystem();
++    assert_eq!(
++        ImageReader::candidate_journal_slots(&pool, 0),
++        Some(Vec::new()),
++        "槽 0 四格都是第一版的值：journal 候选只罩自述的环，mkfs 清过的环里一个写过的扇区都没有（阳性对照）"
++    );
++    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
++    for (field_offset, rewritten_value, field_named) in [
++        (305, 65_536, "单元大小"),
++        (309, 4096, "落点粒度"),
++        (313, 15, "位置条目宽"),
++        (321, 1, "扩展点声明值 N"),
++    ] {
++        let mut rewritten_pool = pool.clone();
++        rewrite_a_field_of_slot_zero_on_device_zero(
++            &mut rewritten_pool,
++            field_offset,
++            rewritten_value,
++        );
++        let slot =
++            rewritten_pool.devices[&DeviceIdentity(0)].read(DeviceOffsetInBytes(0), slot_bytes);
++        assert!(
++            singlefs_checker::check_system_configuration_slot(&slot).is_ok(),
++            "{field_named} 写成 {rewritten_value}、重封之后 magic、整槽校验和、incompat 那几关照样过：不认它的只能是四格那一判"
++        );
++        let candidates =
++            ImageReader::candidate_journal_slots(&rewritten_pool, 0).expect("池里有盘 0");
++        assert!(
++            !candidates.is_empty(),
++            "{field_named} 写成 {rewritten_value} 的槽 0 不算数：journal 候选从环起点罩到盘尾、单元区里 mkfs 写的单元落进来，而候选为空"
++        );
++    }
++}
+diff --git a/crates/singlefs-verification/tests/system_configuration_unit_geometry_fields_are_refused_by_core_and_the_pool_checker.rs b/crates/singlefs-verification/tests/system_configuration_unit_geometry_fields_are_refused_by_core_and_the_pool_checker.rs
+new file mode 100644
+index 000000000..1dbd4016e
+--- /dev/null
++++ b/crates/singlefs-verification/tests/system_configuration_unit_geometry_fields_are_refused_by_core_and_the_pool_checker.rs
+@@ -0,0 +1,250 @@
++//! 系统配置几何段的单元几何四格（D21（权威态与派生态的分界） 已定项 16「单元几何在挂载时求值一次」、已定项 8「N 住系统配置，第一版 N = 0」；C1041）：
++//! 单元大小（偏移 305）、落点粒度（309）、位置条目宽（313）各等于格式常量，扩展点声明值 N（321）等于 0。任一格改一个值、整槽校验和重封，
++//! core 择系统配置与可写挂载都整池拒成同一个成员、盘上逐字节不变；池级 checker 把每块盘每个槽读成「带这一版读者不收的值」、拒在同一格，
++//! I-7.13（系统配置池级字段在读者收的范围里） 判红。四格各一条用例。
++//! 偏移、常量与改成的值用例自己写死，不从实现里取：取了的话，实现把字段写到别处去这几条也跟着走。
++
++use singlefs_checker::image::{
++    judge_system_configuration_values_the_reader_accepts, system_configuration_slot_readings,
++    ImageReader, Judgements, RefusedSystemConfigurationValue, SystemConfigurationSlotReading,
++    UnitGeometryFieldThatDisagrees, SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
++};
++use singlefs_core::address::{DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes, WriteDurability};
++use singlefs_core::checksum::wide_checksum_with_field_zeroed;
++use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
++use singlefs_core::mount::{mount_writable, MountError};
++use singlefs_core::recovery::{
++    choose_system_configuration, RecoveryFailure,
++    SystemConfigurationValueOutsideWhatThisReaderAccepts,
++};
++use singlefs_core::root_ring::RootRingSlotsPerRegion;
++use singlefs_core::system_configuration::{
++    SystemImmutableSizes, SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
++};
++use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES};
++use singlefs_verification::memory_pool::SparseBlockDevice;
++
++const IMAGE_BYTES: u64 = 4 << 30;
++const PHYSICAL_BLOCK_SIZE: u32 = 512;
++/// 系统配置槽 1 的偏移：io_min 不声明时固定结构槽距是 4096。
++const SLOT_ONE_OFFSET: u64 = 4096;
++/// 系统配置字段表（`.claude/kb/layout/01-first-txn.md` 一）：单元大小 305、落点粒度 309、位置条目宽 313、扩展点声明值 N 321，各 4 字节。
++const UNIT_BYTES_OFFSET_IN_THE_SLOT: usize = 305;
++const SLOT_GRANULARITY_BYTES_OFFSET_IN_THE_SLOT: usize = 309;
++const LOCATION_ENTRY_BYTES_OFFSET_IN_THE_SLOT: usize = 313;
++const EXTENSION_POINT_DECLARED_BYTES_OFFSET_IN_THE_SLOT: usize = 321;
++
++fn parameters() -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: *b"singlefs-unitgeo",
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size: PHYSICAL_BLOCK_SIZE,
++            minimum_input_output_bytes: 0,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(0),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++/// mkfs 之后把两块盘四个系统配置槽里 `offset_in_the_slot` 起的 4 字节改成 `rewritten_value`（小端）、整槽校验和重封：
++/// 改出来的槽 magic、校验和、incompat 三关照样过，拒它的只能是读者收不收那几判。
++fn pool_with_every_system_configuration_slot_carrying(
++    offset_in_the_slot: usize,
++    rewritten_value: u32,
++) -> Vec<(DeviceIdentity, SparseBlockDevice)> {
++    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = (0..2u32)
++        .map(|device_number| {
++            (
++                DeviceIdentity(device_number),
++                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_SIZE)),
++            )
++        })
++        .collect();
++    make_filesystem(&parameters(), &mut devices).expect("mkfs 收这一份几何");
++    let slot_bytes = usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
++    for (_, device) in &mut devices {
++        for offset in [0, SLOT_ONE_OFFSET] {
++            let mut slot = vec![0u8; slot_bytes];
++            device
++                .read_at(DeviceOffsetInBytes(offset), &mut slot)
++                .expect("系统配置槽在盘内");
++            slot[offset_in_the_slot..offset_in_the_slot + 4]
++                .copy_from_slice(&rewritten_value.to_le_bytes());
++            let digest = wide_checksum_with_field_zeroed(
++                &slot,
++                slot_bytes,
++                SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
++            );
++            slot[SYSTEM_CONFIGURATION_CHECKSUM_OFFSET..SYSTEM_CONFIGURATION_CHECKSUM_OFFSET + 32]
++                .copy_from_slice(&digest);
++            device
++                .write_at(DeviceOffsetInBytes(offset), &slot, WriteDurability::Plain)
++                .expect("改完的槽写得回去");
++        }
++    }
++    devices
++}
++
++/// 池级 checker 按字节读这几块盘：只给系统配置那几判用，扫描方向的候选一个都不给。
++struct DevicesReadByThePoolChecker<'pool>(&'pool [(DeviceIdentity, SparseBlockDevice)]);
++
++impl ImageReader for DevicesReadByThePoolChecker<'_> {
++    fn devices(&self) -> Vec<u32> {
++        self.0.iter().map(|(identity, _)| identity.0).collect()
++    }
++    fn device_bytes(&self, device: u32) -> Option<u64> {
++        self.0
++            .iter()
++            .find(|(identity, _)| identity.0 == device)
++            .map(|(_, sparse)| sparse.size_in_bytes())
++    }
++    fn read(&self, device: u32, offset: u64, length: usize) -> Option<Vec<u8>> {
++        let (_, sparse) = self.0.iter().find(|(identity, _)| identity.0 == device)?;
++        let mut bytes = vec![0u8; length];
++        sparse
++            .read_at(DeviceOffsetInBytes(offset), &mut bytes)
++            .ok()?;
++        Some(bytes)
++    }
++    fn candidate_unit_slots(&self, _device: u32) -> Option<Vec<u64>> {
++        Some(Vec::new())
++    }
++    fn candidate_journal_slots(&self, _device: u32) -> Option<Vec<u64>> {
++        Some(Vec::new())
++    }
++}
++
++/// 两块盘前 16 MiB（系统配置两槽 + 整条根环 + 一段余量）的字节：拒绝挂载那一格拿它比「盘上逐字节不变」。
++fn front_of_every_device(devices: &[(DeviceIdentity, SparseBlockDevice)]) -> Vec<Vec<u8>> {
++    devices
++        .iter()
++        .map(|(_, device)| {
++            let mut front = vec![0u8; 16 << 20];
++            device
++                .read_at(DeviceOffsetInBytes(0), &mut front)
++                .expect("前 16 MiB 在盘内");
++            front
++        })
++        .collect()
++}
++
++/// 四个槽的某一格改成 `rewritten_value` 之后：core 择系统配置与可写挂载都整池拒成 `expected_by_core`、可写挂载之后盘上逐字节不变；
++/// 池级 checker 把两块盘四个槽都读成拒在 `expected_by_the_pool_checker` 那一格的不收之值，I-7.13 判红。
++fn assert_core_and_the_pool_checker_refuse_the_field_rewritten_at(
++    offset_in_the_slot: usize,
++    rewritten_value: u32,
++    expected_by_core: SystemConfigurationValueOutsideWhatThisReaderAccepts,
++    expected_by_the_pool_checker: UnitGeometryFieldThatDisagrees,
++) {
++    let mut devices =
++        pool_with_every_system_configuration_slot_carrying(offset_in_the_slot, rewritten_value);
++    let chosen = choose_system_configuration(&devices);
++    assert!(
++        matches!(
++            &chosen,
++            Err(RecoveryFailure::SystemConfigurationValueRefused { value: refused_value, .. }) if *refused_value == expected_by_core
++        ),
++        "core 择系统配置要整池拒成 {expected_by_core:?}，实际是 {chosen:?}"
++    );
++    let before = front_of_every_device(&devices);
++    let mounted = mount_writable(&parameters(), &mut devices);
++    assert!(
++        matches!(
++            &mounted,
++            Err(MountError::Recovery(RecoveryFailure::SystemConfigurationValueRefused { value: refused_value, .. })) if *refused_value == expected_by_core
++        ),
++        "可写挂载要整池拒成 {expected_by_core:?}，实际是 {:?}",
++        mounted.err()
++    );
++    assert_eq!(
++        front_of_every_device(&devices),
++        before,
++        "拒绝挂载在任何写之前：盘上逐字节不变"
++    );
++    let readings = system_configuration_slot_readings(&DevicesReadByThePoolChecker(&devices));
++    assert_eq!(readings.len(), 2, "两块盘各两槽");
++    for (device, slots) in &readings {
++        for (slot_index, slot) in slots.iter().enumerate() {
++            assert_eq!(
++                slot,
++                &SystemConfigurationSlotReading::CarriesAValueThisReaderRefuses {
++                    offset_in_bytes: if slot_index == 0 { 0 } else { SLOT_ONE_OFFSET },
++                    refused: RefusedSystemConfigurationValue::UnitGeometryFieldDisagrees(
++                        expected_by_the_pool_checker
++                    ),
++                },
++                "池级 checker：盘 {device} 槽 {slot_index} 拒在与 core 对得上的那一格"
++            );
++        }
++    }
++    let mut judgements = Judgements::default();
++    assert!(
++        judge_system_configuration_values_the_reader_accepts(&readings, &mut judgements),
++        "池级 checker 交回「有带越界值的槽」：整池不作保"
++    );
++    assert!(
++        judgements
++            .first_violation_of(SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS)
++            .is_some(),
++        "I-7.13 判红"
++    );
++}
++
++/// 单元大小写成 65536（格式常量 32768 的两倍）。
++#[test]
++fn a_unit_size_other_than_the_format_constant_is_refused_by_core_and_the_pool_checker() {
++    assert_core_and_the_pool_checker_refuse_the_field_rewritten_at(
++        UNIT_BYTES_OFFSET_IN_THE_SLOT,
++        65536,
++        SystemConfigurationValueOutsideWhatThisReaderAccepts::UnitBytesNotTheFormatConstant {
++            recorded_unit_bytes: 65536,
++            format_unit_bytes: 32768,
++        },
++        UnitGeometryFieldThatDisagrees::UnitBytesNotTheFormatConstant,
++    );
++}
++
++/// 落点粒度写成 4096（格式常量 16384 之外）。
++#[test]
++fn a_slot_granularity_other_than_the_format_constant_is_refused_by_core_and_the_pool_checker() {
++    assert_core_and_the_pool_checker_refuse_the_field_rewritten_at(
++        SLOT_GRANULARITY_BYTES_OFFSET_IN_THE_SLOT,
++        4096,
++        SystemConfigurationValueOutsideWhatThisReaderAccepts::SlotGranularityBytesNotTheFormatConstant {
++            recorded_slot_granularity_bytes: 4096,
++            format_slot_granularity_bytes: 16384,
++        },
++        UnitGeometryFieldThatDisagrees::SlotGranularityBytesNotTheFormatConstant,
++    );
++}
++
++/// 位置条目宽写成 15（格式常量 14 加一）。
++#[test]
++fn a_location_entry_width_other_than_the_format_constant_is_refused_by_core_and_the_pool_checker() {
++    assert_core_and_the_pool_checker_refuse_the_field_rewritten_at(
++        LOCATION_ENTRY_BYTES_OFFSET_IN_THE_SLOT,
++        15,
++        SystemConfigurationValueOutsideWhatThisReaderAccepts::LocationEntryBytesNotTheFormatConstant {
++            recorded_location_entry_bytes: 15,
++            format_location_entry_bytes: 14,
++        },
++        UnitGeometryFieldThatDisagrees::LocationEntryBytesNotTheFormatConstant,
++    );
++}
++
++/// 扩展点声明值 N 写成 1（第一版只收 0）。
++#[test]
++fn a_non_zero_extension_point_size_is_refused_by_core_and_the_pool_checker() {
++    assert_core_and_the_pool_checker_refuse_the_field_rewritten_at(
++        EXTENSION_POINT_DECLARED_BYTES_OFFSET_IN_THE_SLOT,
++        1,
++        SystemConfigurationValueOutsideWhatThisReaderAccepts::ExtensionPointDeclaredBytesNotTheFirstVersionValue {
++            recorded_extension_point_declared_bytes: 1,
++            first_version_extension_point_declared_bytes: 0,
++        },
++        UnitGeometryFieldThatDisagrees::ExtensionPointDeclaredBytesNotTheFirstVersionValue,
++    );
++}
+diff --git a/crates/singlefs-verification/tests/writable_mount_refuses_a_device_whose_probed_physical_block_size_differs_from_the_system_configuration.rs b/crates/singlefs-verification/tests/writable_mount_refuses_a_device_whose_probed_physical_block_size_differs_from_the_system_configuration.rs
+new file mode 100644
+index 000000000..bb82bbf6e
+--- /dev/null
++++ b/crates/singlefs-verification/tests/writable_mount_refuses_a_device_whose_probed_physical_block_size_differs_from_the_system_configuration.rs
+@@ -0,0 +1,147 @@
++//! 可写挂载逐盘比探测到的 `physical_block_size` 与择到的系统配置记着的 mkfs 时的 `physical_block_size`（偏移 317，根槽宽）：
++//! D12（目标介质） 已定项 4 比对清单第一行「对不上 ⇒ 拒绝可写挂载」，D22（单元原子性怎么合成） 已定项 2「挂载时逐设备复算比对」，C1040。
++//! 两盘同构的池建好之后，把一块盘换成字节逐个相同、而探测值改一档的盘：可写挂载在任何写之前拒，盘表那一项点名那块盘、
++//! 探测值与记录值；每块盘逐字节不变。对照：同一份字节交回探测值与记录值相同的两块盘，可写挂载照常做成。
++//! 两条用例各管一个方向：记录 512、探测 4096；记录 4096、探测 512。
++
++use singlefs_core::address::DeviceIdentity;
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::make_filesystem::{make_filesystem, MakeFilesystemParameters};
++use singlefs_core::mount::{mount_writable, DeviceTableDisagreement, MountError};
++use singlefs_core::root_ring::RootRingSlotsPerRegion;
++use singlefs_core::system_configuration::SystemImmutableSizes;
++use singlefs_format::JOURNAL_RING_DEFAULT_BYTES;
++use singlefs_verification::memory_pool::{SparseBlockDevice, SparseDevice};
++
++const IMAGE_BYTES: u64 = 4 << 30;
++/// 盘表里的两块盘。
++const DEVICE_IDENTITIES: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
++
++fn parameters_with_the_physical_block_size(physical_block_size: u32) -> MakeFilesystemParameters {
++    MakeFilesystemParameters {
++        filesystem_identifier: *b"singlefs-probed!",
++        region_devices: [DeviceIdentity(0), DeviceIdentity(1), DeviceIdentity(0)],
++        geometry: SystemImmutableSizes {
++            physical_block_size,
++            minimum_input_output_bytes: 0,
++            fixed_structure_slot_spacing: SystemImmutableSizes::slot_spacing_for(0),
++            journal_ring_bytes: JOURNAL_RING_DEFAULT_BYTES,
++            root_ring_slots_per_region: RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
++        },
++    }
++}
++
++/// 两块探测值都是 `physical_block_size` 的空盘上照 `parameters` 做 mkfs，交回两块盘的字节。
++fn images_of_a_pool_made_on_devices_probing(
++    parameters: &MakeFilesystemParameters,
++    physical_block_size: u32,
++) -> Vec<SparseDevice> {
++    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = DEVICE_IDENTITIES
++        .into_iter()
++        .map(|identity| {
++            (
++                identity,
++                SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(physical_block_size)),
++            )
++        })
++        .collect();
++    make_filesystem(parameters, &mut devices).expect("两块盘的探测值与参数相同，mkfs 收");
++    devices
++        .into_iter()
++        .map(|(_, device)| device.image)
++        .collect()
++}
++
++/// `images` 逐块装进探测值为 `probed_physical_block_size_of_each_device` 的盘，按盘表次序交回。
++fn devices_carrying(
++    images: &[SparseDevice],
++    probed_physical_block_size_of_each_device: [u32; 2],
++) -> Vec<(DeviceIdentity, SparseBlockDevice)> {
++    DEVICE_IDENTITIES
++        .into_iter()
++        .zip(images)
++        .zip(probed_physical_block_size_of_each_device)
++        .map(|((identity, image), probed_physical_block_size)| {
++            let mut device = SparseBlockDevice::new(
++                IMAGE_BYTES,
++                PhysicalBlockSizeInBytes(probed_physical_block_size),
++            );
++            device.image = image.clone();
++            (identity, device)
++        })
++        .collect()
++}
++
++/// 记录值 `recorded` 的池上，`swapped_device` 那块盘换成探测值 `probed` 的盘：可写挂载在任何写之前拒成参数全对、盘表只错那一项，
++/// 两块盘逐字节不变；同一份字节交回探测值都是 `recorded` 的两块盘，可写挂载照常做成。
++fn assert_a_device_probing_another_physical_block_size_is_refused_before_any_write(
++    recorded: u32,
++    swapped_device: DeviceIdentity,
++    probed: u32,
++) {
++    let parameters = parameters_with_the_physical_block_size(recorded);
++    let images = images_of_a_pool_made_on_devices_probing(&parameters, recorded);
++    let probed_of_each_device = DEVICE_IDENTITIES.map(|identity| {
++        if identity == swapped_device {
++            probed
++        } else {
++            recorded
++        }
++    });
++    let mut devices = devices_carrying(&images, probed_of_each_device);
++    let refusal = mount_writable(&parameters, &mut devices)
++        .expect_err("一块盘的探测值与系统配置记着的 physical_block_size 不同：可写挂载必须拒");
++    let MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
++        disagreeing_fields,
++        disagreeing_device_table,
++    } = refusal
++    else {
++        panic!("该报 CallerParametersDisagreeWithTheSelectedSystemConfiguration，实际 {refusal:?}")
++    };
++    assert_eq!(
++        disagreeing_fields,
++        Vec::new(),
++        "参数用的是建池的那一份：一项都不该错"
++    );
++    assert_eq!(
++        disagreeing_device_table,
++        vec![
++            DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration {
++                identity_handed_in: swapped_device,
++                probed_physical_block_size: PhysicalBlockSizeInBytes(probed),
++                physical_block_size_in_the_system_configuration: recorded,
++            }
++        ],
++        "盘表只错一项：换上去的那块盘探测到 {probed}、系统配置记着 {recorded}"
++    );
++    for ((identity, device), before) in devices.iter().zip(&images) {
++        assert_eq!(
++            &device.image, before,
++            "{identity:?} 逐字节不变：拒在任何写之前"
++        );
++    }
++    let mut devices_probing_the_recorded_value = devices_carrying(&images, [recorded, recorded]);
++    mount_writable(&parameters, &mut devices_probing_the_recorded_value).unwrap_or_else(|error| {
++        panic!("同一份字节、两块盘都探测到 {recorded}：可写挂载照常做成，实际 {error:?}")
++    });
++}
++
++/// 记录 512 的池，盘 1 换成探测 4096 的盘（探测值往大改一档）。
++#[test]
++fn a_device_probing_4096_on_a_pool_recording_512_is_refused_before_any_write() {
++    assert_a_device_probing_another_physical_block_size_is_refused_before_any_write(
++        512,
++        DeviceIdentity(1),
++        4096,
++    );
++}
++
++/// 记录 4096 的池，盘 0 换成探测 512 的盘（探测值往小改一档；E72（设备描述符表的挂载复算） 那一格的方向）。
++#[test]
++fn a_device_probing_512_on_a_pool_recording_4096_is_refused_before_any_write() {
++    assert_a_device_probing_another_physical_block_size_is_refused_before_any_write(
++        4096,
++        DeviceIdentity(0),
++        512,
++    );
++}

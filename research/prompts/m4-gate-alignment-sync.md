@@ -19,8 +19,8 @@
 - crates/singlefs-core/src/instance_table_sweep.rs
 - crates/singlefs-core/src/mount.rs
 - crates/singlefs-core/src/recovery.rs
-- crates/singlefs-verification/src/bin/e158_root_choice_repair.rs
-- crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs
+- crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs
+- crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks/main.rs
 - crates/singlefs-verification/src/bin/e205_c971_inverted_first_txg_arm_costs.rs
 - crates/singlefs-verification/src/crash_injection.rs
 - crates/singlefs-verification/src/crash_library.rs

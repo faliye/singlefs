@@ -1,0 +1,5 @@
+[package]
+name = "outer"
+
+[dependencies]
+inner = { path = "inner" }

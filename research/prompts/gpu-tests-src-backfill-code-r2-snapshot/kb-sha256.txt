@@ -1,0 +1,2 @@
+5985b3a6d5049288dc49278c449932a6a349ceb7d4db37f5404c43e43ab03f6f  research/prompts/e202-preregistration.md
+6b613604a394836c54290905ed0f00c4bebd7becfcb13f4acaa9415c426a66ea  research/prompts/gpu-tests-src-backfill-code-r1-main-verification.md

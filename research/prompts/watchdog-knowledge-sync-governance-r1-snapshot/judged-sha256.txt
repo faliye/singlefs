@@ -1,0 +1,7 @@
+c6051269a96c36ace5eb56278cf46bf2e72a0da5da728a8e2e3e473a2373fe7a  research/prompts/_watchdog-knowledge-sync-governance-r1-body.md
+1c46829bc927f97c4cb1a2dd0fc488bfbdd2a1c7d192325f9173f237f898719a  scripts/agents/agent-watch.py
+87a4dcbfa0998e39ec89b2820ab75c85481c8cf5a33470a96bc8734a65ee1d6d  scripts/agents/watch.sh
+f5c737d3a36c5cc68e41bde8eb19b2e8e6411d2aa6f01e4491f335cf40ea243c  scripts/agents/watch.conf
+417aa5393bf0c0183bacc51c96369d30859591a0a3e183c8ea80285d7b8400a6  .claude/skills/dispatch/SKILL.md
+b8e4d774264dddf1e118c299ef11f63c8025602e66996ecc027bf1c2e8334168  .claude/hooks/selftest-registry.tsv
+4b818439bbbaab9c73f48d8677f99d8a7c1cd68fd35968303691f1b762ccda61  .claude/gate.d/break-switch-replay-files.tsv

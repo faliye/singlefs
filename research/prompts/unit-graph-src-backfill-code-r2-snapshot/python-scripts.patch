@@ -1,0 +1,1274 @@
+diff --git a/scripts/gate/admission.py b/scripts/gate/admission.py
+index 2f3757d..b2aa0ea 100644
+--- a/scripts/gate/admission.py
++++ b/scripts/gate/admission.py
+@@ -18,10 +18,14 @@
+                           只取改结局的四张表 build（去掉 jobs、target-dir、incremental）、target、profile、env，[alias]、[net]、[http]、[term] 这类不进
+                           （与 scripts/mutation/lib_mutation_units.py 的 toolchain_lines 同一种收法：BUILD_CONFIGURATION_SECTIONS、BUILD_KEYS_LEFT_OUT）；
+                           rust-toolchain(.toml) 摊开的值；runner / wrapper 指的程序与参数里的脚本的内容 sha256；RUSTC 的 -V），
+-                          请求带 profile:<名> 的另加「profile <名>」与清单 [profile.<名>] 摊开的值；release 这一类档的 cfg 不带 debug_assertions
+-                          编译档里的 debug、incremental 两项三处都不进（PROFILE_SETTINGS_LEFT_OUT）：环境变量 CARGO_PROFILE_<档>_DEBUG、CARGO_PROFILE_<档>_INCREMENTAL，
++                          请求带 profile:<名> 的另加「profile <名>」与清单 [profile.<名>] 摊开的值，再加这个档的生效值（profile_lines：lib_function_units.py 的 effective_profile_lines，
++                          crates/singlefs-unit-graph/src/build_toolchain.rs 同一个判法、两边出的行逐字相同：「profile: <名>」与 opt-level、debug-assertions、overflow-checks、lto、panic、
++                          codegen-units 各一行「profile.<键>: <值>」）；release 这一类档的 cfg 不带 debug_assertions
++                          编译档里的 debug、incremental 两项的原文行三处都不进（PROFILE_SETTINGS_LEFT_OUT）：环境变量 CARGO_PROFILE_<档>_DEBUG、CARGO_PROFILE_<档>_INCREMENTAL，
+                           cargo 配置与清单 [profile.<名>]（连同 package.<包>、build-override 两层）里键名恰好是这两个的；按整个键名比，debug-assertions 照进。
+-                          与 crates/singlefs-unit-graph/src/build_toolchain.rs 的 PROFILE_SETTING_KEYS 同一口径（那边逐项收的六项里没有这两项）
++                          debug 不进键；incremental 改由生效值进：codegen-units 没写时由生效的 incremental（内置默认、清单、CARGO_PROFILE_<档>_INCREMENTAL、CARGO_INCREMENTAL 依次盖）定，
++                          开取 256、关取 16，写了就照写（cargo 配置里写的 profile 与 [build] incremental 不读，同 Rust 那一份）。
++                          与 crates/singlefs-unit-graph/src/build_toolchain.rs 的 PROFILE_SETTING_KEYS 同一口径（那边逐项收的六项里没有 debug 与 incremental）
+     工具链行（Python、shell 入口）  python3 --version 或 bash --version 的第一行；闭包里有工具链询问（[<RUSTC 或 build.rustc 给的编译器>, "-V"]）的，
+                           询问打的版本由闭包里的工具链单元进键（lib_function_units.py 文件头「版本询问」），这里不另加，判法闭包同（judge_key）
+     依赖版本行  闭包里有单元的工作区包，Cargo.toml 写的外部依赖（测试编译的入口另加它那个包的 dev-dependencies；本机目标不要的 target 段不收），
+@@ -613,11 +617,15 @@ library-files（unit-verdicts 族里按文件存的种类：replay-row、E182 
+       cargo 配置的每一张表（[alias]、[net]、[build] 的 incremental、[profile.<名>] 的 debug 与 incremental 这类）都进
+       「自证：unit-key：」
+       「单元键：构建环境只收改结局的设置：CARGO_BUILD_INCREMENTAL 与 [build] incremental 两种取值键相同、[alias] 加一条键不变，[profile.release] 改一项键变」
+-      「单元键：编译档里 debug、incremental 不进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only、」「单元键：编译档里 debug、incremental 不进键：cargo 配置写 [profile.release] 的 debug、」
+-  ADMISSION_BREAK=profile-debug-keyed  编译档的 debug 照进键（环境变量、cargo 配置与清单 [profile.<名>] 三处都进；incremental 照旧不进）
++      「单元键：编译档里 debug 不进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ⇒ 变的是 无」「单元键：编译档里 debug 不进键：cargo 配置写 [profile.release] 的 debug、」
++  ADMISSION_BREAK=profile-debug-keyed  编译档的 debug 照进键（环境变量、cargo 配置与清单 [profile.<名>] 三处都进；incremental 的原文行照旧不进）
+       「自证：unit-key：」
+-      「单元键：编译档里 debug、incremental 不进键：清单 [profile.release] 加 debug = 2、incremental = true ⇒ 变的是 无」
+-      「单元键：编译档里 debug、incremental 不进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only、」「单元键：编译档里 debug、incremental 不进键：cargo 配置写 [profile.release] 的 debug、」
++      「单元键：编译档里 debug 不进键：清单 [profile.release] 加 debug = 2 ⇒ 变的是 无」
++      「单元键：编译档里 debug 不进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only ⇒ 变的是 无」「单元键：编译档里 debug 不进键：cargo 配置写 [profile.release] 的 debug、」
++  ADMISSION_BREAK=profile-incremental-ignored  codegen-units 没写时一律取增量开着的缺省值（增量开关不进键）
++      「自证：unit-key：」
++      「单元键：编译档里 incremental 经 codegen-units 的缺省值进键：清单 [profile.release] 加 incremental = true」
++      「单元键：编译档里 incremental 经 codegen-units 的缺省值进键：环境变量 CARGO_PROFILE_RELEASE_INCREMENTAL=true」「单元键：编译档里 incremental 经 codegen-units 的缺省值进键：环境变量 CARGO_INCREMENTAL=1」
+   ADMISSION_BREAK=withdrawal-owed-unrecorded  记红时 prune-server 不可用：plan-failure --red 收到 verdict-record 退 75 只退 75、不记欠撤，verdict-plan / test-plan 开跑也不读欠撤
+       「自证：reuse-fix：」
+       （同一把键原有的绿留着、下一趟照复用）
+@@ -867,6 +875,7 @@ BUILD_KEYS_LEFT_OUT = frozenset(("jobs", "target-dir", "incremental"))
+ PROFILE_SETTINGS_LEFT_OUT = frozenset(("debug", "incremental"))
+ PROFILE_SETTING_TABLES = ("package", "build-override")   # [profile.<名>] 底下照同一组键写设置的两层（package.<包>、build-override）
+ PROFILE_DEBUG_KEYED_BREAK = "profile-debug-keyed"
++PROFILE_INCREMENTAL_IGNORED_BREAK = "profile-incremental-ignored"
+ BUILD_ENVIRONMENT_ALL_SETTINGS_BREAK = "build-environment-all-settings"
+ BUILD_ENVIRONMENT_PROGRAM_VARIABLES = ("RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "CARGO_BUILD_RUSTC_WRAPPER", "CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER")
+ BUILD_ENVIRONMENT_PROGRAM_VARIABLE_FORMS = (re.compile(r"^CARGO_TARGET_.+_RUNNER$"),)
+@@ -1618,13 +1627,20 @@ def registry_dependency_filter(environment, package, host):
+     return names
+ 
+ 
+-def profile_lines(closure_root, profile):
+-    """--release 这一类编译档：「profile <名>」与清单里 [profile.<名>] 摊开的生效值（debug、incremental 不进，keyed_profile_settings）。"""
++def profile_lines(closure_root, profile, environment):
++    """--release 这一类编译档：「profile <名>」与清单里 [profile.<名>] 摊开的值（debug、incremental 的原文行不进，keyed_profile_settings），
++    再加这个档的生效值（lib_function_units.py 的 effective_profile_lines：crates/singlefs-unit-graph 的 build_toolchain.rs 同一个判法，两边出的行逐字相同）：
++    incremental 自己不出行，由生效的 incremental（内置默认、根清单、CARGO_PROFILE_<档>_INCREMENTAL、CARGO_INCREMENTAL 依次盖）定 codegen-units 没写时的缺省值。
++    弄坏开关 profile-incremental-ignored 下 codegen-units 没写一律取增量开着的缺省值。"""
+     sections = manifest_sections(os.path.join(closure_root, "Cargo.toml")) or {}
+     lines = [f"profile {profile}"]
+     out = []
+     flattened_setting_lines(f"profile.{profile}", keyed_profile_settings((sections.get("profile") or {}).get(profile) or {}), out)
+-    return lines + [f"setting {line}" for line in out]
++    try:
++        effective = function_units().effective_profile_lines(sections, profile, environment, break_is_set(PROFILE_INCREMENTAL_IGNORED_BREAK))
++    except ValueError as error:
++        raise UnitKeyError(f"编译档 {profile} 的生效值算不出（{error}）") from error
++    return lines + [f"setting {line}" for line in out] + effective
+ 
+ 
+ def rust_cfg_for_profile(closure_root, profile):
+@@ -1797,7 +1813,7 @@ def compute_unit_key(context, request):
+             toolchain = list(context.rust_toolchain_lines(closure_root)) if language == "rust" else []
+             toolchain += [f"interpreter {name}: {context.interpreter(name)}" for name in interpreter_lines(language)]
+             if request.profile and language == "rust":
+-                toolchain += profile_lines(closure_root, request.profile)
++                toolchain += profile_lines(closure_root, request.profile, context.environment)
+             dependencies = context.dependency_lines(closure_root, workspace, closure, target_id) if workspace is not None else []
+             externals = closure_programs_externals(context, closure)
+             entry_key, entry_refusals = library.closure_key(closure, toolchain, dependencies, externals)
+@@ -6070,17 +6086,22 @@ def run_unit_key_cells(selftest, module):
+                         f"CARGO_BUILD_INCREMENTAL 两种取值相同 {settings_on == settings_off}，[build] incremental 改了相同 {settings_configured_on == settings_off}，"
+                         f"[alias] 加一条相同 {settings_alias_added == settings_off}，[profile.release] 改了变的 "
+                         f"{[short_name(name) for name in settings_off if settings_profile_changed[name] not in (None, settings_off[name])]}，键 {settings_off}")
+-        # 编译档的 debug、incremental 不进键（文件头「单元键」工具链行、PROFILE_SETTINGS_LEFT_OUT），清单、环境变量、cargo 配置三处各写一回；
+-        # 别的编译档设置照进（按整个键名比，debug-assertions 不因前缀是 debug 被去掉）。弄坏开关 profile-debug-keyed 下前三格转红
++        # 编译档的 debug 不进键（文件头「单元键」工具链行、PROFILE_SETTINGS_LEFT_OUT），清单、环境变量、cargo 配置三处各写一回；incremental 的原文行不进，
++        # 改由它定的 codegen-units 缺省值进键（没写 codegen-units 时开增量 256、关 16；profile_lines），清单、环境变量 CARGO_PROFILE_<档>_INCREMENTAL、CARGO_INCREMENTAL 各一格；
++        # 别的编译档设置照进（按整个键名比，debug-assertions 不因前缀是 debug 被去掉）。弄坏开关 profile-debug-keyed 下 debug 那三格转红，
++        # profile-incremental-ignored 下 incremental 那三格转红
+         every_test = ["test_t", "test_u", "test_v"]
+         manifest = os.path.join(work, "Cargo.toml")
+-        cell("编译档里 debug、incremental 不进键：清单 [profile.release] 加 debug = 2、incremental = true", manifest,
+-             "overflow-checks = true\n", "overflow-checks = true\ndebug = 2\nincremental = true\n", [])
+-        cell("编译档里 debug、incremental 不进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only、CARGO_PROFILE_RELEASE_INCREMENTAL=true", None, None, None, [],
+-             {"CARGO_PROFILE_RELEASE_DEBUG": "line-tables-only", "CARGO_PROFILE_RELEASE_INCREMENTAL": "true"})
++        cell("编译档里 debug 不进键：清单 [profile.release] 加 debug = 2", manifest, "overflow-checks = true\n", "overflow-checks = true\ndebug = 2\n", [])
++        cell("编译档里 debug 不进键：环境变量 CARGO_PROFILE_RELEASE_DEBUG=line-tables-only", None, None, None, [], {"CARGO_PROFILE_RELEASE_DEBUG": "line-tables-only"})
++        cell("编译档里 incremental 经 codegen-units 的缺省值进键：清单 [profile.release] 加 incremental = true", manifest,
++             "overflow-checks = true\n", "overflow-checks = true\nincremental = true\n", every_test)
++        cell("编译档里 incremental 经 codegen-units 的缺省值进键：环境变量 CARGO_PROFILE_RELEASE_INCREMENTAL=true", None, None, None, every_test,
++             {"CARGO_PROFILE_RELEASE_INCREMENTAL": "true"})
++        cell("编译档里 incremental 经 codegen-units 的缺省值进键：环境变量 CARGO_INCREMENTAL=1", None, None, None, every_test, {"CARGO_INCREMENTAL": "1"})
+         write_text(settings_file, "[profile.release]\ndebug = true\nincremental = true\n\n[profile.release.package.demo]\ndebug = 1\n")
+         try:
+-            cell("编译档里 debug、incremental 不进键：cargo 配置写 [profile.release] 的 debug、incremental 与 package.demo 的 debug", None, None, None, [])
++            cell("编译档里 debug 不进键：cargo 配置写 [profile.release] 的 debug、incremental 与 package.demo 的 debug", None, None, None, [])
+         finally:
+             os.remove(settings_file)
+         cell("编译档里别的设置照进键：清单 [profile.release] 加 codegen-units = 1", manifest, "overflow-checks = true\n", "overflow-checks = true\ncodegen-units = 1\n", every_test)
+diff --git a/scripts/gate/lib_function_units.py b/scripts/gate/lib_function_units.py
+index edbc2fa..8c65459 100644
+--- a/scripts/gate/lib_function_units.py
++++ b/scripts/gate/lib_function_units.py
+@@ -327,13 +327,20 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同
+           （RustWorkspace.candidates_seen_from_module：同一模块的、所在模块的 use 引进了它且路径（花括号展开之后）恰好点到候选所在模块的、写成 模块::名 的，super 照个数往上数层；
+           use 路径或 …::名 的根名是 std、core、alloc 或看得见的别的 crate 的库名的指别的 crate，跳过那一处）；点不准的退回全连，
+           字段名、局部变量与 impl 成员自己的名字一份都不连；名字是 use 改名的原名、单元是 macro_rules!（体里的名字在调用处解）的不筛；跨目标的只认 pub、不按模块筛。
++          use 的一支路径点准之后再加几道退回全连：点到的候选带条件编译（自己的条件链非空，或它所在文件在这个目标里的连法里有一条带条件；is_compiled_conditionally）、
++          或候选所在模块另有 use 按名字引进同名（cfg 互斥的另一支可能是 pub use 转来的）；相对路径（首段不是 crate、self、super）的首段在本作用域被别的 use 按名字引进（含 as 改名；glob 不算）。
++          use 原名 as 名 那一支：叶子是别名、as 前面不是 段::，路径只到外层花括号，退回全连，不顺着原名点准。
++          弄坏开关 rust-use-path-conditional-candidates-narrowed、rust-use-path-re-exporting-modules-narrowed、rust-use-path-first-segment-imported-narrowed、
++          rust-use-alias-leaf-followed-to-the-original 各去掉其中一道（各红 USE_PATH_CONDITIONAL_CELL、USE_PATH_RE_EXPORT_CELL、USE_PATH_FIRST_SEGMENT_CELL、USE_PATH_ALIAS_LEAF_CELL）
+           验证包里 CPU 判器的单元经 use 从格式库引进 SLOT_BYTES，不连到 gpu_unit_checks 里私有的同名常量。
+           弄坏开关 rust-crates-names-linked-across-modules：crates/ 下的包照旧按同名连
+   局部 let 与参数绑定遮住的名字（bare_name_only_a_local_binding；与 crates/singlefs-unit-graph 的 is_bare_name_only_a_local_binding_of_the_function 同一个判法）：
+           函数单元里，名字每一处都是局部绑定或落在绑定的作用域里的（语句开头的 let [mut] 名从它的 ; 起到外层花括号收尾，参数从参数表的 ) 起到单元收尾；if let、match、for、闭包参数、解构不认），
+           不往外连同名的函数（let main = …; 不连 fn main）；同一目标、跨目标都这样。只遮函数：let 写成常量、静态量、单元结构体的名字是拿它当模式，照连。
+           绑定之前或作用域之外的同名、带路径的、宏名、作用域外的格式串捕获、宏调用括号里的 let、函数体里有嵌套条目的，都照连，宁可多连。use 改名的原名不看这一条。
+-          弄坏开关 rust-let-shadowed-names-resolved：照旧连到同名函数
++          落在宏调用括号里的名字（宏可能把它接在路径后面或放进嵌套条目，运行时解到同名函数）照连，只有 STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE
++          那 16 个标准库宏（格式化、打印、写、panic!、断言一族、vec!）的括号里、在作用域里的照算局部；外层的括号落在名单之外的宏里的，里层也照连。
++          弄坏开关 rust-let-shadowed-names-resolved：照旧连到同名函数；rust-macro-arguments-all-local：每个宏的括号里的名字都照局部算
+ 
+ 数据目录（RustFile.runtime_manifest_path、fold_manifest_chain；crates/singlefs-unit-graph 的 fold_manifest_directory_read、fold_path_chain 同写）：
+   Path::new(env!("CARGO_MANIFEST_DIR")) / PathBuf::from(…) 后接 .join("字面") 链、链后不再接别的方法，
+@@ -357,14 +364,31 @@ Rust 闭包（3.3，与 crates/singlefs-unit-graph 的 src/closure.rs 逐条同
+   子进程起的是在跑的这个程序文件、从同一个 main 进，换参数只换走哪条路，走的代码都已在闭包里，不连边。
+   路径形状：current_exe() 后接 ?、.unwrap()、.expect("字面串")、闭包一定不交值（以 panic!(…) 或 …process::exit(…) 收尾）的 .unwrap_or_else(…)，
+   或 match current_exe() { Ok(名字) => 同一个名字, Err(…) => <以 return 起头，或一定不交值> }；这个表达式就地写在 Command::new(…) 的括号里，
+-  或绑给 let 名字（单元里这个名字不再 let），名字的每一处用法只是 Command::new(名字)、Command::new(&名字)、名字.display()，至少起一次。
+-  入口：目标是 bin，这一趟不按测试编，一组入口恰好是目标根文件顶层的 fn main（rust_entry_is_the_main_of_a_program）。收闭包时判入口，不判「闭包里有 main」：单测调 main 的进程仍是 libtest。
++  或绑给 let 名字（单元里这个名字不再 let），名字的每一处用法最内的那一层花括号就是这条 let 所在的那一层（不进更深的块：if、循环、match 的分支块、闭包体都算更深；也不出这个块；
++  圆括号、方括号不算块），只是 Command::new(名字)、Command::new(&名字)、名字.display()，至少起一次。
++  「一定不交值」碰到以 } 收尾的表达式：先找这个 } 配的 {，{ 前面一个词是 |（闭包参数）或前两个词是 =、>（=>）才往块里最后一个表达式接着判；别的（else、)、if 的条件、裸块）一律当会交值。
++  入口：目标是 bin，这一趟不按测试编，一组入口恰好是目标根文件里排头一个的顶层 fn main（rust_entry_is_the_main_of_a_program；crates/singlefs-unit-graph 的 main_function_of）。
++  收闭包时判入口，不判「闭包里有 main」：单测调 main 的进程仍是 libtest。目标根文件里有两个顶层 fn main（cfg 互斥的两份）时，Rust 那一份把两份当一组入口、拒算 current-exe；
++  这一份的入口按 <文件>::<限定名> 找、限定名命中两个单元就当场报 UsageError，走不到这个判断（入口解析是两边的差别，不在这一条里改）。
+   --exact 折得出名字的先走「测试二进制起自己」，解不到恰好一个 #[test] fn 照旧拒算。形状不认的，单元里有 SPAWNING_WORDS 就就地拒算，没有的只是问路径。
+-  弄坏开关 rust-own-program-restart-refused、rust-own-program-entry-unchecked、rust-own-program-path-unchecked 各红 OWN_PROGRAM_KEYED_CELL、OWN_PROGRAM_ENTRY_CELL、OWN_PROGRAM_PATH_CELL。
++  弄坏开关 rust-own-program-restart-refused、rust-own-program-entry-unchecked、rust-own-program-path-unchecked 各红 OWN_PROGRAM_KEYED_CELL、OWN_PROGRAM_ENTRY_CELL、OWN_PROGRAM_PATH_CELL；
++  rust-own-program-uses-any-block、rust-own-program-divergence-any-block 各红 OWN_PROGRAM_BLOCK_CELL、OWN_PROGRAM_DIVERGENCE_CELL。
+ extern 块（RustFile.extern_block_declares_only_listed_c_library_calls；crates/singlefs-unit-graph 同写，那边的形态名是 extern-function-interface）：
+-  ABI 恰好是 "C"、条目前没有 #[link…]、块里只有 [#[link_name = "…"]] [pub] fn 名字(…) …;、至少一条、每条的符号（link_name，没有就取函数名）都在
+-  C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 里的不拒算：标准库的文件读写走同一层 C 库，键本来就不跟 C 库变，这两个符号没有多出一类依赖。别的写法拒算 extern-block。
+-  不判：工程里自己定义同名导出符号盖掉 C 库（#[no_mangle] fn pwrite）。弄坏开关 rust-extern-listed-calls-refused、rust-extern-any-block-keyed 各红 EXTERN_LISTED_CELL、EXTERN_REFUSED_CELL。
++  ABI 恰好是 "C"、条目前的属性里任何位置都没有标识符 link（#[link(…)]、#[cfg_attr(条件, link(…))]；link_name 不算，extern_block_attributes_name_link）、
++  块里只有 [#[link_name = "…"]] [pub] fn 名字(…) …;、至少一条、每条的符号（link_name，没有就取函数名）都在
++  C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 里的，切分时不拒算：标准库的文件读写走同一层 C 库，键本来就不跟 C 库变，这两个符号没有多出一类依赖。别的写法拒算 extern-block。
++  不拒算的块进闭包时再看它编进的目标（RustWorkspace.target_may_link_libraries_beyond_the_system_library）：目标里任一个 extern 块（不管进不进闭包）的外属性里有 link，
++  或这个包的构建脚本目标里任一份文件的原文含 rustc-link-lib，这个块照拒算 extern-block（行与片段用这个块的）。
++  不判：工程里自己定义同名导出符号盖掉 C 库（#[no_mangle] fn pwrite）。弄坏开关 rust-extern-listed-calls-refused、rust-extern-any-block-keyed 各红 EXTERN_LISTED_CELL、EXTERN_REFUSED_CELL；
++  rust-extern-link-first-attribute-only 红 EXTERN_LINK_ATTRIBUTE_CELL，rust-extern-other-block-link-unchecked 红 EXTERN_OTHER_BLOCK_LINK_CELL，
++  rust-extern-build-script-link-unchecked 红 EXTERN_BUILD_SCRIPT_LINK_CELL。
++构建档的生效值（effective_profile_lines、effective_profile_lines_of_every_profile；crates/singlefs-unit-graph 的 build_toolchain.rs 的 effective_profile_lines 同一个判法，两边出的行逐字相同；
++  调用方 scripts/mutation/lib_mutation_units.py 的 toolchain_lines 与 scripts/gate/admission.py 的 build_environment_setting_lines 把它们摊进工具链行）：
++  一个 profile 出「profile: <名>」一行与 PROFILE_SETTING_KEYS（opt-level、debug-assertions、overflow-checks、lto、panic、codegen-units）各一行「profile.<键>: <值>」；
++  debug 不出行、incremental 自己不出行。每个设置依次由内置默认（dev、release；test 承 dev、bench 承 release、自定义的照 inherits）、根清单从继承链的根到叶、
++  CARGO_PROFILE_<名>_<键> 盖；codegen-units 三处都没写时由生效的 incremental 定（同样三层盖，最后再由 CARGO_INCREMENTAL 盖：1 开、0 关），开取 CODEGEN_UNITS_WHEN_INCREMENTAL、
++  关取 CODEGEN_UNITS_WHEN_NOT_INCREMENTAL，写了就照写的、不看增量。.cargo 配置里的 profile、[profile.<名>.package.<包>]、build-override 这里不读（调用方另有原文行）。
++  弄坏开关 profile-incremental-ignored（codegen-units 没写一律取增量开着的值）、profile-setting-keys-short（进键的设置名少 codegen-units）各红 PROFILE_INCREMENTAL_CELL、PROFILE_CONSTANTS_CELL。
+ 测试二进制起自己（RustFile.current_exe_child；规则名 current-exe-child；crates/singlefs-unit-graph 同写）：
+   Command::new(…current_exe()…) 后接 .arg(…) / .args([…]) 链，参数里恰好有一个字面 "--exact"，紧跟在它后面的那个参数折得出测试名的，
+   从起子进程的那个单元连一条边到同一编译目标里 libtest 全名（文件在目标里的模块路径加限定名）恰好等于它的那一个 #[test] fn，不拒算 current-exe。
+@@ -676,8 +700,25 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先
+       「R-裸名：局部 let 绑的名字不连同名函数（let sample = …; sample + 1），改那个函数键不变」
+       「R-裸名：参数名不连同名函数（fn f(sample: u32)），改那个函数键不变」
+       「R-裸名：串字面量里的 {名} 是局部 let 绑的，不连同名函数，改那个函数键不变」
++  FUNCTION_UNITS_BREAK=rust-macro-arguments-all-local  名单之外的宏的括号里的名字也照局部算（STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE 不再分内外）
++      「R-裸名：局部 let 绑的名字只写在名单之外的宏（dbg!）的括号里，照连同名函数，改那个函数键变」
++  FUNCTION_UNITS_BREAK=rust-macro-list-short  名单少最后一项（vec），standard_macros_evaluating_their_arguments_in_place 交回的与 Rust 源码里那个常量不同
++      「R-裸名：宏名单与 crates/singlefs-unit-graph/src/closure.rs 的 STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE 逐项相同（读那份源码比）」
++  FUNCTION_UNITS_BREAK=profile-incremental-ignored  codegen-units 没写时一律取增量开着的那个值
++      「构建档：只差 incremental 的两种编法 codegen-units 那一行不同（没写时增量开 256、关 16），显式写了 codegen-units 时不变，debug 不出行；…」
++  FUNCTION_UNITS_BREAK=profile-setting-keys-short  进键的设置名少最后一项（codegen-units）
++      「构建档：进键的设置名与 codegen-units 的两个缺省值逐项与 crates/singlefs-unit-graph 的 PROFILE_SETTING_KEYS、CODEGEN_UNITS_WHEN_INCREMENTAL、CODEGEN_UNITS_WHEN_NOT_INCREMENTAL 相同（读那份源码比）」
++      「构建档：只差 incremental 的两种编法 codegen-units 那一行不同（没写时增量开 256、关 16），显式写了 codegen-units 时不变，debug 不出行；…」
+   FUNCTION_UNITS_BREAK=rust-use-paths-flattened  use 路径压平成一串比，「末段在串里」或「起头是 crate 且候选在根」就算点到（经 pub use 转出的那一份不连）
+       「R-裸名：use 路径点到的模块里没有这个名字（经 pub use 转出来的），退回全连，转出的那一份改了键变」
++  FUNCTION_UNITS_BREAK=rust-use-path-conditional-candidates-narrowed  use 路径点到的候选带条件编译也照点准
++      「R-裸名：use 路径点到的候选带条件编译（另一支 cfg 下名字由 pub use 转来），退回全连，转出的那一份改了键变」
++  FUNCTION_UNITS_BREAK=rust-use-path-re-exporting-modules-narrowed  候选所在模块另有 use 引进同名也照点准
++      「R-裸名：use 路径点到的候选所在模块另有 use 按名字引进同名，退回全连，那条 use 转来的那一份改了键变」
++  FUNCTION_UNITS_BREAK=rust-use-path-first-segment-imported-narrowed  相对路径的首段是别的 use 引进的名字（含 as 改名）也照点准
++      「R-裸名：use 的相对路径首段是别的 use 按名字（as 改名）引进的模块，退回全连，那个模块里的那一份改了键变」
++  FUNCTION_UNITS_BREAK=rust-use-alias-leaf-followed-to-the-original  use 原名 as 名 那一支顺着原名点准
++      「R-裸名：use 原名 as 名 那一支退回全连，别的模块里同名的那一份改了键变」
+   FUNCTION_UNITS_BREAK=rust-verus-segments-ignored  verus! 里照普通 Rust 切（签名后第一个 { 当函数体）
+       「verus! 里 ensures 带花括号：下一个函数照样切开，改它作废」「verus! 里够不到的函数改了不作废」
+   FUNCTION_UNITS_BREAK=rust-cfg-ignored  cfg 一律当真
+@@ -1065,10 +1106,22 @@ Rust 词法单元的缓存（rust_lex_cached）：RustFile 载入一份 .rs 先
+       「Rust：路径原样交给 Command::new 而入口不是 bin 的 main（库单测、bin 里的单测、单测调 main、按测试编的 main、bin 的辅助函数、模块里的 main）：拒算 current-exe」
+   FUNCTION_UNITS_BREAK=rust-own-program-path-unchecked  路径怎么走都当原样交给 Command::new
+       「Rust：入口是 bin 的 main 而路径改过或流向别处（同目录的程序、父目录、失败时交回别的路径、当参数交给别的程序、交给辅助函数、名字绑成别的路径、--exact 点名不存在的）：拒算 current-exe」
++  FUNCTION_UNITS_BREAK=rust-own-program-uses-any-block  名字的用法落在哪一层花括号里都不看（进更深的块、出了 let 所在的块的也算起自己）
++      「Rust：路径绑给 let 名字，用法进了更深的块或出了 let 所在的块（起子进程失败的闭包块里显示、if 块里起、内层块的 let 在块外用）：拒算 current-exe」
++  FUNCTION_UNITS_BREAK=rust-own-program-divergence-any-block  「一定不交值」碰到以 } 收尾的表达式一律往块里看，不看块前面是不是闭包参数或 =>
++      「Rust：取路径失败时的闭包以 if … else { panic!() } 收尾（块前面是 else）：拒算 current-exe」
+   FUNCTION_UNITS_BREAK=rust-extern-listed-calls-refused  extern 块只声明名单里的符号也拒算 extern-block
+       「Rust：extern "C" 块只声明名单里的符号（#[link_name] 或函数名）：不拒算，改调用方键变」
+   FUNCTION_UNITS_BREAK=rust-extern-any-block-keyed  extern 块一律不拒算
+       「Rust：extern 块有名单外的符号、#[link]、别的 ABI、static、别的属性：拒算 extern-block」
++  FUNCTION_UNITS_BREAK=rust-extern-link-first-attribute-only  属性里的 link 只认紧挨 #[ 的（#[cfg_attr(条件, link(…))] 里的不认）
++      「Rust：extern 块外属性里任何位置有 link（#[cfg_attr(条件, link(…))]）：拒算 extern-block」
++  FUNCTION_UNITS_BREAK=rust-extern-other-block-link-unchecked  不看同一个目标里别的 extern 块的 link
++      「Rust：同一个目标里另一个 extern 块带 #[link]（那个块不在闭包里）：名单里的块也拒算 extern-block」
++  FUNCTION_UNITS_BREAK=rust-extern-build-script-link-unchecked  不看包的构建脚本里有没有 rustc-link-lib
++      「Rust：包的构建脚本写了 rustc-link-lib：名单里的块也拒算 extern-block；构建脚本没写的不拒算」
++  FUNCTION_UNITS_BREAK=rust-extern-system-library-list-short  放行的 C 库调用名单少最后一项（fdatasync），与 Rust 源码里那个常量不同
++      「Rust：extern 块放行的 C 库调用名单与 crates/singlefs-unit-graph 的 SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 逐项相同（读那份源码比）」
+   FUNCTION_UNITS_BREAK=shell-nested-functions-by-any-word  套在函数里的函数按词连，外面哪个单元写到同一个词都算
+       「shell：外面的单元里一个词与套在别的函数里的函数同名：不连（改它起的 s/child.sh 键不变）」
+   FUNCTION_UNITS_BREAK=shell-python-launch-arguments-unfolded  shell 起 python 的词不带过去，那份 python 整份收
+@@ -1341,8 +1394,19 @@ VERUS_GHOST_CODE_UNPARSED = "verus-ghost-code-unparsed"
+ BREAK_VARIABLE = "FUNCTION_UNITS_BREAK"
+ # 函数里出现这几个词算起了子进程：此时 current_exe() 折不出要点名的那一条测试，拒算 current-exe（文件头「测试二进制起自己」）
+ SPAWNING_WORDS = frozenset(("Command", "spawn", "posix_spawn", "fork", "execv", "execve", "execvp"))
+-# 不带 #[link] 的 extern "C" 块里只声明这几个符号时不拒算（文件头「extern 块」；crates/singlefs-unit-graph 的 C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 同一份）
++# 属性里没有 link 的 extern "C" 块里只声明这几个符号时切分不拒算（文件头「extern 块」；逐项与 crates/singlefs-unit-graph 的 SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 相同，自证读那份源码比）
+ C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS = ("pwrite", "fdatasync")
++
++
++def c_library_calls_allowed_in_extern_blocks():
++    """上面那张名单；弄坏开关 rust-extern-system-library-list-short 下少最后一项。"""
++    if "rust-extern-system-library-list-short" in active_breaks():
++        return C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS[:-1]
++    return C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS
++
++
++# 构建脚本叫 cargo 多链接一个库的指令名（cargo:rustc-link-lib=…、cargo::rustc-link-lib=… 里都有它）；crates/singlefs-unit-graph 的 RUSTC_LINK_LIBRARY_INSTRUCTION
++RUSTC_LINK_LIBRARY_INSTRUCTION = "rustc-link-lib"
+ REFUSED_EXIT = 4
+ SHELL_TIMEOUT_SECONDS = 600
+ SNIPPET_CHARACTERS = 160
+@@ -2325,6 +2389,19 @@ def format_captures(literal):
+ 
+ # 函数体里有这几个词的（可能嵌套条目，里面同名的不在绑定的作用域里）不按局部绑定遮（bare_name_only_a_local_binding；crates/singlefs-unit-graph 的 WORDS_STARTING_A_NESTED_ITEM）
+ WORDS_STARTING_A_NESTED_ITEM = frozenset(("fn", "impl", "trait", "mod", "const", "static", "struct", "enum", "union", "type", "use", "macro_rules", "extern"))
++# 名字落在这几个标准库宏的调用括号里照算局部（bare_name_only_a_local_binding）：它们把实参当表达式就地求值，不把实参接在路径后面、不放进嵌套条目里；
++# 别的宏把实参展开到哪看不出，落在它们括号里的名字不算遮住。逐项与 crates/singlefs-unit-graph/src/closure.rs 的 STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE 相同（自证读那份源码逐项比）
++STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE = (
++    "format", "format_args", "print", "println", "eprint", "eprintln", "write", "writeln", "panic",
++    "assert", "assert_eq", "assert_ne", "debug_assert", "debug_assert_eq", "debug_assert_ne", "vec",
++)
++
++
++def standard_macros_evaluating_their_arguments_in_place():
++    """上面那张名单；弄坏开关 rust-macro-list-short 下少最后一项（vec）。"""
++    if "rust-macro-list-short" in active_breaks():
++        return STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE[:-1]
++    return STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE
+ 
+ 
+ def function_signature_positions(texts, first, last):
+@@ -2401,11 +2478,27 @@ def identifier_name(text):
+     return text[2:] if text.startswith("r#") else text
+ 
+ 
++def extern_block_attributes_name_link(kinds, texts, first, last):
++    """extern 块的词（first 起、到 last 之前；从它的外属性起，extern 关键字之前）里有没有标识符 link：#[link(…)]、#[cfg_attr(条件, link(…))] 里的都算
++    （link_name 是别的词，不算）；带它的块改链接的库（crates/singlefs-unit-graph 的 extern_block_attributes_name_link 同一个判法）。
++    弄坏开关 rust-extern-link-first-attribute-only 下只认紧挨 #[ 的 link。"""
++    first_attribute_only = "rust-extern-link-first-attribute-only" in active_breaks()
++    for position in range(first, last):
++        if kinds[position] != IDENT:
++            continue
++        if texts[position] == "extern":
++            return False
++        if texts[position] == "link" and (not first_attribute_only or (position >= 2 and texts[position - 1] == "[" and texts[position - 2] == "#")):
++            return True
++    return False
++
++
+ def bare_name_only_a_local_binding(kinds, texts, first, last, name):
+     """函数单元（词 first..last）里 name 只是局部绑定（文件头 Rust 闭包「局部 let 与参数绑定遮住的名字」；crates/singlefs-unit-graph 的
+     is_bare_name_only_a_local_binding_of_the_function 同一个判法）：至少有一处绑定（语句开头的 let [mut] 名，或参数），别的每一处都落在绑定的作用域里。
+     let 从它的 ; 起到外层花括号收尾，参数从参数表的 ) 起到单元收尾。不算遮住的（宁可多连）：绑定之前或作用域之外的、带路径的（前后挨 ::）、
+-    宏名（后接 ! 与开括号）、格式串捕获（{名}）在作用域外的、宏调用括号里的 let、函数体里有嵌套条目（WORDS_STARTING_A_NESTED_ITEM）的。
++    宏名（后接 ! 与开括号）、格式串捕获（{名}）在作用域外的、宏调用括号里的 let、落在宏调用括号里的名字（宏可能把它接在路径后面或放进嵌套条目；
++    只有 STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE 那几个宏的括号里、在作用域里的照算局部）、函数体里有嵌套条目（WORDS_STARTING_A_NESTED_ITEM）的。
+     单个 . 后面的是字段或方法，不看；函数自己的名字不看。"""
+     signature = function_signature_positions(texts, first, last)
+     if signature is None:
+@@ -2416,8 +2509,11 @@ def bare_name_only_a_local_binding(kinds, texts, first, last, name):
+         return texts[position] if first <= position < last else ""
+     parameter = parameter_binding_position(kinds, texts, parameters_open, parameters_close, name, last)
+     has_binding = parameter is not None
+-    # 还开着的每一层括号：[是不是花括号, 在不在宏调用括号里, 此刻名字绑定了没有, 有没有一条 let 在等分号]
+-    stack = [[False, False, False, False]]
++    movable_macros_widen = "rust-macro-arguments-all-local" not in active_breaks()
++    listed_macros = standard_macros_evaluating_their_arguments_in_place()
++    # 还开着的每一层括号：[是不是花括号, 在不在宏调用括号里, 此刻名字绑定了没有, 有没有一条 let 在等分号,
++    #                     在不在名单（STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE）之外的宏调用括号里（外层在里面的算）]
++    stack = [[False, False, False, False, False]]
+     for position in range(first, last):
+         text, kind = texts[position], kinds[position]
+         innermost = stack[-1]
+@@ -2438,12 +2534,15 @@ def bare_name_only_a_local_binding(kinds, texts, first, last, name):
+             if (t(position - 1) == ":" and t(position - 2) == ":") or (t(position + 1) == ":" and t(position + 2) == ":") or (
+                     t(position + 1) == "!" and t(position + 2) in ("(", "[", "{")):
+                 return False
++            if innermost[4] and movable_macros_widen:
++                return False
+             if not innermost[2]:
+                 return False
+         elif kind != LIFETIME:
+             if text in ("(", "[", "{"):
+                 follows_a_macro_name = position >= first + 2 and t(position - 1) == "!" and kinds[position - 2] == IDENT
+-                stack.append([text == "{", innermost[1] or follows_a_macro_name, innermost[2], False])
++                may_move_its_arguments = follows_a_macro_name and identifier_name(t(position - 2)) not in listed_macros
++                stack.append([text == "{", innermost[1] or follows_a_macro_name, innermost[2], False, innermost[4] or may_move_its_arguments])
+             elif text in (")", "]", "}"):
+                 if len(stack) > 1:
+                     stack.pop()
+@@ -3346,9 +3445,19 @@ class RustFile:
+     # 程序起自己与 extern 块（文件头同名两节；crates/singlefs-unit-graph 的 rust_items.rs 同名函数逐条同义，门禁 code-tooling 的 function-units-two-implementations-agree 对拍）
+ 
+     def expression_ending_at_diverges(self, last_token, first_allowed):
+-        """last_token 是一个表达式的最后一个词法单元时，这个表达式是否一定不交值：写成 panic!(…)、…process::exit(…)，或以它们收尾的块。"""
++        """last_token 是一个表达式的最后一个词法单元时，这个表达式是否一定不交值：写成 panic!(…)、…process::exit(…)，或以它们收尾的块。
++        块只认紧跟闭包参数（开括号前面是 |）与紧跟 => 的两种：块前面是 else、)、if 的条件这类的，是分支里的一支，别的分支可能交值。
++        弄坏开关 rust-own-program-divergence-any-block 下任何块都往里看。"""
+         text = self.t(last_token)
+         if text == "}":
++            if "rust-own-program-divergence-any-block" not in self.breaks:
++                opening = next((position for position in range(last_token - 1, first_allowed - 1, -1) if self.t(position) == "{" and self.pairs.get(position) == last_token), None)
++                if opening is None:
++                    return False
++                follows_closure_parameters = self.t(opening - 1) == "|"
++                follows_a_match_arrow = opening >= 2 and self.t(opening - 1) == ">" and self.t(opening - 2) == "="
++                if not (follows_closure_parameters or follows_a_match_arrow):
++                    return False
+             before_the_brace = max(last_token - 1, 0)
+             return self.expression_ending_at_diverges(max(before_the_brace - 1, 0) if self.t(before_the_brace) == ";" else before_the_brace, first_allowed)
+         if text != ")":
+@@ -3433,6 +3542,17 @@ class RustFile:
+         uses = [index for index in range(expression_end, unit_end) if self.kind(index) == IDENT and self.t(index) == name and self.t(index - 1) != "."
+                 and not (self.t(index + 1) == ":" and self.t(index + 2) == ":")]
+ 
++        def innermost_brace_around(index):
++            return next((position for position in range(index - 1, -1, -1) if self.t(position) == "{" and self.pairs.get(position, -1) > index), None)
++
++        # 每一处用法最内的那一层花括号都要是这条 let 所在的那一层：出了这个块的同名用法指的是别的绑定；
++        # 进了更深的块（if、循环、闭包体）的用法走不走得到、块里起的是不是它，看不出。弄坏开关 rust-own-program-uses-any-block 下用法落在哪一层都不看
++        block_of_the_let = innermost_brace_around(expression_start)
++        if block_of_the_let is None:
++            return False
++        if "rust-own-program-uses-any-block" not in self.breaks and any(innermost_brace_around(index) != block_of_the_let for index in uses):
++            return False
++
+         def is_handed_to_command(index):
+             opening = index - 2 if self.t(index - 1) == "&" else index - 1
+             return self.is_command_new_open(opening) and self.pairs.get(opening) == index + 1
+@@ -3452,9 +3572,9 @@ class RustFile:
+             return True
+         if rust_plain_string(self.t(keyword + 1)) != "C" or keyword + 2 != opening:
+             return False
+-        if any(self.t(index) == "#" and self.t(index + 1) == "[" and self.t(index + 2) == "link" for index in range(item_start, keyword)):
++        if extern_block_attributes_name_link(self.kinds, self.texts, item_start, keyword):
+             return False
+-        position, declared_any = opening + 1, False
++        position, declared_any, allowed_calls = opening + 1, False, c_library_calls_allowed_in_extern_blocks()
+         while position < close:
+             link_name = None
+             if self.t(position) == "#":
+@@ -3468,7 +3588,7 @@ class RustFile:
+                 position += 1
+             if self.t(position) != "fn" or self.kind(position + 1) != IDENT or self.t(position + 2) != "(" or (position + 2) not in self.pairs:
+                 return False
+-            if (link_name if link_name is not None else self.t(position + 1)) not in C_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS:
++            if (link_name if link_name is not None else self.t(position + 1)) not in allowed_calls:
+                 return False
+             declared_any = True
+             semicolon = next((index for index in range(self.pairs[position + 2], close) if self.t(index) == ";"), None)
+@@ -4172,6 +4292,7 @@ class RustWorkspace:
+         self.files = {}
+         self.targets = {}
+         self.names_assigned = False
++        self.links_beyond_system_library = {}   # 目标 id → target_may_link_libraries_beyond_the_system_library 的结果
+         self.shell_sources = {}   # 读到的 shell 脚本 → shell_sourced_files 的结果（shell_sourced）
+         for crate in self.crates:
+             for target in crate_targets(root, crate):
+@@ -4185,6 +4306,22 @@ class RustWorkspace:
+         for path in sorted(self.files):
+             self.apply_product_view(self.files[path])
+ 
++    def target_may_link_libraries_beyond_the_system_library(self, target_id):
++        """这个目标链接时可能多出 C 库之外的库（crates/singlefs-unit-graph 的 target_may_link_libraries_beyond_the_system_library 同一个判法）：目标里有一个 extern 块的
++        外属性里有 link（不管它进不进闭包：link 对整个产物生效），或它所在包的构建脚本目标里任一份文件的原文含 RUSTC_LINK_LIBRARY_INSTRUCTION。
++        弄坏开关 rust-extern-other-block-link-unchecked 下不看目标里的 extern 块、rust-extern-build-script-link-unchecked 下不看构建脚本。"""
++        if target_id not in self.links_beyond_system_library:
++            target, breaks = self.targets[target_id], self.breaks
++            has_an_extern_block_naming_link = "rust-extern-other-block-link-unchecked" not in breaks and any(
++                unit.kind == "extern_block" and extern_block_attributes_name_link(rust_file.kinds, rust_file.texts, unit.first_token, unit.last_token)
++                for rust_file in (self.files[path] for path in target.files) for unit in rust_file.units)
++            build_script_links_a_library = "rust-extern-build-script-link-unchecked" not in breaks and any(
++                RUSTC_LINK_LIBRARY_INSTRUCTION in "\n".join(self.files[path].source_rows)
++                for build_script in self.targets.values() if build_script.crate is target.crate and build_script.kind == "build"
++                for path in build_script.files)
++            self.links_beyond_system_library[target_id] = has_an_extern_block_naming_link or build_script_links_a_library
++        return self.links_beyond_system_library[target_id]
++
+     def shell_sourced(self, path):
+         """shell_sourced_files(根, path)，一个工作区里一份脚本只折一趟（几十个入口读同一份脚本）。"""
+         if path not in self.shell_sources:
+@@ -4536,6 +4673,19 @@ class RustWorkspace:
+         """单元在目标 identifier 里所在的模块路径：文件在目标模块树里的路径接文件里的行内模块路径。"""
+         return tuple(self.targets[identifier].files[unit.file][0]) + tuple(unit.scope or ())
+ 
++    def is_compiled_conditionally(self, unit, identifier):
++        """单元带条件编译（crates/singlefs-unit-graph 的 is_conditionally_compiled 同一个判法）：它自己的条件链非空（外层行内模块、impl 头与它自己的 cfg、
++        cfg_attr 里套的 cfg），或它所在文件在目标 identifier 里的连法里有一条带条件（连进来的每一条 mod 声明自己带条件、或声明它的文件又是这样）。"""
++        return bool(unit.conditions) or self.file_is_linked_conditionally(identifier, unit.file, frozenset())
++
++    def file_is_linked_conditionally(self, identifier, path, visited):
++        target = self.targets[identifier]
++        declarations = target.declared_by.get(path, ())
++        if not declarations:
++            return bool(target.files[path][1])
++        return any(declaration.conditions or (declaration.file not in visited and self.file_is_linked_conditionally(identifier, declaration.file, visited | {path}))
++                   for declaration in declarations)
++
+     def candidates_seen_from_module(self, unit, identifier, name, candidates, other_crate_roots=frozenset()):
+         """同一个目标里，单元按裸名 name 连得到 candidates 里的哪几份（文件头 Rust 闭包「R-裸名同一个目标里按模块筛」；crates/singlefs-unit-graph 的
+         candidates_seen_from_the_module_of_the_unit 同一个判法）：与单元同一模块的；所在模块的 use 引进了 name（或是 glob）、use 路径里有候选所在模块的末段
+@@ -4564,14 +4714,34 @@ class RustWorkspace:
+                     found.add(id(candidate))
+             return found or None
+ 
+-        def placed_by_the_use_path(path):
++        scope_uses = self.uses_by_scope.get((unit.file, unit.scope), ())
++        conditions_checked = "rust-use-path-conditional-candidates-narrowed" not in self.breaks
++        re_exports_checked = "rust-use-path-re-exporting-modules-narrowed" not in self.breaks
++        first_segments_checked = "rust-use-path-first-segment-imported-narrowed" not in self.breaks
++
++        def is_imported_by_another_use(uses, except_use, imported_name):
++            """作用域 uses 里除 except_use 之外有一条 use 按名字引进 imported_name（as 改出的名字也算；glob 不算）。"""
++            return any(other is not except_use and imported_name in (other.imports or ()) for other in uses)
++
++        def placed_by_the_use_path(path, path_use):
+             """use 的一支路径（不含名字本身）恰好点到的候选；一份都没点到交 None。恰好点到才算：点到的模块里自己定义的名字压过它 glob 转出来的；
+-            模块里没有这个名字的候选，名字可能是它经 pub use 转出来的，落在哪一份看不出，退回全连。"""
++            模块里没有这个名字的候选，名字可能是它经 pub use 转出来的，落在哪一份看不出，退回全连。点到的候选带条件编译、或候选所在模块另有 use 按名字引进它，
++            名字可能是 cfg 互斥的另一支 pub use 转来的，退回全连；相对路径的首段在本作用域被别的 use 按名字引进（含 as 改名），首段真指的模块看不出，退回全连。
++            path_use 是这一支所在的 use。"""
+             leading_supers = len(path) - len(list(itertools.dropwhile(lambda segment: segment == "super", path)))
+             exact = (tuple(path[1:]) if path[:1] == ["crate"] else own + tuple(path[1:]) if path[:1] == ["self"]
+                      else own[:max(len(own) - leading_supers, 0)] + tuple(path[leading_supers:]) if leading_supers else None)
++            if first_segments_checked and exact is None and path and is_imported_by_another_use(scope_uses, path_use, path[0]):
++                return None
+             found = {id(candidate) for candidate in candidates
+                      if (modules[id(candidate)] == exact if exact is not None else bool(path) and modules[id(candidate)][-len(path):] == tuple(path))}
++            for candidate in candidates:
++                if id(candidate) not in found:
++                    continue
++                if conditions_checked and self.is_compiled_conditionally(candidate, identifier):
++                    return None
++                if re_exports_checked and is_imported_by_another_use(self.uses_by_scope.get((candidate.file, candidate.scope), ()), path_use, name):
++                    return None
+             return found or None
+ 
+         rust_file = self.files[unit.file]
+@@ -4588,11 +4758,13 @@ class RustWorkspace:
+                 continue
+             use_keyword = next((index for index in range(use.first_token, use.last_token)
+                                 if rust_file.kinds[index] == IDENT and rust_file.texts[index] == "use"), use.first_token)
+-            # 这条 use 里引进 name 的每一支（*、名字本身、原名 as name），花括号展开之后整条比
++            # 这条 use 里引进 name 的每一支（*、名字本身），花括号展开之后整条比；原名 as name 那一支 as 前面不是 段::，路径只到外层花括号，
++            # 多半点不到、退回全连（不顺着原名点准：use 引进的是原名改的 name，原名所在模块里叫 name 的是另一份）
+             leaves = [index for index in range(use_keyword + 1, use.last_token)
+-                      if rust_file.t(index) == "*" or (rust_file.kinds[index] == IDENT and rust_file.t(index) == name
+-                                                       and rust_file.t(index + 1) not in (":", "as"))]
+-            hits = [placed_by_the_use_path(use_path_leading_to(rust_file, use_keyword, index - 2 if rust_file.t(index - 1) == "as" else index)) for index in leaves]
++                      if rust_file.t(index) == "*" or (rust_file.kinds[index] == IDENT and rust_file.t(index) == name and rust_file.t(index + 1) != ":")]
++            alias_followed_to_the_original = "rust-use-alias-leaf-followed-to-the-original" in self.breaks
++            hits = [placed_by_the_use_path(use_path_leading_to(rust_file, use_keyword, index - 2 if alias_followed_to_the_original and rust_file.t(index - 1) == "as" else index), use)
++                    for index in leaves]
+             if not hits or None in hits:
+                 every = True
+             else:
+@@ -5004,13 +5176,15 @@ def entry_names_only_defined(workspace, entry):
+     return frozenset((entry.short,)) if occurrences <= 1 else frozenset()
+ 
+ 
+-def rust_entry_is_the_main_of_a_program(target, roots, entry, compiled_as_test):
+-    """这一趟的入口恰好是一个 bin 目标自己的 fn main（目标根文件顶层那一个，一组入口里没有别的）、不按测试编：跑起来的进程从这个 main 起（文件头「程序起自己」）。
+-    弄坏开关 rust-own-program-entry-unchecked 下入口是什么都算。"""
++def rust_entry_is_the_main_of_a_program(workspace, target, roots, compiled_as_test):
++    """这一趟的入口恰好是一个 bin 目标自己的 fn main（crates/singlefs-unit-graph 的 main_function_of：目标根文件里排头一个的顶层 fn main；一组入口里没有别的）、
++    不按测试编：跑起来的进程从这个 main 起（文件头「程序起自己」）。弄坏开关 rust-own-program-entry-unchecked 下入口是什么都算。"""
+     if "rust-own-program-entry-unchecked" in active_breaks():
+         return True
+-    return (target.kind == "bin" and not compiled_as_test and len(roots) == 1 and roots[0] is entry and entry.kind == "fn" and entry.short == "main"
+-            and entry.container is None and not entry.scope and entry.file == target.root_file)
++    if target.kind != "bin" or compiled_as_test:
++        return False
++    main = next((unit for unit in workspace.files[target.root_file].units if unit.kind == "fn" and unit.short == "main" and unit.container is None and not unit.scope), None)
++    return main is not None and len(roots) == 1 and roots[0] is main
+ 
+ 
+ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False, features=(), no_default_features=False,
+@@ -5037,7 +5211,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
+     enabled = workspace.resolve_features(linked_crates, target.crate, requested, no_default_features,
+                                          rust_entry_dependency_sections(target.kind, test_compiled))
+     names, pairs = cfg_entries(([] if no_default_cfg else list(DEFAULT_RUST_CFG)) + list(cfg or ()))
+-    entry_is_the_main_of_a_program = rust_entry_is_the_main_of_a_program(target, roots, entry, test_compiled or "test" in names)
++    entry_is_the_main_of_a_program = rust_entry_is_the_main_of_a_program(workspace, target, roots, test_compiled or "test" in names)
+     known_extra = set(names) | {key for key, _value in pairs}
+     for crate in workspace.crates:
+         known_extra |= crate.check_cfg
+@@ -5303,7 +5477,7 @@ def rust_closure_of(workspace, entry, target_id, cfg=None, no_default_cfg=False,
+             closure.unit_targets.setdefault(id(unit), identifier)
+             closure.refusals.update(unit.refusals)
+             record_cfg_atoms(unit, identifier)
+-            if unit.kind == "extern_block" and not unit.listed_c_library_calls:
++            if unit.kind == "extern_block" and (not unit.listed_c_library_calls or workspace.target_may_link_libraries_beyond_the_system_library(identifier)):
+                 closure.refusals.add(Refusal("extern-block", unit.file, unit.first_line, workspace.files[unit.file].row(unit.first_line)))
+             alias_originals = []
+             if unit.kind != "doctest" or doctest_structure:
+@@ -15478,6 +15652,101 @@ def rust_toolchain_lines(root):
+     return lines
+ 
+ 
++# 构建档的生效值（crates/singlefs-unit-graph 的 build_toolchain.rs：effective_profile_lines 同一个判法，两边出的行逐字相同）。
++# 进键的设置：会改编出来的代码跑出的结果的那几样，每个一行；debug（调试信息）不进。incremental 自己不出行，只在 codegen-units 没写时定它的生效值。
++# 键名与默认值逐项与 Rust 源码里的 PROFILE_SETTING_KEYS、CODEGEN_UNITS_WHEN_INCREMENTAL、CODEGEN_UNITS_WHEN_NOT_INCREMENTAL 相同（自证读那份源码比）
++PROFILE_SETTING_KEYS = ("opt-level", "debug-assertions", "overflow-checks", "lto", "panic", "codegen-units")
++PROFILE_INCREMENTAL_KEY = "incremental"
++CODEGEN_UNITS_WHEN_INCREMENTAL = "256"
++CODEGEN_UNITS_WHEN_NOT_INCREMENTAL = "16"
++CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE = "CARGO_INCREMENTAL"
++# 内置的根 profile 没写时各设置的默认值（codegen-units 不在里面：它没写时的值由生效的 incremental 定）；test 承 dev、bench 承 release
++BUILTIN_ROOT_PROFILES = {
++    "dev": {"opt-level": "0", "debug-assertions": "true", "overflow-checks": "true", "lto": "false", "panic": "unwind", "incremental": "true"},
++    "release": {"opt-level": "3", "debug-assertions": "false", "overflow-checks": "false", "lto": "false", "panic": "unwind", "incremental": "false"},
++}
++BUILTIN_INHERITING_PROFILES = {"test": "dev", "bench": "release"}
++
++
++def profile_setting_keys():
++    """进键的设置名（PROFILE_SETTING_KEYS）；弄坏开关 profile-setting-keys-short 下少最后一项（codegen-units）。"""
++    if "profile-setting-keys-short" in active_breaks():
++        return PROFILE_SETTING_KEYS[:-1]
++    return PROFILE_SETTING_KEYS
++
++
++def profile_environment_variable(profile_name, setting_key):
++    """CARGO_PROFILE_<名>_<键> 的变量名（名与键大写、- 换成 _）。"""
++    return f"CARGO_PROFILE_{profile_name.upper().replace('-', '_')}_{setting_key.upper().replace('-', '_')}"
++
++
++def profile_setting_text(value):
++    """根清单里一个设置的值写成行里的文字：串照原样，布尔写 true / false，整数照数；数组与表不读，交 None。"""
++    if isinstance(value, bool):
++        return "true" if value else "false"
++    if isinstance(value, (str, int)):
++        return str(value)
++    return None
++
++
++def effective_profile_lines(manifest, profile_name, environment, incremental_ignored=False):
++    """一个 profile 的生效值：「profile: <名>」一行，再按 PROFILE_SETTING_KEYS 的次序每个键一行「profile.<键>: <值>」。manifest 是根 Cargo.toml 解析后的表。
++    每个设置依次由内置默认、根清单从继承链的根到叶、CARGO_PROFILE_<名>_<键> 盖；codegen-units 三处都没写时由生效的增量编译开关定
++    （incremental 照同样三层盖，最后再由 CARGO_INCREMENTAL 盖：1 开、0 关）。.cargo 配置与 --config 里写的 profile、[profile.<名>.package.<包>]、build-override 不读。
++    算不出的（profile 不是内置的四种又没写 inherits、inherits 绕成圈、incremental 或 CARGO_INCREMENTAL 的值认不得）抛 ValueError。
++    incremental_ignored 为真（只给弄坏开关用）时 codegen-units 没写一律取增量开着的那一个值。"""
++    written = {}
++    for name, table in ((manifest or {}).get("profile") or {}).items():
++        if isinstance(table, dict):
++            written[name] = {key: text for key, text in ((key, profile_setting_text(value)) for key, value in table.items()) if text is not None}
++    chain, current = [], profile_name
++    while True:
++        if current in chain:
++            raise ValueError(f"profile 的 inherits 绕成了圈：{' → '.join(chain)}")
++        chain.append(current)
++        inherited = written.get(current, {}).get("inherits")
++        if current in BUILTIN_ROOT_PROFILES:
++            effective = dict(BUILTIN_ROOT_PROFILES[current])
++            break
++        if current in BUILTIN_INHERITING_PROFILES and inherited is None:
++            current = BUILTIN_INHERITING_PROFILES[current]
++        elif inherited is not None:
++            current = inherited
++        else:
++            raise ValueError(f"profile「{current}」不是内置的 dev / release / test / bench，根 Cargo.toml 里也没写它的 inherits")
++    setting_keys = profile_setting_keys()
++    settings_read = setting_keys + (PROFILE_INCREMENTAL_KEY,)
++    for profile in reversed(chain):
++        for key in settings_read:
++            if key in written.get(profile, {}):
++                effective[key] = written[profile][key]
++    for key in settings_read:
++        value = environment.get(profile_environment_variable(profile_name, key))
++        if value is not None:
++            effective[key] = value
++    profile_incremental_text = effective.pop(PROFILE_INCREMENTAL_KEY)
++    if profile_incremental_text not in ("true", "false"):
++        raise ValueError(f"profile 的 incremental 写成「{profile_incremental_text}」，只认 true / false")
++    cargo_incremental = environment.get(CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE)
++    if cargo_incremental is not None and cargo_incremental not in ("1", "0"):
++        raise ValueError(f"{CARGO_INCREMENTAL_ENVIRONMENT_VARIABLE} 设成「{cargo_incremental}」，只认 1 / 0")
++    is_incremental = profile_incremental_text == "true" if cargo_incremental is None else cargo_incremental == "1"
++    if incremental_ignored:
++        is_incremental = True
++    effective.setdefault("codegen-units", CODEGEN_UNITS_WHEN_INCREMENTAL if is_incremental else CODEGEN_UNITS_WHEN_NOT_INCREMENTAL)
++    return [f"profile: {profile_name}"] + [f"profile.{key}: {effective[key]}" for key in setting_keys]
++
++
++def effective_profile_lines_of_every_profile(manifest, environment, incremental_ignored=False):
++    """内置的 dev、release、test、bench 与根清单里写了的每个 profile 各自的 effective_profile_lines，连起来（哪个 profile 在编由调用方的 cargo 参数定，键里都带）。"""
++    names = ["dev", "release", "test", "bench"]
++    names += sorted(name for name, table in ((manifest or {}).get("profile") or {}).items() if isinstance(table, dict) and name not in names)
++    lines = []
++    for name in names:
++        lines += effective_profile_lines(manifest, name, environment, incremental_ignored)
++    return lines
++
++
+ def closure_key(closure, toolchain=(), dependencies=(), externals=None, allow_refused=False):
+     """→ (键或 None, 拒算列表)。拒算不空时键是 None（allow_refused 只给对照用：照算出键，拒算照样交回）。
+     闭包里的工具链询问（文件头「版本询问」）由闭包里的工具链单元进键，调用方不另折。
+@@ -15940,6 +16209,116 @@ def compare_cell(fixture, entry, path, old, new, want):
+     return judge
+ 
+ 
++def rust_string_list_constant(constant_name):
++    """crates/singlefs-unit-graph/src 下一个 `const <名>: [&str; N] = [ "…", … ];` 的 (N, 各项按写的次序)；整个目录里恰好一份才算找到，不然抛 AssertionError。"""
++    source_directory = os.path.join(LIBRARY_ROOT, "crates", "singlefs-unit-graph", "src")
++    pattern = re.compile(r"\bconst\s+" + re.escape(constant_name) + r"\s*:\s*\[&str;\s*(\d+)\]\s*=\s*\[(.*?)\];", re.DOTALL)
++    found = []
++    for file_name in sorted(os.listdir(source_directory)):
++        if not file_name.endswith(".rs"):
++            continue
++        with open(os.path.join(source_directory, file_name), encoding="utf-8") as handle:
++            text = handle.read()
++        found += [(int(match.group(1)), re.findall(r'"([^"]*)"', match.group(2))) for match in pattern.finditer(text)]
++    if len(found) != 1:
++        raise AssertionError(f"{source_directory} 下 const {constant_name}: [&str; N] 找到 {len(found)} 份（要恰好 1 份）")
++    return found[0]
++
++
++def rust_string_list_cell(constant_name, python_list):
++    """读 Rust 源码里那个常量，与 python_list()（这一边用的那份名单）逐项比：项数、每一项、次序都要相同。"""
++    def judge(work):
++        declared, items = rust_string_list_constant(constant_name)
++        got = list(python_list())
++        return declared == len(items) and items == got, f"Rust 源码里 {constant_name} 写 {declared} 项、读到 {items}；这一边 {got}"
++    return judge
++
++
++def rust_string_constant(constant_name):
++    """crates/singlefs-unit-graph/src 下一个 `const <名>: &str = "…";` 的值；整个目录里恰好一份才算找到，不然抛 AssertionError。"""
++    source_directory = os.path.join(LIBRARY_ROOT, "crates", "singlefs-unit-graph", "src")
++    pattern = re.compile(r'\bconst\s+' + re.escape(constant_name) + r'\s*:\s*&str\s*=\s*"([^"]*)"\s*;')
++    found = []
++    for file_name in sorted(os.listdir(source_directory)):
++        if file_name.endswith(".rs"):
++            with open(os.path.join(source_directory, file_name), encoding="utf-8") as handle:
++                found += pattern.findall(handle.read())
++    if len(found) != 1:
++        raise AssertionError(f"{source_directory} 下 const {constant_name}: &str 找到 {len(found)} 份（要恰好 1 份）")
++    return found[0]
++
++
++def profile_constants_cell(work):
++    """PROFILE_CONSTANTS_CELL：进键的设置名与 codegen-units 没写时的两个默认值，逐项与 crates/singlefs-unit-graph 的 build_toolchain.rs 里
++    PROFILE_SETTING_KEYS、CODEGEN_UNITS_WHEN_INCREMENTAL、CODEGEN_UNITS_WHEN_NOT_INCREMENTAL 相同（读那份源码比）。"""
++    declared, keys = rust_string_list_constant("PROFILE_SETTING_KEYS")
++    problems = []
++    if declared != len(keys) or keys != list(profile_setting_keys()):
++        problems.append(f"PROFILE_SETTING_KEYS：Rust 写 {declared} 项、读到 {keys}；这一边 {list(profile_setting_keys())}")
++    for name, ours in (("CODEGEN_UNITS_WHEN_INCREMENTAL", CODEGEN_UNITS_WHEN_INCREMENTAL), ("CODEGEN_UNITS_WHEN_NOT_INCREMENTAL", CODEGEN_UNITS_WHEN_NOT_INCREMENTAL)):
++        theirs = rust_string_constant(name)
++        if theirs != ours:
++            problems.append(f"{name}：Rust {theirs}、这一边 {ours}")
++    return not problems, "；".join(problems)
++
++
++def profile_incremental_cell(work):
++    """PROFILE_INCREMENTAL_CELL：构建档的生效值（effective_profile_lines）。内置的 dev、release 照 crates/singlefs-unit-graph 的 build_toolchain.rs 里测试写的整套行；
++    只差 incremental 的两种编法只有 codegen-units 那一行不同（没写 codegen-units 时增量开取 256、关取 16），debug 不出行也不改任何行；
++    incremental 由根清单、CARGO_PROFILE_<名>_INCREMENTAL、CARGO_INCREMENTAL 三种来源各盖一例（依次盖：内置 < 根清单 < profile 环境变量 < CARGO_INCREMENTAL）；
++    显式写了 codegen-units（根清单或环境变量）时增量开关不改任何行。弄坏开关 profile-incremental-ignored、profile-setting-keys-short 下这一格必须判错。"""
++    ignored = "profile-incremental-ignored" in active_breaks()
++    problems = []
++
++    def lines(manifest_text, name, environment=None):
++        try:
++            return effective_profile_lines(tomllib.loads(manifest_text), name, environment or {}, ignored)
++        except ValueError as error:
++            problems.append(f"{name} 算不出：{error}")
++            return []
++
++    def units(found):
++        return next((line.split(": ", 1)[1] for line in found if line.startswith("profile.codegen-units: ")), None)
++
++    def expect(label, got, want):
++        if got != want:
++            problems.append(f"{label}：{got}（要 {want}）")
++    root_manifest = ('[workspace]\nmembers = ["crates/alpha"]\n\n[profile.release]\nopt-level = 3\ndebug = true\noverflow-checks = true\ndebug-assertions = true\n\n'
++                     '[profile.checked]\ninherits = "release"\nlto = "thin"\n')
++    expect("dev 内置整套行", lines("", "dev"), ["profile: dev", "profile.opt-level: 0", "profile.debug-assertions: true", "profile.overflow-checks: true",
++                                          "profile.lto: false", "profile.panic: unwind", "profile.codegen-units: 256"])
++    expect("根清单写了的 release 整套行（debug 不出行）", lines(root_manifest, "release"),
++           ["profile: release", "profile.opt-level: 3", "profile.debug-assertions: true", "profile.overflow-checks: true", "profile.lto: false",
++            "profile.panic: unwind", "profile.codegen-units: 16"])
++    expect("承 release 的自定义 profile 整套行", lines(root_manifest, "checked"),
++           ["profile: checked", "profile.opt-level: 3", "profile.debug-assertions: true", "profile.overflow-checks: true", "profile.lto: thin",
++            "profile.panic: unwind", "profile.codegen-units: 16"])
++    expect("test 承 dev、bench 承 release 的 codegen-units", (units(lines("", "test")), units(lines("", "bench"))), ("256", "16"))
++    incremental_on, incremental_off = lines("", "dev"), lines("", "dev", {"CARGO_INCREMENTAL": "0"})
++    differing = [index for index, (first, second) in enumerate(zip(incremental_on, incremental_off)) if first != second]
++    expect("只差 incremental 的两种编法：不同的行", (len(incremental_on) == len(incremental_off), differing), (True, [len(incremental_on) - 1]))
++    expect("debug 不出行也不改任何行", lines("[profile.dev]\ndebug = 2\n", "dev", {"CARGO_PROFILE_DEV_DEBUG": "line-tables-only"}), lines("", "dev"))
++    expect("根清单 incremental = true 盖 release 内置", units(lines("[profile.release]\nincremental = true\n", "release")), "256")
++    expect("根清单 incremental = false 盖 dev 内置", units(lines("[profile.dev]\nincremental = false\n", "dev")), "16")
++    expect("CARGO_PROFILE_RELEASE_INCREMENTAL=true 盖 release 内置", units(lines("", "release", {"CARGO_PROFILE_RELEASE_INCREMENTAL": "true"})), "256")
++    expect("CARGO_PROFILE_RELEASE_INCREMENTAL=true 盖根清单的 false", units(lines("[profile.release]\nincremental = false\n", "release",
++                                                                                         {"CARGO_PROFILE_RELEASE_INCREMENTAL": "true"})), "256")
++    expect("CARGO_INCREMENTAL=0 盖 dev 内置、根清单与 profile 环境变量的开", units(lines("[profile.dev]\nincremental = true\n", "dev",
++                                                                                             {"CARGO_PROFILE_DEV_INCREMENTAL": "true", "CARGO_INCREMENTAL": "0"})), "16")
++    expect("CARGO_INCREMENTAL=1 盖 release 内置的关", units(lines("", "release", {"CARGO_INCREMENTAL": "1"})), "256")
++    expect("显式写了 codegen-units（根清单）：增量开", units(lines("[profile.dev]\ncodegen-units = 4\n", "dev")), "4")
++    expect("显式写了 codegen-units（根清单）：增量关", units(lines("[profile.dev]\ncodegen-units = 4\n", "dev", {"CARGO_INCREMENTAL": "0"})), "4")
++    expect("显式写了 codegen-units（环境变量）：增量开", units(lines("", "release", {"CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "2", "CARGO_INCREMENTAL": "1"})), "2")
++    expect("显式写了 codegen-units（环境变量）：增量关", units(lines("", "release", {"CARGO_PROFILE_RELEASE_CODEGEN_UNITS": "2"})), "2")
++    for label, manifest_text, environment in (("incremental 写成认不得的值", "[profile.dev]\nincremental = \"yes\"\n", {}), ("CARGO_INCREMENTAL 设成认不得的值", "", {"CARGO_INCREMENTAL": "2"})):
++        try:
++            effective_profile_lines(tomllib.loads(manifest_text), "dev", environment)
++            problems.append(f"{label}：没报错")
++        except ValueError:
++            pass
++    return not problems, "；".join(problems)
++
++
+ def with_breaks_added(judge, *switches):
+     """这一格在当时设着的弄坏开关之上再打开 switches 判（只看一条边、别的边先关掉的格用）：BREAK_CELLS 轮打开点名的开关时，两样一起开着。"""
+     def judge_with_breaks(work):
+@@ -16263,9 +16642,25 @@ def closure_edge_cells():
+         (LET_SHADOW_BOUND_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::bound", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "same")),
+         (LET_SHADOW_PARAMETER_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::parameter", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "same")),
+         (LET_SHADOW_CAPTURE_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::captured", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "same")),
++        (LET_SHADOW_LISTED_MACRO_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::named_in_a_listed_macro", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "same")),
++        (LET_SHADOW_UNLISTED_MACRO_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::named_in_a_macro_outside_the_list", "crates/fshadow/src/lib.rs",
++                                                      "    11\n", "    12\n", "changed")),
++        (LET_SHADOW_NESTED_MACRO_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::named_in_a_listed_macro_inside_an_unlisted_macro", "crates/fshadow/src/lib.rs",
++                                                    "    11\n", "    12\n", "changed")),
++        (STANDARD_MACRO_LIST_CELL, rust_string_list_cell("STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE", standard_macros_evaluating_their_arguments_in_place)),
+         (LET_SHADOW_BEFORE_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::before", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "changed")),
+         (LET_SHADOW_OTHER_BLOCK_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::other_block", "crates/fshadow/src/lib.rs", "    11\n", "    12\n", "changed")),
+         (LET_SHADOW_CONSTANT_CELL, compare_cell(LET_SHADOW_FIXTURE, "crates/fshadow/src/lib.rs::constant_pattern", "crates/fshadow/src/lib.rs", "= 21;", "= 22;", "changed")),
++        (PROFILE_INCREMENTAL_CELL, profile_incremental_cell),
++        (PROFILE_CONSTANTS_CELL, profile_constants_cell),
++        (USE_PATH_CONDITIONAL_CELL, compare_cell(USE_PATH_CONDITIONAL_FIXTURE, "crates/fswap/src/lib.rs::entry_point", "crates/fswap/src/lib.rs",
++                                                 ".map(|byte| u32::from(*byte)).sum()", ".map(|byte| u32::from(*byte) + 1).sum()", "changed")),
++        (USE_PATH_RE_EXPORT_CELL, compare_cell(USE_PATH_RE_EXPORT_FIXTURE, "crates/freexport/src/lib.rs::entry_point", "crates/freexport/src/lib.rs",
++                                               ".map(|byte| u32::from(*byte)).sum()", ".map(|byte| u32::from(*byte) + 1).sum()", "changed")),
++        (USE_PATH_FIRST_SEGMENT_CELL, compare_cell(USE_PATH_FIRST_SEGMENT_FIXTURE, "crates/falias/src/lib.rs::entry_point", "crates/falias/src/lib.rs",
++                                                   "            7\n", "            70\n", "changed")),
++        (USE_PATH_ALIAS_LEAF_CELL, compare_cell(USE_PATH_ALIAS_LEAF_FIXTURE, "crates/fdiverge/src/lib.rs::entry_point", "crates/fdiverge/src/lib.rs",
++                                                "pub mod second {\n    pub fn helper_total() -> u32 {\n        3", "pub mod second {\n    pub fn helper_total() -> u32 {\n        30", "changed")),
+         (USE_PATH_EXACT_CELL, compare_cell(USE_PATH_EXACT_FIXTURE, "crates/fprelude/src/user.rs::width", "crates/fprelude/src/deep.rs", "= 64;", "= 65;", "changed")),
+         (CRATES_MODULE_PRIVATE_CELL, compare_cell(CRATES_MODULE_FIXTURE, "crates/fmodules/src/cpu_checks.rs::cpu_slots", "crates/fmodules/src/gpu_checks.rs",
+                                                   "usize = 32;", "usize = 33;", "same")),
+@@ -17871,19 +18266,26 @@ def own_program_entry_cell(work):
+     return not problems, f"该拒算 current-exe 的没拒算：{problems}"
+ 
+ 
++def own_program_refused_cell(restarts):
++    """restarts（{标签: 起自己的函数}）里每一种从 bin 的 main 起都拒算 current-exe。"""
++    def judge(work):
++        problems = []
++        for label, restart in restarts.items():
++            key, forms = fixture_key(own_program_tree(work, label, {OWN_PROGRAM_MAIN_FILE: own_program_source(restart)}), OWN_PROGRAM_MAIN_ENTRY)
++            if key is not None or "current-exe" not in forms:
++                problems.append(f"{label}：键{'有' if key else '无'}，拒算 {sorted(forms)}")
++        return not problems, f"该拒算 current-exe 的没拒算：{problems}"
++    return judge
++
++
+ def own_program_path_cell(work):
+     """OWN_PROGRAM_PATH_CELL：入口是 bin 的 main，路径改过或流向别处的每一种都拒算 current-exe。"""
+-    problems = []
+-    for label, restart in OWN_PROGRAM_RESTARTS_REFUSED.items():
+-        key, forms = fixture_key(own_program_tree(work, label, {OWN_PROGRAM_MAIN_FILE: own_program_source(restart)}), OWN_PROGRAM_MAIN_ENTRY)
+-        if key is not None or "current-exe" not in forms:
+-            problems.append(f"{label}：键{'有' if key else '无'}，拒算 {sorted(forms)}")
+-    return not problems, f"该拒算 current-exe 的没拒算：{problems}"
++    return own_program_refused_cell(OWN_PROGRAM_RESTARTS_REFUSED)(work)
+ 
+ 
+-def extern_block_tree(work, label, library):
++def extern_block_tree(work, label, library, extra_files=None):
+     base = os.path.join(work, label)
+-    write_tree(base, {"crates/fextern/Cargo.toml": '[package]\nname = "fextern"\n', EXTERN_BLOCK_FILE: library})
++    write_tree(base, {"crates/fextern/Cargo.toml": '[package]\nname = "fextern"\n', EXTERN_BLOCK_FILE: library, **(extra_files or {})})
+     return base
+ 
+ 
+@@ -17908,6 +18310,23 @@ def extern_refused_cell(work):
+     return not problems, f"该拒算 extern-block 的没拒算：{problems}"
+ 
+ 
++def extern_refused_cell_for(label, library, extra_files=None):
++    """一份 extern 夹具（库文件 library，另有 extra_files）拒算 extern-block 的一格。"""
++    def judge(work):
++        key, forms = fixture_key(extern_block_tree(work, label, library, extra_files), EXTERN_BLOCK_ENTRY)
++        return key is None and "extern-block" in forms, f"该拒算 extern-block：键{'有' if key else '无'}，拒算 {sorted(forms)}"
++    return judge
++
++
++def extern_build_script_link_cell(work):
++    """EXTERN_BUILD_SCRIPT_LINK_CELL：名单里的块（EXTERN_LISTED_OWN_NAME）所在的包，构建脚本写了 rustc-link-lib 的拒算 extern-block，写别的指令的算得出键。"""
++    linking_key, linking_forms = fixture_key(extern_block_tree(work, "build-script-links", EXTERN_LISTED_OWN_NAME, EXTERN_BUILD_SCRIPT_LINKING), EXTERN_BLOCK_ENTRY)
++    quiet_key, quiet_forms = fixture_key(extern_block_tree(work, "build-script-quiet", EXTERN_LISTED_OWN_NAME, EXTERN_BUILD_SCRIPT_QUIET), EXTERN_BLOCK_ENTRY)
++    return linking_key is None and "extern-block" in linking_forms and quiet_key is not None, (
++        f"写 rustc-link-lib 的：键{'有' if linking_key else '无'}、拒算 {sorted(linking_forms)}（要无、要有 extern-block）；"
++        f"不写的：键{'有' if quiet_key else '无'}、拒算 {sorted(quiet_forms)}（要有）")
++
++
+ def no_refusal_cell(fixture, entry):
+     def judge(work):
+         base = os.path.join(work, "tree")
+@@ -20175,8 +20594,14 @@ def silent_form_cells():
+         (OWN_PROGRAM_KEYED_CELL, own_program_keyed_cell),
+         (OWN_PROGRAM_ENTRY_CELL, own_program_entry_cell),
+         (OWN_PROGRAM_PATH_CELL, own_program_path_cell),
++        (OWN_PROGRAM_BLOCK_CELL, own_program_refused_cell(OWN_PROGRAM_RESTARTS_REFUSED_BY_BLOCK)),
++        (OWN_PROGRAM_DIVERGENCE_CELL, own_program_refused_cell(OWN_PROGRAM_RESTARTS_REFUSED_BY_DIVERGENCE)),
+         (EXTERN_LISTED_CELL, extern_listed_cell),
+         (EXTERN_REFUSED_CELL, extern_refused_cell),
++        (EXTERN_LINK_ATTRIBUTE_CELL, extern_refused_cell_for("link-in-cfg-attr", EXTERN_LINK_ATTRIBUTE_SOURCE)),
++        (EXTERN_OTHER_BLOCK_LINK_CELL, extern_refused_cell_for("link-on-another-block", EXTERN_OTHER_BLOCK_LINK_SOURCE)),
++        (EXTERN_BUILD_SCRIPT_LINK_CELL, extern_build_script_link_cell),
++        (EXTERN_SYSTEM_LIBRARY_LIST_CELL, rust_string_list_cell("SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS", c_library_calls_allowed_in_extern_blocks)),
+         (LOCAL_NAME_REAL_CALL_CELL, compare_cell(LOCAL_NAME_FIXTURE, "pkg/shadow.py::real_call", "pkg/shadow.py", "return 501", "return 5010", "changed")),
+         (LOCAL_NAME_GLOBAL_CELL, compare_cell(LOCAL_NAME_FIXTURE, "pkg/shadow.py::by_global", "pkg/shadow.py", "return 502", "return 5020", "changed")),
+         (CLOSURE_ROUND_LIMIT_CELL, closure_round_limit_cell),
+diff --git a/scripts/gate/lib_function_units_selftest_fixtures.py b/scripts/gate/lib_function_units_selftest_fixtures.py
+index 90c54dd..ae7b07c 100644
+--- a/scripts/gate/lib_function_units_selftest_fixtures.py
++++ b/scripts/gate/lib_function_units_selftest_fixtures.py
+@@ -1693,6 +1693,112 @@ USE_PATH_EXACT_FIXTURE = {
+     "crates/fprelude/src/deep.rs": "pub const WIDTH: usize = 64;\n",
+     "crates/fprelude/src/user.rs": "use crate::prelude::*;\n\npub fn width() -> usize {\n    WIDTH + 1\n}\n",
+ }
++PROFILE_INCREMENTAL_CELL = ("构建档：只差 incremental 的两种编法 codegen-units 那一行不同（没写时增量开 256、关 16），显式写了 codegen-units 时不变，debug 不出行；"
++                            "incremental 由根清单、CARGO_PROFILE_<名>_INCREMENTAL、CARGO_INCREMENTAL 各盖一例；内置的 dev、release 与自定义 profile 的整套行")
++PROFILE_CONSTANTS_CELL = ("构建档：进键的设置名与 codegen-units 的两个缺省值逐项与 crates/singlefs-unit-graph 的 PROFILE_SETTING_KEYS、CODEGEN_UNITS_WHEN_INCREMENTAL、"
++                          "CODEGEN_UNITS_WHEN_NOT_INCREMENTAL 相同（读那份源码比）")
++USE_PATH_CONDITIONAL_CELL = "R-裸名：use 路径点到的候选带条件编译（另一支 cfg 下名字由 pub use 转来），退回全连，转出的那一份改了键变"
++USE_PATH_RE_EXPORT_CELL = "R-裸名：use 路径点到的候选所在模块另有 use 按名字引进同名，退回全连，那条 use 转来的那一份改了键变"
++USE_PATH_FIRST_SEGMENT_CELL = "R-裸名：use 的相对路径首段是别的 use 按名字（as 改名）引进的模块，退回全连，那个模块里的那一份改了键变"
++USE_PATH_ALIAS_LEAF_CELL = "R-裸名：use 原名 as 名 那一支退回全连，别的模块里同名的那一份改了键变"
++# 下面四份夹具：点到的候选带条件编译（USE_PATH_CONDITIONAL_FIXTURE：只在 cfg 开着时才有；另一支 cfg 下的写法不在样本里）、候选所在模块另有 use 引进同名
++# （USE_PATH_RE_EXPORT_FIXTURE：候选自己不带条件）、相对路径首段是别的 use 的 as 改名、use 原名 as 名（USE_PATH_*_CELL）
++USE_PATH_CONDITIONAL_FIXTURE = {
++    "crates/fswap/Cargo.toml": '[package]\nname = "fswap"\n\n[features]\nfast = []\n',
++    "crates/fswap/src/lib.rs": '''pub mod backend {
++    #[cfg(feature = "fast")]
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.len() as u32
++    }
++}
++
++pub mod portable {
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.iter().map(|byte| u32::from(*byte)).sum()
++    }
++}
++
++use crate::backend::checksum;
++
++pub fn entry_point(data: &[u8]) -> u32 {
++    checksum(data)
++}
++''',
++}
++USE_PATH_RE_EXPORT_FIXTURE = {
++    "crates/freexport/Cargo.toml": '[package]\nname = "freexport"\n',
++    "crates/freexport/src/lib.rs": '''pub mod backend {
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.len() as u32
++    }
++
++    pub use crate::portable::checksum;
++}
++
++pub mod portable {
++    pub fn checksum(data: &[u8]) -> u32 {
++        data.iter().map(|byte| u32::from(*byte)).sum()
++    }
++}
++
++use crate::backend::checksum;
++
++pub fn entry_point(data: &[u8]) -> u32 {
++    checksum(data)
++}
++''',
++}
++USE_PATH_FIRST_SEGMENT_FIXTURE = {
++    "crates/falias/Cargo.toml": '[package]\nname = "falias"\n',
++    "crates/falias/src/lib.rs": '''pub mod deep {
++    pub mod real {
++        pub fn helper_total() -> u32 {
++            7
++        }
++    }
++}
++
++pub mod other {
++    pub mod short {
++        pub fn helper_total() -> u32 {
++            8
++        }
++    }
++}
++
++use crate::deep::real as short;
++use short::helper_total;
++
++pub fn entry_point() -> u32 {
++    helper_total()
++}
++''',
++}
++USE_PATH_ALIAS_LEAF_FIXTURE = {
++    "crates/fdiverge/Cargo.toml": '[package]\nname = "fdiverge"\n',
++    "crates/fdiverge/src/lib.rs": '''pub mod first {
++    pub fn old_total() -> u32 {
++        1
++    }
++
++    pub fn helper_total() -> u32 {
++        2
++    }
++}
++
++pub mod second {
++    pub fn helper_total() -> u32 {
++        3
++    }
++}
++
++use crate::first::old_total as helper_total;
++
++pub fn entry_point() -> u32 {
++    helper_total()
++}
++''',
++}
+ LET_SHADOW_FIXTURE = {
+     "crates/fshadow/Cargo.toml": '[package]\nname = "fshadow"\n',
+     "crates/fshadow/src/lib.rs": '''pub fn sample() -> u32 {
+@@ -1732,8 +1838,27 @@ pub fn constant_pattern() -> u32 {
+     let LIMIT = 5;
+     LIMIT
+ }
++
++pub fn named_in_a_listed_macro() -> String {
++    let sample = 6;
++    format!("{}", sample)
++}
++
++pub fn named_in_a_macro_outside_the_list() -> u32 {
++    let sample = 7;
++    dbg!(sample)
++}
++
++pub fn named_in_a_listed_macro_inside_an_unlisted_macro() -> u32 {
++    let sample = 8;
++    dbg!(format!("{}", sample).len() as u32)
++}
+ ''',
+ }
++LET_SHADOW_LISTED_MACRO_CELL = "R-裸名：局部 let 绑的名字写在名单里的宏（format!）的括号里，不连同名函数，改那个函数键不变"
++LET_SHADOW_UNLISTED_MACRO_CELL = "R-裸名：局部 let 绑的名字写在名单之外的宏（dbg!）的括号里，照连同名函数，改那个函数键变"
++LET_SHADOW_NESTED_MACRO_CELL = "R-裸名：名单里的宏（format!）套在名单之外的宏（dbg!）的括号里，里层的名字也照连同名函数，改那个函数键变"
++STANDARD_MACRO_LIST_CELL = "R-裸名：宏名单与 crates/singlefs-unit-graph 的 STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE 逐项相同（读那份源码比）"
+ LAUNCH_ARGUMENT_CELL = ("python：命令是别的函数的参数（subprocess.Popen(command)、[program, *arguments]）：照闭包里每个调用点的实参折"
+                         "（字面程序、根外程序、外层函数的变量、调仓内函数的返回值），不拒算")
+ LAUNCH_ARGUMENT_SCRIPT_CELL = "python：命令参数在调用点折出根里的脚本（run_tool(\"pkg/tool.sh\", …)）：连上那一份，改它键变"
+@@ -2787,16 +2912,24 @@ OWN_PROGRAM_RESTARTS_KEYED = {
+     command.arg("role");
+     command.status().expect("起得来");
+ }''',
+-    "bound-diverging-fallback": '''fn restart() {
++    "bound-diverging-fallback-used-at-the-level-of-the-let": '''fn restart() {
+     let this_program = std::env::current_exe().unwrap_or_else(|error| {
+         eprintln!("取不到路径：{error}");
+         std::process::exit(78)
+     });
+-    let status = std::process::Command::new(&this_program).arg("role").status().unwrap_or_else(|error| {
+-        eprintln!("起不了 {}：{error}", this_program.display());
+-        std::process::exit(78)
+-    });
++    eprintln!("起 {}", this_program.display());
++    let status = std::process::Command::new(&this_program).arg("role").status();
+     drop(status);
++}''',
++    "bound-by-match-with-a-diverging-block": '''fn restart() {
++    let executable = match std::env::current_exe() {
++        Ok(executable) => executable,
++        Err(error) => {
++            eprintln!("取不到路径：{error}");
++            std::process::exit(78)
++        }
++    };
++    std::process::Command::new(&executable).arg("role").status().expect("起得来");
+ }''',
+     "bound-by-match": '''fn restart() -> Result<(), String> {
+     let executable = match std::env::current_exe() {
+@@ -2862,6 +2995,49 @@ fn restart() {
+     let _ = std::process::Command::new(std::env::current_exe().expect("路径")).args(["--exact", "tests::missing"]).status();
+ }''',
+ }
++# 用法与 let 不在同一层花括号里的几种（OWN_PROGRAM_BLOCK_CELL）：用法进了更深的块（起子进程失败的闭包块里显示、if 块里起）、用法出了 let 所在的块
++OWN_PROGRAM_RESTARTS_REFUSED_BY_BLOCK = {
++    "displayed-inside-a-deeper-block": '''fn restart() {
++    let this_program = std::env::current_exe().unwrap_or_else(|error| {
++        eprintln!("取不到路径：{error}");
++        std::process::exit(78)
++    });
++    let status = std::process::Command::new(&this_program).arg("role").status().unwrap_or_else(|error| {
++        eprintln!("起不了 {}：{error}", this_program.display());
++        std::process::exit(78)
++    });
++    drop(status);
++}''',
++    "use-in-an-if-block": '''fn restart() {
++    let exe = std::env::current_exe().expect("路径");
++    if std::env::args().count() == 1 {
++        std::process::Command::new(&exe).arg("role").status().expect("起得来");
++    }
++}''',
++    "use-after-the-block-of-the-let": '''fn restart() {
++    let exe = std::path::PathBuf::from("/bin/worker");
++    {
++        let exe = std::env::current_exe().unwrap();
++        eprintln!("launcher at {}", exe.display());
++    }
++    let _ = std::process::Command::new(&exe).status();
++}''',
++}
++# 失败时的闭包以 if … else { panic!() } 收尾（OWN_PROGRAM_DIVERGENCE_CELL）：块前面是 else，不是闭包参数也不是 =>，别的分支可能交值
++OWN_PROGRAM_RESTARTS_REFUSED_BY_DIVERGENCE = {
++    "fallback-closure-ending-in-an-if-else": '''fn restart() {
++    let this_program = std::env::current_exe().unwrap_or_else(|_| {
++        if let Some(first_argument) = std::env::args_os().next() {
++            std::path::PathBuf::from(first_argument)
++        } else {
++            panic!("拿不到程序路径")
++        }
++    });
++    let _ = std::process::Command::new(&this_program).arg("role").status();
++}''',
++}
++OWN_PROGRAM_BLOCK_CELL = "Rust：路径绑给 let 名字，用法进了更深的块或出了 let 所在的块（起子进程失败的闭包块里显示、if 块里起、内层块的 let 在块外用）：拒算 current-exe"
++OWN_PROGRAM_DIVERGENCE_CELL = "Rust：取路径失败时的闭包以 if … else { panic!() } 收尾（块前面是 else）：拒算 current-exe"
+ # 夹具与 tests/unit_graph_extern_blocks_declaring_only_listed_system_library_calls_are_keyed.rs 同形
+ EXTERN_BLOCK_FILE = "crates/fextern/src/lib.rs"
+ EXTERN_BLOCK_ENTRY = EXTERN_BLOCK_FILE + "::entry_point"
+@@ -2890,6 +3066,16 @@ EXTERN_BLOCKS_REFUSED = {
+     "static": 'extern "C" {\n    fn fdatasync(fd: i32) -> i32;\n    static environ: *const u8;\n}\npub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n',
+     "another-attribute": 'extern "C" {\n    #[cold]\n    fn fdatasync(fd: i32) -> i32;\n}\npub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n',
+ }
++EXTERN_LINK_ATTRIBUTE_CELL = "Rust：extern 块外属性里任何位置有 link（#[cfg_attr(条件, link(…))]）：拒算 extern-block"
++EXTERN_OTHER_BLOCK_LINK_CELL = "Rust：同一个目标里另一个 extern 块带 #[link]（那个块不在闭包里）：名单里的块也拒算 extern-block"
++EXTERN_BUILD_SCRIPT_LINK_CELL = "Rust：包的构建脚本写了 rustc-link-lib：名单里的块也拒算 extern-block；构建脚本没写的不拒算"
++EXTERN_SYSTEM_LIBRARY_LIST_CELL = "Rust：extern 块放行的 C 库调用名单与 crates/singlefs-unit-graph 的 SYSTEM_LIBRARY_CALLS_ALLOWED_IN_EXTERN_BLOCKS 逐项相同（读那份源码比）"
++EXTERN_LINK_ATTRIBUTE_SOURCE = ('#[cfg_attr(target_os = "linux", link(name = "fakesync"))]\nextern "C" {\n    fn fdatasync(fd: i32) -> i32;\n}\n'
++                                'pub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n')
++EXTERN_OTHER_BLOCK_LINK_SOURCE = ('#[link(name = "fakesync")]\nextern "C" {}\n\nextern "C" {\n    fn fdatasync(fd: i32) -> i32;\n}\n'
++                                  'pub fn entry_point() -> i32 {\n    unsafe { fdatasync(3) }\n}\n')
++EXTERN_BUILD_SCRIPT_LINKING = {"crates/fextern/build.rs": 'fn main() {\n    println!("cargo:rustc-link-lib=fakesync");\n}\n'}
++EXTERN_BUILD_SCRIPT_QUIET = {"crates/fextern/build.rs": 'fn main() {\n    println!("cargo:rerun-if-changed=build.rs");\n}\n'}
+ 
+ FAKE_TOOLCHAIN_SCRIPT = '#!/bin/sh\necho "{name} $(cat "{version}")"\n'
+ 
+@@ -3806,8 +3992,14 @@ BREAK_CELLS = (
+     ("rust-own-program-restart-refused", (OWN_PROGRAM_KEYED_CELL,)),
+     ("rust-own-program-entry-unchecked", (OWN_PROGRAM_ENTRY_CELL,)),
+     ("rust-own-program-path-unchecked", (OWN_PROGRAM_PATH_CELL,)),
++    ("rust-own-program-uses-any-block", (OWN_PROGRAM_BLOCK_CELL,)),
++    ("rust-own-program-divergence-any-block", (OWN_PROGRAM_DIVERGENCE_CELL,)),
+     ("rust-extern-listed-calls-refused", (EXTERN_LISTED_CELL,)),
+     ("rust-extern-any-block-keyed", (EXTERN_REFUSED_CELL,)),
++    ("rust-extern-link-first-attribute-only", (EXTERN_LINK_ATTRIBUTE_CELL,)),
++    ("rust-extern-other-block-link-unchecked", (EXTERN_OTHER_BLOCK_LINK_CELL,)),
++    ("rust-extern-build-script-link-unchecked", (EXTERN_BUILD_SCRIPT_LINK_CELL,)),
++    ("rust-extern-system-library-list-short", (EXTERN_SYSTEM_LIBRARY_LIST_CELL,)),
+     ("shell-nested-functions-by-any-word", (SHELL_NESTED_WORD_CELL,)),
+     ("shell-python-launch-arguments-unfolded", (SHELL_PYTHON_ARGUMENTS_SKIPPED_CELL,)),
+     ("closure-round-limit-unchecked", (CLOSURE_ROUND_LIMIT_CELL,)),
+@@ -3846,8 +4038,16 @@ BREAK_CELLS = (
+     ("rust-outside-crate-names-linked-unimported", (OUTSIDE_IMPORT_CELL,)),
+     ("rust-outside-crate-names-linked-across-modules", (OUTSIDE_MODULE_CELL,)),
+     ("rust-crates-names-linked-across-modules", (CRATES_MODULE_PRIVATE_CELL,)),
+-    ("rust-let-shadowed-names-resolved", (LET_SHADOW_BOUND_CELL, LET_SHADOW_PARAMETER_CELL, LET_SHADOW_CAPTURE_CELL)),
++    ("rust-let-shadowed-names-resolved", (LET_SHADOW_BOUND_CELL, LET_SHADOW_PARAMETER_CELL, LET_SHADOW_CAPTURE_CELL, LET_SHADOW_LISTED_MACRO_CELL)),
++    ("rust-macro-arguments-all-local", (LET_SHADOW_UNLISTED_MACRO_CELL, LET_SHADOW_NESTED_MACRO_CELL)),
++    ("rust-macro-list-short", (STANDARD_MACRO_LIST_CELL,)),
++    ("profile-incremental-ignored", (PROFILE_INCREMENTAL_CELL,)),
++    ("profile-setting-keys-short", (PROFILE_CONSTANTS_CELL, PROFILE_INCREMENTAL_CELL)),
+     ("rust-use-paths-flattened", (USE_PATH_EXACT_CELL,)),
++    ("rust-use-path-conditional-candidates-narrowed", (USE_PATH_CONDITIONAL_CELL,)),
++    ("rust-use-path-re-exporting-modules-narrowed", (USE_PATH_RE_EXPORT_CELL,)),
++    ("rust-use-path-first-segment-imported-narrowed", (USE_PATH_FIRST_SEGMENT_CELL,)),
++    ("rust-use-alias-leaf-followed-to-the-original", (USE_PATH_ALIAS_LEAF_CELL,)),
+     ("rust-cfg-atoms-unnarrowed", ("cfg 成分：闭包没引到 gpu 的入口，带不带 gpu 特性两种目标下键相同",)),
+     ("rust-cfg-macro-atoms-ignored", ("cfg 成分：闭包里有 cfg!、语句上的 #[cfg] 或 #[cfg_attr] 引到 gpu 的入口，带不带 gpu 特性键不同",)),
+     ("wgsl-defined-name-suffixes-ignored", ("WGSL 外名：条目级宏调用定义的名字以 _ 加外名收尾就有着落",
+diff --git a/scripts/mutation/crates-mutation-rows.py b/scripts/mutation/crates-mutation-rows.py
+index 32ed786..d68a7e8 100644
+--- a/scripts/mutation/crates-mutation-rows.py
++++ b/scripts/mutation/crates-mutation-rows.py
+@@ -1028,10 +1028,11 @@ crates-mutation-replay 经 import 调 run_stage（阶段文件里那几行内嵌
+   cargo test --release 用 release 档（bench 承 release），四档都设，顶掉调用方设的同名变量与仓根 Cargo.toml 的 [profile.release] debug；
+   另带 CARGO_PROFILE_RELEASE_INCREMENTAL = CARGO_RELEASE_INCREMENTAL_SETTING（true）：release 档开增量编译，改坏一处只重编改到的那几个代码分区。只设在起 cargo 的那一份环境里。
+   命中重测试目标、这一趟补了 --release 的行（「重测试目标只许 release」）走的就是 release 档，同样关调试信息、开增量；档本身照 --release 进行键的「开关与特性」。
+-  这两项的取值不进行键：算工具链行时照起 cargo 的环境算，lib_mutation_units.py 的 toolchain_lines 按整个键名去掉 CARGO_PROFILE_<档>_DEBUG 与 _INCREMENTAL（它文件头「工具链行」），
++  调试信息的取值不进行键；增量编译的取值不以原文进行键、改由 codegen-units 没写时的缺省值进：算工具链行时照起 cargo 的环境算，lib_mutation_units.py 的 toolchain_lines
++  按整个键名去掉 CARGO_PROFILE_<档>_DEBUG 与 _INCREMENTAL 的原文行，再摊进各档的生效值行（它文件头「工具链行」：codegen-units 没写时增量开取 256、关取 16，写了就照写）；
+   别的构建档设置（opt-level、debug-assertions、overflow-checks、lto、panic、codegen-units，环境变量、cargo 配置与仓根 Cargo.toml 三处）照进；
+   run_stage、plan、row-plan、--list-items 与 toolchain 子命令同一份。
+-  不改判定：调试信息只进 DWARF 段，增量编译只是编译器的缓存，opt-level、overflow-checks、debug-assertions、codegen-units 不动；插桩的覆盖映射不靠 DWARF（量过：一个探针包关掉调试信息、带 -Cinstrument-coverage
++  调试信息只进 DWARF 段，不改判定；增量编译在 codegen-units 没写时把代码分区数从 16 换成 256，所以经 codegen-units 进键；插桩的覆盖映射不靠 DWARF（量过：一个探针包关掉调试信息、带 -Cinstrument-coverage
+   编出来的测试二进制没有 .debug_info 段，llvm-cov export 照样报执行过的函数计数 1、没执行的 0）。
+   量到的（本机，singlefs-core 的测试目标冷编）：开着时写盘 916 MB、编译目录 826 MB、测试二进制 79 MB；关掉后 510 MB、421 MB、17 MB。
+ 先编一份依赖（prepare_seed、sync_dependency_artifacts）：每个工作进程各有一份源码副本与一份编译目录（-w<片号>，插桩的再加 -coverage），冷的那几份各自把外部依赖
+@@ -1082,13 +1083,15 @@ libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）与汇总
+     本模块自证「编译目录清完仍超上限（1K）：头一格判完就停派…」那一格必须判错
+   diskbudgetbycap      磁盘预算不看实测峰值、每份编译目录一律按上限算
+     本模块自证「磁盘预算按实测峰值算：…」那一格必须判错
+-下面十个开关（调试信息与 release 增量、先编一份依赖）一行一个，下一行起写打开后必须判错的自证项：
++下面十一个开关（调试信息与 release 增量、先编一份依赖）一行一个，下一行起写打开后必须判错的自证项：
+   debuginfo-kept       起 cargo 时不设 CARGO_PROFILE_<档>_DEBUG：调试信息开着
+     本模块自证「门禁起的每条 cargo 都关了调试信息」那一格必须判错
+   release-incremental-unset 起 cargo 时不设 CARGO_PROFILE_RELEASE_INCREMENTAL：release 档照 Cargo.toml 不开增量
+     本模块自证「门禁起的每条 cargo 都开了 release 档的增量编译」那一格必须判错
+   profile-debug-keyed  lib_mutation_units.py 的开关（它文件头「工具链行」）：编译档的 debug 照进行键
+-    本模块自证「改编译档的 debug 与 incremental 之后行键不变」那一格必须判错
++    本模块自证「改编译档的 debug 之后行键不变」那一格必须判错
++  profile-incremental-ignored  lib_mutation_units.py 的开关（它文件头「工具链行」）：codegen-units 没写时一律取增量开着的缺省值（增量开关不进行键）
++    本模块自证「改编译档的 incremental 之后行键变」那一格必须判错
+   profile-settings-unkeyed 算工具链行时不收环境里的 CARGO_PROFILE_*（构建档的取值一概不进行键）
+     本模块自证「改编译档的 opt-level、debug-assertions、codegen-units 之后行键变了」那一格必须判错
+   compile-per-worker   不起先编那一份，每个工作进程自己编外部依赖
+@@ -1318,7 +1321,7 @@ WORKER_SLOT_SEARCH_LIMIT = 4096
+ COVERAGE_FLAG = "-Cinstrument-coverage"
+ BUILD_PROFILES_DIRECTORY_NAME = "build-profiles"   # 插桩编译那一步（构建脚本、过程宏）写出的剖析文件的去处，在那一格的 TMPDIR 下，随 TMPDIR 一起删
+ # 这一道起的 cargo 关调试信息、release 档开增量（文件头「调试信息与 release 增量」）：cargo test 用 test 档（承 dev），cargo test --release 用 release 档（bench 承 release），
+-# 调试信息四档都设。取值放在一格的列表里：自证「改编译档的 debug 与 incremental 之后行键不变」那一格就地换它
++# 调试信息四档都设。取值放在一格的列表里：自证「改编译档的 debug 之后行键不变」「改编译档的 incremental 之后行键变」两格就地换它
+ CARGO_DEBUG_PROFILES = ("DEV", "TEST", "RELEASE", "BENCH")
+ CARGO_DEBUG_SETTING = ["false"]
+ CARGO_RELEASE_INCREMENTAL_SETTING = ["true"]
+@@ -1536,7 +1539,7 @@ def cargo_debug_overrides(environment):
+ 
+ def key_toolchain_lines(root, environment):
+     """行键里的工具链行（文件头「行键」「调试信息与 release 增量」）：照起 cargo 时的环境算（调用方的环境加 cargo_debug_overrides）；
+-    覆盖的那几项（debug、incremental）由 lib_mutation_units.py 的 toolchain_lines 按键名去掉，别的构建档取值照进键。
++    覆盖的那几项（debug、incremental）的原文行由 lib_mutation_units.py 的 toolchain_lines 按键名去掉，incremental 改由各档生效值行里 codegen-units 的缺省值进键，别的构建档取值照进键。
+     KeyContext 与 toolchain 子命令都调它。rustc / cargo 起不来抛 MutationUnitsError。弄坏开关 profile-settings-unkeyed：环境里的 CARGO_PROFILE_* 一概不交给它（构建档的取值不进键）。"""
+     if break_is(environment, "profile-settings-unkeyed"):
+         return mutation_units.toolchain_lines(root, {name: value for name, value in environment.items() if not name.startswith("CARGO_PROFILE_")})
+@@ -11484,10 +11487,11 @@ def selftest_unfiltered_static_check_cell(selftest, work):
+ def selftest_debuginfo_cells(selftest, work):
+     """起 cargo 时关调试信息、release 档开增量（文件头「调试信息与 release 增量」）：一趟跑下来假 cargo 收到的每一次 test（基线、变异、插桩编译与插桩跑）环境里四档的
+     CARGO_PROFILE_<档>_DEBUG 都是 false、CARGO_PROFILE_RELEASE_INCREMENTAL 都是 true，调用方设的同名变量也被顶掉。
+-    这两项不进行键：门禁覆盖的取值换成 line-tables-only 与 false、调用方另设 CARGO_PROFILE_TEST_DEBUG 与 CARGO_PROFILE_TEST_INCREMENTAL 的那一趟 4 行都复用；
++    debug 不进行键：门禁覆盖的取值换成 line-tables-only、调用方另设 CARGO_PROFILE_TEST_DEBUG 的那一趟 4 行都复用；incremental 不以原文进行键、改由 codegen-units 没写时的缺省值进
++    （lib_mutation_units.py 的 toolchain_lines）：门禁覆盖的 release 增量换成 false、调用方另设 CARGO_PROFILE_TEST_INCREMENTAL 的那一趟 4 行都现判；
+     别的构建档设置照进：调用方设 CARGO_PROFILE_RELEASE_OPT_LEVEL、CARGO_PROFILE_TEST_DEBUG_ASSERTIONS、CARGO_PROFILE_TEST_CODEGEN_UNITS 的三趟各自 4 行都现判（工具链或依赖变了），
+     都不设又 4 行都复用。弄坏开关 debuginfo-kept 下头一格判错，release-incremental-unset 下第二格判错，profile-debug-keyed（lib_mutation_units.py 的）下
+-    「改编译档的 debug 与 incremental 之后行键不变」判错，profile-settings-unkeyed 下「改编译档的 opt-level、debug-assertions、codegen-units 之后行键变了」判错。"""
++    「改编译档的 debug 之后行键不变」判错，profile-incremental-ignored 下「改编译档的 incremental 之后行键变」判错，profile-settings-unkeyed 下「改编译档的 opt-level、debug-assertions、codegen-units 之后行键变了」判错。"""
+     repository = os.path.join(work, "debuginfo")
+     build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+     environment_log = os.path.join(work, "debuginfo-environment.jsonl")
+@@ -11507,14 +11511,21 @@ def selftest_debuginfo_cells(selftest, work):
+     reused = selftest.run(repository)
+     saved = CARGO_DEBUG_SETTING[0], CARGO_RELEASE_INCREMENTAL_SETTING[0]
+     try:
+-        CARGO_DEBUG_SETTING[0], CARGO_RELEASE_INCREMENTAL_SETTING[0] = "line-tables-only", "false"
+-        unkeyed = selftest.run(repository, CARGO_PROFILE_TEST_DEBUG="2", CARGO_PROFILE_TEST_INCREMENTAL="false")
++        CARGO_DEBUG_SETTING[0] = "line-tables-only"
++        unkeyed = selftest.run(repository, CARGO_PROFILE_TEST_DEBUG="2")
++        CARGO_DEBUG_SETTING[0], CARGO_RELEASE_INCREMENTAL_SETTING[0] = saved[0], "false"
++        incremental_changed = selftest.run(repository, CARGO_PROFILE_TEST_INCREMENTAL="false")
+     finally:
+         CARGO_DEBUG_SETTING[0], CARGO_RELEASE_INCREMENTAL_SETTING[0] = saved
+-    selftest.check("改编译档的 debug 与 incremental 之后行键不变：头一趟之后同一取值 4 行都复用；门禁覆盖的 debug 换成 line-tables-only、release 增量换成 false，"
+-                   "调用方另设 CARGO_PROFILE_TEST_DEBUG=2、CARGO_PROFILE_TEST_INCREMENTAL=false 的那一趟 4 行照样都复用",
++    selftest.check("改编译档的 debug 之后行键不变：头一趟之后同一取值 4 行都复用；门禁覆盖的 debug 换成 line-tables-only、"
++                   "调用方另设 CARGO_PROFILE_TEST_DEBUG=2 的那一趟 4 行照样都复用",
+                    reused[0] == 0 and "现判 0 条、复用 4 条" in reused[1] and unkeyed[0] == 0 and "现判 0 条、复用 4 条" in unkeyed[1],
+-                   f"同一取值 {per_row_how(reused[1])}；换了 debug 与 incremental {per_row_how(unkeyed[1])}")
++                   f"同一取值 {per_row_how(reused[1])}；换了 debug {per_row_how(unkeyed[1])}")
++    selftest.check("改编译档的 incremental 之后行键变：门禁覆盖的 release 增量换成 false、调用方另设 CARGO_PROFILE_TEST_INCREMENTAL=false 的那一趟（样本的 Cargo.toml 没写 codegen-units，"
++                   "缺省值跟增量走）4 行都现判（工具链或依赖变了）",
++                   incremental_changed[0] == 0 and len(per_row_how(incremental_changed[1])) == 4
++                   and set(per_row_how(incremental_changed[1]).values()) == {"现判：工具链或依赖变了"},
++                   f"换了 incremental {per_row_how(incremental_changed[1])}")
+     keyed = {name: selftest.run(repository, **{name: value}) for name, value in (("CARGO_PROFILE_RELEASE_OPT_LEVEL", "2"), ("CARGO_PROFILE_TEST_DEBUG_ASSERTIONS", "false"),
+                                                                                  ("CARGO_PROFILE_TEST_CODEGEN_UNITS", "1"))}
+     back = selftest.run(repository)
+@@ -12888,6 +12899,7 @@ def selftest_break_cell_table():
+         "plain-cells-cards-visible": ("selftest_gpu_cell_dispatch_cells",),
+         "product-gpu-feature-unquiesced": ("selftest_product_gpu_feature_cells",),
+         "profile-debug-keyed": ("selftest_debuginfo_cells",),
++        "profile-incremental-ignored": ("selftest_debuginfo_cells",),
+         "profile-settings-unkeyed": ("selftest_debuginfo_cells",),
+         "progress-line-unwritten": ("selftest_output_stop_cells",),
+         "heartbeat-prefix-dropped": ("selftest_output_progress_cells",),
+diff --git a/scripts/mutation/lib_mutation_units.py b/scripts/mutation/lib_mutation_units.py
+index d67f3f9..64e20ce 100644
+--- a/scripts/mutation/lib_mutation_units.py
++++ b/scripts/mutation/lib_mutation_units.py
+@@ -47,11 +47,18 @@
+   CARGO_BUILD_RUSTFLAGS、CARGO_BUILD_TARGET、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、CARGO_PROFILE_*、CARGO_TARGET_<三元组>_{RUSTFLAGS,RUNNER,LINKER}）；
+   从根往上每一层与 CARGO_HOME 的 .cargo/config.toml（或 config）解析之后的 build（除 jobs、target-dir、incremental）、target、profile、env 各键；
+   根 Cargo.toml 解析之后的 profile、lints、workspace.lints 各键。只取解析后的值，不取原文（注释与排版不进）；文件路径不进（按层级号排）。
+-  编译档里的 debug、incremental 两项三处都不进（PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT）：环境变量 CARGO_PROFILE_<档>_DEBUG、CARGO_PROFILE_<档>_INCREMENTAL，
++  编译档里的 debug、incremental 两项不以原文行进（PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT）：环境变量 CARGO_PROFILE_<档>_DEBUG、CARGO_PROFILE_<档>_INCREMENTAL，
+   cargo 配置与根 Cargo.toml 的 profile 表里各档（连同 package.<包>、build-override 两层）键名恰好是这两个的；按整个键名比，debug-assertions 照进。
++  debug 不进键；incremental 改由生效值进：内置的 dev、release、test、bench 与根清单里写了的每个 profile 各出
++  scripts/gate/lib_function_units.py 的 effective_profile_lines 那一套行（「profile: <名>」与 opt-level、debug-assertions、overflow-checks、lto、panic、codegen-units 各一行
++  「profile.<键>: <值>」，与 crates/singlefs-unit-graph/src/build_toolchain.rs 的 effective_profile_lines 逐字相同；工具链行里不带前缀）：incremental 自己不出行，
++  由生效的 incremental（内置默认、根清单、CARGO_PROFILE_<档>_INCREMENTAL、CARGO_INCREMENTAL 依次盖）定 codegen-units 没写时的缺省值，写了的照写、不看增量。
++  其余的 profile 设置（package.<包>、build-override、别的键）与 cargo 配置里的 profile 仍以原文行进，比 Rust 那一份收得宽。
+   与 scripts/gate/admission.py 的 PROFILE_SETTINGS_LEFT_OUT、crates/singlefs-unit-graph/src/build_toolchain.rs 的 PROFILE_SETTING_KEYS 同一口径。
+-  弄坏开关 profile-debug-keyed（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：debug 照进（incremental 照旧不进）；
+-  crates-mutation-rows.py --selftest 的「改编译档的 debug 与 incremental 之后行键不变」那一格必须判错。
++  弄坏开关 profile-debug-keyed（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：debug 照进（incremental 照旧不以原文行进）；
++  crates-mutation-rows.py --selftest 的「改编译档的 debug 之后行键不变」那一格必须判错。
++  弄坏开关 profile-incremental-ignored（同上两个变量，只给证红用）：codegen-units 没写一律取增量开着的缺省值（增量开关不进键）；
++  crates-mutation-rows.py --selftest 的「改编译档的 incremental 之后行键变」那一格必须判错。
+ 依赖版本行（dependency_lines，与 crates/singlefs-unit-graph/src/lock_file.rs 的 narrowed_lock_lines 同一条规则）：闭包里每个 Rust 单元真点名的外部 crate
+   （单元的词法单元里 use <外部 crate>::…、路径 <外部 crate>::…、extern crate <外部 crate>；外部 crate 是单元所在 crate 清单里不带 path 的依赖，
+   代码名是依赖的键把 - 换成 _，包名取 package = 写的、没写取键），在根 Cargo.lock 里那个工作区 crate 自己的包（同名、没有 source）的 dependencies 里
+@@ -794,6 +801,7 @@ def toolchain_lines(root, environment):
+             if value:
+                 lines += [f"configuration\t{rank}\t{line}" for line in flattened(section, value)]
+     manifest_path = os.path.join(root, "Cargo.toml")
++    manifest = {}
+     if os.path.isfile(manifest_path):
+         try:
+             with open(manifest_path, "rb") as handle:
+@@ -805,6 +813,10 @@ def toolchain_lines(root, environment):
+         for section, value in sections:
+             if value:
+                 lines += [f"manifest\t{line}" for line in flattened(section, value)]
++    try:
++        lines += function_units().effective_profile_lines_of_every_profile(manifest, environment, break_is("profile-incremental-ignored"))
++    except ValueError as error:
++        raise MutationUnitsError(f"构建档的生效值算不出（{manifest_path}、环境变量 CARGO_PROFILE_*、CARGO_INCREMENTAL）：{error}") from error
+     return lines
+ 
+ 

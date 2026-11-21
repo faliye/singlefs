@@ -27,7 +27,7 @@
 | 辩方 Z2 测试支撑 `history.rs:2628` 等同形 `max_by_key` | 零轮，低 | — | 记欠账，不进这一批 |
 | 辩方 Z4 变异表缺 fsync 一臂 | 零轮，低 | — | 第 14 批顺手补一行 |
 
-被点名的 `crates/*/src/*.rs`：`crates/singlefs-reference-filesystem/src/lib.rs`、`crates/singlefs-harness/src/reference_filesystem_translation.rs`、`crates/singlefs-harness/src/fault_injection.rs`、`crates/singlefs-harness/src/mount_transparency.rs`、`crates/singlefs-harness/src/lib.rs`、`crates/singlefs-checker-tier/src/crash_injection.rs`、`crates/singlefs-checker-tier/src/crash_judge_checker.wgsl`、`crates/singlefs-checker/src/image.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-replay-prefix/src/lib.rs`、`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/singlefs-verification/src/bin/e170_specification_executor_export.rs`、`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`。
+被点名的 `crates/*/src/*.rs`：`crates/singlefs-reference-filesystem/src/lib.rs`、`crates/singlefs-harness/src/reference_filesystem_translation.rs`、`crates/singlefs-harness/src/fault_injection.rs`、`crates/singlefs-harness/src/mount_transparency.rs`、`crates/singlefs-harness/src/lib.rs`、`crates/singlefs-checker-tier/src/crash_injection.rs`、`crates/singlefs-checker-tier/src/crash_judge_checker.wgsl`、`crates/singlefs-checker/src/image.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-replay-prefix/src/lib.rs`、`crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`、`crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/main.rs`、`crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs`。
 
 ## 三、改法（第三轮是最终轮，不开第四轮；这一轮的改法都是零轮，进第 14 批实现，交用户表见第五节）
 

@@ -18,7 +18,7 @@
    - `crates/singlefs-harness/src/mount_transparency.rs:2374`：「if let Ok(system_configuration) = SystemConfiguration::parse_slot(&bytes) {」；同文件第 36 行从核心层引入 `choose_system_configuration`，第 2422、2454 行起调它。判官判槽自证用的是核心层的那一段。
    - `crates/singlefs-checker/src/image.rs:1492`：「pub fn system_configuration_redundancy_report(」，池级 checker 自己的读法。
    - `crates/singlefs-harness/tests/acquisition_rewrites_a_device_that_lost_both_system_configuration_slots_only_through_the_gates.rs:159` 的 `a_device_holding_the_version_whose_both_slots_were_zeroed_is_rewritten_by_the_acquisition_and_the_checker_stays_green`，`crates/mutations.tsv` 第 5010 行点名它。
-   - `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs:3529` 按 `RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults` 写了一臂。
+   - `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/witness_criterion_and_writable_mount_probe.rs:244` 按 `RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults` 写了一臂。
 3. 复跑：
    - 辩方模型拷到 `~/.local/share/singlefs/work/m3-close-g4-rewrite-r2-main-checks/model-copy` 经 `run-with-memory-cap.sh 2G` 跑它的 `tools/rerun.sh`：「name=rerun_compare file=explore.out sha256=7b6b7514c4f204f9979d30c6717dc44fd0f1aea47664169b75e110899597a094 same=yes」。
    - 攻方原型要现编、整趟复跑约 20–30 分钟（腿报的，推的），此刻本机 IO 压力 full avg300 85.38（`/proc/pressure/io`），没复跑。它报的数（W1 四组历史合计 172 366 态零发现、MUT-B2 撕裂域 16 个单盘全废态、MUT-B1 整写域 8 态与撕裂域 34 态）判决里只当线索，不当已核的数；第三轮「报出的数字能不能核」那一格要它们在入库装置或复跑过的原型上坐实。

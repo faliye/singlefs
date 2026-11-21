@@ -1,0 +1,4 @@
+2758b102f0c0987b7f64228dffe56e856ee8ee568b500f1f1b36bb1ed956b944  research/prompts/_gpu-cases-without-cards-code-r1-body.md
+39021d79cef232742af28e392fd4415505018ccc2b4063a0ed102db473103d06  research/prompts/gpu-cases-without-cards-code-r1-snapshot/mutation-rows-appended-by-the-batch.tsv
+5740fe8b21fe42ce7117929f2edbef5c7c00739dbdab6682b44ab7e8d7110d60  research/prompts/gpu-cases-without-cards-code-r1-snapshot/mutation-rows-replaced-by-the-batch.tsv
+32d52075d9c3a5779f7e9462e849b260b138e1b618ba8941108acd35c18678b3  research/prompts/gpu-cases-without-cards-code-r1-snapshot/mutation-rows-deleted-after-the-merge.txt

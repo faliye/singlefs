@@ -12,7 +12,7 @@
 | `heavy-thread-probe/Cargo.toml` | `b8d1fc43fdb57babbb0115d49994be3a02c414d6ad3d2b5dc846a9417d56bc84` | 第 8 条的探针（独立小包，不在仓的工作区里），没跑，命令在「要主 agent 跑的命令」 |
 | `heavy-thread-probe/src/main.rs` | `bb52131a1ef37fd50f15fc32f2cea4f20b8b0c43dd397a28edf5891d73ccced8` | 同上 |
 | `heavy-thread-probe/src/copied_heavy_threads.rs` | `a6cf6e74aee9b1c446a539f2d058a62e1fa2cf2f9ed0487a0e892951d7a6685c` | `crates/singlefs-verification/src/heavy_threads.rs` 第 35–78 行逐字拷贝（`sed -n '35,78p' … | sha256sum` 与它同值） |
-| `heavy-thread-probe/src/copied_e184.rs` | `b8b40067984f1a24b81a2897eab26f8f992cbe3b8b81a65b65a1f3a738db6567` | `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs` 第 75–106 行逐字拷贝（同法核过同值） |
+| `heavy-thread-probe/src/copied_e184.rs` | `b8b40067984f1a24b81a2897eab26f8f992cbe3b8b81a65b65a1f3a738db6567` | `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs` 第 75–106 行逐字拷贝（同法核过同值） |
 
 报告里的读数除标「量的」的几处 grep 与 ast 扫描输出外，一律是「推的（按代码读）」：没有一处在入库装置或副本上跑过。
 
@@ -135,9 +135,9 @@ D13（验证路线） 已定项 17 里这一轮压着的几句（kb 文件自己
 
 ### 第 8 条：重活线程数的登记文件只把数编进二进制
 
-仓里有两份 Rust 读法，各自 `include_str!` 同一份文件（`crates/singlefs-verification/src/heavy_threads.rs:25` 与 `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs:47`），对「第一条非注释行」的认法不同：
+仓里有两份 Rust 读法，各自 `include_str!` 同一份文件（`crates/singlefs-verification/src/heavy_threads.rs:25` 与 `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs:47`），对「第一条非注释行」的认法不同：
 - `crates/singlefs-verification/src/heavy_threads.rs:36`：「let mut lines: Vec<&str> = registration_text.split('\n').collect();」——只按 `\n` 切，行尾的 `\r` 留在行里；只去行首空格与制表符；那一行还要带理由：`crates/singlefs-verification/src/heavy_threads.rs:72`：「let reason = after_the_blanks.strip_prefix('#')?;」，不合就 panic。
-- `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs:95`：「.lines()」——Rust 的 `str::lines` 去掉行尾一个 `\r`；不要理由，取行首数字。
+- `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts_write_dump/mod.rs:95`：「.lines()」——Rust 的 `str::lines` 去掉行尾一个 `\r`；不要理由，取行首数字。
 
 变体二（数据单元只取第一条非注释行）的反例（条件式，推的，探针待跑）：
 1. 数据单元规则照 e184 那一份（或 python 的 `splitlines`、`strip`）写。

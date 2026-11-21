@@ -1,0 +1,165 @@
+E7RESULT name=config segment=reader-rules-on-histories configured_threads=31 history_set_phase_threads=5 reader_phase_threads=20 arms=5 reader_units=20 shapes=5
+E7RESULT name=history_space arm=chain_then_lowest writes=4 pool_barriers=2 raw_states=18 distinct_boards=17 crash_points=19 writable_tuples=1487 read_only_tuples=1487 grown_family_tuples=1221 never_grown_family_tuples=266 out_of_model_histories=zero
+E7RESULT name=history_space arm=highest_table writes=4 pool_barriers=2 raw_states=18 distinct_boards=17 crash_points=19 writable_tuples=1487 read_only_tuples=1487 grown_family_tuples=1221 never_grown_family_tuples=266 out_of_model_histories=zero
+E7RESULT name=history_space arm=old_table_while_intent_marker writes=6 pool_barriers=3 raw_states=27 distinct_boards=25 crash_points=28 writable_tuples=2207 read_only_tuples=2207 grown_family_tuples=1815 never_grown_family_tuples=392 out_of_model_histories=zero
+E7RESULT name=history_space arm=lowest_to_read_highest_to_probe writes=4 pool_barriers=2 raw_states=18 distinct_boards=17 crash_points=19 writable_tuples=1487 read_only_tuples=1487 grown_family_tuples=1221 never_grown_family_tuples=266 out_of_model_histories=zero
+E7RESULT name=history_space arm=baseline_only_if_every_table_is_equal writes=4 pool_barriers=2 raw_states=18 distinct_boards=17 crash_points=19 writable_tuples=1487 read_only_tuples=1487 grown_family_tuples=1221 never_grown_family_tuples=266 out_of_model_histories=zero
+E7RESULT name=reading arm=chain_then_lowest reading=leak_writable count=103 denominator=1487 exists=true
+E7RESULT name=reading arm=chain_then_lowest reading=leak_read_only count=103 denominator=1487 exists=true
+E7RESULT name=reading arm=chain_then_lowest reading=misrefusal_literal count=164 denominator=1487 exists=true
+E7RESULT name=reading arm=chain_then_lowest reading=misrefusal_avoidable count=30 denominator=1487 exists=true
+E7RESULT name=reading arm=chain_then_lowest reading=writable_refused count=287 denominator=1487 exists=true
+E7RESULT name=reading arm=highest_table reading=leak_writable count=0 denominator=1487 exists=false
+E7RESULT name=reading arm=highest_table reading=leak_read_only count=0 denominator=1487 exists=false
+E7RESULT name=reading arm=highest_table reading=misrefusal_literal count=550 denominator=1487 exists=true
+E7RESULT name=reading arm=highest_table reading=misrefusal_avoidable count=284 denominator=1487 exists=true
+E7RESULT name=reading arm=highest_table reading=writable_refused count=776 denominator=1487 exists=true
+E7RESULT name=reading arm=old_table_while_intent_marker reading=leak_writable count=0 denominator=2207 exists=false
+E7RESULT name=reading arm=old_table_while_intent_marker reading=leak_read_only count=0 denominator=2207 exists=false
+E7RESULT name=reading arm=old_table_while_intent_marker reading=misrefusal_literal count=431 denominator=2207 exists=true
+E7RESULT name=reading arm=old_table_while_intent_marker reading=misrefusal_avoidable count=66 denominator=2207 exists=true
+E7RESULT name=reading arm=old_table_while_intent_marker reading=writable_refused count=756 denominator=2207 exists=true
+E7RESULT name=reading arm=lowest_to_read_highest_to_probe reading=leak_writable count=103 denominator=1487 exists=true
+E7RESULT name=reading arm=lowest_to_read_highest_to_probe reading=leak_read_only count=0 denominator=1487 exists=false
+E7RESULT name=reading arm=lowest_to_read_highest_to_probe reading=misrefusal_literal count=164 denominator=1487 exists=true
+E7RESULT name=reading arm=lowest_to_read_highest_to_probe reading=misrefusal_avoidable count=30 denominator=1487 exists=true
+E7RESULT name=reading arm=lowest_to_read_highest_to_probe reading=writable_refused count=287 denominator=1487 exists=true
+E7RESULT name=reading arm=baseline_only_if_every_table_is_equal reading=leak_writable count=0 denominator=1487 exists=false
+E7RESULT name=reading arm=baseline_only_if_every_table_is_equal reading=leak_read_only count=0 denominator=1487 exists=false
+E7RESULT name=reading arm=baseline_only_if_every_table_is_equal reading=misrefusal_literal count=885 denominator=1487 exists=true
+E7RESULT name=reading arm=baseline_only_if_every_table_is_equal reading=misrefusal_avoidable count=619 denominator=1487 exists=true
+E7RESULT name=reading arm=baseline_only_if_every_table_is_equal reading=writable_refused count=1111 denominator=1487 exists=true
+E7RESULT name=control arm=chain_then_lowest reader=allow_everything leak_writable=226 leak_read_only=226 misrefusal_literal=0 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=chain_then_lowest reader=reject_every_writable_mount leak_writable=0 leak_read_only=226 misrefusal_literal=1261 misrefusal_avoidable=995 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=chain_then_lowest reader=name_what_the_class_overruns leak_writable=0 leak_read_only=0 misrefusal_literal=266 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=highest_table reader=allow_everything leak_writable=226 leak_read_only=226 misrefusal_literal=0 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=highest_table reader=reject_every_writable_mount leak_writable=0 leak_read_only=226 misrefusal_literal=1261 misrefusal_avoidable=995 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=highest_table reader=name_what_the_class_overruns leak_writable=0 leak_read_only=0 misrefusal_literal=266 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=old_table_while_intent_marker reader=allow_everything leak_writable=325 leak_read_only=325 misrefusal_literal=0 misrefusal_avoidable=0 writable_denominator=2207 read_only_denominator=2207
+E7RESULT name=control arm=old_table_while_intent_marker reader=reject_every_writable_mount leak_writable=0 leak_read_only=325 misrefusal_literal=1882 misrefusal_avoidable=1517 writable_denominator=2207 read_only_denominator=2207
+E7RESULT name=control arm=old_table_while_intent_marker reader=name_what_the_class_overruns leak_writable=0 leak_read_only=0 misrefusal_literal=365 misrefusal_avoidable=0 writable_denominator=2207 read_only_denominator=2207
+E7RESULT name=control arm=lowest_to_read_highest_to_probe reader=allow_everything leak_writable=226 leak_read_only=226 misrefusal_literal=0 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=lowest_to_read_highest_to_probe reader=reject_every_writable_mount leak_writable=0 leak_read_only=226 misrefusal_literal=1261 misrefusal_avoidable=995 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=lowest_to_read_highest_to_probe reader=name_what_the_class_overruns leak_writable=0 leak_read_only=0 misrefusal_literal=266 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=baseline_only_if_every_table_is_equal reader=allow_everything leak_writable=226 leak_read_only=226 misrefusal_literal=0 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=baseline_only_if_every_table_is_equal reader=reject_every_writable_mount leak_writable=0 leak_read_only=226 misrefusal_literal=1261 misrefusal_avoidable=995 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=control arm=baseline_only_if_every_table_is_equal reader=name_what_the_class_overruns leak_writable=0 leak_read_only=0 misrefusal_literal=266 misrefusal_avoidable=0 writable_denominator=1487 read_only_denominator=1487
+E7RESULT name=class_consistency arm=chain_then_lowest reader=arm classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=chain_then_lowest reader=allow_everything classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=chain_then_lowest reader=reject_every_writable_mount classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=chain_then_lowest reader=name_what_the_class_overruns classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=highest_table reader=arm classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=highest_table reader=allow_everything classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=highest_table reader=reject_every_writable_mount classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=highest_table reader=name_what_the_class_overruns classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=old_table_while_intent_marker reader=arm classes=684 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=old_table_while_intent_marker reader=allow_everything classes=684 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=old_table_while_intent_marker reader=reject_every_writable_mount classes=684 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=old_table_while_intent_marker reader=name_what_the_class_overruns classes=684 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=lowest_to_read_highest_to_probe reader=arm classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=lowest_to_read_highest_to_probe reader=allow_everything classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=lowest_to_read_highest_to_probe reader=reject_every_writable_mount classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=lowest_to_read_highest_to_probe reader=name_what_the_class_overruns classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=baseline_only_if_every_table_is_equal reader=arm classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=baseline_only_if_every_table_is_equal reader=allow_everything classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=baseline_only_if_every_table_is_equal reader=reject_every_writable_mount classes=474 classes_with_differing_decisions=zero
+E7RESULT name=class_consistency arm=baseline_only_if_every_table_is_equal reader=name_what_the_class_overruns classes=474 classes_with_differing_decisions=zero
+E7RESULT name=literal_minus_avoidable arm=chain_then_lowest literal=164 avoidable=30 difference=134
+E7RESULT name=literal_minus_avoidable arm=highest_table literal=550 avoidable=284 difference=266
+E7RESULT name=literal_minus_avoidable arm=old_table_while_intent_marker literal=431 avoidable=66 difference=365
+E7RESULT name=literal_minus_avoidable arm=lowest_to_read_highest_to_probe literal=164 avoidable=30 difference=134
+E7RESULT name=literal_minus_avoidable arm=baseline_only_if_every_table_is_equal literal=885 avoidable=619 difference=266
+E7RESULT name=trajectory arm=chain_then_lowest reading=leak_writable counts=5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,13 peak=13 peak_at=18 positive_points=19 of=19 end_of_use=13 last_segment_fully_persisted=5
+E7RESULT name=trajectory arm=chain_then_lowest reading=leak_read_only counts=5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,13 peak=13 peak_at=18 positive_points=19 of=19 end_of_use=13 last_segment_fully_persisted=5
+E7RESULT name=trajectory arm=chain_then_lowest reading=misrefusal_literal counts=6,6,6,6,6,6,6,6,6,6,6,6,6,20,20,6,20,20,0 peak=20 peak_at=13 positive_points=18 of=19 end_of_use=0 last_segment_fully_persisted=20
+E7RESULT name=trajectory arm=chain_then_lowest reading=misrefusal_avoidable counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,0,10,10,0 peak=10 peak_at=14 positive_points=3 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=chain_then_lowest reading=writable_refused counts=12,12,12,12,12,12,12,12,12,12,12,12,12,26,26,12,26,26,15 peak=26 peak_at=13 positive_points=19 of=19 end_of_use=15 last_segment_fully_persisted=26
+E7RESULT name=trajectory arm=highest_table reading=leak_writable counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 peak=0 peak_at=0 positive_points=0 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=highest_table reading=leak_read_only counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 peak=0 peak_at=0 positive_points=0 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=highest_table reading=misrefusal_literal counts=11,31,11,32,38,32,11,31,11,38,38,38,38,38,38,38,38,38,0 peak=38 peak_at=4 positive_points=18 of=19 end_of_use=0 last_segment_fully_persisted=38
+E7RESULT name=trajectory arm=highest_table reading=misrefusal_avoidable counts=0,20,0,21,27,21,0,20,0,27,21,26,20,0,15,27,17,22,0 peak=27 peak_at=4 positive_points=13 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=highest_table reading=writable_refused counts=22,42,22,43,49,43,22,42,22,49,49,49,49,49,49,49,49,49,28 peak=49 peak_at=4 positive_points=19 of=19 end_of_use=28 last_segment_fully_persisted=49
+E7RESULT name=trajectory arm=old_table_while_intent_marker reading=leak_writable counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 peak=0 peak_at=0 positive_points=0 of=28 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=old_table_while_intent_marker reading=leak_read_only counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 peak=0 peak_at=0 positive_points=0 of=28 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=old_table_while_intent_marker reading=misrefusal_literal counts=11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,17,17,18,38,38,18,38,38,0 peak=38 peak_at=22 positive_points=27 of=28 end_of_use=0 last_segment_fully_persisted=38
+E7RESULT name=trajectory arm=old_table_while_intent_marker reading=misrefusal_avoidable counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,0,0,15,7,17,22,0 peak=22 peak_at=26 positive_points=5 of=28 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=old_table_while_intent_marker reading=writable_refused counts=22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,28,28,29,49,49,29,49,49,28 peak=49 peak_at=22 positive_points=28 of=28 end_of_use=28 last_segment_fully_persisted=49
+E7RESULT name=trajectory arm=lowest_to_read_highest_to_probe reading=leak_writable counts=5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,13 peak=13 peak_at=18 positive_points=19 of=19 end_of_use=13 last_segment_fully_persisted=5
+E7RESULT name=trajectory arm=lowest_to_read_highest_to_probe reading=leak_read_only counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 peak=0 peak_at=0 positive_points=0 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=lowest_to_read_highest_to_probe reading=misrefusal_literal counts=6,6,6,6,6,6,6,6,6,6,6,6,6,20,20,6,20,20,0 peak=20 peak_at=13 positive_points=18 of=19 end_of_use=0 last_segment_fully_persisted=20
+E7RESULT name=trajectory arm=lowest_to_read_highest_to_probe reading=misrefusal_avoidable counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,10,0,10,10,0 peak=10 peak_at=14 positive_points=3 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=lowest_to_read_highest_to_probe reading=writable_refused counts=12,12,12,12,12,12,12,12,12,12,12,12,12,26,26,12,26,26,15 peak=26 peak_at=13 positive_points=19 of=19 end_of_use=15 last_segment_fully_persisted=26
+E7RESULT name=trajectory arm=baseline_only_if_every_table_is_equal reading=leak_writable counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 peak=0 peak_at=0 positive_points=0 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=baseline_only_if_every_table_is_equal reading=leak_read_only counts=0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 peak=0 peak_at=0 positive_points=0 of=19 end_of_use=0 last_segment_fully_persisted=0
+E7RESULT name=trajectory arm=baseline_only_if_every_table_is_equal reading=misrefusal_literal counts=13,61,13,61,69,61,13,61,13,69,69,69,69,43,43,69,43,43,3 peak=69 peak_at=4 positive_points=19 of=19 end_of_use=3 last_segment_fully_persisted=43
+E7RESULT name=trajectory arm=baseline_only_if_every_table_is_equal reading=misrefusal_avoidable counts=2,50,2,50,58,50,2,50,2,58,52,57,51,5,20,58,22,27,3 peak=58 peak_at=4 positive_points=19 of=19 end_of_use=3 last_segment_fully_persisted=5
+E7RESULT name=trajectory arm=baseline_only_if_every_table_is_equal reading=writable_refused counts=24,72,24,72,80,72,24,72,24,80,80,80,80,54,54,80,54,54,31 peak=80 peak_at=4 positive_points=19 of=19 end_of_use=31 last_segment_fully_persisted=54
+E7RESULT name=invariance arm=chain_then_lowest variant=newest_slots_0_0 equal_to_main=true
+E7RESULT name=invariance arm=highest_table variant=newest_slots_0_0 equal_to_main=true
+E7RESULT name=invariance arm=old_table_while_intent_marker variant=newest_slots_0_0 equal_to_main=true
+E7RESULT name=invariance arm=lowest_to_read_highest_to_probe variant=newest_slots_0_0 equal_to_main=true
+E7RESULT name=invariance arm=baseline_only_if_every_table_is_equal variant=newest_slots_0_0 equal_to_main=true
+E7RESULT name=invariance arm=chain_then_lowest variant=newest_slots_0_1 equal_to_main=true
+E7RESULT name=invariance arm=highest_table variant=newest_slots_0_1 equal_to_main=true
+E7RESULT name=invariance arm=old_table_while_intent_marker variant=newest_slots_0_1 equal_to_main=true
+E7RESULT name=invariance arm=lowest_to_read_highest_to_probe variant=newest_slots_0_1 equal_to_main=true
+E7RESULT name=invariance arm=baseline_only_if_every_table_is_equal variant=newest_slots_0_1 equal_to_main=true
+E7RESULT name=invariance arm=chain_then_lowest variant=newest_slots_1_0 equal_to_main=true
+E7RESULT name=invariance arm=highest_table variant=newest_slots_1_0 equal_to_main=true
+E7RESULT name=invariance arm=old_table_while_intent_marker variant=newest_slots_1_0 equal_to_main=true
+E7RESULT name=invariance arm=lowest_to_read_highest_to_probe variant=newest_slots_1_0 equal_to_main=true
+E7RESULT name=invariance arm=baseline_only_if_every_table_is_equal variant=newest_slots_1_0 equal_to_main=true
+E7RESULT name=invariance arm=chain_then_lowest variant=alternative_integers_order_preserving_on_every_number equal_to_main=true
+E7RESULT name=invariance arm=highest_table variant=alternative_integers_order_preserving_on_every_number equal_to_main=true
+E7RESULT name=invariance arm=old_table_while_intent_marker variant=alternative_integers_order_preserving_on_every_number equal_to_main=true
+E7RESULT name=invariance arm=lowest_to_read_highest_to_probe variant=alternative_integers_order_preserving_on_every_number equal_to_main=true
+E7RESULT name=invariance arm=baseline_only_if_every_table_is_equal variant=alternative_integers_order_preserving_on_every_number equal_to_main=true
+E7RESULT name=invariance arm=chain_then_lowest variant=alternative_integers_with_fixed_growth_step equal_to_main=false
+E7RESULT name=invariance_detail arm=chain_then_lowest variant=alternative_integers_with_fixed_growth_step compared_reader=arm field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=chain_then_lowest variant=alternative_integers_with_fixed_growth_step compared_reader=allow_everything field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=chain_then_lowest variant=alternative_integers_with_fixed_growth_step compared_reader=reject_every_writable_mount field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=chain_then_lowest variant=alternative_integers_with_fixed_growth_step compared_reader=name_what_the_class_overruns field=classes main=474 variant_value=490
+E7RESULT name=invariance arm=highest_table variant=alternative_integers_with_fixed_growth_step equal_to_main=false
+E7RESULT name=invariance_detail arm=highest_table variant=alternative_integers_with_fixed_growth_step compared_reader=arm field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=highest_table variant=alternative_integers_with_fixed_growth_step compared_reader=allow_everything field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=highest_table variant=alternative_integers_with_fixed_growth_step compared_reader=reject_every_writable_mount field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=highest_table variant=alternative_integers_with_fixed_growth_step compared_reader=name_what_the_class_overruns field=classes main=474 variant_value=490
+E7RESULT name=invariance arm=old_table_while_intent_marker variant=alternative_integers_with_fixed_growth_step equal_to_main=false
+E7RESULT name=invariance_detail arm=old_table_while_intent_marker variant=alternative_integers_with_fixed_growth_step compared_reader=arm field=classes main=684 variant_value=716
+E7RESULT name=invariance_detail arm=old_table_while_intent_marker variant=alternative_integers_with_fixed_growth_step compared_reader=allow_everything field=classes main=684 variant_value=716
+E7RESULT name=invariance_detail arm=old_table_while_intent_marker variant=alternative_integers_with_fixed_growth_step compared_reader=reject_every_writable_mount field=classes main=684 variant_value=716
+E7RESULT name=invariance_detail arm=old_table_while_intent_marker variant=alternative_integers_with_fixed_growth_step compared_reader=name_what_the_class_overruns field=classes main=684 variant_value=716
+E7RESULT name=invariance arm=lowest_to_read_highest_to_probe variant=alternative_integers_with_fixed_growth_step equal_to_main=false
+E7RESULT name=invariance_detail arm=lowest_to_read_highest_to_probe variant=alternative_integers_with_fixed_growth_step compared_reader=arm field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=lowest_to_read_highest_to_probe variant=alternative_integers_with_fixed_growth_step compared_reader=allow_everything field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=lowest_to_read_highest_to_probe variant=alternative_integers_with_fixed_growth_step compared_reader=reject_every_writable_mount field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=lowest_to_read_highest_to_probe variant=alternative_integers_with_fixed_growth_step compared_reader=name_what_the_class_overruns field=classes main=474 variant_value=490
+E7RESULT name=invariance arm=baseline_only_if_every_table_is_equal variant=alternative_integers_with_fixed_growth_step equal_to_main=false
+E7RESULT name=invariance_detail arm=baseline_only_if_every_table_is_equal variant=alternative_integers_with_fixed_growth_step compared_reader=arm field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=baseline_only_if_every_table_is_equal variant=alternative_integers_with_fixed_growth_step compared_reader=allow_everything field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=baseline_only_if_every_table_is_equal variant=alternative_integers_with_fixed_growth_step compared_reader=reject_every_writable_mount field=classes main=474 variant_value=490
+E7RESULT name=invariance_detail arm=baseline_only_if_every_table_is_equal variant=alternative_integers_with_fixed_growth_step compared_reader=name_what_the_class_overruns field=classes main=474 variant_value=490
+E7RESULT name=hand_derivation claim=literal_misrefusal_on_every_arm holds=true reading=chain_then_lowest=164,highest_table=550,old_table_while_intent_marker=431,lowest_to_read_highest_to_probe=164,baseline_only_if_every_table_is_equal=885
+E7RESULT name=hand_derivation claim=chain_then_lowest_leaks_on_early_image holds=true reading=early_image_leak_writable=99,early_image_leak_read_only=99
+E7RESULT name=hand_derivation claim=highest_table_has_no_leak holds=true reading=leak_writable=0,leak_read_only=0
+E7RESULT name=hand_derivation claim=highest_table_misrefuses_avoidably holds=true reading=misrefusal_avoidable=284
+E7RESULT name=hand_derivation claim=lowest_to_read_highest_to_probe_leaks_on_early_image holds=true reading=early_image_leak_writable=99
+E7RESULT name=hand_derivation claim=baseline_misrefuses_avoidably holds=true reading=misrefusal_avoidable=619
+E7RESULT name=hand_derivation claim=chain_then_lowest_never_refuses_the_whole_pool holds=true reading=whole_pool_refusals=0
+E7RESULT name=hand_derivation_witness claim=chain_then_lowest_leaks_on_early_image board=disk0:[table(100,100);table(100,100)]|disk1:[table(200,200);table(200,200)] probe_sizes=100,300 landing=200,200 decision=writable=made,read_only=made,named={}
+E7RESULT name=hand_derivation_witness claim=lowest_to_read_highest_to_probe_leaks_on_early_image board=disk0:[table(100,100);table(100,100)]|disk1:[table(200,200);table(200,200)] probe_sizes=100,300 landing=200,200 decision=writable=made,read_only=made,named={0}
+E7RESULT name=not_run_after_sufficient item=first_five_witnesses_and_distribution_by_action_and_persistence_segment
+E7RESULT name=not_run_after_sufficient item=read_only_refusal_count_class_count_and_class_size_histogram
+E7RESULT name=not_run_this_segment item=existence_judgments_on_the_geometry_sensitivity_sampling_points reason=stability_not_dispatched
+E7RESULT name=not_run_this_segment item=discrimination_self_proof_of_the_geometry_sensitivity reason=stability_not_dispatched
+E7RESULT name=verdict check=positive_controls allow_everything_leaks_on_every_arm=true reject_every_writable_mount_misrefuses_on_every_arm=true
+E7RESULT name=verdict check=negative_controls negative_control_violations=zero
+E7RESULT name=verdict check=decision_is_function_of_observation differing_class_violations=zero
+E7RESULT name=verdict check=literal_minus_avoidable at_least_one_arm_literal_exceeds_avoidable=true
+E7RESULT name=verdict check=invariance invariance_mismatches=5
+E7RESULT name=verdict check=invariance_order_preserving order_preserving_mismatches=zero
+E7RESULT name=verdict check=out_of_model out_of_model_violations=zero
+E7RESULT name=verdict check=history_counts history_count_mismatches=zero
+E7RESULT name=verdict check=hand_derivations hand_derivations_overturned=zero
+E7RESULT name=verdict check=arms_distinguishable any_two_of_the_four_candidate_arms_differ=true
+E7RESULT name=done emitted=165

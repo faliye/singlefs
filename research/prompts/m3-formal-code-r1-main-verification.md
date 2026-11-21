@@ -30,7 +30,7 @@
 | K4 装置 | E165 r1 档 `SELF_CHECKS` 里 `check_the_fixed_point_control` 取真结局，仍可能让变体启动时倒（r1 第二段变体都跑完了，没有反证）；多盘一族代表实现的是「照 `device_identities()` 次序」那一栏；E170 Q3-f 的 28 / 66 是上界（补丁不进任何发布，`root_without_record` 76 行里 0 次置位） | 没攻；读一处，同正推多盘那一条 | **站住，补三句**：E165 页写明代表实现的那一栏；E170 页 Q3-f 写明是上界；r1 档那一条自检记进 E165 第 3 次重跑的注意（它的装置也走 r1 档的启动路径） |
 | C7 必红表与 verified 数 | 对上：153 行锚点全命中 1 次、登记数 56、主 agent 的 `rows.out` 153 行 match | — | **站住** |
 
-被点名的 `crates/*/src/*.rs`：`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-replay-prefix/src/lib.rs`、`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/singlefs-verification/src/bin/e170_specification_executor_export.rs`。
+被点名的 `crates/*/src/*.rs`：`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-replay-prefix/src/lib.rs`、`crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`、`crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/main.rs`。
 
 ## 三、打中的改法（零轮，下一批实现，改完开代码轮第二轮）
 

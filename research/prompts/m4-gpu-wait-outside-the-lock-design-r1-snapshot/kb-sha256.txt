@@ -1,0 +1,6 @@
+77c36c3645a7f6d472a5ebd07dfeabc14762e6da234bccbf5b58b1fc3eb27c20  .claude/kb/milestone/06-sixth-txn.md
+4222c0ea4453a04205dfaed4270c1dc2c315e0d14c9ce5611e14153a61a2c035  .claude/kb/checks-owed.md
+aab4e6c7f6344551e43f6492296865cb0523b7f9768fb8b1eaff97e659237f11  .claude/kb/decisions/26-后台整理与放置回收.md
+ef7546daa2df5b600b66600b75156b70f41cdd67137f4b195bbccc6022fc2fd4  .claude/kb/decisions/24-后台重活能不能卸给GPU.md
+2d20913118836b251e4975a431879fbfd0eb88ad699bfc76523843bb2cf13c86  .claude/kb/decisions/16-发布语义.md
+1356bc391860cec953549a888b04084128eb6573da94da16235553b09ee829f2  .claude/kb/decisions/23-journal的角色与格式.md

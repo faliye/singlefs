@@ -6,7 +6,7 @@
 
 ## 一、问题
 
-英文名：crash_state_dedup_and_time_split（照抄 r2 第 11 行；装置不另起，改原装置 `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs`）
+英文名：crash_state_dedup_and_time_split（照抄 r2 第 11 行；装置不另起，改原装置 `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs`）
 
 ### 1.1 主 agent 给的问题（派发原文，逐字）
 
@@ -49,7 +49,7 @@
 
 ### 1.5 装置写在哪（写死）
 
-**入库装置**，改原装置 `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs`，再改 `crates/mutations.tsv` 里 E161 那几行。理由同 r2 1.5：行 1、行 4 问的就是 `crates/` 今天这份代码的段形、枚举计数与这只装置自己的钉值，另写一份独立模型答不了。
+**入库装置**，改原装置 `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs`，再改 `crates/mutations.tsv` 里 E161 那几行。理由同 r2 1.5：行 1、行 4 问的就是 `crates/` 今天这份代码的段形、枚举计数与这只装置自己的钉值，另写一份独立模型答不了。
 
 这一次要读 `crates/` 的常量：仍只是 r2 1.5 说的那十四个（装置 `local_constants_against_the_crates`，今天第 125 行起），照旧本地常量加回比断言，不直接引。取号轮数 `ACQUISITION_WRITE_ROUNDS`（`transaction.rs:1214`）是不带 `pub` 的私有常量，装置引不到、也不加回比：两轮这件事由段形（A8、S2）看出来，段形对不上就停。新钉的段长表、写数、锚点（第七节）一律写成装置里的本地字面量，不引 crates 测试里的同名数：crates 测试那一份当第三方对照（第四节 4.2）。
 
@@ -164,7 +164,7 @@
 | D1-stride | 第一条流段 8、第二条流段 12 里段内序号 ≡ 0 (mod 2311) | 7 260 × 2 | 不跑，只当锚点 A4 |
 | 对照样本、D2、D3 | 同 r2 5.5 | — | 不跑 |
 
-### 5.6 装置要改哪几处（要动的文件：`crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs`、`crates/mutations.tsv`、`scripts/experiment-apparatus/replay.sh`）
+### 5.6 装置要改哪几处（要动的文件：`crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs`、`crates/mutations.tsv`、`scripts/experiment-apparatus/replay.sh`）
 
 行号是 2026-10-23 工作区的（第三节）。数一律写成本地字面量，不引 crates 测试里的常量。**表里每一个新值都是执行员要量出来、再与第七节对的数**：先照下表把常量改成第七节的值，再跑 C3，`*_match` 全为 true 才算钉住；对不上的照第十一节 V8 / S2 / S3 判，不把量到的数改进常量来让它对上。
 
@@ -376,7 +376,7 @@ F3 用的已知差别表（设计时按 5.5 与第四节 4.4 写，跑之前定�
 这一条只改 C3（与跟着它的 C3b）的起法，补作废情形与要记的出处；第六节各量的门槛、第十节、第十一节已有各条与 5.8 C3 的内存上限、限时、线程原样不动，原文都留着。依据的读数：
 
 - 第一次试跑（主 agent 2026-10-25 照 5.8 C3 原样起，原样留在 `/home/fy5090/.local/share/singlefs/work/m3-close-b16-e161-r3-run/c3-try1-not-run-without-gpu-feature.out`，sha256 `5a912d04bbde9d3320e31d3745fd6ac938860c709c2bc2d43ba755036e92f064`，183 行）：err 文件同目录 `e161-r3-c3-feasibility.err` 末行 `exit=77`；输出第 100、101、144 行三格 `name=stop_clause_crates … judge_stage=not_run`，第 182 行 `E7RESULT name=verdict scope=feasibility clause_S3_holds=not_run clause_S4_holds=not_run judge_stage=not_run`，第 183 行 `E7RESULT name=done emitted=183 loadavg1=14.24 cpus=32`。
-- 原因：装置 `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs:3015–3021`（`CRATES_COMPARISON_NOT_RUN_EXIT_CODE` 的文档：多机配置开了 GPU 而二进制没编进 `gpu` 特性时 crates 那一遍枚举的判段不跑、只录，要结论编进 `--features verdict-store,gpu` 起）；选路在 `crates/singlefs-checker-tier/src/crash_state_enumeration.rs:176`（配置开 GPU 且编进特性才上卡）、`:1247`（没编进特性：判段报本次未跑，不退回 CPU）；用户 2026-10-13 定「配 GPU 必用 GPU」（`crates/singlefs-checker-tier/src/crash_amplification.rs:1396–1399`）。装置收尾 `:5838–5843` 打上面那行判决、退 77。
+- 原因：装置 `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/segment_state_counts_and_comparison_with_the_crates_enumeration.rs:145`（`CRATES_COMPARISON_NOT_RUN_EXIT_CODE` 的文档：多机配置开了 GPU 而二进制没编进 `gpu` 特性时 crates 那一遍枚举的判段不跑、只录，要结论编进 `--features verdict-store,gpu` 起）；选路在 `crates/singlefs-checker-tier/src/crash_state_enumeration.rs:176`（配置开 GPU 且编进特性才上卡）、`:1247`（没编进特性：判段报本次未跑，不退回 CPU）；用户 2026-10-13 定「配 GPU 必用 GPU」（`crates/singlefs-checker-tier/src/crash_amplification.rs:1396–1399`）。装置收尾 `:5838–5843` 打上面那行判决、退 77。
 - 复跑表起这只装置已经是这个样子：`scripts/experiment-apparatus/replay.sh` 文件头 GPU 一段（第 72–84 行）与驱动 `driver_e161_feasibility`（第 2068–2069 行）在配置开了 GPU 时带 `--features verdict-store,gpu`、经 `scripts/crash/gpu-quiesce-run.sh` 起，上限 `REPLAY_MEMORY_CAP`（第 92 行，默认 8G）。
 
 #### 12.1.1 C3 改成这样起（主 agent 跑；C3b 若要跑，同样加特性与清场，其余照 5.8 C3b）
@@ -524,7 +524,7 @@ F3 的已知差别表补两行（只写给翻面格的说明用，不改判定�
 ```bash
 grep -E '^exit=|GPU_QUIESCE ' <日志>
 grep -E '^running [0-9]+ tests?$|^test result:' <日志>
-grep -c '#\[test\]' crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs
+grep -c '#\[test\]' crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs
 grep -cE 'NOT_RUN_[A-Z_]+ test=' <日志>
 grep -c 'judge_stage=not_run' <日志>
 grep -cE 'name=stop_clause_crates cell=test-first-small domain_states=[0-9]+ crates_observed_states=[0-9]+ .*clause_S3_holds=true clause_S4_holds=true' <日志>
@@ -582,7 +582,7 @@ Q4a 记「全绿」要五样都成立：① `exit=0`，且有 `GPU_QUIESCE step=
 | `.claude/singlefs-ai-sop/rules/test-discipline.md`、`.claude/rules/implementation-first.md`、`.claude/rules/mutation-sampling.md`、`.claude/rules/three-way-inference.md`、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`、`.claude/rules/test-script-discipline.md` | 全份 |
 | 调查报告 `/home/fy5090/.local/share/singlefs/work/m3-close-b16-checker-tier-pins/result.md` | 1–142、206–353（第一至三节 3.1、3.5 至第九节）；没读 3.2–3.4 |
 | `research/prompts/e161-r2-prereg.md` | 1–659 全份 |
-| `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs` | 1–20、560–600、5917–5960；常量、锚点、测试名 grep 命中 105、107、125、576–590、2789、4051–4076、4469、5116、5180、5182、5578、5613、5807、5854–6339 的 `#[test]` 与钉值行；6000–6086 里的断言行 |
+| `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs` | 1–20、560–600、5917–5960；常量、锚点、测试名 grep 命中 105、107、125、576–590、2789、4051–4076、4469、5116、5180、5182、5578、5613、5807、5854–6339 的 `#[test]` 与钉值行；6000–6086 里的断言行 |
 | `crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs` | 740–860；grep 命中 774、778、781、785、816 |
 | `crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs` | 90–130、470–570 |
 | `crates/singlefs-checker-tier/tests/in_place_overwrite_torn_state_count.rs` | grep 命中 310、317、323 |

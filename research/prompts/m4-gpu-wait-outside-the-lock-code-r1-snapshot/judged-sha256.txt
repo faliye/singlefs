@@ -1,0 +1,6 @@
+e1c323dce8bbe8a00892b32c9211b614969c2884d9a1767c1fcf4bacc4b6ed29  research/prompts/_m4-gpu-wait-outside-the-lock-code-r1-body.md
+68964569c71f550606bbefc15a889e5660b0693687b84fae1f16eff609a53b3b  research/prompts/m4-gpu-wait-outside-the-lock-design-r3-main-verification.md
+45b353abf92dff29044276ef2e12ccee76efd31251d7b3f3e6ce261021d7bfa2  research/prompts/m4-gpu-wait-outside-the-lock-code-r1-snapshot/mutation-rows-appended-by-the-batch.tsv
+3f25532688ddcb1a1410316ee03f542b0323a8b6370acb2d45303f16f062acf9  research/prompts/m4-gpu-wait-outside-the-lock-code-r1-snapshot/mutation-rows-deleted-after-the-merge.txt
+501f6649e3b5d64f60ae8a1ecf78e308f847a45351049d6326f0a8d1829d2dcb  research/prompts/m4-gpu-wait-outside-the-lock-code-r1-snapshot/mutation-rows-replaced-after-the-merge.tsv
+e3ebe372691cd4070dfbe558506173be3749239ff6c04073792940ee404c124c  research/prompts/m4-gpu-wait-outside-the-lock-code-r1-snapshot/mutation-rows-replaced-by-the-batch.tsv

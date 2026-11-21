@@ -1,0 +1,16 @@
+c00 same-package-control provider-listed=no
+c01 path-attribute provider-listed=yes
+c02 cfg-attr-path provider-listed=yes
+c03 renamed-include-macro provider-listed=yes
+c04 bracket-delimiters provider-listed=yes
+c05 raw-string-path provider-listed=yes
+c06 inline-module-base provider-listed=yes
+c07 absolute-path provider-listed=yes
+c08 non-rs-intermediate provider-listed=yes
+c09 target-directory provider-listed=yes
+c10 hidden-directory provider-listed=yes
+c11 data-files provider-listed=yes
+c12 build-script-path-attribute provider-listed=yes
+c13 include-rs-in-library provider-listed=yes
+c14 build-script-runtime-read provider-listed=no rerun-if-changed-in-build-output=yes
+c15 compile-failure cargo-exit-nonzero=yes

@@ -1,0 +1,11 @@
+crates/singlefs-replay-prefix/src/GPU_GC_PROOFS.md
+crates/singlefs-replay-prefix/src/GPU_GC_SELFTEST.md
+crates/singlefs-replay-prefix/src/README.md
+crates/singlefs-replay-prefix/src/file_range_proofs.rs
+crates/singlefs-replay-prefix/src/gpu_gc_capacity_proofs.rs
+crates/singlefs-replay-prefix/src/gpu_gc_proofs.rs
+crates/singlefs-replay-prefix/src/gpu_gc_scoring_proofs.rs
+crates/singlefs-replay-prefix/src/partial_write_proofs.rs
+crates/singlefs-replay-prefix/tests/gpu_gc_arithmetic_matches_wide_integer_reference.rs
+crates/singlefs-replay-prefix/tests/gpu_gc_capacity_matches_independent_reference.rs
+crates/singlefs-replay-prefix/verus-must-red-worlds.tsv

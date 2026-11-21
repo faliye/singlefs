@@ -3,7 +3,7 @@
 被判的是实现员交回的故障注入装置：`crates/singlefs-harness/src/fault_injection.rs`（新建 2053 行）与
 `crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs`（新建 482 行），
 以及它们牵动的 `crates/singlefs-harness/src/history.rs`、`crates/singlefs-harness/src/lib.rs`、
-`crates/singlefs-harness/src/bin/first_transaction_on_device.rs` 与 `crates/mutations.tsv`。
+`crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs` 与 `crates/mutations.tsv`。
 
 开工快照 `research/prompts/m2-supp3-item4-code-r1-start-snapshot.sha256` 9 个文件，核查员 `sha256sum -c` 全部 `OK`，
 腿跑期间没有别的会话动过被判的文件。
@@ -217,7 +217,7 @@ crates/singlefs-harness/src/fault_injection.rs:1125
 | `crates/singlefs-harness/src/fault_injection.rs` | 判定一、四、五（注入即停、`below(4)` 四选一、`(1..marks.len())`）；改法一、二都落在这里 |
 | `crates/singlefs-harness/src/history.rs` | 判定五（`:833` 那条 `.expect` 与起点段另外三处）；改法二落在这里 |
 | `crates/singlefs-harness/src/lib.rs` | 只新增模块声明，三条腿都没提出问题，核查员没有核到与它相关的引用 |
-| `crates/singlefs-harness/src/bin/first_transaction_on_device.rs` | 本地攻方 K3 Fact 10 核过 `swallow_the_next_barrier_on` 函数体逐字相符；与判定四相关（两种说谎的设备在这里有手写调用点），不改 |
+| `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs` | 本地攻方 K3 Fact 10 核过 `swallow_the_next_barrier_on` 函数体逐字相符；与判定四相关（两种说谎的设备在这里有手写调用点），不改 |
 | `crates/singlefs-harness/tests/second_transaction_supplement_three_fault_injection.rs` | 快档用例本身；判定一、二要改它的停机规则 |
 | `crates/mutations.tsv` | 197-204 行八条；改法一、二各要补一条 |
 | `crates/singlefs-core/src/transaction.rs` | 在开工快照里（第 202 行变异钉的是它），这一轮没有一条腿打中它 |

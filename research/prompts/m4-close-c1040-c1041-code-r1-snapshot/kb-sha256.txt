@@ -1,0 +1,5 @@
+4a2e8ffc5ad4d23c7aecce32c2a8a589c852d80f66efe8a20c1cf8de6063dff2  .claude/kb/decisions/12-目标介质.md
+35035294ec3a1fec352b4b64570cd6797d8b688769d22ca8f8cd235a44646aa4  .claude/kb/checks-owed.md
+20c6badaa1b9633c45340bff494da71d3cb65a881619a8b6f3dae8659ea898a4  crates/singlefs-checker/invariants/02-根环.md
+6ae07fd91ac44891751c7b4ad37ba449b5cefcfacd0703decd8b79e373cc054d  .claude/kb/decisions/22-单元原子性怎么合成.md
+9e876c6a27e8f2a78fe3db1eade5c52cdebb0d5cc35cfd5519b615e04a03bb85  .claude/kb/decisions/21-权威态与派生态的分界.md

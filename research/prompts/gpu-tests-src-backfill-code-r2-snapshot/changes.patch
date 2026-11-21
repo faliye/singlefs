@@ -1,0 +1,1384 @@
+diff --git a/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs b/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
+index 6350528c176b3ac4b38a46567c7a1d37d6cd69cd..6a87c319342447fdb8efd740581e8e95f72fcb5f 100644
+--- a/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
++++ b/crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
+@@ -35,8 +35,10 @@
+ //! 「全部卡」臂开几张每次跑时由 `lockstep --cards <张数>` 设：给了 N 只开服务交来的卡里排在前头的 N 张（先后照服务交来的卡串），
+ //! 不给开交来的全部；`background_gpu_devices` 点名开的那几张，本机没交的卡不开。N 小于 2（只开一张时全部卡臂与点名一张卡臂是同一条臂）、
+ //! 不是数、多于交来的张数都退 2（命令行不对），不截成交来的张数；这一台一张都没交的照「服务交的卡里没有这一台的」退 77。
+-//! 开了几张、照什么开的打在 `name=every_card_arm_cards` 一行；续跑时这两样与产物里已有的这一行有一处不同，或产物里有结果行而没有这一行，
+-//! 打 `name=stopped clause=cards_option_differs_from_the_product_being_resumed` 退 2，两种张数的重复不混在同一份产物里。
++//! 用卡的两条臂开的卡逐张记进产物（[`CardsRecordedForAnArm`]）：全部卡臂开了几张、照什么开的、每张的 PCI 地址与型号打在 `name=every_card_arm_cards` 一行，
++//! 点名一张卡臂（交替跑与并发跑都算）那一张的 PCI 地址与型号打在 `name=one_card_arm_card` 一行。续跑时这几样与产物里已有的同种行有一处不同，
++//! 或产物里有这条臂跑出的结果行（`name=run`、`name=concurrent_run`）而没有这种行，打 `name=stopped clause=cards_differ_from_the_product_being_resumed` 退 2：
++//! 两组卡（换了卡、换了一台）的重复不混在同一份产物里。一条结果行都没跑出来的那一趟（这一台一张都没交、`--cards` 多于交来的、领卡没成）不挡以后的续跑。
+ //! 这份源文件头的张数声明写 `all`：服务把那台此刻的空卡都交来，装置照 `--cards` 只开其中 N 张；没给 `--cards` 而只交来一张时这条臂与点名一张卡臂相同，报本次未跑。
+ //! `lockstep`、`concurrent`、`sensitivity` 与 `stage-three-cost` 不拆成先录后判（理由写在各自入口旁）；
+ //! 只比结果、不量挂钟的那一条内联真卡测试走先录后判：输入与装置自数的参照先在 CPU 上写进判定库，判段读回才取卡（测试包 `common_pairing_input_through_the_library`）。
+@@ -4128,36 +4130,85 @@ const EXIT_RUN_CONDITION_NOT_MET: i32 = 78;
+ 
+ // ---- 开跑之前的三样（停机条款第 1、2 条，开跑自检）----
+ 
+-/// 产品 GPU 包与核心层 `src/` 下每个文件（路径相对仓根，按路径排）与它的 sha256。
++/// crates 摘要从哪几处起走（从仓根起的路径；目录逐层走到每个文件，文件就是它自己）：产品 GPU 包与核心层的 `src/`，
++/// 装置自己的源文件，与它经 `#[path]` 编进来的两份共用模块。这一趟跑的代码就是这几处，停机条款第 2 条（`crates/` 中途被改）要看得见它们每一处的改动。
++const STARTING_PATHS_OF_THE_CRATES_DIGEST: [&str; 5] = [
++    "crates/singlefs-background-gpu/src",
++    "crates/singlefs-core/src",
++    "crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs",
++    "crates/singlefs-background-gpu-tests/tests/common_discrete_gpus_of_this_host/mod.rs",
++    "crates/singlefs-background-gpu-tests/tests/common_pairing_input_through_the_library/mod.rs",
++];
++
++/// crates 摘要走到的一处是什么：目录（底下各项的名字）还是文件。
++enum PathWalkedForTheCratesDigest {
++    Directory { entry_names: Vec<String> },
++    File,
++}
++
++/// [`STARTING_PATHS_OF_THE_CRATES_DIGEST`] 每一处的每个文件（路径相对仓根，按路径排）与它的 sha256；装置从仓根起，仓根是当前目录。
+ fn source_files_and_digests() -> Result<Vec<(String, String)>, String> {
+-    let mut files: Vec<PathBuf> = Vec::new();
+-    let mut directories: Vec<PathBuf> = vec![
+-        PathBuf::from("crates/singlefs-background-gpu/src"),
+-        PathBuf::from("crates/singlefs-core/src"),
+-    ];
+-    while let Some(directory) = directories.pop() {
+-        let entries = std::fs::read_dir(&directory)
+-            .map_err(|error| format!("读 {}（装置要从仓根起）：{error}", directory.display()))?;
+-        for entry in entries {
+-            let path = entry
+-                .map_err(|error| format!("读 {} 的一项：{error}", directory.display()))?
+-                .path();
+-            if path.is_dir() {
+-                directories.push(path);
+-            } else {
+-                files.push(path);
+-            }
++    source_files_and_digests_walked_with(
++        &STARTING_PATHS_OF_THE_CRATES_DIGEST,
++        &what_the_path_is_on_the_disk,
++        &|path: &str| std::fs::read(path).map_err(|error| format!("读 {path}：{error}")),
++    )
++}
++
++/// 盘上的这一处（从仓根起的路径）是目录还是文件；目录交回底下各项的名字。
++///
++/// # Errors
++/// 这一处不在、读不了。
++fn what_the_path_is_on_the_disk(path: &str) -> Result<PathWalkedForTheCratesDigest, String> {
++    let metadata =
++        std::fs::metadata(path).map_err(|error| format!("读 {path}（装置要从仓根起）：{error}"))?;
++    if !metadata.is_dir() {
++        return Ok(PathWalkedForTheCratesDigest::File);
++    }
++    std::fs::read_dir(path)
++        .map_err(|error| format!("读 {path}（装置要从仓根起）：{error}"))?
++        .map(|entry_read| {
++            entry_read
++                .map(|directory_entry| directory_entry.file_name().to_string_lossy().into_owned())
++                .map_err(|error| format!("读 {path} 的一项：{error}"))
++        })
++        .collect::<Result<Vec<String>, String>>()
++        .map(|entry_names| PathWalkedForTheCratesDigest::Directory { entry_names })
++}
++
++/// 从 `starting_paths` 起走（`what_the_path_is` 答每一处是目录还是文件，`bytes_of_the_file` 交文件的字节）：目录逐层走到每个文件，
++/// 文件就是它自己。交回每个文件的路径（按路径的各段排）与它的 sha256。
++///
++/// # Errors
++/// 起走的一处或走到的一处答不出、文件读不了。
++fn source_files_and_digests_walked_with(
++    starting_paths: &[&str],
++    what_the_path_is: &dyn Fn(&str) -> Result<PathWalkedForTheCratesDigest, String>,
++    bytes_of_the_file: &dyn Fn(&str) -> Result<Vec<u8>, String>,
++) -> Result<Vec<(String, String)>, String> {
++    let mut files: Vec<String> = Vec::new();
++    let mut paths_to_walk: Vec<String> = starting_paths
++        .iter()
++        .map(|starting_path| (*starting_path).to_string())
++        .collect();
++    while let Some(path) = paths_to_walk.pop() {
++        match what_the_path_is(&path)? {
++            PathWalkedForTheCratesDigest::File => files.push(path),
++            PathWalkedForTheCratesDigest::Directory { entry_names } => paths_to_walk.extend(
++                entry_names
++                    .into_iter()
++                    .map(|entry_name| format!("{path}/{entry_name}")),
++            ),
+         }
+     }
+-    files.sort();
++    files.sort_by(|left, right| Path::new(left).cmp(Path::new(right)));
+     files
+         .into_iter()
+         .map(|path| {
+-            let bytes =
+-                std::fs::read(&path).map_err(|error| format!("读 {}：{error}", path.display()))?;
++            let bytes = bytes_of_the_file(&path)?;
+             let mut digest = Sha256Digest::new();
+             digest.feed(&bytes);
+-            Ok((path.display().to_string(), digest.finish_as_hex()))
++            Ok((path, digest.finish_as_hex()))
+         })
+         .collect()
+ }
+@@ -5910,87 +5961,259 @@ fn discrete_gpus_named_for_the_every_card_arm(
+     }
+ }
+ 
+-/// `name=every_card_arm_cards` 一行的字段：这一档全部卡臂开几张、照什么开的（`--cards` 给的还是交来的全部）、开的是哪几张。
+-fn fields_of_the_every_card_arm_cards_line(
+-    tier: UnitAreaTier,
+-    cards_of_the_every_card_arm: CardsOfTheEveryCardArm,
+-    discrete_gpus_of_the_every_card_arm: &[DiscreteGpuSeenByThisProcess],
+-) -> String {
+-    format!(
+-        "tier={} cards_named={} named_by={} pci_bus_addresses={}",
+-        tier.name(),
+-        discrete_gpus_of_the_every_card_arm.len(),
+-        cards_of_the_every_card_arm.name(),
+-        field_value(
+-            &discrete_gpus_of_the_every_card_arm
+-                .iter()
+-                .map(|gpu| gpu.pci_bus_address.as_str())
+-                .collect::<Vec<&str>>()
+-                .join(",")
+-        )
++/// 续跑时逐张核开的卡的那两条用卡的臂（各连同它的多判臂）。封闭集合。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++enum ArmWhoseCardsAreRecorded {
++    /// 点名一张卡臂（交替跑与并发跑的 `gpu_one_card`）：记在 `name=one_card_arm_card` 一行。
++    TheCardWithTheLowestPciAddress,
++    /// 全部卡臂：记在 `name=every_card_arm_cards` 一行。
++    EveryCard,
++}
++
++impl ArmWhoseCardsAreRecorded {
++    /// 记这条臂开的卡的那一行的种类（`name=` 的值）。
++    const fn kind_of_the_line(self) -> &'static str {
++        match self {
++            ArmWhoseCardsAreRecorded::TheCardWithTheLowestPciAddress => "one_card_arm_card",
++            ArmWhoseCardsAreRecorded::EveryCard => "every_card_arm_cards",
++        }
++    }
++
++    /// 这条臂挂载用的后台计算：结果行 `arm=` 点到的臂用的是它，那一行就算这条臂跑出的。
++    const fn background_compute_the_arm_mounts_with(self) -> ComputeOfTheArm {
++        match self {
++            ArmWhoseCardsAreRecorded::TheCardWithTheLowestPciAddress => {
++                ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress
++            }
++            ArmWhoseCardsAreRecorded::EveryCard => ComputeOfTheArm::GpuOnEveryCard,
++        }
++    }
++}
++
++/// 一条用卡的臂这一趟开的卡：写进产物的那一行（[`CardsRecordedForAnArm::fields_of_the_line`]），续跑时逐个字段与产物里已有的同种行比
++/// （[`cards_recorded_differing_from_the_product_being_resumed`]）。卡的身份取装置手里有的两样合起来比：PCI 地址（卡插在哪个槽上）与型号
++/// （wgpu 报的名字）。同一个地址上换了型号、同一种型号换了地址都认得出；两台在同一个地址上插着同一种型号的卡认不出（装置拿不到每张卡自己的编号）。
++#[derive(Clone, Debug, PartialEq, Eq)]
++struct CardsRecordedForAnArm {
++    arm: ArmWhoseCardsAreRecorded,
++    /// 续跑时逐个比的字段（键、这一趟的值，值里没有空白），次序就是写进那一行的次序。
++    fields_compared_on_resume: Vec<(&'static str, String)>,
++}
++
++impl CardsRecordedForAnArm {
++    /// 那一行在 `name=` 之后的字段：档，再是逐个比的那几个字段。
++    fn fields_of_the_line(&self, tier: UnitAreaTier) -> String {
++        std::iter::once(format!("tier={}", tier.name()))
++            .chain(
++                self.fields_compared_on_resume
++                    .iter()
++                    .map(|(key, value)| format!("{key}={value}")),
++            )
++            .collect::<Vec<String>>()
++            .join(" ")
++    }
++}
++
++/// 几张卡的 PCI 地址与型号（各去掉空白、`,` 隔开），次序照给的。
++fn pci_bus_addresses_and_models_of(
++    discrete_gpus: &[DiscreteGpuSeenByThisProcess],
++) -> (String, String) {
++    (
++        discrete_gpus
++            .iter()
++            .map(|gpu| field_value(&gpu.pci_bus_address))
++            .collect::<Vec<String>>()
++            .join(","),
++        discrete_gpus
++            .iter()
++            .map(|gpu| field_value(&gpu.model))
++            .collect::<Vec<String>>()
++            .join(","),
+     )
+ }
+ 
+-/// 这一趟打不打 `name=every_card_arm_cards` 一行、续跑时核不核它：点了全部卡臂（两条之一），而且这一台交来了卡。
+-/// 这一台一张都没交的不打不核：哪条 GPU 臂都不跑（退 77），产物里不留一行零张，以后在交了卡的那一台续跑时不被它挡住。
+-fn the_every_card_arm_cards_are_recorded(
+-    arms_requested: &[LockstepArm],
++/// 点名一张卡臂这一趟开的那一张：交来的卡里 PCI 地址最小的那一张（同 [`background_compute_settings_of_the_arm`] 点的那一张）。
++/// 没点这条臂（`computes_requested` 里没有它）或这一台一张都没交的交回 `None`：不打不核。
++fn cards_recorded_for_the_one_card_arm(
++    computes_requested: &[ComputeOfTheArm],
+     cards: &CardsSeenByThisProcess,
+-) -> bool {
+-    arms_requested
+-        .iter()
+-        .any(|arm| arm.compute == ComputeOfTheArm::GpuOnEveryCard)
+-        && !cards.discrete_gpus.is_empty()
++) -> Option<CardsRecordedForAnArm> {
++    if !computes_requested.contains(&ComputeOfTheArm::GpuOnTheCardWithTheLowestPciAddress) {
++        return None;
++    }
++    let lowest = cards.discrete_gpus.first()?;
++    let (pci_bus_address, model) = pci_bus_addresses_and_models_of(std::slice::from_ref(lowest));
++    Some(CardsRecordedForAnArm {
++        arm: ArmWhoseCardsAreRecorded::TheCardWithTheLowestPciAddress,
++        fields_compared_on_resume: vec![("pci_bus_address", pci_bus_address), ("model", model)],
++    })
+ }
+ 
+-/// 续跑时核产物里已有的 `name=every_card_arm_cards` 行（不分档）：每一行的 `cards_named` 与 `named_by` 都同这一趟算出的相同才接着跑，
+-/// 两种张数的重复不混在同一份产物里。交回 `None` 是接着跑：产物是新的（一行结果都没有），或每一行都相同。
+-/// 交回 `Some` 是停下：`name=stopped clause=cards_option_differs_from_the_product_being_resumed` 那一行在 clause 之后的字段，
+-/// 带产物里的与这一趟的 `cards_named`、`named_by`；产物里有结果行而没有 `every_card_arm_cards` 行的，认不出那几次开了几张，
+-/// 产物那一边写 `none`、出路是换一个 `--product`。
+-fn every_card_arm_cards_differing_from_the_product_being_resumed(
+-    lines_already_in_the_product: &[KindAndFieldsOfAResultLine],
+-    cards_named_now: usize,
++/// 全部卡臂这一趟开的卡：开了几张、照什么开的（`--cards` 给的还是交来的全部）、每张的 PCI 地址与型号（按 PCI 地址次序）。
++/// 没点这条臂或这一台一张都没交的交回 `None`：不打不核（哪条 GPU 臂都不跑、退 77，产物里不留一行零张）。
++fn cards_recorded_for_the_every_card_arm(
++    computes_requested: &[ComputeOfTheArm],
++    cards: &CardsSeenByThisProcess,
+     cards_of_the_every_card_arm: CardsOfTheEveryCardArm,
+-) -> Option<String> {
+-    if lines_already_in_the_product.is_empty() {
++    discrete_gpus_of_the_every_card_arm: &[DiscreteGpuSeenByThisProcess],
++) -> Option<CardsRecordedForAnArm> {
++    if !computes_requested.contains(&ComputeOfTheArm::GpuOnEveryCard) {
++        return None;
++    }
++    if cards.discrete_gpus.is_empty() {
+         return None;
+     }
+-    let cards_named_now_text = cards_named_now.to_string();
+-    let named_by_now = cards_of_the_every_card_arm.name();
++    let (pci_bus_addresses, models) =
++        pci_bus_addresses_and_models_of(discrete_gpus_of_the_every_card_arm);
++    Some(CardsRecordedForAnArm {
++        arm: ArmWhoseCardsAreRecorded::EveryCard,
++        fields_compared_on_resume: vec![
++            (
++                "cards_named",
++                discrete_gpus_of_the_every_card_arm.len().to_string(),
++            ),
++            ("named_by", cards_of_the_every_card_arm.name().to_string()),
++            ("pci_bus_addresses", pci_bus_addresses),
++            ("models", models),
++        ],
++    })
++}
++
++/// 产物里已有的结果行里有没有用 `compute` 挂载的臂跑出的：交替跑的 `name=run`、并发跑的 `name=concurrent_run`，照 `arm=` 认臂（多判臂算它那一种）。
++fn the_product_has_runs_mounted_with(
++    lines_already_in_the_product: &[KindAndFieldsOfAResultLine],
++    compute: ComputeOfTheArm,
++) -> bool {
++    lines_already_in_the_product.iter().any(|(name, fields)| {
++        let arm_name = fields.get("arm").map_or("", String::as_str);
++        let compute_of_the_line = match name.as_str() {
++            "run" => LockstepArm::of_the_name(arm_name).map(|arm| arm.compute),
++            "concurrent_run" => {
++                ConcurrentArm::of_the_name(arm_name).map(ConcurrentArm::compute_of_the_arm)
++            }
++            _other_kind => None,
++        };
++        compute_of_the_line == Some(compute)
++    })
++}
++
++/// 续跑时核产物里已有的、与 `recorded_now` 同种的行（不分档）：每一行逐个字段都同这一趟的相同才接着跑，交回 `None`。产物里没有这种行时，
++/// 这条臂一条结果行都没跑出来过（[`the_product_has_runs_mounted_with`]）也接着跑：一张没交、`--cards` 多于交来的、领卡没成的那一趟只留了开头几行。
++/// 交回 `Some` 是停下：`name=stopped clause=cards_differ_from_the_product_being_resumed` 那一行在 clause 之后的字段——那一行的种类、
++/// 产物里的与这一趟的逐个字段（产物里没有这种行、或那一行缺这个字段的写 `none`）、理由。
++fn cards_recorded_differing_from_the_product_being_resumed(
++    lines_already_in_the_product: &[KindAndFieldsOfAResultLine],
++    recorded_now: &CardsRecordedForAnArm,
++) -> Option<String> {
++    let kind_of_the_line = recorded_now.arm.kind_of_the_line();
+     let mut lines_recorded_in_the_product = lines_already_in_the_product
+         .iter()
+-        .filter(|(name, _fields)| name == "every_card_arm_cards")
+-        .map(|(_name, fields)| (fields.get("cards_named"), fields.get("named_by")))
++        .filter(|(name, _fields)| name == kind_of_the_line)
++        .map(|(_name, fields)| fields)
+         .peekable();
+-    let (cards_named_in_the_product, named_by_in_the_product, reason) =
+-        if lines_recorded_in_the_product.peek().is_none() {
+-            (
+-                "none",
+-                "none",
+-                "产物里有结果行而没有every_card_arm_cards行，认不出那几次全部卡臂开了几张，换一个--product",
+-            )
+-        } else {
+-            let (cards_named_recorded, named_by_recorded) = lines_recorded_in_the_product.find(
+-                |(cards_named_of_the_line, named_by_of_the_line)| {
+-                    cards_named_of_the_line.map(String::as_str)
+-                        != Some(cards_named_now_text.as_str())
+-                        || named_by_of_the_line.map(String::as_str) != Some(named_by_now)
+-                },
+-            )?;
+-            (
+-                cards_named_recorded.map_or("none", String::as_str),
+-                named_by_recorded.map_or("none", String::as_str),
+-                "产物里全部卡臂开的张数或照什么开的与这一趟不同，两种张数的重复不混在一份产物里，照产物里的张数与开法重起或换一个--product",
+-            )
+-        };
++    let (fields_in_the_product, reason) = if lines_recorded_in_the_product.peek().is_none() {
++        if !the_product_has_runs_mounted_with(
++            lines_already_in_the_product,
++            recorded_now.arm.background_compute_the_arm_mounts_with(),
++        ) {
++            return None;
++        }
++        (
++            None,
++            "产物里有这条臂跑出的结果行而没有记它开的卡的那一行，认不出那几次开的是哪几张卡，换一个--product",
++        )
++    } else {
++        let differing = lines_recorded_in_the_product.find(|fields| {
++            recorded_now
++                .fields_compared_on_resume
++                .iter()
++                .any(|(key, value_now)| fields.get(*key) != Some(value_now))
++        })?;
++        (
++            Some(differing),
++            "产物里这条臂开的卡与这一趟不同，两组卡的重复不混在一份产物里，照产物里的那几张卡重起或换一个--product",
++        )
++    };
++    let in_the_product = recorded_now
++        .fields_compared_on_resume
++        .iter()
++        .map(|(key, _value_now)| {
++            let value_in_the_product = fields_in_the_product
++                .and_then(|fields| fields.get(*key))
++                .map_or("none", String::as_str);
++            format!("{key}_in_the_product={value_in_the_product}")
++        });
++    let now = recorded_now
++        .fields_compared_on_resume
++        .iter()
++        .map(|(key, value_now)| format!("{key}_now={value_now}"));
+     Some(format!(
+-        "cards_named_in_the_product={} named_by_in_the_product={} cards_named_now={cards_named_now} named_by_now={named_by_now} reason={reason}",
+-        field_value(cards_named_in_the_product),
+-        field_value(named_by_in_the_product),
++        "line={kind_of_the_line} {} reason={reason}",
++        in_the_product.chain(now).collect::<Vec<String>>().join(" ")
+     ))
+ }
+ 
++/// 这一趟要记的卡（`cards_recorded`）逐条先与产物里已有的核（[`cards_recorded_differing_from_the_product_being_resumed`]），全都对得上才交回要打的记卡那几行
++/// （种类、`name=` 之后的字段，次序照 `cards_recorded`）；有一条对不上交回 `Err`，带 `name=stopped` 那一行在 clause 之后的字段，一行记卡的都不打。
++fn lines_recording_the_cards_unless_one_differs_from_the_product_being_resumed(
++    lines_already_in_the_product: &[KindAndFieldsOfAResultLine],
++    tier: UnitAreaTier,
++    cards_recorded: &[CardsRecordedForAnArm],
++) -> Result<Vec<(&'static str, String)>, String> {
++    for recorded_now in cards_recorded {
++        if let Some(fields) = cards_recorded_differing_from_the_product_being_resumed(
++            lines_already_in_the_product,
++            recorded_now,
++        ) {
++            return Err(fields);
++        }
++    }
++    Ok(cards_recorded
++        .iter()
++        .map(|recorded_now| {
++            (
++                recorded_now.arm.kind_of_the_line(),
++                recorded_now.fields_of_the_line(tier),
++            )
++        })
++        .collect())
++}
++
++/// 交替跑与并发跑取卡之后、开跑之前调：照 [`lines_recording_the_cards_unless_one_differs_from_the_product_being_resumed`] 核了打记卡的那几行；
++/// 有一条对不上打 `name=stopped clause=cards_differ_from_the_product_being_resumed …`，交回退出码 2（命令行不对：续的产物与这一趟的卡不是同一组）；
++/// 产物由拥有它的调用方收尾（[`ProductWriter::finish`] 拿走产物，收尾之后不能再写）。
++fn emit_the_cards_recorded_unless_one_differs_from_the_product_being_resumed(
++    product: &mut ProductWriter,
++    product_path: &Path,
++    lines_already_in_the_product: &[KindAndFieldsOfAResultLine],
++    tier: UnitAreaTier,
++    cards_recorded: &[CardsRecordedForAnArm],
++) -> Result<(), i32> {
++    match lines_recording_the_cards_unless_one_differs_from_the_product_being_resumed(
++        lines_already_in_the_product,
++        tier,
++        cards_recorded,
++    ) {
++        Ok(lines) => {
++            for (kind, fields) in &lines {
++                product.emit(kind, fields);
++            }
++            Ok(())
++        }
++        Err(fields) => {
++            product.emit(
++                "stopped",
++                &format!("clause=cards_differ_from_the_product_being_resumed {fields}"),
++            );
++            eprintln!(
++                "续跑的产物 {} 里用卡的臂开的卡与这一趟对不上：{fields}\n{USAGE}",
++                product_path.display()
++            );
++            Err(EXIT_USAGE)
++        }
++    }
++}
++
+ /// 这条臂开的卡从哪一份里取：全部卡臂是 `--cards` 挑过的那一份，点名一张卡臂（取头一张）与 CPU 臂是交来的全部。
+ fn discrete_gpus_of_the_arm<'cards>(
+     compute: ComputeOfTheArm,
+@@ -6308,31 +6531,34 @@ fn lockstep_command(command: &LockstepCommand) -> i32 {
+             return EXIT_USAGE;
+         }
+     };
+-    if the_every_card_arm_cards_are_recorded(&command.arms_requested, &cards) {
+-        if let Some(fields) = every_card_arm_cards_differing_from_the_product_being_resumed(
+-            &opening.lines_already_in_the_product,
+-            discrete_gpus_of_the_every_card_arm.len(),
++    let computes_requested: Vec<ComputeOfTheArm> = command
++        .arms_requested
++        .iter()
++        .map(|arm| arm.compute)
++        .collect();
++    let cards_recorded: Vec<CardsRecordedForAnArm> = [
++        cards_recorded_for_the_one_card_arm(&computes_requested, &cards),
++        cards_recorded_for_the_every_card_arm(
++            &computes_requested,
++            &cards,
+             command.cards_of_the_every_card_arm,
+-        ) {
+-            product.emit(
+-                "stopped",
+-                &format!("clause=cards_option_differs_from_the_product_being_resumed {fields}"),
+-            );
+-            product.finish();
+-            eprintln!(
+-                "续跑的产物 {} 里全部卡臂开的卡与这一趟对不上：{fields}\n{USAGE}",
+-                command.product.display()
+-            );
+-            return EXIT_USAGE;
+-        }
+-        product.emit(
+-            "every_card_arm_cards",
+-            &fields_of_the_every_card_arm_cards_line(
+-                command.tier,
+-                command.cards_of_the_every_card_arm,
+-                &discrete_gpus_of_the_every_card_arm,
+-            ),
+-        );
++            &discrete_gpus_of_the_every_card_arm,
++        ),
++    ]
++    .into_iter()
++    .flatten()
++    .collect();
++    if let Err(exit_code) =
++        emit_the_cards_recorded_unless_one_differs_from_the_product_being_resumed(
++            &mut product,
++            &command.product,
++            &opening.lines_already_in_the_product,
++            command.tier,
++            &cards_recorded,
++        )
++    {
++        product.finish();
++        return exit_code;
+     }
+     let mut arms_run: Vec<LockstepArm> = Vec::new();
+     for arm in &command.arms_requested {
+@@ -7600,6 +7826,27 @@ fn concurrent_command(command: &ConcurrentCommand) -> i32 {
+             return exit_code;
+         }
+     };
++    let computes_requested: Vec<ComputeOfTheArm> = command
++        .arms_requested
++        .iter()
++        .map(|arm| arm.compute_of_the_arm())
++        .collect();
++    let cards_recorded: Vec<CardsRecordedForAnArm> =
++        cards_recorded_for_the_one_card_arm(&computes_requested, &cards)
++            .into_iter()
++            .collect();
++    if let Err(exit_code) =
++        emit_the_cards_recorded_unless_one_differs_from_the_product_being_resumed(
++            &mut product,
++            &command.product,
++            &opening.lines_already_in_the_product,
++            command.tier,
++            &cards_recorded,
++        )
++    {
++        product.finish();
++        return exit_code;
++    }
+     let mut arms_run: Vec<ConcurrentArm> = Vec::new();
+     for arm in &command.arms_requested {
+         match reason_the_arm_is_not_run_on_the_cards(arm.compute_of_the_arm(), &cards) {
+@@ -12127,25 +12374,28 @@ mod tests {
+     /// 同上一条，GPU 点名一张卡臂换成真卡上产品那一份：五遍每段的活槽数都等于装置自己数的。先录后判：只录那一段在 CPU 上造小池、
+     /// 取分配记录与单元区、装置自数参照、写进判定库，不取卡；判段读回之后才取卡、只跑 GPU、逐段比，对拍结论按键入库复用（库里有两边一致的不取卡）。
+     /// 持卡判入口 [`judged_on_the_cards_that_the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool`]。
++    /// 对拍经全仓那一份库，包在 [`with_the_one_library_kept_for_this_process`] 里：同一个二进制里设一次性库的用例等它对拍完。
+     #[cfg(feature = "tests-on-a-real-gpu")]
+     #[test]
+     fn the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool(
+     ) {
+-        crate::common_pairing_input_through_the_library::pairing_concluded_on_the_cards_through_the_pairing_library(
+-            "the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool",
+-            REFERENCE_UNITS_GROUP_OF_THE_APPARATUS_COUNT,
+-            || {
+-                let (allocation_records, unit_area) =
+-                    allocation_records_and_unit_area_of_the_image(&small_pool_image())
+-                        .expect("量挂载成");
+-                pairing_input_bytes_of_the_allocation_records_and_the_unit_area(
+-                    &allocation_records,
+-                    unit_area,
+-                )
+-            },
+-            reference_bytes_of_the_apparatus_count_of_the_live_slots_per_segment,
+-            judged_on_the_cards_that_the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool,
+-        );
++        with_the_one_library_kept_for_this_process(|| {
++            crate::common_pairing_input_through_the_library::pairing_concluded_on_the_cards_through_the_pairing_library(
++                "the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool",
++                REFERENCE_UNITS_GROUP_OF_THE_APPARATUS_COUNT,
++                || {
++                    let (allocation_records, unit_area) =
++                        allocation_records_and_unit_area_of_the_image(&small_pool_image())
++                            .expect("量挂载成");
++                    pairing_input_bytes_of_the_allocation_records_and_the_unit_area(
++                        &allocation_records,
++                        unit_area,
++                    )
++                },
++                reference_bytes_of_the_apparatus_count_of_the_live_slots_per_segment,
++                judged_on_the_cards_that_the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool,
++            );
++        });
+     }
+ 
+     /// 小池上 GPU 点名一张卡臂照产品 greedy 跑的那一次 GC 调用：丙段至少调了一次、那一截不长于整次调用。只在真卡上跑通、没有 CPU 一侧可比
+@@ -12582,27 +12832,80 @@ mod tests {
+         );
+     }
+ 
++    /// 交替跑里名字是 `arm_names` 的那几条臂挂载用的后台计算（按名字取臂）。
++    fn computes_of_the_lockstep_arms_named(arm_names: &[&str]) -> Vec<ComputeOfTheArm> {
++        arm_names
++            .iter()
++            .map(|arm_name| {
++                LockstepArm::of_the_name(arm_name)
++                    .unwrap_or_else(|| panic!("测试里点的臂 {arm_name} 是交替跑的臂"))
++                    .compute
++            })
++            .collect()
++    }
++
++    /// `--cards 2` 那一趟全部卡臂记的卡（交来三张、开前两张）。
++    fn every_card_arm_cards_of_the_cards_option_two() -> CardsRecordedForAnArm {
++        let three = three_discrete_gpus_seen_on_this_host();
++        cards_recorded_for_the_every_card_arm(
++            &computes_of_the_lockstep_arms_named(&["gpu_every_card"]),
++            &three_cards_handed_over_out_of_the_pci_order(),
++            CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
++            &three[..2],
++        )
++        .expect("点了全部卡臂、这一台交了卡")
++    }
++
++    /// 记卡那一行照装置写的样子（不带前缀）。
++    fn line_of_the_cards_recorded(recorded: &CardsRecordedForAnArm) -> String {
++        format!(
++            "name={} {}",
++            recorded.arm.kind_of_the_line(),
++            recorded.fields_of_the_line(UnitAreaTier::FourGibibytes)
++        )
++    }
++
+     /// 场景：全部卡臂照 `--cards 2` 点了两张、没给 `--cards` 点了三张。
+-    /// 预期：`name=every_card_arm_cards` 一行写出开了几张、照什么开的（`cards_option` 或 `every_handed_over_card`）与哪几张。
++    /// 预期：`name=every_card_arm_cards` 一行写出开了几张、照什么开的（`cards_option` 或 `every_handed_over_card`）、每张的 PCI 地址与型号。
+     #[test]
+     fn the_every_card_arm_cards_line_tells_how_many_cards_and_whether_the_cards_option_named_them()
+     {
+         let three = three_discrete_gpus_seen_on_this_host();
+         assert_eq!(
+-            fields_of_the_every_card_arm_cards_line(
+-                UnitAreaTier::FourGibibytes,
+-                CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
+-                &three[..2],
+-            ),
+-            "tier=4GiB cards_named=2 named_by=cards_option pci_bus_addresses=0000:01:00.0,0000:02:00.0"
++            every_card_arm_cards_of_the_cards_option_two().fields_of_the_line(UnitAreaTier::FourGibibytes),
++            "tier=4GiB cards_named=2 named_by=cards_option pci_bus_addresses=0000:01:00.0,0000:02:00.0 \
++             models=model_at_0000:01:00.0,model_at_0000:02:00.0"
+         );
+         assert_eq!(
+-            fields_of_the_every_card_arm_cards_line(
+-                UnitAreaTier::FourGibibytes,
++            cards_recorded_for_the_every_card_arm(
++                &computes_of_the_lockstep_arms_named(&["gpu_every_card"]),
++                &three_cards_handed_over_out_of_the_pci_order(),
+                 CardsOfTheEveryCardArm::EveryHandedOverCard,
+                 &three,
+-            ),
+-            "tier=4GiB cards_named=3 named_by=every_handed_over_card pci_bus_addresses=0000:01:00.0,0000:02:00.0,0000:03:00.0"
++            )
++            .map(|recorded| recorded.fields_of_the_line(UnitAreaTier::FourGibibytes)),
++            Some(
++                "tier=4GiB cards_named=3 named_by=every_handed_over_card pci_bus_addresses=0000:01:00.0,0000:02:00.0,0000:03:00.0 \
++                 models=model_at_0000:01:00.0,model_at_0000:02:00.0,model_at_0000:03:00.0"
++                    .to_string()
++            )
++        );
++    }
++
++    /// 场景：服务交来三张（交来的先后 03、01、02），点了点名一张卡臂。
++    /// 预期：`name=one_card_arm_card` 一行记的是 PCI 地址最小的那一张（01，点名一张卡臂开的就是它）的地址与型号。
++    #[test]
++    fn the_one_card_arm_card_line_tells_the_address_and_model_of_the_lowest_handed_over_card() {
++        assert_eq!(
++            cards_recorded_for_the_one_card_arm(
++                &computes_of_the_lockstep_arms_named(&["gpu_one_card"]),
++                &three_cards_handed_over_out_of_the_pci_order(),
++            )
++            .map(|recorded| line_of_the_cards_recorded(&recorded)),
++            Some(
++                "name=one_card_arm_card tier=4GiB pci_bus_address=0000:01:00.0 model=model_at_0000:01:00.0"
++                    .to_string()
++            )
+         );
+     }
+ 
+@@ -12636,28 +12939,56 @@ mod tests {
+         );
+     }
+ 
+-    /// 场景：点了全部卡臂、交来三张；点了全部卡多判臂、这一台一张没交；只点 CPU 臂与点名一张卡臂、交来三张。
+-    /// 预期：只有头一种打 `name=every_card_arm_cards` 一行、续跑时核它；这一台没交卡的不打不核（照旧退 77），没点全部卡臂的不打不核。
+-    #[test]
+-    fn the_every_card_arm_cards_are_recorded_only_with_an_every_card_arm_on_a_host_handed_cards() {
+-        let no_card = CardsSeenByThisProcess {
++    /// 这一台一张卡都没交的情形（取卡模块交回 `None`）。
++    fn no_card_handed_to_this_host() -> CardsSeenByThisProcess {
++        CardsSeenByThisProcess {
+             discrete_gpus: Vec::new(),
+             handed_over_pci_bus_addresses_in_the_handed_over_order: Vec::new(),
+             vulkan_instance: None,
+-        };
++        }
++    }
++
++    /// 场景：点了全部卡臂、交来三张；点了全部卡多判臂、这一台一张没交；只点 CPU 臂与点名一张卡臂、交来三张；点名一张卡臂、这一台一张没交。
++    /// 预期：点了那条臂、这一台交了卡才记它开的卡（续跑时才核）；这一台没交卡的不记不核（那一趟退 77），没点那条臂的不记不核。
++    #[test]
++    fn the_cards_of_an_arm_are_recorded_only_when_the_arm_is_requested_on_a_host_handed_cards() {
++        let three = three_cards_handed_over_out_of_the_pci_order();
++        let every_card = computes_of_the_lockstep_arms_named(&["gpu_every_card"]);
++        let every_card_rejudged = computes_of_the_lockstep_arms_named(&["gpu_every_card_rejudged"]);
++        let cpu_and_one_card = computes_of_the_lockstep_arms_named(&["cpu", "gpu_one_card"]);
++        let every_handed_over = CardsOfTheEveryCardArm::EveryHandedOverCard;
+         assert_eq!(
+             (
+-                the_every_card_arm_cards_are_recorded(
+-                    &[LOCKSTEP_ARMS[2]],
+-                    &three_cards_handed_over_out_of_the_pci_order()
+-                ),
+-                the_every_card_arm_cards_are_recorded(&[LOCKSTEP_ARMS[5]], &no_card),
+-                the_every_card_arm_cards_are_recorded(
+-                    &[LOCKSTEP_ARMS[0], LOCKSTEP_ARMS[1]],
+-                    &three_cards_handed_over_out_of_the_pci_order()
+-                ),
++                cards_recorded_for_the_every_card_arm(
++                    &every_card,
++                    &three,
++                    every_handed_over,
++                    &three.discrete_gpus
++                )
++                .is_some(),
++                cards_recorded_for_the_one_card_arm(&every_card, &three).is_some(),
++                cards_recorded_for_the_every_card_arm(
++                    &every_card_rejudged,
++                    &no_card_handed_to_this_host(),
++                    every_handed_over,
++                    &[]
++                )
++                .is_some(),
++                cards_recorded_for_the_one_card_arm(&cpu_and_one_card, &three).is_some(),
++                cards_recorded_for_the_every_card_arm(
++                    &cpu_and_one_card,
++                    &three,
++                    every_handed_over,
++                    &three.discrete_gpus
++                )
++                .is_some(),
++                cards_recorded_for_the_one_card_arm(
++                    &cpu_and_one_card,
++                    &no_card_handed_to_this_host()
++                )
++                .is_some(),
+             ),
+-            (true, false, false)
++            (true, false, false, true, false, false)
+         );
+     }
+ 
+@@ -12674,104 +13005,316 @@ mod tests {
+             .collect()
+     }
+ 
+-    /// `--cards 2` 那一趟写下的 `name=every_card_arm_cards` 一行（不带前缀）。
+-    fn every_card_arm_cards_line_of_the_cards_option_two() -> String {
+-        let three = three_discrete_gpus_seen_on_this_host();
+-        format!(
+-            "name=every_card_arm_cards {}",
+-            fields_of_the_every_card_arm_cards_line(
+-                UnitAreaTier::FourGibibytes,
+-                CardsOfTheEveryCardArm::FirstHandedOverCards(
+-                    NonZeroUsize::new(2).expect("2 不是 0")
+-                ),
+-                &three[..2],
+-            )
+-        )
+-    }
++    /// 全部卡臂交替跑一次的 `name=run` 一行（只带续跑认臂要的几样）。
++    const RUN_LINE_OF_THE_EVERY_CARD_ARM: &str =
++        "name=run tier=4GiB arm=gpu_every_card repeat=0 session=1 void=no batches=144";
+ 
+-    /// 场景：新产物（一行结果都没有）；续跑的产物里有 `--cards 2` 那一趟写下的一行，这一趟同样 `--cards 2`、开到两张。
++    /// 场景：新产物（一行结果都没有）；续跑的产物里有 `--cards 2` 那一趟记下的一行与它跑出的重复，这一趟同样 `--cards 2`、开到同样两张。
+     /// 预期：都接着跑。
+     #[test]
+     fn resuming_a_product_with_the_same_every_card_arm_cards_goes_on() {
+-        let cards_option_two =
+-            CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0"));
++        let recorded_now = every_card_arm_cards_of_the_cards_option_two();
+         assert_eq!(
+-            every_card_arm_cards_differing_from_the_product_being_resumed(&[], 2, cards_option_two),
++            cards_recorded_differing_from_the_product_being_resumed(&[], &recorded_now),
+             None
+         );
+-        let line_of_the_cards_option_two = every_card_arm_cards_line_of_the_cards_option_two();
++        let line_of_the_cards_option_two = line_of_the_cards_recorded(&recorded_now);
+         assert_eq!(
+-            every_card_arm_cards_differing_from_the_product_being_resumed(
++            cards_recorded_differing_from_the_product_being_resumed(
+                 &lines_already_in_a_product_of(&[
+                     "name=session_start session=1 command=lockstep",
+                     line_of_the_cards_option_two.as_str(),
++                    RUN_LINE_OF_THE_EVERY_CARD_ARM,
+                     "name=repeat_done tier=4GiB repeat=0 session=1",
+                 ]),
+-                2,
+-                cards_option_two,
++                &recorded_now,
++            ),
++            None
++        );
++    }
++
++    /// 场景：头一趟这一台一张卡都没交（照 `lockstep_command` 写下的行：开头几行、造池、`gpus count=0`、`not_run`、`done`，没有记卡的行），
++    /// 另一趟 `--cards 2` 多于交来的一张（停在 `cards_option_exceeds_the_cards_handed_over`），之后在交了两张卡的一台上同一条命令续跑。
++    /// 预期：接着跑：那两趟一条结果行都没跑出来，不挡以后的续跑。
++    #[test]
++    fn a_session_that_ran_no_arm_does_not_block_a_later_resume_on_a_host_handed_cards() {
++        let lines_of_the_sessions_that_ran_no_arm = lines_already_in_a_product_of(&[
++            "name=session_start session=1 command=lockstep reading=occupancy tier=4GiB arms=gpu_every_card",
++            "name=constants compared_against_the_crates=true mismatches=0",
++            "name=crates_version files=1 combined_sha256=00",
++            "name=tier_device tier=4GiB accepted_by_the_make_filesystem=true",
++            "name=construction tier=4GiB geometry_formed=true",
++            "name=gpus enumerated=false count=0 pci_bus_addresses= models=",
++            "name=not_run tier=4GiB arm=gpu_every_card reason=本进程看得到的独立显卡一张都没有",
++            "name=done emitted=8",
++            "name=session_start session=2 command=lockstep reading=occupancy tier=4GiB arms=gpu_every_card",
++            "name=gpus enumerated=true count=1 pci_bus_addresses=0000:01:00.0 models=model_at_0000:01:00.0",
++            "name=stopped clause=cards_option_exceeds_the_cards_handed_over reason=--cards_2_多于服务交给这一台的_1_张卡",
++            "name=done emitted=3",
++        ]);
++        assert_eq!(
++            cards_recorded_differing_from_the_product_being_resumed(
++                &lines_of_the_sessions_that_ran_no_arm,
++                &every_card_arm_cards_of_the_cards_option_two(),
+             ),
+             None
+         );
+     }
+ 
+     /// 场景：续跑的产物里那一行是 `--cards 3` 开的三张；这一趟 `--cards 2`。
+-    /// 预期：照什么开的相同而张数不同，停下，带上产物里的（3 张、`cards_option`）与这一趟的（2 张、`cards_option`）。
++    /// 预期：照什么开的相同而张数与卡不同，停下，逐个字段带上产物里的与这一趟的，理由点名两组卡不混。
+     #[test]
+     fn resuming_a_product_whose_every_card_arm_opened_another_count_stops() {
+         assert_eq!(
+-            every_card_arm_cards_differing_from_the_product_being_resumed(
++            cards_recorded_differing_from_the_product_being_resumed(
+                 &lines_already_in_a_product_of(&[
+                     "name=session_start session=1 command=lockstep",
+-                    "name=every_card_arm_cards tier=4GiB cards_named=3 named_by=cards_option pci_bus_addresses=0000:01:00.0,0000:02:00.0,0000:03:00.0",
++                    "name=every_card_arm_cards tier=4GiB cards_named=3 named_by=cards_option pci_bus_addresses=0000:01:00.0,0000:02:00.0,0000:03:00.0 \
++                     models=model_at_0000:01:00.0,model_at_0000:02:00.0,model_at_0000:03:00.0",
+                 ]),
+-                2,
+-                CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
++                &every_card_arm_cards_of_the_cards_option_two(),
+             ),
+             Some(
+-                "cards_named_in_the_product=3 named_by_in_the_product=cards_option cards_named_now=2 named_by_now=cards_option reason=产物里全部卡臂开的张数或照什么开的与这一趟不同，两种张数的重复不混在一份产物里，照产物里的张数与开法重起或换一个--product"
++                "line=every_card_arm_cards cards_named_in_the_product=3 named_by_in_the_product=cards_option \
++                 pci_bus_addresses_in_the_product=0000:01:00.0,0000:02:00.0,0000:03:00.0 \
++                 models_in_the_product=model_at_0000:01:00.0,model_at_0000:02:00.0,model_at_0000:03:00.0 \
++                 cards_named_now=2 named_by_now=cards_option pci_bus_addresses_now=0000:01:00.0,0000:02:00.0 \
++                 models_now=model_at_0000:01:00.0,model_at_0000:02:00.0 \
++                 reason=产物里这条臂开的卡与这一趟不同，两组卡的重复不混在一份产物里，照产物里的那几张卡重起或换一个--product"
+                     .to_string()
+             )
+         );
+     }
+ 
+-    /// 场景：续跑的产物里有 `--cards 2` 那一趟写下的一行；这一趟没给 `--cards`、交来的正好两张。
+-    /// 预期：张数相同而照什么开的不同，照样停下。
++    /// 场景：续跑的产物里有 `--cards 2` 那一趟记下的一行；这一趟没给 `--cards`、交来的正好是同样两张。
++    /// 预期：张数与卡都相同而照什么开的不同，照样停下。
+     #[test]
+     fn resuming_a_product_with_the_same_count_named_another_way_stops() {
+-        let line_of_the_cards_option_two = every_card_arm_cards_line_of_the_cards_option_two();
+-        assert_eq!(
+-            every_card_arm_cards_differing_from_the_product_being_resumed(
+-                &lines_already_in_a_product_of(&[line_of_the_cards_option_two.as_str()]),
+-                2,
++        let line_of_the_cards_option_two =
++            line_of_the_cards_recorded(&every_card_arm_cards_of_the_cards_option_two());
++        let three = three_discrete_gpus_seen_on_this_host();
++        let stopped = cards_recorded_differing_from_the_product_being_resumed(
++            &lines_already_in_a_product_of(&[line_of_the_cards_option_two.as_str()]),
++            &cards_recorded_for_the_every_card_arm(
++                &computes_of_the_lockstep_arms_named(&["gpu_every_card"]),
++                &three_cards_handed_over_out_of_the_pci_order(),
++                CardsOfTheEveryCardArm::EveryHandedOverCard,
++                &three[..2],
++            )
++            .expect("点了全部卡臂、这一台交了卡"),
++        );
++        assert!(
++            stopped.as_deref().is_some_and(|fields| fields
++                .contains("named_by_in_the_product=cards_option")
++                && fields.contains("named_by_now=every_handed_over_card")),
++            "{stopped:?}"
++        );
++    }
++
++    /// 场景：上一趟交来 01、02 两张、做完重复 0；这一趟交来 02、03 两张（张数同、卡不同，或换了一台），同样不给 `--cards`。
++    /// 预期：停下，带上产物里的与这一趟的 PCI 地址：两组卡的重复不混在同一份产物里。
++    #[test]
++    fn resuming_a_product_handed_other_cards_of_the_same_count_stops() {
++        let three = three_discrete_gpus_seen_on_this_host();
++        let every_card = computes_of_the_lockstep_arms_named(&["gpu_every_card"]);
++        let recorded_in_the_earlier_session = cards_recorded_for_the_every_card_arm(
++            &every_card,
++            &three_cards_handed_over_out_of_the_pci_order(),
++            CardsOfTheEveryCardArm::EveryHandedOverCard,
++            &three[..2],
++        )
++        .expect("点了全部卡臂、这一台交了卡");
++        let line_of_the_earlier_session =
++            line_of_the_cards_recorded(&recorded_in_the_earlier_session);
++        let stopped = cards_recorded_differing_from_the_product_being_resumed(
++            &lines_already_in_a_product_of(&[
++                "name=session_start session=1 command=lockstep",
++                line_of_the_earlier_session.as_str(),
++                RUN_LINE_OF_THE_EVERY_CARD_ARM,
++                "name=repeat_done tier=4GiB repeat=0 session=1",
++            ]),
++            &cards_recorded_for_the_every_card_arm(
++                &every_card,
++                &three_cards_handed_over_out_of_the_pci_order(),
+                 CardsOfTheEveryCardArm::EveryHandedOverCard,
++                &three[1..],
++            )
++            .expect("点了全部卡臂、这一台交了卡"),
++        );
++        assert!(
++            stopped.as_deref().is_some_and(|fields| fields
++                .contains("pci_bus_addresses_in_the_product=0000:01:00.0,0000:02:00.0")
++                && fields.contains("pci_bus_addresses_now=0000:02:00.0,0000:03:00.0")),
++            "{stopped:?}"
++        );
++    }
++
++    /// 场景：上一趟开的两张与这一趟 PCI 地址相同而型号不同（换了一台，那一台同样的槽上插着另一种卡）。
++    /// 预期：停下，带上两边的型号。
++    #[test]
++    fn resuming_a_product_whose_cards_have_the_same_addresses_but_other_models_stops() {
++        let line_of_the_cards_option_two =
++            line_of_the_cards_recorded(&every_card_arm_cards_of_the_cards_option_two());
++        let line_of_the_other_host =
++            line_of_the_cards_option_two.replace("model_at", "other_model_at");
++        let stopped = cards_recorded_differing_from_the_product_being_resumed(
++            &lines_already_in_a_product_of(&[line_of_the_other_host.as_str()]),
++            &every_card_arm_cards_of_the_cards_option_two(),
++        );
++        assert!(
++            stopped.as_deref().is_some_and(|fields| fields.contains(
++                "models_in_the_product=other_model_at_0000:01:00.0,other_model_at_0000:02:00.0"
++            ) && fields
++                .contains("models_now=model_at_0000:01:00.0,model_at_0000:02:00.0")),
++            "{stopped:?}"
++        );
++    }
++
++    /// 场景：续跑的产物里两行 `name=every_card_arm_cards`，头一行与这一趟相同、后一行开的是另外两张。
++    /// 预期：停下：每一行都核，不只看头一行。
++    #[test]
++    fn resuming_a_product_whose_later_cards_line_differs_stops() {
++        let line_of_the_cards_option_two =
++            line_of_the_cards_recorded(&every_card_arm_cards_of_the_cards_option_two());
++        let line_of_other_cards =
++            line_of_the_cards_option_two.replace("0000:01:00.0", "0000:03:00.0");
++        assert!(cards_recorded_differing_from_the_product_being_resumed(
++            &lines_already_in_a_product_of(&[
++                line_of_the_cards_option_two.as_str(),
++                line_of_other_cards.as_str(),
++            ]),
++            &every_card_arm_cards_of_the_cards_option_two(),
++        )
++        .is_some());
++    }
++
++    /// 场景：续跑的产物里点名一张卡臂那一行记的是 02；这一趟点名一张卡臂开的是 01。
++    /// 预期：停下，逐个字段带上产物里的与这一趟的地址与型号。
++    #[test]
++    fn resuming_a_product_whose_one_card_arm_opened_another_card_stops() {
++        assert_eq!(
++            cards_recorded_differing_from_the_product_being_resumed(
++                &lines_already_in_a_product_of(&[
++                    "name=one_card_arm_card tier=4GiB pci_bus_address=0000:02:00.0 model=model_at_0000:02:00.0",
++                ]),
++                &cards_recorded_for_the_one_card_arm(
++                    &computes_of_the_lockstep_arms_named(&["gpu_one_card"]),
++                    &three_cards_handed_over_out_of_the_pci_order(),
++                )
++                .expect("点了点名一张卡臂、这一台交了卡"),
+             ),
+             Some(
+-                "cards_named_in_the_product=2 named_by_in_the_product=cards_option cards_named_now=2 named_by_now=every_handed_over_card reason=产物里全部卡臂开的张数或照什么开的与这一趟不同，两种张数的重复不混在一份产物里，照产物里的张数与开法重起或换一个--product"
++                "line=one_card_arm_card pci_bus_address_in_the_product=0000:02:00.0 model_in_the_product=model_at_0000:02:00.0 \
++                 pci_bus_address_now=0000:01:00.0 model_now=model_at_0000:01:00.0 \
++                 reason=产物里这条臂开的卡与这一趟不同，两组卡的重复不混在一份产物里，照产物里的那几张卡重起或换一个--product"
+                     .to_string()
+             )
+         );
+     }
+ 
+-    /// 场景：续跑的产物里有结果行（起过、跑完过重复），而没有 `name=every_card_arm_cards` 行；这一趟 `--cards 2`。
+-    /// 预期：当成对不上停下，产物那一边写 `none`，出路写换一个 `--product`。
++    /// 场景：续跑的产物里有全部卡臂跑出的 `name=run` 行与重复，而没有 `name=every_card_arm_cards` 行；这一趟 `--cards 2`。
++    /// 预期：当成对不上停下，产物那一边逐个字段写 `none`，出路写换一个 `--product`。
+     #[test]
+     fn resuming_a_product_without_an_every_card_arm_cards_line_stops() {
+         assert_eq!(
+-            every_card_arm_cards_differing_from_the_product_being_resumed(
++            cards_recorded_differing_from_the_product_being_resumed(
+                 &lines_already_in_a_product_of(&[
+                     "name=session_start session=1 command=lockstep",
++                    RUN_LINE_OF_THE_EVERY_CARD_ARM,
+                     "name=repeat_done tier=4GiB repeat=0 session=1",
+                 ]),
+-                2,
+-                CardsOfTheEveryCardArm::FirstHandedOverCards(NonZeroUsize::new(2).expect("2 不是 0")),
++                &every_card_arm_cards_of_the_cards_option_two(),
+             ),
+             Some(
+-                "cards_named_in_the_product=none named_by_in_the_product=none cards_named_now=2 named_by_now=cards_option reason=产物里有结果行而没有every_card_arm_cards行，认不出那几次全部卡臂开了几张，换一个--product"
++                "line=every_card_arm_cards cards_named_in_the_product=none named_by_in_the_product=none \
++                 pci_bus_addresses_in_the_product=none models_in_the_product=none \
++                 cards_named_now=2 named_by_now=cards_option pci_bus_addresses_now=0000:01:00.0,0000:02:00.0 \
++                 models_now=model_at_0000:01:00.0,model_at_0000:02:00.0 \
++                 reason=产物里有这条臂跑出的结果行而没有记它开的卡的那一行，认不出那几次开的是哪几张卡，换一个--product"
+                     .to_string()
+             )
+         );
+     }
+ 
++    /// 场景：续跑的产物里只有 CPU 臂跑出的 `name=run` 行，全部卡臂这一趟头一次点；另一份产物里有并发跑点名一张卡臂跑出的
++    /// `name=concurrent_run` 行，而没有 `name=one_card_arm_card` 行。
++    /// 预期：头一份接着跑（CPU 臂的结果不算全部卡臂跑出的）；后一份停下（并发跑的结果照它的臂算）。
++    #[test]
++    fn only_the_runs_mounted_like_the_arm_make_its_missing_cards_line_stop_the_resume() {
++        let one_card_now = cards_recorded_for_the_one_card_arm(
++            &computes_of_the_lockstep_arms_named(&["gpu_one_card"]),
++            &three_cards_handed_over_out_of_the_pci_order(),
++        )
++        .expect("点了点名一张卡臂、这一台交了卡");
++        assert_eq!(
++            (
++                cards_recorded_differing_from_the_product_being_resumed(
++                    &lines_already_in_a_product_of(&[
++                        "name=run tier=4GiB arm=cpu repeat=0 session=1 void=no batches=144",
++                    ]),
++                    &every_card_arm_cards_of_the_cards_option_two(),
++                )
++                .is_some(),
++                cards_recorded_differing_from_the_product_being_resumed(
++                    &lines_already_in_a_product_of(&[
++                        "name=concurrent_run tier=4GiB arm=gpu_one_card repeat=0 session=1 foreground_interval_milliseconds=50 void=no",
++                    ]),
++                    &one_card_now,
++                )
++                .is_some(),
++            ),
++            (false, true)
++        );
++    }
++
++    /// 场景：这一趟要记两条臂的卡；产物里点名一张卡臂那一行对得上、全部卡臂那一行对不上；另一份产物两行都对得上。
++    /// 预期：头一份交回停下的字段、一行记卡的都不打；后一份照次序交回要打的两行。
++    #[test]
++    fn the_cards_lines_are_emitted_only_when_every_arm_agrees_with_the_product_being_resumed() {
++        let one_card_now = cards_recorded_for_the_one_card_arm(
++            &computes_of_the_lockstep_arms_named(&["gpu_one_card"]),
++            &three_cards_handed_over_out_of_the_pci_order(),
++        )
++        .expect("点了点名一张卡臂、这一台交了卡");
++        let every_card_now = every_card_arm_cards_of_the_cards_option_two();
++        let cards_recorded_now = [one_card_now.clone(), every_card_now.clone()];
++        let line_of_the_one_card = line_of_the_cards_recorded(&one_card_now);
++        let line_of_the_every_card = line_of_the_cards_recorded(&every_card_now);
++        let line_of_other_every_cards =
++            line_of_the_every_card.replace("0000:02:00.0", "0000:03:00.0");
++        assert!(
++            lines_recording_the_cards_unless_one_differs_from_the_product_being_resumed(
++                &lines_already_in_a_product_of(&[
++                    line_of_the_one_card.as_str(),
++                    line_of_other_every_cards.as_str(),
++                ]),
++                UnitAreaTier::FourGibibytes,
++                &cards_recorded_now,
++            )
++            .is_err()
++        );
++        assert_eq!(
++            lines_recording_the_cards_unless_one_differs_from_the_product_being_resumed(
++                &lines_already_in_a_product_of(&[
++                    line_of_the_one_card.as_str(),
++                    line_of_the_every_card.as_str(),
++                ]),
++                UnitAreaTier::FourGibibytes,
++                &cards_recorded_now,
++            ),
++            Ok(vec![
++                (
++                    "one_card_arm_card",
++                    one_card_now.fields_of_the_line(UnitAreaTier::FourGibibytes)
++                ),
++                (
++                    "every_card_arm_cards",
++                    every_card_now.fields_of_the_line(UnitAreaTier::FourGibibytes)
++                ),
++            ])
++        );
++    }
++
+     /// 一条分配记录（代照写 5）。
+     fn allocation_record_of_the_pairing(
+         device: u32,
+@@ -13204,4 +13747,135 @@ mod tests {
+             "装置里现建一张空的开卡表的只该有进程那一张（openings_not_returned_in_this_process）：别处现建的开卡不与别的开卡共用表"
+         );
+     }
++
++    /// 场景：现造一棵小树（只在内存里）：摘要要走的五处各有文件（产品 GPU 包的 `src/` 底下另有一层目录），测试包里另有一份不在摘要里的测试文件。
++    /// 预期：摘要的文件清单正好是那五处底下的文件（装置自己与它经 `#[path]` 编进来的两份共用模块都在），不在那五处的测试文件不在，按路径的各段排。
++    #[test]
++    fn the_crates_digest_covers_the_apparatus_and_the_two_modules_it_compiles_in_by_path() {
++        let files_of_the_tree: BTreeMap<&str, &[u8]> = [
++            "crates/singlefs-background-gpu/src/lib.rs",
++            "crates/singlefs-background-gpu/src/nested/kernel.wgsl",
++            "crates/singlefs-core/src/lib.rs",
++            "crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs",
++            "crates/singlefs-background-gpu-tests/tests/common_discrete_gpus_of_this_host/mod.rs",
++            "crates/singlefs-background-gpu-tests/tests/common_pairing_input_through_the_library/mod.rs",
++            "crates/singlefs-background-gpu-tests/tests/real_gpu_tests_open_only_the_gpus_the_task_server_handed_over.rs",
++        ]
++        .into_iter()
++        .map(|path| (path, path.as_bytes()))
++        .collect();
++        let what_the_path_is = |path: &str| -> Result<PathWalkedForTheCratesDigest, String> {
++            if files_of_the_tree.contains_key(path) {
++                return Ok(PathWalkedForTheCratesDigest::File);
++            }
++            let prefix_of_the_entries = format!("{path}/");
++            let entry_names: BTreeSet<String> = files_of_the_tree
++                .keys()
++                .filter_map(|file| file.strip_prefix(prefix_of_the_entries.as_str()))
++                .filter_map(|rest| rest.split('/').next())
++                .map(str::to_string)
++                .collect();
++            if entry_names.is_empty() {
++                return Err(format!("小树里没有 {path}"));
++            }
++            Ok(PathWalkedForTheCratesDigest::Directory {
++                entry_names: entry_names.into_iter().collect(),
++            })
++        };
++        let bytes_of_the_file = |path: &str| -> Result<Vec<u8>, String> {
++            files_of_the_tree
++                .get(path)
++                .map(|bytes| bytes.to_vec())
++                .ok_or_else(|| format!("小树里没有文件 {path}"))
++        };
++        let files = source_files_and_digests_walked_with(
++            &STARTING_PATHS_OF_THE_CRATES_DIGEST,
++            &what_the_path_is,
++            &bytes_of_the_file,
++        )
++        .expect("五处都在小树里");
++        assert_eq!(
++            files
++                .iter()
++                .map(|(path, _digest)| path.as_str())
++                .collect::<Vec<&str>>(),
++            [
++                "crates/singlefs-background-gpu/src/lib.rs",
++                "crates/singlefs-background-gpu/src/nested/kernel.wgsl",
++                "crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs",
++                "crates/singlefs-background-gpu-tests/tests/common_discrete_gpus_of_this_host/mod.rs",
++                "crates/singlefs-background-gpu-tests/tests/common_pairing_input_through_the_library/mod.rs",
++                "crates/singlefs-core/src/lib.rs",
++            ]
++        );
++    }
++
++    /// 场景：环境变量没给卡串，有领卡通道，领卡那一端拒了。
++    /// 预期：取卡报错，那一句点名是按需领卡没成、带上那一端的话，不当成「服务没给卡的来路」。
++    #[test]
++    fn a_failed_lease_through_the_channel_is_reported_as_the_lease_failing() {
++        let channel = lease_channel_given();
++        assert_eq!(
++            cards_handed_to_the_apparatus(None, Some(&channel), &|_channel| {
++                Err("领卡那一端拒了".to_string())
++            }),
++            Err("按需领卡没成：领卡那一端拒了".to_string())
++        );
++    }
++
++    /// 场景：对拍输入里「释放没有」那一格读回 2（录的与读的布局对不上）。
++    /// 预期：当场停下，那一句点名是哪一格、读回的是几。
++    #[test]
++    #[should_panic(expected = "释放没有只写 0 或 1，读回 2")]
++    fn a_number_written_other_than_zero_or_one_is_refused_as_a_layout_mismatch() {
++        whether_of_the_number_written(2, "释放没有");
++    }
++
++    /// [`a_disposable_library_is_set_only_after_the_pairing_through_the_one_library_returns`] 里那一段在对拍里停多久：
++    /// 设一次性库那一条线程在这么久里早就设上了（没有守卫的话），守卫在时它等满这么久。
++    const TIME_THE_TEST_STAYS_INSIDE_THE_PAIRING: Duration = Duration::from_millis(200);
++
++    /// 真卡对拍用例经全仓那一份库对拍时包在外面（`the_gpu_arm_on_a_real_card_counts_the_same_live_slots_per_segment_as_the_apparatus_on_the_small_pool`）：
++    /// 先拿 `TheOneLibraryKeptForThisProcess`，到 `pairing` 返回为止，同一个二进制里设一次性库的用例
++    /// （`the_record_stage_of_the_live_slot_pairing_takes_no_card_and_the_judge_stage_reads_back_the_apparatus_count`）等它放手。
++    /// 不拿的，那条用例设着一次性库的那一刻开库就开到那一份：它收尾停掉临时服务，这一边接着读写连不上，只录那一段录进去的输入跟着丢。
++    fn with_the_one_library_kept_for_this_process<Outcome>(
++        pairing: impl FnOnce() -> Outcome,
++    ) -> Outcome {
++        let _the_one_library = singlefs_verification::crash_library::TheOneLibraryKeptForThisProcess::keep_disposable_libraries_out();
++        pairing()
++    }
++
++    /// 场景：一条线程进了 [`with_the_one_library_kept_for_this_process`]（真卡对拍用例经全仓那一份库对拍的那一段），在里面停一会儿；
++    /// 它进去之后，另一条线程去设一次性库（同一个二进制里先录后判那条用例做的事）。
++    /// 预期：一次性库等那一段返回之后才设得上（设上的那一刻那一段已经返回）：同时跑的两条用例，真卡那一条开库开不到一次性库。
++    /// 两条线程是这个场景本身（并发下的守卫），不拆。
++    #[test]
++    fn a_disposable_library_is_set_only_after_the_pairing_through_the_one_library_returns() {
++        let disposable = singlefs_verification::crash_library::DisposableLibrary::new(
++            "e202-one-library-kept-during-the-pairing",
++        )
++        .unwrap_or_else(|refusal| panic!("{refusal}"));
++        let (entered_sender, entered_receiver) = mpsc::channel::<()>();
++        let has_the_pairing_returned = AtomicBool::new(false);
++        std::thread::scope(|scope| {
++            scope.spawn(|| {
++                with_the_one_library_kept_for_this_process(|| {
++                    entered_sender
++                        .send(())
++                        .expect("设一次性库的那一条线程在等这一声");
++                    std::thread::sleep(TIME_THE_TEST_STAYS_INSIDE_THE_PAIRING);
++                    has_the_pairing_returned.store(true, Ordering::SeqCst);
++                });
++            });
++            entered_receiver
++                .recv()
++                .expect("对拍那一段的线程进去之后才发这一声");
++            let _the_library_of_this_process = disposable.make_it_the_library_of_this_process();
++            assert!(
++                has_the_pairing_returned.load(Ordering::SeqCst),
++                "一次性库在对拍那一段还没返回时就设上了：那一段里开的库会开到这一份"
++            );
++        });
++    }
+ }
+diff --git a/crates/singlefs-background-gpu-tests/tests/reference_units_entries_name_functions_that_exist.rs b/crates/singlefs-background-gpu-tests/tests/reference_units_entries_name_functions_that_exist.rs
+new file mode 100644
+index 0000000000000000000000000000000000000000..87f9673e138a8b5711f09387f6b01e33ec15635f
+--- /dev/null
++++ b/crates/singlefs-background-gpu-tests/tests/reference_units_entries_name_functions_that_exist.rs
+@@ -0,0 +1,137 @@
++//! 对拍参照一侧的入口登记表（`src/reference_units_entries.rs`）逐组对构建脚本编进来的参照一侧键表（`OUT_DIR/reference_units_keys.tsv`，
++//! 表的写法在 `singlefs-unit-graph` 的 `entry_groups` 文件头）：每组都算出了键、组里登记的入口都编进来了、每个入口在组的闭包里恰好是一个 fn，
++//! 组名、入口、键各不相同。核法照 GPU 一侧那一张（`tests/pairing_conclusion_on_the_cards_is_reused_by_its_keys_and_judged_again_when_a_side_changes.rs`
++//! 的 `every_gpu_side_group_is_keyed_and_closes_over_the_kernels_of_the_product_gpu_crate`）：只读编进来的那一份，跑时不读盘上的树。
++//! 入口找不到、不唯一、在这组特性下不编进来的，构建脚本已经停下（`singlefs-unit-graph` 的 `EntryError`）；这里补的是构建脚本不停的那几种：
++//! 组拒算或没编进来、一个入口没进闭包、两组共用一个组名或一个入口（一组登记成另一组那个编得过的入口，参照改了它的键不跟着变）。
++//! 不要卡、不挂特性，`cargo test -p singlefs-background-gpu-tests --test <本目标>` 就能跑。
++#[allow(
++    dead_code,
++    reason = "这里只读参照一侧那张登记表，组的目标与收闭包时交的特性名不用"
++)]
++#[path = "../src/reference_units_entries.rs"]
++mod reference_units_entries;
++
++use std::collections::BTreeSet;
++
++/// 构建脚本写下的参照一侧键表。
++const REFERENCE_UNITS_KEYS_TEXT: &str =
++    include_str!(concat!(env!("OUT_DIR"), "/reference_units_keys.tsv"));
++
++/// 入口 fn 路径起头的包名（构建脚本只拿它找包）。
++const PACKAGE_PREFIX_OF_THE_ENTRIES: &str = "singlefs_background_gpu_tests::";
++
++/// 编进来的参照一侧键表里组 `group_name` 那几行：组那一行的结论（`keyed`、`refused`、`not-compiled`，没有这一组是空串）与键（算出了的才有），
++/// 这组特性下没编进来的入口，组成清单里 fn 的限定名。
++struct ReferenceGroupInTheCompiledTable {
++    verdict: String,
++    key_hexadecimal: Option<String>,
++    entries_not_compiled: Vec<String>,
++    qualified_names_of_the_functions: Vec<String>,
++}
++
++/// 编进来的参照一侧键表里组 `group_name` 那几行。
++fn reference_group_in_the_compiled_table(group_name: &str) -> ReferenceGroupInTheCompiledTable {
++    let mut verdict = String::new();
++    let mut key_hexadecimal = None;
++    let mut entries_not_compiled = Vec::new();
++    let mut qualified_names_of_the_functions = Vec::new();
++    for line in REFERENCE_UNITS_KEYS_TEXT.lines() {
++        let fields: Vec<&str> = line.split('\t').collect();
++        match fields.as_slice() {
++            ["group", name, "keyed", key, ..] if *name == group_name => {
++                verdict = "keyed".to_string();
++                key_hexadecimal = Some((*key).to_string());
++            }
++            ["group", name, group_verdict, ..] if *name == group_name => {
++                verdict = (*group_verdict).to_string();
++            }
++            ["not-compiled-entry", name, entry, ..] if *name == group_name => {
++                entries_not_compiled.push((*entry).to_string());
++            }
++            ["unit", name, "fn", qualified_name, ..] if *name == group_name => {
++                qualified_names_of_the_functions.push((*qualified_name).to_string());
++            }
++            _ => {}
++        }
++    }
++    ReferenceGroupInTheCompiledTable {
++        verdict,
++        key_hexadecimal,
++        entries_not_compiled,
++        qualified_names_of_the_functions,
++    }
++}
++
++/// 组成清单里的一个 fn 是不是登记的入口 `entry_path`：限定名在本包里（包名起头），去掉包名之后的模块路径与 fn 名是它的结尾
++/// （限定名里包名与模块路径之间夹着目标的标记，例 `<test 目标>`、`<bin 名>`）。
++fn is_the_function_of_the_entry(qualified_name: &str, entry_path: &str) -> bool {
++    let path_in_the_package = entry_path
++        .strip_prefix(PACKAGE_PREFIX_OF_THE_ENTRIES)
++        .expect("登记表里的入口都写成 singlefs_background_gpu_tests::<模块路径>::<fn>");
++    qualified_name.starts_with(PACKAGE_PREFIX_OF_THE_ENTRIES)
++        && qualified_name.ends_with(&format!("::{path_in_the_package}"))
++}
++
++/// 场景：读构建脚本编进来的参照一侧键表，逐组对登记表（`src/reference_units_entries.rs`）里的组。
++/// 预期：组名各不相同、两组不共用一个入口；每组都算出了键、组里登记的入口都编进来了、每个入口在这组的闭包里恰好是一个 fn；键两两不同。
++/// 判别力（`crates/mutations.tsv`）：「参照一侧登记表：两组登记同一个组名」「参照一侧登记表：一组登记成另一组的入口」两行各让这一条红。
++#[test]
++fn every_reference_group_is_keyed_and_closes_over_each_of_its_own_entries_once() {
++    let groups = reference_units_entries::REFERENCE_UNITS_ENTRY_GROUPS;
++    let group_names: BTreeSet<&str> = groups.iter().map(|group| group.group_name).collect();
++    assert_eq!(group_names.len(), groups.len(), "组名各不相同");
++    let entries: Vec<&str> = groups
++        .iter()
++        .flat_map(|group| group.entry_functions.iter().copied())
++        .collect();
++    let distinct_entries: BTreeSet<&str> = entries.iter().copied().collect();
++    assert_eq!(
++        distinct_entries.len(),
++        entries.len(),
++        "两组不共用一个入口、一组里不重复登记一个入口：{entries:#?}"
++    );
++    let groups_falling_short: Vec<String> = groups
++        .iter()
++        .filter_map(|group| {
++            let compiled = reference_group_in_the_compiled_table(group.group_name);
++            let entries_not_found_once: Vec<(&str, usize)> = group
++                .entry_functions
++                .iter()
++                .map(|entry| {
++                    (
++                        *entry,
++                        compiled
++                            .qualified_names_of_the_functions
++                            .iter()
++                            .filter(|qualified_name| is_the_function_of_the_entry(qualified_name, entry))
++                            .count(),
++                    )
++                })
++                .filter(|(_entry, functions_found)| *functions_found != 1)
++                .collect();
++            (compiled.verdict != "keyed"
++                || !compiled.entries_not_compiled.is_empty()
++                || !entries_not_found_once.is_empty())
++            .then(|| {
++                format!(
++                    "{}：结论 {:?}，没编进来的入口 {:?}，在闭包里不是恰好一个 fn 的入口（入口，找到几个）{entries_not_found_once:?}",
++                    group.group_name, compiled.verdict, compiled.entries_not_compiled
++                )
++            })
++        })
++        .collect();
++    assert!(
++        groups_falling_short.is_empty(),
++        "每组都算出了键、入口都编进来了、每个入口在闭包里恰好是一个 fn：{groups_falling_short:#?}"
++    );
++    let distinct_keys: BTreeSet<String> = groups
++        .iter()
++        .filter_map(|group| reference_group_in_the_compiled_table(group.group_name).key_hexadecimal)
++        .collect();
++    assert_eq!(
++        distinct_keys.len(),
++        groups.len(),
++        "每组一把键、两两不同：两组不落到同一把参照一侧的键上"
++    );
++}

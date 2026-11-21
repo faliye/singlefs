@@ -33,8 +33,8 @@
 - `.claude/rules/verification-reference.md:75`（单个 GPU 测试二进制只用分到的卡，派活与判法拆开）
 
 代码里做的（行号都是现版本，`grep -n` 取）：
-1. 卡串来路只有两个：环境变量与领卡通道，没有第三条路。`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5708`：「cards_handed_over_or_leased_on_demand(environment_value, channel, lease)」；
-   两样都没有走 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5710`：「.ok_or_else(|| REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER.to_string())」，上到命令里退 78（开头的来路核在 6074，退出码常量在 4127）。
+1. 卡串来路只有两个：环境变量与领卡通道，没有第三条路。`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/cards_of_the_command.rs:56`：「cards_handed_over_or_leased_on_demand(environment_value, channel, lease)」；
+   两样都没有走 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/cards_of_the_command.rs:58`：「.ok_or_else(|| REASON_WITHOUT_CARDS_FROM_THE_TASK_SERVER.to_string())」，上到命令里退 78（开头的来路核在 6074，退出码常量在 4127）。
 2. 全文 `created_for_this_process` 0 命中（`grep -c`，在装置里；取卡模块里那一处建实例只在对上交来的卡之后）：`main` 不再现建 Vulkan 实例、不再枚举本机的卡。
 3. 取卡在 CPU 的活之后：`lockstep` 造起步镜像在 6277、取卡在 6286；`concurrent` 在 7587 与 7596；`stage-three-cost` 造镜像加装置自数在 8738 到 8754、取卡在 8756。
    不要卡的 `geometry-check`、`construction-timing` 传 `CardsOfTheCommand::NotNeeded`（7820、7956），开头只打一行 `enumerated=false`（6085）。
@@ -65,7 +65,7 @@
 | GPU 全部卡臂 | `gpu`，不给 `background_gpu_devices`，每张卡上限 1 GiB | 同上，参与的卡是本进程看得到的全部独显，按 PCI 地址次序填满 | 同上；活装得进头一张卡时（第四节推算），分到活的卡与点名一张卡臂相同，差只在多几张参与的卡 |
 ```
 
-代码（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs` 2846 起）：全部卡臂的 `background_gpu_devices` 是 `Some(` 服务交来的卡逐张的标识 `)`，上限一份一张；
+代码（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs` 2846 起）：全部卡臂的 `background_gpu_devices` 是 `Some(` 服务交来的卡逐张的标识 `)`，上限一份一张；
 点名一张卡臂在 2839 `.take(1)` 取 `cards.discrete_gpus` 的头一张。
 
 逐句比：

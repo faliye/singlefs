@@ -1,0 +1,16 @@
+name=spec_equals_bytewise_intersection inputs=28561 grid=[-4,9) bad=0
+name=unit_split_lemma_under_premise inputs=76895 holds=76895
+name=unit_split_lemma_premise_dropped counterexamples=61360 first=(-4, -3, -4, -3, -4)
+name=write_split_lemma_under_premise inputs=76895 holds=76895
+name=write_split_lemma_premise_dropped counterexamples=61360 first=(-4, -3, -4, -4, -3)
+name=unit_split_weakest_premise triples_registered_premise_misses=442 all_misses_are_inverted_unit_ue_le_b_le_us=True registered_premise_always_sufficient=True
+name=write_split_weakest_premise triples_registered_premise_misses=442 all_misses_are_inverted_write_we_le_s_le_ws=True
+name=bytes_in_unit_postcondition inputs=6561 some_branch=876 none_branch=5685 violations=0
+name=bytes_in_unit_new_conjunct_is_not_vacuous plus_one_fails_on_every_some_input=True none_conjunct_equivalent_to_old_forall=True
+name=checked_bytes_in_indexed_unit_postcondition outer_none=2816 inner_none=6445 inner_some=1491 violations=0
+name=indexed_row_plus_one_fails_on_every_some_input ok=True
+name=indexed_row_drop_written_bytes inputs_where_the_mutation_breaks_the_old_forall=1491 of_which_the_new_length_zero_conjunct_breaks_too=1491
+name=witness_facts count=11 bad=0
+name=witness_lemma_call_premises unit_calls=3 write_calls=3 all_premises_hold=True
+name=witness_lemma_calls_needed_by_the_eleven_facts needed=no note=十一条等式都是闭式求值；六处调用只证引理前提可满足
+name=model_result failures=0

@@ -57,9 +57,9 @@ HEAD 之后、冻结副本里改过的 19 份都在这一轮的射程里：
 - `crates/singlefs-core/src/recovery.rs`
 - `crates/singlefs-core/src/transaction.rs`
 - `crates/singlefs-core/src/write_accounting.rs`
-- `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`：E158 的实验装置，由实验页的单测与变异表判，这一轮不判
-- `crates/singlefs-harness/src/bin/first_transaction_on_device.rs`
-- `crates/singlefs-harness/src/bin/first_transaction_region_bytes.rs`
+- `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs`：E158 的实验装置，由实验页的单测与变异表判，这一轮不判
+- `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs`
+- `crates/singlefs-implementation-experiments/src/bin/new_pool_file_creation_region_bytes.rs`
 - `crates/singlefs-harness/src/fault_injection.rs`
 - `crates/singlefs-harness/src/history.rs`
 - `crates/singlefs-harness/src/model.rs`

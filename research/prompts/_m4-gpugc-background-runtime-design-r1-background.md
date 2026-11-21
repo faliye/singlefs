@@ -12,7 +12,7 @@
 
 ## 二、实现今天的样子（主 agent 的观测，2026-11-09）
 
-- 后台入口：`crates/singlefs-core/src/mounted_session.rs` 的 `run_compaction_in_the_background`（`MountedSession` 第 2842 行、`MountedSessionWithPendingChanges` 第 6021 行）收 `devices: &mut Vec<(DeviceIdentity, Device)>`、`CompactionPacing`、`&dyn CallerOfTheBackgroundCompaction`。文档写「核心层不起线程、不读钟（钟与前台的 fsync 由 `caller` 答）」。调用方全在 E202（GPU与CPU两种模式GC对照组） 的装置（`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs`）与验证包测试里，产品里没有调用方。
+- 后台入口：`crates/singlefs-core/src/mounted_session.rs` 的 `run_compaction_in_the_background`（`MountedSession` 第 2842 行、`MountedSessionWithPendingChanges` 第 6021 行）收 `devices: &mut Vec<(DeviceIdentity, Device)>`、`CompactionPacing`、`&dyn CallerOfTheBackgroundCompaction`。文档写「核心层不起线程、不读钟（钟与前台的 fsync 由 `caller` 答）」。调用方全在 E202（GPU与CPU两种模式GC对照组） 的装置（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`）与验证包测试里，产品里没有调用方。
 - 起跑判据：`crates/singlefs-core/src/compaction_plan.rs` 第 1405 行 `compaction_starts_by_the_watermarks`，文档「第一版三条水位恒 0（关），产品路径恒不起跑；只供测试的开关强制」。`CompactionRunForcing`（第 440 行）只有 `FollowTheWatermarks`、`ForcedToStopForTests`、`ForcedToStartForTests`。
 - 水位的两套说法：`.claude/kb/mount-parameters.md`「整理三个水位的名字与条款对不上」：系统配置字段表写低水位、高水位、停止线三个 8 字节字段（`crates/singlefs-core/src/system_configuration.rs:369` `compaction_watermarks`，0 = 内置默认，`.claude/kb/layout/01-first-txn.md:153`）；D26（后台整理与放置回收） 已定项 1 的三水位是全空聚簇段数、碎片度 `F = runs / L`、不可回收字节，任一越线起跑，都带设备维。哪个字段对哪个量没有条款。三个量的读法：`crates/singlefs-core/src/allocator.rs` 的 `empty_segments`（第 12、320 行）、`free_runs`（第 899 行）；不可回收字节的现读腿自己查。
 - 周期：`CompactionTimerFallback`（`compaction_plan.rs` 第 1305 行起），默认 `Off`；`CompactionPacing` 每次调后台入口由调用方交。`publish_when_due`（`mounted_session.rs` 第 5941 行）同样要调用方按周期调，丢失窗口的 P 归调用方（D16（发布语义） 已定项 2、5）。
@@ -2189,7 +2189,7 @@ D16（发布语义） 管发布这一格：一个新根什么时候发、一次�
 
 跑前登记 `research/prompts/e202-preregistration.md`。回答问题单 `research/prompts/m4-gpugc-compare-questions.md`：比较同一负载、同一池下 `background_compute=cpu` 与 `background_compute=gpu` 两种模式的 GC 挂钟、占用的主机 CPU 时间与省下的时间、前台 fsync 延迟分布，以及省下的 CPU 时间随盘容量的变化。
 
-装置 `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs`（入库装置，住在 background-gpu 包里）。**这一页只记跑前登记与装置骨架已写，产物一次没跑。**
+装置 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`（入库装置，住在 background-gpu 包里）。**这一页只记跑前登记与装置骨架已写，产物一次没跑。**
 
 ```
 

@@ -1,0 +1,2 @@
+ae5893aed41e9739f8c0f01afd3b10ba3d066aedd44d5bf05322c084051626df  .claude/kb/decisions/26-后台整理与放置回收.md
+7df1a1b7415e0250296503aaa2d9ee65563b4b4cdbc03f13e86822b9653415fd  .claude/kb/decisions/24-后台重活能不能卸给GPU.md

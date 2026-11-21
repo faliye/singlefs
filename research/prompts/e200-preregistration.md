@@ -108,7 +108,7 @@
 ## 三、实现今天的样子
 
 2026-11-02 现查（主工作区，`git rev-parse HEAD` 为 `59ce5a86550de2c2c9bc6b51b34b4f881313682c`）。被跑的不是今天的 `crates/`，是第一节读法 4 造出的近似树；今天的 `crates/` 只在现状树那一侧出现。
-- **E171 装置今天**：`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 12 960 行，sha256 `cbecfcebadf9f9c6135230071625dd5477da7b92942e2795ec693936318739bc`（E171 第 2 次重跑登记第三节记的是 `22400a1b…`，之后又改过）；`crash_amplification::` 与 `crash_state_enumeration::` 命中 7 处。git 里这条路径唯一一份修订 6 前后的版本是 `ab35105f…`（提交 `f8a9ddaab`，12 645 行），它的这两个前缀命中 0 处。
+- **E171 装置今天**：`crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs` 12 960 行，sha256 `cbecfcebadf9f9c6135230071625dd5477da7b92942e2795ec693936318739bc`（E171 第 2 次重跑登记第三节记的是 `22400a1b…`，之后又改过）；`crash_amplification::` 与 `crash_state_enumeration::` 命中 7 处。git 里这条路径唯一一份修订 6 前后的版本是 `ab35105f…`（提交 `f8a9ddaab`，12 645 行），它的这两个前缀命中 0 处。
 - **`31e47115…` 那一版的 `crates/singlefs-checker-tier/Cargo.toml`**：第 27 行有 `gpu` 特性；近似树里的装置不走崩溃判段（上一条 0 处），编、跑都不带它。
 - **快照摘要**：`scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 第 241 行 `snapshot_digest`（只收 `.rs` 与 `Cargo.*`）。
 - **对照脚本**：同目录 `contrast_revision_6_against_revision_8.py`（388 行）第 54–55 行 `S15_COMPARE` 钉到修订 6 草稿 `e171-r1-segment1-rev6/s15_compare.py`（sha256 `346fcc2e…`），那份文件与草稿目录都不在（E171 第 2 次重跑修订 5 第 5.1 条），所以它的 ② 起不来；它的 ① 的身份字段配法在第 58 行 `IDENTITY_FIELDS`，对照·修订 6 照这一份配。
@@ -313,8 +313,8 @@
 1. **第一节读法 1 要抄的六行**（`git show 04ceaa904^:research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-frozen-tree-r6-r3.out` 第 11–16 行，整行抄）：
 
 ```
-E7RESULT name=frozen_tree key=file_difference against=first_segment_tree file=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs tree_sha256=67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156 other_sha256=b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84
-E7RESULT name=frozen_tree key=file_difference against=q5_tree file=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs tree_sha256=67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156 other_sha256=dbef78ed3eede487d5e5bea46dc5eb0a58735faa6930ea6548889bc62d908ea2
+E7RESULT name=frozen_tree key=file_difference against=first_segment_tree file=crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs tree_sha256=67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156 other_sha256=b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84
+E7RESULT name=frozen_tree key=file_difference against=q5_tree file=crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs tree_sha256=67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156 other_sha256=dbef78ed3eede487d5e5bea46dc5eb0a58735faa6930ea6548889bc62d908ea2
 E7RESULT name=frozen_tree key=device_sha256 place=tree sha256=67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156 expected=67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156 holds=true
 E7RESULT name=frozen_tree key=device_sha256 place=q5_tree sha256=dbef78ed3eede487d5e5bea46dc5eb0a58735faa6930ea6548889bc62d908ea2 expected=dbef78ed3eede487d5e5bea46dc5eb0a58735faa6930ea6548889bc62d908ea2 holds=true
 E7RESULT name=frozen_tree key=device_sha256 place=first_segment_tree sha256=b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84 expected=b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84 holds=true
@@ -368,7 +368,7 @@ E7RESULT name=frozen_tree key=device_sha256 place=repo sha256=ab35105f861d509457
 - 两份冻结树产物（`git show 04ceaa904^:research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-frozen-tree.out` 与 `…-frozen-tree-r6-r3.out`，取到草稿目录）：键种计数；前者 `key=git_status` 94 行、`git_head`、`snapshot_digest`、`git_status_lines` 与 13 行 `file_sha256`（第 99–111 行，各截到 200 字）；后者 `git_head`、三个快照摘要、`device_sha256` 四行、`p6`、`file_sha256` 两行、`binary_sha256` 两行（各截到 300 字）。
 - `scripts/kb/claim-experiment.sh` 第 1–60 行（去空行）；`scripts/kb/quote-kb.py --help` 前 30 行；`scripts/agents/snapshot-tree.py` 第 1–40 行（去空行）。
 - `scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/`：`ls`；`row_driver.py` 第 225–275 行；`contrast_revision_6_against_revision_8.py` 第 1–30 行与第 9、15、18、54、55、58、127–136 行；`segment_one_units_revision_11.py` 第 60–204 行里 `grep` 命中行；`frozen_tree_lines_revision_8.py` 第 2–45 行里 `grep` 命中行；`revision_8_research_side_of_the_revision_6_run.json` 第 1–40 行；`wc -l` 五份。
-- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：`sha256sum`、`wc -l`、`grep -c`；同路径在 `f8a9ddaab` 的那一版：`sha256sum`、`wc -l`、`grep -c`；`git show 31e471154:crates/singlefs-checker-tier/Cargo.toml` 的 `grep -n gpu`（第 19、20、27 行）。
+- `crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs`：`sha256sum`、`wc -l`、`grep -c`；同路径在 `f8a9ddaab` 的那一版：`sha256sum`、`wc -l`、`grep -c`；`git show 31e471154:crates/singlefs-checker-tier/Cargo.toml` 的 `grep -n gpu`（第 19、20、27 行）。
 - `.claude/heavy-thread-default` 全文；`.claude/gate.d/doc-experiments.sh` 的 `gate-cell` 名与第 27、28、46–48、147–158 行；`scripts/gate/wallclock-assert-lint.py` 第 1–60 行（去空行）；`research/prompts/e199-preregistration.md` 第十四节。
 
 跑过的命令（原样；`<草稿目录>` = `/home/fy5090/.local/share/singlefs/work/compat-removal-e171-approximate-tree-design`）：

@@ -303,7 +303,7 @@ LANDED_AT PARTIAL_AT WRITTEN_MINIMUM | 落地个数 落地花费 | 部分个数 
 
 | 出处 | 写的数 | 今天 | 怎么核的 |
 |---|---|---|---|
-| 调度记录第 162 行「单元表 19 个、登记 13 个」 | 19、13 | 复得出：单元表字面量 19 行，登记表 14 行、第 3 列不同单元名 13 个 | `awk` 数 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 的 `formal_run_units` 数组里带引号的行；`cut -f3 \| sort -u \| wc -l` |
+| 调度记录第 162 行「单元表 19 个、登记 13 个」 | 19、13 | 复得出：单元表字面量 19 行，登记表 14 行、第 3 列不同单元名 13 个 | `awk` 数 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 的 `formal_run_units` 数组里带引号的行；`cut -f3 \| sort -u \| wc -l` |
 | 调度记录第 199 行「快照 74 份」「清单抄 3 行」 | 74、3 | 复得出：74 行全对上；`_landing-audit-r3-checklist.md` 表里 3 行 | `sha256sum -c`；读那份清单 |
 | 第二轮判决第 32 行「63 份全对上」 | 63 | 今天对活仓 11 份对不上（第七批改的与重出的结局账存档）；重建的快照树 63 份全对上 | K3-4 |
 | 第二轮判决第 34 行交回形状 files 3287、送达 3075 | 3287、3075 | 今天 3292 份、3082 条 success=True，形状仍三种 | `probes/handback_shapes.py`（第二轮攻方的原样） |

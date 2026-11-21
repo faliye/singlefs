@@ -186,7 +186,7 @@ S=5 只在 mkfs 算出槽距落在 512–614 KiB 时取到（`crates/singlefs-co
 - 前台入口都经锁：`accept`、`publish_pending_now`、`publish_user_change`、切换、`with_the_session_and_devices` 都走 `lock_the_session`。成立（读码）。读路径要持这把锁（闭包），读与整理批互等；`read_at` 没有 fsync 那样的让路（推的，没量）。
 - 一拍与线程体：同一段代码，差三处：周期节奏（`crates/singlefs-mount-runtime/src/lib.rs:599`，用例一律拨 30 秒，1 秒那一支没用例）；`crates/singlefs-mount-runtime/src/lib.rs:606` 那一支（重发那一格打中）；锁上的竞争（一拍用例单线程，`accept` 插队那一格打中）。绿不能外推到这三处。
 - 真卡小池一张卡：外推不到几张卡、大盘。门每次发布读整环（`crates/singlefs-core/src/mount.rs:4258` 起，3S 根加每条根的树表）在一把锁里，内存盘上量不到挂钟；`name=gate_close` 打 `reads_of_the_passes` 给读次数，机械盘上一次发布多几十次随机读（推的）。开卡期限默认三张卡（`crates/singlefs-background-gpu/src/gpu_opener_of_this_process.rs:33`），四张卡都慢时健康也拒（推的，极端）。
-- E202 与七·4：不走运行库，走全趟入口加 `ForcedToStartForTests`（`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs:3347`）。差别：没有门的读、没有放锁、没有一拍上限。E202 量到的后台 CPU 时间不含门的读。结论要引到产品路径时要写这一条（推的，没量差多少）。
+- E202 与七·4：不走运行库，走全趟入口加 `ForcedToStartForTests`（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/gc_call_windows.rs:223`）。差别：没有门的读、没有放锁、没有一拍上限。E202 量到的后台 CPU 时间不含门的读。结论要引到产品路径时要写这一条（推的，没量差多少）。
 
 ## T4：水位与默认值
 

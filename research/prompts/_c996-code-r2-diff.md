@@ -2042,7 +2042,7 @@ index 23aeb6342efa630ec1f6f1e3abbff10d8bbd7179..dca4c19fb1d025783b5c3a37ff9e7003
      #[test]
 ````
 
-### crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs
+### crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs
 
 ````diff
 diff --git a/crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs b/crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs

@@ -169,7 +169,7 @@ e369806ada88096355d238d24cafe504bd852b9b8d9b23b520a24873872418ba  tools/rerun.sh
 |---|---|---|---|
 | ① | 返回 `impl Trait` 的函数造包装值 | 读规则推的 | 那个函数体写了包装类型名，函数在闭包里 |
 | ① | 闭包、函数指针、元组 struct 构造器当函数传（`.map(Wrapper)`） | 推的 | 构造器名就是类型名 |
-| ① | 类型别名被点名、原名没写（`type CountedDevice<Inner> = RecordingBlockDevice<FaultInjectingBlockDevice<Inner>>`，真仓 `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device.rs:560`） | 真仓一处 | 别名单元进闭包、它的词里写着原名，原名照点名；漏的是反方向（impl 写在别名上，已列打中） |
+| ① | 类型别名被点名、原名没写（`type CountedDevice<Inner> = RecordingBlockDevice<FaultInjectingBlockDevice<Inner>>`，真仓 `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs:564`） | 真仓一处 | 别名单元进闭包、它的词里写着原名，原名照点名；漏的是反方向（impl 写在别名上，已列打中） |
 | ① | 关联类型 `type Output = Wrapper<T>` 再经 `Self::Output` 用 | 推的 | 写那一行的 impl 头连成员进闭包时成员（关联类型单元）的词里有 `Wrapper` |
 | ① | `Default::default()`、`From`/`Into`、推断、迭代器适配器 | 推的 | 目标类型总要在闭包里某处写出（签名、字段、注解、turbofish），否则编不过 |
 | ① | `paste!` / `concat_idents!` 拼类型名 | 读 `crates/singlefs-unit-graph/tests/unit_graph_refusals_name_the_unit_and_the_form.rs` 的 `an_identifier_pasting_macro_is_refused` | 拒算照跑，不假绿 |

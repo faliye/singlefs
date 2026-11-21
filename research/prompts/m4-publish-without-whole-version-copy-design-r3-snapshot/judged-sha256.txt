@@ -1,0 +1,2 @@
+bb5f062a0acff91702ab064d9e2bb59d8d72155dd98854783293991d1a2da0db  .claude/kb/milestone/04-fourth-txn.md
+2d20913118836b251e4975a431879fbfd0eb88ad699bfc76523843bb2cf13c86  .claude/kb/decisions/16-发布语义.md

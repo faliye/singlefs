@@ -1,0 +1,6 @@
+E7RESULT name=config table_rows=3 unit_test_modules=test_no_such_module_for_the_control timeout_seconds=300
+E7RESULT name=anchor mutation=控制·抓到 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=控制·没红 hits=1 files=contrast_against_r1.py
+E7RESULT name=anchor mutation=控制·无效 hits=1 files=contrast_against_r1.py
+E7RESULT name=baseline unit_tests=red
+E7RESULT name=done emitted=6

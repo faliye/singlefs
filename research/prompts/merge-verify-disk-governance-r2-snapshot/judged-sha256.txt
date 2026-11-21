@@ -1,0 +1,7 @@
+d3d53d9b8f0dd5e6f22ae445dc22a5c007776bcf70d892e0962ad724a7287fb1  research/prompts/_merge-verify-disk-governance-r2-body.md
+75c1df5d5d8dc859a68241c9d4fae9adb3b23aa92530e75dfc7b81602fdf8d5c  scripts/gate/merge-and-verify.sh
+a828f32be81e60b1fda589de9d30a6e2033f3ed6b9fcb803b28d68bff912843f  .claude/main-agent.md
+12f01e7eafac6a1ae5eb51fbfe6cb2ab757e2b11e42ed6de1a56727d760d5931  .claude/skills/merge-verify/SKILL.md
+25c8101ba2ab7edf2da18f7bb3b3bd50b3a6ec8f90b406f643e22d41511635b3  .claude/hooks/lib_run_scope.py
+26537aae49fc7942d1319b69a792e94926d45f2ad961eeb86ef82439f07e89e2  Cargo.toml
+73e6194ebaf428fd1da87da45eda796d47f435491ac580b20bac141be77ec2d1  .claude/gate.d/break-switch-replay-files.tsv

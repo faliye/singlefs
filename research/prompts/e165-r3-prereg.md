@@ -8,7 +8,7 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，不另起新装置；第三段驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
+英文名：replay_bounded_enumeration（照抄原登记；装置仍是 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`，不另起新装置；第三段驱动仍是 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`）
 
 主 agent 给的问题（逐字，派发提示里的几行）：
 
@@ -45,7 +45,7 @@
 ```markdown
 #### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」
 
-**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 不是产品调用方。四个里程碑依次是：
+**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 不是产品调用方。四个里程碑依次是：
 
 | 里程碑 | 义务 | 落点 |
 |---|---|---|
@@ -371,7 +371,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 **后几段的根**：第二段从第一段的根拷出（第一段收尾原地 `sha256sum -c` 那份清单退 0 之后整份 `cp -a`），只盖上第二段改完的装置与 `crates/mutations.tsv`（这一段追加的装置变异行）；第三段在第二段的根上跑驱动（同 r2 修订 3、4 的做法）。主工作区在这三段之间再被别人改，不进这几份根。
 
-**装置写在哪（写死）**：入库装置，改 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 这一份。理由：三行问的都是 `crates/` 今天这份 `choose_root`、`scan_journal`、`replay_journal` 串起来的性质（Q3 问的是 r2 那批违例态在今天这份实现上的拆法），另写一份独立模型答不了；`.claude/rules/implementation-first.md` 第 4 条的例外同原登记第三节。判据一侧照旧只用本地常量与生成时记下的真相（含 5.3 的「理想恢复」），不调 core 的判定函数定期望。这一次新读的 `crates/` 常量逐个改成本地常量加回比断言（不许直接引）：
+**装置写在哪（写死）**：入库装置，改 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 这一份。理由：三行问的都是 `crates/` 今天这份 `choose_root`、`scan_journal`、`replay_journal` 串起来的性质（Q3 问的是 r2 那批违例态在今天这份实现上的拆法），另写一份独立模型答不了；`.claude/rules/implementation-first.md` 第 4 条的例外同原登记第三节。判据一侧照旧只用本地常量与生成时记下的真相（含 5.3 的「理想恢复」），不调 core 的判定函数定期望。这一次新读的 `crates/` 常量逐个改成本地常量加回比断言（不许直接引）：
 
 | 本地常量 | 值 | 回比断言对着的 crates 东西 |
 |---|---|---|
@@ -865,7 +865,7 @@ KF3 必须读到的四格（`anchors_r3_i812_premise.py`；对照界内第一次
 | `crates/singlefs-core/src/system_configuration.rs`、`crates/singlefs-core/src/journal.rs`、`crates/singlefs-format/src/lib.rs` | grep 命中行（`SystemImmutableSizes` 184–209、`pub struct JournalRecord` 148–196、根环与暖机常量 238–288） |
 | `crates/singlefs-core/src/pointer.rs` | 与 r2 冻结根那一份的 `diff` 前 60 行 |
 | `crates/mutations.tsv` | 1822–1829（grep `择根核\|择根胶水\|扫环…`、`awk` 取 1822–1827 的四列） |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 定义行的 grep（`草稿 device-defs.txt`）；400–600；1160–1200；3014–3175；4594–4700；5060–5180；J6Qn 计数器的 grep 命中行 |
+| `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` | 定义行的 grep（`草稿 device-defs.txt`）；400–600；1160–1200；3014–3175；4594–4700；5060–5180；J6Qn 计数器的 grep 命中行 |
 | `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh` | 1–30；`REGISTERED\|--profile\|--list-items\|…` 的 grep 命中行 |
 | `scripts/experiment-apparatus/replay.sh` | grep `e165` 的命中行（222–231、533–585） |
 | r2 冻结根 `/tmp/claude-1000/e165-r2-segment4/root/` | 清单 `sha256sum -c`；`recovery.rs` 与 10-3 快照之差的前 9 000 字节；`root_record.rs`、`pointer.rs`、`replay_core` 三处 `diff` |

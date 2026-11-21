@@ -12,7 +12,7 @@
 
 主 agent 给的问题（逐字）：E168 的登记修订怎么写。问题单：`/home/fy5090/.local/share/singlefs/work/older-debts-fact-table/result.md` 第 25 行 E168 那一行（整行读）。要点：装置靠一张删除路径补丁表在副本上跑（`scripts/experiment-apparatus/e168_delete_ring_window_borrow.rs:9` 写补丁表、`:1031` 有 `delete_path_patch_absent` 停机；补丁表 22 行；`scripts/experiment-apparatus/replay.sh:3366` 的 `e168_patched_tree` 还在）；主 agent 已定改成直接驱动 `crates/singlefs-core` 里的真 unlink，再量每片峰值校内存表（`.claude/memory-bounded-parallelism.tsv:17` 每件 4294967296 是推的）；`s1_history` 一行在 11-08 退 4（窄几何被准入式子拒，转述，现核）。1. 写登记修订：改成真 unlink，去掉补丁表与 `e168_patched_tree`；窄几何改到准入过得去（写清改成多少、依据哪条准入式子）；臂、判据、失败条款跑前写死，只许收严。2. 写明每片峰值怎么量、量完怎么改内存表第 17 行。3. 登记文件的位置与命名照仓里 E168 已有登记现查。
 
-现查对主 agent 转述的几处（命令在第十三节）：装置文件在 `crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs`（`scripts/experiment-apparatus/` 下没有这个文件）；补丁表写在该文件头 :9，桩 `delete_path_hooks` 在 :1030、打停机行在 :1031；补丁表数据行 19（`grep -vc '^#'` 量的），加 3 行注释共 22 行；`replay.sh:3366` 的 `e168_patched_tree` 在；内存表第 17 行是 `cargo:singlefs-verification:e168_delete_ring_window_borrow`，每件 4294967296、底座 4294967296，出处写明「一片峰值没量成」，装置常量 `PEAK_BYTES_OF_ONE_LARGE_SLICE`（:317）、`RESIDENT_BYTES_BESIDES_THE_LARGE_SLICES`（:320）也是推的。登记位置：原登记归档在 git 历史里，工作区里没有 `e168-*` 登记，重跑登记的命名取 `research/prompts/e<号>-r<n>-prereg.md`，所以是本文件（同类先例：`e165-r1-prereg.md`、`e184-r2-prereg.md`）。
+现查对主 agent 转述的几处（命令在第十三节）：装置文件在 `crates/singlefs-implementation-experiments/src/bin/e168_delete_ring_window_borrow/main.rs`（`scripts/experiment-apparatus/` 下没有这个文件）；补丁表写在该文件头 :9，桩 `delete_path_hooks` 在 :1030、打停机行在 :1031；补丁表数据行 19（`grep -vc '^#'` 量的），加 3 行注释共 22 行；`replay.sh:3366` 的 `e168_patched_tree` 在；内存表第 17 行是 `cargo:singlefs-verification:e168_delete_ring_window_borrow`，每件 4294967296、底座 4294967296，出处写明「一片峰值没量成」，装置常量 `PEAK_BYTES_OF_ONE_LARGE_SLICE`（:317）、`RESIDENT_BYTES_BESIDES_THE_LARGE_SLICES`（:320）也是推的。登记位置：原登记归档在 git 历史里，工作区里没有 `e168-*` 登记，重跑登记的命名取 `research/prompts/e<号>-r<n>-prereg.md`，所以是本文件（同类先例：`e165-r1-prereg.md`、`e184-r2-prereg.md`）。
 
 ### 1.1 读法写死
 
@@ -450,7 +450,7 @@
 
 ### 5.0 装置写在哪（写死）
 
-**入库装置**：`crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs`（执行员改写这一份，不是另写独立模型）。理由同原 5.0：四行问的都是 `crates/` 这份代码的性质——W 是 core 今天的删除批新占多少槽，环窗口、保留量是 `admission.rs` 今天现算的，回收是 `allocator.rs` 今天的回收；另写一份独立模型量出来的是模型的 W。装置只调 `crates/singlefs-core` 的公开入口，**不套补丁表、不改 core、不拷副本**；本次要读的 `crates/` 常量见第三节末尾与原 5.0 的清单，执行员逐个写成本地常量加回比断言，不直接引。
+**入库装置**：`crates/singlefs-implementation-experiments/src/bin/e168_delete_ring_window_borrow/main.rs`（执行员改写这一份，不是另写独立模型）。理由同原 5.0：四行问的都是 `crates/` 这份代码的性质——W 是 core 今天的删除批新占多少槽，环窗口、保留量是 `admission.rs` 今天现算的，回收是 `allocator.rs` 今天的回收；另写一份独立模型量出来的是模型的 W。装置只调 `crates/singlefs-core` 的公开入口，**不套补丁表、不改 core、不拷副本**；本次要读的 `crates/` 常量见第三节末尾与原 5.0 的清单，执行员逐个写成本地常量加回比断言，不直接引。
 
 - 本次从装置里去掉：`delete_path_hooks` 桩与停机行 `delete_path_patch_absent`、`DeletePathHooks` 及其假实现、补丁表文件、`scripts/experiment-apparatus/replay.sh` 的 `e168_patched_tree` 与对它的自检行、`driver_e168_positive_controls` 里拷副本的那几行（改成在主工作区直接跑，同 `driver_e168_s1_history`）、装置文件头与注释里讲补丁表的句子、`crates/mutations.tsv` 里只盯这些被去掉的件的 E168 变异行。去干净的判据是停机条款 S2n。
 - 起装置的命令：装置的 `segment1`、`positive-controls` 走 `GivenStatesEngine` 判崩溃态（S7 那一次 checker），所以起它的命令一律带 `--features gpu`，整条经任务服务交，`cargo run` 不写范围声明：`task-server/task submit -- cargo run -q --release -p singlefs-verification --features gpu --bin e168_delete_ring_window_borrow -- segment1 [--geometry <几何名>]`（`positive-controls`、`s1-history` 同形）；单测：`SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-verification 的 e168 装置单测; 范围=1 个测试目标; 为什么=改装置后核单测和变异' task-server/task submit -- cargo test -p singlefs-verification --features gpu --bin e168_delete_ring_window_borrow`。装置文件头前 60 行已有 `// task-server-gpu-arguments: segment1 positive-controls`，保留（`s1-history` 不判、不卡）。执行员改完用 `scripts/hosts/compile-then-swap.py` 换进主工作区，该脚本照上面的 `--features` 原样编。
@@ -800,7 +800,7 @@ borrow 是落点那一判（谓词）的输入、也是 M1 的输入。每条删
 | `crates/singlefs-core/src/allocator.rs` | 625–700、2680–2800、2915–3012；grep 命中 790、1089–1117、2099–2252、2863–2896 |
 | `crates/singlefs-core/src/mount.rs` | grep 命中 1609、4747、4880、4988、9059、9562–9575 |
 | `crates/singlefs-core/src/allocation_record_tree.rs` | 60–140 |
-| `crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs` | 1–60、100–135、300–330、1040–1075、3980–4060、4140–4200；grep 命中 1006–1031、3888、3950、4521–4544、4980–4999 |
+| `crates/singlefs-implementation-experiments/src/bin/e168_delete_ring_window_borrow/main.rs` | 1–60、100–135、300–330、1040–1075、3980–4060、4140–4200；grep 命中 1006–1031、3888、3950、4521–4544、4980–4999 |
 | `scripts/experiment-apparatus/replay.sh` | 3346–3395；grep 命中 107、177、692、2103–2168、2706–2707、3860 |
 | `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv` | 每行前 260 字 |
 | `.claude/memory-bounded-parallelism.tsv` | 1–19（第 17 行整行） |

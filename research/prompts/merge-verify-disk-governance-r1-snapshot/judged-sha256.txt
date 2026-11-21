@@ -1,0 +1,6 @@
+88bc8e83e2ca312e8987fe730eb64c772d0805d0f799baf3c1d55867efd2321d  research/prompts/_merge-verify-disk-governance-r1-body.md
+c6badd7bdfb5505053ed6cb89a8f4f2db577539f46753a95aff0bca9f8b00d2a  scripts/gate/merge-and-verify.sh
+ea06ca3cdccc6242baecebe8d83fd74d0daeb02ded79aeb6bf97684e1caf26bb  .claude/main-agent.md
+172989b3a6b11a29474d5baee4573f9f32d8f9d1e2fce67f1a522e4012e2de17  .claude/skills/merge-verify/SKILL.md
+47442adce3ded60494c1fd89ddc87692906be81c90b7bf0b9224e1069fa17b68  .claude/hooks/lib_run_scope.py
+46af10110d3bde0157413bfa872fe6b185593544041d4cea046722422b0f4ab2  Cargo.toml

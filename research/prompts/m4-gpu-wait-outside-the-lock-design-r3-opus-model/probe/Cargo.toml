@@ -1,0 +1,11 @@
+[package]
+name = "gpu-wait-outside-the-lock-r3-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "设计三方 m4-gpu-wait-outside-the-lock-design-r3 攻方腿的探针：签发那一支锁外照旧一版选段、锁外期间前台的用户数据落进选中的段、回锁里签发，意图里的 c0 与 segs0 照哪一版取"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-verification = { path = "../singlefs-verification", default-features = false }

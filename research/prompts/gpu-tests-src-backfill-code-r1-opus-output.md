@@ -4,7 +4,7 @@
 
 开工核对：`sha256sum -c research/prompts/gpu-tests-src-backfill-code-r1-snapshot/crates-sha256.txt` 四份都是 OK，`kb-sha256.txt` 两份也是 OK（这一次跑出来的原样输出，见草稿目录之外没另存）。下文行号都按这一版取。
 
-下文「装置」指 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs`。读数凡是写「量过」的，都是在仓副本上跑探针得来，命令在「要主 agent 跑的命令」一节；这一轮我自己没跑项目代码，所以下文没有一处是「量过」，全是读代码推的，探针交给主 agent 跑。
+下文「装置」指 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`。读数凡是写「量过」的，都是在仓副本上跑探针得来，命令在「要主 agent 跑的命令」一节；这一轮我自己没跑项目代码，所以下文没有一处是「量过」，全是读代码推的，探针交给主 agent 跑。
 
 ## 各格判定一览
 
@@ -54,7 +54,7 @@ research/prompts/e202-preregistration.md: OK
 
 被判对象只比两样东西：「.map(|(_name, fields)| (fields.get("cards_named"), fields.get("named_by")))」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5964`）。`pci_bus_addresses` 写进了那一行，但从不拿来比。点名一张卡臂用的是交来的卡里 PCI 地址最小的那一张，这张卡没有任何续跑核对。concurrent 与 sensitivity 里的并发那一点没有全部卡臂，续跑时卡的一样都不核。
 
-续跑读回来的数里没有卡：「struct RunNumbers {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5247`）只有臂、重复号、批数和三个纳秒数。`name=run` 行虽然带了 `gpu_models`，`repeats_already_done` 并不过滤它。
+续跑读回来的数里没有卡：「struct RunNumbers {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/lockstep_tier_judgement_and_repeats.rs:9`）只有臂、重复号、批数和三个纳秒数。`name=run` 行虽然带了 `gpu_models`，`repeats_already_done` 并不过滤它。
 
 历史（每一步都是被判对象许可的）：
 
@@ -80,7 +80,7 @@ research/prompts/e202-preregistration.md: OK
 
 注释原文：「这一台一张都没交的不打不核：哪条 GPU 臂都不跑（退 77），产物里不留一行零张，以后在交了卡的那一台续跑时不被它挡住。」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5935`）。
 
-核对函数唯一放行「产物里没有 `every_card_arm_cards` 行」的条件是「if lines_already_in_the_product.is_empty() {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5956`），也就是产物里一行结果都没有。可是每一趟在取卡之前，就已经往产物里写了一串结果行：`opening_of_the_command` 第一件事就是写「"session_start",」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:6054`），接着写 constants、cpu_clock_check、crates_file、crates_version、tier_device、construction，到没交卡那一支又写 gpus、not_run、done。
+核对函数唯一放行「产物里没有 `every_card_arm_cards` 行」的条件是「if lines_already_in_the_product.is_empty() {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5956`），也就是产物里一行结果都没有。可是每一趟在取卡之前，就已经往产物里写了一串结果行：`opening_of_the_command` 第一件事就是写「"session_start",」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/command_opening_and_construction_lines.rs:24`），接着写 constants、cpu_clock_check、crates_file、crates_version、tier_device、construction，到没交卡那一支又写 gpus、not_run、done。
 
 历史一（注释点名的那一种）：服务交来的卡里没有这一台的。取卡模块交回 `None`，lockstep 写下 not_run，最后「return EXIT_NO_ARM_RAN;」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:6371`）。之后同一条命令在交了两张卡的那一台续跑：`the_every_card_arm_cards_are_recorded` 判真，产物非空，又没有 `every_card_arm_cards` 行，于是停下，写 `cards_named_in_the_product=none … 换一个--product`，退 2。
 
@@ -139,7 +139,7 @@ research/prompts/e202-preregistration.md: OK
 | stage-three-cost | 退 78 | 退 78 | **CPU 臂照跑、GPU 臂打 not_run，退 0** | 不适用 |
 | 内联真卡对拍用例 | 打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名>`，交回没跑成 | panic，被收成两边不一致，照这把键记红 | 交回没跑成；标记靠取卡模块打的那一行（见第五节） | 不适用 |
 
-stage-three-cost 那一格：「if let Some(reason) = reason_the_arm_is_not_run_on_the_cards(arm, &cards) {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:8767`）这一行是 diff 改过的。CPU 臂的理由恒为「ComputeOfTheArm::Cpu => None,」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:2810`），于是 CPU 臂跑完，`does_every_arm_agree` 保持 true，走到「if does_every_arm_agree {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:8831`）退 0。跑前登记的要求是：要卡的子命令一张独显都看不到时「退 77，不当跑过」（`research/prompts/e202-preregistration.md:236`）。stage-three-cost 是文件头点名的四个要卡子命令之一。
+stage-three-cost 那一格：「if let Some(reason) = reason_the_arm_is_not_run_on_the_cards(arm, &cards) {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/stage_three_cost_subcommand.rs:534`）这一行是 diff 改过的。CPU 臂的理由恒为「ComputeOfTheArm::Cpu => None,」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/arms_and_background_compute_settings.rs:136`），于是 CPU 臂跑完，`does_every_arm_agree` 保持 true，走到「if does_every_arm_agree {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/stage_three_cost_subcommand.rs:607`）退 0。跑前登记的要求是：要卡的子命令一张独显都看不到时「退 77，不当跑过」（`research/prompts/e202-preregistration.md:236`）。stage-three-cost 是文件头点名的四个要卡子命令之一。
 
 - 会不会「悄悄退回 CPU」：不会把 GPU 臂偷偷换到 CPU 上跑，not_run 那一行照打。但整条命令退 0，服务与主 agent 看到的是成功，而丙段代价要比的 GPU 那一半根本没量。
 - 可达性：服务只会把它派去的那一台的卡交出来（`task-server/task_server.py` 文件头 ② 的分卡说明；我没逐行核服务）。所以「交了卡却没有这一台的」要服务出岔子才走得到，推的。HEAD 里看不见独显时也是这样走（逻辑相同），这次 diff 只是把触发条件换了。
@@ -157,7 +157,7 @@ lockstep 与 concurrent 没打中：卡对不上和一张没交都不退回 CPU�
 
 推不出的一处：产品的进程开卡器 `GpuOpenerOfThisProcess` 自己另持一张表（`crates/singlefs-background-gpu/src/gpu_opener_of_this_process.rs:308`）。装置不经它开卡（装置里 `GpuOpener` 0 命中）；但挂着时切换开卡（`put_the_gpus_opened_since_the_settings_were_handed_in_in_effect`）走的是哪一张表，我没追进产品包，推不出。
 
-取卡：`CARDS_SEEN_BY_THIS_PROCESS` 用 `get_or_init` 包着 `cards_taken_for_this_process`（5818 行），把取卡失败的那一句也一起缓存下来。弱打中（可达性推不出）：同一个测试进程里有两条真卡用例（12134 与 12153 两条，都挂特性）都调 `cards_of_this_process`。取卡模块在交了卡、却没有这一台的时候，只在第一次取卡那一刻打「println!("NOT_RUN_NO_GPU_ADAPTER test={test_name} reason={reason}");」（`crates/singlefs-background-gpu-tests/tests/common_discrete_gpus_of_this_host/mod.rs:698`），而且 `test=` 填的是装置名 `e202_gpu_cpu_gc_comparison`，不是用例名。后取卡的那条用例拿到缓存里的空卡：对拍用例交回没跑成（`pairing_concluded_on_the_cards_through_the_pairing_library` 交回 `()`，结局被丢掉）；`a_greedy_call…` 在「if cards.vulkan_instance.is_none() {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:12172`）这里直接 `return`，一行标记都不打。门禁的按条记库是按时间认记号归谁的（`scripts/gate/lib_libtest_result_lines.py` 文件头「按条记库」）。后跑的那一条开始时，前一条打的那行已经过去了，它就会被记成绿，并且以后按单元键复用。走到这里要两个条件同时成立：服务交了别台的卡，或者卡串是空白。服务按需领卡时会摘掉 `GPU_CARDS_BY_PRIORITY`（`task-server/task_server.py:11205`），所以推的结论是：正常经服务交的任务走不到。改法（零轮）：`a_greedy_call…` 与 8683 行那一支自己打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名>`。
+取卡：`CARDS_SEEN_BY_THIS_PROCESS` 用 `get_or_init` 包着 `cards_taken_for_this_process`（5818 行），把取卡失败的那一句也一起缓存下来。弱打中（可达性推不出）：同一个测试进程里有两条真卡用例（12134 与 12153 两条，都挂特性）都调 `cards_of_this_process`。取卡模块在交了卡、却没有这一台的时候，只在第一次取卡那一刻打「println!("NOT_RUN_NO_GPU_ADAPTER test={test_name} reason={reason}");」（`crates/singlefs-background-gpu-tests/tests/common_discrete_gpus_of_this_host/mod.rs:698`），而且 `test=` 填的是装置名 `e202_gpu_cpu_gc_comparison`，不是用例名。后取卡的那条用例拿到缓存里的空卡：对拍用例交回没跑成（`pairing_concluded_on_the_cards_through_the_pairing_library` 交回 `()`，结局被丢掉）；`a_greedy_call…` 在「if cards.vulkan_instance.is_none() {」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/stage_three_cost_subcommand/tests.rs:171`）这里直接 `return`，一行标记都不打。门禁的按条记库是按时间认记号归谁的（`scripts/gate/lib_libtest_result_lines.py` 文件头「按条记库」）。后跑的那一条开始时，前一条打的那行已经过去了，它就会被记成绿，并且以后按单元键复用。走到这里要两个条件同时成立：服务交了别台的卡，或者卡串是空白。服务按需领卡时会摘掉 `GPU_CARDS_BY_PRIORITY`（`task-server/task_server.py:11205`），所以推的结论是：正常经服务交的任务走不到。改法（零轮）：`a_greedy_call…` 与 8683 行那一支自己打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名>`。
 
 ## 六、先录后判：录与判之间输入会不会变、键罩没罩全（没打中）
 
@@ -233,7 +233,7 @@ lockstep 与 concurrent 没打中：卡对不上和一张没交都不退回 CPU�
 ## 十一、检查单八格的细节
 
 1. 走不到的理由：8576、8593、8596 三处：写下的就是 `u32`、`u16` 的值，读回的字节就是这一把录入键下写进去的那一份，成立。8557、8583：编码器的输出进录入键，解码器在两个闭包里、进两把单元键，布局一改键就跟着变，「录的与读的布局对不上」走不到，成立。8682、8695：取卡或计数没成，被收成判红（第六节），成立。8696：循环正好 `STAGE_THREE_COST_REPEATS` 遍（8147 行），成立。8702：故意判红的出口，成立。
-2. 类型与名字：`FirstHandedOverCards(NonZeroUsize)`（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5865`）能装下 1，「至少两张」只在 `cards_of_the_every_card_arm_of_the_options` 里守（`machine-first` 的「类型让非法状态无法表示」是写法建议，不是判据）。「const NAME_OF_THE_APPARATUS_IN_THE_CARD_LINES: &str = "e202_gpu_cpu_gc_comparison";」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs:5728`）被当作 `test=` 的值交给取卡模块，于是标记行里的用例名是装置名（第五节）。PCI 地址是裸 `String`，HEAD 里就这样。新加的名字里没找到序数或位置代称（新测试里的 `three[..2]`、`three[1..]` 是切片，不是名字）。判：成立。
+2. 类型与名字：`FirstHandedOverCards(NonZeroUsize)`（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/cards_of_the_command.rs:218`）能装下 1，「至少两张」只在 `cards_of_the_every_card_arm_of_the_options` 里守（`machine-first` 的「类型让非法状态无法表示」是写法建议，不是判据）。「const NAME_OF_THE_APPARATUS_IN_THE_CARD_LINES: &str = "e202_gpu_cpu_gc_comparison";」（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/cards_of_the_command.rs:76`）被当作 `test=` 的值交给取卡模块，于是标记行里的用例名是装置名（第五节）。PCI 地址是裸 `String`，HEAD 里就这样。新加的名字里没找到序数或位置代称（新测试里的 `three[..2]`、`three[1..]` 是切片，不是名字）。判：成立。
 3. 不兼容旧代码与旧格式：diff 里没有认旧行形态的分支。「没有 `every_card_arm_cards` 行」与「行不同」走同一个 clause、同一条出路（重起或换一个 `--product`），只是理由那一句不同，而且它也罩新产物（1.2 节），不是专为旧版本开的。判：成立。
 4. 不新建判定库：见第七节。判：成立。
 5. 所有任务多机可用：两台读同一份产物，续跑派到另一台时，两台的重复混进一份产物而不停（1.1 节）。依据是「派到两台里任何一台都要跑得起、判得对」（`.claude/rules/verification.md:65`）。`HOST_LOAD_CORES_AT_MOST = 16.0` 与节拍数 100 是登记里写死的常量，两台都一样，不会让判出的结局不同。判：不成立。

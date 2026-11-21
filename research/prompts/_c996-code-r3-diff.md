@@ -3514,7 +3514,7 @@
              BackgroundGpuComputeFailed::EveryParticipatingGpuShortOfFreeMemoryForTheSmallestPiece {
 ````
 
-## crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs
+## crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs
 
 ````diff
 --- a/crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs

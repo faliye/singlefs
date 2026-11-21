@@ -478,7 +478,7 @@ D16（发布语义） 管发布这一格：一个新根什么时候发、一次�
 
 背景是 C370（需求、可用与 df 没有共同单位）、C371（活元数据没有定义）、C356（第九项按统计量之差算，净释放时为负且没有钳位）、C546（抬 F 被拒时扣住的槽不退回）、C570（抬 F 回收扣住的槽计数上空闲但分配器不发）、C571（df 算不算聚簇段内关着的空槽，假性 ENOSPC 待判）六条欠账；被测条款是 D16（发布语义） 已定项 1（`df`、准入、抬 F 那一串、正常卸载）、D28（挂载期承诺量） 已定项 1（九项式子）与已定项 3（「`df` 报可用」那一句）、D3（空间分配） 已定项 12（两道串联的闸），它们引的定义是 D3（空间分配） 已定项 8（聚簇段对用户数据关着）与已定项 9（假性 ENOSPC 的定义）。
 
-装置是入库装置 `crates/singlefs-verification/src/bin/e180_admission_reading_versus_writable_bytes.rs`（只读、只驱动与观测 `crates/` 今天的会话发布路径、准入读数与分配器，不改 `crates/singlefs-core`、`crates/singlefs-checker`；要读 `crates/` 常量的量都是本地常量，值抄自 kb 的登记位，开跑先与实现侧回比）。这一份只有第一段；第二段（F6 的造格、五条臂重试与崩溃点枚举）不在里面。
+装置是入库装置 `crates/singlefs-implementation-experiments/src/bin/e180_admission_reading_versus_writable_bytes/main.rs`（只读、只驱动与观测 `crates/` 今天的会话发布路径、准入读数与分配器，不改 `crates/singlefs-core`、`crates/singlefs-checker`；要读 `crates/` 常量的量都是本地常量，值抄自 kb 的登记位，开跑先与实现侧回比）。这一份只有第一段；第二段（F6 的造格、五条臂重试与崩溃点枚举）不在里面。
 
 **现状**：
 
@@ -603,7 +603,7 @@ bash scripts/experiment-apparatus/e180-reading-shards.sh --list-items    # 逐�
 
 跑前登记 `research/prompts/e181-preregistration.md`（两段：第一段固定点与落得下段答 F9、F11、F10；第二段截短盘段答 F14，这一页只写第一段）。回答的是岔路单 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` 的四行：F9（落得下那一判的固定点上界要不要加这次普通分配在中央映射树里多出的删插：P1 加，P2 不加、走固定点取不到照报 `PlacementRefused`）、F11（先拒那一道要不要算各盘最低落点再比，量扫描挂钟随单元区的增长）、F10（两槽的提交内生块要不要在落得下那一判按槽对数，先找让没挡的槽够、对齐的空槽对不够的可达盘面 G10）、F14（第二段）。背景是 C573（固定点上界没算有普通分配那次发布多出的删插）、C574（落得下那一判不核两槽对齐与各盘同槽）、C582（挂载盘容量下界没条款该取哪个）三条欠账，被测条款是 D28（挂载期承诺量） 已定项 1、4 与 D3（空间分配） 已定项 5、8、10、12。
 
-装置是入库装置 `crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs`（只读驱动 `singlefs-core` 的公开入口，不改 `crates/` 里别的文件；每个会读 `crates/` 常量的量在装置里是本地常量，值抄自 kb 的登记位，`check_local_constants_against_the_crates` 逐个回比）。
+装置是入库装置 `crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound/main.rs`（只读驱动 `singlefs-core` 的公开入口，不改 `crates/` 里别的文件；每个会读 `crates/` 常量的量在装置里是本地常量，值抄自 kb 的登记位，`check_local_constants_against_the_crates` 逐个回比）。
 
 **现状**：
 
@@ -671,11 +671,11 @@ F11 的 `median_nanoseconds`、`maximum_nanoseconds` 与 `f10_measure_*` 里的�
 
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
-| 1 | 真写的固定点：角色路径 | 这次发布真写出的角色里不是普通分配的那几个，各自跨度相加 | `crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs:715 fixed_point_account` | 角色分类 `space_budget_of_role`（核心层）、这次发布的 `rewritten` |
-| 2 | 真写的固定点：记录路径 | 这一版分配记录里分配代等于这次 txg、没释放的记录，逐盘加跨度，再减普通分配与实例切换角色的槽数 | `crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs:715 fixed_point_account` | 同一份发布输出；减数读同一个 `space_budget_of_role`，角色分类错时两条一起错 |
-| 3 | ckpt_cost：本地重算 | 分配记录树按 K1、中央映射树按逐层路径式子、记账树、谱系、退役、树表 1，逐项相加 | `crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs:615 local_checkpoint_cost` | 记账树、谱系、退役三项取核心层同名公开函数；单元区起点与槽数、树高从分配器和根节点头读 |
-| 4 | ckpt_cost：核心层 | `checkpoint_cost_of_the_version_to_build_on_with_node_capacities` | `crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs:691 core_checkpoint_cost` | 同上三个公开函数 |
-| 5 | K1 的手算 | 单元区 [50176, 262144) 在层级 0、1、2 罩到的位置数手算，根层级 1、2、3 的 K1 是 525、529、531 | `crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs:3592 allocation_record_tree_nodes_of_two_four_gibibyte_devices_are_525_529_and_531_at_root_levels_one_two_and_three` | D28（挂载期承诺量） 已定项 4 的 S_L = 812 × 169^L |
+| 1 | 真写的固定点：角色路径 | 这次发布真写出的角色里不是普通分配的那几个，各自跨度相加 | `crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound/checkpoint_cost_and_fixed_point_account.rs:243 fixed_point_account` | 角色分类 `space_budget_of_role`（核心层）、这次发布的 `rewritten` |
+| 2 | 真写的固定点：记录路径 | 这一版分配记录里分配代等于这次 txg、没释放的记录，逐盘加跨度，再减普通分配与实例切换角色的槽数 | `crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound/checkpoint_cost_and_fixed_point_account.rs:243 fixed_point_account` | 同一份发布输出；减数读同一个 `space_budget_of_role`，角色分类错时两条一起错 |
+| 3 | ckpt_cost：本地重算 | 分配记录树按 K1、中央映射树按逐层路径式子、记账树、谱系、退役、树表 1，逐项相加 | `crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound/checkpoint_cost_and_fixed_point_account.rs:141 local_checkpoint_cost` | 记账树、谱系、退役三项取核心层同名公开函数；单元区起点与槽数、树高从分配器和根节点头读 |
+| 4 | ckpt_cost：核心层 | `checkpoint_cost_of_the_version_to_build_on_with_node_capacities` | `crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound/checkpoint_cost_and_fixed_point_account.rs:219 core_checkpoint_cost` | 同上三个公开函数 |
+| 5 | K1 的手算 | 单元区 [50176, 262144) 在层级 0、1、2 罩到的位置数手算，根层级 1、2、3 的 K1 是 525、529、531 | `crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound/main.rs:217 allocation_record_tree_nodes_of_two_four_gibibyte_devices_are_525_529_and_531_at_root_levels_one_two_and_three` | D28（挂载期承诺量） 已定项 4 的 S_L = 812 × 169^L |
 
 跨路径的比对：路径 3 与 4 在每一次写之前逐个相等，不等就停机（`write_units_from_bytes_and_account` 里「B3 停机」），单测 `the_local_checkpoint_cost_equals_the_core_one_on_every_version_measured` 钉在三个几何、两档容量上；路径 1 与 2 在第一个文件那一版上钉住（单测 `the_first_file_publish_has_six_ordinary_and_eight_fixed_point_slots_by_both_paths` 钉 6 与 8），之后每次发成的写在产物里并排报 `true_fixed_point` 与 `true_fixed_point_by_records`，没有断言逐次连起来，还欠这一条。结论的取值是枚举点：五档单元数、三个几何、两档树容量，理由是登记只要求这几档；路径 1 与 2 共用角色分类，分类错时一起错。
 

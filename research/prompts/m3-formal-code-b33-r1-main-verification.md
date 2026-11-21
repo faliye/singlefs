@@ -8,7 +8,7 @@
 - 33-a：`crates/singlefs-harness/tests/overwrite_in_one_instance.rs`、`crates/singlefs-checker-tier/src/crash_injection.rs`；
 - 33-b：`crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs`；
 - 33-c：`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-harness/tests/checker_known_bad_images.rs`；
-- E156 第 5、6 次：`crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`；
+- E156 第 5、6 次：`crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`；
 - `crates/mutations.tsv` 各份追加、替换与按名删。
 
 ## 一、这一轮的材料与证据

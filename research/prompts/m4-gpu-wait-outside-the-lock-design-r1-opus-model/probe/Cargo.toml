@@ -1,0 +1,11 @@
+[package]
+name = "gpu-wait-outside-the-lock-r1-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "设计三方 m4-gpu-wait-outside-the-lock-design-r1 攻方腿的探针：回锁复核用弱判据时锁外那一批建在旧一版上发出去；GPU 实现那把锁与会话锁的次序"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }
+singlefs-mount-runtime = { path = "../singlefs-mount-runtime" }
+singlefs-verification = { path = "../singlefs-verification", default-features = false }

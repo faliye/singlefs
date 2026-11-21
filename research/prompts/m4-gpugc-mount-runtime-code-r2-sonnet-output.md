@@ -159,7 +159,7 @@ c66297432aec2b8f71d805b0c9ae5b9ccce4a221c0caef923a48449faa97b7fd  tools/rerun-fr
 
 ### 3.4 `ForegroundFsync::CallerIsStoppingItsThread` 在全部 `match` 上的行为
 
-产品代码里对这个枚举的 `match` 只有一处，穷尽、无通配：`crates/singlefs-core/src/mounted_session.rs:4442`–`:4455`（量的：全仓 `grep -rn ForegroundFsync --include=*.rs crates` 的命中里，别处都是构造、`==` 比较或测试替身；E202 装置 `crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs:6154` 起是 `== ForegroundFsync::Waiting` 的过滤，`crates/singlefs-verification/src/history.rs:10265` 起是返回 `Waiting`/`NoneWaiting` 的替身，都不受新成员影响）。行为：停线程时破例也让，停因照记 `YieldedToAForegroundFsync`（`compaction_plan.rs:622`），这个停因的文档现在写了两种来由（`:620`）。**一个名字两个意思**，见检查单「类型与名字」。
+产品代码里对这个枚举的 `match` 只有一处，穷尽、无通配：`crates/singlefs-core/src/mounted_session.rs:4442`–`:4455`（量的：全仓 `grep -rn ForegroundFsync --include=*.rs crates` 的命中里，别处都是构造、`==` 比较或测试替身；E202 装置 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/command_opening_and_construction_lines.rs:145` 起是 `== ForegroundFsync::Waiting` 的过滤，`crates/singlefs-verification/src/history.rs:10265` 起是返回 `Waiting`/`NoneWaiting` 的替身，都不受新成员影响）。行为：停线程时破例也让，停因照记 `YieldedToAForegroundFsync`（`compaction_plan.rs:622`），这个停因的文档现在写了两种来由（`:620`）。**一个名字两个意思**，见检查单「类型与名字」。
 
 ## 检查单
 

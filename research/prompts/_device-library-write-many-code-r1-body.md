@@ -10,7 +10,7 @@
 
 - 被判的文件：`crates/singlefs-device-library/src/lib.rs`（快照 sha256 `60dd1dfd…`）。文件头写着协议：`read`、`write`、`write-many <条数>` 三种请求，三种都可能回 `failed <退出码> <一句>`，装置照退出码退。
 - 管道那一头（转交给 prune-server 的一侧）：`scripts/experiment-apparatus/device-code-key.py` 文件头第 53–57 行写 `write-many` 的服务侧：整批读全、核全之后才动手，每条照 `write` 记账（写过的键、复用哨兵），再经客户端 `write_many` 一次写服务；有一条相对键不合整批一条都不写；条数至少 1。它的弄坏开关在同一文件头第 141–152 行（`write-many-first-entry-only` 等六个）。这份脚本不是这一轮被判的文件，当上下文读。
-- 调用方：`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:24484` `self.store.write_many(&items);`（E158 按单位成批写）。
+- 调用方：`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/fifth_run_judgement_library.rs:132` `self.store.write_many(&items);`（E158 按单位成批写）。
 - 变异行：`crates/mutations.tsv` 第 7393–7399 行（判定库口子 write-many 七条）与第 7401、7405 行（E158 调用侧）。
 - 测试：`crates/singlefs-device-library/src/lib.rs` 的 `mod tests` 新加三条：`write_many_announces_the_count_and_each_length_in_bytes_and_takes_one_written_for_the_whole_batch`、`write_many_of_nothing_sends_no_request_and_takes_no_reply`、`write_many_in_memory_stores_every_entry_and_counts_one_call_per_non_empty_batch`。
 - 压着的条款：`.claude/rules/verification.md`「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」（装置不开本地库，读写经服务）；同一份规则「一个门禁：两种跑法」里复用与「一块判完才落盘，写入是原子的」（`.claude/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」）。
@@ -28,7 +28,7 @@
 
 ### 检查单：走不到的理由二次查实
 
-这一份没有新加 `todo!`、`unreachable!`、`assert!`。新加的 `panic!` 有两处：`count_write_many_calls` 在 `Backend::Relay` 上 `panic!("单测只数内存那一种")`，测试辅助 `replies_left_unread` 在 `Backend::Memory` 上 panic（在 `mod tests` 里）。主 agent 判前一处走不到：`count_write_many_calls` 全仓只在单测里调：本包 `mod tests` 一处、`crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 第 30030、30043 行两处（在同文件第 29232 行 `#[cfg(test)]` 之后）（腿现跑 `grep -rn count_write_many_calls crates scripts` 核）。新加的 `expect` 两处是锁没中毒（`"转交判定库的锁没有中毒"`、`"单测内存库的锁没有中毒"`）。腿逐处追调用点判「走不到」成不成立。
+这一份没有新加 `todo!`、`unreachable!`、`assert!`。新加的 `panic!` 有两处：`count_write_many_calls` 在 `Backend::Relay` 上 `panic!("单测只数内存那一种")`，测试辅助 `replies_left_unread` 在 `Backend::Memory` 上 panic（在 `mod tests` 里）。主 agent 判前一处走不到：`count_write_many_calls` 全仓只在单测里调：本包 `mod tests` 一处、`crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 第 30030、30043 行两处（在同文件第 29232 行 `#[cfg(test)]` 之后）（腿现跑 `grep -rn count_write_many_calls crates scripts` 核）。新加的 `expect` 两处是锁没中毒（`"转交判定库的锁没有中毒"`、`"单测内存库的锁没有中毒"`）。腿逐处追调用点判「走不到」成不成立。
 
 ### 检查单：类型与名字
 

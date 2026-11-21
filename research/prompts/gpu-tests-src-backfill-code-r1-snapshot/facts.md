@@ -7,7 +7,7 @@
 `git status --short -- crates/singlefs-background-gpu-tests`（节选本批四份；整包都是 `A`）：
 
 ```
-A  crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs
+A  crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs
 A  crates/singlefs-background-gpu-tests/src/gpu_side_units_entries.rs
 A  crates/singlefs-background-gpu-tests/src/lib.rs
 A  crates/singlefs-background-gpu-tests/src/reference_units_entries.rs
@@ -353,7 +353,7 @@ diff.patch：`git diff HEAD -- crates/singlefs-background-gpu-tests/src > …/di
 #### 带 --item 的命令与项
 
 命令 `grep -rnF '<名>' .claude/gate.d/*.tsv scripts/crash/ scripts/experiment-apparatus/replay.sh .claude/heavy-thread-exempt .claude/crates-review-exempt crates/mutations.tsv scripts/mutation/tables/`（原样输出在 `…/registry-grep.txt`，137 行）。命中：
-- `.claude/gate.d/comment-history-lag.tsv:11`：`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs	5	# 存量，改净后删这一行`
+- `.claude/gate.d/comment-history-lag.tsv:11`：`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs	5	# 存量，改净后删这一行`
 - `.claude/gate.d/experiment-number-directories.tsv:17`：`crates/singlefs-background-gpu-tests/src/bin	e-number-names	# 登记里写死成入库装置的实验，装置住在产品 GPU 的测试包里（e202_gpu_cpu_gc_comparison.rs 这类）`
 - `.claude/gate.d/path-moves.tsv:673`：旧路径 → 新路径那一行（见第〇节）。
 - `crates/mutations.tsv`：第二段（文件）恰是这份的 **121 行**（`awk -F'\t' '$2=="crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs"' crates/mutations.tsv | wc -l`；量的）；cargo 参数段一律 `-p singlefs-background-gpu-tests --bin e202_gpu_cpu_gc_comparison -- <测试名>`。名字带 E202 而文件是别处的另有 3 行（7945 指 `tests/common_pairing_input_through_the_library/mod.rs`，7948、7949 指 `tests/common_discrete_gpus_of_this_host/mod.rs`）。这些行就是 crates-mutation-replay `--item` 可点的项。

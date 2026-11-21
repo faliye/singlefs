@@ -13,7 +13,7 @@
 - 问题单：`research/prompts/m3-close-cost-measurement-questions.md`，已在提交 `59ce5a865` 移出工作区，取法 `git show 59ce5a865^:research/prompts/m3-close-cost-measurement-questions.md`（13 行，`sha256sum` 为 `c5dec701293cb41b2f3a7b291b8e85a4e3f5e837c60024415f21c3023e1ba2d5`）。这一份只答它的 H2 一行；H3、H4、H5 不碰。
 - 第几次：工作区已有 `research/prompts/e183-r1-prereg.md`（第 1 次重跑，只重跑第一段）；这一份按 **E183（容量斜率读缓存小盘准入与清扫阈值的代价数） 第 2 次重跑登记**（只跑第二段）写，文件名 `e183-r2-prereg.md`。执行员在实验页加一节，标题写「第 2 次重跑（第二段 H2 第一次跑：经统一任务服务分片，X3 改读进程高水位）」，派发闸认续做靠这一行标题。
 
-**装置写在哪（写死）：入库装置，同上一次登记。** 改的是 `crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`（执行员照 `experiment-runner` 定义用 `scripts/hosts/compile-then-swap.py` 换进主工作区）与跑法脚本 `scripts/experiment-apparatus/e183-capacity-cells.sh`。依据同上一次登记表头那一句：H2 问的是 `crates/` 今天这份分配器与发布路径的代价随容量怎么长，另写一份独立模型答不了。本地常量的规矩照旧（上一次登记表头那张表与第十二节第二条，21 个，逐个回比 `crates/`）；这一份**不新读 `crates/` 的任何常量**：新加的阈值 X22 是登记写死的数（第七节 A42），不来自 `crates/`，不回比。
+**装置写在哪（写死）：入库装置，同上一次登记。** 改的是 `crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs`（执行员照 `experiment-runner` 定义用 `scripts/hosts/compile-then-swap.py` 换进主工作区）与跑法脚本 `scripts/experiment-apparatus/e183-capacity-cells.sh`。依据同上一次登记表头那一句：H2 问的是 `crates/` 今天这份分配器与发布路径的代价随容量怎么长，另写一份独立模型答不了。本地常量的规矩照旧（上一次登记表头那张表与第十二节第二条，21 个，逐个回比 `crates/`）；这一份**不新读 `crates/` 的任何常量**：新加的阈值 X22 是登记写死的数（第七节 A42），不来自 `crates/`，不回比。
 
 **起跑前提（写死，第十一节 T7）**：执行员开工第一步核五样，任一不成立就不开工、交回：
 
@@ -60,7 +60,7 @@
 >      - 这个测法要的、服务现在给不出的东西（例：每片尝试的峰值要多细），列进「要管任务服务的会话确认的」一节，由主 agent 去问。
 >
 > 3. **装置现状**（主 agent 派的调查员量的，报告 `/home/fy5090/.local/share/singlefs/work/m3-close-b19-experiment-status/result.md` 第 80–115 行）：
->    - 装置是 `crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`，H2 入口在第 6096–6105 行（`h2 list-shards`、`h2 shard`、`h2 merge`）。
+>    - 装置是 `crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs`，H2 入口在第 6096–6105 行（`h2 list-shards`、`h2 shard`、`h2 merge`）。
 >    - 照现状能编（任务 4487 编过）。
 >    - H2 产物一份都没有，复跑表也还没有 H2 的行。
 >    - 验收：登记里写明装置那一侧要改的地方（文件:行），交给之后的执行员。
@@ -238,7 +238,7 @@ PC-堆、PC-线性、PC-平同上一次登记 5.3 节（V30、V32 照旧）。�
 
 ### 5.6 准入接法（写死；执行员第一段登记）
 
-1. `.claude/gate.d/stage-inputs.tsv` 照第 43 行 E142 那一行的写法（三段：键、入口、`#` 注释；没有准入条件那一列）加一行：键 `E183/h2`；入口 `crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs::main scripts/experiment-apparatus/e183-capacity-cells.sh`；注释写「E183（容量斜率读缓存小盘准入与清扫阈值的代价数） 第二段 H2（跑前登记 `research/prompts/e183-r2-prereg.md`）：装置的 main 与分片跑法脚本；经 task-server 分片的计划那一步问准入，产物头由跑法脚本接」。键用 `E183/h2` 不用 `E183`：复跑表里 E183 已有三行，实验号登记了准入就判「几行共用一个键」（K29）。
+1. `.claude/gate.d/stage-inputs.tsv` 照第 43 行 E142 那一行的写法（三段：键、入口、`#` 注释；没有准入条件那一列）加一行：键 `E183/h2`；入口 `crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs::main scripts/experiment-apparatus/e183-capacity-cells.sh`；注释写「E183（容量斜率读缓存小盘准入与清扫阈值的代价数） 第二段 H2（跑前登记 `research/prompts/e183-r2-prereg.md`）：装置的 main 与分片跑法脚本；经 task-server 分片的计划那一步问准入，产物头由跑法脚本接」。键用 `E183/h2` 不用 `E183`：复跑表里 E183 已有三行，实验号登记了准入就判「几行共用一个键」（K29）。
 2. 不加复跑表行、不动 `replay.sh` 的 `ADMISSION_ROW_KEYS`：复跑表里没有准入键是 `E183/h2` 的行时，`admission.py experiment` 按登记的入口算键（K29）。第二段不进复跑表的理由：一趟要经服务分 5 片跑数小时、两台都可能派到，`replay.sh` 是一条任务里整份跑，装不下这种跑法；产物带挂钟字段，逐字节比不了。**待主 agent 认**。
 3. 问准入的是计划那一步（5.3），不是装置：`admission.py experiment` 退 0 的那几行（`E7INPUT` 开头，`sha256=` 记的是 `E183/h2` 的实验键）由合并接在产物最前面；同一把键已有产物（退 77）整件不跑。脚本文件头第 2 行 `# admission: always` 的理由改写成「每一次调照服务给的那一步跑；实验一级的准入在计划那一步问 `admission.py experiment … E183/h2`」（写法照 `.claude/singlefs-ai-sop/rules/preflight-discipline.md`）。
 4. 主 agent 在交 `run` 之前可先单判一次：`task-server/task submit -- python3 scripts/gate/admission.py experiment /home/fy5090/code/singlefs E183/h2`（仓根起），`task wait` 末行 `exit=0` 放行、`exit=77` 是已有同键产物、`exit=3` 前提没齐、`exit=2` 登记有错。
@@ -414,7 +414,7 @@ T2、T4 同上一次登记第十一节（T4 这一次另罩「堆量跨台不同
 ### 13.3 `crates/`、服务、脚本与登记表
 
 - `crates/singlefs-core/src/allocator.rs`、`transaction.rs`、`mounted_session.rs`、`block_device.rs`：K16、K17、K28 那几条 `grep -n` 的命中行。
-- 装置 `crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`（8411 行，`sha256sum` `92c480bd63087bf342d98489eec967de17bea94ed452f3e435fc4f80920e4284`）：第 2643–2652、2855–2868、2870–2960、3096–3150、3230–3255、3275–3320、3338–3372、3940–3975、4160–4210、5997–6115 行；`grep -n` 包装退出码、`name=h2_` 行名、单测名、函数名的命中行；`grep -c '#\[test\]'` = 73。
+- 装置 `crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs`（8411 行，`sha256sum` `92c480bd63087bf342d98489eec967de17bea94ed452f3e435fc4f80920e4284`）：第 2643–2652、2855–2868、2870–2960、3096–3150、3230–3255、3275–3320、3338–3372、3940–3975、4160–4210、5997–6115 行；`grep -n` 包装退出码、`name=h2_` 行名、单测名、函数名的命中行；`grep -c '#\[test\]'` = 73。
 - `scripts/experiment-apparatus/e183-capacity-cells.sh` 整份（355 行）。
 - `task-server/README.md` 第 85–105 行；`task-server/task_server_lib.py` 第 85–145、143–270、884–893、960–990、2087–2090 行与 `grep -n` 的命中行；`task-server/task` 第 15–30、85–125 行；`task-server/task_server.py` 第 1817–1835 行与 `grep -n 'memory_peak'` 的命中行；`scripts/hosts/multi-host-run.sh` 与 `scripts/hosts/memory_peaks_lib.py` 里 `grep -n 'MULTI_HOST_RUN_PEER_SCRATCH'` 的命中行。
 - `multi-host.env` 里 `SLICE_MEMORY_CAP_BY_HOST`、`NFS_SHARED_ROOTS` 两个键的行（只记了 slice 总上限的值，主机地址与路径不进这一份）；`multi-host.env.example` 第 37–43 行；`.claude/heavy-thread-default`；`.cargo/config.toml` 的非注释行。

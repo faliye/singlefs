@@ -255,7 +255,7 @@ let _ = std::process::Command::new(&program).arg("-c").arg("true").status();
 
 ## 8 事实表 `facts.md` 写错的地方（线索，不是依据）与正文里一处观测
 
-1. `facts.md` 224 行与正文第 7 件：「`entry_group_key_with_the_features_of_the_build` 的返回类型换成新类型」（事实表写「返回值类型由 `EntryGroupKey` 改成新类型（L166、L239）」）**不对**。它的签名仍是 `-> Result<EntryGroupKey, EntryError> {`（`crates/singlefs-unit-graph/src/entry_groups.rs:116`），改成转调新函数后 `.map(|keyed| keyed.key)`；L166、L239 属于新函数 `entry_group_key_not_following_the_listed_units`。仓里别处调它的（`crates/singlefs-background-gpu-tests/build.rs:94`、`crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs:2087`）不用改。
+1. `facts.md` 224 行与正文第 7 件：「`entry_group_key_with_the_features_of_the_build` 的返回类型换成新类型」（事实表写「返回值类型由 `EntryGroupKey` 改成新类型（L166、L239）」）**不对**。它的签名仍是 `-> Result<EntryGroupKey, EntryError> {`（`crates/singlefs-unit-graph/src/entry_groups.rs:116`），改成转调新函数后 `.map(|keyed| keyed.key)`；L166、L239 属于新函数 `entry_group_key_not_following_the_listed_units`。仓里别处调它的（`crates/singlefs-background-gpu-tests/build.rs:94`、`crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks/shard_library_and_reuse_keys.rs:147`）不用改。
 2. `facts.md` 73 行 `build_features.rs`「改到/新加的函数名 3 个……两处都没引到的 1 个：`environment_name_of`」：`environment_name_of` 没改，它只是块头（`@@ … @@ fn environment_name_of`）里「上一个函数」的上下文；真正改的是它后面的 `features_of_the_crate_being_built`（形参改名）。同类的误取（块头函数当改了的函数）在事实表别处可能还有，我只核了这一处。
 3. `facts.md` 156 行 `crates/singlefs-unit-graph/src/closure.rs:29：E053`：把注释里的 rustc 错误码 `E0530` 当成 kb 的 E 编号并且还截成 `E053`；它不是 kb 编号，也没有这个编号的实验。
 4. `facts.md` 174 行「类型与名字：新加的条目名 13 个」里 `fn finish` 不是新加（§7.2）；`facts.md` 97 行 `build_toolchain.rs` 的 2 个与 `rule_switches.rs` 的 `EVERY_RULE` 同理，都是旧名改了类型或长度。

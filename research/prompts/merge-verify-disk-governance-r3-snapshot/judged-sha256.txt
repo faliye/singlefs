@@ -1,0 +1,3 @@
+7cfac4c4fe022fe39cc90c627475f20c018fca2b9cfed1735c79038cff0717a3  research/prompts/_merge-verify-disk-governance-r3-body.md
+5dbf51739d699464addf4a105aa12d9fdb1952c348ea5e4bd69eeaa0baf7210e  scripts/gate/merge-and-verify.sh
+658dced79ecc62c0ff6cd863b796177d0fbb003a49461097cb167d03b0890d7e  .claude/gate.d/break-switch-replay-files.tsv

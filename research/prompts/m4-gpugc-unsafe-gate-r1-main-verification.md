@@ -1,6 +1,6 @@
 # m4-gpugc-unsafe-gate-r1 判决：unsafe-allowances 那一格的判法与登记行（2026-11-05）
 
-被判的文件：`.claude/gate.d/code-source-discipline.sh`（unsafe-allowances 格）、`.claude/gate.d/unsafe-allowances.tsv`，以及登记行指到的 `crates/singlefs-background-gpu/src/background_gpu.rs`、`crates/singlefs-background-gpu/src/lib.rs`、`crates/singlefs-background-gpu/tests/checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs`、`crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs`、`crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`。正文 `research/prompts/_m4-gpugc-unsafe-gate-r1-body.md`，背景 `research/prompts/_m4-gpugc-unsafe-gate-r1-background.md`。
+被判的文件：`.claude/gate.d/code-source-discipline.sh`（unsafe-allowances 格）、`.claude/gate.d/unsafe-allowances.tsv`，以及登记行指到的 `crates/singlefs-background-gpu/src/background_gpu.rs`、`crates/singlefs-background-gpu/src/lib.rs`、`crates/singlefs-background-gpu/tests/checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs`、`crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs`、`crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs`。正文 `research/prompts/_m4-gpugc-unsafe-gate-r1-body.md`，背景 `research/prompts/_m4-gpugc-unsafe-gate-r1-background.md`。
 
 ## 一、腿与核查
 

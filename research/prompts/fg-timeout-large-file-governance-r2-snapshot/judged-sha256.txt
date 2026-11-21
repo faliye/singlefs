@@ -1,0 +1,7 @@
+8e042f45d9d78b6bc79cbec9e8043d07e1bda428850935cdfcbf41542d33d5af  research/prompts/_fg-timeout-large-file-governance-r2-body.md
+02d0c3c820d5d9e46de611250dfcae2edef7831786c8be87a1bdccfcb4027ea9  .claude/hooks/bash-command-detector.sh
+196d9ff7ecb7a1917f8cebbd9be91f1e1d7a355fbd6c06143391340d9c8412b8  scripts/gate/large-file-check.py
+8c097a5d85bc51dfc5cfc8725e7273aff9f635425838f134bd1b12e037292596  .claude/gate.d/code-tooling.sh
+c72529ce094c9fc69c366addf47450c2f37939487d6c578f0d4b906fe55dcb88  .claude/hooks/agent-write-scope.tsv
+d1066319a2b1a3eb304641894b0cfcfd3e7a55193ce13a7933625a773bb6c872  scripts/agents/dispatch-prompt.py
+255b3b5b69e6a3b2542f9007d2adf8a788160a615fd20f63249615ba080f9d8d  .claude/agent-common.md

@@ -1,0 +1,5 @@
+[package]
+name = "fswap"
+
+[features]
+fast = []

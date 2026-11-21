@@ -1,0 +1,5 @@
+b63f864869ccef422827a47b3365e93ec4b86cfc32b21595ed708708568f896e  research/prompts/_amplification-without-cards-code-r2-body.md
+68e981839cf90d9ff22d95cc689523fa8152c7ff42201aa736ac1619e67858af  research/prompts/amplification-without-cards-code-r1-main-verification.md
+2ada7157b3771d8a0eb295e8327081d9dcbed1ec77f8db32d1124f5b6b14d688  .claude/rules/verification.md
+e375c24894551245283ccf23c9ef7abaac1769f7e464fc18903f2b94d7ead17e  scripts/crash/crash-amplification-item.sh
+ec83ab9181030012288d4367d5032d701cb435f2b6e3d0039f564425d06903a5  gpu-verification-server/control

@@ -220,7 +220,7 @@ aa83a8d3669989a101b41f41918de778a315520bd23247d565512ea14ed9e936  src/attack_r2_
 
 **`observations()`**：单独一把小锁（`crates/singlefs-mount-runtime/src/lib.rs:946`），不取会话锁，发布中途读得到；`update_the_observations` 都在放了会话锁之后（`crates/singlefs-mount-runtime/src/lib.rs:531` 的块结束才记）。`compaction_publishes` 文档写「整理发布次数」，实际数 `versions_published.len()`，删除步也算进去（`crates/singlefs-mount-runtime/src/lib.rs:576`），放锁之后删除步一次一个进这个数。低危：读数名不符。`has_a_background_trip_under_way` 在会话锁里读（`crates/singlefs-mount-runtime/src/lib.rs:537`）。
 
-**`CallerIsStoppingItsThread`**：`foreground_fsync()` 只有一处调用（`crates/singlefs-core/src/mounted_session.rs:4441`），`match` 三臂都写，没有通配（`grep` 范围：`crates/` 下非 `tests/` 的 `foreground_fsync()`）。`e202` 那一处只断言不匹配（`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs:9322`）。`history.rs` 答的是两个成员之一（`crates/singlefs-verification/src/history.rs:10267`），不答新成员，没有差。这个成员走让路那一支，停因记 `YieldedToAForegroundFsync`；低于底额时这一趟不留、不低于底额时留，反正线程要停了。**没打中。**
+**`CallerIsStoppingItsThread`**：`foreground_fsync()` 只有一处调用（`crates/singlefs-core/src/mounted_session.rs:4441`），`match` 三臂都写，没有通配（`grep` 范围：`crates/` 下非 `tests/` 的 `foreground_fsync()`）。`e202` 那一处只断言不匹配（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/unit_area_tiers_and_local_constants/tests.rs:44`）。`history.rs` 答的是两个成员之一（`crates/singlefs-verification/src/history.rs:10267`），不答新成员，没有差。这个成员走让路那一支，停因记 `YieldedToAForegroundFsync`；低于底额时这一趟不留、不低于底额时留，反正线程要停了。**没打中。**
 
 **破例还开着时写带宽截住**：`admit_the_next_batch_under_the_write_bandwidth_limit` 在破例之后照判（`crates/singlefs-core/src/mounted_session.rs:4457`），`is_the_exception_of_the_trip_still_open` 留着，下一拍接着破例。这是实现员写明的。写带宽窗口没过之前低于底额也发不出：条款第 6 条的上限，不矛盾。**没打中。**
 

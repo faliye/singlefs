@@ -2,7 +2,7 @@
 
 正文 `research/prompts/_test-script-align-code-r1-body.md`；腿：正推 `research/prompts/test-script-align-code-r1-sonnet-output.md`（K1、K4、K5）、攻方 `research/prompts/test-script-align-code-r1-opus-output.md`（K2、K3），模型目录各自 `-model/`。
 
-被判的 `crates/*/src/*.rs`：`crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`、`crates/singlefs-checker-tier/src/crash.rs`、`crates/singlefs-checker-tier/src/crash_amplification.rs`、`crates/singlefs-harness/src/history.rs`、`crates/singlefs-checker-tier/src/crash_injection.rs`；连同正文第一节那张表里的测试文件与 `crates/mutations.tsv` 第 1573–1610 行。
+被判的 `crates/*/src/*.rs`：`crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`、`crates/singlefs-checker-tier/src/crash.rs`、`crates/singlefs-checker-tier/src/crash_amplification.rs`、`crates/singlefs-harness/src/history.rs`、`crates/singlefs-checker-tier/src/crash_injection.rs`；连同正文第一节那张表里的测试文件与 `crates/mutations.tsv` 第 1573–1610 行。
 
 ## 一、核查
 

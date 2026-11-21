@@ -6,7 +6,7 @@
 
 英文名：gc_batch_wall_clock_split
 
-（照抄 r3 登记第一节第 7 行；装置仍是 `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs`，不另起。重判脚本另起文件名 `scripts/experiment-apparatus/e185_r4_baseline_rejudge.py`，英文名同上，前缀 `e185_r4_` 标这一趟。）
+（照抄 r3 登记第一节第 7 行；装置仍是 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs`，不另起。重判脚本另起文件名 `scripts/experiment-apparatus/e185_r4_baseline_rejudge.py`，英文名同上，前缀 `e185_r4_` 标这一趟。）
 
 **主 agent 给的问题**（派发提示「关的是哪几条」逐字）：
 
@@ -159,7 +159,7 @@ GPU 路径与 CPU 路径是两份实现（D24（后台重活能不能卸给 GPU�
 | 可克隆 | `crates/singlefs-core/src/allocator.rs:1817-1818`、`compaction_plan.rs:615-616` | `PoolAllocator`、`CompactionOfThisMount` 派生 `Clone`（这一趟不靠它） |
 | 编译配置 | `Cargo.toml:18-23`；`.cargo/config.toml` | release 档 `opt-level = 3`、`debug = true`、`overflow-checks = true`、`debug-assertions = true`：带调试信息，`addr2line` 认得出函数与内联；`.cargo/config.toml` 只有 `[env] BINDGEN_EXTRA_CLANG_ARGS`，没有 `rustflags`。`grep -rn 'timer_create\|SIGPROF\|force-frame-pointers' crates/ scripts/` 零命中 |
 
-**装置今天的样子**（改前基线）：主工作区 `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs` sha256 `4368c0e7a7870a09810fa5667173f9cf14625f4d64c4e0287ee10ec7ef80e6ea`、20497 行、`#[test]` 174 条，即 r3 登记 R3-1 那一版；HEAD 那一版仍是 `b3a50d50…`（r2 那一版，r3 的改动还没提交）。`crates/mutations.tsv` 里 `E185 V` 起头 154 行（V1–V154）。
+**装置今天的样子**（改前基线）：主工作区 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` sha256 `4368c0e7a7870a09810fa5667173f9cf14625f4d64c4e0287ee10ec7ef80e6ea`、20497 行、`#[test]` 174 条，即 r3 登记 R3-1 那一版；HEAD 那一版仍是 `b3a50d50…`（r2 那一版，r3 的改动还没提交）。`crates/mutations.tsv` 里 `E185 V` 起头 154 行（V1–V154）。
 
 | 装置里的一处 | 行 | 看到的 |
 |---|---|---|
@@ -204,7 +204,7 @@ GPU 路径与 CPU 路径是两份实现（D24（后台重活能不能卸给 GPU�
 
 ### 装置写在哪（写死）
 
-- **控漂移段、写法与拆分段：入库装置**。仍是 `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs`，加两个子命令 `host-cpu-drift-control`、`cpu-writings-and-function-partition`，原有八个子命令、原有产物行、原有判据与 V1–V154 不动。理由：第 2 行问的是这台机器上 `wgpu` 30.0.1 经 checker 档起卡之后一次提交的主机 CPU 随轮次怎么走，只能在 r3 第一段那一套 GPU 栈上量；第 1 行要的是 crates 这份 GC 代码在同一批真调用上各阶段的 CPU、第 3 行要的是 crates 这份代码一次真调用的 CPU 按函数怎么分，都要直接调 crates 的函数、在 crates 的调用里取样。替代写法（硬件 CRC、按身份查的扫描）只住在装置里、只给计时用，不改 `crates/`，每一次重放都与 crates 那一份对拍（停机 K-S1、K-S2）。**改前基线取主工作区今天那一版 sha256 `4368c0e7a7870a09810fa5667173f9cf14625f4d64c4e0287ee10ec7ef80e6ea`**（第三节）。
+- **控漂移段、写法与拆分段：入库装置**。仍是 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs`，加两个子命令 `host-cpu-drift-control`、`cpu-writings-and-function-partition`，原有八个子命令、原有产物行、原有判据与 V1–V154 不动。理由：第 2 行问的是这台机器上 `wgpu` 30.0.1 经 checker 档起卡之后一次提交的主机 CPU 随轮次怎么走，只能在 r3 第一段那一套 GPU 栈上量；第 1 行要的是 crates 这份 GC 代码在同一批真调用上各阶段的 CPU、第 3 行要的是 crates 这份代码一次真调用的 CPU 按函数怎么分，都要直接调 crates 的函数、在 crates 的调用里取样。替代写法（硬件 CRC、按身份查的扫描）只住在装置里、只给计时用，不改 `crates/`，每一次重放都与 crates 那一份对拍（停机 K-S1、K-S2）。**改前基线取主工作区今天那一版 sha256 `4368c0e7a7870a09810fa5667173f9cf14625f4d64c4e0287ee10ec7ef80e6ea`**（第三节）。
 - **重判段：`scripts/experiment-apparatus/` 下的独立脚本** `scripts/experiment-apparatus/e185_r4_baseline_rejudge.py`（带同名 `_test.py` 自证与 `.mutations.tsv` 变异表，形照同目录 `e185_r1_compare.py`）。它只读产物做算术，不调 crates、不与装置共用代码（`.claude/rules/implementation-first.md` 第 4 条）；它与装置的 Rust 判法是两份写法，靠停机 K-S3（写法甲、门槛来源「r2 产物按比例换」、c_rt 来源 r3 时逐行复现 r3 第一段产物的判定）对上。
 
 入库装置这一趟新读 crates 的东西，逐个改成本地常量加回比、或按行为对拍，不直接引：
@@ -561,7 +561,7 @@ r3 登记的 J1–J11 照管控漂移段两条臂各自的 R1–R5 行（原样�
 
 C895 要的（`.claude/kb/checks-owed.md` 第 574 行）：装置里立一张正式跑的单元表（照 E165 `formal_run_units` 的形），比对对象改登记成正式行、复跑列写 `replay.sh` 的驱动名；判别力是单元表少一条、格必须红。要关它，改这几处：
 
-1. **装置的测试模块**（`mod tests`，第 15205 行起）新加一条测试，里面一个 `formal_run_units` 数组，照 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 第 18399 行的形：每条是（单元名字面、子命令、参数、留存产物名、这一单元跑的阳性对照名单）。列 r3 三条（第一段带 `-2` 那一份、第二段、第三段）与这一趟两条（控漂移段、写法与拆分段）；重判段不在装置里，它的单元写进 `scripts/experiment-apparatus/e185_r4_baseline_rejudge_test.py` 的同形数组。测试核三样：每个单元的子命令能被 `run_the_subcommand`（第 14979 行）认、参数能被 `options_of`（第 14944 行）与 `points_of`（第 14959 行）收下；每个单元点名的阳性对照在装置里都有判定函数，喂答案已知的合成读数时都判得出（复用 `positive_control_judges_hold_inside_their_bands_only` 第 15803 行、`thread_clock_control_judges_the_spin_and_the_sleep_at_the_registered_edges` 第 19354 行那一类）；全部单元并起来罩全 r3 登记与这一份登记的阳性对照表。
+1. **装置的测试模块**（`mod tests`，第 15205 行起）新加一条测试，里面一个 `formal_run_units` 数组，照 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 第 18399 行的形：每条是（单元名字面、子命令、参数、留存产物名、这一单元跑的阳性对照名单）。列 r3 三条（第一段带 `-2` 那一份、第二段、第三段）与这一趟两条（控漂移段、写法与拆分段）；重判段不在装置里，它的单元写进 `scripts/experiment-apparatus/e185_r4_baseline_rejudge_test.py` 的同形数组。测试核三样：每个单元的子命令能被 `run_the_subcommand`（第 14979 行）认、参数能被 `options_of`（第 14944 行）与 `points_of`（第 14959 行）收下；每个单元点名的阳性对照在装置里都有判定函数，喂答案已知的合成读数时都判得出（复用 `positive_control_judges_hold_inside_their_bands_only` 第 15803 行、`thread_clock_control_judges_the_spin_and_the_sleep_at_the_registered_edges` 第 19354 行那一类）；全部单元并起来罩全 r3 登记与这一份登记的阳性对照表。
 2. **子命令名立成常量**：`run_the_subcommand` 里的子命令字面量与单元表引同一份常量，不各写一份。
 3. **装置文件头**（第 9–27 行的子命令清单）补两个新子命令。
 4. **`scripts/experiment-apparatus/replay.sh` 的复跑表**（第 1492 行起的 `TABLE`）：E185 今天一行都没有，而 `.claude/gate.d/replay-comparison-units.tsv` 的正式行「复跑」列要写驱动名（写 `none:` 的行只缩不涨，新加的 `none:` 行格判红）。所以关 C895 还要给每个正式跑配一个驱动：重判段能做成逐字比的驱动（纯算术、几秒、产物逐字可复现）；控漂移段、写法与拆分段与 r3 那三段是真设备计时，要清场、要第二台、单趟 1–2 小时，复跑驱动只能比不随时序变的那几行（锚点、行数、对拍结果、停机条款），要另写一个比较器。
@@ -576,7 +576,7 @@ C895 要的（`.claude/kb/checks-owed.md` 第 574 行）：装置里立一张正
 执行员写于 2026-10-24，三段的产物一份都还没跑。依据只有三样：第一节「主 agent 定」第 6 条（撤拆法乙）、派发提示「登记第十二节记装置 sha256、条数与前任定下的口径」「子命令名要改就在第十二节记一条修订」两句，与下面写明的单测、自证读数。
 
 R4-1 改完的东西与 sha256（主工作区的装置由主 agent 打 `patch/crates.patch` 换上；sha256 是打上之后那一份）：
-- 装置 `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs` `9e813cbd36900f1b0c7001e6de0f98de01080bbf7ac6aab39d8e7c9854bd97f8`（25850 行；改前 `4368c0e7…`、20497 行）。`#[test]` 174 条加到 230 条（新 56 条；`drift_control_without_the_gpu_feature_reports_not_run` 只在不带 `gpu` 特性时编）。
+- 装置 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` `9e813cbd36900f1b0c7001e6de0f98de01080bbf7ac6aab39d8e7c9854bd97f8`（25850 行；改前 `4368c0e7…`、20497 行）。`#[test]` 174 条加到 230 条（新 56 条；`drift_control_without_the_gpu_feature_reports_not_run` 只在不带 `gpu` 特性时编）。
 - 重判脚本 `scripts/experiment-apparatus/e185_r4_baseline_rejudge.py` `32f1421863eee648de35d756f59093bc3dadc2fa82e6ed30b1c9b56b7509f39b`（773 行）；自证 `e185_r4_baseline_rejudge_test.py` `81b888d413336bd7077810f232d7abb98fd76309757dd5f07dc68bf5b7c48675`（23 项）；变异表 `e185_r4_baseline_rejudge.mutations.tsv` `2192be951bbaabdb8b1c01bd85d59c3dbe0ed815ab62c7113b43c968fd204693`（22 行）。
 - 起跑脚本 `scripts/experiment-apparatus/e185-r4-segment-run.sh`（登记的装置 sha256 写在它的 `registered_apparatus_sha256`，与上面那一个相同）。
 - `crates/mutations.tsv` 追加 57 行：V155–V165、V169–V182（第九节表里那几行；V166–V168 见 R4-4，V183–V198 随拆法乙撤了，号不再用）与执行员补的 V199–V230（R4-5）。V1–V154 的锚点在新源码里逐条恰好命中一次。
@@ -636,8 +636,8 @@ R4-7 起法没换：两段照第五节「跑法」那两条起；控漂移段与
 | `crates/singlefs-core/src/compaction_plan.rs`；`records.rs`；`allocator.rs`；`transaction.rs` | 88、615–616、660、735；462、474；1815–1818；9676、9776、9852（`grep`） |
 | `crates/singlefs-format/src/lib.rs` | 17、20（`grep`） |
 | `crates/singlefs-core/src/` 下 `root_record.rs`、`instance_table_sweep.rs`、`system_configuration.rs`、`make_filesystem.rs`、`mounted_read.rs`、`journal.rs`、`recovery.rs`、`mount.rs` | `grep -rn 'crc32_castagnoli\|wide_checksum_field_holds'` 命中行 |
-| `crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs` | 1–60；380–500；3440–3480；7630–7870；9440–9640；12559–12660；13117–13330；13450–13470；14188–14270；14322–14420；`grep` 命中 112、114、149、161、164、384、405、412、452、477、490、716、2037、2052、2638、2744、3392、3404、3461、3975、4156、4677、4691、4948、5723、5725、6322、7634、7900、8105–8296、9479–9552、9700–9767、10327、10934、10963、11004–11871、11968–12112、12569–12583、13003–14424、14542–15205、15209–19868 间的函数与测试名、19692 |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 18380–18410；18760–18800 |
+| `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` | 1–60；380–500；3440–3480；7630–7870；9440–9640；12559–12660；13117–13330；13450–13470；14188–14270；14322–14420；`grep` 命中 112、114、149、161、164、384、405、412、452、477、490、716、2037、2052、2638、2744、3392、3404、3461、3975、4156、4677、4691、4948、5723、5725、6322、7634、7900、8105–8296、9479–9552、9700–9767、10327、10934、10963、11004–11871、11968–12112、12569–12583、13003–14424、14542–15205、15209–19868 间的函数与测试名、19692 |
+| `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` | 18380–18410；18760–18800 |
 | `crates/mutations.tsv` | `grep -c 'E185 V'`；`grep 'E185 V' \| tail -2` |
 | `Cargo.toml`；`.cargo/config.toml`；`Cargo.lock` | 18–23；全文；`grep -n '^name = "\(libc\|addr2line\|gimli\|object\|backtrace\)"'` 命中 360–361 |
 | `scripts/experiment-apparatus/e185-r3-segment-run.sh` | 1–137 |
@@ -669,7 +669,7 @@ which nm addr2line; cat /sys/devices/system/cpu/nohz_full; cat /sys/devices/syst
 bash scripts/crash/crash-point-replay-shard-configuration-check.sh --emit-hosts
 sha256sum crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs                 # 4368c0e7…
 git show HEAD:crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs | sha256sum  # b3a50d50…
-grep -c 'E185 V' crates/mutations.tsv; grep -c '#\[test\]' crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs   # 154；174
+grep -c 'E185 V' crates/mutations.tsv; grep -c '#\[test\]' crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs   # 154；174
 grep -rn '_mm_crc32\|crc32_u64\|sse4.2\|sse4_2' crates/ --include=*.rs | wc -l                     # 0
 grep -n 'HashMap\|BTreeMap' crates/singlefs-core/src/region_scan.rs                                 # 12、145、422、452
 grep -rn 'timer_create\|SIGPROF\|force-frame-pointers' crates/ scripts/ --include=*.rs --include=*.sh --include=*.toml | wc -l   # 0

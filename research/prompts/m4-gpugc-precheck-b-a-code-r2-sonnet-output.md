@@ -143,7 +143,7 @@
 
 ### T3-2　甲判出时 `devices_short` 为空，读它的调用方拿到空表会不会走错支
 
-- `devices_short`、`empty_cluster_segments_below_the_floor` 两个字段，非测试代码里在 `crates/singlefs-core/src/mounted_session.rs` 之外没有任何读它们的地方（`grep -rn 'devices_short' crates --include=*.rs` 在核心层之外只命中验证包与运行库的测试）。验证包模型 `crates/singlefs-verification/src/history.rs:5446`、`:5599`、`:5644` 与实验装置 `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs:19902`、`crates/singlefs-verification/src/bin/e180_admission_reading_versus_writable_bytes.rs:642` 匹配这个成员，只读 `floor_raises`、`versions_published`、`last_refusal`，不看这两个字段；甲判出时 `last_refusal` 仍是空间不够那一种，模型归类不变。
+- `devices_short`、`empty_cluster_segments_below_the_floor` 两个字段，非测试代码里在 `crates/singlefs-core/src/mounted_session.rs` 之外没有任何读它们的地方（`grep -rn 'devices_short' crates --include=*.rs` 在核心层之外只命中验证包与运行库的测试）。验证包模型 `crates/singlefs-verification/src/history.rs:5446`、`:5599`、`:5644` 与实验装置 `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/fourth_run_segment_two/random_executor.rs:656`、`crates/singlefs-implementation-experiments/src/bin/e180_admission_reading_versus_writable_bytes/pool_and_publish_log.rs:64` 匹配这个成员，只读 `floor_raises`、`versions_published`、`last_refusal`，不看这两个字段；甲判出时 `last_refusal` 仍是空间不够那一种，模型归类不变。
 - 测试帮手 `assert_refused_with_nothing_pushed`（`crates/singlefs-mount-runtime/tests/mount_runtime_accept_raises_the_floor_for_space.rs:1013`）断言 `!no_space.devices_short.is_empty()`（`:1026`）：只适用乙的形。它的两处调用（`:1077`、`:1131`）放的是「比单元区还大的写」，上界必小于需求，乙先判出，甲不跑；先乙后甲的次序恰好保着这个帮手。以后有人把甲的形（全空段为 0 而上界够用）接进这个帮手会假红，这是帮手的限度，不是产品的毛病。
 - 口径裂缝：「全空段少于 `N₀`」现有两条报法（合取 7 自己拒：`Publish` 带 `EmptyClusterSegmentsBelowTheFloor`；甲判出：`NoSpaceEven…` 带 `Some`）。今天没有产品调用方读这个差别，所以没有走错的支；T1-1 末尾那句「调用方分得出」是它的文字影子。判决第一轮已记，不另判。
 

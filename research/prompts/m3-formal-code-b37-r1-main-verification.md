@@ -4,8 +4,8 @@
 
 被判的文件（第 37 批，主 agent 自己写的几处，逐块见改动全文 `research/prompts/_m3-formal-code-b37-r1-diff.md`）：
 - `crates/singlefs-checker/src/image.rs`（第 211–212 行 I-4.1 常量的文档注释）；
-- `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`（内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`）；
-- `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs`（两条内联单测的钉值）；
+- `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`（内联单测 `every_criterion_has_a_positive_control_and_every_control_is_red`）；
+- `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs`（两条内联单测的钉值）；
 - `crates/mutations.tsv`（本批两行）。
 
 ## 一、这一轮的材料与证据

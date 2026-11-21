@@ -1,0 +1,2 @@
+77c4012c48f7bf87099b3df37fa69bed79da4fea38dad3880aded3ce65bc05ff  research/prompts/_judging-closure-and-real-card-instance-code-r2-body.md
+deddc5b5fa8bf931ef19ebc2c1426eb1eeb59f308fa5a2bc6ba12f994f415926  research/prompts/judging-closure-and-real-card-instance-code-r1-main-verification.md

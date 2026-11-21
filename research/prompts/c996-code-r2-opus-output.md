@@ -222,7 +222,7 @@ SINGLEFS_RUN_SCOPE='种类=target; 跑什么=攻方腿模型复跑：singlefs-ba
 
 ### 不兼容旧代码与旧格式：成立
 
-`grep -nE 'legacy|old_format|migrat|兼容' research/prompts/_c996-code-r2-diff.md` 退 1、零命中。两批之间那一问的旧形状（交回 `Option<BackgroundGpuComputeFailed>`）在核心层特质、两份核那一层、e202 两个包装里都换成了三种答法，没有留着的转接。一处疑点：`failure_under_the_settings_handed_in` 核心层不再直接读，留着给特质那一问的缺省答法用，实现员报告写「验证包里那几份只覆写 `failure_under_the_settings_handed_in` 的替身不用改」；它同时还被 e202 直接调（`crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs:7977`），不是只为旧替身留的，我判成立。
+`grep -nE 'legacy|old_format|migrat|兼容' research/prompts/_c996-code-r2-diff.md` 退 1、零命中。两批之间那一问的旧形状（交回 `Option<BackgroundGpuComputeFailed>`）在核心层特质、两份核那一层、e202 两个包装里都换成了三种答法，没有留着的转接。一处疑点：`failure_under_the_settings_handed_in` 核心层不再直接读，留着给特质那一问的缺省答法用，实现员报告写「验证包里那几份只覆写 `failure_under_the_settings_handed_in` 的替身不用改」；它同时还被 e202 直接调（`crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/construction_timing_subcommand.rs:90`），不是只为旧替身留的，我判成立。
 
 ### 不新建判定库：成立
 

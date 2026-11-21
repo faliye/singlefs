@@ -8,7 +8,7 @@
 
 ## 一、问题
 
-英文名：replay_bounded_enumeration（照抄原登记；装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 不另起、不改）
+英文名：replay_bounded_enumeration（照抄原登记；装置 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` 不另起、不改）
 
 主 agent 给的问题（逐字）：
 
@@ -283,7 +283,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 
 ## 三、实现今天的样子
 
-主 agent 以外的观测，行号是 2026-10-01 现读的。sha256：`crates/singlefs-core/src/recovery.rs` `40067ae38fc76d7945ac61ee088682d6ce5ef578955c80f3268316e7597dd504`；`crates/singlefs-replay-prefix/src/lib.rs` `5f29497341979dba2aad7befe067f117d9b207392da64d7e76651d3a63514190`；`crates/mutations.tsv` `8c24d2c627caf36cd0931a5b0405c19c0a7f24a7086d2b0e9ede1fd58431fe38`；`crates/singlefs-replay-prefix/Cargo.toml` `bed8bd8c94f680ddfadb6550af093dfd29a52d13c6d08565e7e0f3d62e7c46b3`；装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` `24a4b2ebd917ca151ef1699ee26ab99ebc396e14b029889762a8e7ff66a96896`。登记时（原登记）的 `recovery.rs` 与 `crates/mutations.tsv` 就是 `HEAD`（提交 fcc4d340）里的那两份：`git show HEAD:…` 的 sha256 分别是 `f04814901d9521a1f72bf64aae530157c643fe47f3b0a37ac06695feb9418fdb`、`7e05b65eb66fa67a7197179e9fd8fb93ec02bc0be6b401c0135066b841e21258`，与原登记第三节、第九节记的相同。
+主 agent 以外的观测，行号是 2026-10-01 现读的。sha256：`crates/singlefs-core/src/recovery.rs` `40067ae38fc76d7945ac61ee088682d6ce5ef578955c80f3268316e7597dd504`；`crates/singlefs-replay-prefix/src/lib.rs` `5f29497341979dba2aad7befe067f117d9b207392da64d7e76651d3a63514190`；`crates/mutations.tsv` `8c24d2c627caf36cd0931a5b0405c19c0a7f24a7086d2b0e9ede1fd58431fe38`；`crates/singlefs-replay-prefix/Cargo.toml` `bed8bd8c94f680ddfadb6550af093dfd29a52d13c6d08565e7e0f3d62e7c46b3`；装置 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` `24a4b2ebd917ca151ef1699ee26ab99ebc396e14b029889762a8e7ff66a96896`。登记时（原登记）的 `recovery.rs` 与 `crates/mutations.tsv` 就是 `HEAD`（提交 fcc4d340）里的那两份：`git show HEAD:…` 的 sha256 分别是 `f04814901d9521a1f72bf64aae530157c643fe47f3b0a37ac06695feb9418fdb`、`7e05b65eb66fa67a7197179e9fd8fb93ec02bc0be6b401c0135066b841e21258`，与原登记第三节、第九节记的相同。
 
 | 事实 | 文件:行 |
 |---|---|
@@ -301,7 +301,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 | 自造表 Z1–Z4 的原文在今天的 `recovery.rs` 里命中 0 次（主循环已不是 `above.into_iter().take(…)`、`let all_verified = !verify_named_units` 已不在） | `grep -c -F` 两条，各 0（第十三节） |
 | 红例钉表的脚本按名字换 ⑥：`tsv-<行号>` 取 `crates/mutations.tsv` 那一行的名字，`Z<n>` 写死取 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv` | `scripts/experiment-apparatus/e165-pin-red-examples.py` 文件头第 13–15 行 |
 
-**装置写在哪（写死）**：入库装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs`，**这一次不改它**（R1 问的就是同一个装置、同一组参数在今天的树上出不出同样的字节）。它读 `crates/` 常量的那一张回比表同原登记第三节，原样生效。要改的只有 `research/` 那一侧：第二段驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`（选行与改哪个文件，第九节）、自造表 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`（原地改锚点，名字不动，第九节 9.4），`scripts/experiment-apparatus/replay.sh` 里 `driver_e165_segment2` 那一行改指 r1 的产物（第五节 5.4）。装置在今天的树上编不过、或常量回比断言红，走停机条款 RH2，不改装置。
+**装置写在哪（写死）**：入库装置 `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs`，**这一次不改它**（R1 问的就是同一个装置、同一组参数在今天的树上出不出同样的字节）。它读 `crates/` 常量的那一张回比表同原登记第三节，原样生效。要改的只有 `research/` 那一侧：第二段驱动 `scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh`（选行与改哪个文件，第九节）、自造表 `scripts/mutation/tables/e165_replay_bounded_enumeration_custom.tsv`（原地改锚点，名字不动，第九节 9.4），`scripts/experiment-apparatus/replay.sh` 里 `driver_e165_segment2` 那一行改指 r1 的产物（第五节 5.4）。装置在今天的树上编不过、或常量回比断言红，走停机条款 RH2，不改装置。
 
 ## 四、跑之前已经存在的数
 
@@ -631,7 +631,7 @@ R1 另钉一样：比对命令先把两份文件的行数各报出来（`wc -l`�
 | `crates/singlefs-core/src/recovery.rs` | 2900–3165；grep `singlefs_replay_prefix\|PrefixKernel\|fn …` 命中行；`replay_journal(` 命中 3015、4189 |
 | `HEAD:crates/singlefs-core/src/recovery.rs`（草稿 `old/recovery.rs`） | 3070–3135、3170–3200；`record_ends_its_publish` 命中 2932、2972、3161、3168、3200 |
 | `HEAD:crates/mutations.tsv`、今天的 `crates/mutations.tsv` | 经 `map23.py` 整份解析；23 行的名字、原文、替换文（`diffs23.txt`）；今天第 36、1502 行前 120–200 字符 |
-| `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` | 1–60；`singlefs_core\|singlefs_format\|replay_journal(` 命中行；939–957 |
+| `crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs` | 1–60；`singlefs_core\|singlefs_format\|replay_journal(` 命中行；939–957 |
 | `crates/singlefs-checker-tier/Cargo.toml` | grep `singlefs` 命中 2、6、9–12 |
 | 仓根 `Cargo.toml` | 全文 |
 | `.cargo/config.toml` | 全文 |

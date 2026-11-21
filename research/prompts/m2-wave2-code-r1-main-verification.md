@@ -49,10 +49,10 @@
 | `crates/singlefs-core/src/write_accounting.rs` | 攻了：Z2-a / Z2-b 的按种类合计与设备一层逐项比 |
 | `crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/lib.rs` | 攻了：Z1-d、Z2-c 走到重开与恢复 |
 | `crates/singlefs-checker/src/walk.rs`、`crates/singlefs-checker/src/image.rs` | 攻了：Z4 两半 |
-| `crates/singlefs-harness/src/first_transaction_regions.rs`、`crates/singlefs-harness/src/sha256.rs`、`crates/singlefs-harness/src/hexadecimal.rs`、`crates/singlefs-harness/src/bin/first_transaction_region_bytes.rs`、`crates/singlefs-harness/src/lib.rs` | 攻了：Z5（区域表与字节表逐行、配对行） |
+| `crates/singlefs-harness/src/first_transaction_regions.rs`、`crates/singlefs-harness/src/sha256.rs`、`crates/singlefs-harness/src/hexadecimal.rs`、`crates/singlefs-implementation-experiments/src/bin/new_pool_file_creation_region_bytes.rs`、`crates/singlefs-harness/src/lib.rs` | 攻了：Z5（区域表与字节表逐行、配对行） |
 | `crates/singlefs-harness/src/scenario.rs`、`crates/singlefs-harness/src/crash.rs` | 攻了：Z5（量 5 的实装一侧）；文件内容与装置不同由诊断查出，改的是装置 |
-| `crates/singlefs-harness/src/bin/first_transaction_device_log_check.rs` | 没攻：只是跟着 `run_first_transaction` 回调多一个参数改的调用点（3 行） |
-| `crates/singlefs-harness/src/bin/first_transaction_on_device.rs` | 没攻：增补 1、增补 2 第 30 行加的 `publish_writes` 行与挂载窗口这一轮的腿没碰；同一文件里 E152（按里程碑对比六家文件系统的文件性能） 加的几种模式是别的会话的改动，不在本轮 |
+| `crates/singlefs-verification/src/bin/new_pool_file_creation_device_log_check.rs` | 没攻：只是跟着 `run_first_transaction` 回调多一个参数改的调用点（3 行） |
+| `crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs` | 没攻：增补 1、增补 2 第 30 行加的 `publish_writes` 行与挂载窗口这一轮的腿没碰；同一文件里 E152（按里程碑对比六家文件系统的文件性能） 加的几种模式是别的会话的改动，不在本轮 |
 | `crates/singlefs-core/src/system_configuration.rs`、`crates/singlefs-format/src/lib.rs`、`crates/singlefs-harness/src/segments.rs` | 没攻：只改了 `//!` 注释里的路径（`.claude/rules/path-moves.md`） |
 
 ## 四、核查员查出的引用错
