@@ -481,6 +481,141 @@ fn records_starting_in_the_region(
     Ok(records_in_region)
 }
 
+/// 区域扫描对一个 R 要读的那几个单元（[`unit_reads_of_the_region_scan`]）：R 那块盘上起点在 R 里、未释放的记录按槽升序，钉住、隔离、
+/// 跨度不是单元形状的不读——与 [`scan_region_over_the_identity_index`] 和 [`scan_region_on_the_gpu`] 读的是同一串。R 有记录跨着边界时一个都不读
+/// （两条扫描都在读之前整次拒）。读盘留在会话锁里、分类在锁外时，锁里照它读（[`Self::read_with`]），锁外的扫描只取读好的字节。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnitReadsOfARegionScan {
+    region: CompactionRegion,
+    reads: Vec<UnitReadOfTheRegionScan>,
+}
+
+/// 区域扫描要读的一个单元：哪块盘、哪个槽起、读多少字节（跨度 1 读 16 KiB，跨度 2 读 32 KiB）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnitReadOfTheRegionScan {
+    pub device: DeviceIdentity,
+    pub slot: SlotNumber,
+    pub unit_bytes: usize,
+}
+
+/// 区域扫描对 `region` 要读的那几个单元，次序与两条扫描读的次序相同。只读记录与两张集合，不读设备。
+#[must_use]
+pub fn unit_reads_of_the_region_scan(
+    region: CompactionRegion,
+    allocation_records: &[AllocationRecord],
+    pinned_slots: &BTreeSet<SlotNumber>,
+    quarantined_slots: &BTreeSet<SlotNumber>,
+) -> UnitReadsOfARegionScan {
+    let reads = match records_starting_in_the_region(region, allocation_records) {
+        Err(_record_straddling_the_boundary) => Vec::new(),
+        Ok(records_in_region) => records_in_region
+            .into_iter()
+            .filter(|record| {
+                let covered_slots =
+                    record.slot..SlotNumber(record.slot.0 + u64::from(record.span_slots));
+                pinned_slots.range(covered_slots.clone()).next().is_none()
+                    && quarantined_slots.range(covered_slots).next().is_none()
+            })
+            .filter_map(|record| {
+                unit_bytes_read_for_the_span(record.span_slots).map(|unit_bytes| {
+                    UnitReadOfTheRegionScan {
+                        device: record.device,
+                        slot: record.slot,
+                        unit_bytes,
+                    }
+                })
+            })
+            .collect(),
+    };
+    UnitReadsOfARegionScan { region, reads }
+}
+
+impl UnitReadsOfARegionScan {
+    /// 这一串是哪个 R 的。
+    #[must_use]
+    pub fn region(&self) -> CompactionRegion {
+        self.region
+    }
+
+    /// 要读的那几个单元，按扫描读的次序。
+    #[must_use]
+    pub fn reads(&self) -> &[UnitReadOfTheRegionScan] {
+        &self.reads
+    }
+
+    /// 照这一串逐个读：`read_unit_bytes(盘, 槽, 字节数)` 读那个落点上的单元，读不到交 `None`（同两条扫描收的读法）。
+    pub fn read_with<ReadUnitBytes>(
+        self,
+        mut read_unit_bytes: ReadUnitBytes,
+    ) -> UnitBytesReadBeforeTheRegionScan
+    where
+        ReadUnitBytes: FnMut(DeviceIdentity, SlotNumber, usize) -> Option<Vec<u8>>,
+    {
+        let bytes_of_each_unit = self
+            .reads
+            .into_iter()
+            .map(|read| {
+                (
+                    (read.device, read.slot),
+                    UnitBytesOfOneRead {
+                        unit_bytes: read.unit_bytes,
+                        bytes: read_unit_bytes(read.device, read.slot, read.unit_bytes),
+                    },
+                )
+            })
+            .collect();
+        UnitBytesReadBeforeTheRegionScan {
+            region: self.region,
+            bytes_of_each_unit,
+        }
+    }
+}
+
+/// 一个 R 的区域扫描要读的单元，读好的字节（[`UnitReadsOfARegionScan::read_with`]）：扫描读单元的那一步交回这里的，不再读设备。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnitBytesReadBeforeTheRegionScan {
+    region: CompactionRegion,
+    bytes_of_each_unit: BTreeMap<(DeviceIdentity, SlotNumber), UnitBytesOfOneRead>,
+}
+
+/// 读好的一个单元：读了多少字节，读出的那一份（读不到是 `None`）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct UnitBytesOfOneRead {
+    unit_bytes: usize,
+    bytes: Option<Vec<u8>>,
+}
+
+impl UnitBytesReadBeforeTheRegionScan {
+    /// 读的是哪个 R。
+    #[must_use]
+    pub fn region(&self) -> CompactionRegion {
+        self.region
+    }
+
+    /// 扫描读单元的那一步（两条扫描收的 `read_unit_bytes`）：交回读好的那一份（读的时候读不到是 `None`）。
+    ///
+    /// # Panics
+    /// 扫描要读的单元没读过、或读的字节数不同：读好的这一串与扫描照同一份记录、同两张集合、同一张跨度表定（[`unit_reads_of_the_region_scan`]），
+    /// 调用方拿别的 R、别的记录或别的集合去扫才会走到。
+    #[must_use]
+    pub fn unit_bytes(
+        &self,
+        device: DeviceIdentity,
+        slot: SlotNumber,
+        unit_bytes: usize,
+    ) -> Option<Vec<u8>> {
+        let read = self
+            .bytes_of_each_unit
+            .get(&(device, slot))
+            .expect("扫描读的单元都在读好的那一串里：两边照同一份记录、同两张集合、同一张跨度表定");
+        assert_eq!(
+            read.unit_bytes, unit_bytes,
+            "读好的字节数与扫描要读的相同：两边照同一张跨度表定"
+        );
+        read.bytes.clone()
+    }
+}
+
 /// GPU 路径上一次区域扫描的结果（[`scan_region_on_the_gpu`]）：扫描本身（交回 `Ok` 时 `allocations` 只有判定了的记录），
 /// 与这一轮两份核判得不一样的记录。
 #[derive(Clone, Debug, PartialEq, Eq)]

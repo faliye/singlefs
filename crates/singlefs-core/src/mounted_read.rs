@@ -28,6 +28,7 @@ use singlefs_format::{DATA_UNIT_BYTES, INODE_RECORD_BYTES, NODE_BYTES};
 use crate::address::{
     DataUnitIndexInFile, DeviceIdentity, FileOffsetInBytes, InodeNumber, SlotNumber, TreeIdentifier,
 };
+use crate::block_device::PhysicalBlockSizeInBytes;
 use crate::checksum::crc32_castagnoli;
 use crate::code_two_tree::{read_code_two_tree, CodeTwoTreeHeaderJudgement};
 use crate::extent_tree::{
@@ -35,6 +36,7 @@ use crate::extent_tree::{
     ExtentTreeReading, ExtentUpperLeafTarget,
 };
 use crate::inode_tree::INODE_KEY_WIDTH_IN_BYTES;
+use crate::mount::PhysicalBlockSizeProbedOnADeviceDifferingFromTheSystemConfiguration;
 use crate::pointer::{
     DataPointer, LocationEntry, NodePointer, PointerHeadFieldOutsideTheFirstVersion,
 };
@@ -615,11 +617,29 @@ pub fn open_pool_for_read(
     })
 }
 
+/// 只读挂载逐盘比 `physical_block_size` 时拒的一块盘（[`devices_whose_physical_block_size_refuses_the_read_only_mount`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PhysicalBlockSizeOfADeviceRefusingTheReadOnlyMount {
+    /// 这块盘这一刻探测到的不是择到的那份系统配置记着的 mkfs 时的值：与可写挂载报的同一项
+    /// （`mount::DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration`）。
+    ProbedValueDiffersFromTheSystemConfiguration(
+        PhysicalBlockSizeProbedOnADeviceDifferingFromTheSystemConfiguration,
+    ),
+    /// 读者报了这块盘（[`PoolReader::device_identities`]），问它多宽（[`PoolReader::physical_block_size_probed_on_the_device`]）
+    /// 却答池里没有这块盘：这一比做不成，不当成相等放行——D12（目标介质） 已定项 4 要每块盘都比过。
+    NotAnsweredByTheReader { device: DeviceIdentity },
+}
+
 /// 只读挂载没做成。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MountReadOnlyFailure {
     /// 择系统配置、择根这一段判红（一条自证过的根都没有也在内）。
     Recovery(RecoveryFailure),
+    /// 择到系统配置之后逐盘比 `physical_block_size`，有盘对不上（D12（目标介质） 已定项 4 比对清单第一行「拒绝挂载（可写与只读都拒）」）：
+    /// 按 [`PoolReader::device_identities`] 的次序每块拒的盘一项。拒在择根之前，一条根、一条 journal 记录都还没读，读结论一样都没交出去。
+    DevicesWhosePhysicalBlockSizeDisagreesWithTheSystemConfiguration(
+        Vec<PhysicalBlockSizeOfADeviceRefusingTheReadOnlyMount>,
+    ),
     /// 根择到了，沿它打开挂载态时判红。
     Open(OpenPoolForReadFailure),
 }
@@ -637,7 +657,7 @@ pub struct MountedReadOnly {
     pub devices_without_a_mountable_system_configuration_slot: Vec<DeviceIdentity>,
 }
 
-/// 只读挂载：择系统配置 → 择根 → 全环扫描 journal → 按前缀口径施加 → 沿施加之后的根打开挂载态。
+/// 只读挂载：择系统配置 → 逐盘比 `physical_block_size`（对不上就拒）→ 择根 → 全环扫描 journal → 按前缀口径施加 → 沿施加之后的根打开挂载态。
 /// 一个字节都不写（并行线二「这条线不写盘」）。施加之后那一版三样读者的并集里有字节丢了、没有内容拒收、系统配置没见证它时，
 /// 退到 [见证到的那一版, 所选根) 里最新的那条根打开（F2 乙，[`fall_back_judged_on_the_three_readers`]）：`chosen_root` 与 `effective_root`
 /// 都是退到的那一条，`journal` 仍是对原来所选根扫环、施加那一趟的报告；那一条打不开就留在所选那一版。
@@ -676,12 +696,64 @@ pub fn mount_read_only_of_the_pool(
     )
 }
 
-/// [`mount_read_only`] 与 [`mount_read_only_of_the_pool`] 共用的路径：系统配置已经择过。
+/// 按 [`PoolReader::device_identities`] 的次序逐块问读者这块盘这一刻多宽（[`PoolReader::physical_block_size_probed_on_the_device`]），
+/// 与择到的那份系统配置记着的 mkfs 时的值（`physical_block_size_in_the_system_configuration`，偏移 317，根槽宽）比：
+/// 不等的、读者答不出的各报一项（[`PhysicalBlockSizeOfADeviceRefusingTheReadOnlyMount`]）。与可写挂载那一判
+/// （`mount::physical_block_sizes_probed_on_the_devices_differing_from_the_system_configuration`）比的是同一对值；可写挂载拿着盘直接探测，
+/// 只读挂载只拿得到读者，经读者问。只问块宽，不读盘、不写盘。
+///
+/// 循环：按读者报的盘逐块（轮数 = 盘数），跨轮只往交回的清单里追加，没有提前出口。
+fn devices_whose_physical_block_size_refuses_the_read_only_mount(
+    reader: &dyn PoolReader,
+    physical_block_size_in_the_system_configuration: PhysicalBlockSizeInBytes,
+) -> Vec<PhysicalBlockSizeOfADeviceRefusingTheReadOnlyMount> {
+    reader
+        .device_identities()
+        .into_iter()
+        .filter_map(|device| {
+            let Some(probed_physical_block_size) =
+                reader.physical_block_size_probed_on_the_device(device)
+            else {
+                return Some(
+                    PhysicalBlockSizeOfADeviceRefusingTheReadOnlyMount::NotAnsweredByTheReader {
+                        device,
+                    },
+                );
+            };
+            let probed_differs_from_the_recorded =
+                probed_physical_block_size != physical_block_size_in_the_system_configuration;
+            let differing = PhysicalBlockSizeProbedOnADeviceDifferingFromTheSystemConfiguration {
+                identity_handed_in: device,
+                probed_physical_block_size,
+                physical_block_size_in_the_system_configuration,
+            };
+            probed_differs_from_the_recorded.then_some(
+                PhysicalBlockSizeOfADeviceRefusingTheReadOnlyMount::ProbedValueDiffersFromTheSystemConfiguration(
+                    differing,
+                ),
+            )
+        })
+        .collect()
+}
+
+/// [`mount_read_only`] 与 [`mount_read_only_of_the_pool`] 共用的路径：系统配置已经择过。择根之前先逐盘比 `physical_block_size`
+/// （[`devices_whose_physical_block_size_refuses_the_read_only_mount`]），有一块对不上就拒（[`MountReadOnlyFailure::DevicesWhosePhysicalBlockSizeDisagreesWithTheSystemConfiguration`]）。
 fn mount_read_only_from_the_system_configuration_choice(
     reader: &dyn PoolReader,
     system_configuration_choice: crate::recovery::SystemConfigurationChoice,
 ) -> Result<MountedReadOnly, MountReadOnlyFailure> {
     let system_configuration = system_configuration_choice.system_configuration;
+    let devices_refusing = devices_whose_physical_block_size_refuses_the_read_only_mount(
+        reader,
+        PhysicalBlockSizeInBytes(system_configuration.immutable.sizes.physical_block_size),
+    );
+    if !devices_refusing.is_empty() {
+        return Err(
+            MountReadOnlyFailure::DevicesWhosePhysicalBlockSizeDisagreesWithTheSystemConfiguration(
+                devices_refusing,
+            ),
+        );
+    }
     let chosen_root = choose_root(reader, &system_configuration)
         .ok_or(MountReadOnlyFailure::Recovery(RecoveryFailure::NoValidRoot))?;
     let records = scan_journal(reader, &system_configuration);
@@ -1421,6 +1493,12 @@ mod tests {
             self.device_identities()
                 .contains(&device)
                 .then_some(DEVICE_BYTES_OF_THE_TWO_DEVICES)
+        }
+        fn physical_block_size_probed_on_the_device(
+            &self,
+            _device: DeviceIdentity,
+        ) -> Option<crate::block_device::PhysicalBlockSizeInBytes> {
+            unreachable!("打开文件那一趟不挂载，不探测块宽")
         }
         fn read(
             &self,

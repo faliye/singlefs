@@ -1421,6 +1421,12 @@ mod misplaced_ring_reads_tests {
         fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
             PoolReader::device_size_in_bytes(self.devices, device)
         }
+        fn physical_block_size_probed_on_the_device(
+            &self,
+            device: DeviceIdentity,
+        ) -> Option<PhysicalBlockSizeInBytes> {
+            PoolReader::physical_block_size_probed_on_the_device(self.devices, device)
+        }
         fn read(
             &self,
             device: DeviceIdentity,
@@ -1897,6 +1903,12 @@ mod misplaced_ring_reads_tests {
         }
         fn device_size_in_bytes(&self, device: DeviceIdentity) -> Option<u64> {
             PoolReader::device_size_in_bytes(self.devices, device)
+        }
+        fn physical_block_size_probed_on_the_device(
+            &self,
+            device: DeviceIdentity,
+        ) -> Option<PhysicalBlockSizeInBytes> {
+            PoolReader::physical_block_size_probed_on_the_device(self.devices, device)
         }
         fn read(
             &self,

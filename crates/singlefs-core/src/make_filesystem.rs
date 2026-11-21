@@ -27,7 +27,9 @@ use crate::allocator::{
     DeviceFreeMap, Placement, PoolAllocator, RootRingOccupancy, RootRingOccupant, UnitAreaStart,
     UnitAreaStartOffTheClusterSegmentBoundaryUnsupported,
 };
-use crate::block_device::{BlockDevice, BlockDeviceError, WriteDurability};
+use crate::block_device::{
+    BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
+};
 use crate::bytes::ByteWriter;
 use crate::checksum::crc32_castagnoli;
 use crate::pointer::{BirthSequence, LocationEntry, NodePointer, PointerHead};
@@ -208,6 +210,17 @@ pub enum MakeFilesystemError {
     /// 第一个文件版本与暖机撞在同一个 (实例, txg) 上）。
     RegionDevicesNotTheFirstVersionLayout {
         region_devices: [DeviceIdentity; 3],
+    },
+    /// 参数里的 `physical_block_size`（根槽宽，写进系统配置偏移 317）不是盘 `device` 这一刻探测到的值
+    /// （[`BlockDevice::probe_physical_block_size`]；D22（单元原子性怎么合成） 已定项 2 根槽宽一格「调用方给的 `physical_block_size`
+    /// 与 mkfs 时探测到的不同就拒绝 mkfs」，C1040）：照参数写出的池，D12（目标介质） 已定项 4 比对清单第一行「拒绝挂载（可写与只读都拒）」。
+    /// 可写挂载与挂着之后的入口逐盘比探测值会拒（`mount::DeviceTableDisagreement::PhysicalBlockSizeProbedOnTheDeviceDiffersFromTheSystemConfiguration`），
+    /// 只读挂载同样拒（`mounted_read::MountReadOnlyFailure::DevicesWhosePhysicalBlockSizeDisagreesWithTheSystemConfiguration`）。
+    /// 按盘表次序报第一块不等的盘；几何判定都过了才判这一条，同样在任何写之前，盘上一个字节都没动。
+    PhysicalBlockSizeParameterDiffersFromTheProbedValue {
+        device: DeviceIdentity,
+        probed_physical_block_size: PhysicalBlockSizeInBytes,
+        physical_block_size_in_the_parameters: PhysicalBlockSizeInBytes,
     },
     /// 第一版 mkfs 按固定结构槽距算出的默认每区槽数 S 小于 5（[`first_version_make_filesystem_geometry`]，D22（单元原子性怎么合成）
     /// 已定项 16 第 3 句「小于 5 拒绝 mkfs」）：算几何那一步就交回，盘上一个字节都没动。显式给 S 的建池入口（[`make_filesystem`]
@@ -591,12 +604,34 @@ pub fn first_version_make_filesystem_geometry(
     })
 }
 
+/// 按盘表次序逐块探测 `physical_block_size`，交回第一块探测值不是参数里那个的盘
+/// （[`MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue`]；D22（单元原子性怎么合成） 已定项 2 根槽宽一格，C1040）；
+/// 每块盘都等于参数交回 None。只调探测，不读盘、不写盘。迭代次数的上界是盘数，唯一的提前出口是第一块不等的盘。
+fn first_device_probing_a_physical_block_size_other_than_the_parameter<Device: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    devices: &[(DeviceIdentity, Device)],
+) -> Option<MakeFilesystemError> {
+    let physical_block_size_in_the_parameters =
+        PhysicalBlockSizeInBytes(parameters.geometry.physical_block_size);
+    devices.iter().find_map(|(device, block_device)| {
+        let probed_physical_block_size = block_device.probe_physical_block_size();
+        (probed_physical_block_size != physical_block_size_in_the_parameters).then_some(
+            MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue {
+                device: *device,
+                probed_physical_block_size,
+                physical_block_size_in_the_parameters,
+            },
+        )
+    })
+}
+
 /// 内层入口：对两块设备做 mkfs，fsid 照调用方给的 `parameters.filesystem_identifier` 写，不另取。给测试、装置、崩溃点重放
 /// 与 C484、C651 的回归用例用（同参数同 fsid 两次逐字节相同）；对外的入口是 [`make_filesystem_drawing_the_filesystem_identifier`]。
 /// `devices` 里每块盘的身份由调用方给（位置条目按设备身份升序）。
 ///
 /// # Errors
-/// 几何判定不过（都在任何写之前），或底层块设备错。
+/// 几何判定不过、参数里的 `physical_block_size` 不是某块盘探测到的值
+/// （[`MakeFilesystemError::PhysicalBlockSizeParameterDiffersFromTheProbedValue`]；都在任何写之前），或底层块设备错。
 pub fn make_filesystem<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
     devices: &mut [(DeviceIdentity, Device)],
@@ -613,6 +648,11 @@ pub fn make_filesystem<Device: BlockDevice>(
         .map(|(identity, device)| (*identity, device.size_in_bytes()))
         .collect();
     let unit_area_start = check_geometry(parameters, &sizes)?;
+    if let Some(refusal) =
+        first_device_probing_a_physical_block_size_other_than_the_parameter(parameters, devices)
+    {
+        return Err(refusal);
+    }
     let instance_table_placement = instance_table_placement_at(unit_area_start);
     let tree_table_genesis_placement = tree_table_genesis_placement_at(unit_area_start);
     let identities: Vec<DeviceIdentity> = sizes.iter().map(|(identity, _)| *identity).collect();

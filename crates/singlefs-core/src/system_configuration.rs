@@ -46,6 +46,16 @@ const FSID_OFFSET: usize = 4 + 2 + 96;
 /// 几何段开头「节点大小」那 4 字节（字段表 `layout/01-first-txn.md` 一：加密预留 114 字节之后、单元大小之前）。
 /// 写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、读侧 [`SystemConfiguration::parse_slot`] 按它切。
 const NODE_BYTES_OFFSET: u64 = 301;
+/// 几何段里紧跟节点大小的「单元大小」「落点粒度」「位置条目宽」三格各 4 字节（305、309、313），之后是 `physical_block_size` 4（317）
+/// 与「扩展点声明值 N」4（321；字段表 `layout/01-first-txn.md` 一）。写侧 [`SystemConfiguration::to_slot`] 写它们之前断言位置、
+/// 读侧 [`unit_geometry_fields_recorded_in_the_slot`] 按它们切。
+const UNIT_BYTES_OFFSET: u64 = 305;
+const SLOT_GRANULARITY_BYTES_OFFSET: u64 = 309;
+const LOCATION_ENTRY_BYTES_OFFSET: u64 = 313;
+const EXTENSION_POINT_DECLARED_BYTES_OFFSET: u64 = 321;
+/// 第一版写进、也只收的扩展点声明值 N（D21（权威态与派生态的分界） 已定项 8：N 住系统配置几何段，第一版 N = 0）。
+/// 读者择系统配置时拿槽里读到的与它比，不等整池拒（`recovery` 的 `system_configuration_values_this_reader_accepts`）。
+pub const EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION: u32 = 0;
 /// 几何段里「根环区域数 R」那一字节（字段表 `layout/01-first-txn.md` 一：R 在 361）。写侧 [`SystemConfiguration::to_slot`] 写它之前断言位置、
 /// 读侧 [`root_ring_region_count_recorded_in_the_slot`] 按它切。
 const ROOT_RING_REGION_COUNT_OFFSET: u64 = 361;
@@ -158,6 +168,42 @@ pub fn root_ring_region_stride_fields_recorded_in_the_slot(
     RootRingRegionStrideFieldsRecordedInTheSlot {
         prime_step: ByteReader::at(slot, field_offset(ROOT_RING_PRIME_STEP_OFFSET)).get_u32(),
         chunk_bytes: ByteReader::at(slot, field_offset(ROOT_RING_CHUNK_BYTES_OFFSET)).get_u32(),
+    }
+}
+
+/// 一槽系统配置里记着的单元几何四格：单元大小、落点粒度、位置条目宽、扩展点声明值 N（偏移 305、309、313、321 各 4 字节，小端）。
+/// 写者照格式常量 `DATA_UNIT_BYTES`、`SLOT_BYTES`、`LOC_ENTRY` 与 [`EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION`] 写
+/// （[`SystemConfiguration::to_slot`]）；core 读写单元、算落点、切位置条目都按格式常量走，[`SystemConfiguration::parse_slot`] 不读它们；
+/// 读者择系统配置时拿它们与格式常量比，不等整池拒（`recovery` 的 `system_configuration_values_this_reader_accepts`；
+/// D21（权威态与派生态的分界） 已定项 16「单元几何在挂载时求值一次」、已定项 8「N 住系统配置」）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct UnitGeometryFieldsRecordedInTheSlot {
+    pub unit_bytes: u32,
+    pub slot_granularity_bytes: u32,
+    pub location_entry_bytes: u32,
+    pub extension_point_declared_bytes: u32,
+}
+
+/// 见 [`UnitGeometryFieldsRecordedInTheSlot`]。只切字节、不判值。
+///
+/// # Panics
+/// 槽短于 4096 字节：调用方先过了 [`SystemConfiguration::parse_slot`]（它判过槽宽）才调这里。
+#[must_use]
+pub fn unit_geometry_fields_recorded_in_the_slot(
+    slot: &[u8],
+) -> UnitGeometryFieldsRecordedInTheSlot {
+    let field_offset = |offset: u64| usize::try_from(offset).expect("字段表里的偏移装得进 usize");
+    UnitGeometryFieldsRecordedInTheSlot {
+        unit_bytes: ByteReader::at(slot, field_offset(UNIT_BYTES_OFFSET)).get_u32(),
+        slot_granularity_bytes: ByteReader::at(slot, field_offset(SLOT_GRANULARITY_BYTES_OFFSET))
+            .get_u32(),
+        location_entry_bytes: ByteReader::at(slot, field_offset(LOCATION_ENTRY_BYTES_OFFSET))
+            .get_u32(),
+        extension_point_declared_bytes: ByteReader::at(
+            slot,
+            field_offset(EXTENSION_POINT_DECLARED_BYTES_OFFSET),
+        )
+        .get_u32(),
     }
 }
 
@@ -628,11 +674,15 @@ impl SystemConfiguration {
             writer.put_u32(self.mutable.node_bytes());
         });
         slot.write(SlotFieldMutability::ImmutableConfiguration, |writer| {
+            writer.assert_position(UNIT_BYTES_OFFSET, "单元大小");
             writer.put_u32(u32::try_from(DATA_UNIT_BYTES).expect("单元大小"));
+            writer.assert_position(SLOT_GRANULARITY_BYTES_OFFSET, "落点粒度");
             writer.put_u32(u32::try_from(SLOT_BYTES).expect("落点粒度"));
+            writer.assert_position(LOCATION_ENTRY_BYTES_OFFSET, "位置条目宽度");
             writer.put_u32(u32::try_from(LOC_ENTRY).expect("位置条目宽度"));
             writer.put_u32(self.immutable.sizes.physical_block_size);
-            writer.put_u32(0); // 扩展点声明值 N：第一版 0（D21（权威态与派生态的分界） 已定项 8）
+            writer.assert_position(EXTENSION_POINT_DECLARED_BYTES_OFFSET, "扩展点声明值 N");
+            writer.put_u32(EXTENSION_POINT_DECLARED_BYTES_OF_THE_FIRST_VERSION);
             writer.assert_position(JOURNAL_RING_START_SLOT_OFFSET, "journal 环起点");
             writer.put_u64(self.immutable.journal_ring_start_slot.0);
             writer.put_u64(self.immutable.sizes.journal_ring_bytes);
