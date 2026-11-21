@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：preregistration-parallelism
+want=gate_changed_paths 取不到改动路径：git -c core.quotepath=false diff --name-only HEAD -- 退出 128
+want=gate_changed_paths 取不到改动路径：git -c core.quotepath=false diff --name-only --diff-filter=A HEAD -- 退出 128
+want=git 的报错原文：
+want=diff.renames
+want=✗ 取不到这次改动的路径（scripts/gate/changed-paths.sh 读不到，或它的 gate_changed_paths 失败）
+want=doc-experiments.sh：1 格里 1 格红（preregistration-parallelism）

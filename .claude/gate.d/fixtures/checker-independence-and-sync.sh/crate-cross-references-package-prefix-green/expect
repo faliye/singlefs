@@ -1,0 +1,3 @@
+exit=0
+want=跨包源码与不属任何包的文件 2 处都登在放行表（1 行）或滞后表（0 行）里
+want=crate-cross-references：绿

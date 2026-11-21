@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # mutation-list-items 格复用三问样本的现场：一个小工作区（一个包 tiny，两份源文件 lib.rs、second.rs，各一条普通测试），变异表由同目录的 rows.tsv 抄进 crates/mutations.tsv
-# （两行各改一份文件，按改的文件分成两组）。源文件由这里现写；crates-mutation-rows.py --list-items 在它上面只起 git 与 rustc -vV，不编不跑。
+# （两行各改一份文件，按改的文件分成两组）。源文件由这里现写；crates-mutation-rows.py --list-items 在它上面只起 git，不编不跑。
 set -euo pipefail
 mkdir -p crates/tiny/src
 printf '[workspace]\nmembers = ["crates/tiny"]\nresolver = "2"\n' > Cargo.toml

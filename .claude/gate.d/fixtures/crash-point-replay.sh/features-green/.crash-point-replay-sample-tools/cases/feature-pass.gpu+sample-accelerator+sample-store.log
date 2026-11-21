@@ -23,7 +23,7 @@ test gpu_pair_agrees_with_the_cpu ... ok
 
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
-     Running tests/store_only.rs (target/release/deps/store_only-0000000000000014)
+     Running tests/store_only/main.rs (target/release/deps/store_only-0000000000000014)
 
 running 1 test
 test store_only_quick ... ok

@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：reading-discipline
+want=C60（恒定读数没有故障注入自证）：豁免表涨了——2 个文件的登记行数比基准多：
+want=scripts/experiment-apparatus/e8_seed_and_readings/readings.rs：归基准 HEAD 里的入口文件 scripts/experiment-apparatus/e8_seed_and_readings.rs（那一行基准登记 1 行），族内 1 个文件现在共 2 行
+want=scripts/experiment-apparatus/e12_unrelated_readings.rs：基准 HEAD 里没有这个文件登记，它也不是基准里哪一份入口文件拆出来的部分文件，现在 1 行
+want=reading-discipline：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（reading-discipline）

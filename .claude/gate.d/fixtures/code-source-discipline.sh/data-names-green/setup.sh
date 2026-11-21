@@ -4,7 +4,11 @@
 set -e
 mkdir -p .claude/kb scripts/experiment-apparatus
 printf 'e<数字>  # 样本：实验编号\nmac  # 样本：message authentication code，校验标签\n' > .claude/abbreviations
-printf 'scripts/experiment-apparatus/e1_demo.rs:ino_old  # 样本：还没改完名\n' > .claude/data-name-lint-exclude
+printf 'scripts/experiment-apparatus/e1_demo.rs:ino_old  # 样本：还没改完名\nscripts/experiment-apparatus/e2_split/parts/tests.rs:slot_ino  # 样本：装置目录子模块里还没改完名\n' > .claude/data-name-lint-exclude
+# 装置拆成子模块：根 main.rs 与两层下的 tests.rs（带还没改完名的缩写，登记在排除表里）；射程只认顶层的 .rs 时，排除表那一行判「不在扫描范围」
+mkdir -p scripts/experiment-apparatus/e2_split/parts
+printf 'mod parts;\nfn main() {}\n' > scripts/experiment-apparatus/e2_split/main.rs
+printf 'const FIELDS: &[(&str, u32)] = &[("slot_ino", 2)];\n' > scripts/experiment-apparatus/e2_split/parts/tests.rs
 cat > scripts/experiment-apparatus/e1_demo.rs <<'RS'
 const FIELDS: &[(&str, u32)] = &[("system_configuration_mac", 16), ("e100_slot_count", 4), ("ino_old", 8)];
 fn arm(selector: u8) -> &'static str {

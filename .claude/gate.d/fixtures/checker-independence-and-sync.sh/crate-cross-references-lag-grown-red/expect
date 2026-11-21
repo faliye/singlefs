@@ -1,0 +1,4 @@
+exit=1
+want=那一版多出 1 行（只缩不涨）：
+want=第 3 行 crates/consumer  引 crates/provider/tests/c/mod.rs
+want=crate-cross-references：红（退出 1）

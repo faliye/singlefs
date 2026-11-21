@@ -1,2 +1,0 @@
-# 计划那一步（.gate-shard-phase）点名一条小用例，caller-environment 交的内存上限 1 GiB：起编之前判出装不下编一次验证包，不起编、退 250（不算红也不算绿），判的是 crash-case-replay 格；门禁只跑这份点名的格
-crash-case-replay

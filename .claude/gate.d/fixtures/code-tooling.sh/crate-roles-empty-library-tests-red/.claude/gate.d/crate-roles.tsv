@@ -1,0 +1,8 @@
+# 登记表
+p-format	产品	crates/p-format	格式常量，样本里的产品
+p-gpu	产品	crates/p-gpu	产品 GPU 路径，测试在包内
+p-verify	验证	crates/p-verify	验证包，门禁起的工具在 src/bin/
+p-support	测试支撑	crates/p-support	两处依赖的测试支撑
+p-experiments	实验装置	crates/p-experiments	实验包，只放装置二进制
+p-legacy-tests	验证	crates/p-legacy-tests	拆包进行中的测试包
+p-x-tests	验证	crates/p-x-tests	为产品 GPU 包的测试另开的包

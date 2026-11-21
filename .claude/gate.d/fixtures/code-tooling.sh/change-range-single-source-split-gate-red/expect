@@ -1,0 +1,5 @@
+exit=1
+want=✗ 1 行在阶段里自己算 diff 基准
+want=.claude/gate.d/lib/61-样本红的门禁-cells.sh:3  base="$(git merge-base HEAD origin/main)"
+want=✗ 1 行列路径的 git 调用没带 -c core.quotepath=false
+want=.claude/gate.d/lib/61-样本红的门禁-cells.sh:4  listed="$(git diff --name-only "$base")"

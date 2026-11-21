@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：mutation-tables
+want=crates/mutations.tsv 这些行 cargo test 参数里的筛选词筛不到点名的测试
+want=crates/mutations.tsv:13 M_测试目标子模块里的用例写了裸名：筛选词 deeper_case（--exact） 筛不到点名的 nested_cases::deeper::deeper_case
+want=crates/mutations.tsv:14 M_二进制子模块里内联测试模块的用例写了裸名：筛选词 tool_case（--exact） 筛不到点名的 checks::tests::tool_case
+want=mutation-tables：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（mutation-tables）

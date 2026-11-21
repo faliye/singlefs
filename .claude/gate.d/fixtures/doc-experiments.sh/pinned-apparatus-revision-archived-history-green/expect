@@ -1,0 +1,7 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：pinned-apparatus-revision
+want=钉了装置 sha256 的起跑脚本 1 份：装置源码这次改动里变了的 1 份，登记第十二节都新加了修订（scripts/experiment-apparatus/e943-r2-segment-run.sh（research/prompts/e943-r2-prereg.md，取自 git 历史
+want=里它被删之前的那一版））
+want=登记已归档、不在树里不判 0 份
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格绿（pinned-apparatus-revision），0 格本次未跑（无）

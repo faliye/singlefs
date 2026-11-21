@@ -1,0 +1,4 @@
+exit=1
+want=没注册放置类弹窗闸：PreToolUse 里没有 matcher 覆盖 AskUserQuestion、命令指向 ask-user-placement-guard.sh 的一条
+want=→ 怎么办：在 hooks.PreToolUse 的 AskUserQuestion 那一条里加 command "bash \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/ask-user-placement-guard.sh"
+want=agent-write-scope：红（退出 1）

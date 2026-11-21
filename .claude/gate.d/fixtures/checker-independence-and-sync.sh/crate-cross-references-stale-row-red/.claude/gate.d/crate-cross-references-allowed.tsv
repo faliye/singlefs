@@ -1,0 +1,3 @@
+# 样本里的放行表：一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」，路径相对样本根。
+# 写法照仓里那一份（.claude/gate.d/crate-cross-references-allowed.tsv）。
+crates/consumer	crates/provider/tests/c/mod.rs	# 样本里登的一行：引用改掉之后这一行就用不着了

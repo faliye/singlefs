@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：batch-scope
+want=diff.renameLimit
+want=4 个触发文件没登记进这一批的范围
+want=doc-process-records.sh：1 格里 1 格红（batch-scope）

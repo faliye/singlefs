@@ -1,0 +1,3 @@
+# 样本登记表
+scripts/gate/layout.py	selftest	# 样本：自证只在内存里判
+scripts/gate/margin.py	selftest	# 样本：自证只在内存里判

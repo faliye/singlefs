@@ -1,0 +1,11 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：pinned-apparatus-revision
+want=2 份钉了装置 sha256 的起跑脚本对不上它的跑前登记
+want=scripts/experiment-apparatus/e955-r2-segment-run.sh：装置源码 crates/sample/src/bin/e955_apparatus.rs 在这次改动里变了，起跑脚本点名的登记 research/prompts/e955-r2-prereg.md 不在树里，git 历史
+want=里被 git mv 改名成了 research/prompts/e955-r2-prereg-gc-split.md（不是归档）：把起跑脚本注释里「跑前登记 research/prompts/e955-r2-prereg.md」改成「跑前登记 research/prompts/e955-r2-prereg-gc-split.md」，再照新名字的登记核修订
+want=scripts/experiment-apparatus/e956-r2-segment-run.sh：装置源码 crates/sample/src/bin/e956_apparatus.rs 在这次改动里变了、钉值从
+want=里被 git mv 改名成了 research/prompts/e956-r2-prereg-gc-split.md（不是归档）：把起跑脚本注释里「跑前登记 research/prompts/e956-r2-prereg.md」改成「跑前登记 research/prompts/e956-r2-prereg-gc-split.md」，再照新名字的登记核修订
+want=登记被 git mv 改了名的，把起跑脚本注释里「跑前登记 <路径>」改成红行点名的新名字
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（pinned-apparatus-revision）
+want=→ pinned-apparatus-revision：补登记第十二节一行修订（新 sha256、改了什么）

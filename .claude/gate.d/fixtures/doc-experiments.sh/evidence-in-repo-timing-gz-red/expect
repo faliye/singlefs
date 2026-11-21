@@ -1,0 +1,7 @@
+exit=1
+want=research/results/ 里却没有一份不比它旧的产物
+want=scripts/experiment-apparatus/e928_timing_gz_stale.rs（装置源码，改于 2026-09-05）：复跑表里 E928 的 timing 行点名的产物里最旧的 research/results/e928-timing-gz-stale-2026-09-01.out.gz 还是 2026-09-01 那份（每一份都要不比装置旧）
+want=样本只跑 .gate-cells 点名的格：evidence-in-repo
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（evidence-in-repo）
+want=→ evidence-in-repo：跑一次把产物存进 research/results/

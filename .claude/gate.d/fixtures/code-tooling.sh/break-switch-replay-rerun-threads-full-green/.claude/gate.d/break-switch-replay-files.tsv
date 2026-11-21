@@ -1,0 +1,2 @@
+# 样本复跑登记表：一份脚本两条开关，一条头一趟没红要重跑
+scripts/gate/again.sh	30	# 样本：每一趟核自己拿到的 SINGLEFS_THREAD_CAP，重跑那一趟要拿满登记的线程数

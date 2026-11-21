@@ -1,5 +1,6 @@
 exit=0
-want=✓ 产物与依据都落在仓里（判了 4 份这一轮改过的实验装置与变异表、10 份 .md，扫到 5 处 /tmp 路径、没有一处是引依据；基准 HEAD）
+want=按复跑表判 1 份（复跑表里这个实验的行是 exact、点名的产物在盘；装置比产物新也不要求重写产物，输出变了归 research-build-and-replay.sh 的逐字节复跑判红）：E912（scripts/experiment-apparatus/e912_replay_exact.rs；复跑表 exact 行点名的 research/results/e912-replay-exact-2026-09-01.out）
+want=✓ 产物与依据都落在仓里（判了 5 份这一轮改过的实验装置与变异表、10 份 .md，扫到 5 处 /tmp 路径、没有一处是引依据；基准 HEAD）
 want=按修改时刻判 1 份登记了准入、research/results/ 里却还没有一份带实验键产物的（或今天的实验键拒算）：E909
 want=没判 1 份 research/prompts 下这一轮没新写的 .md
 want=没判 1 份只改了 // 注释的装置源码（碰不到产物，不要求重跑）：scripts/experiment-apparatus/e905_comment_only.rs

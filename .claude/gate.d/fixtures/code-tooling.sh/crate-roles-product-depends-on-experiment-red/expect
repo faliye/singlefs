@@ -1,0 +1,4 @@
+exit=1
+want=✗ experiment-dependency：crates/p-gpu/Cargo.toml 依赖实验装置包 p-experiments
+want=crates/ 下各包的角色与放置有 1 处不合
+want=crate-roles：红

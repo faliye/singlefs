@@ -5,6 +5,7 @@
 # 它登记在原样保存的证据里，本阶段不判——扫到的 /tmp 处数与没判的份数把这一条钉住；
 # E905 只改了 // 注释里的路径（path-moves.md 要求的改写），产物再旧也不判，成功行列出它。
 # E909 登记了准入，产物头没记实验键、产物比源码新，按修改时刻判绿，成功行把它列进「按修改时刻判」（产物头记的实验键对得上的那一路由 admission.py --selftest 判）。
+# E912 的复跑表行是 exact、点名的产物在盘，装置比产物新也判绿，成功行把它列进「按复跑表判」（复跑表行是 timing 或点名的产物不在盘的两种红，在 evidence-in-repo-red 里）。
 # 修改日子一律按东京的零点写（TZ=Asia/Tokyo touch -d <日期>），格里也按东京的日期报，与跑门禁那台机器的时区无关。
 # 样本根的 .gate-cells 只点名 evidence-in-repo；原先同一道里别的九格也跑这份样本，为它们补的东西（留着不碍事）在下面各处的注释里写明（一条样本决策、每个实验号一页正文、产物不进版本库）；
 # 补的实验页与决策是 .md，这一格扫的 .md 因此从 3 份变 9 份。
@@ -50,6 +51,9 @@ printf 'E909\t%s\t# 样本：登记了准入\n' "$e909_source" > .claude/gate.d/
 printf 'fn main() { println!("e909"); }\n' > "$e909_source"
 # 变更史里一行早先写下的「依据：报告 /tmp/…」：基准就有、这一轮没动，是历史条目，不判（开关 history-lines-judged 打开时判红）
 printf '## E900（样本实验）\n\n### 2026-09-01\n\n- 新立。\n  - **依据**：执行员报告 `/tmp/claude-1000/e900-run/report.md`。\n' > .claude/kb/experiments-history.md
+# E912：复跑表里这个实验的行是 exact、点名的产物在盘；装置改了而复跑出来逐字节相同，产物没重写、比装置旧 ⇒ 按复跑表判绿，成功行列出它
+printf 'E912|e912-replay-exact||e912-replay-exact-2026-09-01.out|exact\n' > scripts/experiment-apparatus/replay.sh
+printf 'fn main() { println!("e912"); }\n' > scripts/experiment-apparatus/e912_replay_exact.rs
 git add -A && git commit -qm base
 # 产物在基准提交之后才落盘、不进版本库（这一格只看产物的修改日子与产物头记的实验键，不看跟没跟踪）：
 # 同一道里的 archive-past-rounds 格把跟踪着又没改过的产物当上一轮的，这样它在这份样本里判绿
@@ -89,3 +93,7 @@ printf 'fn main() { println!("e909 改过了"); }\n' > "$e909_source"
 printf 'E7RESULT name=e909 rows=1\n' > research/results/e909-registered-without-key-2026-09-06.out
 TZ=Asia/Tokyo touch -d 2026-09-06 research/results/e909-registered-without-key-2026-09-06.out
 TZ=Asia/Tokyo touch -d 2026-09-05 "$e909_source"
+printf 'E7RESULT name=e912 rows=1\n' > research/results/e912-replay-exact-2026-09-01.out
+printf 'fn main() { println!("e912 改过了"); }\n' > scripts/experiment-apparatus/e912_replay_exact.rs
+TZ=Asia/Tokyo touch -d 2026-09-01 research/results/e912-replay-exact-2026-09-01.out
+TZ=Asia/Tokyo touch -d 2026-09-05 scripts/experiment-apparatus/e912_replay_exact.rs

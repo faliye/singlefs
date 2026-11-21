@@ -1,0 +1,6 @@
+exit=2
+want=✗ 样本根的 .gate-items 点名的项不在可点的项里：「scripts/gate/trio.py:TRIO_BREAK=delta」；一格都没跑
+want=break-switch-replay  scripts/gate/trio.py
+want=break-switch-replay  scripts/gate/trio.py:TRIO_BREAK=alpha
+want=break-switch-replay  scripts/gate/trio.py:TRIO_BREAK=beta
+want=break-switch-replay  scripts/gate/trio.py:TRIO_BREAK=gamma

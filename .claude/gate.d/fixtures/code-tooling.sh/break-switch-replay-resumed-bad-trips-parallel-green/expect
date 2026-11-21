@@ -1,0 +1,12 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=── 打断与续跑：被打断的那一趟（break-switch-replay）
+want=· 样本档：判完第 3 趟、落了盘，照 .unit-verdict-sample/interrupted-resume/stop-after 停掉这一趟
+want=── 打断与续跑：第二趟（break-switch-replay）
+want=· 开关趟落盘：取回 3 趟（键相同、跑完就落了盘，不再起），这一趟要起 2 趟
+want=break-switch-replay 取回的落盘趟里 2 趟判得不是对的（取回时：退 137：2 趟）：scripts/gate/lane.sh 这几趟不当头一趟
+want=开关趟：现跑 4 趟、取回 3 趟
+want=脚本与钩子的弄坏开关复跑：复跑了 4 条开关（1 份），自证红且点名的格与实际红的格逐格相同 4 条
+want=── 打断与续跑：第三趟（break-switch-replay）
+want=全部复用，这一格一条都没起
+want=break-switch-replay：绿

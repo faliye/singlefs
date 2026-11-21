@@ -62,6 +62,8 @@
 # 格并行：阶段在 stage_cells_run 之前设 STAGE_CELLS_JOBS=<路数>（大于 1）时，选中的格至多这么多路同时跑（第 i 格等第 i-路数 格收完再起），
 #   各格的标准输出与标准错误写进各自的临时文件、各自记用时，全部收回后按登记次序回放（先打「── 格名：判什么」再打那一格的输出），逐格退出码照旧按次序收、份数对不上判红。
 #   每格照旧在它自己的进程组里；门禁收到信号时对还没收回的每一格的进程组先 TERM、过宽限 KILL。不设或设 1 照旧一格接一格跑。
+#   缺省路数经 stage_cells_default_jobs 取（每台默认重活线程数，scripts/hosts/heavy-threads.sh 的 heavy_thread_default）；取不出时阶段那一句把 STAGE_CELLS_JOBS 设成空串，
+#   stage_cells_run 见它设了而是空的就整道判红（退 1）、一格都不跑，不退回一路。
 #   只给互不依赖、不起编译与重活的格用：各格不许写同一份文件、不许读别的格留下的东西。弄坏开关 shared-shell、term-leaves-cell 下不并行。
 #
 # 直接执行只跑自证（gate.sh 只取门禁目录顶层的 *.sh，不把它当阶段跑；code-tooling 的 runner 表跑它的 --selftest）：
@@ -88,6 +90,7 @@
 #   term-leaves-cell    格在前台子 shell 里跑、不装 trap：门禁被 TERM 时自己退出，格里的进程不收   term-collects-cell 判错
 #   parallel-first-exit-for-all  格并行时每一格都记第一格的退出码                         parallel-mixed 判错
 #   parallel-term-leaves-cells   格并行时门禁被 TERM 不收各格的进程组                      parallel-term-collects-cells 判错
+#   jobs-unregistered-as-one     stage_cells_default_jobs 取不出每台默认重活线程数时交 1、退 0（整道一格接一格照常跑）   jobs-default-unregistered 判错
 
 declare -ga STAGE_CELLS_NAMES=()
 declare -gA STAGE_CELLS_FUNCTION=() STAGE_CELLS_TITLE=() STAGE_CELLS_HOWTO=()
@@ -103,6 +106,8 @@ STAGE_CELLS_OWN_REPOSITORY_SAMPLE_LINE="自证在临时目录里搭的小仓，�
 STAGE_CELLS_REUSE_CHECKS="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P)/scripts/gate/lib_reuse_checks.py"
 # 收到信号时收格的宽限：比 scripts/gate/lib_process_group.py 的 TERM_GRACE_SECONDS（8 秒）短，起门禁的一方收会话之前这一层先把格收完
 STAGE_CELLS_TERM_GRACE_SECONDS=5
+# 格并行的缺省路数取不出时整道判红的出路（stage_cells_run 打）
+STAGE_CELLS_JOBS_UNREGISTERED_HOWTO="照上面那几行的出路修 .claude/heavy-thread-default（线程固定取登记值，SINGLEFS_THREAD_CAP 由服务套的 capped.sh 设，不自己设）或 SINGLEFS_THREAD_CAP，再跑这一道；不退回一路、不退回按核数算。"
 STAGE_CELLS_RUNNING_GROUP=""
 STAGE_CELLS_RUNNING_PID=""
 STAGE_CELLS_RUNNING_NAME=""
@@ -299,13 +304,28 @@ stage_cells_write_last_run() {
   return 0
 }
 
-# stage_cells_default_jobs：格并行的缺省路数，取每台默认重活线程数（.claude/heavy-thread-default 第一行行首的数）；取不出交 1（不并行）。
-#   阶段要并行就在 stage_cells_run 之前写 STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"（环境里给了就照给的，给 1 是一格接一格跑）。
+# stage_cells_default_jobs：格并行的缺省路数，取每台默认重活线程数：source 这份库所在仓（.claude/gate.d/lib/ 往上三级）的 scripts/hosts/heavy-threads.sh、
+#   调 heavy_thread_default（认 SINGLEFS_THREAD_CAP，判法在那份文件头），打出的数与退出码原样交回；取不出时标准输出什么都不打、退非 0，
+#   原因照那份库写在标准错误里（不吞），不退回一路、不退回按核数算。
+#   阶段要并行就在 stage_cells_run 之前写 STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"（环境里给了就照给的，给 1 是一格接一格跑）；
+#   取不出时这一句把 STAGE_CELLS_JOBS 设成空串，stage_cells_run 认「设了而是空的」整道判红、一格都不跑（STAGE_CELLS_JOBS_UNREGISTERED_HOWTO）。
+#   弄坏开关 jobs-unregistered-as-one 下取不出照旧交 1、退 0（整道一格接一格照常跑）。
 stage_cells_default_jobs() {
-  local registered
-  registered="$(sed -n 's/^\([0-9][0-9]*\).*/\1/p' "$(dirname "${BASH_SOURCE[0]}")/../../heavy-thread-default" 2>/dev/null | head -n 1)"
-  [[ "$registered" =~ ^[1-9][0-9]*$ ]] || registered=1
-  printf '%s\n' "$registered"
+  # 登记位是仓根的 .claude/heavy-thread-default，读法只在 heavy-threads.sh 里
+  local library status
+  library="$(dirname "${BASH_SOURCE[0]}")/../../../scripts/hosts/heavy-threads.sh"
+  if source "$library"; then
+    heavy_thread_default && return 0
+    status=$?
+  else
+    status=$?
+    printf '  ✗ source 不了 %s（原因在上一行），取不了每台默认重活线程数\n' "$library" >&2
+  fi
+  if [[ "${STAGE_CELLS_BREAK:-}" == jobs-unregistered-as-one ]]; then
+    printf '1\n'
+    return 0
+  fi
+  return "$status"
 }
 
 # stage_cells_group_members <进程组号>：/proc 里这个组还没退出的进程号（僵尸不算），一行一个。只读，不发信号。
@@ -435,6 +455,13 @@ stage_cells_run() {
     trap 'stage_cells_stop_on_signal HUP 1' HUP
   fi
   local parallel_jobs="${STAGE_CELLS_JOBS:-1}"
+  if [[ -n "${STAGE_CELLS_JOBS+set}" && -z "$STAGE_CELLS_JOBS" ]]; then
+    # 格并行的缺省路数取不出（stage_cells_default_jobs 那一段注释）：整道判红，一格都不跑
+    rm -rf "${scratch:?}"
+    printf '  ✗ %s：格并行的缺省路数取不出（stage_cells_default_jobs 没交出每台默认重活线程数，原因在上面它写到标准错误的那几行），这一道一格都没跑\n' "$STAGE_CELLS_STAGE_NAME"
+    printf '     → 怎么办：%s\n' "$STAGE_CELLS_JOBS_UNREGISTERED_HOWTO"
+    exit 1
+  fi
   [[ "$parallel_jobs" =~ ^[1-9][0-9]*$ ]] || parallel_jobs=1
   if [[ "${STAGE_CELLS_BREAK:-}" == shared-shell || "${STAGE_CELLS_BREAK:-}" == term-leaves-cell ]]; then parallel_jobs=1; fi
   if ((parallel_jobs > 1 && ${#STAGE_CELLS_SELECTED[@]} > 1)); then
@@ -624,6 +651,7 @@ stage_cells_selftest() {
       'printf "%s\n" "$@" > "$SAMPLE_REST"' \
       'ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"' \
       'cd "$ROOT" || exit 2' \
+      '[[ -z "${SAMPLE_DEFAULT_JOBS:-}" ]] || STAGE_CELLS_JOBS="${STAGE_CELLS_JOBS:-$(stage_cells_default_jobs)}"' \
       'stage_cells_run "$ROOT"' > "$stage_file"
 
   # sample_case <标签> <想要的退出码> <想要的 trace（空格隔开，- 表示一格都没跑）> <环境…> -- <参数…>
@@ -757,6 +785,14 @@ stage_cells_selftest() {
   if sample_case parallel-mixed 1 "*" STAGE_CELLS_JOBS=2 OUTCOME_BETA=1 OUTCOME_GAMMA=77 -- "$sample_root"; then
     output_has "alpha：绿"; output_has "beta：红（退出 1）"; output_has "gamma：本次未跑"; output_has "--check beta"
   fi
+  # 格并行的缺省路数（stage_cells_default_jobs）：合成阶段照阶段的写法取缺省（SAMPLE_DEFAULT_JOBS），经 heavy_thread_default 取、认 SINGLEFS_THREAD_CAP；
+  # 取不出整道判红、一格都不跑，heavy_thread_default 写到标准错误的原因照出
+  if sample_case jobs-default-from-heavy-threads 0 "*" SAMPLE_DEFAULT_JOBS=1 SINGLEFS_THREAD_CAP=2 -- "$sample_root"; then
+    output_has "至多 2 路并行"
+  fi
+  if sample_case jobs-default-unregistered 1 - SAMPLE_DEFAULT_JOBS=1 SINGLEFS_THREAD_CAP=not-a-number -- "$sample_root"; then
+    output_has "格并行的缺省路数取不出"; output_has "SINGLEFS_THREAD_CAP=not-a-number 不是正整数"
+  fi
   # 格并行时门禁被 TERM：alpha 格里睡着的孙进程要跟着没了，门禁退 143
   label=parallel-term-collects-cells; cases=$((cases + 1))
   local parallel_stage_pid parallel_sleeper="" parallel_waited_ticks=0 parallel_switches=() parallel_switch_name
@@ -817,7 +853,7 @@ stage_cells_selftest() {
   local breaks_proven=0 breaks_missed=() break_name
   if ((wrong == 0)) && [[ -z "$nested" && -z "${STAGE_CELLS_BREAK:-}" ]]; then
     for break_name in list-empty check-ignored unknown-accepted marker-everywhere marker-ignored red-swallowed not-run-as-pass shared-shell not-run-unreported generic-howto last-run-unwritten break-honored-everywhere \
-        own-repository-any-marker own-repository-refused unavailable-as-red term-leaves-cell parallel-first-exit-for-all parallel-term-leaves-cells; do
+        own-repository-any-marker own-repository-refused unavailable-as-red term-leaves-cell parallel-first-exit-for-all parallel-term-leaves-cells jobs-unregistered-as-one; do
       if STAGE_CELLS_BREAK="$break_name" bash "$library_under_test" --selftest-nested >/dev/null 2>&1; then
         breaks_missed+=("$break_name")
       else

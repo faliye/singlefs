@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：pinned-apparatus-revision
+want=2 份钉了装置 sha256 的起跑脚本对不上它的跑前登记
+want=scripts/experiment-apparatus/e938-r2-segment-run.sh：钉了装置 sha256，认不出跑前登记（脚本注释里点名了 research/prompts/ 下名字带 prereg 的 .md，但没有一处写成「跑前登记 <路径>」，认不出哪一份是它自己的登记）
+want=scripts/experiment-apparatus/e939-r2-segment-run.sh：钉了装置 sha256，认不出跑前登记（注释里「跑前登记」后面点名了 2 份不同的登记（research/prompts/e939-r2-prereg.md、research/prompts/e939-r1-prereg.md），认不出哪一份是它自己的）
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（pinned-apparatus-revision）
+want=→ pinned-apparatus-revision：补登记第十二节一行修订（新 sha256、改了什么）

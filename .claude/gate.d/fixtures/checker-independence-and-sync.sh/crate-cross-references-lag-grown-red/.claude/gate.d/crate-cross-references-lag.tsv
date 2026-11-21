@@ -1,0 +1,3 @@
+# 样本里的滞后表：一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」，只缩不涨。
+# 写法照仓里那一份（.claude/gate.d/crate-cross-references-lag.tsv）。
+crates/consumer	crates/provider/tests/c/mod.rs	# 拆包时要改写的存量：样本里新加的一行

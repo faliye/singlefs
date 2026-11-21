@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-headers
+want=scripts/gate/divided_core.py：读了 ORPHAN_BREAK，所属入口 scripts/gate/divided.py 整族的文件头开关表里没有这几条
+want=弄坏开关文件头：1 处不对（读开关的 1 份：写全 0 份、豁免 0 份）
+want=break-switch-headers：红（退出 1）

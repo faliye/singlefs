@@ -21,5 +21,9 @@ fn report() {
 }
 // ("cnt_comment", 1) 写在注释里不判
 RS
+# 装置拆成子模块：根 main.rs 与两层下的 tests.rs（元组首列带没登记的缩写 mac）；射程只认顶层的 .rs 时这一处看不见
+mkdir -p scripts/experiment-apparatus/e2_split/parts
+printf 'mod parts;\nfn main() {}\n' > scripts/experiment-apparatus/e2_split/main.rs
+printf 'const FIELDS: &[(&str, u32)] = &[("slot_mac", 2)];\n' > scripts/experiment-apparatus/e2_split/parts/tests.rs
 printf '| 字段 | 宽 |\n|---|---|\n| `cnt_total` | 8 |\n| `count_total` | 8 |\n' > .claude/kb/demo.md
 git init -q . && git add -A

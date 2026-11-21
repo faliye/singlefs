@@ -1,0 +1,4 @@
+exit=1
+want=research/prompts/_c999-code-r1-body.md：没有「### 检查单：放的位置」这一格
+want=代码轮正文的检查单没写全（1 处，查了 1 份）
+want=code-round-checklist：红

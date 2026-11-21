@@ -1,0 +1,2 @@
+# 样本的角色登记（四列制表符分隔：包名、角色、目录、理由）
+demo-experiments	实验装置	crates/demo-experiments	样本里的实验包，只放装置二进制

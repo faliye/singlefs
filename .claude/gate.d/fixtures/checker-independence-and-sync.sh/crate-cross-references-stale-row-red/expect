@@ -1,0 +1,4 @@
+exit=1
+want=两张表有 1 行写不对或用不着了：
+want=.claude/gate.d/crate-cross-references-allowed.tsv 第 3 行：crates/consumer 的编译单元这一趟没有读 crates/provider/tests/c/mod.rs，删掉这一行
+want=crate-cross-references：红（退出 1）

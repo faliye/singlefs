@@ -5,3 +5,4 @@ M_库里筛选词对得上	crates/demo/src/lib.rs	assert_eq!(super::published_ge
 M_改litmus文件	litmus/sample.litmus	exists (x=1)	exists (x=0)	-p demo --test reads_litmus	reads_the_litmus_directory
 M_删掉litmus里的写	litmus/sample.litmus	 WRITE_ONCE(*x, 1);		-p demo --test reads_litmus	reads_the_litmus_directory
 M_宏展开出来的测试	crates/demo/tests/generated.rs	generated_case!(generated_by_a_macro_case);		-p demo --test generated	generated_by_a_macro_case
+M_目录式测试目标经 #[path] 引共用模块里的测试	crates/demo/tests/split_target/main.rs	common_split::marker();		-p demo --test split_target	shared_split_case

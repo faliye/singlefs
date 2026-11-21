@@ -1,0 +1,5 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=.claude/gate.d/break-switch-replay-files.tsv:2 scripts/gate/lonely.py 代码里不读弄坏开关了，那一行删掉
+want=脚本与钩子的弄坏开关复跑：1 处不对（复跑了 0 条、0 份）
+want=break-switch-replay：红（退出 1）

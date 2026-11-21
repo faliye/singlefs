@@ -14,6 +14,7 @@
 research	e-number-names	# 跑前登记、重跑登记与三方材料（research/prompts/），实验产物（research/results/，含子目录）
 scripts	e-number-names	# 实验装置（scripts/experiment-apparatus/）、变异表（scripts/mutation/tables/）与别处带实验号的脚本（scripts/devices/ 下的探针）
 crates/singlefs-verification/src/bin	e-number-names	# 登记里写死成入库装置的实验，装置住在 验证包里（e165_replay_bounded_enumeration.rs 这类）
+crates/singlefs-implementation-experiments/src/bin	e-number-names	# 登记里写死成入库装置的实验，装置住在实验包里（e158_root_choice_repair.rs 这类）
 crates/singlefs-background-gpu-tests/src/bin	e-number-names	# 登记里写死成入库装置的实验，装置住在产品 GPU 的测试包里（e202_gpu_cpu_gc_comparison.rs 这类）
 .claude/kb/experiments	number-names	# 实验页：<号>-<简称>.md 与两份译文
 .claude/kb/experiments.md	index-rows	# 实验索引表：只登了索引行、页还没建的号也算用过

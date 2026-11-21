@@ -17,6 +17,8 @@ printf 'name\tfile\n' > crates/mutations.tsv
 # 那两格在这里判「没有触发文件」——batch-scope 绿、knowledge-sync 无对象可判
 mkdir -p .claude/gate.d
 printf '^\\.claude/hooks/\t# 钩子（这份样本不碰）\n' > .claude/gate.d/knowledge-sync-triggers.tsv
+# 角色表把两个包登成验证：它们的 src 是非产品代码（弄坏开关 test-code-skipped 去掉的那一类）
+printf '# 样本里的角色表\nsinglefs-verification\t验证\tcrates/singlefs-verification\t样本里的验证包\nsinglefs-checker\t验证\tcrates/singlefs-checker\t样本里的池级 checker\n' > .claude/gate.d/crate-roles.tsv
 git add -A && git commit -qm base
 printf 'pub fn workload() -> u32 { 2 }\n' > crates/singlefs-verification/src/model.rs
 printf '#[test]\nfn workload_runs() { assert_eq!(2, 2); }\n' > crates/singlefs-verification/tests/workload.rs

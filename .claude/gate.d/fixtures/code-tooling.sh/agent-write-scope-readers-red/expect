@@ -1,0 +1,5 @@
+exit=1
+want=这些定义的 tools 里没有 Write 与 Edit（只带 Read、Bash 这类），写范围表里却没有登记
+want=     beta
+want=→ 怎么办：照它定义里「写范围」一节，在 .claude/hooks/agent-write-scope.tsv 给它加路径模式
+want=agent-write-scope：红（退出 1）

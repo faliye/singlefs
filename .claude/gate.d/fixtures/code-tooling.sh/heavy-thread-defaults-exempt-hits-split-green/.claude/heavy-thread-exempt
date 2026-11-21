@@ -1,0 +1,3 @@
+# 样本：scripts/new-rig/report_cores.sh 里两行 $(nproc) 各挪进同目录的 report_cores-count.sh、report_cores-show.sh（钩子拆法的部分文件），表里改成两行、锚串不变
+scripts/new-rig/report_cores-count.sh:$(nproc)  # 样本：只把核数打出来，不起线程
+scripts/new-rig/report_cores-show.sh:$(nproc)  # 样本：只把核数打出来，不起线程

@@ -1,0 +1,3 @@
+exit=1
+want=✗ lag-grown：.claude/gate.d/crate-roles-lag.tsv 比基准那一版多出 1 行（只缩不涨）：第 4 行 crates/p-verify/src/bin/e8_moving_out.rs
+want=crate-roles：红

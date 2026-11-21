@@ -1,0 +1,2 @@
+# 样本：scripts/new-rig/report_cores.sh 里 $(nproc) 那一行挪进同目录的 report_cores-count.sh（钩子拆法的部分文件），表里那一行改成新路径、锚串不变
+scripts/new-rig/report_cores-count.sh:jobs=$(nproc)  # 样本：只把核数打出来，不起线程

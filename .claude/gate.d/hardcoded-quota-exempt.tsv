@@ -7,7 +7,13 @@
 scripts/experiment-apparatus/e184-segment-one-long-run.sh:E184_SELFTEST_HOSTS  # 自证里假机器清单的台数
 
 # 这一轮不碰的文件（别的会话留着没提交的改动与别的门禁）：改了要连同那份文件一起改，交它们的那一批
-scripts/hosts/multi-host-run.sh:--memory-cap 256M  # 不碰（别的会话的改动）；自证里造的场景上限
-scripts/hosts/multi-host-run.sh:--memory-cap 2G --label peer-too-big  # 不碰（别的会话的改动）；自证格：比配置大要被拒的输入
+scripts/hosts/multi-host-run-selftest.sh:--memory-cap 256M  # 不碰（别的会话的改动）；自证里造的场景上限
+scripts/hosts/multi-host-run-selftest.sh:--memory-cap 2G --label peer-too-big  # 不碰（别的会话的改动）；自证格：比配置大要被拒的输入
 
 # 改不成现算的：上限是实验参数、进了驱动的算术，或要交给不认 auto 的 multi-host-run.sh --memory-cap
+
+# 自证造的假值与弄坏开关的坏命令文字：不起真跑法
+scripts/experiment-apparatus/e185-r2-segment-run.sh:memory_kept=$(export E185_MEMORY_CAP=3G  # 自证里「调用方已给了 E185_MEMORY_CAP 照留」那一格造的假上限，只看给的值留没留，不是跑法的上限
+scripts/experiment-apparatus/e185-r3-segment-run.sh:memory_kept=$(export E185_MEMORY_CAP=3G  # 自证里「调用方已给了 E185_MEMORY_CAP 照留」那一格造的假上限，只看给的值留没留，不是跑法的上限
+scripts/experiment-apparatus/e185-r4-segment-run.sh:memory_kept=$(export E185_MEMORY_CAP=3G  # 自证里「调用方已给了 E185_MEMORY_CAP 照留」那一格造的假上限，只看给的值留没留，不是跑法的上限
+scripts/gate/merge-and-verify-steps-lib.sh:run-with-memory-cap.sh" 36G  # 弄坏开关 rerun-command-wrapped 拼出的坏命令文字：只在自证打开开关时才拼、打印成重跑命令给自证认包装词，不被起

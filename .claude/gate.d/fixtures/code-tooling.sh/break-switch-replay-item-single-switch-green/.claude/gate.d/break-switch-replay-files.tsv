@@ -1,0 +1,2 @@
+# 样本复跑登记表：trio 三条开关各红一格，gamma 那一条点名的项写的是另一格
+scripts/gate/trio.py	30	# 样本：只点 alpha 一条，另两条不该起

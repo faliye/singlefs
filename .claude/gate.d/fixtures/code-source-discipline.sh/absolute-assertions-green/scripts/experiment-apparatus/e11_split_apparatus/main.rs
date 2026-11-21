@@ -1,0 +1,2 @@
+mod checks;
+fn main() {}

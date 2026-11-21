@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：batch-scope
+want=gate_changed_paths 取不到改动路径：git -c core.quotepath=false diff --name-only HEAD -- 退出 128
+want=git 的报错原文：
+want=diff.renames
+want=✗ 取不到这次改动碰了哪些路径（基准 HEAD）
+want=doc-process-records.sh：1 格里 1 格红（batch-scope）

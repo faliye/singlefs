@@ -1,0 +1,4 @@
+exit=1
+want=crates/ 下有 1 处编译单元读了别的包目录下的源码或不属任何包的文件，两张表里都没登：
+want=crates/consumer  引 crates/provider/src/k.wgsl（test:cross；跨包源码）
+want=crate-cross-references：红（退出 1）

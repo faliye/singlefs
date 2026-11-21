@@ -1,0 +1,9 @@
+[package]
+name = "p-format"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[build-dependencies]
+support = { path = "../p-support", package = "p-support" }

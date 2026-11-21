@@ -1,0 +1,3 @@
+# 进样本档先核在不在临时 prune-server 底下（阶段文件头「样本档」）；这一份放 .sample-environment-bare，按「环境里什么都没设」答：退 2、一格都不判。
+# 点只读树的 crash-knobs 一格：弄坏开关 sample-service-unchecked 下照判它（不起 cargo），判不出 2；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-knobs

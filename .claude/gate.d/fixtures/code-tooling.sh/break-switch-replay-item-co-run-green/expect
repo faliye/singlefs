@@ -1,6 +1,9 @@
 exit=0
-want=只跑 样本根的 .gate-items 点名的项：break-switch-replay 1 项
+want=只跑 样本根的 .gate-items 点名的项：break-switch-replay 2 项
 want=样本只跑 .gate-cells 点名的格：break-switch-replay
-want=· 按条复用：1 份脚本、2 条判定（基准趟 1 条、开关 1 条），现判 2、复用 0、拒算 0；起 1 份（陪跑 2 条
-want=脚本与钩子的弄坏开关复跑：复跑了 3 条开关（1 份）
+want=── 复用三问：unit 那一趟（break-switch-replay）
+want=全部复用，这一格一条都没起
+want=· 按条复用：1 份脚本、4 条判定（基准趟 1 条、开关 3 条），现判 1、复用 3、拒算 0；起 1 份（陪跑
+want=脚本与钩子的弄坏开关复跑：复跑了 3 条开关（1 份），自证红且点名的格与实际红的格逐格相同 3 条
+want=REUSE_SELFTEST script=.claude/gate.d/code-tooling.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=4 affected=1
 want=break-switch-replay：绿

@@ -32,7 +32,7 @@
 #     末行写明「只判了选中的 N 行，不是整道结论」；不经格汇总，选中的全抓到退 3、有红退 1
 #     （汇总把 0、77 之外的码并成 1，驱动就分不出这两样）。
 #
-# 判据（判法、派活、判定库与覆盖都在 scripts/mutation/crates-mutation-rows.py；拷贝范围、判法单元、行键、判定库放哪、复用判据、弄坏开关见它的文件头）：
+# 判据（判法、派活、判定库与覆盖都在 scripts/mutation/crates-mutation-rows.py；拷贝范围、行键、判定库放哪、复用判据、弄坏开关见它的文件头）：
 #   crates/mutations.tsv 每行六段（变异名、文件、原文、替换文、cargo test 参数、必须红的测试名），替换文可以空（删掉原文），其余五段不许空；
 #   必须红的测试名是一个用例名，只有 \n 一种反斜杠转义，文件落在每片拷的范围（stage-inputs.tsv 本阶段那一行）之内：
 #   这几样派活之前判（row_problems，门禁 code-source-discipline 经 static-check 静态判同一份），有一行不过整道判红、一个工作进程都不起；
@@ -61,7 +61,7 @@
 #   自证在 crates-mutation-rows.py --selftest（selftest_memory_cells、selftest_worker_peak_cells）；本道样本不判这一条。
 #   判完的格每条立刻原子写进判定库（工作进程里 Library.write：同目录临时文件、fsync、改名），整组被硬杀之后重跑同一条命令，判过的格照键复用、只现判剩下的；
 #   自证 selftest_killed_run_resume_cell 起子进程跑到一半对整组 SIGKILL 再重跑；弄坏开关 GATE_MUTATION_BREAK=records-written-at-end（记录攒到进程池收尾才写）下这一格必须判错。
-#   重跑拿不到复用的另一个原因：crates-mutation-rows.py 里任何一处模块级赋值、import、类头、带缺省值的 def 头（连同自证用的 FAKE_CARGO 这类字符串常量）改了，判法单元指纹就变，整库的行键跟着全变（文件头「判法单元」），不是没写。
+#   驱动（crates-mutation-rows.py 与它拆出的各份）与算键库（lib_mutation_units.py、lib_function_units*.py）的代码不进行键：改它们不作废已判的行（crates-mutation-rows.py 文件头「行键」「不进键的」）；测试服务代码（scripts/gate/test-service-code-paths.tsv 登的）同样不进行键。
 #   线程数按工作进程数压：每个 cargo 的编译并行度 CARGO_BUILD_JOBS 取 max(1, 每台默认重活线程数 ÷ 工作进程数)（GATE_MUTATION_CARGO_JOBS 顶掉它，要正整数；与 ④ 试进程数时同一个函数 cargo_jobs_for）。
 #   磁盘余量（工作进程数的 ③，crates-mutation-rows.py 的 disk_bound_for）：每个工作进程最多占两份编译目录（普通、插桩），一份涨满按下面「编译目录上限」算；
 #   派活之前按目标盘余量（外层给了 GATE_MUTATION_DISK_FREE 用它，不然读编译目录所在的盘）核「片号 1…n 各两份还能涨的量 + 备用 GATE_MUTATION_DISK_RESERVE（默认 30G）」，
@@ -86,14 +86,18 @@
 #   （编出来的二进制里编死了 CARGO_MANIFEST_DIR，拷过去 cargo 照样判 Fresh、跑的时候读先编那一份的文件）；回收不碰这几份。先编那一份里摸过的包有产物是 fresh 整道判红。
 #   自证与弄坏开关 compile-per-worker、workspaceunitsshared、seedmtimekept、seedfreshunchecked 在 crates-mutation-rows.py --selftest；本道样本不判这一条。
 # 调试信息与 release 增量：这一道起的每条 cargo 都带 CARGO_PROFILE_{DEV,TEST,RELEASE,BENCH}_DEBUG=false（cargo test 用 test 档、承 dev；cargo test --release 用 release 档）
-#   与 CARGO_PROFILE_RELEASE_INCREMENTAL=true，顶掉仓根 Cargo.toml 的 [profile.release] 与调用方的同名变量；编译档的 debug、incremental 不进行键，别的构建档取值照进
-#   （crates-mutation-rows.py 文件头「调试信息与 release 增量」）。
-#   自证与弄坏开关 debuginfo-kept、release-incremental-unset、profile-debug-keyed、profile-settings-unkeyed 在 crates-mutation-rows.py --selftest；本道样本不判这一条。
+#   与 CARGO_PROFILE_RELEASE_INCREMENTAL=true，顶掉仓根 Cargo.toml 的 [profile.release] 与调用方的同名变量；编译档（各档设置）与线程数都不进行键
+#   （crates-mutation-rows.py 文件头「调试信息与 release 增量」）。基线的批例外：不带 CARGO_PROFILE_RELEASE_INCREMENTAL 这一项（调用方自己设了的值照放回、没设就不放），调试信息那四项照带
+#   （baseline_cargo_environment，下面「崩溃判定」写了为什么）。
+#   自证与弄坏开关 debuginfo-kept、release-incremental-unset、profile-keyed、build-jobs-keyed、build-environment-keyed 在 crates-mutation-rows.py --selftest；本道样本不判这一条。
 #   片号锁的自证同在那里：弄坏开关 GATE_MUTATION_BREAK=local-shard-numbering（两次并发调用领到的片号重叠）那一格必须判错
 #   （直接起自证时同义名 CRATES_MUTATION_ROWS_BREAK）；本道样本不判这一条。
-# 崩溃判定（crates-mutation-rows.py 文件头「变异复跑的崩溃判定」）：变异行的判定照行键经 prune-server 写进真服务里那一份判定库（下面「复用」）；
-#   起 cargo test 真跑测试的每一次（基线的批、变异、记覆盖的插桩跑）共用模块另起一份它自己的临时 prune-server，走判定库的 验证包用例在变异版上判出的崩溃结论
-#   只落进那一份、跑完停服务删目录，不读不写真服务里的崩溃判定；这里不设库的变量、不建本地库。
+# 崩溃判定（crates-mutation-rows.py 文件头「变异复跑的崩溃判定」「基线连调用方的判定库服务」）：变异行的判定照行键经 prune-server 写进真服务里那一份判定库（下面「复用」）；
+#   基线的批在没改坏的副本上跑，不起临时 prune-server，起 cargo 时连哪一处照调用方的环境（经任务服务跑是全仓那一份真服务，样本与自证是它们所在的那一份临时服务）：
+#   走判定库的 验证包用例判过的崩溃状态块按块键从那一份读、没判过的判了写进去，与门禁 crash-point-replay 读写的是同一份；基线起的 cargo 不带上面那一项
+#   CARGO_PROFILE_RELEASE_INCREMENTAL 覆盖，release 档的崩溃判定版本因此与 crash-point-replay 的 cargo test --release 同一把。
+#   变异与记覆盖的插桩跑（起 cargo test 真跑测试的每一次）共用模块各起一份它自己的临时 prune-server，走判定库的 验证包用例在变异版上判出的崩溃结论
+#   只落进那一份、跑完停服务删目录，不读不写真服务里的崩溃判定；变异版一律现判，不按键只读复用真库里基线那一份；这里不设库的变量、不建本地库。
 #   临时服务的二进制由这一格交下去（prune_server_binary_for_mutation_runs）：PRUNE_SERVER_BINARY 设了（绝对路径、可执行）照原样交，不是的这一格判红、一条都不判；
 #   没设先照这一道所在仓的 scripts/hosts/rocksdb-prebuilt.py entry 判预编库的取值，再在这一格自己的临时目录里编一份（直接起，线程是服务套的 capped.sh 设好的变量，
 #   cargo build --release --offline --manifest-path <这一道所在的仓>/prune-server/Cargo.toml --bin prune-server，与 code-tooling.sh 的 code_tooling_prune_server_binary 同一种编法），
@@ -117,20 +121,20 @@
 #
 # 基线（判法见 crates-mutation-rows.py 文件头「基线」）：点名的测试在没改坏的副本上本来就红时，改坏之后照样红、记「抓到」什么都没证明，
 #   所以派变异之前先跑基线，不是恰好一个 ok 的行记「基线不绿」、整道判红。「计数：」那一行的格式不动（mutation-triage 照栏读），基线另起一行「基线：…」报。
-# 复用：每行一条判定，行键是被改坏的函数单元（种类、指纹；所在文件与限定名不进键）、原文、替换文、点名测试执行过的单元集合指纹、判「抓没抓到」的判法单元指纹、工具链、解析出的依赖版本，
+# 复用：每行一条判定，行键只有两样：被改坏的函数单元（种类、指纹；所在文件与限定名不进键）、原文、替换文，加点名测试的单元闭包键与选中它的开关与特性；构建环境（编译器与链接器相关的环境变量、cargo 配置、清单的 lints）、rustc 与 cargo 的版本、Cargo.lock 里的依赖版本、编译档与线程数、驱动与算键库的代码都不进键，
 #   不带变异名；没有管整库的版本号、没有版本目录；一份库，两台判出的都经 prune-server 写进同一份（下面「分片」）。
 #   库名固定（mutation-units 族，种类 singlefs-crates-mutation-library），库根不进键，派到哪台、判的是哪棵树都写同一份；取不到库名、服务连不上整道退出（连不上退 75），不现判；
 #   成功句末尾点名库在哪。判出的不是「抓到」（没红、无效、基线不绿……）照行键盖掉原有的「抓到」，下一趟现判。
 #   一行的基线结局不随这一趟选了哪几行而变（只看这一行自己的过滤词选中的结果行）：点名单跑与整张表对同一行判同一个结论。
-#   判法单元连同 judge_row、judge_batch、run_cargo_command 这几段收闭包；逐样与弄坏开关在 crates-mutation-rows.py 文件头「判法单元」「行键」「判定库」「复用判据」「基线」。
+#   逐样与弄坏开关在 crates-mutation-rows.py 文件头「行键」「判定库」「复用判据」「基线」。
 #   没有整道全绿标记，不问 stage-must-run.sh。点名测试那一段这里取它的单元闭包键（入口 = 那条测试函数，比执行过的单元宽，不漏）；
 #   执行过的单元另记在覆盖记录里（-C instrument-coverage、llvm-profdata、llvm-cov，工具不对整道判红），基线 ok 那一条按它复用、不按整树快照。
-#   键对不上的现判，按栏报数（行新加、判法单元变了、被改坏的单元变了、点名测试的闭包变了、原文或替换文变了、工具链或依赖变了、上次没判成抓到、一律现判），
+#   键对不上的现判，按栏报数（行新加、被改坏的单元变了、点名测试的闭包变了、原文或替换文变了、上次没判成抓到、一律现判），
 #   stderr 逐行写变了哪几个单元；算不出键的那一行拒算（点名的测试认不出单元、闭包里有认不出的形态），每趟照跑。成功句末尾报「现判 N、复用 M、拒算 R、本次未跑 K」。
 #   撞键就拒算：表里两行以上算出同一把行键（两份内容相同的函数各改一处、点名同一条测试），这几行拒算、照跑、不复用，
 #   stderr 逐行与成功句末尾报「拒算（行键撞键：与第 N 行同键）」；--item 与分片只判选中的行时，撞键照整张表判。
 #   判法与弄坏开关 row-key-collision-unrefused 在 crates-mutation-rows.py 文件头「行键」，自证在它的 --selftest；本道样本不判这一条。
-#   键、库的存放、复用判据写在 crates-mutation-rows.py 文件头「复用」「判法单元」「行键」「判定库」「复用判据」。只读看这一趟会怎么判：python3 scripts/mutation/crates-mutation-rows.py plan <根>；
+#   键、库的存放、复用判据写在 crates-mutation-rows.py 文件头「复用」「行键」「判定库」「复用判据」。只读看这一趟会怎么判：python3 scripts/mutation/crates-mutation-rows.py plan <根>；
 #   --list-items 末行报键对不上的条数。只有「抓到」与基线 ok 复用。
 # 分片（一律分片；机器、上限与每片派到哪台归 task-server，这一道自己不连第二台）：文件头第三行「# task-server-shards: *」让服务把经它交的这一道拆成三步，
 #   每步都照原命令（连同 --item）起这一道一次，环境里 TASK_SERVER_SHARD_PHASE 说是哪一步（task-server/task_server_lib.py 文件头「分片」）；
@@ -154,7 +158,10 @@
 #   （`GPU_DEVICE_LOST test=<当前线程名> card=<卡名> reason=<一句>`，test= 可以是 main、unnamed-thread、全名，不比对）的那一条，
 #   红的是设备丢失、不是断言，记本次未跑；标记行只在别的用例的那一段里、FAILED 而都没有这一行（含显存不够）照记抓到；点名的测试 ok 而带这一行照 ok 的判法。
 #   弄坏开关 device-lost-ignored 与 device-lost 样本在下面；逐样自证在 crates-mutation-rows.py --selftest「设备丢失」那几格。
-#   只有本次未跑的这一格退 77。模块写进 GATE_MUTATION_NOT_RUN_RECORD，这里转进 $GATE_NOT_RUN_FILE（分片的各片不转，由合并那一步的核账再报）。
+#   只有本次未跑的这一格退 77。模块写进 GATE_MUTATION_NOT_RUN_RECORD，这里转进 $GATE_NOT_RUN_FILE（分片的各片不转进它）。
+#   分片的一片（GATE_MUTATION_ROW_SELECTION 设着、不是 --item 换成的）：驱动（scripts/mutation/mutation-shard-run.sh 文件头「三步」shard）设了
+#   GATE_MUTATION_SHARD_NOT_RUN_FILE 的，这一片本次未跑的几条原样追加进它（每条一行，行首是这一道的文件名，写法同 $GATE_NOT_RUN_FILE），
+#   合并那一步照它把这几行从「读不到」里分出来逐条列；写不进去这一片退 1。
 #
 # 弄坏开关（只给证红用）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/crates-mutation-replay.sh/ 下的目录名，
 # 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首；样本档登记为 samples:.crates-mutation-replay-sample-tools（假工具标记目录），句首都是逐个打开开关实跑样本档、照原样输出写的）：
@@ -177,9 +184,9 @@
 #       red（输出里找不到「计数：抓到 0 条、没红 1 条、无效 1 条、锚点失效 0 行（共 4 条）」）、
 #       green（期望退出 0，实测 1）、not-run（期望退出 0，实测 1）
 #   复用、续跑、只改一行只跑那一行、单元键的每一样（controls 路的 S34、S30、N33、N34、N45，被改坏的单元、点名测试的闭包、V5 那一类常量）、
-#   基线按执行过的单元复用、判法单元指纹、久的先派、选行这几样要连跑好几趟，在 scripts/mutation/crates-mutation-rows.py --selftest 里
-#   用假 cargo、假 llvm 工具跑（门禁 code-tooling 替它复跑），弄坏开关 baseline-by-tree-snapshot、judge-units-whole-file、
-#   mutated-unit-ignored、test-closure-ignored、rowkeywithouttoolchain、coveragenotrecorded、llvmversionunchecked、timingsignored、nobaseline、
+#   基线按执行过的单元复用、久的先派、选行这几样要连跑好几趟，在 scripts/mutation/crates-mutation-rows.py --selftest 里
+#   用假 cargo、假 llvm 工具跑（门禁 code-tooling 替它复跑），弄坏开关 baseline-by-tree-snapshot、driver-and-library-keyed、
+#   mutated-unit-ignored、mutated-test-service-code-keyed、test-closure-ignored、build-environment-keyed、toolchain-version-keyed、dependency-versions-keyed、coveragenotrecorded、llvmversionunchecked、timingsignored、nobaseline、
 #   emptyreplacementrefused、cargoconfignotcopied、broken-pool-looked-up-late 下各有一格必须判错（逐个开关红在哪几格写在它文件头「弄坏开关」）。
 #   行里已带 --exact 的变异记覆盖、点名的测试在这一组特性下不编：弄坏开关 exactduplicated，以及 scripts/mutation/lib_mutation_units.py 里的
 #   closure-error-masked（同样从 GATE_MUTATION_BREAK 认；按路径载入的 lib_function_units.py 不登记进 sys.modules，--list-items 末尾的真错被 PicklingError 盖住）各有格必须判错，
@@ -200,16 +207,9 @@
 #   点名的测试目标全在放开名单里的带每台默认重活线程数（放开名单是 crates-mutation-rows.py 的 GPU_TEST_THREADS_RELEASED_TARGETS 加验证包登记的只经卡池取卡的测试目标，gpu_released_test_targets 照被判那棵树现读）；行里自己已写 --test-threads 的不重复补；线程参数不进行键
 #   （crates-mutation-rows.py 文件头「带 gpu 特性的格测试参数收尾带 --test-threads」）。弄坏开关 GATE_MUTATION_BREAK=gpu-test-threads-unadded（不补），
 #   自证在 crates-mutation-rows.py --selftest「带 gpu 的行收尾带 --test-threads 1、放开名单里的目标带登记值、不带 gpu 的行不带」那一格；本道样本不判这一条（样本用假 cargo、没有显卡）。
-# 按项机读行（统一任务服务按项先算后排读它；一项 = 变异名，同名的几行合成一项；格式与算法在 crates-mutation-rows.py 文件头「按项机读行」）：
+# 按项机读行（统一任务服务不读它，只有 crates-mutation-rows.py 的 --selftest 认；一项 = 变异名，同名的几行合成一项；格式与算法在 crates-mutation-rows.py 文件头「按项机读行」）：
 #   --list-items --with-keys   stdout，每项一行（次序是变异表的次序，行数等于逐行列出的项数，条数之和等于末行合计的数）：
 #       ITEM_PLAN item=<项名> to_judge=<要现判的条数：键对不上与拒算> reusable=<能复用的条数：键对得上>
-#   --list-items --with-keys --item …   stdout，ITEM_PLAN 之后另打（整表不打）：每项一行、次序同变异表，末了一行收尾：
-#       ITEM_CARD item=<项名> card=<0|1>        1 是点名的行里有一行要卡或没证明不要卡，0 是证明了不要卡
-#       ITEM_CARD_DONE items=<项数>
-#     判法：点名的行里有一行 cargo 参数开了上卡的特性（crates-mutation-rows.py 的 gpu_test_run）就整条都是 1；点名的行都没开、而多机配置写了 ENABLE_GPU=1 时再算
-#     开 GPU 时崩溃判段那几行补 gpu 特性的行（plan_context 的 gpu_route_lines，上面「开 GPU 时崩溃判段那几行补 gpu 特性」），补了的那项是 1，其余是 0。
-#     算失败（读不了表、选行不对、键与闭包算不出）一行都不打、原因在 stderr、退出码仍照 ITEM_PLAN 那一步；统一任务服务读不到这些行就保持要卡，
-#     读到每一项都是 0 才把这条任务改成不要卡、不分卡（task-server/task_server_lib.py 文件头「资源记录」预计用时末段）。
 #   真跑（整张表、--item、分片的各片同样）  stderr，每项跑完一行（带挂钟，所以不进 stdout）：
 #       ITEM_DONE item=<项名> seconds=<这一项自己的挂钟秒数> judged=<现判条数> reused=<复用条数> exit=<这一项的退出码：0 抓到、77 本次未跑、1 其余>
 #   弄坏开关 GATE_MUTATION_BREAK=item-plan-reusable-zero、item-plan-selection-ignored（带 --item 也算整表）、item-done-reused-silent、item-done-seconds-whole-run，
@@ -478,65 +478,6 @@ if ((! list_items)) && [[ -n "$shard_phase" ]]; then
   esac
 fi
 
-# 点名的几项要不要卡（文件头「按项机读行」的 ITEM_CARD，统一任务服务在估算那一步读）：每项一行 ITEM_CARD、末了一行 ITEM_CARD_DONE，打在 stdout。
-# 点名的行里有一行 cargo 参数开了上卡的特性（共用模块的 gpu_test_run）就整条都是 1（没证明的写 1，不再算下去）；一行都没开、而多机配置开了 GPU（ENABLE_GPU=1）时，
-# 再照共用模块的 plan_context 算开 GPU 时崩溃判段那几行补 gpu 特性的行（gpu_route_lines），补了的那一项是 1，其余是 0。算失败（读不了表、选行不对、
-# 键与闭包算不出、任何异常）一行都不打，原因打在 stderr：服务照没有这些行办，保持要卡。
-item_cards_lines() {
-  python3 - "$ROOT" "$STAGE_REPOSITORY/scripts/mutation/crates-mutation-rows.py" "$item_selection_file" <<'PY' || echo "  ! ITEM_CARD 没算出来（原因在上面）：服务按要卡办" >&2
-import contextlib
-import importlib.util
-import os
-import shlex
-import sys
-
-
-def item_cards(root, module_path, selection_path):
-    specification = importlib.util.spec_from_file_location("crates_mutation_rows", module_path)
-    module = importlib.util.module_from_spec(specification)
-    sys.modules[specification.name] = module
-    specification.loader.exec_module(module)
-    environment = dict(os.environ)
-    rows, _malformed = module.read_table(os.path.join(root, module.TABLE), environment)
-    selected, problems = module.read_selection(selection_path, rows)
-    if problems:
-        raise RuntimeError("选行文件不对：" + "；".join(problems))
-    chosen = [row for row in rows if row.line_number in selected]
-    cards = {}
-    for row in chosen:
-        try:
-            on_card = module.gpu_test_run(["cargo", "test", *shlex.split(row.arguments)])
-        except ValueError:
-            on_card = True   # 引号不配对：认不出就当要卡
-        cards[row.name] = max(cards.get(row.name, 0), int(on_card))
-    if any(cards.values()):
-        cards = {name: 1 for name in cards}   # 有一项已经要卡，整条都要卡：别的项不再花时间证明，没证明的写 1
-    elif cards and module.gpu_route_enabled(environment)[0]:
-        with contextlib.redirect_stdout(sys.stderr):
-            context = module.plan_context(root, environment, selection_path)
-        if context is None:
-            raise RuntimeError("键与闭包没算出来，开 GPU 时哪几行要补 gpu 特性无从知道")
-        routed = {line_number for line_number, _feature in context["key_context"].gpu_route_lines}
-        for row in chosen:
-            if row.line_number in routed:
-                cards[row.name] = 1
-    if not cards:
-        raise RuntimeError("点名的行一行都没读到")
-    return cards
-
-
-try:
-    result = item_cards(sys.argv[1], sys.argv[2], sys.argv[3])
-except Exception as error:
-    print(f"  ✗ ITEM_CARD：{type(error).__name__}: {error}", file=sys.stderr)
-    print("     → 怎么办：照上面一句改 --item 点名的行或 crates/mutations.tsv 里那几行（选行文件对不上、读不了表）；改完重交，服务这一次按要卡办", file=sys.stderr)
-    sys.exit(1)
-for name, value in result.items():
-    print(f"ITEM_CARD item={name} card={value}")
-print(f"ITEM_CARD_DONE items={len(result)}")
-PY
-}
-
 if ((list_items)); then
   # 一行一条变异（# 起头的行与空行不算）：变异名<制表符>第几行、改哪个文件；只有共用模块里一份。--with-keys 另给每项一行 ITEM_PLAN；
   # 带 --item 的只列、只算点名那几行：选行文件（上面 --item 换成的）交给 --rows。不 exec：退出时 EXIT trap 删选行文件
@@ -544,9 +485,7 @@ if ((list_items)); then
   if ((with_keys)); then list_items_arguments+=(--with-keys); fi
   if [[ -n "$item_selection_file" ]]; then list_items_arguments+=(--rows "$item_selection_file"); fi
   python3 "$STAGE_REPOSITORY/scripts/mutation/crates-mutation-rows.py" "${list_items_arguments[@]}" "$ROOT"
-  list_items_exit=$?
-  if ((list_items_exit == 0)) && ((with_keys)) && [[ -n "$item_selection_file" ]]; then item_cards_lines; fi
-  exit "$list_items_exit"
+  exit $?
 fi
 
 # ── crates-mutation-rows 格 ──
@@ -611,9 +550,17 @@ module_exit=$?
 if [[ "$module_exit" == 250 && -n "${memory_cap_hit_directory:-}" ]]; then : > "$memory_cap_hit_directory/memory-cap-hit"; fi
 unset GATE_MUTATION_NOT_RUN_RECORD
 not_run_count="$(grep -c . "$not_run_record" 2>/dev/null)" || not_run_count=0
-# 分片的各片（GATE_MUTATION_ROW_SELECTION 不是 --item 换成的）不转：分出去的行由合并那一步的核账再报
+# 分片的各片（GATE_MUTATION_ROW_SELECTION 不是 --item 换成的）不转进 GATE_NOT_RUN_FILE：分出去的行由合并那一步照下面 GATE_MUTATION_SHARD_NOT_RUN_FILE 的记录列、再由合并那一步的核账报
 if ((not_run_count > 0)) && [[ -n "${GATE_NOT_RUN_FILE:-}" && ( -z "${GATE_MUTATION_ROW_SELECTION:-}" || -n "$item_selection_file" ) ]]; then
   cat "$not_run_record" >> "$GATE_NOT_RUN_FILE"
+fi
+# 分片的一片：本次未跑的几条交给驱动的产物目录（GATE_MUTATION_SHARD_NOT_RUN_FILE，文件头「分片」），合并那一步照它列
+if ((not_run_count > 0)) && [[ -n "${GATE_MUTATION_SHARD_NOT_RUN_FILE:-}" && -n "${GATE_MUTATION_ROW_SELECTION:-}" && -z "$item_selection_file" ]]; then
+  if ! cat "$not_run_record" >> "$GATE_MUTATION_SHARD_NOT_RUN_FILE"; then
+    echo "  ✗ 这一片本次未跑的 $not_run_count 条写不进 $GATE_MUTATION_SHARD_NOT_RUN_FILE，合并那一步会把它们当读不到的行"
+    echo "     → 怎么办：看那份文件所在的产物目录可不可写、满没满，修好重投这一片。"
+    exit 1
+  fi
 fi
 # --item 点名的几行：选中的全抓到时模块退 3（选行模式给驱动看的约定），人点名的全抓到就是这一格绿；
 # 选中的里有本次未跑的不说都抓到，全是本次未跑的退 77。

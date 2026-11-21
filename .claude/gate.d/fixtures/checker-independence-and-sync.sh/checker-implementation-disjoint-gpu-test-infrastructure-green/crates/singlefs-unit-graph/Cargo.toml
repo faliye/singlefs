@@ -1,0 +1,6 @@
+[package]
+name = "singlefs-unit-graph"
+
+[dependencies]
+quote = "1.0.35"
+

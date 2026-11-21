@@ -1,0 +1,2 @@
+# 样本：report_cores.sh 里 $(nproc) 那一行挪进了同目录的 other-cores.sh（不是它按拆法命名的部分文件，族外），表里那一行写新路径
+scripts/new-rig/other-cores.sh:jobs=$(nproc)  # 样本：只把核数打出来，不起线程

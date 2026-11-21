@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# crash-point-replay 样本 sample-root-bare-red 的假 rustc：-V、-Vv 打版本；-vV 另打 host，别的退 0（这份样本退在开格之前，弄坏开关 sample-service-unchecked 下也只判只读树的一格）
+case "${1:-}" in
+  -V|-Vv) echo "rustc 0.0.0-crash-point-replay-sample" ;;
+  -vV) printf '%s\n' "rustc 0.0.0-crash-point-replay-sample" "host: x86_64-unknown-linux-gnu" "release: 0.0.0" ;;
+esac
+exit 0

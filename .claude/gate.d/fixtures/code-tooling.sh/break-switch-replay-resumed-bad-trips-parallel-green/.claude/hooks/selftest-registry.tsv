@@ -1,0 +1,2 @@
+# 样本登记表
+scripts/gate/lane.sh	selftest	# 样本：自证只睡几秒，只在样本树里读写 running/ 下几个小文件

@@ -1,5 +1,6 @@
 exit=0
 want=样本只跑 .gate-cells 点名的格：break-switch-replay
 want=并行 2 条（登记的每台默认重活线程数 2 条；内存上限 102400 MiB
-want=外层 2 条 × 里层 1 = 2（不超过每台默认重活线程数 2）
+want=基准趟：外层 1 条 × 里层 2 = 2（不超过每台默认重活线程数 2）
+want=开关趟：外层 2 条 × 里层 1 = 2（不超过每台默认重活线程数 2）
 want=break-switch-replay：绿

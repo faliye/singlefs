@@ -1,5 +1,5 @@
 exit=1
-want=15 处自己定并行度默认值的写法没经登记位取
+want=14 处自己定并行度默认值的写法没经登记位取
 want=scripts/experiment-apparatus/baseline_read.py:3  读自己的线程变量 SAMPLE_BASELINE_THREADS：capped.sh 不设它
 want=scripts/experiment-apparatus/wrap_helper.py:8  读自己的线程变量 SAMPLE_WRAP_THREADS：capped.sh 不设它
 want=scripts/experiment-apparatus/alias_env.py:4  读自己的线程变量 SAMPLE_ALIAS_THREADS：capped.sh 不设它

@@ -1,0 +1,8 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mutation-list-items
+want=── 复用三问：first 那一趟（mutation-list-items）
+want=crates-mutation-rows.py --list-items 在被判的根上跑通：列了 2 行，键对不上 2 条（这一趟要现判）
+want=全部复用，这一格没起它
+want=· 按条复用：2 条（变异表 2 行按改的文件分组），现判 1、复用 1、拒算 0
+want=REUSE_SELFTEST script=.claude/gate.d/code-tooling.sh same-inputs=reused unrelated-change=reused unit-change=rejudged-only-affected items=2 affected=1
+want=mutation-list-items：绿

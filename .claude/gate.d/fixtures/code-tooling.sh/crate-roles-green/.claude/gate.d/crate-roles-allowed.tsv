@@ -1,0 +1,2 @@
+crates/p-verify/src/bin/e7_gate_tool.rs	# 门禁起它，留在验证包
+crates/p-verify/src/bin/library_reader.rs	# 崩溃入口起它读判定库

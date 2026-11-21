@@ -1,0 +1,4 @@
+# 样本表
+alpha	crates/**	样本
+alpha	/tmp/claude-1000/**	样本
+beta	/tmp/claude-1000/**	样本：只带 Read、Bash 的定义也登记

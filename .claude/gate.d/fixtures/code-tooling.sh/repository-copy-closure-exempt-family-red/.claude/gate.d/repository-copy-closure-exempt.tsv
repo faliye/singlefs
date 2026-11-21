@@ -1,0 +1,2 @@
+# 样本：stage-copy.sh 里拷 crates 那一行挪进了 .claude/gate.d/lib/ 下的 other-cells.sh（不是它按拆法命名的部分文件，族外），表里那一行写新路径
+.claude/gate.d/lib/other-cells.sh:"$repository_root/crates"  # 样本：自证搭的小仓要整份 crates

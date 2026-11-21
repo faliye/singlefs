@@ -1,0 +1,11 @@
+[package]
+name = "p-gpu"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+measure = { path = "../p-experiments", package = "p-experiments" }
+
+[dependencies]
+p-format = { path = "../p-format" }
+

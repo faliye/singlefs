@@ -1,0 +1,5 @@
+exit=1
+want=cargo check 退 101、编不过（1 个包：crates/consumer），这几个包这一趟没有事实、不入库
+want=error: couldn't read `crates/consumer/tests/common_shared/../../../provider/tests/c/mod.rs`: No such file or directory (os error 2)
+want=· crates/consumer：红，现判（编不过）
+want=crate-cross-references：红（退出 1）

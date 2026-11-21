@@ -1,0 +1,5 @@
+[package]
+name = "singlefs-core"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }

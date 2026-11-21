@@ -1,0 +1,4 @@
+exit=1
+want=共用切词模块 .claude/hooks/lib_shell_words.py 里的函数，在 .claude/hooks/ 下别的文件里又定义了一份
+want=.claude/hooks/shared_text_tools.py:4  def commands_at_command_position（共用模块里定义在 lib_shell_words.py）
+want=agent-write-scope：红（退出 1）

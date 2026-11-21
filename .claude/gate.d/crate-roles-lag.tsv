@@ -1,0 +1,4 @@
+# crate-roles 格的滞后表，只缩不涨（门禁 code-tooling 的 crate-roles 格与基准那一版比，多出行判红）：一行「<目标的源文件><TAB># 理由」，一个目标一行。
+# 目标是实验装置之外的包里没登放行表的二进制目标，或库为空、角色不是测试支撑的包的测试目标（判法 scripts/gate/crate-roles-check.py 文件头）；整包目录与别的目录不收。
+# 改完一个删一行；那一行用不着了（目标搬走、包不再犯）门禁判红，同一次改动删掉。
+crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs	# 实验装置 E202（GPU与CPU两种模式GC对照组），随测试包拆包搬进实验包时删这一行（records/2026-11-19-产品GPU包测试与E202装置归位.md）

@@ -1,0 +1,2 @@
+# 样本根的逐项点名（当作命令行上的 --item）：点开关表写在部分文件里的那一条开关
+scripts/gate/divided.py:DIVIDED_BREAK=drop

@@ -1,0 +1,4 @@
+exit=1
+want=✗ 2 处自己定并行度默认值的写法没经登记位取
+want=crates/demo/src/shares.rs:3  核数的一半
+want=crates/demo/src/shares.rs:16  核数的一半

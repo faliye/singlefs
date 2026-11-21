@@ -1,0 +1,5 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：break-switch-headers
+want=弄坏开关文件头：读开关的 1 份：写全 1 份、豁免 0 份
+want=另有 1 份部分文件读开关，读的开关整族的文件头开关表里都有
+want=break-switch-headers：绿

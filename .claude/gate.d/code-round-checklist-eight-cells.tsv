@@ -1,0 +1,12 @@
+# 门禁 doc-process-records 的 code-round-checklist 格读的只判八格的名单：第九格「放的位置」立起那一天以前写好的代码轮正文，标题有没有日期都登，只判前八格。
+# 一行「<相对仓根的正文路径><TAB># 理由>」。只缩不长：正文归档、改名之后那一行判红，同一次改动删掉；不往里加新正文。
+research/prompts/_amplification-without-cards-code-r1-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_amplification-without-cards-code-r2-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_checker-src-backfill-code-r1-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_gpu-tests-src-backfill-code-r1-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_m4-close-c1040-c1041-code-r1-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_replay-prefix-backfill-code-r1-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_unit-graph-src-backfill-code-r1-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_write-composition-code-r1-body.md	# 标题没有日期，第九格立起之前写好
+research/prompts/_judging-closure-and-real-card-instance-code-r3-body.md	# 标题日期是第九格截止日那一天，那一天第九格换上之前写好的八格正文
+research/prompts/_replay-prefix-backfill-code-r3-body.md	# 标题日期是第九格截止日那一天，那一天第九格换上之前写好的八格正文

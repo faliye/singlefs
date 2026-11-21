@@ -1,0 +1,9 @@
+[package]
+name = "p-experiments"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+p-gpu = { path = "../p-gpu" }
+p-verify = { path = "../p-verify" }
+

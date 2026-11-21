@@ -1,0 +1,2 @@
+# 样本复跑登记表
+scripts/gate/divided.py	30	# 样本：入口自己不读开关，读开关的代码与开关表都在 import 的部分文件里

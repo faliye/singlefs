@@ -1,0 +1,3 @@
+exit=0
+want=可疑写法 0 处全在排除表里（表 0 行，每行都命中）
+want=heavy-thread-defaults：绿

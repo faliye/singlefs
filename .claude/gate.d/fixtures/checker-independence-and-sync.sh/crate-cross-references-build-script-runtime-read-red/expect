@@ -1,0 +1,4 @@
+exit=1
+want=crates/ 下有 1 处编译单元读了别的包目录下的源码或不属任何包的文件，两张表里都没登：
+want=crates/consumer  引 crates/provider/src/k.wgsl（构建脚本报的 rerun-if-changed；构建脚本运行时读的别的包文件）
+want=crate-cross-references：红（退出 1）

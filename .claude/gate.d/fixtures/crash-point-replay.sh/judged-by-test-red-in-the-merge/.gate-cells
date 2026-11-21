@@ -1,0 +1,3 @@
+# 登记了 red-blocks=judged-by-test 的崩溃枚举用例：单片那一趟 cargo test 退 0（日志照 judged-by-test-green），核账那一趟 cargo test 退 101（同名 .merge-exit）：
+# 核账那一步判红，判的是 crash-case-replay 格；门禁只跑这份点名的格，code-tooling 的 fixture-claims 格也照它数红绿
+crash-case-replay

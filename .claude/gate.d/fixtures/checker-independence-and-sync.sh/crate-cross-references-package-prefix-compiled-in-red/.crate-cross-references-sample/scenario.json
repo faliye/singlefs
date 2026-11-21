@@ -1,0 +1,40 @@
+{
+ "packages": [
+  {
+   "name": "consumer",
+   "directory": "crates/consumer"
+  },
+  {
+   "name": "provider",
+   "directory": "crates/provider"
+  }
+ ],
+ "workspace_members": [
+  "consumer"
+ ],
+ "units": [
+  {
+   "package": "consumer",
+   "kind": [
+    "test"
+   ],
+   "name": "cross",
+   "src_path": "crates/consumer/tests/cross.rs",
+   "deps_name": "cross-5a1f0c2e9d3b7a64",
+   "dep_info": "dep-info/cross.d"
+  }
+ ],
+ "build_scripts": [
+  {
+   "package": "consumer",
+   "directory_name": "consumer-8e3b5a1f7c0d2469",
+   "output": [
+    "cargo::rerun-if-changed=build.rs",
+    "cargo::rerun-if-changed=../provider/src/k.wgsl",
+    "cargo::rerun-if-changed=../provider/tests/c/mod.rs"
+   ],
+   "generated": {}
+  }
+ ],
+ "exit_code": 0
+}

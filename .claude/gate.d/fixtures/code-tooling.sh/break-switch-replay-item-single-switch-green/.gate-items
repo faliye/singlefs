@@ -1,0 +1,2 @@
+# 样本根的逐项点名（当作命令行上的 --item）：只点 trio.py 的一条开关；只起基准趟与这一条，另两条不起
+scripts/gate/trio.py:TRIO_BREAK=alpha

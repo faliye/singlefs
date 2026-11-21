@@ -1,0 +1,10 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：reading-discipline
+want=扫了 2 个文件（读不动的 0 个）
+want=这 2 个文件分属 1 份装置，其中 1 份有不止一个源文件
+want=C60 查了 2 个整型结构体字段
+want=折叠写法 1 处（豁免表 1 行，放行 1 处）
+want=恒为字面量 0 的 1 个（豁免表 1 行，放行 1 处）
+want=只缩不涨（基准 HEAD）：C59、C60
+want=reading-discipline：绿
+want=code-source-discipline.sh：1 格里 1 格绿（reading-discipline），0 格本次未跑（无）

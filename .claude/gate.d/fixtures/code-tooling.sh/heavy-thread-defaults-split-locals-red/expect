@@ -1,0 +1,4 @@
+exit=1
+want=✗ 2 处自己定并行度默认值的写法没经登记位取
+want=scripts/hosts/orphan_run-body.sh:3  读自己的线程变量 SAMPLE_ORPHAN_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值
+want=scripts/hosts/stranger_report.sh:3  读自己的线程变量 SAMPLE_STRANGER_WORKERS：capped.sh 不设它，读它的那条语句里也没回退到 SINGLEFS_THREAD_CAP 或登记值

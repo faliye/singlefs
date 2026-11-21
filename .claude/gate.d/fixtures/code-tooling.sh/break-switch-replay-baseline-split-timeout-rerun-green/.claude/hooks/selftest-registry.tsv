@@ -1,0 +1,3 @@
+# 样本登记表
+scripts/gate/slow.sh	selftest	# 样本：自证只睡几秒、只在内存里判
+scripts/gate/quick.sh	selftest	# 样本：自证只在内存里判

@@ -1,0 +1,6 @@
+exit=0
+want=里进仓的 git 钩子装好了：core.hooksPath 是主工作树钩子目录的绝对路径
+want=pre-commit、pre-merge-commit、prepare-commit-msg、pre-applypatch、pre-push 在、有执行位、进仓的模式是 100755
+want=样本只跑 .gate-cells 点名的格：git-hooks-installed
+want=── 汇总：code-tooling.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=  git-hooks-installed：绿

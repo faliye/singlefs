@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：task-and-session-numbers
+want=这次改动相对基准多出 4 行写了任务号、会话短号或批号，在 4 份文件里
+want=records/2026-09-24-样本调度.md:4  任务服务的任务号  「任务 21036」
+want=records/fenced.md:3  批号  「第 7 批」
+want=records/2026-09-25-新记录.md:3  批号  「批 105」
+want=.claude/kb/probe.md:3  任务服务的任务号  「任务 21037」
+want=doc-text.sh：1 格里 1 格红（task-and-session-numbers）

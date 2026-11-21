@@ -4,7 +4,8 @@
 #   tracked-r1   点名 other.rs 与 gone.rs；快照目录基准里就已跟踪；gone.rs 这次删了，没有内容可算哈希，清单没有它不碍事
 #   中文题-r1    判决文件名是中文，点名 named.rs，快照目录同名（git 不带 core.quotepath=false 时中文文件名是带引号的八进制串，会认不出）
 #   kbonly-r1    只点 kb 的推论轮，外加通配写法 crates/*/src/*.rs，不算点名文件，不判
-#   testonly-r1  只点名 验证包的测试代码，不判
+#   testonly-r1  只点名验证包的代码（角色表里登成验证，非产品代码），不判
+# 角色表只登了验证包；crates/demo 没登记，照产品算。
 # 另有基准里就有的旧判决 old-r1 点名 lib.rs、没有快照，这次只补了一句，不判。
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
@@ -19,6 +20,7 @@ printf '# old 第一轮：主 agent 核实\n\n改动：crates/demo/src/lib.rs �
 # 同一个阶段的 batch-scope 与 knowledge-sync 两格读触发文件清单（读不到就红）：这份只放一条碰不到这份样本改动的正则、随基准提交
 mkdir -p .claude/gate.d
 printf '^\\.claude/hooks/\t# 钩子（这份样本不碰）\n' > .claude/gate.d/knowledge-sync-triggers.tsv
+printf '# 样本里的角色表\nsinglefs-verification\t验证\tcrates/singlefs-verification\t样本里的验证包\n' > .claude/gate.d/crate-roles.tsv
 sha256sum crates/demo/src/other.rs > research/prompts/tracked-r1-snapshot/crates-sha256.txt
 git add -A && git commit -qm base
 printf 'pub fn publish() -> u32 { 2 }\n' > crates/demo/src/lib.rs

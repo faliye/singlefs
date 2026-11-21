@@ -1,0 +1,5 @@
+exit=1
+want=允许两边共用的 `singlefs-unit-graph` 的依赖闭包（本仓内部依赖图加仓根 Cargo.lock，dev-dependencies 也算）里有 GPU 一族或验证包、产品 GPU 包 1 个
+want=singlefs-unit-graph → wgpu
+want=允许两边共用的 `prune-server` 的依赖闭包（本仓内部依赖图加仓根 Cargo.lock，dev-dependencies 也算）里有 GPU 一族或验证包、产品 GPU 包 2 个
+want=checker-implementation-disjoint：红（退出 1）

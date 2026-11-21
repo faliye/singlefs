@@ -1,0 +1,4 @@
+exit=1
+want=✗ product-binary：crates/p-gpu（产品）有 1 个二进制目标在放行表、滞后表里都没有：crates/p-gpu/src/bin/e1_x.rs（bin e1_x）
+want=crates/ 下各包的角色与放置有 1 处不合
+want=crate-roles：红

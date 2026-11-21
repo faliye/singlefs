@@ -1,0 +1,3 @@
+# 样本标记：门禁 broad-mutation 在被判的根里见到它才进样本模式（阶段文件头「样本」）；现场照下一行的情形造（.claude/gate.d/lib/broad-mutation-samples.py）
+# 这一份另放 .sample-environment-bare：进样本模式先核在不在临时 prune-server 底下，按「环境里什么都没设」答，退 2、现场不造、格不判
+scenario=summary:green

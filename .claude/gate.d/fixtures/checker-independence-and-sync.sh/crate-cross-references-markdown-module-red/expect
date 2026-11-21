@@ -1,0 +1,5 @@
+exit=1
+want=crates/ 下有 1 处编译单元读了别的包目录下的源码或不属任何包的文件，两张表里都没登：
+want=crates/consumer  引 crates/provider/src/code.md（test:cross；跨包源码，后缀是数据后缀
+want=别的包的数据文件 1
+want=crate-cross-references：红（退出 1）

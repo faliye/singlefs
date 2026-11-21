@@ -1,0 +1,2 @@
+# 样本根的逐项点名（当作命令行上的 --item）：只点 tally.py 的一条开关；汇总行那一行没被点名，只点单条认不出它是不是汇总行，判不定、不记库
+scripts/gate/tally.py:TALLY_BREAK=prefix

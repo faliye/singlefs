@@ -1,0 +1,17 @@
+# crates/ 下各包的角色（门禁 code-tooling 的 crate-roles 格读，判法 scripts/gate/crate-roles-check.py；规矩在 .claude/rules/directory-layout.md「crates/：各包放什么」）。
+# 一个包一行，四列制表符分隔：包名（Cargo.toml [package] 的 name）、角色、目录（相对仓根）、理由（至少 4 个字）。
+# 角色四选一：产品（随产品发的代码）、验证（验证包、池级 checker、RefFS）、测试支撑（只给测试与装置用的库，至少两个无条件的依赖者，产品包只在 [dev-dependencies] 里依赖它）、实验装置（实验包，只放装置二进制，没有包依赖它）。
+# 新加一个包同一次改动登它那一行；包删了、改名了、搬了，同一次改动删、改这一行。
+singlefs-format	产品	crates/singlefs-format	格式常量，核心层与池级 checker 共用的一边（门禁 checker-independence-and-sync ⑧ 的允许共用）
+singlefs-core	产品	crates/singlefs-core	核心层，产品文件系统的主体
+singlefs-replay-prefix	产品	crates/singlefs-replay-prefix	取日志前缀的纯函数核，核心层调用、Verus 验证
+singlefs-mount-runtime	产品	crates/singlefs-mount-runtime	挂载就起的后台运行库，只依赖核心层
+singlefs-background-gpu	产品	crates/singlefs-background-gpu	产品 GPU 路径，它的测试住它自己的 tests/
+singlefs-checker	验证	crates/singlefs-checker	池级 checker，判一个镜像的判决器库
+singlefs-reference-filesystem	验证	crates/singlefs-reference-filesystem	RefFS，语义级的参照文件系统
+singlefs-verification	验证	crates/singlefs-verification	验证包：测试、测试的脚手架与门禁、崩溃入口自己起的工具
+singlefs-background-gpu-tests	验证	crates/singlefs-background-gpu-tests	实验装置 E202（GPU与CPU两种模式GC对照组）搬进实验包之前的落脚处，拆包进行中，见 records/2026-11-19-产品GPU包测试与E202装置归位.md；E202 装置登在 .claude/gate.d/crate-roles-lag.tsv
+singlefs-unit-graph	测试支撑	crates/singlefs-unit-graph	函数单元图，验证包与产品 GPU 包的测试一侧都依赖
+singlefs-device-library	测试支撑	crates/singlefs-device-library	实验装置读写判定库的口子，实验包与 scripts/experiment-apparatus 都依赖
+singlefs-background-gpu-pairing-keys	测试支撑	crates/singlefs-background-gpu-pairing-keys	产品 GPU 包真卡对拍两侧与录入那一组的判法单元键，产品包测试与实验包里的 E202 依赖
+singlefs-implementation-experiments	实验装置	crates/singlefs-implementation-experiments	实验包：实验装置二进制，依赖验证包与产品，没有包依赖它

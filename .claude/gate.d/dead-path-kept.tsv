@@ -43,3 +43,20 @@
 .claude/kb/checks-owed.md	scripts/crash/crash-point-replay-shard-run.sh	# 抄下来的当时的做法：C796、C640、C793 三行已关，记的是关账那天它的自证与登记，脚本 2026-11-10 整份删了（门禁 crash-point-replay 自己分片），改成后继就成假话
 .claude/skills/merge-verify/SKILL.md	a/.claude/gate.d/refused-tests.tsv	# 抄下来的命令：git diff --no-index 在草稿目录里对 a、b 两份拷贝出补丁，路径相对那个草稿目录，仓根下没有
 .claude/skills/merge-verify/SKILL.md	b/.claude/gate.d/refused-tests.tsv	# 抄下来的命令：git diff --no-index 在草稿目录里对 a、b 两份拷贝出补丁，路径相对那个草稿目录，仓根下没有
+.claude/kb/checks-owed.md	scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs	# 说当时的事：C774 记的是第二十五次跑前后装置的内容，那时装置是单个文件，grep -c 65549 的现查输出是拆前的数，改成后继就成假话
+.claude/kb/checks-owed.md	scripts/experiment-apparatus/e159_fsync_wait_group_commit.rs	# 抄下来的当时的命令：C776 抄的 grep -n 点名拆前单个文件，「五行都是 311」是它当时的输出，换成后继输出就对不上
+.claude/kb/checks-owed.md	scripts/experiment-apparatus/e172_deletion_write_dry_run.rs	# 说当时的事：C775 记的是装置加退役项那一趟，grep -c 退役 现查 48 是拆前单个文件的数，改成后继就成假话
+.claude/kb/experiments/139-按盘回退下界的收严形态.md	scripts/experiment-apparatus/e139_tightened_floor.rs	# 抄下来的当时的命令与当时单文件的行号、行数：grep -c 输出 36、装置行号、5229 行与 6341 行都指拆前单个文件，改成后继就成假话
+.claude/kb/experiments/142-新池新建文件的干跑.md	scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs	# 抄下来的当时的命令：grep -n 点名拆前单个文件，「第 107、108 行」是它当时的输出
+.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md	scripts/experiment-apparatus/e155_fsync_write_volume.rs	# 抄下来的当时的命令：mutate.sh 点名拆前单个文件，「15 条全部红」是它当时的输出
+.claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md	scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency.rs	# 说当时的事：装置从拆前单个文件第 36–2058 行原样拷来、与源文件逐个 diff 为空，行号与 diff 都指那一版
+.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md	crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs	# 抄下来的当时的命令：grep -c 点名拆前单个文件，「19 条」是它当时的输出
+.claude/kb/experiments/166-并行提交的共享状态分法.md	scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition.rs	# 抄下来的当时的命令：grep -c 点名拆前单个文件，「21」是它当时的输出
+.claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md	scripts/experiment-apparatus/e167_multi_inflight_crash_cut.rs	# 抄下来的当时的命令：三处 grep -c 点名拆前单个文件，37、52、59 条是它们各自当时的输出
+.claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md	scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery.rs	# 抄下来的当时的命令：grep -c 点名拆前单个文件，「30 条」是它当时的输出
+.claude/kb/experiments/171-三oracle合谋测试.md	crates/singlefs-verification/tests/checker_known_bad_images.rs	# 说当时的事：装置照抄的是拆前单个文件，sha256 前缀与「第 7–1294 行」都指那一版
+.claude/kb/experiments/186-不认识的树-记账维重推.md	scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs	# 抄下来的当时的命令与出处：grep -c 输出 22 与 35、与主工作区那份源文件 diff 无输出，都是拆前单个文件的事
+.claude/kb/experiments/187-隔离落盘代价.md	scripts/experiment-apparatus/e187_quarantine_mark_cost.rs	# 抄下来的当时的命令：grep -c 点名拆前单个文件，「33」是它当时的输出
+.claude/kb/experiments/199-发布照抄上一版的代价.md	scripts/experiment-apparatus/e199_transaction_output_copy.rs	# 说当时的事：跑这份产物的那一版装置，sha256 与 2619 行指拆前单个文件
+.claude/kb/milestone/02-second-txn.md	scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs	# 说当时的事：2026-09-23 追平 mkfs 那一刻装置是单个文件，「第 2193、2195 行调 record_zero_fill」指那一版
+

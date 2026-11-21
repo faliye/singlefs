@@ -1,0 +1,6 @@
+exit=1
+want=样本档：
+want=✓ crash-case:plain-stream 第 0/1 片判完它领的块
+want=✓ crash-case:fault-injection-given-states 第 0/1 片判完它领的块
+want=✗ crash-case:fault-injection-given-states 判红：cargo test 退非 0（上面是它的尾部）
+want=✗ 1 条崩溃枚举用例判红：crash-case:fault-injection-given-states（这一趟判绿 1 条

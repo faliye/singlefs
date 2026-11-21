@@ -1,4 +1,7 @@
-# 样本的登记表：三行都写对了
+# 样本的登记表：六行都写对了
 .claude/gate.d/sample-stage.sh	样本：一个工作进程一大块内存
 scripts/experiment-apparatus/budget_run.sh	样本：一个走种子的线程约 4 GiB
 cargo:demo:demo_device	样本：一份准备单位要建两份池
+cargo:demo:demo_split_run	样本：目录式测试目标，子模块里按空闲内存定开几个工作线程
+cargo:demo:demo_split_bin	样本：目录式二进制目标，子模块里按空闲内存定开几个工作线程
+scripts/hosts/split_gate.sh	样本：入口自己没有这类写法，拆出的部分文件里按内存预算算走种子的线程数

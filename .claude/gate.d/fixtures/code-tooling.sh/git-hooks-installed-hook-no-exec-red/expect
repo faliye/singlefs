@@ -1,0 +1,7 @@
+exit=1
+want=pre-applypatch 没有执行位
+want=进仓的 git 钩子没装好（1 处，逐条列在上面）：提交与推送前的大文件判法就不起作用
+want=python3 scripts/gate/git-hooks-install.py install
+want=样本只跑 .gate-cells 点名的格：git-hooks-installed
+want=  git-hooks-installed：红（退出 1）
+want=bash .claude/gate.d/code-tooling.sh --check git-hooks-installed

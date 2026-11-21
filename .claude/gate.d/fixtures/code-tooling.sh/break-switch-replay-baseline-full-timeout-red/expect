@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=scripts/gate/stall.sh：不设开关的 --selftest 就没过（超时：基准趟限时 3 秒；头一趟里层已拿满登记的 4 个线程、跑了
+want=到点，不重跑），开关下的失败行比不出哪些是开关弄红的，这一份的开关一条都没起
+want=脚本与钩子的弄坏开关复跑：1 处不对（复跑了 0 条、0 份）
+want=break-switch-replay：红（退出 1）

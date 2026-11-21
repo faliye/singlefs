@@ -1,0 +1,5 @@
+exit=1
+want=crates/ 下有 1 处编译单元读了别的包目录下的源码或不属任何包的文件，两张表里都没登：
+want=crates/consumer  引 OUT_DIR:consumer/copied.rs（test:cross；构建脚本拷进 OUT_DIR 的别的包文件，内容与 crates/provider/src/x.rs 相同）
+want=构建脚本生成 1
+want=crate-cross-references：红（退出 1）

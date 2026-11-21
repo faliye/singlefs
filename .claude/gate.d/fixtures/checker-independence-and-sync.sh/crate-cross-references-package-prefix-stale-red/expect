@@ -1,0 +1,5 @@
+exit=1
+want=两张表有 2 行写不对或用不着了：
+want=.claude/gate.d/crate-cross-references-allowed.tsv 第 4 行：crates/consumer 的前缀行 crates/absent/ 不是别的包的目录
+want=.claude/gate.d/crate-cross-references-allowed.tsv 第 5 行：crates/consumer 的前缀行 crates/bystander/ 这一趟没有一处构建脚本报的 rerun-if-changed 落在它里面
+want=crate-cross-references：红（退出 1）

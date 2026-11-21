@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# crash-point-replay 样本 sample-root-bare-red 的假 cargo：-V 打版本，别的一律退 101（这份样本退在开格之前，不该起 cargo；起了就照退 101 判错，不起真 cargo）
+if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-crash-point-replay-sample"; exit 0; fi
+echo "样本 sample-root-bare-red 的假 cargo 不该被起：$*"
+exit 101

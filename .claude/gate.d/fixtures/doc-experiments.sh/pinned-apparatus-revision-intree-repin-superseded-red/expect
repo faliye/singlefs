@@ -1,0 +1,7 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：pinned-apparatus-revision
+want=1 份钉了装置 sha256 的起跑脚本对不上它的跑前登记
+want=scripts/experiment-apparatus/e954-r2-segment-run.sh：钉值从 0ed8fd181f21 改成了 c90686d32781，登记 research/prompts/e954-r2-prereg.md 的第十二节里基准钉值前 12 位 0ed8fd181f21 写在钉值前 12 位 c90686d32781 之后：钉值只认第十二节里最后写下的那个，c90686d32781 是已被后续修订作废的值（回退到旧值的，在第十二节末尾新加一行写回旧值与为什么回退）
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（pinned-apparatus-revision）
+want=→ pinned-apparatus-revision：补登记第十二节一行修订（新 sha256、改了什么）

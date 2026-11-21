@@ -1,0 +1,6 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：break-switch-replay
+want=! admission.py verdict-plan 卡住：整组连着 2 秒 CPU 一个滴答都没涨、也没有进程在等盘
+want=! 按条复用算不出（admission.py verdict-plan 退 124（
+want=脚本与钩子的弄坏开关复跑判红：按条复用失灵
+want=break-switch-replay：红（退出 1）

@@ -1,2 +1,3 @@
-# 样本根的逐项点名（当作命令行上的 --item）：只点 tally.py 的一条开关；那一份照整份起（另两条陪跑），okay.py 不起
+# 样本根的逐项点名（当作命令行上的 --item）：点 tally.py 整份，又点它的一条开关：按整份起（基准趟与三条开关都是这一趟的判定；复用三问的 unit 那一趟只 prefix 现判，基准趟与另两条复用、照起），okay.py 不起
+scripts/gate/tally.py
 scripts/gate/tally.py:TALLY_BREAK=prefix

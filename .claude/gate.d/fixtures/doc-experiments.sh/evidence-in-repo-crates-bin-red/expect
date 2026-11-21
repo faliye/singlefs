@@ -1,0 +1,8 @@
+exit=1
+want=research/results/ 里却没有一份不比它旧的产物
+want=crates/sample/src/bin/e921_apparatus.rs（装置源码，改于 2026-09-05）：research/results 下一份 E921 的产物都没有
+want=crates/sample/src/bin/e922_apparatus_dir/main.rs（装置源码，改于 2026-09-05）：最新的 E922 产物 research/results/e922-apparatus-dir-2026-09-01.out 还是 2026-09-01 那份
+want=样本只跑 .gate-cells 点名的格：evidence-in-repo
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（evidence-in-repo）
+want=→ evidence-in-repo：跑一次把产物存进 research/results/

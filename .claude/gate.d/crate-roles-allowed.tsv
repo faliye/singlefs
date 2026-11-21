@@ -1,0 +1,8 @@
+# crate-roles 格的放行表（门禁 code-tooling 的 crate-roles 格读）：实验装置之外的包里留在原处的二进制目标，一行「<二进制目标的源文件><TAB># 理由>」。
+# 验证包与测试支撑包登门禁、崩溃入口自己起的工具，产品包登产品自己的可执行入口；理由写谁起它。条目不在了、或不再是实验装置之外的包里的二进制目标，门禁判红，同一次改动删这一行。
+crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs	# 门禁 formal-verification 的红例钉表一格起它（.claude/gate.d/e165-pinned-red-examples.tsv）
+crates/singlefs-verification/src/bin/crash_library_reader.rs	# 崩溃点重放入口 scripts/crash/crash-point-replay.sh 与 scripts/crash/crash-library-totals.sh 起它读崩溃判定库
+crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs	# 真设备入口 scripts/devices/e152-run.sh 编它当来宾程序，门禁 qemu-device-streams 按它的单元闭包算键
+crates/singlefs-verification/src/bin/new_pool_file_creation_device_log_check.rs	# 门禁 qemu-device-streams 起它核来宾跑出的设备日志
+crates/singlefs-verification/examples/shrink_one_failing_random_history_seed.rs	# 随机历史判红打出的复现行起它收缩种子（tests/random_histories/main.rs），测试的脚手架，留验证包
+crates/singlefs-unit-graph/src/bin/unit_graph.rs	# 函数单元图的命令行 unit-graph：门禁共用库 scripts/gate/lib_function_units_unit_graph.py 起它算判法单元键

@@ -1,0 +1,34 @@
+# 门禁 checker-independence-and-sync 的 crate-cross-references 格的放行表：判法判红而确要留着的引用，判据一句话：编译单元读进来的文件落在别的包目录里、或不属任何包的，判红，登放行表才过；只有别的包目录下后缀是 .toml、.md、.tsv 的数据文件放行，条件是只经 include_str! / include_bytes! 读进来（当模块或 include! 编进来的不论后缀照源码判）；构建脚本报的 rerun-if-changed 落在别的包目录里的照同一句判，拷进 OUT_DIR 再编进来的别的包文件不论后缀判红。一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」，路径都相对仓根（OUT_DIR 里的写 OUT_DIR:<包名>/<相对路径>），理由至少 8 个字。
+# 判法读 cargo check 写的 dep-info 与构建脚本的 output（scripts/gate/crate-cross-references-check.py 文件头）：一个包的几个编译单元与构建脚本读同一份文件登一行；这一趟没有哪个单元读它了，门禁判红，同一次改动删这一行。
+# 前缀行「<构建脚本所在的包目录><TAB><别的包目录>/<TAB># 理由>」：第二列以 / 收尾，放行这个包的构建脚本报的 rerun-if-changed 里落在那个别的包目录下的每一份（构建脚本为算判定的单元键，逐份读别的包源码取指纹，只算哈希、不编进本包）；只放行构建脚本报的 rerun-if-changed，编进编译单元的与拷进 OUT_DIR 的照旧逐文件登；指的目录不是一个包的目录、这一趟没有一处落在它里面的行判红。
+crates/singlefs-unit-graph	crates/singlefs-core/build.rs	# 单元图的单测把核心层的构建脚本编进来，逐个核特性表与核心层 Cargo.toml 的 [features] 相同；被测的就是那份构建脚本
+crates/singlefs-unit-graph	crates/singlefs-background-gpu/build.rs	# 单元图的单测把产品 GPU 包的构建脚本编进来，逐个核特性表与它 Cargo.toml 的 [features] 相同；被测的就是那份构建脚本
+crates/singlefs-unit-graph	crates/singlefs-verification/build.rs	# 单元图的单测读验证包的构建脚本原文，核它把 profile 读到的环境变量逐个报给 cargo；被测的就是那份构建脚本
+crates/singlefs-unit-graph	crates/singlefs-background-gpu-pairing-keys/build.rs	# 单元图的单测读真卡对拍键那个测试支撑包的构建脚本原文，核它把 profile 读到的环境变量逐个报给 cargo；被测的就是那份构建脚本
+crates/singlefs-verification	crates/singlefs-core/build.rs	# 验证包的测试经 #[path] 把核心层的整份构建脚本编进来，读它的特性表、调它的 features_opened_by_the_rustflags_but_off_in_this_build_script，核 RUSTFLAGS 点名打开的特性与它自己的 cfg 对不上时判得出；被测的就是那份构建脚本
+crates/singlefs-background-gpu-pairing-keys	crates/singlefs-background-gpu/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-background-gpu 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-pairing-keys	crates/singlefs-core/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-core 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-pairing-keys	crates/singlefs-format/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-format 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-pairing-keys	crates/singlefs-mount-runtime/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-mount-runtime 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-pairing-keys	crates/singlefs-replay-prefix/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-replay-prefix 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-pairing-keys	crates/singlefs-unit-graph/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-unit-graph 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-pairing-keys	prune-server/	# 构建脚本为算判定的单元键，把单元闭包里 prune-server 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-background-gpu/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-background-gpu 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-checker/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-checker 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-core/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-core 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-format/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-format 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-mount-runtime/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-mount-runtime 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-replay-prefix/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-replay-prefix 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-unit-graph/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-unit-graph 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-background-gpu-tests	crates/singlefs-verification/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-verification 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-implementation-experiments	crates/singlefs-checker/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-checker 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-implementation-experiments	crates/singlefs-core/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-core 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-implementation-experiments	crates/singlefs-format/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-format 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-implementation-experiments	crates/singlefs-verification/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-verification 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-verification	crates/singlefs-background-gpu/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-background-gpu 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-verification	crates/singlefs-checker/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-checker 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-verification	crates/singlefs-core/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-core 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-verification	crates/singlefs-format/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-format 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-verification	crates/singlefs-replay-prefix/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-replay-prefix 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-verification	crates/singlefs-unit-graph/	# 构建脚本为算判定的单元键，把单元闭包里 singlefs-unit-graph 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包
+crates/singlefs-verification	prune-server/	# 构建脚本为算判定的单元键，把单元闭包里 prune-server 的源码逐份报 rerun-if-changed 取指纹；只算哈希、不编进本包

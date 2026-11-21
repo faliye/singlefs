@@ -3,6 +3,7 @@ want=样本档：
 want=· 样本档：上一版（.unit-verdict-sample/prior）的 3 条测试函数照判绿记进这一版的判定库
 want=（上一版那一趟的多机配置 .unit-verdict-sample/prior-multi-host.env，ENABLE_GPU=0）
 want=· 按条复用：验证包 3 条编得进的测试函数，现判 0、复用 3、拒算 0；这一组特性下不编 0 条
+want=✓ 第 0/1 片的按条复用那一趟：第 0/1 片：没有归这一片要现判的测试函数，这一片没起 cargo（复用 3）
 want=复用 crates/singlefs-verification/tests/setting.rs::test_t
 want=验证包 3 条测试函数都有键相同的判定，全部复用，这一趟没起 cargo（现判 0、复用 3、拒算 0，各片跑过）
 want=逐格：crash-case-replay：绿；feature-gated-tests：无对象可判

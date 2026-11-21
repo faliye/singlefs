@@ -1,7 +1,7 @@
 # E165（恢复重放有界穷举与变异杀伤界）钉住的红例：E165 第二段驱动每出一个红，按输入原样钉成这里的一行，门禁逐行复判（用户 2026-10-01 定，调度记录 records/2026-10-01-里程碑三形式化接入.md 第三节）。
 # 修好之后留作回归：今天的实现在这个输入上的逐态行要与 ⑦ 逐字节相同，⑥ 点名的「改回去就红」的变异要还在它的表里。
 # 红例缩不了，原样钉：一行就是有界穷举里按 ②③④ 定位的一个状态（恢复重放的一份盘上输入），① 由这个状态本身算出；把输入缩小就成了枚举里的另一个状态
-#   （②③④ 与 ① 都变），而全量对每个域从最小的 N 起逐个 N 穷举到界（装置 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs 里
+#   （②③④ 与 ① 都变），而全量对每个域从最小的 N 起逐个 N 穷举到界（装置 crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs 里
 #   for size in domain.smallest_size()..=largest_size 那一层），更小的输入要是也红，它已经是红例账里自己的一行、照样钉在这张表里。
 # 行只由 scripts/experiment-apparatus/e165-pin-red-examples.py <红例账…> 追加（写前复核这份文件没被别人改过，已钉的不重复），不手改；
 # E165 第二段驱动 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh 写完一对红例账与 kill-bounds 产物之后当场照追加用法调它，再 --check 同一对判钉全（驱动文件头「钉红例」一段）。

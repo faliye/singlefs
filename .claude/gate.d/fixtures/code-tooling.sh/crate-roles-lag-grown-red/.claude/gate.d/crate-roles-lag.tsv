@@ -1,0 +1,4 @@
+crates/p-legacy-tests/tests/one.rs	# 拆包进行中，搬回被测包时删这一行
+crates/p-legacy-tests/tests/two.rs	# 拆包进行中，搬回被测包时删这一行
+crates/p-legacy-tests/src/bin/e3_old.rs	# 要搬进实验包的装置
+crates/p-verify/src/bin/e8_moving_out.rs	# 要搬进实验包的装置

@@ -1,0 +1,2 @@
+scripts/gate/alpha.py ALPHA_BREAK=drop
+scripts/gate/alpha.py ALPHA_BREAK=swap

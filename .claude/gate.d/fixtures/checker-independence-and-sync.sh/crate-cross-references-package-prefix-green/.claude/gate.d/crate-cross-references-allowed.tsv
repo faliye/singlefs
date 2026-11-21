@@ -1,0 +1,3 @@
+# 样本里的放行表：一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」，路径相对样本根；第二列以 / 收尾的是前缀行，放行这个包的构建脚本报的 rerun-if-changed 里落在那个别的包目录下的每一份。
+# 写法照仓里那一份（.claude/gate.d/crate-cross-references-allowed.tsv）。
+crates/consumer	crates/provider/	# 样本里登的前缀行：消费包的构建脚本为算判定的单元键，逐份读提供包的源码取指纹

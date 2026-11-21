@@ -1,0 +1,8 @@
+exit=1
+want=research/results/ 里却没有一份不比它旧的产物
+want=scripts/experiment-apparatus/e919_timing_row_missing.rs（装置源码，改于 2026-09-05）：复跑表里 E919 的 timing 行点名的产物 e919-timing-row-missing-b-2026-09-01.out 在 research/results 下不在盘
+want=scripts/experiment-apparatus/e920_timing_row_stale.rs（装置源码，改于 2026-09-05）：复跑表里 E920 的 timing 行点名的产物里最旧的 research/results/e920-timing-row-stale-b-2026-09-01.out 还是 2026-09-01 那份（每一份都要不比装置旧）
+want=样本只跑 .gate-cells 点名的格：evidence-in-repo
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（evidence-in-repo）
+want=→ evidence-in-repo：跑一次把产物存进 research/results/

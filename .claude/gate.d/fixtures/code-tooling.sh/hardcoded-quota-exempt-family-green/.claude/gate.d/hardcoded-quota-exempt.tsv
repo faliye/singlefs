@@ -1,0 +1,2 @@
+# 样本：split_values.py 里写死上限那一行挪进同目录的 split_values_cap.py（Python 拆法的部分文件），表里那一行改成新路径、锚串不变
+scripts/hosts/split_values_cap.py:DEVICE_MEMORY_CAP = "6G"  # 样本：自证里造的假值

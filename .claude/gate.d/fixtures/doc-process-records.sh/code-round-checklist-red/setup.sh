@@ -5,7 +5,7 @@ sample_date="$(TZ=Asia/Tokyo date -d '+30 days' +%F)"
 mkdir -p research/prompts
 {
   printf '# c991-code-r1：样本代码轮第一轮正文（%s）\n\n' "$sample_date"
-  for label in 走不到的理由二次查实 类型与名字 不兼容旧代码与旧格式 测试优先多线程 "带 --item 的命令与项" 新崩溃流多罩了什么; do
+  for label in 走不到的理由二次查实 类型与名字 不兼容旧代码与旧格式 测试优先多线程 "带 --item 的命令与项" 新崩溃流多罩了什么 放的位置; do
     printf '### 检查单：%s\n\n成立：样本里的答案与证据，crates/demo/src/lib.rs:1。\n\n' "$label"
   done
 } > research/prompts/_c991-code-r1-body.md

@@ -1,0 +1,51 @@
+{
+ "packages": [
+  {
+   "name": "consumer",
+   "directory": "crates/consumer"
+  },
+  {
+   "name": "provider",
+   "directory": "crates/provider"
+  }
+ ],
+ "workspace_members": [
+  "consumer"
+ ],
+ "units": [
+  {
+   "package": "consumer",
+   "kind": [
+    "test"
+   ],
+   "name": "cross",
+   "src_path": "crates/consumer/tests/cross.rs",
+   "deps_name": "cross-5a1f0c2e9d3b7a64",
+   "dep_info": "dep-info/cross.d"
+  },
+  {
+   "package": "consumer",
+   "kind": [
+    "custom-build"
+   ],
+   "name": "build-script-build",
+   "src_path": "crates/consumer/build.rs",
+   "deps_name": "build_script_build-b84e2c6a1f9d3570",
+   "dep_info": "dep-info/build-script-build.d",
+   "build_directory": "consumer-b84e2c6a1f9d3570"
+  }
+ ],
+ "build_scripts": [
+  {
+   "package": "consumer",
+   "directory_name": "consumer-3c9e1b5d7f20a4e8",
+   "output": [
+    "cargo::rerun-if-changed=build.rs"
+   ],
+   "generated": {
+    "generated.rs": "pub const GENERATED: u32 = 1;\n"
+   }
+  }
+ ],
+ "exit_code": 0
+}

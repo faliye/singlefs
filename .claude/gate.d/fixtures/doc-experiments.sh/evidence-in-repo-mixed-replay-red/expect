@@ -1,0 +1,10 @@
+exit=1
+want=research/results/ 里却没有一份不比它旧的产物
+want=scripts/experiment-apparatus/e915_mixed_replay.rs（装置源码，改于 2026-09-05）：复跑表里 E915 的 timing 行点名的产物里最旧的 research/results/e915-mixed-replay-timing-2026-09-01.out
+want=还是 2026-09-01 那份
+want=→ 怎么办：跑一次把产物存进 research/results/，并在 scripts/experiment-apparatus/replay.sh 把这个实验的登记行指到它。
+want=样本只跑 .gate-cells 点名的格：evidence-in-repo
+want=── 汇总：doc-experiments.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=doc-experiments.sh：1 格里 1 格红（evidence-in-repo）
+want=→ evidence-in-repo：跑一次把产物存进 research/results/
+want=bash .claude/gate.d/doc-experiments.sh --check evidence-in-repo

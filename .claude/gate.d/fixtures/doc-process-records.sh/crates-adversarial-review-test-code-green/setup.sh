@@ -14,6 +14,8 @@ printf 'pub fn pool_checked() -> u32 { 1 }\n' > crates/singlefs-checker/src/lib.
 printf 'name\tfile\n' > crates/mutations.tsv
 # 同一个阶段的 batch-scope 与 knowledge-sync 两格读触发文件清单（读不到就红）：这份只放一条碰不到这份样本改动的正则、随基准提交
 printf '^\\.claude/agents/\t# 定义（这份样本不碰）\n' > .claude/gate.d/knowledge-sync-triggers.tsv
+# 角色表把两个包登成验证：它们的 src 是非产品代码（弄坏开关 test-code-skipped 去掉的那一类）
+printf '# 样本里的角色表\nsinglefs-verification\t验证\tcrates/singlefs-verification\t样本里的验证包\nsinglefs-checker\t验证\tcrates/singlefs-checker\t样本里的池级 checker\n' > .claude/gate.d/crate-roles.tsv
 git add -A && git commit -qm base
 printf 'pub fn workload() -> u32 { 2 }\n' > crates/singlefs-verification/src/model.rs
 printf '#[test]\nfn workload_runs() { assert_eq!(2, 2); }\n' > crates/singlefs-verification/tests/workload.rs

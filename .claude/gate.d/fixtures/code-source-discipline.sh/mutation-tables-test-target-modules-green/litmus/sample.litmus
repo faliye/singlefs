@@ -1,0 +1,4 @@
+C sample
+{}
+P0(int *x) { WRITE_ONCE(*x, 1); }
+exists (x=1)

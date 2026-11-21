@@ -7,8 +7,10 @@
   units:<名>       新键在真源码上的样子：样本根里写一棵小工作区（singlefs-core、singlefs-checker、singlefs-format），载入驱动、用它的函数照这棵树
                    把清单按单元记进判定库、每条记一行抓到（键是此刻算的单元键）；再照情形改源码。不写 summary.sh：
                    格起真的驱动 --summary（--toolchain-from / --tools-from 取样本里的两份文件），判法、单元键都是此刻驱动那一份
-                   判定库是 prune-server 里那一份（驱动文件头「判定库」）：库目录 .broad-sample/home 只当名字、本地不建；样本根在临时目录底下
-                   （共享门禁的 stage-selftest.sh 拷进 mktemp -d），客户端照它另占一份命名空间；要连得上服务，连不上客户端退 75、这份现场造不成
+                   判定库是 prune-server 里那一份（驱动文件头「判定库」）：库目录 .broad-sample/home 只当名字、本地不建；命名空间只在临时 prune-server
+                   底下给（scripts/prune-server/prune_server_client.py 文件头「键空间」：环境里有 PRUNE_SERVER_TEMPORARY_SERVICE_SOCKET 时按库目录另占一份），
+                   不在临时服务底下几份样本读写真服务里同一个种类、互相读到对方记的结论。所以样本档整条套 --with-temporary-service 起，
+                   阶段进样本模式先核在不在临时服务底下、不在就退 2，一份现场都不造（.claude/gate.d/broad-mutation.sh 文件头「样本」）；连不上服务客户端退 75、这份现场造不成
 各情形改的那一处与期望写在 SCENARIOS 旁边的注释里；样本目录的 expect 写它该红还是该绿、该出现的句子。
 """
 import argparse

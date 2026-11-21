@@ -1,0 +1,8 @@
+[package]
+name = "p-legacy-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+p-gpu = { path = "../p-gpu" }
+

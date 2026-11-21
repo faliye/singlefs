@@ -1,0 +1,3 @@
+# 样本里的放行表：一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」，路径相对样本根。
+# 写法照仓里那一份（.claude/gate.d/crate-cross-references-allowed.tsv）。
+crates/consumer	crates/provider/src/k.wgsl	# 样本里登的一行：消费包的测试读提供包的着色器源码，确要编进来

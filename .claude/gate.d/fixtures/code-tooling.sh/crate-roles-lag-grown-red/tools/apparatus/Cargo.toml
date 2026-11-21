@@ -1,0 +1,9 @@
+[package]
+name = "apparatus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dev-dependencies]
+support = { path = "../../crates/p-support", package = "p-support" }

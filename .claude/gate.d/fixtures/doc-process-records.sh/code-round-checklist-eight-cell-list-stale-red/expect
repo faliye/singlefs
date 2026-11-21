@@ -1,0 +1,4 @@
+exit=1
+want=✗ 只判八格的名单 .claude/gate.d/code-round-checklist-eight-cells.tsv 有 1 行不对（名单 1 行）
+want=.claude/gate.d/code-round-checklist-eight-cells.tsv 第 1 行的 research/prompts/_c996-code-r1-body.md 不在了
+want=code-round-checklist：红

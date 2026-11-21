@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 本该判红，一份样本同时放四种坏法：装置改了而产物比它旧；变异表改了而这个实验号一份产物都没有；
 # kb 里把还清依据写成 /tmp 下的报告；这一轮新写的提示里把实现员报告引成 /tmp 下的文件；
-# 另有一个装置注释与代码一起改（E907），不许按只改注释放过；E910 登记了准入，产物比源码新而产物头记的实验键对不上今天的，按实验键判红。
+# 另有一个装置注释与代码一起改（E907），不许按只改注释放过；E910 登记了准入，产物比源码新而产物头记的实验键对不上今天的，按实验键判红；
+# E913 的复跑表行是 timing、E914 的复跑表行是 exact 而点名的产物不在盘，都不按复跑表放过，照旧按修改时刻判红。
 # 修改日子一律按东京的零点写（TZ=Asia/Tokyo touch -d <日期>），格里也按东京的日期报，与跑门禁那台机器的时区无关。
 # 样本根的 .gate-cells 只点名 evidence-in-repo，同一道里别的九格不跑这份样本；want 只认 evidence-in-repo 格自己的行。
 set -e
@@ -29,6 +30,12 @@ mkdir -p .claude/gate.d
 printf 'E910\tscripts/experiment-apparatus/e910_fingerprint_stale.rs::main\t# 样本：登记了准入\n' > .claude/gate.d/stage-inputs.tsv
 printf '[package]\nname = "e910-sample"\nversion = "0.0.0"\nedition = "2021"\n\n[[bin]]\nname = "e910"\npath = "e910_fingerprint_stale.rs"\n' > scripts/experiment-apparatus/Cargo.toml
 printf 'fn main() { println!("e910"); }\n' > scripts/experiment-apparatus/e910_fingerprint_stale.rs
+# E913、E914：复跑表里的行是 timing（比对方式不是 exact），或是 exact 而点名的产物不在盘（盘上只有一份更旧的别名产物）⇒ 仍按修改时刻判，产物比装置旧判红
+printf 'E913|e913-replay-timing||e913-replay-timing-2026-09-01.out|timing\nE914|e914-replay-exact-product-missing||e914-replay-exact-product-missing-2026-09-02.out|exact\n' > scripts/experiment-apparatus/replay.sh
+printf 'fn main() { println!("e913"); }\n' > scripts/experiment-apparatus/e913_replay_timing.rs
+printf 'E7RESULT name=e913 rows=1\n' > research/results/e913-replay-timing-2026-09-01.out
+printf 'fn main() { println!("e914"); }\n' > scripts/experiment-apparatus/e914_replay_exact_product_missing.rs
+printf 'E7RESULT name=e914 rows=1\n' > research/results/e914-older-2026-09-01.out
 git add -A && git commit -qm base
 printf 'fn main() { println!("e901 改过了"); }\n' > scripts/experiment-apparatus/e901_stale_product.rs
 printf '// 字段表见 layout/01-first.md\nfn main() { println!("e907 改过了"); }\n' > scripts/experiment-apparatus/e907_comment_and_code.rs
@@ -58,3 +65,7 @@ printf 'fn main() { println!("e910 改过了"); }\n' > scripts/experiment-appara
 printf 'E7INPUT name=input_fingerprint key=E910 sha256=%064d files=1\nE7RESULT name=e910 rows=1\n' 0 > research/results/e910-fingerprint-stale-2026-09-06.out
 TZ=Asia/Tokyo touch -d 2026-09-05 scripts/experiment-apparatus/e910_fingerprint_stale.rs
 TZ=Asia/Tokyo touch -d 2026-09-06 research/results/e910-fingerprint-stale-2026-09-06.out
+printf 'fn main() { println!("e913 改过了"); }\n' > scripts/experiment-apparatus/e913_replay_timing.rs
+printf 'fn main() { println!("e914 改过了"); }\n' > scripts/experiment-apparatus/e914_replay_exact_product_missing.rs
+TZ=Asia/Tokyo touch -d 2026-09-01 research/results/e913-replay-timing-2026-09-01.out research/results/e914-older-2026-09-01.out
+TZ=Asia/Tokyo touch -d 2026-09-05 scripts/experiment-apparatus/e913_replay_timing.rs scripts/experiment-apparatus/e914_replay_exact_product_missing.rs

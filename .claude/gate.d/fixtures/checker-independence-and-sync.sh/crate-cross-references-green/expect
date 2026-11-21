@@ -1,0 +1,5 @@
+exit=0
+want=跨包源码与不属任何包的文件 1 处都登在放行表（1 行）或滞后表（0 行）里
+want=构建脚本生成 1、依赖源码 0、别的包的数据文件 1
+want=crate-cross-references：绿
+want=crates/ 下 1 个包的 2 个编译单元

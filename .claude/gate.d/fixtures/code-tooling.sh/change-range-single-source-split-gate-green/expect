@@ -1,0 +1,4 @@
+exit=0
+want=查了 .claude/gate.d/ 下 4 份：没有阶段自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false，调共用取法都判了退出码
+want=其中门禁拆出的库 2 份（照拆分族归到 2 道门禁）
+want=没扫的库 1 份（不在任何一道门禁的拆分族里）：.claude/gate.d/lib/unrelated-cells.sh

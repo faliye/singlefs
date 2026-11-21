@@ -1,0 +1,4 @@
+exit=1
+want=✗ empty-library-tests：crates/p-x-tests（验证）库是空的、却有 2 个测试目标不在滞后表里（crates/p-x-tests/tests/alpha.rs、crates/p-x-tests/tests/beta.rs）
+want=crates/ 下各包的角色与放置有 1 处不合
+want=crate-roles：红

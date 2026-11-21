@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: checker 类：checker 与实现只共享常量模块、记账语义不许同源，验证包与产品 GPU 包不共用代码；布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟；判器调用点要么在判定段里、要么带了豁免或 CPU 参照的标记
+# run-condition: command bash git python3 cargo
+# task-server-compiles: yes
+# gate-stage: checker 类：checker 与实现只共享常量模块、记账语义不许同源，验证包与产品 GPU 包不共用代码，crates/ 下各包的编译单元不读别的包目录下的源码（照 cargo check 写的 dep-info 判）；布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟；判器调用点要么在判定段里、要么带了豁免或 CPU 参照的标记
 # gate-fixture: yes
 # gate-category: checker 类
 # gate-similar: code-source-discipline.sh 它的 format-constants 格也按 lib-format-const.py 读格式常量，但判的是 kb 字段表与常量模块两边的值逐个对得上；这里判格式常量变了 checker 跟没跟，不比两边的值；它的 mutation-tables 格按 lib-owed.py 读欠账表，判实验源码与变异表的纪律
@@ -11,9 +12,12 @@
 # gate-similar: model-differential-and-scenarios.sh 同样盯验证包，但判的是用例粒度与模型对拍，不读 Cargo.toml
 # gate-similar: code-source-discipline.sh 它的 gpu-exemptions 格（scripts/crash/gpu-exemptions-check.py）读同一种 // gpu-exempt: 标记，判的是标记与豁免表逐项对上；这里的 cpu-judging-sites 格判的是判器调用点有没有落在判定段里或带了标记，对象是调用点不是表行；并进那一道要改 code-source-discipline.sh，那一份这一轮有别的会话在加格（records/2026-10-13-复用键与全仓改名.md 课题 4 批次 4-2 派发），所以落在判 checker 与实现之间账的这一道
 # gate-similar: code-tooling.sh 它的 function-units-two-implementations-agree 格也调 scripts/gate/lib_function_units.py，判的是函数单元两份实现逐单元对拍；这里的 checker-direction-overlap 格拿它收的闭包判池级 checker 两个方向共享了什么，对象是 checker 源码、不是库本身
+# gate-similar: crash-point-replay.sh 它也起 cargo、按单元键复用判定，但只编验证包（cargo test --release -p singlefs-verification --lib --tests），罩不到别的包的测试、示例、二进制与特性组合；crate-cross-references 格要 cargo check 全部包的全部目标与特性，并进它也是那一道再多编一遍，还把一格读 dep-info 的判法绑上它的计划、各片、合并三步，所以留在判包与包之间账的这一道
+# gate-similar: crates-mutation-replay.sh 它经 scripts/mutation/prove_red_core.py 与 scripts/gate/lib_rebuilt_packages.py 也读编译目录里的 dep-info，判的是改过的包这一趟重编了没有；crate-cross-references 格判的是编译单元读的文件落在哪个包，对象不同
 #
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就四格都跑，格名写错退 2）：
+# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就五格都跑，格名写错退 2）：
 # gate-cell: checker-implementation-disjoint checker 与实现只共享常量模块，验证包与产品 GPU 包不共用代码
+# gate-cell: crate-cross-references crates/ 下各包的编译单元不读别的包目录下的源码（照 cargo check 写的 dep-info 判，按包复用判定）
 # gate-cell: layout-checker-sync 布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟
 # gate-cell: cpu-judging-sites 验证包里每一处调判器的地方，要么在判定段里，要么包住它的函数带豁免或 CPU 参照的标记
 # gate-cell: checker-direction-overlap 池级 checker 遍历式与扫描式两个方向调用的函数单元，交集只许落在格式解析与常量里，取不到调用图也判红
@@ -23,12 +27,14 @@
 # 依据：.claude/kb/decisions/13-验证路线.md 已定项 5（两侧只共享 kb 字段表生成的常量模块）；⑤⑥⑦ 另依已定项 3（RefFS）
 # 与 F4「RefFS 单独一个包，按依赖图判」（research/prompts/m3-formal-r4-main-verification.md，
 # 判决 research/prompts/m3-formal-r5-main-verification.md 第二节 U4 一行）；⑧ 另依七·2 research/prompts/m4-gpugc-design-r3-main-verification.md
-# 第二节 G7 一行与「新开产品 GPU 包，门禁补一格」（records/2026-10-19-里程碑四GPU垃圾回收开工.md 里弹窗定四问的一行）。①②③⑤⑥⑦⑧ 七条，任一条不成立判红：
+# 第二节 G7 一行与「新开产品 GPU 包，门禁补一格」（records/2026-10-19-里程碑四GPU垃圾回收开工.md 里弹窗定四问的一行）；⑧ 的允许共用里单元图与判定库客户端另依 .claude/rules/directory-layout.md「crates/：各包放什么」。①②③⑤⑥⑦⑧ 七条，任一条不成立判红：
 #   ① 按 crates/*/Cargo.toml 建内部依赖图，singlefs-checker 与 singlefs-core 各取传递闭包求交，减去 singlefs-format 必须为空。
 #      取闭包：checker 经中间包依赖实现时，直接依赖表上看不出。外部 crate 是叶子、照样参与求交；
 #      罩不到外部 crate 之间的传递依赖（要真跑 cargo tree）。
 #   ② checker 源码零处引 singlefs_core，经 `package =` 改名引进来的别名（`别名::`）同样算。
-#   ③ crates/singlefs-format/src/**/*.rs 正文不许有 if / match / for / while / loop；`#[cfg(test)]` 只豁免紧跟它的那一个 item。
+#   ③ crates/singlefs-format/src/**/*.rs 正文不许有 if / match / for / while / loop；`#[cfg(test)]` 只豁免紧跟它的那一个 item；整份算测试代码的文件
+#      （父文件里引到它的每一处 mod 声明带 #[cfg(test)]、祖先文件整份算测试、文件自己带 #![cfg(test)]；认法只在 scripts/gate/lib_rust_test_module_files.py 文件头）整份不扫，
+#      它的行数记进 skipped_test_lines（成功句「标着的项 N 行不扫」里的 N）。
 #   ⑤ singlefs-reference-filesystem（RefFS）的传递闭包（dev-dependencies 也算）⊆ {它自己}：只用 std，singlefs-format 与外部 crate 都不许有。
 #   ⑥ RefFS 的源码（包目录下全部 .rs，target/ 除外）零处引 singlefs_core、singlefs_checker、singlefs_verification
 #      （真名按标识符认，`singlefs_checker_x` 这类更长的标识符不算一处 `singlefs_checker`）；经 `package =` 改名引进来的别名照 ② 的认法（`别名::`）同样算。
@@ -38,12 +44,15 @@
 #   ⑧ 验证包 singlefs-verification 与产品 GPU 包 singlefs-background-gpu：两边的传递闭包（dev-dependencies 也算）里都没有对方；
 #      两边闭包的交集减去允许共用的必须为空。允许共用的：singlefs-format、singlefs-core 与它们经 [dependencies] / [build-dependencies]
 #      带进来的（dev-dependencies 不算），wgpu、naga 一族（名字是 wgpu、naga 或以 `wgpu-`、`naga-` 起头）与仓根 Cargo.lock 里它们的传递依赖
-#      （没有 Cargo.lock 时只认一族的名字）。有一边依赖另一边时交集这一条不判（交集就是下面那一边的整个闭包），等依赖删掉再判。
+#      （没有 Cargo.lock 时只认一族的名字），函数单元图 singlefs-unit-graph 与它经 [dependencies] / [build-dependencies] 带进来的（verus_syn、proc-macro2、quote），
+#      判定库客户端 prune-server（在 crates/ 之外，按名字认）。有一边依赖另一边时交集这一条不判（交集就是下面那一边的整个闭包），等依赖删掉再判。
+#      允许共用的单元图与判定库客户端（包目录 crates/singlefs-unit-graph、prune-server 在的那几个）另判：它们的依赖闭包（本仓内部依赖图加仓根 Cargo.lock，
+#      dev-dependencies 也算）里没有 wgpu、naga 一族，没有验证包与产品 GPU 包；有就判红。
 #      两边的源码（包目录下全部 .rs，target/ 除外）零处引对方：真名按标识符认，经 `package =` 改名引进来的别名照 ② 的认法（`别名::`）。
 #      包在而哪一边一个 .rs 都没有，判红。
 #   产品 GPU 包目录 crates/singlefs-background-gpu 不在照 RefFS 那一段判红。
 #   ⑧ 罩不到的：外部 crate 之间的传递依赖只看 Cargo.lock 里 wgpu、naga 一族那一支（别的要真跑 cargo tree）；`#[path = …]`、`include!`、
-#      `include_str!` 跨包目录引源码或着色器文件不认（只认 crate 名与别名）。
+#      `include_str!` 跨包目录引源码或着色器文件归 crate-cross-references 格判。
 # 依赖表认 [dependencies] / [dev-dependencies] / [build-dependencies] / [target.'…'.dependencies]、[dependencies.X]、
 # `X.workspace = true`（根 Cargo.toml [workspace.dependencies] 里的 package = 改名也认）、`别名 = { package = "真名", … }`；闭包按真名求交。
 # 为什么：checker 重建记账、运行时增量维护记账，I-3.1（已分配统计对得上） 拿两者对账；两侧共用语义代码时写错会两边同样错，对账照样全绿。
@@ -51,6 +60,27 @@
 # 射程：判不了两边各写的语义对不对（归模型对拍与变异表）；「运行时记账分支取反，I-3.1 必须红」在 crates/mutations.tsv，
 # 归门禁 crates-mutation-replay；也判不了 RefFS 的语义对不对、它与实现是不是落在同一个崩溃语义的误解上（归 D13（验证路线） 已定项 6 的合谋测试）。
 # 六个 crate 路径写死，改名、搬家或包不在都判红、不跳过。
+#
+# ── crate-cross-references ──
+# 依据：.claude/rules/directory-layout.md「crates/：各包放什么」（编译单元读进来的文件落在别的包目录里、或不属任何包的，判红，登放行表才过；
+#   只有别的包目录下后缀是 .toml、.md、.tsv 的数据文件放行，条件是只经 include_str! / include_bytes! 读进来（当模块或 include! 编进来的不论后缀照源码判）；
+#   构建脚本报的 rerun-if-changed 落在别的包目录里的照同一句判，拷进 OUT_DIR 再编进来的别的包文件不论后缀判红）。
+#   放行表另认一种前缀行「<构建脚本所在的包目录><TAB><别的包目录>/<TAB># 理由>」：构建脚本为算判定的单元键逐份读别的包源码取指纹，一行放行读一整个别的包；
+#   只放行构建脚本报的 rerun-if-changed 那一类，编进编译单元的与拷进 OUT_DIR 的照旧逐文件登；指的目录不是一个包的目录、这一趟没有一处落在它里面的前缀行判红（判法文件头「两张表」）。
+# 判法只在 scripts/gate/crate-cross-references-check.py check（判的包、dep-info 怎么读、读到的文件怎么分、两张表的写法、单元键与判定库、样本与射程都在它文件头）：
+#   cargo check --offline --message-format=json --all-targets --all-features 编这一趟要现判的包，读每个编译单元的 dep-info 与构建脚本的 output，照上面那一句分类；
+#   数据后缀的那几份是不是只当数据读、OUT_DIR 里的是不是别的包文件的拷贝，认法与认不到的在判法文件头「数据读法」「OUT_DIR 拷贝」「判不到的」。写法不论，真编进来的都在 dep-info 里。
+#   存量：拆包时要改写的登在只缩不涨的 .claude/gate.d/crate-cross-references-lag.tsv，确要留着的登在放行表 .claude/gate.d/crate-cross-references-allowed.tsv；
+#   两张表一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」（相对仓根，理由至少 8 个字），引用不在了的行判红；滞后表比基准那一版多出行判红
+#   （基准那一版在这一格里经 lib-lag-baseline.py show 取，基准名照 scripts/gate/changed-paths.sh 的 gate_diff_base gate；不在 git 仓里或基准里还没有这张表的不比、
+#   成功句写明；取不到判红）。
+# 编译目录：照环境里的 CARGO_TARGET_DIR（文件头的会编声明「# task-server-compiles: yes」让统一任务服务给这一次尝试一份），这一道不建、不删；
+#   没设或落在被判的根里判红、一个包都不编。--list 不起 cargo。
+# 复用：一个包一条判定（判法文件头「复用」：键是判法闭包、工作区清单、包目录下的文件与这个包上一次读过的包外文件与构建脚本的输入，工具链与构建环境不进键），
+#   在 prune-server 那一份库里（unit-verdicts 族，种类 crate-cross-references-check.py:packages）；键相同的包不起 cargo，分类与两张表每趟照库里的事实现判；
+#   成功句报现判、复用、强制现判、拒算各几个；复用三问与复用哨兵在判法的 --selftest（reuse-three-questions、reuse-sentinel 两格）。prune-server 不可用这一格退 75。
+# 样本档：样本根里放录好的 .d 与包清单（.crate-cross-references-sample/scenario.json），判法照它写假 cargo 与假 rustc（.crate-cross-references-sample-tools/），
+#   不起真编译；样本档在临时 prune-server 底下起（判法开跑先核，不在退 2）。
 #
 # ── layout-checker-sync ──
 # 读 .claude/gate.d/layouts.tsv：一套布局一行，制表符分四列（布局名 / incompat 位号 / 格式定义路径 / checker 判定路径，后两列逗号分隔）。
@@ -105,6 +135,43 @@
 #                                                              ⑧ 红、交集只点 2 个（sample-gpu-kernels、pollster）
 #   checker-implementation-disjoint-gpu-package-moved-red      产品 GPU 包搬到 crates/background-gpu、包名没变：判红
 #   checker-implementation-disjoint-gpu-package-without-sources-red  产品 GPU 包只有 Cargo.toml、一个 .rs 都没有：判红
+#   checker-implementation-disjoint-gpu-test-infrastructure-green  两边都依赖 singlefs-unit-graph（它带进 quote）与仓根下的 prune-server：⑧ 绿，两个都判了闭包
+#   checker-implementation-disjoint-gpu-test-infrastructure-red    同上，单元图另依赖 wgpu、prune-server 另依赖验证包：⑧ 红，两个都点名
+#   checker-implementation-disjoint-cfg-test-module-file-green     同 -green，共享模块 lib.rs 里 `#[cfg(test)] mod tests;`，引进来的 tests.rs 里有 if：整份不扫、行数记进 skipped_test_lines：③ 绿
+#                                                                  （两份源码、正文 3 行、标着的项 5 行不扫：lib.rs 的 2 行加 tests.rs 的 3 行）
+#   checker-implementation-disjoint-cfg-test-module-file-red       同上，lib.rs 另有没带 #[cfg(test)] 的 `mod plain;`，plain.rs 里有 if：③ 红、只点 plain.rs 那一处（tests.rs 的 if 不算）
+#   crate-cross-references 的样本：两个包 crates/consumer（测试目标 tests/cross.rs）与 crates/provider，cross.rs 照下面的写法引 provider 的 tests/c/mod.rs 或 src/k.wgsl，
+#   .crate-cross-references-sample/dep-info/ 下录好那个单元的 .d（列着中转的同包文件与引到的那一份），两张表只有表头：每份判红，编得过的点名「crates/consumer  引 <那一份>」，
+#   inline-module-base 那一份照真 cargo 编不过（没有 .d，scenario.json 里 exit_code 101、stderr 录真 cargo 的报错）、点名编不过
+#   crate-cross-references-plain-path-red             `#[path = "../../provider/tests/c/mod.rs"]`（对照）
+#   crate-cross-references-cfg-attr-path-red          `#[cfg_attr(all(), path = "../../provider/tests/c/mod.rs")]`
+#   crate-cross-references-renamed-include-macro-red  `use std::include_str as grab;` 后 `grab!("../../provider/src/k.wgsl")`
+#   crate-cross-references-bracket-delimiters-red     `include_str!["../../provider/src/k.wgsl"]`
+#   crate-cross-references-raw-string-path-red        `#[path = r"../../provider/tests/c/mod.rs"]`
+#   crate-cross-references-inline-module-base-red     `mod common_shared { #[path = "../../../provider/tests/c/mod.rs"] pub mod c; }`（行内模块里的 #[path] 从 tests/common_shared/ 起算；
+#                                                     那个目录不在，rustc 读不到、编不过：判红、点名「cargo check 退 101、编不过」，这个包这一趟不入库）
+#   crate-cross-references-absolute-path-red          `#[path = "<样本根的绝对路径>/crates/provider/tests/c/mod.rs"]`（录好的 .d 里写 @ROOT@，假 cargo 换成样本根）
+#   crate-cross-references-non-rs-intermediate-red    `#[path = "shim.inc"] mod shim;`，shim.inc 里再 `#[path]` 引过去（中转那一份算同包）
+#   crate-cross-references-target-directory-red       `mod target;`，tests/target/mod.rs 里引
+#   crate-cross-references-hidden-directory-red       `#[path = ".shared/mod.rs"] mod shared;`，.shared/mod.rs 里引
+#   crate-cross-references-green                      同包 `#[path = "c/mod.rs"]`、读 provider 的 Cargo.toml、读 OUT_DIR 里构建脚本生成的 .rs、读依赖源码，
+#                                                     放行表登了一处跨包引用（tests/cross.rs 引 provider 的 src/k.wgsl）；另有 build.rs 的构建脚本单元，
+#                                                     它的 .d 照真 cargo 写在 build/consumer-<哈希>/build_script_build-<哈希>.d：绿、点名 2 个编译单元
+#   crate-cross-references-markdown-module-red        `#[path = "../../provider/src/code.md"] mod from_markdown;`，另 include_str! 读 provider 的 src/notes.md：
+#                                                     只点名 code.md（跨包源码，后缀是数据后缀），notes.md 算别的包的数据文件
+#   crate-cross-references-unpackaged-include-red     `include!("../../../shared/snippet.inc")`、`include_str!("../../../notes/table.txt")`（两份都不属任何包）：两份都点名（仓里不属任何包的文件）
+#   crate-cross-references-out-dir-copy-red           构建脚本往 OUT_DIR 写 copied.rs（与 provider 的 src/x.rs 逐字节相同）与 generated.rs，cross.rs 都 include! 进来：
+#                                                     只点名 OUT_DIR:consumer/copied.rs（构建脚本拷进 OUT_DIR 的别的包文件，内容与 crates/provider/src/x.rs 相同）
+#   crate-cross-references-build-script-runtime-read-red  构建脚本的 output 报 rerun-if-changed=../provider/src/k.wgsl 与 ../provider/Cargo.toml：
+#                                                     只点名 k.wgsl（构建脚本报的 rerun-if-changed；构建脚本运行时读的别的包文件）
+#   crate-cross-references-package-prefix-green      构建脚本的 output 报 rerun-if-changed=../provider/src/k.wgsl 与 ../provider/src/shared.rs（另有 ../provider/Cargo.toml），
+#                                                     放行表登一行前缀行 crates/consumer、crates/provider/：绿、「2 处都登在放行表（1 行）」
+#   crate-cross-references-package-prefix-compiled-in-red  同一行前缀行；cross.rs 经 #[path] 编进 provider 的 tests/c/mod.rs，构建脚本也报了它的 rerun-if-changed、另报 ../provider/src/k.wgsl：
+#                                                     红、「1 处」没登，点名 mod.rs（test:cross、构建脚本报的 rerun-if-changed；跨包源码），k.wgsl 由前缀行放行
+#   crate-cross-references-package-prefix-stale-red     放行表三行前缀行：crates/provider/（k.wgsl 落在里面）、crates/absent/（目录不在）、crates/bystander/（是一个包、没有 rerun-if-changed 落在里面）：
+#                                                     红、「2 行写不对或用不着了」，点名后两行各自的原因
+#   crate-cross-references-stale-row-red              放行表一行点名的引用这一趟没有：判红、点名那一行
+#   crate-cross-references-lag-grown-red              setup.sh 提交一版没有数据行的滞后表，再加一行（那一处引用在）：判红（滞后表涨了）
 # 弄坏开关（打开后样本判错；每条下面逐行点名判错的样本，括号里是那一份出不来的那一句）：
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库 lib/stage-cells.sh：红格按绿记、整道退 0
 #     checker-implementation-disjoint-red、checker-implementation-disjoint-reference-closure-red、checker-implementation-disjoint-reference-format-red
@@ -115,6 +182,13 @@
 #     checker-implementation-disjoint-gpu-verification-depends-red、checker-implementation-disjoint-gpu-bridge-red
 #     checker-implementation-disjoint-gpu-shared-closure-red、checker-implementation-disjoint-gpu-package-moved-red
 #     checker-implementation-disjoint-gpu-package-without-sources-red
+#     checker-implementation-disjoint-gpu-test-infrastructure-red
+#     checker-implementation-disjoint-cfg-test-module-file-red
+#     crate-cross-references-plain-path-red、crate-cross-references-cfg-attr-path-red、crate-cross-references-renamed-include-macro-red、crate-cross-references-bracket-delimiters-red、crate-cross-references-raw-string-path-red
+#     crate-cross-references-inline-module-base-red、crate-cross-references-absolute-path-red、crate-cross-references-non-rs-intermediate-red、crate-cross-references-target-directory-red、crate-cross-references-hidden-directory-red
+#     crate-cross-references-stale-row-red、crate-cross-references-lag-grown-red
+#     crate-cross-references-markdown-module-red、crate-cross-references-unpackaged-include-red、crate-cross-references-out-dir-copy-red、crate-cross-references-build-script-runtime-read-red
+#     crate-cross-references-package-prefix-compiled-in-red、crate-cross-references-package-prefix-stale-red
 #     cpu-judging-sites-red、layout-checker-sync-base-unreadable-red
 #     layout-checker-sync-first-registration-changed-value、layout-checker-sync-red
 #     checker-direction-overlap-red、checker-direction-overlap-unobtainable-red
@@ -145,8 +219,81 @@
 #     checker-implementation-disjoint-gpu-package-absent（退 0）
 #     checker-implementation-disjoint-gpu-package-moved-red（退 0）
 #     checker-implementation-disjoint-gpu-package-without-sources-red（退 0）
+#     checker-implementation-disjoint-gpu-test-infrastructure-red（退 0）
+#   CHECKER_INDEPENDENCE_BREAK=test-infrastructure-disallowed  ⑧ 的允许共用里不算单元图与判定库客户端
+#     checker-implementation-disjoint-gpu-test-infrastructure-green（退 1，「除允许共用的之外还交在 3 个上」）
+#   CHECKER_INDEPENDENCE_BREAK=test-infrastructure-closure-unchecked  ⑧ 不判单元图与判定库客户端的闭包
+#     checker-implementation-disjoint-gpu-test-infrastructure-red（退 0）
+#     checker-implementation-disjoint-gpu-test-infrastructure-green（照样退 0，成功句换成「弄坏开关 test-infrastructure-closure-unchecked：…没判」，「允许共用的单元图与判定库客户端在的 2 个」那一句出不来）
+#   CHECKER_INDEPENDENCE_BREAK=test-module-file-scanned  ③ 把整份算测试代码的文件（父文件里 #[cfg(test)] mod 声明引进来的、祖先整份算测试的、带 #![cfg(test)] 的）也逐行扫分支循环
+#     checker-implementation-disjoint-cfg-test-module-file-green（退 1：tests.rs 里的 if 判成分支）
+#     checker-implementation-disjoint-cfg-test-module-file-red（「共享的常量模块正文里有 1 处分支或循环」出不来：tests.rs 的 if 也被点名，是 2 处）
 #   CHECKER_INDEPENDENCE_BREAK=relative-root-unresolved  cd 进根之后不把根换成绝对路径
 #     cpu-judging-sites-relative-root-green（判法脚本在新的工作目录下读不到登记表，退 1，「判器调用点都合规…」）
+#   CRATE_CROSS_REFERENCES_BREAK=dep-info-unread  归判法 scripts/gate/crate-cross-references-check.py：不读 .d，每个编译单元只算它的根文件
+#     crate-cross-references-plain-path-red（退 0）
+#     crate-cross-references-cfg-attr-path-red（退 0）
+#     crate-cross-references-renamed-include-macro-red（退 0）
+#     crate-cross-references-bracket-delimiters-red（退 0）
+#     crate-cross-references-raw-string-path-red（退 0）
+#     crate-cross-references-absolute-path-red（退 0）
+#     crate-cross-references-non-rs-intermediate-red（退 0）
+#     crate-cross-references-target-directory-red（退 0）
+#     crate-cross-references-hidden-directory-red（退 0）
+#     crate-cross-references-markdown-module-red（退 0）
+#     crate-cross-references-unpackaged-include-red（退 0）
+#     crate-cross-references-out-dir-copy-red（退 0）
+#     crate-cross-references-package-prefix-compiled-in-red（退 0：mod.rs 不再是编进编译单元的，只剩构建脚本报的那一处，被前缀行放行）
+#     crate-cross-references-green（退 1：放行表那一行点名的引用这一趟没有）
+#   CRATE_CROSS_REFERENCES_BREAK=out-dir-not-allowed  归判法：OUT_DIR 里生成的文件不放行
+#     crate-cross-references-green（退 1：生成的 .rs 判成仓外不属任何包的文件）
+#     crate-cross-references-out-dir-copy-red（「构建脚本拷进 OUT_DIR 的别的包文件」那一句出不来：两份都判成仓外不属任何包的文件）
+#   CRATE_CROSS_REFERENCES_BREAK=table-keys-by-source-file  归判法：两张表的第一列照编译单元的根文件认、不照包目录认
+#     crate-cross-references-plain-path-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-cfg-attr-path-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-renamed-include-macro-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-bracket-delimiters-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-raw-string-path-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-absolute-path-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-non-rs-intermediate-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-target-directory-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-hidden-directory-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-markdown-module-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-unpackaged-include-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-out-dir-copy-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-package-prefix-compiled-in-red（「crates/consumer  引」那一句出不来：点名的是根文件）
+#     crate-cross-references-green（退 1：放行表那一行对不上）
+#   CRATE_CROSS_REFERENCES_BREAK=stale-rows-accepted  归判法：表里点名的引用这一趟没有也不报
+#     crate-cross-references-stale-row-red（退 0）
+#   CRATE_CROSS_REFERENCES_BREAK=lag-growth-accepted  归判法：滞后表比基准多出行不报
+#     crate-cross-references-lag-grown-red（退 0）
+#   CRATE_CROSS_REFERENCES_BREAK=compile-failure-accepted  归判法：cargo check 编不过照编过办
+#     crate-cross-references-inline-module-base-red（「cargo check 退 101、编不过」那一句出不来：红的换成「输出里却没有它的编译单元」）
+#   CRATE_CROSS_REFERENCES_BREAK=build-script-dep-info-by-artifact-name  归判法：构建脚本单元的 .d 照产物名找（build-script-build.d），不照 rustc 真写的 build_script_build-<哈希>.d
+#     crate-cross-references-green（退 1：构建脚本单元找不到 dep-info）
+#   CRATE_CROSS_REFERENCES_BREAK=unpackaged-sources-allowed  归判法：不属任何包的文件一律照数据放行
+#     crate-cross-references-unpackaged-include-red（退 0）
+#   CRATE_CROSS_REFERENCES_BREAK=unpackaged-by-suffix  归判法：不属任何包的文件照后缀分，.rs、.wgsl 之外放行
+#     crate-cross-references-unpackaged-include-red（退 0）
+#   CRATE_CROSS_REFERENCES_BREAK=data-suffix-by-name  归判法：别的包目录下数据后缀的文件不看读法、一律放行
+#     crate-cross-references-markdown-module-red（退 0）
+#   CRATE_CROSS_REFERENCES_BREAK=out-dir-copies-unchecked  归判法：OUT_DIR 里的文件不与别的包目录里的文件比内容
+#     crate-cross-references-out-dir-copy-red（退 0）
+#   CRATE_CROSS_REFERENCES_BREAK=build-inputs-unclassified  归判法：构建脚本报的 rerun-if-changed 不分类
+#     crate-cross-references-build-script-runtime-read-red（退 0）
+#     crate-cross-references-package-prefix-green（退 1：前缀行这一趟没有一处 rerun-if-changed 落在它里面）
+#     crate-cross-references-package-prefix-compiled-in-red（「test:cross、构建脚本报的 rerun-if-changed；跨包源码」那一句出不来：mod.rs 只剩编进编译单元那一处）
+#     crate-cross-references-package-prefix-stale-red（「2 行写不对或用不着了」出不来：k.wgsl 不再落在 crates/provider/ 那一行里，是 3 行）
+#   CRATE_CROSS_REFERENCES_BREAK=package-prefix-rows-ignored  归判法：放行表的前缀行不认（照没有这一行）
+#     crate-cross-references-package-prefix-green（退 1：k.wgsl 与 shared.rs 没登）
+#     crate-cross-references-package-prefix-compiled-in-red（「1 处」没登出不来：k.wgsl 也没登，是 2 处）
+#   CRATE_CROSS_REFERENCES_BREAK=package-prefix-allows-all-categories  归判法：前缀行连编进编译单元的也放行
+#     crate-cross-references-package-prefix-compiled-in-red（退 0：mod.rs 被前缀行放行）
+#   CRATE_CROSS_REFERENCES_BREAK=package-prefix-directory-unchecked  归判法：前缀行指的目录不核是不是一个包的目录
+#     crate-cross-references-package-prefix-stale-red（「crates/absent/ 不是别的包的目录」那一句出不来：换成目录不在也算「这一趟没有一处」）
+#   CRATE_CROSS_REFERENCES_BREAK=package-prefix-unused-accepted  归判法：前缀行这一趟没有一处被它放行也不报
+#     crate-cross-references-package-prefix-stale-red（「2 行写不对或用不着了」出不来：crates/bystander/ 那一行不报，是 1 行）
+#   判法另有几条开关（找不到 dep-info、编译目录、cargo metadata 的平台、单元键的几样输入、复用哨兵、一台写库另一台读库），样本上证不了，开关表在判法文件头，由它的 --selftest 证红
 #   REJECTION_BLOCKS_BREAK=summaries-only  归 lib/rejection-blocks.py：只打摘要、不打明细
 #     layout-checker-sync-base-unreadable-red（「format/布局.md：读不出基准 HEAD 里的 format/布局.md」）
 #     layout-checker-sync-first-registration-changed-value（「改值 SAMPLE_UNIT_BYTES：16384 → 32768（format/src/lib.rs）」）
@@ -196,7 +343,9 @@ STAGE_NAME="$(basename "$0")"
 source "$STAGE_DIR/lib/stage-cells.sh"
 
 stage_cell checker-implementation-disjoint cell_checker_implementation_disjoint "checker 与实现只共享常量模块，验证包与产品 GPU 包不共用代码" \
-  "照上面各条的出路改：checker 要用的逻辑在 checker 里自己写一份，只有格式常量从 singlefs_format 取；共享模块只发射标量（D13（验证路线） 已定项 5）；RefFS 只用 std、不依赖 singlefs-format 与别的包、不引那三个包，实现与池级 checker 不依赖它（D13（验证路线） 已定项 3）；验证包与产品 GPU 包 singlefs-background-gpu 互不依赖、互不引，只共用 singlefs-format、singlefs-core 与 wgpu、naga 一族（用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」）"
+  "照上面各条的出路改：checker 要用的逻辑在 checker 里自己写一份，只有格式常量从 singlefs_format 取；共享模块只发射标量（D13（验证路线） 已定项 5）；RefFS 只用 std、不依赖 singlefs-format 与别的包、不引那三个包，实现与池级 checker 不依赖它（D13（验证路线） 已定项 3）；验证包与产品 GPU 包 singlefs-background-gpu 互不依赖、互不引，只共用 singlefs-format、singlefs-core、wgpu、naga 一族与单元图 singlefs-unit-graph、判定库客户端 prune-server（用户 2026-10-26 定「新开产品 GPU 包，门禁补一格」），单元图与判定库客户端不依赖 GPU 一族、验证包与产品 GPU 包"
+stage_cell crate-cross-references cell_crate_cross_references "crates/ 下各包的编译单元不读别的包目录下的源码（照 cargo check 写的 dep-info 判，按包复用判定）" \
+  "照上面逐处列的改：一个包的代码不读另一个包目录下的源码，要用就在 Cargo.toml 里依赖那个包、或在自己的包里写一份（.claude/rules/directory-layout.md「crates/：各包放什么」，改 crates/ 归实现员）；拆包时才改的存量登 .claude/gate.d/crate-cross-references-lag.tsv（只缩不涨），确要编进别的包源码的登 .claude/gate.d/crate-cross-references-allowed.tsv，一行「<编译单元所在的包目录><TAB><引到的文件><TAB># 理由>」；编译目录、判定库与编不过的照红句的出路办；判法与样本在 scripts/gate/crate-cross-references-check.py 文件头"
 stage_cell layout-checker-sync cell_layout_checker_sync "布局的格式常量变了，它的 checker 判定路径要在同一次改动里跟" \
   "在同一次改动里改这套布局的 checker 判定路径；checker 今天确实判不了的，把常量名登记进 .claude/gate.d/layouts-checker-lag.tsv 并挂一条开着的欠账；布局清单与位号登记照上面那一条的出路改"
 stage_cell cpu-judging-sites cell_cpu_judging_sites "验证包里每一处调判器的地方，要么在判定段里，要么包住它的函数带豁免或 CPU 参照的标记" \
@@ -228,8 +377,10 @@ if [[ "${CHECKER_INDEPENDENCE_BREAK:-}" != relative-root-unresolved ]]; then ROO
 
 # ── checker-implementation-disjoint ──
 cell_checker_implementation_disjoint() {
-python3 - <<'PY'
-import glob, os, re, sys
+test_module_files_library_file="$REPO_ROOT/scripts/gate/lib_rust_test_module_files.py"
+[[ -f "$test_module_files_library_file" ]] || { echo "  ✗ 找不到 $test_module_files_library_file"; echo "     → 怎么办：它随仓走（scripts/gate/lib_rust_test_module_files.py），被删了就从 git 找回来；③ 里整份文件算测试代码的认法只在那一份里写。"; exit 1; }
+python3 - "$test_module_files_library_file" <<'PY'
+import glob, importlib.util, os, re, sys
 
 CHECKER = "crates/singlefs-checker"
 CORE = "crates/singlefs-core"
@@ -240,6 +391,10 @@ REFERENCE = "crates/singlefs-reference-filesystem"
 REFERENCE_CRATE_NAME = "singlefs-reference-filesystem"
 BACKGROUND_GPU = "crates/singlefs-background-gpu"
 BACKGROUND_GPU_CRATE_NAME = "singlefs-background-gpu"
+UNIT_GRAPH = "crates/singlefs-unit-graph"
+UNIT_GRAPH_CRATE_NAME = "singlefs-unit-graph"
+PRUNE_SERVER = "prune-server"
+PRUNE_SERVER_CRATE_NAME = "prune-server"
 BREAK = os.environ.get("CHECKER_INDEPENDENCE_BREAK", "")
 
 def fail(message, steps):
@@ -247,6 +402,14 @@ def fail(message, steps):
     for step in steps:
         print(f"     → {step}")
     sys.exit(1)
+
+sys.dont_write_bytecode = True
+test_module_files_spec = importlib.util.spec_from_file_location("lib_rust_test_module_files", sys.argv[1])
+test_module_files = importlib.util.module_from_spec(test_module_files_spec)
+try:
+    test_module_files_spec.loader.exec_module(test_module_files)
+except (ImportError, SyntaxError, OSError) as error:
+    fail(f"载不进 {sys.argv[1]}：{error}", ["怎么办：照它的报错修好（python3 -m py_compile 先过），③ 里整份文件算测试代码的认法只在那一份里写。"])
 
 DEPENDENCY_TABLE = re.compile(r"^\[(?:target\.(?:'[^']*'|\"[^\"]*\"|[^\]]+)\.)?(?:dev-|build-)?dependencies\]$")
 DEPENDENCY_ITEM_TABLE = re.compile(r"^\[(?:target\.(?:'[^']*'|\"[^\"]*\"|[^\]]+)\.)?(?:dev-|build-)?dependencies\.([A-Za-z0-9_\-]+)\]$")
@@ -407,7 +570,12 @@ if not shared_sources:
         "怎么办：常量模块搬家了就同步改这个阶段里的路径；扫到 0 个文件而报绿，与判过了一模一样。",
     ])
 branches, scanned_lines, skipped_test_lines = [], 0, 0
+# 整份算测试代码的文件（认法在 scripts/gate/lib_rust_test_module_files.py）整份不扫，行数记进 skipped_test_lines；弄坏开关 test-module-file-scanned 下照产品代码扫
+whole_test_paths = set() if BREAK == "test-module-file-scanned" else test_module_files.whole_test_files(".", shared_sources)
 for path in shared_sources:
+    if path in whole_test_paths:
+        skipped_test_lines += sum(1 for _line in open(path, encoding="utf-8"))
+        continue
     # `#[cfg(test)]` 只豁免紧跟的那一个 item（花括号配平到收尾，或一行以分号收尾）：豁免到文件尾，前部贴一个就藏住整份正文的分支。
     skipping, depth, opened = False, 0, False
     for line_number, line in enumerate(open(path, encoding="utf-8"), 1):
@@ -612,7 +780,8 @@ def references_to(sources, target_name, aliases):
 
 GPU_SEPARATION_STEPS = [f"怎么办：{BACKGROUND_GPU_DECISION}。验证包的 GPU 判器与产品 GPU 包共用一段代码时，那段写错会让判器与被判的产品路径一起错，",
                         "        GPU 对拍照样全绿（D13（验证路线） 已定项 5 同一个理由）。两边都要用的东西各写一份；",
-                        f"        只许共用 `{SHARED_CRATE_NAME}`、`{core_name}`（连同它们不经 dev-dependencies 带进来的）与 wgpu、naga 一族（连同 Cargo.lock 里它们的依赖）。"]
+                        f"        只许共用 `{SHARED_CRATE_NAME}`、`{core_name}`（连同它们不经 dev-dependencies 带进来的）、wgpu、naga 一族（连同 Cargo.lock 里它们的依赖）",
+                        f"        与单元图 `{UNIT_GRAPH_CRATE_NAME}`（连同它不经 dev-dependencies 带进来的）、判定库客户端 `{PRUNE_SERVER_CRATE_NAME}`。"]
 background_gpu_present = os.path.isdir(BACKGROUND_GPU)
 if background_gpu_present:
     background_gpu_name, _, background_gpu_aliases = manifest_of(BACKGROUND_GPU)
@@ -638,13 +807,37 @@ if background_gpu_present:
                 gpu_family_allowed.add(dependency)
                 queue.append(dependency)
     internal_allowed = closure_without_dev({SHARED_CRATE_NAME, core_name})
-    shared_beyond_allowed = [] if depends_on_each_other else sorted((background_gpu_closure & verification_closure) - internal_allowed - gpu_family_allowed)
+    # 单元图与判定库客户端是测试基础设施，两边都可以用（.claude/rules/directory-layout.md「crates/：各包放什么」）；它们自己不带 GPU 一族、不带验证包与产品 GPU 包，下面另判
+    test_infrastructure_allowed = set() if BREAK == "test-infrastructure-disallowed" else closure_without_dev({UNIT_GRAPH_CRATE_NAME}) | {PRUNE_SERVER_CRATE_NAME}
+    shared_beyond_allowed = [] if depends_on_each_other else sorted((background_gpu_closure & verification_closure) - internal_allowed
+                                                                    - test_infrastructure_allowed - gpu_family_allowed)
     if shared_beyond_allowed:
         gpu_problems.append((
             f"验证包与产品 GPU 包的依赖闭包（dev-dependencies 也算）除允许共用的之外还交在 {len(shared_beyond_allowed)} 个上：",
             [f"{name}：{dependency_chain(verification_name, name)}；{dependency_chain(background_gpu_name, name)}" for name in shared_beyond_allowed],
             GPU_SEPARATION_STEPS,
         ))
+    test_infrastructure_judged = []
+    for infrastructure_name, infrastructure_directory in ((UNIT_GRAPH_CRATE_NAME, UNIT_GRAPH), (PRUNE_SERVER_CRATE_NAME, PRUNE_SERVER)):
+        if not os.path.isfile(os.path.join(infrastructure_directory, "Cargo.toml")):
+            continue
+        test_infrastructure_judged.append(infrastructure_name)
+        reach = set(manifest_of(infrastructure_directory)[1]) | set((lock_graph or {}).get(infrastructure_name, ()))
+        queue = list(reach)
+        while queue:
+            current = queue.pop()
+            for dependency in set(internal.get(current, ())) | set((lock_graph or {}).get(current, ())):
+                if dependency not in reach:
+                    reach.add(dependency)
+                    queue.append(dependency)
+        forbidden = sorted(name for name in reach if GPU_SHARED_FAMILY.match(name) or name in (verification_name, background_gpu_name))
+        if forbidden and BREAK != "test-infrastructure-closure-unchecked":
+            gpu_problems.append((
+                f"允许两边共用的 `{infrastructure_name}` 的依赖闭包（本仓内部依赖图加仓根 Cargo.lock，dev-dependencies 也算）里有 GPU 一族或验证包、产品 GPU 包 {len(forbidden)} 个：",
+                [dependency_chain(infrastructure_name, name) for name in forbidden],
+                [f"怎么办：`{infrastructure_name}` 是两边都用的测试基础设施，只有它不带 GPU 一族、不带判器所在的验证包与被判的产品 GPU 包，两边共用它才不会一起错；",
+                 "        把这条依赖删掉，要用的东西放回验证包或产品 GPU 包自己那一侧。"],
+            ))
     verification_sources = package_sources(VERIFICATION)
     background_gpu_sources = package_sources(BACKGROUND_GPU)
     for directory, sources in ((VERIFICATION, verification_sources), (BACKGROUND_GPU, background_gpu_sources)):
@@ -670,6 +863,11 @@ if background_gpu_present:
                    f"的交集 {len(background_gpu_closure & verification_closure)} 个都在允许共用的里（经 `{SHARED_CRATE_NAME}`、`{core_name}` 带进来的 {len(internal_allowed)} 个，"
                    f"wgpu、naga 一族{'连同 Cargo.lock 里它们的依赖' if lock_graph is not None else '（仓根没有 Cargo.lock，只认一族的名字）'} {len(gpu_family_allowed)} 个），"
                    f"两边的 {len(verification_sources)} 份、{len(background_gpu_sources)} 份源码零处互相引用（别名引进来的 {len(tier_via) + len(gpu_via)} 个）")
+    if BREAK == "test-infrastructure-closure-unchecked":
+        test_infrastructure_summary = "弄坏开关 test-infrastructure-closure-unchecked：单元图与判定库客户端的闭包没判"
+    else:
+        test_infrastructure_summary = (f"允许共用的单元图与判定库客户端在的 {len(test_infrastructure_judged)} 个（{'、'.join(test_infrastructure_judged) or '都不在'}）"
+                                       "依赖闭包里没有 wgpu、naga 一族与验证包、产品 GPU 包")
 else:
     # 包目录不在判红：包名还在别处、或还有包依赖它，是搬家或改名了，点名在哪；都没有，包就是没建
     elsewhere = sorted(crate_directories.get(BACKGROUND_GPU_CRATE_NAME, []))
@@ -688,6 +886,7 @@ else:
              "        路径对不上 ⑧ 就没有对象可判，所以判红。"],
         ))
     gpu_summary = f"产品 GPU 包 {BACKGROUND_GPU} 不在，⑧ 没判"
+    test_infrastructure_summary = "产品 GPU 包不在，单元图与判定库客户端的闭包也没判"
 if not gpu_judged:
     gpu_summary = f"弄坏开关 gpu-packages-unchecked：⑧ 没判（{gpu_summary}）"
 
@@ -710,11 +909,32 @@ print(f"  ✓ checker 与实现只共享常量模块 `{SHARED_CRATE_NAME}`（传
       f"checker 的 {len(checker_sources)} 份源码零处引 `singlefs_core`（别名引进来的 {len(core_aliases)} 个）；"
       f"共享模块 {len(shared_sources)} 份源码的正文 {scanned_lines} 行里没有分支与循环（`#[cfg(test)]` 标着的项 {skipped_test_lines} 行不扫）；"
       f"{reference_summary}；实现闭包 {len(core_dependencies)} 个、池级 checker 闭包 {len(checker_dependencies)} 个里都没有 RefFS 包；"
-      f"{gpu_summary}")
+      f"{gpu_summary}；{test_infrastructure_summary}")
 print(f"    这一道判不了的：两边各自手写的那份语义对不对（归模型对拍与变异表），以及 C12（增量语义共用） 另一半"
       f"「运行时记账分支取反 ⇒ I-3.1（已分配统计对得上） 必须红」——那一条在 `crates/mutations.tsv` 里，门禁 crates-mutation-replay 复跑；"
-      f"⑧ 认不出 `#[path = …]`、`include!`、`include_str!` 跨包目录引源码或着色器文件")
+      f"跨包读源码归 crate-cross-references 格")
 PY
+}
+
+# ── crate-cross-references ──
+cell_crate_cross_references() {
+  # 滞后表只缩不涨：基准那一版先在这里取好（不在 git 仓里、还没有提交的照基准里没有办），状态交给判法
+  local lag_base lag_state="none" lag_name="" lag_problem lag_exit
+  lag_base="$(mktemp)" || { echo "  ✗ 建不了放基准那一版滞后表的临时文件"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格。"; exit 1; }
+  # trap 里写设 trap 时就展开好的字面路径：lag_base 是这个函数的局部变量，EXIT 在函数返回、格的子 shell 退出时才跑，那时变量已经没了，删不到那份文件
+  trap "rm -f -- $(printf '%q' "$lag_base")" EXIT
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git rev-parse --verify -q HEAD >/dev/null 2>&1; then
+    # shellcheck source=../../scripts/gate/changed-paths.sh
+    source "$REPO_ROOT/scripts/gate/changed-paths.sh" || { echo "  ✗ source 不了 $REPO_ROOT/scripts/gate/changed-paths.sh，取不到改动范围的基准，滞后表只缩不涨没法比"; echo "     → 怎么办：它随仓走（scripts/gate/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
+    lag_name="$(gate_diff_base gate)"
+    if lag_problem="$(python3 "$STAGE_DIR/lib-lag-baseline.py" show "$lag_name" .claude/gate.d/crate-cross-references-lag.tsv 2>&1 >"$lag_base")"; then
+      lag_state="table"
+    else
+      lag_exit=$?
+      if ((lag_exit == 3)); then lag_state="none"; else lag_state="unreadable:${lag_problem:-lib-lag-baseline.py show 退 $lag_exit}"; fi
+    fi
+  fi
+  python3 "$REPO_ROOT/scripts/gate/crate-cross-references-check.py" check "$ROOT" --lag-base-state "$lag_state" --lag-base-file "$lag_base" --lag-base-name "$lag_name"
 }
 
 # ── layout-checker-sync ──

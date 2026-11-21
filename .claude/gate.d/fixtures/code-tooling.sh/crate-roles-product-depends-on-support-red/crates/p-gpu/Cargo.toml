@@ -1,0 +1,9 @@
+[package]
+name = "p-gpu"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+p-format = { path = "../p-format" }
+p-support = { path = "../p-support" }
+

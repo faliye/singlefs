@@ -1,0 +1,5 @@
+exit=1
+want=共享的常量模块正文里有 1 处分支或循环
+want=crates/singlefs-format/src/plain.rs:2：if value > 10 { 10 } else { value }
+want=样本只跑 .gate-cells 点名的格：checker-implementation-disjoint
+want=checker-implementation-disjoint：红（退出 1）

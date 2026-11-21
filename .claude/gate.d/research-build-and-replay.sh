@@ -49,7 +49,7 @@
 #                        显卡（文件头「显卡」）：这一格不领卡、不挑卡、不清场，第一趟与挂钟断言单线程那一趟都照整个工作区起；环境里有 GPU_CARDS_BY_PRIORITY 就原样留给
 #                        这两趟 cargo test、打一行是哪一串，没有打一行、照起。起真卡的单测（required-features 点到 scripts/mutation/mutate.sh 的 CARD_FEATURES 里的特性，
 #                        今天是 e163-gpu）拿不到卡就打 NOT_RUN_NO_GPU_ADAPTER，照下面 NOT_RUN 那一条判红。
-#   wallclock-asserts-registered  python3 scripts/gate/wallclock-assert-lint.py：scripts/experiment-apparatus/*.rs 的 #[test] 里按挂钟判的断言要带 // wallclock-assert: 登记位
+#   wallclock-asserts-registered  python3 scripts/gate/wallclock-assert-lint.py：scripts/experiment-apparatus/ 下顶层的 *.rs 与带根 main.rs 的装置目录里的 .rs（判法脚本文件头「用法」一段）的 #[test] 里按挂钟判的断言要带 // wallclock-assert: 登记位
 #                        （或怕不着负载的 // wallclock-assert-load-safe:），缺了判红、点名文件:行号；带了而断言里没有挂钟量也判红；登记名是别的未登记测试名的子串
 #                        （--skip 是子串匹配，会连那一条一起跳过）也判红。判法、登记位写法在判法脚本文件头；
 #                        判法立之前就在仓里还没复核的在 .claude/gate.d/wallclock-assert-lag.tsv（只缩不涨），成功句另报条数，并往 $GATE_NOT_RUN_FILE 报一行。
@@ -70,7 +70,7 @@
 #                        枚举对象与 code-source-discipline 的 mutation-tables 格同一个来源：scripts/mutation/tables/ 下每张 .tsv 对 scripts/experiment-apparatus/ 下同名的 .rs；
 #                        bin 名经 mutate.sh --binary-of <名>.rs 取（与它核对 bin 的读法同一份）。没有同名 .rs 的表（shell 探针、Python 驱动、crates 那一侧的）
 #                        取不出（bin、源文件、表）三元组，逐张点名、往 $GATE_NOT_RUN_FILE 报本次未跑、不算绿；一张都判不了退 77。
-#                        按条复用归 mutate.sh（它文件头「按条入库」：每条变异一条判定，键是原文、替换文、包住原文的单元闭包、cargo 参数与特性、工具链、依赖版本，
+#                        按条复用归 mutate.sh（它文件头「按条入库」：每条变异一条判定，键是原文、替换文、包住原文的单元闭包、cargo 参数与特性（编译器与依赖版本、构建环境不进键），
 #                        库在 prune-server 那一份（mutation-units 族，种类 singlefs-mutate-library，库名固定，mutate.sh 文件头「按条入库」），
 #                        不进 /tmp；判红的（没红、编不过、没跑完）照键记红、撤绿、下一趟现判，不当绿复用）：这一格不另建库、不整格问复用；一张表的条全部复用时 mutate.sh 一条都不编。
 #                        这一格读每张表末尾「计数：」那一行，逐张报「现判 N 条、复用 M 条、拒算 R 条」，成功句报合计与「本次未跑 K 张表」；

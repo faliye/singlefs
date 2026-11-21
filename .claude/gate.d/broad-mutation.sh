@@ -17,7 +17,7 @@
 # 参数解析、每格一个子 shell、汇总与退出码经共用库 lib/stage-cells.sh。
 #
 # 判什么：此刻源码上每一条变异都有单元键相同的结论、没有一条没红（gate-verdict 格）；结论键是被变异的函数单元与它调到的单元各自的指纹、原文、替换文、
-#   抓它的测试的单元闭包键（没红的是能碰到它的测试各自的闭包键）、工具链、cargo-mutants / nextest / llvm 版本、构建环境的生效值、解析出的依赖版本、判法单元指纹
+#   抓它的测试的单元闭包键（没红的是能碰到它的测试各自的闭包键）；构建环境（编译变量、cargo 配置）、rustc 与 cargo 的版本（cargo-mutants / nextest / llvm 版本、rust-toolchain 的值在内）、Cargo.lock 里的依赖版本、编译档与线程数、驱动与算键库的代码都不进键
 #   （规则在 scripts/mutation/mutation-prune.py 文件头，判定库在 scripts/mutation/broad-mutation.py 文件头「判定库」「键」：prune-server 里那一份，族 broad-mutation）。
 #   判定库里没有「一版」：不比暂存树、不比提交，没有 library-version-is-staged-tree 格，没有 --marker-check；也没有整道标记，不问 stage-must-run.sh，每趟照判。
 #   记红、撤绿、下趟现判（驱动文件头「判定行」末段）：这一道判红的是没红（missed > 0）与没结论；没红的条在驱动的剪枝跑里不沿用，每趟现判（同一把键更早的抓到、无效撤掉，
@@ -54,6 +54,10 @@
 #   样本档在临时 prune-server 底下起，判定另占临时服务里一份命名空间，不碰两台共用的那一份），再改源码，格起真的驱动 --summary（--home .broad-sample/home、--toolchain-from .broad-sample/rustc-vv.txt、
 #   --tools-from .broad-sample/tool-versions.txt）。units 族要连得上判定库服务（主 agent 照 scripts/prune-server/prune_server_client.py 文件头「命令行」
 #   --with-temporary-service 那一条在临时服务底下起样本档；连不上的样本照造不成判红）。
+#   进样本模式先核在不在临时服务底下（调客户端的 selftest_service_problem，只看环境、不连服务；scripts/crash/crash-point-replay.sh 自证开跑先调的同一个）：
+#   不在就退 2、一份样本都不造、不判，拒绝说明给带包装的整条（不在临时服务底下，判定库的键没有命名空间，units 族几份样本共用真服务里同一个种类、互相读到对方记的结论）。
+#   样本根放 .sample-environment-bare 的，这一判按「环境里什么都没设」答（样本在临时服务底下被喂时造出裸跑的样子）：
+#   gate-verdict-sample-service-bare-red 放它（情形 summary:green），期望退 2、点名没有临时 prune-server；其余样本都在临时服务底下被喂，是这一判的绿侧。
 #   gate-verdict-units-* 那几份是新键的样本（controls 路第 5 节、words 路 N27）：-green 照记的那一份源码判绿；-callee-changed-red 被调的 helper 改了函数体，
 #   只有调它的那一条要现判（NO_CONCLUSION 带「变了：改了 helper」）、helper 自己那个单元没记清单（UNLISTED），别的条照样有结论；
 #   -comment-only-green 只加注释，零条要现判；-unlisted-red 新加一个函数，那个单元没记清单；
@@ -100,6 +104,8 @@
 #       gate-verdict-gpu-summary-mismatch-red（判绿）
 #   CHECKER_TIER_BROAD_MUTATION_BREAK=summary-unavailable-as-red  驱动 --summary 退 75（判定库服务不可用）也照「退了 0、8 之外的码」判红、退 1
 #       gate-verdict-service-unavailable（判红，退 1 不是期望的 75）
+#   CHECKER_TIER_BROAD_MUTATION_BREAK=sample-service-unchecked  进样本模式不核在不在临时 prune-server 底下（裸跑也造、也判，样本的判定写进真服务）
+#       gate-verdict-sample-service-bare-red（照判 summary:green、退 0，不是期望的 2）
 #   STAGE_CELLS_BREAK=red-swallowed  归共用库：每份红样本的格按绿记、整道退 0（汇总与 --check 归共用库）
 #       gate-verdict-detail-count-red、gate-verdict-empty-list-red、gate-verdict-line-missing-red、gate-verdict-missed-red、gate-verdict-no-conclusion-red、
 #       gate-verdict-red-exit-zero-red、gate-verdict-refused-count-red、gate-verdict-silent-driver-red、gate-verdict-totals-mismatch-red、gate-verdict-unknown-verdict-red、
@@ -189,6 +195,17 @@ summary_command=(python3 "$DRIVER" --summary --source "$ROOT")
 # 服务分片起的一趟起的驱动：不带选条参数的剪枝跑（驱动文件头第一条），驱动照 TASK_SERVER_SHARD_PHASE 只跑那一步（驱动文件头「分片」）
 driver_command=(python3 "$DRIVER" --source "$ROOT")
 if ((sample_mode)); then
+  # 样本只在临时 prune-server 底下判（文件头「样本」）：调客户端的 selftest_service_problem（只看环境、不连服务），不在临时服务底下退 2、一份样本都不造、不判。
+  #   弄坏开关 sample-service-unchecked 下不核
+  if [[ ",${CHECKER_TIER_BROAD_MUTATION_BREAK:-}," != *,sample-service-unchecked,* ]]; then
+    if ! service_problem="$(python3 -c 'import os, sys; sys.path.insert(0, sys.argv[1]); import prune_server_client; print(prune_server_client.selftest_service_problem({} if os.path.isfile(sys.argv[2]) else None))' \
+          "$STAGE_REPOSITORY/scripts/prune-server" "$ROOT/.sample-environment-bare" 2>&1)" || [[ -n "$service_problem" ]]; then
+      echo "  ✗ 判的根是样本（$ROOT），样本档不在临时 prune-server 底下，样本的判定会写进真服务、与真门禁同一个种类：${service_problem:-读不了 scripts/prune-server/prune_server_client.py}；一份样本都没判"
+      echo "     → 怎么办：样本档整条套临时服务起（交任务服务时前面加 task-server/task submit --）：python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d --item broad-mutation.sh"
+      echo "       单跑某一份样本根时，把 bash .claude/gate.d/broad-mutation.sh <样本根> 接在同一个包装的 -- 后面。"
+      exit 2
+    fi
+  fi
   LIBRARY_HOME="$ROOT/$SAMPLE_DIRECTORY/home"
   scenario="$(sed -n 's/^scenario=//p' "$SAMPLE_MARKER" | head -n 1)"
   if [[ -n "$scenario" ]] && ! env -u BROAD_MUTATION_BREAK python3 "$SAMPLE_BUILDER" "$DRIVER" "$ROOT" "$scenario"; then

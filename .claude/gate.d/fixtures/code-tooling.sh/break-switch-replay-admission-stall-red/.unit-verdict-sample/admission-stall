@@ -1,0 +1,1 @@
+# 样本档造卡住：在这里时 verdict-plan 那一趟换成只睡 20 秒、不用 CPU 的命令，卡住的限时改成 2 秒（code-tooling.sh 共用段 UNIT_VERDICT_ROUNDS_LIBRARY 上方的注释）

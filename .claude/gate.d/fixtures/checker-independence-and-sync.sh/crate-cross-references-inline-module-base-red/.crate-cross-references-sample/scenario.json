@@ -1,0 +1,28 @@
+{
+ "packages": [
+  {
+   "name": "consumer",
+   "directory": "crates/consumer"
+  },
+  {
+   "name": "provider",
+   "directory": "crates/provider"
+  }
+ ],
+ "workspace_members": [
+  "consumer"
+ ],
+ "units": [],
+ "build_scripts": [],
+ "exit_code": 101,
+ "stderr": [
+  "    Checking consumer v0.1.0 (@ROOT@/crates/consumer)",
+  "error: couldn't read `crates/consumer/tests/common_shared/../../../provider/tests/c/mod.rs`: No such file or directory (os error 2)",
+  " --> crates/consumer/tests/cross.rs:4:5",
+  "  |",
+  "4 |     pub mod c;",
+  "  |     ^^^^^^^^^^",
+  "",
+  "error: could not compile `consumer` (test \"cross\") due to 1 previous error"
+ ]
+}

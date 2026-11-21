@@ -3,7 +3,7 @@
 # tests.tsv 一行一条：<哪一趟：plain|feature|both><TAB><源文件><TAB><libtest 名，- 是这个二进制这一趟一条都没有><TAB><ok|FAILED|ignored><TAB><样子><TAB><测试自己打的一行，- 是不打>
 #   样子：line（自己打的那一行先单独一行，结果行在它后面：几条同时跑时的样子）、scattered（「test <名> ... 」后面接自己打的那一行，结局另起一行：
 #   别的测试打的字夹进起头与结局之间时的样子）、glued（结局粘在自己打的那一行后面，认不出结局）。
-# 不带 --features 是 plain 那一趟，带了是 feature 那一趟。带 --tests 打这一趟的全部源文件；不带的 --lib 打 src/lib.rs、--test <名> 打 tests/<名>.rs、
+# 不带 --features 是 plain 那一趟，带了是 feature 那一趟。带 --tests 打这一趟的全部源文件；不带的 --lib 打 src/lib.rs、--test <名> 打 tests/<名>.rs（tests.tsv 里写了 tests/<名>/main.rs 的打它）、
 # --bin <名> 打 src/bin/<名>.rs（点了而这一趟没有它的行，打 running 0 tests）。-- 之后的 --skip <名>（带 --exact 时整名相同才跳）跳过的不打、计进 filtered out。
 # 有 FAILED 的二进制汇总行写 FAILED、整趟退 101。
 # 环境里设了 SINGLEFS_CRASH_AMPLIFICATION_STAGE 的（产品 GPU 包的测试包那一格的两段）另打一行 CRASH_POINT_REPLAY_PROGRESS sample-cargo-stage: stage=<值> cards=[<GPU_CARDS_BY_PRIORITY，没设写 unset>]；
@@ -60,7 +60,7 @@ for word in "$@"; do
   else
     case "$previous" in
       --features) pass=feature ;;
-      --test) sources+=("tests/$word.rs") ;;
+      --test) if [[ -n "$(awk -F'\t' -v source="tests/$word/main.rs" '$2 == source' "$here/cases/tests.tsv")" ]]; then sources+=("tests/$word/main.rs"); else sources+=("tests/$word.rs"); fi ;;   # 目录式测试目标：tests.tsv 里的源文件写 tests/<名>/main.rs
       --bin) sources+=("src/bin/$word.rs") ;;
     esac
     [[ "$word" == --tests ]] && all_sources=1

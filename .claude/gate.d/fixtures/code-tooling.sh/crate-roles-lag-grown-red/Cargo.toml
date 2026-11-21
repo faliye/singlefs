@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/p-format", "crates/p-gpu"]
+exclude = ["tools/apparatus"]

@@ -1,0 +1,6 @@
+exit=0
+want=1 个有 Write 或 Edit 的定义与 1 个只带 Read、Bash 这类的定义都登记了、3 条路径模式
+want=（lib_shell_words.py 加
+want=个部分文件）只在这几份里定义（查了 .claude/hooks/ 下另外 4 个文件）
+want=（lib_project_code_runs.py 加
+want=个部分文件）只在这几份里定义（查了 .claude/hooks/ 下另外 5 个文件；selftest、load_sibling_module 不算

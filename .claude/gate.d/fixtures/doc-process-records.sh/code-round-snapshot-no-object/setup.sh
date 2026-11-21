@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 两份新写的判决，一份只点 kb（含通配写法 crates/*/src/*.rs）、一份只点名测试代码 ⇒ 没有对象可判，退 77，逐份报出不判的原因。
+# 两份新写的判决，一份只点 kb（含通配写法 crates/*/src/*.rs）、一份只点名池级 checker 的代码（角色表里登成验证，非产品代码）⇒ 没有对象可判，退 77，逐份报出不判的原因。
 set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 git init -q -b master .
@@ -8,6 +8,7 @@ printf 'pub fn check() -> u32 { 1 }\n' > crates/singlefs-checker/src/lib.rs
 # 同一个阶段的 batch-scope 与 knowledge-sync 两格读触发文件清单（读不到就红）：这份只放一条碰不到这份样本改动的正则、随基准提交
 mkdir -p .claude/gate.d
 printf '^\\.claude/hooks/\t# 钩子（这份样本不碰）\n' > .claude/gate.d/knowledge-sync-triggers.tsv
+printf '# 样本里的角色表\nsinglefs-checker\t验证\tcrates/singlefs-checker\t样本里的池级 checker\n' > .claude/gate.d/crate-roles.tsv
 git add -A && git commit -qm base
 printf 'pub fn check() -> u32 { 2 }\n' > crates/singlefs-checker/src/lib.rs
 cat > research/prompts/kbonly-r1-main-verification.md <<'MD'

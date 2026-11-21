@@ -1,0 +1,5 @@
+exit=1
+want=crates/ 下有 2 处编译单元读了别的包目录下的源码或不属任何包的文件，两张表里都没登：
+want=crates/consumer  引 notes/table.txt（test:cross；仓里不属任何包的文件）
+want=crates/consumer  引 shared/snippet.inc（test:cross；仓里不属任何包的文件）
+want=crate-cross-references：红（退出 1）
