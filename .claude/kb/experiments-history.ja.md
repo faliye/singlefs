@@ -401,6 +401,15 @@
 
 ## E10 (老化：構造的抗老化 vs 事後デフラグ)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（1 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e10_aging_compaction.rs` → `scripts/experiment-apparatus/e10_aging_compaction/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/10-老化结构抗老化vs事后整理.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/10-老化结构抗老化vs事后整理.md` の、影響を受ける決定の表。
+
 ### 2026-10-26
 
 - 生出力の引用を git 履歴に改めた：第一段の分割成果物 4 件はアーカイブ済み（作業ツリーにもステージングエリアにもない）で、「計測条件と成果物」の段を `git show e1b1ceb95:research/results/e10-aging-compaction-2026-10-13/<シャード>.out` に書き改めた；同じ段に、この登録が出すのは整理下限額 `N₀` だけで、製品のバッチサイズと整理の三つの水位はこの登録に属さないと明記した。数値、結論、状態は不変、「影響を受ける決定」の二行は同日に振り返った。
@@ -4545,6 +4554,15 @@
 
 ## E139 (ディスク別ロールバック下限の厳格形態)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（2 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 4 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e139_tightened_floor.rs` → `scripts/experiment-apparatus/e139_tightened_floor/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/139-按盘回退下界的收严形态.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/139-按盘回退下界的收严形态.md` の、影響を受ける決定の表。
+
 ### 2026-10-29
 
 - 第 3 回再実行 (回収閾値を `crates/` の今日の書き方に合わせて変更) 実行完了：装置に CG を追加（F_有効 は 3 項の最大、その場で min(F_有効, m)、残りは本インスタンスのルートが各生存ディスクに落ちるまで保留；自己検証に通らないスロットは住んでいた可能性のある最古の txg に固定；管理者ロールバックは F を再計算しない）、テスト対象方式 `RGall_core_gate` を第 2 回の `RGall_ring_all` と 611 組で行ごとに比較、判定ビット 0 → 1 の組 0、1 → 0 の組 0、反転なし；赤判定 8 行（削除後の再書き込み失敗、`near_full` と `cost_growth` のコストが c_max まで上がったセル）は第 2 回の成果物にすでにあり、F3、F9 が発動、「反転なし、甲の前提には別の欠け目がある」と記す；`activation_faults` の陽性対照は S = 16 で 12 行が 0、F4 はそのクラスだけを扱う；判別力 220 組、すべて軌跡行と帰属行；CG の到達：d ≠ 0 のサンプル 12628、dF ≠ 0 14080、固定値が効いたのは 480、保留分の待機 0；`G2R_core_gate` は判定到達後は未実行。
@@ -4635,6 +4653,15 @@
   - **根拠**：D16 (パブリッシュセマンティクス) 確定項目 8 と D28 (マウント時コミットメント量) 確定項目 3 からの連動；C126 (切り替え予約の最悪量に計測条件がない) の半分清算のセル。
 
 ## E142 (新規プールでのファイル作成のドライラン)
+
+### 2026-11-20
+
+- 装置は crates のコード分割と装置パッケージの lint 収束で変更され、その後は正式には実行していない：実験ページの「これが答えられないこと」の節に一段落を加えて明記し、影響する決定の表の全行の見直し日を当日に改めた；装置が量った数値、結論、成果物は変わらない。
+  - **根拠**：`scripts/experiment-apparatus/on-request-experiments.tsv` は E142 (新規プールでのファイル作成のドライラン) を依頼があったときだけ実行するものとして登録している；ゲート doc-experiments の evidence-in-repo セルは、装置が変わって新しい成果物がないとき、実験ページに新しく加えた行に正式には実行していないと書くことを求める。
+  - **変更前**：`git show HEAD:.claude/kb/experiments/142-新池新建文件的干跑.md` の「これが答えられないこと」の節と影響する決定の表。
+- 現状を述べる文にある旧い単一ファイルのパスを、分割後のパスに改めた：ページ冒頭の「コード」の行は `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run/main.rs` と同じディレクトリの各モジュールファイルを挙げ、`const GAPS` 配列の参照先は `structure_catalog_and_offset_explanations.rs` にした；それらの実行で何をしたかを述べる文は当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` から `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run/main.rs` への移動を登録している；`.claude/rules/path-moves.md`「やり方」の第 5 段階：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスに改める。
+  - **変更前**：`git show HEAD:.claude/kb/experiments/142-新池新建文件的干跑.md` のページ冒頭の「コード」の行と `const GAPS` に触れた一文。
 
 ### 2026-11-01
 
@@ -4975,6 +5002,15 @@
 
 ## E152 (マイルストーン別の六ファイルシステムとのファイル性能比較)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（2 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e152_file_system_benchmark.rs` → `scripts/experiment-apparatus/e152_file_system_benchmark/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` の、影響を受ける決定の表。
+
 ### 2026-11-17
 
 - 2026-11-17 の実行を追加：作業ツリーの変更を載せた状態での 2 ディスクミラー 7 構成＋singlefs 各 5 回、VM 40 回すべて `vm_exit=0`。表は実験ページの一節と `scripts/experiment-apparatus/perf-by-milestone.md` III.5 にそのまま写し、2026-09-29 の実行とセル別に比較した（207 セル中 15% 超変化は 25 セル）。影響決定表 4 行を当日まで確認、影響なし。
@@ -5041,17 +5077,44 @@
 
 ## E153 (元帳形態とリング上の空洞のコスト)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（1 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes.rs` → `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/153-账本形态与环上有洞的代价.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/153-账本形态与环上有洞的代价.md` の、影響を受ける決定の表。
+
 ### 2026-09-17
 
 - E155 (永続化毎の書き込み量：3種のfsync形態と反実仮想上限) 節の同日の項目「」を参照。
 
 ## E154 (2重ゲート直列再判定と回収タイミングのコスト)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（1 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 1 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_timing.rs` → `scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_timing/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/154-两道闸串-重判与回收时点的代价.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/154-两道闸串-重判与回收时点的代价.md` の、影響を受ける決定の表。
+
 ### 2026-09-17
 
 - E155 (永続化毎の書き込み量：3種のfsync形態と反実仮想上限) 節の同日の項目「」を参照。
 
 ## E155 (永続化毎の書き込み量：3種のfsync形態と反実仮想上限)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（3 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 1 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e155_fsync_write_volume.rs` → `scripts/experiment-apparatus/e155_fsync_write_volume/main.rs`、`scripts/experiment-apparatus/e155_second_run_fsync_write_volume.rs` → `scripts/experiment-apparatus/e155_second_run_fsync_write_volume/main.rs`、`scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency.rs` → `scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md` の、影響を受ける決定の表。
 
 ### 2026-09-24
 
@@ -5129,7 +5192,7 @@
   - **根拠**：再実行登録 `research/prompts/e156-r6-prereg.md`；成果物 `e156-alloc-basis-counts-2026-10-05-r2.out`、`research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.txt`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-point-sets.txt`；本文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md) の「第 6 回の再実行（2026-10-05）」の節。
 
 - E156 (alloc-basis 4分岐のコスト数値) の第 5 回の再実行：core の断言の後、W7 のセルの陽性対照を PC-固定閾値 に替え、第 4 回の読み値を新しい `crates/` でフィールドごとに比べ直した
-  - **変更前**：装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（5776 行、単体テスト 17 本）の W7 の陽性対照は PC-アロケータ（`allocator_without_the_root_ring`、S = 4、ρ = 1、k = 0、ルートリング表を持たないアロケータに戻し、A10 は赤と判定すべき）、成果物 `e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行）、`replay.sh` の E156 (alloc-basis 4分岐のコスト数値) の行はそれを指していた；ユーザーが「アロケータがルートリング表を持たないのにルートを一つ記録したら core が断言する」と決めた後、PC-アロケータ は最初のルートの記録で panic するようになった。
+  - **変更前**：装置 `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`（5776 行、単体テスト 17 本）の W7 の陽性対照は PC-アロケータ（`allocator_without_the_root_ring`、S = 4、ρ = 1、k = 0、ルートリング表を持たないアロケータに戻し、A10 は赤と判定すべき）、成果物 `e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行）、`replay.sh` の E156 (alloc-basis 4分岐のコスト数値) の行はそれを指していた；ユーザーが「アロケータがルートリング表を持たないのにルートを一つ記録したら core が断言する」と決めた後、PC-アロケータ は最初のルートの記録で panic するようになった。
   - **変更後**：装置 5819 行、単体テスト 18 本（PC-アロケータ を撤去し、PC-固定閾値 を追加：セル表の Hh(1, 後, S, ρ) の六セルの二つの遅れ集合を k = 0 の A10 の判定に渡し、`name=pc_pinned_floor` の六行と集計一行を出す；新しい単体テスト U19）；成果物 `research/results/e156-alloc-basis-counts-2026-10-05.out`（3955 行、同じバイナリで再実行するとバイト単位で同じ）。第 1 行：六セルの二列の判定はどれも「不一致」、遅れ集合はどれも 6S − 1 を含む、`v2_pc_pinned_floor_seen=true`。第 2 行：正規化した後 3948 行のうち 294 行が異なる（判定行 60、カウント行 234、`name=done` のカウント項目を含む）：`f24_real_every_differ_points` 0 → 34、`s11_k10_violation_points` 0 → 34、`q1d_growth` の幾何感度は「12 のサンプリング点で一致」から「不安定」に（「実」の列の 4 点が `not_monotonic`）、F1 は依然発動；帰属の実行（写しで 31-1 の断言を逆に当てる）は新しい成果物とバイト単位で同じで、違いは 31-1 から来たものではない。停止 S11、S14 が発動し、メイン agent に渡す；`replay.sh` の E156 (alloc-basis 4分岐のコスト数値) の行は新しい成果物を指すよう変更、r2 のものは残す。インラインの単体テストとミューテーション表全体は走らせていない（ヘビー層、コミット時に回す）。
   - **根拠**：再実行登録 `research/prompts/e156-r5-prereg.md`；成果物 `research/results/e156-alloc-basis-counts-2026-10-05.out`、`research/results/e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out`、`research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`；ミューテーションの二つ `research/results/e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv`、`research/results/e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`；本文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
   - **変更前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 の文書鉄則修正より前のそのままの姿：このブロックの番号に略称を補い、名前が衝突するローカルのアーム名を小文字にした。元の文はこの版にある）
@@ -5137,7 +5200,7 @@
 ### 2026-09-26
 
 - E156 (alloc-basis 4分岐のコスト数値) の第 4 回の再実行：三つの前提を装置で再現、分岐票第 3 行は前提 2 により無効、第 1 行は履歴 38 本を測り終えた
-  - **変更前**：装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（4335 行、単体テスト 11 / ミューテーション 12 件）は、マウント時にロールバックしマウント中は回収しない旧実装に従って書かれていた：H0 / HR / HK / HK-F0 / HF / HX / HY / Hh の八族、分岐 1 は S = 8 と S = 4、ρ = 1、回収時点「実」、穴の位置「後」、k ≤ 2 でしか測っていなかった；着手時に単体テスト U11、U13 がすでに赤（マウント時のロールバックは削除済み）。索引行の状態は「一部実行済み（2026-09-22 第一・第二段 + 2026-09-23 R2 第一段 + 2026-09-24 R2 第二・第三段（範囲を縮め、S=8、ρ=1 の一つの幾何サンプリング点だけ）、登録済みの装置、決定的、単体テスト 5 / ミューテーション 4 件すべて検出；分岐 2、7 は実行済み；分岐 3 は一つの幾何セルを実行済み（X8 (小プール枯渇の二つの計測条件の構成)-A は未実施）；分岐 1 は穴の数のサンプリング点三つを実行済み（S×ρ の全走査は未実施））」；結論の列はそのまま：K1 は一字一句照合して一致（ディスク 0 の記帳第 1/2/5 項が 13/211955/1）；分岐 2：リスト L（4 箇所）はコマンドが捕まえた 41 箇所を漏らしていた（`|M∖L|=41`）、ゲート 51 番そのものは変える必要がない（データ駆動）が、登録が与えた二段の説明自体が式の写しを一つ漏らしていた；分岐 7（R2 第一段を判定対象のミラーだけを読むよう変えた後で再実行）：G27 は H0/HR/HK の計 168 の本当の正当な状態で誤報ゼロ（Q7b）；判別力の自己テスト ①（第 5 項を引かない）はこの段で試した 7 つの到達可能な基底（β0/β1/β2 と HK の四つの観測点）のどれでも定められた色の変化が見られず、登録の無効条項が発動し、Q7a の表全体を登録の規則どおり無効にした——Q7d-2/Q7d-3 は「測り方そのものが 0 を見られない」という説明を排除し（HK-F0、β_syn では測り方は 0 を測れる）、根本原因は当時「到達可能な正当な状態の第 5 項は決して 0 にならない」まで絞られた；**この結論は 2026-09-25 の第 3 回の再実行の続行段で覆された**：新しい到達可能な基底（`beta_hr_rollback_row`、HR 一族のロールバックで行を書く一歩、`family=HR kind=rollback_row txg=76`、第 5 項はちょうど 0）を補うと、判別力の自己証明 ① が初めて到達可能な基底で色を変えた（`flips_red_to_green=true`）、詳しくは実験ページ「履歴バージョン」の 2026-09-25 の続行段を参照；分岐 3（HF の幾何セル一つ）：G7（公開の入口の組み直し）と F-控除（本当の実装）の D_rel はまったく同じ（どちらも 0、空でないパブリッシュで数える）、差は小さい（`max_diff=0≤3`）、K9 は予想の 3 を確認できなかった；分岐 1（Hh(k) の穴の数のサンプリング点三つ、k=0/1/2）：Q1a−Q1b の差 Δ は穴の数につれて穴ごとに +50 で単調に増え（20→70→120）、h=0 から 2 スロット/1 スロットの二つの閾値を越えるが、h=0 の基準値 20 そのものの機構は突き止めきれていない。
+  - **変更前**：装置 `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`（4335 行、単体テスト 11 / ミューテーション 12 件）は、マウント時にロールバックしマウント中は回収しない旧実装に従って書かれていた：H0 / HR / HK / HK-F0 / HF / HX / HY / Hh の八族、分岐 1 は S = 8 と S = 4、ρ = 1、回収時点「実」、穴の位置「後」、k ≤ 2 でしか測っていなかった；着手時に単体テスト U11、U13 がすでに赤（マウント時のロールバックは削除済み）。索引行の状態は「一部実行済み（2026-09-22 第一・第二段 + 2026-09-23 R2 第一段 + 2026-09-24 R2 第二・第三段（範囲を縮め、S=8、ρ=1 の一つの幾何サンプリング点だけ）、登録済みの装置、決定的、単体テスト 5 / ミューテーション 4 件すべて検出；分岐 2、7 は実行済み；分岐 3 は一つの幾何セルを実行済み（X8 (小プール枯渇の二つの計測条件の構成)-A は未実施）；分岐 1 は穴の数のサンプリング点三つを実行済み（S×ρ の全走査は未実施））」；結論の列はそのまま：K1 は一字一句照合して一致（ディスク 0 の記帳第 1/2/5 項が 13/211955/1）；分岐 2：リスト L（4 箇所）はコマンドが捕まえた 41 箇所を漏らしていた（`|M∖L|=41`）、ゲート 51 番そのものは変える必要がない（データ駆動）が、登録が与えた二段の説明自体が式の写しを一つ漏らしていた；分岐 7（R2 第一段を判定対象のミラーだけを読むよう変えた後で再実行）：G27 は H0/HR/HK の計 168 の本当の正当な状態で誤報ゼロ（Q7b）；判別力の自己テスト ①（第 5 項を引かない）はこの段で試した 7 つの到達可能な基底（β0/β1/β2 と HK の四つの観測点）のどれでも定められた色の変化が見られず、登録の無効条項が発動し、Q7a の表全体を登録の規則どおり無効にした——Q7d-2/Q7d-3 は「測り方そのものが 0 を見られない」という説明を排除し（HK-F0、β_syn では測り方は 0 を測れる）、根本原因は当時「到達可能な正当な状態の第 5 項は決して 0 にならない」まで絞られた；**この結論は 2026-09-25 の第 3 回の再実行の続行段で覆された**：新しい到達可能な基底（`beta_hr_rollback_row`、HR 一族のロールバックで行を書く一歩、`family=HR kind=rollback_row txg=76`、第 5 項はちょうど 0）を補うと、判別力の自己証明 ① が初めて到達可能な基底で色を変えた（`flips_red_to_green=true`）、詳しくは実験ページ「履歴バージョン」の 2026-09-25 の続行段を参照；分岐 3（HF の幾何セル一つ）：G7（公開の入口の組み直し）と F-控除（本当の実装）の D_rel はまったく同じ（どちらも 0、空でないパブリッシュで数える）、差は小さい（`max_diff=0≤3`）、K9 は予想の 3 を確認できなかった；分岐 1（Hh(k) の穴の数のサンプリング点三つ、k=0/1/2）：Q1a−Q1b の差 Δ は穴の数につれて穴ごとに +50 で単調に増え（20→70→120）、h=0 から 2 スロット/1 スロットの二つの閾値を越えるが、h=0 の基準値 20 そのものの機構は突き止めきれていない。
   - **変更後**：装置を丸ごと書き直し（5755 行、単体テスト 17 本；`crates/mutations.tsv` に M35–M43 の九行を新設、M32–M34 の三行をアンカー変更、この装置を指す 22 行は草稿ディレクトリのリポジトリの写しで一つずつすべて赤）：第一段（前提 1–3 の最小の再現、PC-c2、ロールバックを抱える形の単体テスト二本）と第二段（Hh(k, 位置, S, ρ) の並べられる履歴 38 本 ×「実」「毎」）だけを走らせた。前提 1 は成り立ち、前提 2 は成り立たず（分岐票第 3 行は無効で測らない）、前提 3 は分岐 2 のその一族だけが旧式に従う；第 1 行の 12 のサンプリング点で Q1c-前 はどれも 2 スロットを越え、F1 が発動。第一段は停止 S1(i) に当たった（装置にもともとある「出した後でルートスロットだけを戻す」対照のミラーが、録画した切り出し区間とディスクごとにシステム構成のセクタ一つ分違った。実装はルートスロットの後にシステム構成も回転させるため）、S1 の行の「装置を変え、第十二節に書く」に従い、対照のミラーをシステム構成の二スロットも一緒に戻すよう変え、メイン agent の認定に渡す。実験ページの本文は第 4 回の再実行の現状に替え、第 1–3 回の再実行の本文はそのままページ内の「履歴バージョン」に移した。
   - **根拠**：再実行登録 `e156-r4-prereg.md`（第十二節の修正 1、2）；成果物 `e156-alloc-basis-counts-2026-09-26.out`；E156 (alloc-basis 4分岐のコスト数値) に対して `bash scripts/experiment-apparatus/replay.sh` を走らせると E156 (alloc-basis 4分岐のコスト数値) のセルはバイト一致を報告；単体テスト `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 17 passed；本文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
 
@@ -5152,7 +5215,7 @@
 ### 2026-09-23
 
 - E156 (alloc-basis 4分岐のコスト数値) の R2 の再実行の第一段：R3（G27 がミラーを読むよう変更）、HK/HK-F0 の二つの新しい履歴の族、分岐 7 の Q7a–Q7f 一式
-  - **変更前**：第一・第二段の装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（単体テスト 2 / ミューテーション 1 件）では G27 は両側とも判定対象のミラーを読んでいなかった——基底の側はメモリ上のアロケータを読み、不良ミラーの側は呼び出し側が渡した三つ組を読んでいた（C471 (成果物の中で同じフィールド名が二つの経路で逆の二つの量を指している) が記録したフィールドの意味が逆になっている欠陥を直した後も、この読み方のまま）；基底は β0/β1/β2 の三つだけ；分岐 7 の判別力の自己証明 ① は三つの基底のどれでも色が変わらず、Q7a は V3 により無効；S1(c) は既存のテストファイルをその場で走らせるだけで、装置側での再生はなかった；分岐 1、3、7 はすべて開いており、Q7d/Q7e/Q7f/S9 の種類の量はなかった。
+  - **変更前**：第一・第二段の装置 `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`（単体テスト 2 / ミューテーション 1 件）では G27 は両側とも判定対象のミラーを読んでいなかった——基底の側はメモリ上のアロケータを読み、不良ミラーの側は呼び出し側が渡した三つ組を読んでいた（C471 (成果物の中で同じフィールド名が二つの経路で逆の二つの量を指している) が記録したフィールドの意味が逆になっている欠陥を直した後も、この読み方のまま）；基底は β0/β1/β2 の三つだけ；分岐 7 の判別力の自己証明 ① は三つの基底のどれでも色が変わらず、Q7a は V3 により無効；S1(c) は既存のテストファイルをその場で走らせるだけで、装置側での再生はなかった；分岐 1、3、7 はすべて開いており、Q7d/Q7e/Q7f/S9 の種類の量はなかった。
   - **変更後**：実行前登録 `e156-r2-prereg.md`（分岐票の第 9、11、12 行だけを覆う；この段は第 12 行だけを行う）。R3：新しい関数 `allocated_minus_deferred_mismatches_referenced(pool, accounting_slot, referenced)` はミラーのバイトだけを解析する；旧いメモリ上の読み方は U8 のミューテーションの反面用に残す。HK / HK-F0 の二つの本当の履歴の族を新設（β0→O→E→クラッシュなしの再オープン→O×4→F を上限まで引き上げ→O→管理者ロールバック→O→c2 のクラッシュとリカバリ→O、骨格パブリッシュのすべてのパブリッシュ種別を覆う；HK-F0 は同じ一連の操作だが `ReuseWindow::ForcedToZero`、R7 の到達不能な陽性対照）、β0/β1/β2、β_syn（β0 のミラーに (第 1 項 −1、第 5 項 −1、第 2 項 +1) を施す）、β_F0 と合わせて 9 つの基底にし、一つずつ Q7a（Bd(+1)/(−1)/(+8)）、Q7c ①②、PC-検査-Bk1/Bk2/Bk3 を走らせた；Q7d-1/Q7d-2/Q7d-3、Q7e、Q7f の五種類の量を新設；S1(c) は装置自身が `rollback_by_a_forward_publish.rs` のロールバック隔離の場面を再生し `assert_eq!` で項目ごとに照合するよう変更；アンカー1/アンカー2/アンカー3 の三つのアンカーは装置内でその場で計算し、実装側の同名の定数や幾何関数と突き合わせた。装置を書く途中で自身の実装の穴を二つ見つけて直した（成果物より前、`e156-r2-prereg.md`「十二」の修正 1、2 を参照）：① HK のロールバック目標の選択は `effective_rollback_floor` で候補集合を絞らねばならず、`readable_roots` の中で `checkpoint_txg` が最小のものをそのまま取ってはならない（HK が F を引き上げた後、genesis はもう候補ではない）；② `mount_writable`/`mount_rollback` の内部で再構築されるアロケータは `ReuseWindow` を製品の既定に戻してしまうので、マウント/ロールバックのたびに `set_reuse_window` をやり直す必要がある。命名規律で一文字/文字に数字を付けた識別子を 40 余り変え（`g8_prime_is_red` など）、`naming-lint.sh` はすべて緑。単体テスト 4 本（`new_pool_file_creation_self_release_is_one_slot`、`red_check_reads_the_corrupted_mirror_not_the_live_allocator` を新設）、ミューテーション表はこの bin で累計 3 件、すべて手で赤→緑→復元して緑を確認。成果物 `e156-alloc-basis-counts-2026-09-23-stage1.out`（324 行、二回のその場の実行でバイト一致）、`replay.sh:175` はそれを指すよう変更。**結論**：Q7b では 168 の到達可能な正当な状態（H0/HR/HK）で G27 は誤報ゼロ；Q7d-2 はこの 168 の状態で第 5 項が一度も 0 にならないことを示す（最小値 1）；Q7d-3（陽性対照）は測り方が 0 を見られることを証明（HK-F0、β_syn のどちらでも測れた）；Q7c ① は 7 つの到達可能な基底のどれでも依然として色が変わらず、2 つの到達不能な基底（β_syn、β_F0）でだけ変わる；登録 V3 に従い、**Q7a の表全体は依然無効**——分岐 7（分岐票第 12 行）は続けても覆らず、判定基準を変えるか受け入れるかはメイン agent に渡す。HK-F0 の F の引き上げの探査は S9（候補ルートのツリーテーブルが読めない、`ForcedToZero` のもとで genesis のツリーテーブルのユニットが早すぎる再利用を受けた）に当たり、そのセルで止まったが、既に報告した判定には影響しない。
   - **根拠**：実行前登録 `e156-r2-prereg.md`；成果物 `e156-alloc-basis-counts-2026-09-23-stage1.out`；再実行 `bash scripts/experiment-apparatus/replay.sh E156`（alloc-basis の四つの分岐のコストの数）はバイト一致を報告；単体テスト `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 4 passed；ミューテーション表 `crates/mutations.tsv` のこの bin の 3 件を一つずつ手で確認；本文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
 
@@ -5175,6 +5238,12 @@
 - E155 (永続化毎の書き込み量：3種のfsync形態と反実仮想上限) 節の同日の項目「E155 (永続化毎の書き込み量：3種のfsync形態と反実仮想上限)…」を参照。
 
 ## E158 (ルート選択と修復の4分岐)
+
+### 2026-11-20
+
+- 装置は crates のコード分割と装置パッケージの lint 収束で変更され、その後は正式には実行していない：実験ページの「答えられないこと」の節に一段落を加えて明記し、影響する決定の表の全行の見直し日を当日に改めた；装置が量った数値、結論、成果物は変わらない。
+  - **根拠**：`scripts/experiment-apparatus/on-request-experiments.tsv` は E158 (ルート選択と修復の4分岐) を依頼があったときだけ実行するものとして登録している；ゲート doc-experiments の evidence-in-repo セルは、装置が変わって新しい成果物がないとき、実験ページに新しく加えた行に正式には実行していないと書くことを求める。
+  - **変更前**：`git show HEAD:.claude/kb/experiments/158-择根与修复四岔路.md` の「答えられないこと」の節と影響する決定の表。
 
 ### 2026-11-12
 
@@ -5257,7 +5326,7 @@
     Φ1 の故障注入、PC1-a/PC1-b、Q1-1 から Q1-4 の装置のコードは一行も書いておらず、数は一つもなかった；分岐票第 2 行（C331 (ルート選択の逆転による確認済み書き込みの上書き) ①②）
     も同じく数は一つもなかった。
   - **変更後**：メイン agent のメッセージ「続けて、この段はまだ分岐票が求める数を出していない、止まらない」——
-    `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` に約 500 行を追加：H1 一族の列挙（`h1_family`：
+    `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` に約 500 行を追加：H1 一族の列挙（`h1_family`：
     n1∈{1,2,3}、j は読めるルートをそれぞれ取る、m∈{0,1,2}）、Φ1 の故障注入（`attempt_op1`：(デバイス, オフセット) で正確に注入し、配置先は
     `locate_allocation_record_tree` がツリーテーブル 0 件/非 0 件の二つの枝でその場で調べる）、PC1-a/PC1-b（`run_pc1_a_and_b`）。
     **途中でバグを一つ見つけて直した（成果物より前）**：`root_record_of` は最初 `RootView::record_bytes`（457
@@ -5327,6 +5396,15 @@
 
 ## E159 (並行数に伴うfsync待機時間：グループコミットとWALの2アーム)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（1 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 1 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e159_fsync_wait_group_commit.rs` → `scripts/experiment-apparatus/e159_fsync_wait_group_commit/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md` の、影響を受ける決定の表。
+
 ### 2026-10-17
 
 - 「結果は成果物から行ごと写した」の見出しに括弧書き「（成果物が作業領域から移された行はポインタ一行で書く）」を追加；スモーク実行の証拠のポインタ行の括弧書きを空の `name=` からその行の実際の書き方 `E7RESULT E159RESULT arm=yi-M-K10` に変更；結論・数値・成果物は不変。
@@ -5344,6 +5422,12 @@
 ## E160 (ランダム小読み取り比率：3つの起源と再開判定基準の合成)
 
 ## E161 (クラッシュ増幅の重複排除と段階別所要時間)
+
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/161-崩溃放量的去重与分段耗时.md` の、影響を受ける決定の表。
 
 ### 2026-10-26
 
@@ -5375,10 +5459,19 @@
 
 - E161 (クラッシュ増幅の重複排除と段階別所要時間) の実行可能性の段
   - **変更前**：実行前登録 `research/prompts/e161-preregistration.md` しかなく、装置、成果物、実験ページはなかった。
-  - **変更後**：登録した装置 `crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs`（単体テスト 13 本、`crates/mutations.tsv` にミューテーション 12 件を追加）；ユーザーの決定に従い実行可能性の段だけを走らせた（一本目のストリームの書き込み数が 26 未満の各セグメントは全量、二本のストリームの甲二のクイック層は全領域、二つの 26 書き込みセグメントはそれぞれ 4096 個のセグメント先頭）、停止条項 S1–S6、登録第七節のすべてのアンカー、crates との状態ごとの突き合わせはすべて通過、G1–G5 は判定していない。
+  - **変更後**：登録した装置 `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs`（単体テスト 13 本、`crates/mutations.tsv` にミューテーション 12 件を追加）；ユーザーの決定に従い実行可能性の段だけを走らせた（一本目のストリームの書き込み数が 26 未満の各セグメントは全量、二本のストリームの甲二のクイック層は全領域、二つの 26 書き込みセグメントはそれぞれ 4096 個のセグメント先頭）、停止条項 S1–S6、登録第七節のすべてのアンカー、crates との状態ごとの突き合わせはすべて通過、G1–G5 は判定していない。
   - **根拠**：登録第十二節 12.2（ユーザーは実行可能性だけを検証すると決めた）；成果物 `e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out`。
 
 ## E162 (クラッシュ増幅判定ブロックストレージ選定)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（1 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e162_crash_verdict_block_store.rs` → `scripts/experiment-apparatus/e162_crash_verdict_block_store/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/162-崩溃放量判定块存储选型.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/162-崩溃放量判定块存储选型.md` の、影響を受ける決定の表。
 
 ### 2026-09-28
 
@@ -5415,6 +5508,15 @@
   - **根拠**：実行前登録 `e163-preregistration.md`；成果物 `research/results/e163-gpu-multicard-crc32c-2026-09-27-{r1,r2,f1,f2,r1-merge}.out`。
 
 ## E164 (クラッシュ増幅新設計の小規模機能テスト)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（2 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs` → `scripts/experiment-apparatus/e164_crash_amplification_design_function_test/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md` の、影響を受ける決定の表。
 
 ### 2026-10-17
 
@@ -5501,6 +5603,15 @@
 
 ## E166 (並行コミットの共有状態分割法)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（3 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 1 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition.rs` → `scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/166-并行提交的共享状态分法.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/166-并行提交的共享状态分法.md` の、影響を受ける決定の表。
+
 ### 2026-10-01
 
 - E166 (並行コミットの共有状態分割法) のページを作成、第一段を実行済み
@@ -5513,6 +5624,15 @@
   - **変更前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 の文書鉄則修正より前のそのままの姿：このブロックの番号に略称を補い、名前が衝突するローカルのアーム名を小文字にした。元の文はこの版にある）
 
 ## E167 (複数インフライトパブリッシュのクラッシュ網羅分割法)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（5 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 3 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e167_multi_inflight_crash_cut.rs` → `scripts/experiment-apparatus/e167_multi_inflight_crash_cut/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md` の、影響を受ける決定の表。
 
 ### 2026-10-15
 
@@ -5530,6 +5650,12 @@
 
 ## E168 (削除によるリザーブ量借用のリングウィンドウ)
 
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/168-删除借保留量的环窗口.md` の、影響を受ける決定の表。
+
 ### 2026-10-17
 
 - 成果物の表の segment1 の行に「未登録：115 MB、.gitignore 第 32 行で無視され、それを走らせたマシンにしかない」を補った；結論・数値・成果物は不変。
@@ -5543,7 +5669,7 @@
 ### 2026-10-01
 
 - E168 (削除によるリザーブ量借用のリングウィンドウ) のページを作成、装置を書き上げた
-  前二回のディスパッチの実行担当は返却しなかった；三回目に引き継いで登録用の装置 `crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs`（メインの作業領域の版の削除の入口はスタブ）、削除経路のパッチ表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`（19 行）、単体テスト 11 本、`crates/mutations.tsv` 末尾の装置ミューテーション 15 行を書き、コンパイルが通った；単体テスト、ミューテーション、第一段の成果物はどれも走らせていない（checker 層）、状態は「進行中（装置）」。
+  前二回のディスパッチの実行担当は返却しなかった；三回目に引き継いで登録用の装置 `crates/singlefs-implementation-experiments/src/bin/e168_delete_ring_window_borrow/main.rs`（メインの作業領域の版の削除の入口はスタブ）、削除経路のパッチ表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`（19 行）、単体テスト 11 本、`crates/mutations.tsv` 末尾の装置ミューテーション 15 行を書き、コンパイルが通った；単体テスト、ミューテーション、第一段の成果物はどれも走らせていない（checker 層）、状態は「進行中（装置）」。
 
 ### 2026-10-03
 
@@ -5554,6 +5680,15 @@
   - **根拠**：segment1 の成果物の第 177053 行の判定行、第 25777 行の最小反例；メイン agent が登録済みの成果物でアームごとに拒否を分けた `39 N-A landing 0`、`26 N-B no_space_after_raising_the_floor 0`；ユーザーのポップアップ「統合後に本当の実装で再実行（推奨）」「s1/陽性対照を残し、segment1 は入れない（推奨）」。
 
 ## E169 (並行コミットの追記規律とプレフィックスリカバリ)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（8 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 1 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery.rs` → `scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md` の、影響を受ける決定の表。
 
 ### 2026-10-01
 
@@ -5566,6 +5701,12 @@
   - **変更前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 の文書鉄則修正より前のそのままの姿：このブロックの番号に略称を補い、名前が衝突するローカルのアーム名を小文字にした。元の文はこの版にある）
 
 ## E170 (O3仕様実行器初版)
+
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/170-O3规约执行器第一版.md` の、影響を受ける決定の表。
 
 ### 2026-10-17
 
@@ -5729,6 +5870,15 @@
 
 ## E172 (削除書き出しバイトのドライラン)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（3 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e172_deletion_write_dry_run.rs` → `scripts/experiment-apparatus/e172_deletion_write_dry_run/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/172-删除写出的字节的干跑.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/172-删除写出的字节的干跑.md` の、影響を受ける決定の表。
+
 ### 2026-11-02
 
 - 第3回の再実行・第3段：成果物 `research/results/e172-r3-deletion-write-dry-run-2026-11-02.out`（966行）が出て、質問票 `research/prompts/m3-close-b19-p5-forks.md` の第2行は甲と判定した。ページ見出し、索引行、本文を第3回の現状（固定値層、条項層、判別アーム R-ret、陽性対照25組、A-journal の8行の不一致、単体テスト52件、ミューテーション表49件すべて検出）に置き換えた。第2回の現状、実施内容、再実行、判定、読数、A-journal、単体テストとミューテーションはページの履歴バージョンの第2回の項に移した（引用していた第2回の成果物の行は参照に変更）。「答えられないこと」に10–13項を加え、経路と結論の登録のソース行番号を現在の値に直し、「影響を受ける意思決定」に2行（D3 (領域割り当て)確定項目2 と D8 (コアインデックス構造)確定項目9、いずれも参考資料）を加えて、ほかの全行を再確認した（影響なし）。
@@ -5781,6 +5931,15 @@
 
 ## E173 (上限が不良スロットに引っかかった場合の3処置)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（3 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs` → `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md` の、影響を受ける決定の表。
+
 ### 2026-11-13
 
 - E173 (上限が不良スロットに引っかかった場合の3処置) の第 2 回再実行（第 1 段を今日の `crates/` で再出力、再実行表の第 2921 行だけを再実行）を実行：問題一は候補 ① と判定、新しい成果物を 2026-11-02 のものと行ごとに比べると違うのは `g_min_trial` の 2 行だけで、違いは `end=` の中の結末名だけ（`NoSpaceAfterRaisingTheFloor` が `NoSpaceEvenWithEverythingAFloorRaiseCouldRelease` に変わった）；問題二は候補 ① と判定、R3 から R7（X3 の 9 幾何 27 行、G-min の選択、X5 の `excess_slots`、`s16_g_1` の n コード = 21、第 2 段の幾何定数表）はすべて従来どおりで、ページで引いた数は不変；無効化条項 RV1 から RV7 は発動せず、ただし RV4 で登録した実行前後のツリー全体のハッシュは取らず、より弱いファイル時刻の確認に替えた；ページに「第 2 回再実行」の節を新設し、状態に「第 2 回再実行済み」を加え、「影響を受ける決定」の 5 行は振り返りの日付を更新、関係は不変；再実行表の第 2921 行は `…-2026-11-13-r2.out` を指すように変えた
@@ -5807,6 +5966,15 @@
 
 ## E174 (借用証書喪失時の待機とGPUメモリ返却)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（1 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs` → `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/174-借据丢掉时等待与显存回还.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/174-借据丢掉时等待与显存回还.md` の、影響を受ける決定の表。
+
 ### 2026-10-17
 
 - 再実行のブロックを `cd research` から scripts/experiment-apparatus で始めるよう変え；カードに載せる run のコマンドは装置のファイルヘッダに従い `scripts/experiment-apparatus/device-code-key.py run` から起動するよう変え、判定のコマンドはリポジトリルートで走らせるよう変えた；結論・数値・成果物は不変。
@@ -5830,9 +5998,15 @@
 
 ## E175 (製品パス上のinode番号水位ロールバックと再発番)
 
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変え、本文からタスク番号とバッチ番号を削っただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md` の、影響を受ける決定の表。
+
 ### 2026-11-09
 
-- E175 (製品パス上のinode番号水位ロールバックと再発番) の装置を検証クレートの bin `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs` に変え、旧ファイルとディレクトリは削除した。ページ上の再実行の説明、装置とソースの位置、単体テストとミューテーションの現状もこの bin に合わせて書き換えた：`driver_e175` は `cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression` を直接実行し、環境変数は変わらない。エントリ引数 `summarize` を追加し、`E175_RESULT_FILE` と `E175_SUMMARY_FILE` は必須になった（bin ターゲットには `CARGO_TARGET_TMPDIR` がない）。再実行登録行の行キーは関数ユニットのクロージャで構成される（この行のユニット数は5831）。残存成果物 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` は bin の結果行とバイト単位で一致する。結論・数値・成果物は不変。
+- E175 (製品パス上のinode番号水位ロールバックと再発番) の装置を検証クレートの bin `crates/singlefs-implementation-experiments/src/bin/e175_product_path_inode_watermark_regression/main.rs` に変え、旧ファイルとディレクトリは削除した。ページ上の再実行の説明、装置とソースの位置、単体テストとミューテーションの現状もこの bin に合わせて書き換えた：`driver_e175` は `cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression` を直接実行し、環境変数は変わらない。エントリ引数 `summarize` を追加し、`E175_RESULT_FILE` と `E175_SUMMARY_FILE` は必須になった（bin ターゲットには `CARGO_TARGET_TMPDIR` がない）。再実行登録行の行キーは関数ユニットのクロージャで構成される（この行のユニット数は5831）。残存成果物 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` は bin の結果行とバイト単位で一致する。結論・数値・成果物は不変。
   - **根拠**：ユーザー決定「1 2都要彻底改」（`records/2026-11-06-门禁判定全部入库.md` の「批 13」の節）；タスク11045 再実行の現判定「バイト一致1」；タスク11055 この bin の `main` を変えるとキーが変わり、E183 (容量傾き・読み取りキャッシュ小ディスク受入と掃除閾値のコスト値) の bin の `main` や無関係なテストファイルを変えても変わらない。
   - **変更前**：`git show HEAD:scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`。
 
@@ -5862,6 +6036,15 @@
 
 ## E176 (inodeツリーリーフ統合3候補の容量と書き込みコスト)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（2 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs` → `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md` の、影響を受ける決定の表。
+
 ### 2026-10-17
 
 - 再実行のブロックを `cd research` から scripts/experiment-apparatus で始めるよう変え、scripts/hosts と scripts/mutation のパスもそれに合わせて変え、ミューテーション表は scripts/mutation/tables/ を指す；結論・数値・成果物は不変。
@@ -5882,6 +6065,15 @@
 
 ## E177 (ツリー別墓石未作成時の復活数)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（4 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones.rs` → `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/177-逐树不写墓碑的复活数.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/177-逐树不写墓碑的复活数.md` の、影響を受ける決定の表。
+
 ### 2026-10-17
 
 - 再実行のブロックを `cd research` から scripts/experiment-apparatus で始めるよう変え、scripts/hosts と scripts/mutation のパスもそれに合わせて変え、ミューテーション表は scripts/mutation/tables/ を指す；結論・数値・成果物は不変。
@@ -5897,6 +6089,15 @@
   - **根拠**：判定 `research/prompts/m3-leaf-death-r1-main-verification.md` 第二節 K1「F1 と F2 の判定の仕方」と K4（G-窮屈 の理由の文、影響する決定表）；`research/prompts/m3-leaf-death-r2-main-verification.md` 第二節の F2 を論じる小節（F2 が当たりという判定は成り立ち、影響は実験ページの言い回しにだけある）；`research/prompts/m3-leaf-death-r3-main-verification.md` 第五節と決定の見直し。
 
 ## E178 (リーフコンテナとレコード死亡の計数)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（9 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs` → `scripts/experiment-apparatus/e178_leaf_and_record_death_counts/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/178-叶容器与记录死亡的计数.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/178-叶容器与记录死亡的计数.md` の、影響を受ける決定の表。
 
 ### 2026-10-17
 
@@ -5933,12 +6134,24 @@
 
 ## E180 (受入読み取り値と真の書き込み可能量)
 
+### 2026-11-20
+
+- 装置は crates のコード分割で変更され、その後は正式には実行していない：実験ページの「答えられないこと」の節に一段落を加えて明記し、影響を受ける決定の表の全行の見直し日を当日に改めた；装置が量った数値、結論、成果物は変わらない。
+  - **根拠**：`scripts/experiment-apparatus/on-request-experiments.tsv` は E180 (受入読み取り値と真の書き込み可能量) を依頼があったときだけ実行するものとして登録している（ユーザー定案、`records/2026-11-17-里程碑四收口续做.md` 第 255 行）；ゲート doc-experiments の evidence-in-repo セルは、装置が変わって新しい成果物がないとき、実験ページに新しく加えた行に正式には実行していないと書くことを求める。
+  - **変更前**：`git show HEAD:.claude/kb/experiments/180-准入读数与真可写量.md` の「答えられないこと」の節と影響を受ける決定の表。
+
 ### 2026-10-21
 
 - 新設、未実行：ページを作成し experiments.md の索引に登録した。第一段の読み値の段の装置、単体テスト 45 本、ミューテーション行 22 本、29 分割の長時間実行スクリプト `scripts/experiment-apparatus/e180-reading-shards.sh` を書き上げた；読み値の長時間実行は二回とも走り終えておらず、分割はリポジトリの外にあって登録しておらず、成果物はない；第二段の保持位置の段の装置は書いていない。実行前登録 `research/prompts/e180-preregistration.md`（第十二節の修正 1–4：T が journal レコードの上限で切られる状態に三列の判定を補う、探査のセッションの写しから大きなバイトを外す、第一段の逸脱六件、切られた状態は必要に応じて絞り、第一段は分割して走らせてから統合する）。
-  - **根拠**：分岐票 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` の F2、F5、F6、F8 の四行；ディスパッチの記録 `records/2026-10-18-里程碑三收尾与近期欠账.md` 第 230、310 行（二回の長時間実行は走り終わらず、止めた）；装置 `crates/singlefs-verification/src/bin/e180_admission_reading_versus_writable_bytes.rs`（`grep -c '#\[test\]'` = 45）、`crates/mutations.tsv` で名前が小文字の `e180` で始まる 22 行。
+  - **根拠**：分岐票 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` の F2、F5、F6、F8 の四行；ディスパッチの記録 `records/2026-10-18-里程碑三收尾与近期欠账.md` 第 230、310 行（二回の長時間実行は走り終わらず、止めた）；装置 `crates/singlefs-implementation-experiments/src/bin/e180_admission_reading_versus_writable_bytes/main.rs`（`grep -c '#\[test\]'` = 45）、`crates/mutations.tsv` で名前が小文字の `e180` で始まる 22 行。
 
 ## E181 (着弾判定とマウント下限)
+
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/181-落得下那一判与挂载下界.md` の、影響を受ける決定の表。
 
 ### 2026-11-10
 
@@ -5953,9 +6166,15 @@
 
 ## E182 (放棄ルート読み取り不能の3分岐)
 
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/182-被抛弃根读不出的三条岔路.md` の、影響を受ける決定の表。
+
 ### 2026-10-18
 
-- 新設、第一段の装置を書き上げ、成果物は未実行：ページを作成、実行前登録 `research/prompts/e182-preregistration.md`（第十二節の修正 12.1 から 12.10：続行のキーを関数ユニットの閉包の指紋に替える、壁時計は実測に従って書き直す、単一ディスクのリカバリで落ちたディスクの識別子はまだあるが読めない、`Overwrite` は `publish_overwrite` を取る、状態は二状態だけを取る、陽性対照の走らせ方、アームの成果物名、ミューテーション行、単体テストは走らせられなかった、`walk.rs` の指紋が登録と違う）、登録用の装置 `crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs`、長時間実行スクリプト `scripts/experiment-apparatus/e182-single-device-long-run.sh`、ミューテーション行 6 本；単体テストはメイン agent に渡して走らせ、第一段の成果物（B1、B4）と第二段（B2）は未実行。
+- 新設、第一段の装置を書き上げ、成果物は未実行：ページを作成、実行前登録 `research/prompts/e182-preregistration.md`（第十二節の修正 12.1 から 12.10：続行のキーを関数ユニットの閉包の指紋に替える、壁時計は実測に従って書き直す、単一ディスクのリカバリで落ちたディスクの識別子はまだあるが読めない、`Overwrite` は `publish_overwrite` を取る、状態は二状態だけを取る、陽性対照の走らせ方、アームの成果物名、ミューテーション行、単体テストは走らせられなかった、`walk.rs` の指紋が登録と違う）、登録用の装置 `crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks/main.rs`、長時間実行スクリプト `scripts/experiment-apparatus/e182-single-device-long-run.sh`、ミューテーション行 6 本；単体テストはメイン agent に渡して走らせ、第一段の成果物（B1、B4）と第二段（B2）は未実行。
   - **根拠**：分岐票 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` の B1、B2、B4 の三行、ディスパッチの記録 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 
 ### 2026-10-19
@@ -6001,10 +6220,16 @@
 
 ### 2026-10-18
 
-- 新設、第一段（H4）を実行済み：ページを作成、実行前登録 `research/prompts/e183-preregistration.md`（第十二節の修正三件：PC-受入 の空プールの半分は V33 の原文に従い一敗と記録、陽性対照 PC-受入-ファイル を補う、K32 の空プールの半分は `writable_mount` の入口でだけ判定し、`before_a_publish` の入口は G8 に従って記録）、登録用の装置 `crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`、成果物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` と `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`；V33 の空プールの半分が当たり、PC-受入-ファイル の 4 項目は成り立ち、H4 は判定に足り、第二から第四段（H2、H5、H3）は未実行。
+- 新設、第一段（H4）を実行済み：ページを作成、実行前登録 `research/prompts/e183-preregistration.md`（第十二節の修正三件：PC-受入 の空プールの半分は V33 の原文に従い一敗と記録、陽性対照 PC-受入-ファイル を補う、K32 の空プールの半分は `writable_mount` の入口でだけ判定し、`before_a_publish` の入口は G8 に従って記録）、登録用の装置 `crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs`、成果物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` と `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`；V33 の空プールの半分が当たり、PC-受入-ファイル の 4 項目は成り立ち、H4 は判定に足り、第二から第四段（H2、H5、H3）は未実行。
   - **根拠**：問題票 `research/prompts/m3-close-cost-measurement-questions.md` の H4 の行、ディスパッチの記録 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 
 ## E184 (通常層と大負荷層のコストカウント)
+
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/184-常规层与大负载层的代价计数.md` の、影響を受ける決定の表。
 
 ### 2026-10-26
 
@@ -6027,7 +6252,7 @@
 
 ### 2026-10-19
 
-- 新設、第一段（J1、分岐 G1 に対応）を実行済み：ページを作成、実行前登録 `research/prompts/e184-preregistration.md`（第十二節の修正十件：修正 1 は `crash_points_of_the_steps` を直接呼ぶよう変える、修正 6 は上書きのチェーン u = 4、16 を順次書き込みに変える、修正 10 はブロック数の上界が 2^26 を超える展開を計画に入れない）、登録用の装置 `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts.rs` と `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump.rs`、長時間実行スクリプト `scripts/experiment-apparatus/e184-segment-one-long-run.sh`、成果物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out`（950 行、18 件のうち 17 件をその場で実行）；J1-乙 のランダム履歴は歩数の段ごとに overlap、overlap、partial、separate（歩数の一行は不安定と記録）、上書きのチェーンの三段は separate、J1-丙 はすべて independent、ストリーム 9 本は取り出せず、アンカー B1 が失敗条項 F6 を発動；G1 は判定に足り、第二から第四段（J3、J2、J4）は未実行。
+- 新設、第一段（J1、分岐 G1 に対応）を実行済み：ページを作成、実行前登録 `research/prompts/e184-preregistration.md`（第十二節の修正十件：修正 1 は `crash_points_of_the_steps` を直接呼ぶよう変える、修正 6 は上書きのチェーン u = 4、16 を順次書き込みに変える、修正 10 はブロック数の上界が 2^26 を超える展開を計画に入れない）、登録用の装置 `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts/main.rs` と `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts_write_dump.rs`、長時間実行スクリプト `scripts/experiment-apparatus/e184-segment-one-long-run.sh`、成果物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out`（950 行、18 件のうち 17 件をその場で実行）；J1-乙 のランダム履歴は歩数の段ごとに overlap、overlap、partial、separate（歩数の一行は不安定と記録）、上書きのチェーンの三段は separate、J1-丙 はすべて independent、ストリーム 9 本は取り出せず、アンカー B1 が失敗条項 F6 を発動；G1 は判定に足り、第二から第四段（J3、J2、J4）は未実行。
   - **根拠**：問題票 `research/prompts/m3-close-c409-cost-questions.md` の J1 の行、分岐票 `research/prompts/m3-close-c409-r1-forks.md` の G1 の行、ディスパッチの記録 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 - 再実行の表に決定的な一片を登録：`E184|@driver_e184||e184-regular-layer-cost-counts-selfcheck-2026-10-19.out|exact`（`selfcheck`、保存する成果物 `research/results/e184-regular-layer-cost-counts-selfcheck-2026-10-19.out` は成果物全体の第 31 から 69 行にドライバが補った締めの行を加えたもの）、ほかの各件は壁時計のフィールドを含むので登録しない。
   - **根拠**：成果物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out` 第 30 から 69 行。
@@ -6035,6 +6260,15 @@
   - **根拠**：成果物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h5-2026-10-19.out` 第 7931、7932、19065、19066 行、ディスパッチの記録 `records/2026-10-18-里程碑三收尾与近期欠账.md` の「メイン agent が E183 で成果物を走らせる前の五箇所を判定」の一行。
 
 ## E185 (GC 1バッチ移行のウォールクロック内訳)
+
+### 2026-11-19
+
+- ページ先頭の現状の行と三つの起動スクリプト `scripts/experiment-apparatus/e185-r2-segment-run.sh`、`e185-r3-segment-run.sh`、`e185-r4-segment-run.sh` の `registered_apparatus_sha256` を、今計算した `d312b9aa71d0518976fd383b48300705f4598d2e79d4a3d59488657e684a51eb` に付け直した（装置 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` 26562 行、`#[test]` 240 件、三回計算して同じ値）。結論・数値・成果物は不変。装置は前回の固定以来 827 行増え 27 行減っており、測り方と判定基準が動いたかどうかは一箇所ずつは確かめていない。
+  - **根拠**：旧台帳 `records/2026-11-17-subagent账本自上而下清欠.md` 第二百二十四節第 22 条（登録 a5b48b73、現在の計算 d312b9aa）。書き戻し担当の報告 `~/.local/share/singlefs/work/ledger-open-kb-writeback/result.md` 第 4 条。三つの起動スクリプトは差し替えツールで実際に差し替えた（結果「换上了 3 份」）。差し替えの後、三つの自己証明はすべて終了コード 0。
+  - **変更前**：固定値 `a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082`（同じ節の 2026-11-02 のブロックの第二項）。
+- 同じ日の付け直しを撤回した：三つの起動スクリプトの `registered_apparatus_sha256` を各登録第十二節の値に戻した（第 2 回再実行 `0bd22743…`、第 3 回再実行 `4368c0e7…`、第 4 回再実行 `9e813cbd…`）。ページ先頭の現状の行は、装置が登録の後で変更され、第十二節に改訂行がなく、起動すると停止条項で終了コード 3 になる、と書き直した。装置が今計算する値は `d312b9aa…` のまま。
+  - **根拠**：治理文件轮第一轮の判決 `research/prompts/ledger-open-fixes-governance-r1-main-verification.md`「二、判决」第 13 条：付け直しで停止条項 K-S6、J-S7 が素通りになっていた。第 4 回再実行の登録 `research/prompts/e185-r4-prereg.md:579`、第 2・3 回再実行の登録第十二節は `git show a24379563^:research/prompts/e185-r2-prereg.md` と `git show a24379563^:research/prompts/e185-r3-prereg.md`。
+  - **変更前**：同じ日に先に付けた値 `d312b9aa71d0…`。
 
 ### 2026-11-02
 
@@ -6231,10 +6465,19 @@
 
 ### 2026-10-19
 
-- 新設、装置は書いた、未実行：ページを作成、実行前登録 `research/prompts/e185-preregistration.md`（第十二節は 12.1 だけを記録：ミューテーション表は `crates/mutations.tsv` に置き、判定基準は動かしていない）；登録用の装置 `crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs` の四つのサブコマンド、インラインの単体テスト 45 本を書き上げ、ミューテーション行 22 本を `crates/mutations.tsv` に追加；単体テスト、ミューテーションの三つの数、四段の成果物はどれも走らせていない。
+- 新設、装置は書いた、未実行：ページを作成、実行前登録 `research/prompts/e185-preregistration.md`（第十二節は 12.1 だけを記録：ミューテーション表は `crates/mutations.tsv` に置き、判定基準は動かしていない）；登録用の装置 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` の四つのサブコマンド、インラインの単体テスト 45 本を書き上げ、ミューテーション行 22 本を `crates/mutations.tsv` に追加；単体テスト、ミューテーションの三つの数、四段の成果物はどれも走らせていない。
   - **根拠**：問題票 `research/prompts/m4-gpugc-measure-forks.md` の第 1 行と第 4 行の単独実行の半分（ディスパッチでこの段が答えるべき分岐）、ディスパッチの記録 `records/2026-10-19-里程碑四GPU垃圾回收开工.md`。
 
 ## E186 (未知のツリー・記帳次元の再導出)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（4 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 3 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs` → `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/186-不认识的树-记账维重推.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/186-不认识的树-记账维重推.md` の、影響を受ける決定の表。
 
 ### 2026-10-20
 
@@ -6248,6 +6491,15 @@
   - **変更前**：状態は「実行済み（Q1、Q2 は判定に足りる；ミューテーション表 17 件すべて検出）」。
 
 ## E187 (隔離マークの永続化コスト)
+
+### 2026-11-20
+
+- 装置は crates のコード分割と装置パッケージの lint 収束で変更され、その後は正式には実行していない：実験ページの「答えられないこと」の節に一段落を加えて明記し、影響を受ける決定の表の全行の見直し日を当日に改めた；装置が量った数値、結論、成果物は変わらない。
+  - **根拠**：`scripts/experiment-apparatus/on-request-experiments.tsv` は E187 (隔離マークの永続化コスト) を依頼があったときだけ実行するものとして登録している；ゲート doc-experiments の evidence-in-repo セルは、装置が変わって新しい成果物がないとき、実験ページに新しく加えた行に正式には実行していないと書くことを求める。
+  - **変更前**：`git show HEAD:.claude/kb/experiments/187-隔离落盘代价.md` の「答えられないこと」の節と影響を受ける決定の表。
+- 現状を述べる文にある旧い単一ファイルのパスを、分割後のパスに改めた：ページ冒頭の「装置」の行は `scripts/experiment-apparatus/e187_quarantine_mark_cost/main.rs` と同じディレクトリの各モジュールファイルを挙げ、再実行の節のミューテーションコマンドは `e187_quarantine_mark_cost/main.rs` を使い、「経路と結論の登録」の二つのソース位置は分割後のファイルと行にした；それらの実行で何をしたかを述べる文、写してきたコマンドと出力は当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e187_quarantine_mark_cost.rs` から `scripts/experiment-apparatus/e187_quarantine_mark_cost/main.rs` への移動を登録している；`.claude/rules/path-moves.md`「やり方」の第 5 段階：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスに改める。
+  - **変更前**：`git show HEAD:.claude/kb/experiments/187-隔离落盘代价.md` のページ冒頭の「装置」の行、再実行の節のミューテーションコマンド、「経路と結論の登録」のソース位置。
 
 ### 2026-11-08
 
@@ -6266,12 +6518,20 @@
 - 新設、第一段を実行済み、第二段とミューテーション表は未実行：ページを作成、実行前登録 `research/prompts/e187-preregistration.md`（第十二節の修正一から修正五、単体テストの後、成果物の前に書いた；修正一はモデルの二つの配置規則を `crates/` に従って細かくし、メイン agent の認定に渡す）、装置 `scripts/experiment-apparatus/e187_quarantine_mark_cost.rs`（単体テスト 30 本、ほかにスレッドの登録位置 2 本）、ミューテーション表 `scripts/mutation/tables/e187_quarantine_mark_cost.tsv`（17 件、未実行）、第一段の成果物 `research/results/e187-quarantine-mark-cost-segment-one-2026-10-21.out`（250 行）、再実行の表に `E187|e187-quarantine-mark-cost|segment-one|e187-quarantine-mark-cost-segment-one-2026-10-21.out|exact` を登録。状態は「一部実行済み（第一段を実行済み；第二段の作業負荷とミューテーション表は未実行）」。
   - **根拠**：分岐票 `research/prompts/m4-i315-quarantine-mark-cost-forks.md` のその行、バッチ `records/2026-10-13-里程碑四预开发.md` の m4-i315-quarantine-mark-cost の節；第二段（320 セル × 三アーム）は本機が満載のとき前面で 225 秒走って 42 セルを終え、メイン agent に渡して起動してもらう。
 
+## E197 (リングスキャン接着部のメモリとディスク数)
+
+### 2026-11-20
+
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/197-扫环胶水内存随盘数.md` の、影響を受ける決定の表。
+
 ## E198 (番号取得スキップを出生代号で認める前提)
 
 ### 2026-11-11
 
 - 装置の締めの行を `name=done result_lines=` から `name=done emitted=`（締めの行自身を含む）に変え、二つの段を出し直した：第一段 `research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-10.out`（タスク 13021、1445 行）、第二段 `research/results/e198-instance-table-pointer-birth-skip-premise-segment-two-2026-11-10.out`（タスク 13022、2107 行）。単体テストのタスク 12588 は 26 本すべて通った。古い成果物と行ごとに比べると最終行だけが違う。`replay.sh` の E198 二行を新しい成果物名に向け、実験ページの「現状」に一項目を補い、「再実行」の二つのコマンドを新しい成果物名に替え、「影響する決定」の二行を見直した。状態と問題票の二行の判定は変わらない。
-  - **根拠**：装置 `crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs:4770-4771`。古い成果物 `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out`、`git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-two.out`。
+  - **根拠**：装置 `crates/singlefs-implementation-experiments/src/bin/e198_instance_table_pointer_birth_skip_premise/main.rs:300-301`（分割前は `HEAD:crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs:4770-4771`）。古い成果物 `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out`、`git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-two.out`。
 
 ### 2026-11-05
 
@@ -6289,10 +6549,19 @@
 
 ### 2026-10-29
 
-- 新規、装置作成済み・成果物は未実行：ページを作成。実行前登録 `research/prompts/e198-preregistration.md`（第十二節の修訂 1 は派遣プロンプトでメイン agent が四つの保留項目に出した決定どおり書いた。掃除閾値の製品デフォルトは 369 から 365 に変え、G1 は 365 を取る。修訂 2 は V4、V7 の取得点と単体テストを確定）、リポジトリに入れる装置 `crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs`（単体テスト 25 本、実行担当の作業ディレクトリで書いた。コンパイルと単体テストはメイン agent の担当）、変異行 9 本は作業ディレクトリに用意、再実行表に `E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one.out|exact` と `E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact` を登録。状態「装置作成済み、成果物は未実行」。
+- 新規、装置作成済み・成果物は未実行：ページを作成。実行前登録 `research/prompts/e198-preregistration.md`（第十二節の修訂 1 は派遣プロンプトでメイン agent が四つの保留項目に出した決定どおり書いた。掃除閾値の製品デフォルトは 369 から 365 に変え、G1 は 365 を取る。修訂 2 は V4、V7 の取得点と単体テストを確定）、リポジトリに入れる装置 `crates/singlefs-implementation-experiments/src/bin/e198_instance_table_pointer_birth_skip_premise/main.rs`（単体テスト 25 本、実行担当の作業ディレクトリで書いた。コンパイルと単体テストはメイン agent の担当）、変異行 9 本は作業ディレクトリに用意、再実行表に `E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one.out|exact` と `E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact` を登録。状態「装置作成済み、成果物は未実行」。
   - **根拠**：問題票 `research/prompts/m3-close-b19-c699-forks.md` の二行、バッチ `records/2026-10-18-里程碑三收尾与近期欠账.md` の 19-3。停止条項 S5 はコードを読む限り第二段で発動し、S5 の文言はメイン agent が決める。ページの「現状」と実行担当の報告 `~/.local/share/singlefs/work/m3-close-b19-e198-run/result.md` に記録。
 
 ## E199 (前回バージョンをそのままコピーするパブリッシュのコスト)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（1 箇所）：関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。それらの実行が何をしたかを述べる文や、写したコマンドとその出力の 1 箇所は、当時の単一ファイルのパスのままにした。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e199_transaction_output_copy.rs` → `scripts/experiment-apparatus/e199_transaction_output_copy/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/199-发布照抄上一版的代价.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/199-发布照抄上一版的代价.md` の、影響を受ける決定の表。
 
 ### 2026-11-05
 
@@ -6332,6 +6601,15 @@
 
 ## E201 (3オラクル共謀現ツリー全表)
 
+### 2026-11-18
+
+- 第 1 次再実行を実行し判定可能（再実行登録 `research/prompts/e201-r1-prereg.md`、質問票 `research/prompts/e201-r1-questions.md`）：ミューテーション表 57 行のうち 56 行を検出、第 57 行「判法 E171 目录只在 e171_research_side 里插」は赤にならず等価と判定。単体テスト六つの 124 件はすべて通過（実リポジトリを読む単体テストでの赤は U1 に分類し、`test_full_table_run.py` はリポジトリルートそのものを別扱いにし、手作りのテストケースを三つ足した）。ミューテーションドライバは起動できる（終了コード 2 になった `mutation_driver.py` の回（`type=command-failed exit=2`）の原因はベースラインの単体テストの赤）。ページに「第 1 次再実行」の節と分岐表の三行を足し、「現状」の単体テストとミューテーションの数を当時の数として示し、再現表に `driver_e201_mutations` を登録した。状態を「装置作成済み、成果物未実行」から「装置作成済み、二段の成果物未実行；第 1 次再実行は実行済み（判定可能）」に変えた。第 57 行の処置（等価性のテストを残し、振る舞いを変える変異に差し替える）はメイン agent に任せ、装置と表は変えていない。
+  - **根拠**：`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations.out` 第 117 行 `E7RESULT name=verdict mutations=57 caught=56 invalid=0 survived=1 timed_out=0 restored_and_baseline_green=true`；`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-unit-tests-after.out` 第 217・219 行（`Ran 124 tests`、`OK`）；対照の成果物二つは 5.2 と項目ごとに同じ；ツリー要約三回は同値、装置の要約は前後で同値（無効化条項 Z2・Z3 は発火しない）；等価の読みは `scripts/gate/lib_function_units.py` の `PythonModule.search_directories`。
+  - **変更前**：`git show HEAD:.claude/kb/experiments/201-三oracle合谋今树整表.md`。
+- 第 57 行の処置を反映し、再現登録を新しい成果物に向け直した：等価性のテスト `JudgeImportTests.test_without_the_drivers_own_insertion_the_key_library_still_resolves_the_e171_modules_through_the_research_side`（既定のスイッチでは `ok`、キー計算ライブラリで破壊スイッチ `python-imported-sys-path-ignored` を入れるとちょうどこの一件が赤）を `test_current_tree_row_driver.py` に入れ、行ドライバのその行の上のコメントを書き直し、表の第 57 行を「判法 E171 目录不进 import 路径」（`e171_research_side.py` の挿入の行を `pass` に替える）に差し替えた。差し替えた後は単体テスト 125 件がすべて通過し、全表 57 行すべて検出。`replay.sh` の再現表の E201 行、`.claude/gate.d/replay-comparison-units.tsv` の E201 行、再実行登録の第十一節の比較対象表第 1 行を新しい成果物に向け直した。r1 の成果物（56 行検出、1 行赤にならず）は残し、読み値は変えない。`driver_e201_mutations` は単体テスト六つを `--unit-test-module` で一つずつ渡す（`replay.sh --selftest` の回（`type=command-failed exit=1`）は「静态核 mutation-driver-tables」で赤：そのセルは `TEST_MODULES` を行単位で読み、E201 のドライバはそれを二行にまたがって書いている）。再実行登録の修訂 3。記録の状態の括弧書き、「現状」の件数、第 22 行の一文（`FrozenO3Is496Tests` 二つと変異表二行は 2026-11-11 に実行済み）、冒頭の一文、分岐表、「第 1 次再実行」の節、「影響する決定」の振り返りをそれに合わせて変えた。索引の行の「ミューテーション表 50 行」「単体テスト 115 件」「変異 50 件すべて検出」はいまの数にした。
+  - **根拠**：`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations-2026-11-18.out` 第 117 行 `E7RESULT name=verdict mutations=57 caught=57 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`、第 116 行 `E7RESULT name=mutation number=57 outcome=✅ mutation=判法_E171_目录不进_import_路径 unit_test_exit=1`；`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-unit-tests-after-2026-11-18.out` 第 182、184 行（`Ran 125 tests in 13.567s`、`OK`）；`JudgeImportTests` だけを `python-imported-sys-path-ignored` を入れて走らせた回の `FAILED (failures=1)`（赤は等価性のテスト）；`replay.sh --selftest` の回のログ第 310 行（`ast.literal_eval` のトレースバック）；派遣プロンプト（バッチ `records/2026-11-17-subagent账本清欠调度记录.md#13`）。
+  - **変更前**：状態の括弧書きは「ミューテーション表 57 行のうち 56 行を検出、1 行は赤にならず等価と判定」、再現表の行は `e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations.out` を指し、冒頭の一文は「単体テスト、変異、自己検証、成果物はまだ走らせていない」、「O3 側」の項目の最後の一文は「この二つはまだ走らせていない」；コミット済みの版は `git show HEAD:.claude/kb/experiments/201-三oracle合谋今树整表.md`。
+
 ### 2026-11-11
 
 - O3 側を 487 ディレクトリと r2 の凍結参照から、496 ディレクトリと E171 (3オラクル共謀テスト) 第 3 次再実行の凍結参照に替えた：登録第十二節の修訂 8。装置は `e171_research_side.py` で自プロセス内の `frozen_o3` の定数三つを替えるだけで、単体テストを二本、ミューテーション行を二行足し、ページの「現状」「口径」にそれぞれ一文を足した。状態は「装置は書いた、成果物は未実行」のまま。
@@ -6346,6 +6624,15 @@
   - **根拠**：質問票 `research/prompts/e171-current-tree-full-table-questions.md` の二行、バッチ `records/2026-10-31-删兼容旧版本代码.md` 第 18 バッチ。ユーザーの決定「第 2 回再実行は収束、全表は新しい実験として立てる」と 2026-11-02 のダイアログの三つの選択（選択肢はそのバッチの記録）。
 
 ## E203 (受理前スキャン系のステップコスト)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（4 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e203_admission_scan_cost.rs` → `scripts/experiment-apparatus/e203_admission_scan_cost/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/203-准入之前扫类的步代价.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/203-准入之前扫类的步代价.md` の、影響を受ける決定の表。
 
 ### 2026-11-05
 
@@ -6384,6 +6671,15 @@
 
 ## E206 (パブリッシュ固定点ラウンド数のコスト)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（2 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e206_fixed_point_cost.rs` → `scripts/experiment-apparatus/e206_fixed_point_cost/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/206-发布固定点轮数的代价.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/206-发布固定点轮数的代价.md` の、影響を受ける決定の表。
+
 ### 2026-11-13
 
 - 統合レポートを、今日の装置が計算し直した全体に差し替えた：`research/results/e206-fixed-point-cost-report-2026-11-13.out`（792 行）を新設し、登録行はそれを指すようにし、`-r2`（754 行）と 11-09 の原本レポート（753 行）は残した。`-r2` と比べると `name=by_delta_pooled_fallback` の 38 行と締めの行の数が違うだけで、ほかの行はバイト単位で同一。ページの `question=q4 arm=p1` の行の 2 項目は新しいレポートの順に直し（11-09 の原本レポートは `-r2` と逆順、集合は同じ）、無効化条項 1 の 3 行には保存レポートでの行番号 607、609、611 を加え、決定表は 2026-11-13 まで見直した。読み取り値・成果物・結論は変わっていない。
@@ -6409,6 +6705,15 @@
   - **変更前**：なし、この節は新しい。
 
 ## E207 (厳格判定下のスキャン系ステップ数)
+
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（5 箇所）：関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e207_strict_scan_steps.rs` → `scripts/experiment-apparatus/e207_strict_scan_steps/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/207-严格判据下的扫类步数.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/207-严格判据下的扫类步数.md` の、影響を受ける決定の表。
 
 ### 2026-11-13
 
@@ -6441,6 +6746,15 @@
 
 ## E209 (スパイクの原因)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（2 箇所）：関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e209_spike_cause.rs` → `scripts/experiment-apparatus/e209_spike_cause/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/209-尖峰成因.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/209-尖峰成因.md` の、影響を受ける決定の表。
+
 ### 2026-11-13
 
 - 新規、未実行：装置（計数スクリプト、履歴ケース、スクリプト表、モデル、入口とライブラリスクリプト）、単体テスト、変異表を書き、ゲートが番号を認識できるようページを作った；成果物は 1 つも実行しておらず、測定値はまだ 1 つもない。
@@ -6464,8 +6778,23 @@
 
 ## E210 (ディスク拡大時の容量表書き換えにおける読者規則四案)
 
+### 2026-11-20
+
+- 現状を述べる文の中の装置ソースのパスを、crates コード分割後のパスに改めた（2 箇所）：装置全体を指すものは同名ディレクトリ下の `main.rs` と書く、関数・定数・テストを名指ししているものはそれがあるモジュールファイルと書く、行番号つきのものは分割後の行番号に替えた。
+  - **根拠**：移動登録表 `.claude/gate.d/path-moves.tsv` が `scripts/experiment-apparatus/e210_capacity_grow_reader_rules.rs` → `scripts/experiment-apparatus/e210_capacity_grow_reader_rules/main.rs` を登録している。`.claude/rules/path-moves.md`「やり方」第 5 手順：移動そのものを述べる文は旧パスのまま、現状を述べる文は新パスにする。
+  - **改前**：`git show HEAD:.claude/kb/experiments/210-盘变大改容量表的读者规则四臂.md` の、装置ソースのパスを引いて現状を述べる文。
+- 影響を受ける決定の表の全行の見直し日を今日に改め、「影響なし」と書いた：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。
+  - **根拠**：doc-experiments ゲートの decision-links セル：実験ページの本文が変わったら、影響を受ける決定の表に見直しが要る。移動登録表 `.claude/gate.d/path-moves.tsv` が、装置ソースの同名ディレクトリへの移動を登録している。
+  - **改前**：`git show HEAD:.claude/kb/experiments/210-盘变大改容量表的读者规则四臂.md` の、影響を受ける決定の表。
+
 ### 2026-11-18
 
 - 新規作成、未実行：独立に手書きした計数モデル（bin `e210-capacity-grow-reader-rules`、コマンドライン引数で成果物の 2 区間から選ぶ）、単体テスト 36 件、ミューテーション表 23 行を書き終え、`replay.sh` に再実行の登録 2 行を足し、ゲートが番号を認識できるようにページと索引行を作った；ビルド・単体テスト・ミューテーション表・成果物は一度も実行しておらず、測定値は 1 つもない。
   - **根拠**：実行前登録 `research/prompts/e210-preregistration.md`；分岐表 `research/prompts/m4-capacity-grow-r1-forks.md`。
   - **改訂前**：なし、この節は新しい。
+- 装置の不変性チェックを改めた：その単体テスト実行では 36 件が通り 2 件が赤になった、赤は不変性チェックだった。別の整数組への置き換えを、ディスクごとに 1 枚の置き換え表にし、同じ主格の整数はどの形状でも同じ新しい整数に置き換える；「再拡大」のプローブ値は 2 通りの書き方（ほかの数と一緒に置き換える、登記の字面どおり置き換え後の大きさに 100 を足す）を持ち、判定行は `invariance_mismatches`（登記の字面の基準）と `order_preserving_mismatches`（足した基準）に分け、食い違うフィールドは `name=invariance_detail` 行にフィールドごとに並べる；単体テスト 38 件、ミューテーション表 27 行；登記第十二節に「改訂」の段落を足した。成果物は依然として一度も実行しておらず、測定値はない。
+  - **根拠**：登記 `research/prompts/e210-preregistration.md` 第十二節「改訂」；その単体テスト出力。
+  - **改訂前**：同日の直前の項目（単体テスト 36 件、ミューテーション 23 行、不変性チェックは各形状の順位で置き換え）。
+- 2 区間の成果物を実行して読んだ：単体テスト 40 件が通り、ミューテーション表 27 行すべて検出、行 2 と行 3 の区間が 32 行、行 1 の区間が 165 行。行 2 と行 3 は判定に足りる（アーム丙がスロットを 2 回、バリアを 1 本多く書く；境界 1 つと 2 つをまたぐ点が各 17228 スロット、合成した対照点が 812、階層の突き合わせはすべて一致）；行 1 は装置内で判定に足りる（書き込み可能の漏れはアーム甲・丁が各 103 / 1487、読み取り専用はアーム甲が 103、アーム乙・丙とベースラインアームは 0；回避可能な誤拒否はアーム甲 30、乙 284、丙 66、丁 30、ベースラインアーム 619）；アーム甲・丁の書き込み可能の漏れとアーム丙の読み取り専用の漏れは攻撃側の列挙モデルと食い違い（E210 は遅れたディスクの分岐を作っておらず、イメージは 2 つの時点だけでインテントマーカーを持たない）、ページは並べて「2 つの装置が食い違う、未判定」と記した；不変性チェックは字面どおりの基準で 5 件の食い違い（すべて観測クラス数、474 から 490 と 684 から 716）、順序を保つ基準で 0 件、無効化条項 1 の扱いはメイン agent の判断待ち；書き込み可能な漏れ 103 件はソースから手で分類し（早いイメージ 99、前のイメージ 4）ページに書いた、履歴ごとの詳細はない；ページと索引行を 3 言語で改めた。
+  - **根拠**：`research/results/e210-capacity-grow-reader-rules-write-counts-and-root-level-2026-11-18.out` の 2 行目から 24 行目と 28 行目から 31 行目；`research/results/e210-capacity-grow-reader-rules-reader-rules-on-histories-2026-11-18.out` の 7 行目から 31 行目と 142 行目から 164 行目；攻撃側のモデルによる 2 回の実行出力。
+  - **改訂前**：同日の直前の項目（装置の不変性チェックを改めた、成果物は一度も実行しておらず測定値なし）。

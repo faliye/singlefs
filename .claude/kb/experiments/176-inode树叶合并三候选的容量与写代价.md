@@ -10,7 +10,7 @@
 
 跑前登记 `e176-preregistration.md`（第二段跑完时 sha256 `f7599076bb469dcc483f98cb0f557aca5bc6d79759fe674b4b52f150b8291fa9`，含第十二节「修订」三条：修订 1 补 M3 f = 59 变体的阳性对照与它的公共窗口读法；修订 2 把对拍 bin 从可选特性挪成独立 manifest，见「做了什么」；修订 3 补第二段的三个公共窗口、三个变体的阳性对照与变异 V14–V16，第二段产物之前写）。回答的是岔路单 `m3-3-5-forks.md` 的 M 那一行：inode 树叶容器删到稀疏时怎么回收，C116（叶容器的分裂 / 合并纪律没有会失败的检查） 合并那一半与 C536（inode 树的「左从右借」让容器号条件为假）。
 
-三个候选：M1 只删空即摘（E176（inode 树叶合并三候选的容量与写代价） 跑的时候 `crates/` 的做法；`crates/` 已是 M3）；M2 只做左吸收右（相邻两片合起来 ≤ 233 条就并）；M3 照 D8（核心索引结构） 已定项 6 原文，左吸收右加左从右借（主取样点下限 f = 117、均分借）。装置是独立手写模型 `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs`，不与 `crates/` 共用代码；M1 那一臂另由对拍 bin `scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` 逐步比当时 `crates/singlefs-core/src/inode_tree.rs` 的两个纯函数（`crates/` 已是 M3，这一臂的对拍没重做）。
+三个候选：M1 只删空即摘（E176（inode 树叶合并三候选的容量与写代价） 跑的时候 `crates/` 的做法；`crates/` 已是 M3）；M2 只做左吸收右（相邻两片合起来 ≤ 233 条就并）；M3 照 D8（核心索引结构） 已定项 6 原文，左吸收右加左从右借（主取样点下限 f = 117、均分借）。装置是独立手写模型 `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites/main.rs`，不与 `crates/` 共用代码；M1 那一臂另由对拍 bin `scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` 逐步比当时 `crates/singlefs-core/src/inode_tree.rs` 的两个纯函数（`crates/` 已是 M3，这一臂的对拍没重做）。
 
 **现状**：
 
@@ -630,7 +630,7 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 | # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
 |---|---|---|---|---|
-| 1 | 独立手写模型 | 叶容器表只存号；插入末尾分裂、删空即摘、M2 并、M3 借，两种记法按这次发布动过的容器号与第一个摘片位置算。M1 与路径 2 比的是 22 条登记序列上 M1 被拒之前的每一步（枚举点，不是定义域：负载取登记的三族 22 点）；锚点格与路径 3 比 | `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs:155 insert`、`:278 remove`、`:321 rewrites_of_this_publish` | 一片 233 条、根扇出 135（本地常量，值抄自 `crates/` 并在路径 2 那边回比）；位置记法的定义（读当时 `crates/singlefs-core/src/inode_tree.rs` 的 `remove_record_from_leaf_containers` 得来）；负载生成器（对拍时两边吃同一个生成器的输出） |
+| 1 | 独立手写模型 | 叶容器表只存号；插入末尾分裂、删空即摘、M2 并、M3 借，两种记法按这次发布动过的容器号与第一个摘片位置算。M1 与路径 2 比的是 22 条登记序列上 M1 被拒之前的每一步（枚举点，不是定义域：负载取登记的三族 22 点）；锚点格与路径 3 比 | `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites/leaf_containers_and_the_tree.rs:131 insert`、`:254 remove`、`:297 rewrites_of_this_publish` | 一片 233 条、根扇出 135（本地常量，值抄自 `crates/` 并在路径 2 那边回比）；位置记法的定义（读当时 `crates/singlefs-core/src/inode_tree.rs` 的 `remove_record_from_leaf_containers` 得来）；负载生成器（对拍时两边吃同一个生成器的输出） |
 | 2 | `crates/` 的两个纯函数 | 今天实现的 M1：`write_records_into_leaf_containers` 追加 / 末尾分裂、片数 > 135 拒；`remove_record_from_leaf_containers` 删空摘片、右边各片全进重写清单 | `crates/singlefs-core/src/inode_tree.rs:181 write_records_into_leaf_containers`、`:286 remove_record_from_leaf_containers` | `INODE_LEAF_RECORDS`（`crates/singlefs-format/src/lib.rs`）、`leaf_containers_one_root_node_holds`（`inode_tree.rs`）；对拍时的负载生成器取自路径 1 |
 | 3 | 设计员的独立参照（Python） | 同样的三条臂，只在登记第七节的六个手造场景与空间放大那一格上算 | 无实现：只有抄本，在 `e176-preregistration.md` 第 500 行起的 `anchors.py` 代码块（草稿目录那份不入库） | 233、135；位置记法的同一个定义；它在 X 删空摘掉之后不查新相邻那一对（登记第十三节写明，六个格不受影响） |
 
@@ -647,7 +647,7 @@ Q2p、Q2c、Q3 对「借多少」不稳定（涉及 M3 的四行，在 W-R p = 0
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D8（核心索引结构） 已定项 6 | 支撑 | 2026-11-15 不受影响：复跑产物换成 `e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out`，与 `e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` 逐字节一致，结论与数不变；此前 2026-11-03 不受影响：只改复跑写法，结论、数与产物都不变；此前 2026-11-01 不受影响：只改复跑起法；此前 2026-10-17 不受影响：这一轮只同步措辞、产物指针、路径与数，结论、数与产物不变；此前 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
+| D8（核心索引结构） 已定项 6 | 支撑 | 2026-11-20 不受影响：拆分只换了装置源码的文件布局，结论、数与产物不变；此前 2026-11-15 不受影响：复跑产物换成 `e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out`，与 `e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` 逐字节一致，结论与数不变；此前 2026-11-03 不受影响：只改复跑写法，结论、数与产物都不变；此前 2026-11-01 不受影响：只改复跑起法；此前 2026-10-17 不受影响：这一轮只同步措辞、产物指针、路径与数，结论、数与产物不变；此前 2026-10-11 不受影响：只改措辞（时间词、位置指代与自称），结论、数与产物不变 |
 
 ## 历史版本
 

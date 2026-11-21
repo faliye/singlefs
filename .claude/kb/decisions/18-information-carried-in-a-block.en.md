@@ -1,4 +1,4 @@
-## D18 (Information Carried in a Block) —— Settled
+## D18 Information Carried in a Block —— Settled
 
 [中文](18-块里携带什么信息.md) · **English** · [日本語](18-ブロックに含める情報.ja.md)
 

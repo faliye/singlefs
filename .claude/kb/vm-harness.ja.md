@@ -7,11 +7,13 @@
 
 ## 一言で
 
+仮想マシンでの実行は入口スクリプトにまとめ、コマンド全体をタスクサービス経由で投入する：
+
 ```bash
-cd scripts/experiment-apparatus
-cargo build --release --target x86_64-unknown-linux-musl --bin <実験バイナリ名>
-bash ../devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名前> /dev/vda <引数...>
+task-server/task submit -- bash scripts/experiment-apparatus/<実験>-vm-bench-run.sh <出力ファイル> <引数...>
 ```
+
+入口スクリプトはまず実験バイナリを musl 静的バイナリにビルドし（`cargo build --release --target x86_64-unknown-linux-musl --bin <実験バイナリ名>`。ビルドディレクトリはサービスが与える `CARGO_TARGET_DIR` で、リポジトリ内には置かない。バイナリは cargo が報告した位置から取る）、続けて `bash scripts/devices/vm-bench.sh <そのバイナリ> <引数...>` で仮想マシンに送る。ディスクのパス（`/dev/vda` …）は `vm-bench.sh` が引数の前に付けてバイナリに渡すので、引数には書かない。手本は既存の `scripts/experiment-apparatus/e56-vm-bench-run.sh`（使い方、自己検証、破壊スイッチはそのファイル頭にある）。
 
 ## ディスクを何台接続するか
 

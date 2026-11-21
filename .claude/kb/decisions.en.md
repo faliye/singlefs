@@ -58,7 +58,7 @@ kb-shape section 7 **independently counts the body text** to compare—if the ge
 | D19 (Block Pointer Structure & Width Budget) | Settled 15 / Unsettled 0 | Pointers split into two sections; carries dev; fixed width; position entry 14 bytes; position authority hybrid; mapping key reuses write sequence key by class; all pointers enter mapping; header carries birth (tree, txg) | [19-Block Pointer Structure & Width Budget.en.md](decisions/19-block-pointer-structure-width-budget.en.md) | Implemented 15 / Unimplemented 0 |
 | D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment) | Settled 8 / Unsettled 0 | Load-bearing surface is unit; atomic width takes runtime probed physical_block_size | [20-Load-Bearing Surface: Unit Atomicity & Self-Containment.en.md](decisions/20-load-bearing-surface-unit-atomicity-self-containment.en.md) | Implemented 4 / Unimplemented 0 / No code object 4 |
 | D21 (Boundary Between Authoritative and Derived States) | Settled 19 / Unsettled 0 | Authoritative state = units + accounting + root; index is derived state, rebuildable | [21-Boundary Between Authoritative and Derived States.en.md](decisions/21-boundary-between-authoritative-and-derived-states.en.md) | Implemented 4 / Unimplemented 10 / No code object 5 |
-| D22 (Synthesizing Unit Atomicity) | Settled 25 / Unsettled 1 | Boundary determined by parent pointers; accounting uses COW; root ring R=3; root record routes through tree table indirection | [22-Synthesizing Unit Atomicity.en.md](decisions/22-synthesizing-unit-atomicity.en.md) | Implemented 16 / Unimplemented 2 / No code object 8 |
+| D22 (Synthesizing Unit Atomicity) | Settled 25 / Unsettled 1 | Boundary determined by parent pointers; accounting uses COW; root ring R=3; root record routes through tree table indirection | [22-Synthesizing Unit Atomicity.en.md](decisions/22-synthesizing-unit-atomicity.en.md) | Implemented 14 / Unimplemented 4 / No code object 8 |
 | D23 (Journal Role & Format) | Settled 26 / Unsettled 0 | Records target states for pointer layer; fixed-length ring, 4 KiB records; reverse chain CRC32C; replay lower bound = root high-water mark | [23-Journal Role & Format.en.md](decisions/23-journal-role-format.en.md) | Implemented 23 / Unimplemented 1 / No code object 2 |
 | D24 (Offloading Heavy Background Work to GPU) | Settled 5 / Unsettled 0 | Deferred, non-essential; load-bearing only user settlements | [24-Offloading Heavy Background Work to GPU.en.md](decisions/24-offloading-heavy-background-work-to-gpu.en.md) | Implemented 1 / Unimplemented 1 / No code object 3 |
 | D25 (Target Workload Priority) | Settled 7 / Unsettled 0 | Coarse granularity: one fsync carries 8 leaves on 1 shared spine | [25-Target Workload Priority.en.md](decisions/25-target-workload-priority.en.md) | Implemented 0 / Unimplemented 1 / No code object 6 |
@@ -385,14 +385,14 @@ and a status that disagrees with the document is turned red by the item-ref-stat
   - 6. Zoned write pointers as witnesses outside filesystem checksum jurisdiction —— **Unsettled** · No code object
   - 7. Field table of root records —— Settled · Implemented
   - 8. Placement of fixed structures —— Settled · Unimplemented
-  - 9. Field table of system configuration —— Settled · Implemented
+  - 9. Field table of system configuration —— Settled · Unimplemented
   - 10. Whether zone write pointer can serve as authoritative recovery ceiling —— Settled · No code object
   - 11. Whether zone write pointer enters O2 judgment inputs —— Settled · No code object
   - 12. Whether system configuration requires its own tree table unit pointer —— Settled · Implemented
   - 13. Endianness and enum encoding conventions for on-disk fixed-length fields —— Settled · Implemented
   - 14. Scope of I-7.6 (root ring zones land on distinct disks) judgment when devs < R —— Settled · Implemented
   - 15. Four linked cells in the system configuration field table: whether the indirect-directory unit pointer is 59 or 83, whether the first version writes a device table, and devs —— Settled · Implemented
-  - 16. System config slot rotation rules; root ring formula address space and intra-region slots —— Settled · Implemented
+  - 16. System config slot rotation rules; root ring formula address space and intra-region slots —— Settled · Unimplemented
   - 17. Completion of registry locations for Item 13 —— Settled · Implemented
   - 18. Demarcation line —— Settled · No code object
   - 19. Ordinary units with parent pointers: COW + D4 checksums suffice without device atomicity assumptions —— Settled · No code object

@@ -1,4 +1,4 @@
-## D23 (Journal Role & Format) —— Settled
+## D23 Journal Role & Format —— Settled
 
 [中文](23-journal的角色与格式.md) · **English** · [日本語](23-ジャーナルの役割と形式.ja.md)
 

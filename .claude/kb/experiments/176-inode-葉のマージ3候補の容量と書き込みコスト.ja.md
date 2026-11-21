@@ -10,7 +10,7 @@
 
 事前登録 `e176-preregistration.md`（第2段完了時 sha256 `f7599076bb469dcc483f98cb0f557aca5bc6d79759fe674b4b52f150b8291fa9`）には第12節の修訂3件を含む。修訂1は M3 f=59 の陽性対照と共通窓の読み方、修訂2は突き合わせ bin をオプション機能から独立 manifest に移動、修訂3は第2段の3共通窓・3変種の陽性対照・変異 V14～V16 を第2段成果物前に追加。分岐票 `m3-3-5-forks.md` の M 行、すなわち inode 木の葉コンテナが疎になったときの回収、C116 (リーフコンテナの分割・マージ規律に失敗しうる検査がない)のマージ側、C536 (inode ツリーの「左が右から借用」がコンテナ番号条件を偽にする)に答える。
 
-候補は M1：空になった葉のみ除去（E176 実行時の `crates/`、現在は M3）、M2：左が右を吸収するのみ（隣接2片の合計≤233行ならマージ）、M3：D8 (コアインデックス構造)確定項目6どおり左吸収と左が右から借りる方式（主点の下限 f=117、均等化して借りる）。装置 `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs` は独立手書きモデルで `crates/` とコードを共有しない。M1 は別途 `scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` で当時の `crates/singlefs-core/src/inode_tree.rs` の2純関数と逐次突き合わせ（現在 `crates/` は M3 となり突き合わせはやり直していない）。
+候補は M1：空になった葉のみ除去（E176 実行時の `crates/`、現在は M3）、M2：左が右を吸収するのみ（隣接2片の合計≤233行ならマージ）、M3：D8 (コアインデックス構造)確定項目6どおり左吸収と左が右から借りる方式（主点の下限 f=117、均等化して借りる）。装置 `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites/main.rs` は独立手書きモデルで `crates/` とコードを共有しない。M1 は別途 `scripts/experiment-apparatus/e176_crates_oracle/oracle.rs` で当時の `crates/singlefs-core/src/inode_tree.rs` の2純関数と逐次突き合わせ（現在 `crates/` は M3 となり突き合わせはやり直していない）。
 
 **現状：**
 
@@ -630,7 +630,7 @@ Q2p、Q2c、Q3 は「借用量」に対して不安定である（M3 に関わ�
 
 | # | 経路 | 算出 | ソース | 共通入力 |
 |---|---|---|---|---|
-| 1 | 独立手書きモデル | 葉表は番号のみ。末尾分割・空葉除去・M2 マージ・M3 借用、変更コンテナと最初の除去位置から2記法を計算。M1 は22登録系列の拒否前各操作で経路2と比較（列挙点、定義域全体ではない）。アンカーは経路3と比較。 | `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs:155 insert`、`:278 remove`、`:321 rewrites_of_this_publish` | 233行/片、根ファンアウト135は `crates/` からコピーし経路2で突き合わせ。位置記法は当時の `remove_record_from_leaf_containers` 由来。突き合わせ両側は同じ負荷生成器を使用。 |
+| 1 | 独立手書きモデル | 葉表は番号のみ。末尾分割・空葉除去・M2 マージ・M3 借用、変更コンテナと最初の除去位置から2記法を計算。M1 は22登録系列の拒否前各操作で経路2と比較（列挙点、定義域全体ではない）。アンカーは経路3と比較。 | `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites/leaf_containers_and_the_tree.rs:131 insert`、`:254 remove`、`:297 rewrites_of_this_publish` | 233行/片、根ファンアウト135は `crates/` からコピーし経路2で突き合わせ。位置記法は当時の `remove_record_from_leaf_containers` 由来。突き合わせ両側は同じ負荷生成器を使用。 |
 | 2 | `crates/` 2純関数 | 当時の M1：`write_records_into_leaf_containers` は末尾追加・分割、135超で拒否。`remove_record_from_leaf_containers` は空葉除去、右側すべてをリストへ。 | `crates/singlefs-core/src/inode_tree.rs:181 write_records_into_leaf_containers`、`:286 remove_record_from_leaf_containers` | format の `INODE_LEAF_RECORDS`、inode_tree の `leaf_containers_one_root_node_holds`、経路1の負荷生成器。 |
 | 3 | 設計者の独立 Python 参照 | 同じ3アームを登録第7節の手作り6シナリオと空間増幅マスのみで計算。 | 実装は入庫されず、`e176-preregistration.md` 500行以降の `anchors.py` コードブロックのみ。 | 233、135、同一位置記法。X が空で除去された後に新隣接対を調べない（第13節、6マスに影響なし）。 |
 
@@ -647,7 +647,7 @@ Q2p、Q2c、Q3 は「借用量」に対して不安定である（M3 に関わ�
 
 | 決定項目 | 関係 | 再確認 |
 |---|---|---|
-| D8 (コアインデックス構造)確定項目6 | 支持 | 2026-11-15 影響なし：再実行の成果物を `e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out` に差し替え、`e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` とバイト単位で一致、結論・数値は不変。それ以前の 2026-11-03 影響なし：再実行コマンドの書き方だけを変更した。結論・数・成果物は不変。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-17 は文言・成果物参照・パス・数値の同期のみで結論・数・成果物は不変。2026-10-11 も時間語・位置指示・自称の文言変更のみで不変。 |
+| D8 (コアインデックス構造)確定項目6 | 支持 | 2026-11-20 影響なし：分割は装置ソースのファイル配置を変えただけで、結論、数値、成果物は変わらない。それ以前の 2026-11-15 影響なし：再実行の成果物を `e176-inode-leaf-merge-capacity-and-rewrites-segment-one-2026-11-14.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two-2026-11-14.out` に差し替え、`e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out`、`e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` とバイト単位で一致、結論・数値は不変。それ以前の 2026-11-03 影響なし：再実行コマンドの書き方だけを変更した。結論・数・成果物は不変。それ以前の 2026-11-01 影響なし：再実行の起動コマンドだけを変更した。それ以前の 2026-10-17 は文言・成果物参照・パス・数値の同期のみで結論・数・成果物は不変。2026-10-11 も時間語・位置指示・自称の文言変更のみで不変。 |
 
 ## 履歴バージョン
 

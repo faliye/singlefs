@@ -34,7 +34,7 @@ The tokens in the `doc-lint:not-numbers` line share the shape of identifiers (up
 but they are domain terms, not identifiers of this project, and therefore do not require short names. Add new similar terms to that line; do not modify the gate.
 `F41` is similarly the last four hex digits truncated from the Castagnoli polynomial `0x1EDC6F41` of CRC-32C (settled item 17 of D18 (Information Carried in a Block) hardcodes this parameter).
 
-<!-- doc-lint:not-numbers L1 L2 L3 AES-256 AES256 SHA256 SHA-256 SHA512 CRC32 CRC32C CRC64 RAID5 RAID6 OCFS2 Z3 T10 M1 M2 M3 M4 M5 M6 M7 M8 M9 M12 M13 M25 M26 F41 -->
+<!-- doc-lint:not-numbers L1 L2 L3 AES-256 AES256 SHA256 SHA-256 SHA512 CRC32 CRC-32 CRC32C CRC64 UTF-8 RAID5 RAID6 OCFS2 Z3 T10 T-3 Y4.2 SSD8 M1 M2 M3 M4 M5 M6 M7 M8 M9 M12 M13 M25 M26 F41 -->
 
 `M` followed by numbers (`M1`–`M9`, `M12`, `M13`, `M25`, `M26` in the `doc-lint:not-numbers` line) are **row names in the mutation table**, not identifiers of this project. Their registry location is
 `scripts/mutation/tables/<bin>.tsv`—the first column of each table, with a one-to-one correspondence to that binary.

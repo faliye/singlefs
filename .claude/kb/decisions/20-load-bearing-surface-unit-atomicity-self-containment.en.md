@@ -1,4 +1,4 @@
-## D20 (Load-Bearing Surface: Unit Atomicity & Self-Containment) —— Settled
+## D20 Load-Bearing Surface: Unit Atomicity & Self-Containment —— Settled
 
 [中文](20-承重面单元的原子性与自包含.md) · **English** · [日本語](20-荷重受け面-ユニットの原子性と自己完結性.ja.md)
 
@@ -62,7 +62,7 @@ Two mutually independent reasons:
 
 #### Settled Item 4: Atomic Width Specified Separately by Unit Class; Combining into One Statement Is Erroneous
 
-**Implementation boundary**: The judgement resolution takes the value recorded in the system configuration, not the value probed at run time (C1040 (Mount does not compare the probed physical block size or the capacities of the two disks)).
+**Implementation boundary**: The judgement resolution takes the value recorded in the system configuration; writable and read-only mounts both compare, per disk, the value probed at mount with the value recorded in the system configuration and refuse when they differ, and mkfs also refuses when its parameter differs from the probed value.
 
 **Settlement**: The answers to the two questions must be given separately by unit class.
 

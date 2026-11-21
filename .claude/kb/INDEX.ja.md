@@ -34,7 +34,7 @@
 これらはドメイン用語であり、本プロジェクトの識別子ではないため、略称を付ける必要はありません。同種の用語を追加する場合はその行に加え、ゲートを変更しないでください。
 `F41` も同様に CRC-32C の Castagnoli 多項式 `0x1EDC6F41` の下位 4 桁を切り出したものです（D18 (ブロックに含める情報) の確定項目 17 がこのパラメータを固定しています）。
 
-<!-- doc-lint:not-numbers L1 L2 L3 AES-256 AES256 SHA256 SHA-256 SHA512 CRC32 CRC32C CRC64 RAID5 RAID6 OCFS2 Z3 T10 M1 M2 M3 M4 M5 M6 M7 M8 M9 M12 M13 M25 M26 F41 -->
+<!-- doc-lint:not-numbers L1 L2 L3 AES-256 AES256 SHA256 SHA-256 SHA512 CRC32 CRC-32 CRC32C CRC64 UTF-8 RAID5 RAID6 OCFS2 Z3 T10 T-3 Y4.2 SSD8 M1 M2 M3 M4 M5 M6 M7 M8 M9 M12 M13 M25 M26 F41 -->
 
 `M` に数字が続くもの（`doc-lint:not-numbers` 行の `M1`〜`M9`、`M12`、`M13`、`M25`、`M26`）は**ミューテーション表の行名**であり、本プロジェクトの識別子ではありません。それらの登録場所は
 `scripts/mutation/tables/<bin>.tsv` です——各表の第 1 列で、バイナリと 1 対 1 に対応します。

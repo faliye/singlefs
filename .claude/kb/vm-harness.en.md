@@ -8,11 +8,13 @@ This document covers only the current status, not history.
 
 ## In short
 
+Write the VM run as an entry script and submit the whole command through the task service:
+
 ```bash
-cd scripts/experiment-apparatus
-cargo build --release --target x86_64-unknown-linux-musl --bin <experiment_bin_name>
-bash ../devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<name> /dev/vda <args...>
+task-server/task submit -- bash scripts/experiment-apparatus/<experiment>-vm-bench-run.sh <output_file> <args...>
 ```
+
+The entry script first builds the experiment binary as a musl static binary (`cargo build --release --target x86_64-unknown-linux-musl --bin <experiment_bin_name>`; the build directory is the `CARGO_TARGET_DIR` the service gives, never inside the repository, and the binary is taken from the location cargo reports), then sends it into the VM with `bash scripts/devices/vm-bench.sh <that_binary> <args...>`. `vm-bench.sh` puts the disk paths (`/dev/vda` …) in front of the arguments it passes to the binary, so the arguments do not name them. The existing one to copy is `scripts/experiment-apparatus/e56-vm-bench-run.sh` (its usage, self-test and breakage switches are in its file header).
 
 ## How many disks to attach
 

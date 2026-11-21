@@ -401,6 +401,15 @@
 
 ## E10（老化：结构抗老化 vs 事后整理）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（1 处）：指整个装置的写成同名目录下的 `main.rs`。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e10_aging_compaction.rs` → `scripts/experiment-apparatus/e10_aging_compaction/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/10-老化结构抗老化vs事后整理.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/10-老化结构抗老化vs事后整理.md` 里影响的决策表。
+
 ### 2026-10-26
 
 - 原始输出改引 git 历史：第一段四份分片产物已归档（工作区与暂存区都没有），「口径与产物」一段改写成 `git show e1b1ceb95:research/results/e10-aging-compaction-2026-10-13/<片>.out`；同一段写明这次登记只出整理底额 `N₀`，产品批大小与三条整理水位不归这次登记。数、结论与状态不变，「影响的决策」两行回看同日更新。
@@ -4545,6 +4554,15 @@
 
 ## E139（按盘回退下界的收严形态）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（2 处）：指整个装置的写成同名目录下的 `main.rs`；说那几次跑做了什么、抄下来的命令与输出的 4 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e139_tightened_floor.rs` → `scripts/experiment-apparatus/e139_tightened_floor/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/139-按盘回退下界的收严形态.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/139-按盘回退下界的收严形态.md` 里影响的决策表。
+
 ### 2026-10-29
 
 - 第 3 次重跑（回收门槛照 `crates/` 今天的写法改）已跑：装置加 CG（F_生效 三项取最大、当场取 min(F_生效, m) 其余扣到本实例的根落满每块幸存盘；自证不过的槽钉在可能住过的最旧 txg；管理员回退不重算 F），被测臂 `RGall_core_gate` 对第 2 次的 `RGall_ring_all` 逐行比 611 对，判定位 0 → 1 的 0 对、1 → 0 的 0 对，不翻面；判红 8 行（删了再写失败，`near_full` 与 `cost_growth` 开销升到 c_max 那几格）第 2 次产物里就有，F3、F9 触发，记「不翻面，甲的前提另有缺口」；`activation_faults` 的阳性对照在 S = 16 有 12 行为 0，F4 只管那一类；判别力 220 对，全在轨迹与归因行；CG 走到：d ≠ 0 12628 个采样、dF ≠ 0 14080、钉值起作用 480、扣住在等 0；`G2R_core_gate` 够判后未跑。
@@ -4635,6 +4653,15 @@
   - **依据**：D16（发布语义） 已定项 8 与 D28（挂载期承诺量） 已定项 3 的连带；C126（切换预留的最坏量没有口径） 半还那一格。
 
 ## E142（新池新建文件的干跑）
+
+### 2026-11-20
+
+- 装置在 crates 代码拆分与装置包 lint 收口里改过、之后没有正式跑：实验页「它答不了的」一节加一段写明，影响的决策表各行的回看日期改成当天；装置量的数、结论与产物不变。
+  - **依据**：`scripts/experiment-apparatus/on-request-experiments.tsv` 登记 E142（新池新建文件的干跑） 按要求才跑；门禁 doc-experiments 的 evidence-in-repo 格要求装置改了而没有新产物时，实验页新加的行里写没有正式跑。
+  - **改前**：`git show HEAD:.claude/kb/experiments/142-新池新建文件的干跑.md` 里「它答不了的」一节与影响的决策表。
+- 现状句里的旧单文件路径改成拆分之后的路径：页首「代码」一行写 `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run/main.rs` 与同目录下的各模块文件，`const GAPS` 数组的指向改成 `structure_catalog_and_offset_explanations.rs`；说那几次跑做了什么的句子仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` 搬到 `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/142-新池新建文件的干跑.md` 里页首「代码」一行与 `const GAPS` 那一句。
 
 ### 2026-11-01
 
@@ -4975,6 +5002,15 @@
 
 ## E152（按里程碑对比六家文件系统的文件性能）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（2 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e152_file_system_benchmark.rs` → `scripts/experiment-apparatus/e152_file_system_benchmark/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` 里影响的决策表。
+
 ### 2026-11-17
 
 - 加 2026-11-17 那次跑：工作区改动之上，两盘镜像七家 + singlefs 各 5 轮，40 次虚机跑全 `vm_exit=0`；表整份原样写进实验页一节与 `scripts/experiment-apparatus/perf-by-milestone.md` 三·五，与 2026-09-29 那次逐格比（207 格里变了 15% 以上的 25 格）；影响的决策表四行回看到当天，不受影响。
@@ -5041,17 +5077,44 @@
 
 ## E153（账本形态与环上有洞的代价）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（1 处）：指整个装置的写成同名目录下的 `main.rs`。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes.rs` → `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/153-账本形态与环上有洞的代价.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/153-账本形态与环上有洞的代价.md` 里影响的决策表。
+
 ### 2026-09-17
 
 - 见 E155（每次持久化的写量：三种 fsync 形态与反事实上界） 节同日条目「」。
 
 ## E154（两道闸串-重判与回收时点的代价）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（1 处）：指整个装置的写成同名目录下的 `main.rs`；说那几次跑做了什么、抄下来的命令与输出的 1 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_timing.rs` → `scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_timing/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/154-两道闸串-重判与回收时点的代价.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/154-两道闸串-重判与回收时点的代价.md` 里影响的决策表。
+
 ### 2026-09-17
 
 - 见 E155（每次持久化的写量：三种 fsync 形态与反事实上界） 节同日条目「」。
 
 ## E155（每次持久化的写量：三种 fsync 形态与反事实上界）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（3 处）：指整个装置的写成同名目录下的 `main.rs`；说那几次跑做了什么、抄下来的命令与输出的 1 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e155_fsync_write_volume.rs` → `scripts/experiment-apparatus/e155_fsync_write_volume/main.rs`、`scripts/experiment-apparatus/e155_second_run_fsync_write_volume.rs` → `scripts/experiment-apparatus/e155_second_run_fsync_write_volume/main.rs`、`scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency.rs` → `scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md` 里影响的决策表。
 
 ### 2026-09-24
 
@@ -5129,7 +5192,7 @@
   - **依据**：重跑登记 `research/prompts/e156-r6-prereg.md`；产物 `e156-alloc-basis-counts-2026-10-05-r2.out`、`research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.txt`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-point-sets.txt`；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)「第 6 次重跑（2026-10-05）」一节。
 
 - E156（alloc-basis 四条岔路的代价数） 第 5 次重跑——core 断言之后 W7 那一格的阳性对照换成 PC-钉门槛，第 4 次读数在新 `crates/` 上逐字段重比
-  - **改前**：装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（5776 行，17 单测）里 W7 的阳性对照是 PC-分配器（`allocator_without_the_root_ring`，S = 4、ρ = 1、k = 0，换回不装根环表的分配器，A10 应判红），产物 `e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行），`replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一行指它；用户定「core 在分配器没装根环表而记了一条根时断言」之后，PC-分配器 在第一次记根就 panic。
+  - **改前**：装置 `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`（5776 行，17 单测）里 W7 的阳性对照是 PC-分配器（`allocator_without_the_root_ring`，S = 4、ρ = 1、k = 0，换回不装根环表的分配器，A10 应判红），产物 `e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行），`replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一行指它；用户定「core 在分配器没装根环表而记了一条根时断言」之后，PC-分配器 在第一次记根就 panic。
   - **改后**：装置 5819 行、18 单测（PC-分配器 撤了，加 PC-钉门槛：格表里 Hh(1, 后, S, ρ) 六格的两份滞后集合交 k = 0 的 A10 判定，打 `name=pc_pinned_floor` 六行与一行汇总；新单测 U19）；产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`（3955 行，同一个二进制再跑逐字节相同）。第 1 行：六格两列的判定都判「不符」、滞后集合都含 6S − 1，`v2_pc_pinned_floor_seen=true`。第 2 行：规范化之后 3948 行里 294 行不同（60 判决行、234 计数行，含 `name=done` 的计数项）：`f24_real_every_differ_points` 0 → 34、`s11_k10_violation_points` 0 → 34、`q1d_growth` 的几何敏感性由「12 个取样点一致」变「不稳定」（「实」列 4 点 `not_monotonic`）、F1 仍触发；归属跑（副本里反打 31-1 的断言）与新产物逐字节相同，不同不是 31-1 带来的。停机 S11、S14 触发，交主 agent；`replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一行改指新产物，r2 那一份留着。内联单测与变异整表没跑（重型，归提交时）。
   - **依据**：重跑登记 `research/prompts/e156-r5-prereg.md`；产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`、`research/results/e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out`、`research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`；变异两行 `research/results/e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv`、`research/results/e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
   - **改前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 文档铁律修正之前的原样：这一块里的编号补了简称、撞名的本地臂名改成小写，原句在这一版）
@@ -5137,7 +5200,7 @@
 ### 2026-09-26
 
 - E156（alloc-basis 四条岔路的代价数） 第 4 次重跑——三个前提在装置上复现、岔路单第 3 行按前提 2 失效、第 1 行 38 条历史量完
-  - **改前**：装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（4335 行，11 单测 / 12 条变异）照挂载时回退、挂载内不回收的旧实现写：H0 / HR / HK / HK-F0 / HF / HX / HY / Hh 八族，岔路 1 只在 S = 8 与 S = 4、ρ = 1、回收时点「实」、洞位置「后」、k ≤ 2 上量过；开工时单测 U11、U13 就红（挂载时回退已删）。索引行状态「部分已跑（2026-09-22 第一、二段 + 2026-09-23 R2 第一段 + 2026-09-24 R2 第二、三段（缩小范围，只在 S=8、ρ=1 一个几何取样点上），入库装置，确定性，5 单测 / 4 条变异全抓；岔路 2、7 已跑；岔路 3 一个几何格已跑（X8（小池耗尽两口径构造）-A 未做）；岔路 1 三个洞数取样点已跑（S×ρ 全扫未做））」；结论列原样：K1 逐字核对相符（盘 0 记账第 1/2/5 项 13/211955/1）；岔路 2：清单 L（4 处）漏了命令抓到的 41 处（`|M∖L|=41`），门禁 51 号本身不用改（数据驱动），但登记给的两步说明本身漏了一处公式副本；岔路 7（R2 第一段改成只读被判镜像之后重跑）：G27 在 H0/HR/HK 共 168 个真实合法状态上零误报（Q7b）；判别力自测①（不减第 5 项）在这一段测过的 7 个可达基底（β0/β1/β2 与 HK 的四个观测点）上都没看到规定的转色，触发登记里的作废条款，Q7a 整张表按登记规则作废——Q7d-2/Q7d-3 排除了「量法本身看不见 0」这条解释（HK-F0、β_syn 上量法测得到 0），根因当时收窄到「可达合法状态第 5 项从来不是 0」；**这句结论已被 2026-09-25 第 3 次重跑续派段推翻**：补一个新的可达基底（`beta_hr_rollback_row`，HR 家族回退写行那一步，`family=HR kind=rollback_row txg=76`，第 5 项恰为 0）之后，判别力自证①第一次在可达基底上转色（`flips_red_to_green=true`），详见实验页「历史版本」2026-09-25 续派段；岔路 3（一个 HF 几何格）：G7（公开入口重组）与 F-扣（真实实现）的 D_rel 完全相同（都是 0，非空发布计），差别不大（`max_diff=0≤3`），K9 未验到预期的 3；岔路 1（三个 Hh(k) 洞数取样点，k=0/1/2）：Q1a−Q1b 之差 Δ 随洞数单调 +50/洞（20→70→120），从 h=0 起就越过 2 槽/1 槽两个门槛，但 h=0 的基线值 20 本身未查透机制。
+  - **改前**：装置 `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`（4335 行，11 单测 / 12 条变异）照挂载时回退、挂载内不回收的旧实现写：H0 / HR / HK / HK-F0 / HF / HX / HY / Hh 八族，岔路 1 只在 S = 8 与 S = 4、ρ = 1、回收时点「实」、洞位置「后」、k ≤ 2 上量过；开工时单测 U11、U13 就红（挂载时回退已删）。索引行状态「部分已跑（2026-09-22 第一、二段 + 2026-09-23 R2 第一段 + 2026-09-24 R2 第二、三段（缩小范围，只在 S=8、ρ=1 一个几何取样点上），入库装置，确定性，5 单测 / 4 条变异全抓；岔路 2、7 已跑；岔路 3 一个几何格已跑（X8（小池耗尽两口径构造）-A 未做）；岔路 1 三个洞数取样点已跑（S×ρ 全扫未做））」；结论列原样：K1 逐字核对相符（盘 0 记账第 1/2/5 项 13/211955/1）；岔路 2：清单 L（4 处）漏了命令抓到的 41 处（`|M∖L|=41`），门禁 51 号本身不用改（数据驱动），但登记给的两步说明本身漏了一处公式副本；岔路 7（R2 第一段改成只读被判镜像之后重跑）：G27 在 H0/HR/HK 共 168 个真实合法状态上零误报（Q7b）；判别力自测①（不减第 5 项）在这一段测过的 7 个可达基底（β0/β1/β2 与 HK 的四个观测点）上都没看到规定的转色，触发登记里的作废条款，Q7a 整张表按登记规则作废——Q7d-2/Q7d-3 排除了「量法本身看不见 0」这条解释（HK-F0、β_syn 上量法测得到 0），根因当时收窄到「可达合法状态第 5 项从来不是 0」；**这句结论已被 2026-09-25 第 3 次重跑续派段推翻**：补一个新的可达基底（`beta_hr_rollback_row`，HR 家族回退写行那一步，`family=HR kind=rollback_row txg=76`，第 5 项恰为 0）之后，判别力自证①第一次在可达基底上转色（`flips_red_to_green=true`），详见实验页「历史版本」2026-09-25 续派段；岔路 3（一个 HF 几何格）：G7（公开入口重组）与 F-扣（真实实现）的 D_rel 完全相同（都是 0，非空发布计），差别不大（`max_diff=0≤3`），K9 未验到预期的 3；岔路 1（三个 Hh(k) 洞数取样点，k=0/1/2）：Q1a−Q1b 之差 Δ 随洞数单调 +50/洞（20→70→120），从 h=0 起就越过 2 槽/1 槽两个门槛，但 h=0 的基线值 20 本身未查透机制。
   - **改后**：装置整个改写（5755 行，17 单测；`crates/mutations.tsv` 新加 M35–M43 九行、改锚 M32–M34 三行，点着这个装置的 22 行在草稿目录仓副本里逐条全红）：只跑第一段（前提 1–3 的最小复现、PC-c2、挂着回退那一形的两个单测）与第二段（Hh(k, 位置, S, ρ) 38 条排得下的历史 × 「实」「每」）。前提 1 成立、前提 2 不成立（岔路单第 3 行失效不量）、前提 3 只有岔路 2 那一族按旧式子；第 1 行 12 个取样点上 Q1c-前 都越过 2 槽，F1 触发。第一段撞上停机 S1(i)（装置原有「发完只改回根槽」的对照镜像与录写切段差每块盘一个系统配置扇区，实现在根槽之后还轮换系统配置），按 S1 行「改装置，写进第十二节」把对照镜像改成连系统配置两槽一起改回，交主 agent 认。实验页正文换成第 4 次重跑的现状，第 1–3 次重跑的正文原样挪进页内「历史版本」。
   - **依据**：重跑登记 `e156-r4-prereg.md`（第十二节修订 1、2）；产物 `e156-alloc-basis-counts-2026-09-26.out`；对 E156（alloc-basis 四条岔路的代价数）跑 `bash scripts/experiment-apparatus/replay.sh` 的 E156（alloc-basis 四条岔路的代价数） 那一格报字节一致；单测 `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 17 passed；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
 
@@ -5152,7 +5215,7 @@
 ### 2026-09-23
 
 - E156（alloc-basis 四条岔路的代价数） R2 重跑第一段——R3（G27 改读镜像）、HK/HK-F0 两族新历史、岔路 7 全套 Q7a–Q7f
-  - **改前**：第一、二段的装置 `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs`（2 单测 / 1 条变异）里 G27 两侧都不读被判镜像——基底那一侧读内存分配器，坏镜像那一侧读调用方传入的三元组（C471（产物里同一个字段名在两条路径上指着相反的两个量） 记的那处字段语义反了的缺陷改掉之后仍是这个读法）；只有 β0/β1/β2 三个基底；岔路 7 判别力自证①在三个基底上都不转色，Q7a 按 V3 作废；S1(c) 只现跑已有测试文件，没有装置侧重放；岔路 1、3、7 全开着，无 Q7d/Q7e/Q7f/S9 这几类量。
+  - **改前**：第一、二段的装置 `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs`（2 单测 / 1 条变异）里 G27 两侧都不读被判镜像——基底那一侧读内存分配器，坏镜像那一侧读调用方传入的三元组（C471（产物里同一个字段名在两条路径上指着相反的两个量） 记的那处字段语义反了的缺陷改掉之后仍是这个读法）；只有 β0/β1/β2 三个基底；岔路 7 判别力自证①在三个基底上都不转色，Q7a 按 V3 作废；S1(c) 只现跑已有测试文件，没有装置侧重放；岔路 1、3、7 全开着，无 Q7d/Q7e/Q7f/S9 这几类量。
   - **改后**：跑前登记 `e156-r2-prereg.md`（只覆盖岔路单第 9、11、12 行；这一段只做第 12 行）。R3：新函数 `allocated_minus_deferred_mismatches_referenced(pool, accounting_slot, referenced)` 只解析镜像字节；旧内存读法保留给 U8 的变异反面用。新增 HK / HK-F0 两族真实历史（β0→O→E→无崩溃重开→O×4→抬 F 到上限→O→管理员回退→O→c2 崩溃并恢复→O，覆盖 骨架发布 全部发布种类；HK-F0 同一串操作但 `ReuseWindow::ForcedToZero`，R7 的不可达阳性对照），连同 β0/β1/β2、β_syn（β0 镜像做 (第 1 项 −1、第 5 项 −1、第 2 项 +1)）、β_F0 凑成 9 个基底，逐个跑 Q7a（Bd(+1)/(−1)/(+8)）、Q7c①②、PC-检查-Bk1/Bk2/Bk3；新增 Q7d-1/Q7d-2/Q7d-3、Q7e、Q7f 五类量；S1(c) 改成装置自己重放 `rollback_by_a_forward_publish.rs` 的回退隔离场景并 `assert_eq!` 逐项核对；锚1/锚2/锚3 三个锚点在装置里现算并与实现侧同名常量或几何函数回比。写装置期间发现并修了两处自己的实现缺口（产物之前，见 `e156-r2-prereg.md`「十二」修订 1、2）：① HK 的回退目标选取要按 `effective_rollback_floor` 过滤候选集，不能直接拿 `readable_roots` 里 `checkpoint_txg` 最小的一条（HK 抬过 F 之后 genesis 已经不是候选）；② `mount_writable`/`mount_rollback` 内部重建的分配器会把 `ReuseWindow` 重置回产品默认，每次挂载/回退之后要重新 `set_reuse_window`。命名纪律改了 40 余处单字母/字母加数字标识符（`g8_prime_is_red` 等），`naming-lint.sh` 全绿。单测 4 个（新增 `new_pool_file_creation_self_release_is_one_slot`、`red_check_reads_the_corrupted_mirror_not_the_live_allocator`），变异表这个 bin 累计 3 条，全部手工验证红→绿→复原绿。产物 `e156-alloc-basis-counts-2026-09-23-stage1.out`（324 行，两遍现跑逐字节一致），`replay.sh:175` 改指向它。**结论**：Q7b 在 168 个可达合法状态（H0/HR/HK）上 G27 零误报；Q7d-2 显示这 168 个状态第 5 项从未为 0（最小值 1）；Q7d-3（阳性对照）证明量法看得见 0（HK-F0、β_syn 都测到）；Q7c①在全部 7 个可达基底上仍不转色，只在 2 个不可达基底（β_syn、β_F0）上转色；按登记 V3，**Q7a 整张表仍然作废**——岔路 7（岔路单第 12 行）续跑翻不了面，改判据还是认下交主 agent。HK-F0 的抬 F 探测撞上 S9（候选根树表读不出，`ForcedToZero` 下过早复用了 genesis 的树表单元），停在那一格，不影响已报的判定。
   - **依据**：跑前登记 `e156-r2-prereg.md`；产物 `e156-alloc-basis-counts-2026-09-23-stage1.out`；复跑 `bash scripts/experiment-apparatus/replay.sh E156`（alloc-basis 四条岔路的代价数）报字节一致；单测 `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 4 passed；变异表 `crates/mutations.tsv` 该 bin 3 条逐条手工验证；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
 
@@ -5176,6 +5239,12 @@
 
 ## E158（择根与修复四岔路）
 
+### 2026-11-20
+
+- 装置在 crates 代码拆分与装置包 lint 收口里改过、之后没有正式跑：实验页「它答不了的」一节加一段写明，影响的决策表各行的回看日期改成当天；装置量的数、结论与产物不变。
+  - **依据**：`scripts/experiment-apparatus/on-request-experiments.tsv` 登记 E158（择根与修复四岔路） 按要求才跑；门禁 doc-experiments 的 evidence-in-repo 格要求装置改了而没有新产物时，实验页新加的行里写没有正式跑。
+  - **改前**：`git show HEAD:.claude/kb/experiments/158-择根与修复四岔路.md` 里「它答不了的」一节与影响的决策表。
+
 ### 2026-11-12
 
 - E158（择根与修复四岔路） 第 5 次重跑 S4 一档两臂的合并产物写回，实验页加「2026-11-12」一节
@@ -5186,7 +5255,7 @@
 
 - E158（择根与修复四岔路） 第 5 次重跑冻结树上的七份最终产物写回，实验页加「2026-11-11」一节
   - **改前**：实验页没有第 5 次重跑一节；第 5 次重跑第一、二段的七份产物是在别的会话还往主工作区打改动期间出的非最终产物，放在执行员工作根下、不进库；`research/results/` 下没有 `r5-enum` 的产物；`.claude/gate.d/replay-comparison-units.tsv` 里没有 E158 第 5 次重跑的行。
-  - **改后**：七份最终产物 `research/results/e158-root-choice-repair-2026-11-09-r5-enum-{g0-today,g0-today-one-thread,g0-skip,s16-today,s16-skip,small-ring-today,small-ring-skip}.out` 与 S1 回比 `e158-r5-constants-frozen-tree.txt` 拷进库（拷后逐份 sha256 与草稿目录一致，产物名日期沿用登记 11.3 写死的 2026-11-09）；实验页加「2026-11-11」一节，标题状态改成第 5 次重跑三档两臂与一线程对拍已出最终产物、S4 两臂没跑；索引行改状态；复跑表不加行；`replay-comparison-units.tsv` 给登记 11.3 的九个比对对象各写一行「不登记的比对对象」，欠在 C999（E158 第 5 次重跑与 E171 第 3 次重跑的最终产物没出）。读数：G0、S16、小环三档各 1371 节点，today 臂 Q1 至 Q4 的违例个数都是 0，skip 臂三档 Q3(a) 违例 10968、Q4 违例 1096（G0、小环）与 1312（S16），G0 的 31 线程趟与一线程趟除 `r5_run_parameters` 外逐行相同、摘要同为 `c45a0b205083052a9c80389e353481185df53249b3d3aa1bd21dff889ebd9077`；与上一轮非最终产物相比，一线程趟逐字节相同，其余六份去掉 `r5_run_parameters` 一行后逐行相同。登记修订 12.6、12.7 在这之前已写进 `research/prompts/e158-r5-prereg.md`。
+  - **改后**：七份最终产物 `research/results/e158-root-choice-repair-2026-11-09-r5-enum-{g0-today,g0-today-one-thread,g0-skip,s16-today,s16-skip,small-ring-today,small-ring-skip}.out` 与 S1 回比 `e158-r5-constants-frozen-tree.txt` 拷进库（拷后逐份 sha256 与草稿目录一致，产物名日期沿用登记 11.3 写死的 2026-11-09）；实验页加「2026-11-11」一节，标题状态改成第 5 次重跑三档两臂与一线程对拍已出最终产物、S4 两臂没跑；索引行改状态；复跑表不加行；`replay-comparison-units.tsv` 给登记 11.3 的九个比对对象各写一行「不登记的比对对象」，欠在 C999（E158 第5次重跑与 E171 第3次最终产物没出）。读数：G0、S16、小环三档各 1371 节点，today 臂 Q1 至 Q4 的违例个数都是 0，skip 臂三档 Q3(a) 违例 10968、Q4 违例 1096（G0、小环）与 1312（S16），G0 的 31 线程趟与一线程趟除 `r5_run_parameters` 外逐行相同、摘要同为 `c45a0b205083052a9c80389e353481185df53249b3d3aa1bd21dff889ebd9077`；与上一轮非最终产物相比，一线程趟逐字节相同，其余六份去掉 `r5_run_parameters` 一行后逐行相同。登记修订 12.6、12.7 在这之前已写进 `research/prompts/e158-r5-prereg.md`。
   - **依据**：用户定「冻树重出」「S4 两臂在全量门禁时跑」；七份产物与任务 12564、12565、12579、12580、12581、12582、12584、12585、12586 的日志（`NOT_RUN` 合计 0）；实验页「2026-11-11」一节。
 
 ### 2026-11-09
@@ -5257,7 +5326,7 @@
     Φ1 故障注入、PC1-a/PC1-b、Q1-1 至 Q1-4 的装置代码一行没写，一个数都没有；岔路单第 2 行（C331（择根倒挂压过已确认的写） ①②）
     同样一个数都没有。
   - **改后**：主 agent 消息「接着做，这一段还没交出岔路单要的数，不停」——在
-    `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` 新增约 500 行：H1 家族枚举（`h1_family`：
+    `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` 新增约 500 行：H1 家族枚举（`h1_family`：
     n1∈{1,2,3}、j 取每条可读根、m∈{0,1,2}）、Φ1 故障注入（`attempt_op1`：按 (设备, 偏移) 精确注入，落点由
     `locate_allocation_record_tree` 现查树表 0 条/非 0 条两支）、PC1-a/PC1-b（`run_pc1_a_and_b`）。
     **过程中发现并修了一个 bug（产物之前）**：`root_record_of` 最初拿 `RootView::record_bytes`（截到 457
@@ -5327,6 +5396,15 @@
 
 ## E159（fsync 等待时间随并发数：组提交与 WAL 两臂）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（1 处）：指整个装置的写成同名目录下的 `main.rs`；说那几次跑做了什么、抄下来的命令与输出的 1 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e159_fsync_wait_group_commit.rs` → `scripts/experiment-apparatus/e159_fsync_wait_group_commit/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md` 里影响的决策表。
+
 ### 2026-10-17
 
 - 「结果整行抄自产物」标题加括注「（产物已移出工作区的行写成一行指针）」；冒烟存证那一行指针的括注由空的 `name=` 改成那一行的实际写法 `E7RESULT E159RESULT arm=yi-M-K10`；结论、数与产物不变。
@@ -5344,6 +5422,12 @@
 ## E160（随机小读占比：三个来源与重开判据的合成）
 
 ## E161（崩溃放量的去重与分段耗时）
+
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/161-崩溃放量的去重与分段耗时.md` 里影响的决策表。
 
 ### 2026-10-26
 
@@ -5375,10 +5459,19 @@
 
 - E161（崩溃放量的去重与分段耗时） 可行性档
   - **改前**：只有跑前登记 `research/prompts/e161-preregistration.md`，没有装置、产物与实验页。
-  - **改后**：入库装置 `crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs`（13 单测，`crates/mutations.tsv` 追加 12 条变异）；按用户定只跑可行性档（第一条流写数少于 26 的各段全量、两条流的甲二快档全域、两个 26 写段各 4096 个段头），停机条款 S1–S6、登记第七节全部锚点与 crates 逐状态对拍全过，G1–G5 未判。
+  - **改后**：入库装置 `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs`（13 单测，`crates/mutations.tsv` 追加 12 条变异）；按用户定只跑可行性档（第一条流写数少于 26 的各段全量、两条流的甲二快档全域、两个 26 写段各 4096 个段头），停机条款 S1–S6、登记第七节全部锚点与 crates 逐状态对拍全过，G1–G5 未判。
   - **依据**：登记第十二节 12.2（用户定只验可行性）；产物 `e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out`。
 
 ## E162（崩溃放量判定块存储选型）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（1 处）：指整个装置的写成同名目录下的 `main.rs`。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e162_crash_verdict_block_store.rs` → `scripts/experiment-apparatus/e162_crash_verdict_block_store/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/162-崩溃放量判定块存储选型.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/162-崩溃放量判定块存储选型.md` 里影响的决策表。
 
 ### 2026-09-28
 
@@ -5415,6 +5508,15 @@
   - **依据**：跑前登记 `e163-preregistration.md`；产物 `research/results/e163-gpu-multicard-crc32c-2026-09-27-{r1,r2,f1,f2,r1-merge}.out`。
 
 ## E164（崩溃放量新设计的小范围功能测试）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（2 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs` → `scripts/experiment-apparatus/e164_crash_amplification_design_function_test/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md` 里影响的决策表。
 
 ### 2026-10-17
 
@@ -5501,6 +5603,15 @@
 
 ## E166（并行提交的共享状态分法）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（3 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号；说那几次跑做了什么、抄下来的命令与输出的 1 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition.rs` → `scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/166-并行提交的共享状态分法.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/166-并行提交的共享状态分法.md` 里影响的决策表。
+
 ### 2026-10-01
 
 - E166（并行提交的共享状态分法） 建页，第一段已跑
@@ -5513,6 +5624,15 @@
   - **改前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 文档铁律修正之前的原样：这一块里的编号补了简称、撞名的本地臂名改成小写，原句在这一版）
 
 ## E167（多在飞发布的崩溃枚举切法）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（5 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号；说那几次跑做了什么、抄下来的命令与输出的 3 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e167_multi_inflight_crash_cut.rs` → `scripts/experiment-apparatus/e167_multi_inflight_crash_cut/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md` 里影响的决策表。
 
 ### 2026-10-15
 
@@ -5530,6 +5650,12 @@
 
 ## E168（删除借保留量的环窗口）
 
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/168-删除借保留量的环窗口.md` 里影响的决策表。
+
 ### 2026-10-17
 
 - 产物表里 segment1 一行补「未入库：115 MB，被 .gitignore 第 32 行忽略，只在跑它的那台机器上」；结论、数与产物不变。
@@ -5543,7 +5669,7 @@
 ### 2026-10-01
 
 - E168（删除借保留量的环窗口） 建页，装置写成
-  前两次派发的执行员没交回；第三次接手写入库装置 `crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs`（主工作区那一份删除入口是桩）、删除路径补丁表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`（19 行）、11 条单测、`crates/mutations.tsv` 末尾 15 行装置变异，编过；单测、变异与第一段产物都没跑（checker 档），状态「进行中（装置）」。
+  前两次派发的执行员没交回；第三次接手写入库装置 `crates/singlefs-implementation-experiments/src/bin/e168_delete_ring_window_borrow/main.rs`（主工作区那一份删除入口是桩）、删除路径补丁表 `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv`（19 行）、11 条单测、`crates/mutations.tsv` 末尾 15 行装置变异，编过；单测、变异与第一段产物都没跑（checker 档），状态「进行中（装置）」。
 
 ### 2026-10-03
 
@@ -5554,6 +5680,15 @@
   - **依据**：segment1 产物第 177053 行判决行、第 25777 行最小反例；主 agent 在入库产物上按臂拆拒绝 `39 N-A landing 0`、`26 N-B no_space_after_raising_the_floor 0`；用户弹窗「等合入后在真实现上重跑（推荐）」「留 s1/阳性对照，segment1 不进（推荐）」。
 
 ## E169（并行提交的追加纪律与前缀恢复）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（8 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号；说那几次跑做了什么、抄下来的命令与输出的 1 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery.rs` → `scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md` 里影响的决策表。
 
 ### 2026-10-01
 
@@ -5566,6 +5701,12 @@
   - **改前**：`git show ce1457c3:.claude/kb/experiments-history.md`（2026-10-12 文档铁律修正之前的原样：这一块里的编号补了简称、撞名的本地臂名改成小写，原句在这一版）
 
 ## E170（O3规约执行器第一版）
+
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/170-O3规约执行器第一版.md` 里影响的决策表。
 
 ### 2026-10-17
 
@@ -5729,6 +5870,15 @@
 
 ## E172（删除写出的字节的干跑）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（3 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e172_deletion_write_dry_run.rs` → `scripts/experiment-apparatus/e172_deletion_write_dry_run/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/172-删除写出的字节的干跑.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/172-删除写出的字节的干跑.md` 里影响的决策表。
+
 ### 2026-11-02
 
 - 第 3 次重跑第三段：产物 `research/results/e172-r3-deletion-write-dry-run-2026-11-02.out`（966 行）跑出，问题单 `research/prompts/m3-close-b19-p5-forks.md` 第 2 行判甲，页头状态、索引行与正文换成第 3 次的现状（钉值层、条款层、判别臂 R-ret、阳性对照 25 对、A-journal 八行不符、单测 52 条与变异表 49 条全抓）；第 2 次的现状、做了什么、复跑、判决、读数、A-journal、单测与变异挪进页面「历史版本」的第 2 次那一条（整行抄的第 2 次产物行改成指针），「它答不了的」加第 10–13 条，「路径与结论登记」的源码行号改成现值，「影响的决策」加 D3（空间分配） 已定项 2、D8（核心索引结构） 已定项 9 两行（备料），其余各行重新回看（不受影响）。
@@ -5782,6 +5932,15 @@
 
 ## E173（上限卡在读坏槽的三种处置）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（3 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs` → `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md` 里影响的决策表。
+
 ### 2026-11-13
 
 - E173（上限卡在读坏槽的三种处置） 第 2 次重跑（第一段在今天的 `crates/` 上重出，只重跑复跑表第 2921 行）已跑：问题一判候选 ①，新产物与 2026-11-02 那份逐行比只有 `g_min_trial` 两行不同，只差 `end=` 里的结局名（`NoSpaceAfterRaisingTheFloor` 换成 `NoSpaceEvenWithEverythingAFloorRaiseCouldRelease`）；问题二判候选 ①，R3 至 R7（X3 九个几何 27 行、G-min 选择、X5 的 `excess_slots`、`s16_g_1` 的 n代 = 21、第二段几何常量表）全部照旧，页上引的数不变；作废条款 RV1 至 RV7 没触发，其中 RV4 登记的跑前跑后整树哈希没取，换成弱一些的文件时间核对；页面新增「第 2 次重跑」一节，状态加「第 2 次重跑已跑」，「影响的决策」五行回看日期更新、关系不变；复跑表第 2921 行改指 `…-2026-11-13-r2.out`
@@ -5808,6 +5967,15 @@
 
 ## E174（借据丢掉时等待与显存回还）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（1 处）：指整个装置的写成同名目录下的 `main.rs`。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs` → `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/174-借据丢掉时等待与显存回还.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/174-借据丢掉时等待与显存回还.md` 里影响的决策表。
+
 ### 2026-10-17
 
 - 复跑块由 `cd research` 改在 scripts/experiment-apparatus 起；上卡的 run 命令改成按装置文件头经 `scripts/experiment-apparatus/device-code-key.py run` 起，判的命令改在仓根跑；结论、数与产物不变。
@@ -5831,9 +5999,15 @@
 
 ## E175（产品路径上 inode 号水位退回与重发号）
 
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，并删去了正文里的任务号与批号，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md` 里影响的决策表。
+
 ### 2026-11-09
 
-- E175（产品路径上 inode 号水位退回与重发号） 装置改成验证包的 bin `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs`，旧文件与目录已删；页上的跑法、装置与源码位置、单测与变异的现状跟着改成这个 bin：`driver_e175` 直接 `cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression`，环境变量不变；新增入口参数 `summarize`，`E175_RESULT_FILE`、`E175_SUMMARY_FILE` 变成必给（bin 目标没有 `CARGO_TARGET_TMPDIR`）；复跑登记行的行键由函数单元的闭包组成（这一行的单元数 5831）；留存产物 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 与 bin 的结果行字节一致。结论、数与产物不变。
+- E175（产品路径上 inode 号水位退回与重发号） 装置改成验证包的 bin `crates/singlefs-implementation-experiments/src/bin/e175_product_path_inode_watermark_regression/main.rs`，旧文件与目录已删；页上的跑法、装置与源码位置、单测与变异的现状跟着改成这个 bin：`driver_e175` 直接 `cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression`，环境变量不变；新增入口参数 `summarize`，`E175_RESULT_FILE`、`E175_SUMMARY_FILE` 变成必给（bin 目标没有 `CARGO_TARGET_TMPDIR`）；复跑登记行的行键由函数单元的闭包组成（这一行的单元数 5831）；留存产物 `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 与 bin 的结果行字节一致。结论、数与产物不变。
   - **依据**：用户定案「1 2都要彻底改」（`records/2026-11-06-门禁判定全部入库.md` 的「批 13」一节）；任务 11045 复跑现判「字节一致 1」；任务 11055 改这个 bin 的 `main` 键变，改 E183（容量斜率读缓存小盘准入与清扫阈值的代价数） 的 bin 的 `main` 与无关的测试文件键不变。
   - **改前**：`git show HEAD:scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`。
 
@@ -5863,6 +6037,15 @@
 
 ## E176（inode 树叶合并三候选的容量与写代价）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（2 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs` → `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md` 里影响的决策表。
+
 ### 2026-10-17
 
 - 复跑块由 `cd research` 改在 scripts/experiment-apparatus 起，scripts/hosts 与 scripts/mutation 路径跟着改，变异表指 scripts/mutation/tables/；结论、数与产物不变。
@@ -5883,6 +6066,15 @@
 
 ## E177（逐树不写墓碑的复活数）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（4 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones.rs` → `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/177-逐树不写墓碑的复活数.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/177-逐树不写墓碑的复活数.md` 里影响的决策表。
+
 ### 2026-10-17
 
 - 复跑块由 `cd research` 改在 scripts/experiment-apparatus 起，scripts/hosts 与 scripts/mutation 路径跟着改，变异表指 scripts/mutation/tables/；结论、数与产物不变。
@@ -5898,6 +6090,15 @@
   - **依据**：判决 `research/prompts/m3-leaf-death-r1-main-verification.md` 第二节 K1「F1 与 F2 的判法」与 K4（G-紧 理由句、影响的决策表）；`research/prompts/m3-leaf-death-r2-main-verification.md` 第二节讲 F2 的那一小节（F2 判打中站得住，影响只在实验页措辞）；`research/prompts/m3-leaf-death-r3-main-verification.md` 第五节与回看决策。
 
 ## E178（叶容器与记录死亡的计数）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（9 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs` → `scripts/experiment-apparatus/e178_leaf_and_record_death_counts/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/178-叶容器与记录死亡的计数.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/178-叶容器与记录死亡的计数.md` 里影响的决策表。
 
 ### 2026-10-17
 
@@ -5934,12 +6135,24 @@
 
 ## E180（准入读数与真可写量）
 
+### 2026-11-20
+
+- 装置在 crates 代码拆分里改过、之后没有正式跑：实验页「它答不了的」一节加一段写明，影响的决策表各行的回看日期改成当天；装置量的数、结论与产物不变。
+  - **依据**：`scripts/experiment-apparatus/on-request-experiments.tsv` 登记 E180（准入读数与真可写量） 按要求才跑（用户定，`records/2026-11-17-里程碑四收口续做.md` 第 255 行）；门禁 doc-experiments 的 evidence-in-repo 格要求装置改了而没有新产物时，实验页新加的行里写没有正式跑。
+  - **改前**：`git show HEAD:.claude/kb/experiments/180-准入读数与真可写量.md` 里「它答不了的」一节与影响的决策表。
+
 ### 2026-10-21
 
 - 新立，未跑：建页并登记进 experiments.md 索引。第一段读数段装置、45 条单测、22 条变异行与 29 片的分片长跑脚本 `scripts/experiment-apparatus/e180-reading-shards.sh` 写成；读数长跑两趟都没跑完，片在仓外、不入库，没有产物；第二段扣住位段装置没写。跑前登记 `research/prompts/e180-preregistration.md`（第十二节修订 1–4：T 被 journal 记录上限截尾的状态补三栏判定、探测的会话拷贝摘掉大字节、第一段的偏离六条、截尾状态按需收紧与第一段分片跑再合并）。
-  - **依据**：岔路单 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` 的 F2、F5、F6、F8 四行；调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md` 第 230、310 行（两趟长跑没跑完、停了）；装置 `crates/singlefs-verification/src/bin/e180_admission_reading_versus_writable_bytes.rs`（`grep -c '#\[test\]'` = 45），`crates/mutations.tsv` 里名字以小写 `e180` 起头的 22 行。
+  - **依据**：岔路单 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` 的 F2、F5、F6、F8 四行；调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md` 第 230、310 行（两趟长跑没跑完、停了）；装置 `crates/singlefs-implementation-experiments/src/bin/e180_admission_reading_versus_writable_bytes/main.rs`（`grep -c '#\[test\]'` = 45），`crates/mutations.tsv` 里名字以小写 `e180` 起头的 22 行。
 
 ## E181（落得下那一判与挂载下界）
+
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/181-落得下那一判与挂载下界.md` 里影响的决策表。
 
 ### 2026-11-10
 
@@ -5954,9 +6167,15 @@
 
 ## E182（被抛弃根读不出的三条岔路）
 
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/182-被抛弃根读不出的三条岔路.md` 里影响的决策表。
+
 ### 2026-10-18
 
-- 新立，第一段装置写成、产物未跑：建页，跑前登记 `research/prompts/e182-preregistration.md`（第十二节修订 12.1 至 12.10：续跑键换成函数单元闭包指纹、挂钟按实测改写、单盘恢复里掉了的盘身份还在读不到、`Overwrite` 取 `publish_overwrite`、状态只取两态、阳性对照跑法、臂的产物名、变异行、单测没能跑、`walk.rs` 指纹与登记不同），入库装置 `crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs`、长跑脚本 `scripts/experiment-apparatus/e182-single-device-long-run.sh`、变异行 6 条；单测交主 agent 跑，第一段产物（B1、B4）与第二段（B2）未跑。
+- 新立，第一段装置写成、产物未跑：建页，跑前登记 `research/prompts/e182-preregistration.md`（第十二节修订 12.1 至 12.10：续跑键换成函数单元闭包指纹、挂钟按实测改写、单盘恢复里掉了的盘身份还在读不到、`Overwrite` 取 `publish_overwrite`、状态只取两态、阳性对照跑法、臂的产物名、变异行、单测没能跑、`walk.rs` 指纹与登记不同），入库装置 `crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks/main.rs`、长跑脚本 `scripts/experiment-apparatus/e182-single-device-long-run.sh`、变异行 6 条；单测交主 agent 跑，第一段产物（B1、B4）与第二段（B2）未跑。
   - **依据**：岔路单 `research/prompts/m3-close-admission-and-shadow-ledger-forks.md` 的 B1、B2、B4 三行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 
 ### 2026-10-19
@@ -6002,10 +6221,16 @@
 
 ### 2026-10-18
 
-- 新立，第一段（H4）已跑：建页，跑前登记 `research/prompts/e183-preregistration.md`（第十二节修订三条：PC-准入 空池一半按 V33 原文记一次输、补阳性对照 PC-准入-文件、K32 空池一半只在 `writable_mount` 入口判而 `before_a_publish` 入口按 G8 记），入库装置 `crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`，产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` 与 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`；V33 空池一半打中，PC-准入-文件 4 项成立，H4 够判，第二到四段（H2、H5、H3）未跑。
+- 新立，第一段（H4）已跑：建页，跑前登记 `research/prompts/e183-preregistration.md`（第十二节修订三条：PC-准入 空池一半按 V33 原文记一次输、补阳性对照 PC-准入-文件、K32 空池一半只在 `writable_mount` 入口判而 `before_a_publish` 入口按 G8 记），入库装置 `crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs`，产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` 与 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`；V33 空池一半打中，PC-准入-文件 4 项成立，H4 够判，第二到四段（H2、H5、H3）未跑。
   - **依据**：问题单 `research/prompts/m3-close-cost-measurement-questions.md` 的 H4 一行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 
 ## E184（常规层与大负载层的代价计数）
+
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/184-常规层与大负载层的代价计数.md` 里影响的决策表。
 
 ### 2026-10-26
 
@@ -6028,7 +6253,7 @@
 
 ### 2026-10-19
 
-- 新立，第一段（J1，对应岔路 G1）已跑：建页，跑前登记 `research/prompts/e184-preregistration.md`（第十二节修订十条：修订 1 `crash_points_of_the_steps` 改直接调、修订 6 覆盖写链 u = 4、16 改走顺序写、修订 10 块数上界超过 2^26 的展开不排计划），入库装置 `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts.rs` 与 `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump.rs`，长跑脚本 `scripts/experiment-apparatus/e184-segment-one-long-run.sh`，产物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out`（950 行，18 件现跑 17 件）；J1-乙 随机历史随步数档 overlap、overlap、partial、separate（步数一行记不稳定），覆盖写链三档 separate，J1-丙 全部 independent，9 条流取不出，锚 B1 触发失败条款 F6；G1 够判，第二到四段（J3、J2、J4）未跑。
+- 新立，第一段（J1，对应岔路 G1）已跑：建页，跑前登记 `research/prompts/e184-preregistration.md`（第十二节修订十条：修订 1 `crash_points_of_the_steps` 改直接调、修订 6 覆盖写链 u = 4、16 改走顺序写、修订 10 块数上界超过 2^26 的展开不排计划），入库装置 `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts/main.rs` 与 `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts_write_dump.rs`，长跑脚本 `scripts/experiment-apparatus/e184-segment-one-long-run.sh`，产物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out`（950 行，18 件现跑 17 件）；J1-乙 随机历史随步数档 overlap、overlap、partial、separate（步数一行记不稳定），覆盖写链三档 separate，J1-丙 全部 independent，9 条流取不出，锚 B1 触发失败条款 F6；G1 够判，第二到四段（J3、J2、J4）未跑。
   - **依据**：问题单 `research/prompts/m3-close-c409-cost-questions.md` 的 J1 一行，岔路单 `research/prompts/m3-close-c409-r1-forks.md` 的 G1 一行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`。
 - 复跑表登记确定性的一片：`E184|@driver_e184||e184-regular-layer-cost-counts-selfcheck-2026-10-19.out|exact`（`selfcheck`，留存产物 `research/results/e184-regular-layer-cost-counts-selfcheck-2026-10-19.out` 是整份产物第 31 至 69 行加驱动补的收尾行），其余各件含挂钟字段，不登记。
   - **依据**：产物 `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out` 第 30 至 69 行。
@@ -6036,6 +6261,15 @@
   - **依据**：产物 `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h5-2026-10-19.out` 第 7931、7932、19065、19066 行，调度记录 `records/2026-10-18-里程碑三收尾与近期欠账.md`「主 agent 判 E183 跑产物前五处」一行。
 
 ## E185（GC一批搬迁的挂钟拆分）
+
+### 2026-11-19
+
+- 页首现状那一行与三份起跑脚本 `scripts/experiment-apparatus/e185-r2-segment-run.sh`、`e185-r3-segment-run.sh`、`e185-r4-segment-run.sh` 的 `registered_apparatus_sha256` 重钉成现算的 `d312b9aa71d0518976fd383b48300705f4598d2e79d4a3d59488657e684a51eb`（装置 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` 26562 行、`#[test]` 240 条，现算三次相同）；结论、数与产物不变。装置自上次钉值以来改了 827 行加、27 行删，量法与判据有没有动没逐处核。
+  - **依据**：旧账本 `records/2026-11-17-subagent账本自上而下清欠.md` 第二百二十四节第 22 条（登记 a5b48b73、现算 d312b9aa）；写回员报告 `~/.local/share/singlefs/work/ledger-open-kb-writeback/result.md` 第 4 条；三份起跑脚本经换上工具真换（结局「换上了 3 份」），换上后三份起跑脚本的自证都退 0。
+  - **改前**：钉值 `a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082`（同一节 2026-11-02 那一块第二条）。
+- 撤回同一天上一条的重钉：三份起跑脚本的 `registered_apparatus_sha256` 改回各自登记第十二节写的值（第 2 次重跑 `0bd22743…`、第 3 次重跑 `4368c0e7…`、第 4 次重跑 `9e813cbd…`），页首现状那一行改写成装置在登记之后改过、登记第十二节没有修订行、起跑照停机条款退 3；装置现算 `d312b9aa…` 照旧。
+  - **依据**：治理文件轮第一轮判决 `research/prompts/ledger-open-fixes-governance-r1-main-verification.md`「二、判决」第 13 条：重钉把停机 K-S6、J-S7 变成了照跑；第 4 次重跑登记 `research/prompts/e185-r4-prereg.md:579`，第 2、3 次重跑登记的第十二节在 `git show a24379563^:research/prompts/e185-r2-prereg.md` 与 `git show a24379563^:research/prompts/e185-r3-prereg.md`。
+  - **改前**：同一节同一天上一条（钉值 `d312b9aa71d0…`）。
 
 ### 2026-11-02
 
@@ -6231,10 +6465,19 @@
 
 ### 2026-10-19
 
-- 新立，装置已写、未跑：建页，跑前登记 `research/prompts/e185-preregistration.md`（第十二节只记 12.1：变异表落在 `crates/mutations.tsv`，判据没动）；入库装置 `crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs` 四个子命令、45 条内联单测写成，22 条变异行追加进 `crates/mutations.tsv`；单测、变异三个数与四段产物都没跑。
+- 新立，装置已写、未跑：建页，跑前登记 `research/prompts/e185-preregistration.md`（第十二节只记 12.1：变异表落在 `crates/mutations.tsv`，判据没动）；入库装置 `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` 四个子命令、45 条内联单测写成，22 条变异行追加进 `crates/mutations.tsv`；单测、变异三个数与四段产物都没跑。
   - **依据**：问题单 `research/prompts/m4-gpugc-measure-forks.md` 第 1 行与第 4 行的单跑那一半（派发这一段要答的岔路），调度记录 `records/2026-10-19-里程碑四GPU垃圾回收开工.md`。
 
 ## E186（不认识的树·记账维重推）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（4 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号；说那几次跑做了什么、抄下来的命令与输出的 3 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs` → `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/186-不认识的树-记账维重推.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/186-不认识的树-记账维重推.md` 里影响的决策表。
 
 ### 2026-10-20
 
@@ -6248,6 +6491,15 @@
   - **改前**：状态「已跑（Q1、Q2 够判；变异表 17 条全抓）」。
 
 ## E187（隔离落盘代价）
+
+### 2026-11-20
+
+- 装置在 crates 代码拆分与装置包 lint 收口里改过、之后没有正式跑：实验页「它答不了的」一节加一段写明，影响的决策表各行的回看日期改成当天；装置量的数、结论与产物不变。
+  - **依据**：`scripts/experiment-apparatus/on-request-experiments.tsv` 登记 E187（隔离落盘代价） 按要求才跑；门禁 doc-experiments 的 evidence-in-repo 格要求装置改了而没有新产物时，实验页新加的行里写没有正式跑。
+  - **改前**：`git show HEAD:.claude/kb/experiments/187-隔离落盘代价.md` 里「它答不了的」一节与影响的决策表。
+- 现状句里的旧单文件路径改成拆分之后的路径：页首「装置」一行写 `scripts/experiment-apparatus/e187_quarantine_mark_cost/main.rs` 与同目录下的各模块文件，复跑一节的变异命令改用 `e187_quarantine_mark_cost/main.rs`，「路径与结论登记」两行源码落点改成拆分之后的文件与行号；说那几次跑做了什么、抄下来的命令与输出仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e187_quarantine_mark_cost.rs` 搬到 `scripts/experiment-apparatus/e187_quarantine_mark_cost/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/187-隔离落盘代价.md` 里页首「装置」一行、复跑一节的变异命令与「路径与结论登记」的源码落点。
 
 ### 2026-11-08
 
@@ -6266,12 +6518,20 @@
 - 新立，第一段已跑、第二段与变异表没跑：建页，跑前登记 `research/prompts/e187-preregistration.md`（第十二节修订一到修订五，写在单测之后、产物之前；修订一把模型的两条落点规则按 `crates/` 落细，交主 agent 认），装置 `scripts/experiment-apparatus/e187_quarantine_mark_cost.rs`（30 条单测，另 2 条线程登记位），变异表 `scripts/mutation/tables/e187_quarantine_mark_cost.tsv`（17 条，没跑），第一段产物 `research/results/e187-quarantine-mark-cost-segment-one-2026-10-21.out`（250 行），复跑表登记 `E187|e187-quarantine-mark-cost|segment-one|e187-quarantine-mark-cost-segment-one-2026-10-21.out|exact`。状态「部分已跑（第一段已跑；第二段工作负载与变异表没跑）」。
   - **依据**：岔路单 `research/prompts/m4-i315-quarantine-mark-cost-forks.md` 那一行，批次 `records/2026-10-13-里程碑四预开发.md` 的 m4-i315-quarantine-mark-cost 一节；第二段（320 格 × 三臂）在本机满载时前台 225 秒跑完 42 格，交主 agent 起。
 
+## E197（扫环胶水内存随盘数）
+
+### 2026-11-20
+
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/197-扫环胶水内存随盘数.md` 里影响的决策表。
+
 ## E198（取号跳过认出生代号的前提）
 
 ### 2026-11-11
 
 - 装置收尾行由 `name=done result_lines=` 改成 `name=done emitted=`（含收尾行自己），两段重出：第一段 `research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-10.out`（任务 13021，1445 行），第二段 `research/results/e198-instance-table-pointer-birth-skip-premise-segment-two-2026-11-10.out`（任务 13022，2107 行），单测任务 12588 26 条全过；与旧产物逐行比只有末行不同。`replay.sh` 两行 E198 改指新产物名，实验页「现状」补一条、「复跑」两条命令换新产物名，「影响的决策」两行重新回看，状态与问题单两行的判定不变。
-  - **依据**：装置 `crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs:4770-4771`；旧产物 `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out`、`git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-two.out`。
+  - **依据**：装置 `crates/singlefs-implementation-experiments/src/bin/e198_instance_table_pointer_birth_skip_premise/main.rs:300-301`（拆分前为 `HEAD:crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs:4770-4771`）；旧产物 `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out`、`git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-two.out`。
 
 ### 2026-11-05
 
@@ -6289,10 +6549,19 @@
 
 ### 2026-10-29
 
-- 新立，装置已写、产物未跑：建页，跑前登记 `research/prompts/e198-preregistration.md`（第十二节修订 1 照派发提示里主 agent 对四个待认项的定案写，清扫阈值的产品默认由 369 改成 365、G1 取 365；修订 2 写定 V4、V7 的取样点与单测），入库装置 `crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs`（25 条单测，在执行员草稿目录里写成，编译与单测归主 agent），变异行 9 条备在草稿目录，复跑表登记 `E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one.out|exact` 与 `E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact`。状态「装置已写、产物未跑」。
+- 新立，装置已写、产物未跑：建页，跑前登记 `research/prompts/e198-preregistration.md`（第十二节修订 1 照派发提示里主 agent 对四个待认项的定案写，清扫阈值的产品默认由 369 改成 365、G1 取 365；修订 2 写定 V4、V7 的取样点与单测），入库装置 `crates/singlefs-implementation-experiments/src/bin/e198_instance_table_pointer_birth_skip_premise/main.rs`（25 条单测，在执行员草稿目录里写成，编译与单测归主 agent），变异行 9 条备在草稿目录，复跑表登记 `E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one.out|exact` 与 `E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact`。状态「装置已写、产物未跑」。
   - **依据**：问题单 `research/prompts/m3-close-b19-c699-forks.md` 两行，批次 `records/2026-10-18-里程碑三收尾与近期欠账.md` 的 19-3；停机条款 S5 按读码推会在第二段触发、S5 的字面交主 agent 定，写在实验页「现状」与执行员报告 `~/.local/share/singlefs/work/m3-close-b19-e198-run/result.md`。
 
 ## E199（发布照抄上一版的代价）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（1 处）：点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号；说那几次跑做了什么、抄下来的命令与输出的 1 处仍写当时的单文件路径。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e199_transaction_output_copy.rs` → `scripts/experiment-apparatus/e199_transaction_output_copy/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/199-发布照抄上一版的代价.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/199-发布照抄上一版的代价.md` 里影响的决策表。
 
 ### 2026-11-05
 
@@ -6332,6 +6601,15 @@
 
 ## E201（三oracle合谋今树整表）
 
+### 2026-11-18
+
+- 第 1 次重跑已跑、够判（重跑登记 `research/prompts/e201-r1-prereg.md`，问题单 `research/prompts/e201-r1-questions.md`）：变异表 57 行 56 条抓到、第 57 行「判法 E171 目录只在 e171_research_side 里插」没红、判等价；六个单测模块 124 条全过（那一条读真仓的红分到 U1，`test_full_table_run.py` 把仓根自身单列、补三条手造用例）；变异驱动起得来（`mutation_driver.py` 那一趟退 2、`type=command-failed exit=2`，原因是基线单测红）。页加「第 1 次重跑」一节与岔路表三行，「现状」的单测与变异条数标成当时的数，复跑表登记 `driver_e201_mutations`；状态由「装置已写、产物未跑」改成「装置已写、两段产物未跑；第 1 次重跑已跑（够判）」。第 57 行的处置（留档等价测试、换一条会改行为的变异）交主 agent 定，装置与表没动。
+  - **依据**：`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations.out` 第 117 行 `E7RESULT name=verdict mutations=57 caught=56 invalid=0 survived=1 timed_out=0 restored_and_baseline_green=true`；`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-unit-tests-after.out` 第 217、219 行（`Ran 124 tests`、`OK`）；两份控制产物与 5.2 逐项相同；树摘要三次同值、装置摘要前后同值（作废 Z2、Z3 不触发）；等价的读法见 `scripts/gate/lib_function_units.py` 的 `PythonModule.search_directories`。
+  - **改前**：`git show HEAD:.claude/kb/experiments/201-三oracle合谋今树整表.md`。
+- 第 57 行处置落地、复跑登记改指新产物：等价留档用例 `JudgeImportTests.test_without_the_drivers_own_insertion_the_key_library_still_resolves_the_e171_modules_through_the_research_side`（默认开关下 `ok`，算键的库开弄坏开关 `python-imported-sys-path-ignored` 时恰这一条红）进 `test_current_tree_row_driver.py`，逐行驱动那一句上方注释改写，表第 57 行换成「判法 E171 目录不进 import 路径」（`e171_research_side.py` 那一句插入换成 `pass`）；换上之后单测 125 条全过、整表 57 条全抓。`replay.sh` 复跑表 E201 行、`.claude/gate.d/replay-comparison-units.tsv` E201 行、重跑登记第十一节比对对象表第 1 行改指新产物，r1 那份产物（56 抓 1 没红）留着、读数不改；`driver_e201_mutations` 把六个单测模块逐个用 `--unit-test-module` 给（`replay.sh --selftest` 那一趟（`type=command-failed exit=1`）红在「静态核 mutation-driver-tables」：那一格按行取 `TEST_MODULES`，E201 那份驱动跨两行写）。重跑登记修订 3。页的状态括注、「现状」的条数、第 22 行那一句（`FrozenO3Is496Tests` 两条与变异表两行 2026-11-11 已跑）、开头一句、岔路表、「第 1 次重跑」一节与「影响的决策」回看照改；索引行的「变异表 50 条」「单测 115 条」「变异 50 条全抓」改成此刻的数。
+  - **依据**：`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations-2026-11-18.out` 第 117 行 `E7RESULT name=verdict mutations=57 caught=57 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`、第 116 行 `E7RESULT name=mutation number=57 outcome=✅ mutation=判法_E171_目录不进_import_路径 unit_test_exit=1`；`research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-unit-tests-after-2026-11-18.out` 第 182、184 行（`Ran 125 tests in 13.567s`、`OK`）；只跑 `JudgeImportTests`、开 `python-imported-sys-path-ignored` 那一趟 `FAILED (failures=1)`（红的是留档那一条）；`replay.sh --selftest` 那一趟日志第 310 行（`ast.literal_eval` 回溯）；派发提示（批次 `records/2026-11-17-subagent账本清欠调度记录.md#13`）。
+  - **改前**：状态括注「变异表 57 行 56 条抓到、1 条没红判等价」，复跑表行指 `e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations.out`，开头一句「单测、变异、自证与产物都还没跑」，「O3 一侧」那一条末句「这两格还没跑」；提交过的那一版是 `git show HEAD:.claude/kb/experiments/201-三oracle合谋今树整表.md`。
+
 ### 2026-11-11
 
 - O3 一侧由 487 目录与 r2 冻结参照换成 496 目录与 E171 第 3 次重跑的冻结参照：登记第十二节修订 8，装置只在 `e171_research_side.py` 换本进程里 `frozen_o3` 的三个常量，单测加两条、变异表加两行，页的「现状」「口径」各加一句；状态仍是「装置已写、产物未跑」。
@@ -6346,6 +6624,15 @@
   - **依据**：问题单 `research/prompts/e171-current-tree-full-table-questions.md` 两行，批次 `records/2026-10-31-删兼容旧版本代码.md` 第 18 批；用户定「第 2 次重跑收尾，整表另立新实验」与 2026-11-02 弹窗里的三条（选项记在那一批的记录）。
 
 ## E203（准入之前扫类的步代价）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（4 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e203_admission_scan_cost.rs` → `scripts/experiment-apparatus/e203_admission_scan_cost/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/203-准入之前扫类的步代价.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/203-准入之前扫类的步代价.md` 里影响的决策表。
 
 ### 2026-11-05
 
@@ -6384,6 +6671,15 @@
 
 ## E206（发布固定点轮数的代价）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（2 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e206_fixed_point_cost.rs` → `scripts/experiment-apparatus/e206_fixed_point_cost/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/206-发布固定点轮数的代价.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/206-发布固定点轮数的代价.md` 里影响的决策表。
+
 ### 2026-11-13
 
 - 合并报告换成今天的装置重算的整份：新增 `research/results/e206-fixed-point-cost-report-2026-11-13.out`（792 行），登记行改指它，`-r2`（754 行）与 11-09 的原始报告（753 行）留着；比 `-r2` 多 38 行 `name=by_delta_pooled_fallback` 与收尾行条数，别的行逐字相同；页里 `question=q4 arm=p1` 那一行两项次序照新报告改正（11-09 原始报告与 `-r2` 次序相反，同一集合），作废条款 1 那三行补上留存报告里的行号 607、609、611；决策表回看到 2026-11-13；读数、产物与结论没动。
@@ -6409,6 +6705,15 @@
   - **改前**：无，这一节是新的。
 
 ## E207（严格判据下的扫类步数）
+
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（5 处）：点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e207_strict_scan_steps.rs` → `scripts/experiment-apparatus/e207_strict_scan_steps/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/207-严格判据下的扫类步数.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/207-严格判据下的扫类步数.md` 里影响的决策表。
 
 ### 2026-11-13
 
@@ -6440,6 +6745,15 @@
 
 ## E209（尖峰成因）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（2 处）：点名了函数、常量或用例的写成它所在的模块文件。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e209_spike_cause.rs` → `scripts/experiment-apparatus/e209_spike_cause/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/209-尖峰成因.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/209-尖峰成因.md` 里影响的决策表。
+
 ### 2026-11-13
 
 - 新立，未跑：装置（计数脚本、历史用例、脚本表、模型、入口与判定库脚本）、单测与变异表写完，页建起来给门禁认号；产物一次没跑，一个读数都没有。
@@ -6463,8 +6777,23 @@
 
 ## E210（盘变大改容量表的读者规则四臂）
 
+### 2026-11-20
+
+- 现状句里的装置源码路径改成 crates 代码拆分之后的路径（2 处）：指整个装置的写成同名目录下的 `main.rs`，点名了函数、常量或用例的写成它所在的模块文件，带行号的换成拆分之后的行号。
+  - **依据**：搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了 `scripts/experiment-apparatus/e210_capacity_grow_reader_rules.rs` → `scripts/experiment-apparatus/e210_capacity_grow_reader_rules/main.rs`；`.claude/rules/path-moves.md`「怎么做」第 5 步：说搬迁本身的句子留旧路径，说现状的句子改成新路径。
+  - **改前**：`git show HEAD:.claude/kb/experiments/210-盘变大改容量表的读者规则四臂.md` 里引装置源码路径的现状句。
+- 影响的决策表各行回看日期改成当天，写「不受影响」：拆分只换了装置源码的文件布局，结论、数与产物不变。
+  - **依据**：门禁 doc-experiments 的 decision-links 格：实验页正文改了，影响的决策表要有回看；搬迁登记表 `.claude/gate.d/path-moves.tsv` 登记了装置源码搬进同名目录。
+  - **改前**：`git show HEAD:.claude/kb/experiments/210-盘变大改容量表的读者规则四臂.md` 里影响的决策表。
+
 ### 2026-11-18
 
 - 新立，未跑：独立手写的计数模型（bin `e210-capacity-grow-reader-rules`，命令行参数选两段产物）、单测 36 条与变异表 23 条写完，`replay.sh` 加两行复跑登记，页与索引行建起来给门禁认号；编译、单测、变异表与产物一次没跑，一个读数都没有。
   - **依据**：跑前登记 `research/prompts/e210-preregistration.md`；岔路单 `research/prompts/m4-capacity-grow-r1-forks.md`。
   - **改前**：无，这一节是新的。
+- 装置改了不变性核对：单测那一次 36 条过、2 条红，红的是不变性核对。另一组整数的换数改成每块盘一张换数表、同一个主格整数在所有形状里换同一个数；「再变大」的探测值分两种写法（一并换数、登记原文的在换过的数上直接加 100），判决行拆成 `invariance_mismatches`（登记原文口径）与 `order_preserving_mismatches`（补的判据），不符逐字段列在 `name=invariance_detail` 行；单测 38 条、变异表 27 条；登记第十二节补「修订」一段。产物仍一次没跑，没有读数。
+  - **依据**：登记 `research/prompts/e210-preregistration.md` 第十二节「修订」；该次单测输出。
+  - **改前**：同日上一项（单测 36 条、变异表 23 条，不变性核对用每个形状自己的次序排名换数）。
+- 两段产物已跑并读过：单测 40 条过、变异表 27 条全抓到、行 2 与行 3 一段 32 行、行 1 一段 165 行。行 2 与行 3 够判（丙多写 2 次槽 1 道屏障；跨一道与跨两道各 17228 整槽、合成对照点 812、层级对拍全对）；行 1 装置内够判（漏放行可写甲、丁各 103 / 1487，只读甲 103，乙、丙、基线臂 0；误拒可避免甲 30、乙 284、丙 66、丁 30、基线臂 619）；甲、丁可写漏放行与丙只读漏放行与攻方腿的枚举模型对不上（E210 没建落后盘一支，镜像只有两种时点且不带意图标记），页里并列标「两套装置对不上、未判」；不变性核对登记原文口径 5 处不符（全是观测类数 474 变 490、684 变 716）、保序判据 0 不符，作废条款 1 处置待主 agent 判；103 条可写漏放行按源码手算分类（早镜像 99、前镜像 4）写进页，没有逐条明细；页与索引行三语同改。
+  - **依据**：`research/results/e210-capacity-grow-reader-rules-write-counts-and-root-level-2026-11-18.out` 第 2 至 24、28 至 31 行；`research/results/e210-capacity-grow-reader-rules-reader-rules-on-histories-2026-11-18.out` 第 7 至 31、142 至 164 行；攻方腿模型两趟输出。
+  - **改前**：同日上一项（装置改了不变性核对，产物一次没跑，没有读数）。

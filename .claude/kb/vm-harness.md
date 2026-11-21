@@ -8,11 +8,13 @@
 
 ## 一句话
 
+虚机那一趟写成一份入口脚本，整条经任务服务交：
+
 ```bash
-cd scripts/experiment-apparatus
-cargo build --release --target x86_64-unknown-linux-musl --bin <实验二进制名>
-bash ../devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/<名> /dev/vda <参数...>
+task-server/task submit -- bash scripts/experiment-apparatus/<实验>-vm-bench-run.sh <输出文件> <参数...>
 ```
+
+入口脚本里先把实验二进制编成 musl 静态二进制（`cargo build --release --target x86_64-unknown-linux-musl --bin <实验二进制名>`，编译目录取服务给的 `CARGO_TARGET_DIR`、不在仓里，二进制取 cargo 报的位置），再用 `bash scripts/devices/vm-bench.sh <那份二进制> <参数...>` 送进虚机。盘的路径（`/dev/vda` …）由 `vm-bench.sh` 接在参数前面传给二进制，参数里不写。现成的一份是 `scripts/experiment-apparatus/e56-vm-bench-run.sh`（用法、自证与弄坏开关写在它的文件头），照它写。
 
 ## 挂几块盘
 

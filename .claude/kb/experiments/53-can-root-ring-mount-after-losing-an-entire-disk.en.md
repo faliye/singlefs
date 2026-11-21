@@ -55,8 +55,7 @@ Reports three numbers: `survivors` (count of passing slots), `chosen_gen` (selec
 - Code `scripts/experiment-apparatus/e53_ring_failure.rs`.
 - Reproduction:
   ```
-  cd scripts/experiment-apparatus && cargo build --release --target x86_64-unknown-linux-musl --bin e53_ring_failure
-  VM_DISKS=4 bash scripts/devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/e53_ring_failure
+  task-server/task submit -- env VM_DISKS=4 bash scripts/experiment-apparatus/e53-vm-bench-run.sh <output_file>
   ```
 - Raw output `e53-ring-failure-2026-08-30.out`.
 - Mutation table `scripts/mutation/tables/e53_ring_failure.tsv`.
@@ -102,8 +101,7 @@ can easily carry a self-consistent checksum; **judgment then relies entirely on 
   Mutation table `scripts/mutation/tables/e53_ring_failure.tsv` (6 rules, all caught).
 - Reproduction (E53 (Can Root Ring Mount After Losing an Entire Disk) requires VM, not in quick tier of `replay.sh`):
   ```
-  cd scripts/experiment-apparatus && cargo build --release --target x86_64-unknown-linux-musl --bin e53_ring_failure
-  VM_DISKS=4 VM_DISK_MB=64 bash scripts/devices/vm-bench.sh target/x86_64-unknown-linux-musl/release/e53_ring_failure
+  task-server/task submit -- env VM_DISKS=4 VM_DISK_MB=64 bash scripts/experiment-apparatus/e53-vm-bench-run.sh <output_file>
   ```
 - ⚠️ **Injection form is "entire content wiped", not "read returns EIO"**. Minimal initramfs lacks `dm-error`,
   and true device removal (`device_del`) was not performed. ⇒ **E53 (Can Root Ring Mount After Losing an Entire Disk) proves "whether root can be selected when content vanishes"**,
@@ -120,9 +118,9 @@ can easily carry a self-consistent checksum; **judgment then relies entirely on 
 
 | Decision Item | Relationship | Review |
 |---|---|---|
-| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | Prepares | 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D22 (Synthesizing Unit Atomicity) settled item 2 | Supports | 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
-| D16 (Publish Semantics) settled item 6 | Supports | 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D5 (Snapshot / Space Accounting Mechanism) settled item 2 | Prepares | 2026-11-19 unaffected: only the wording of the rerun commands changed (now an entry script); conclusions, numbers and artifacts unchanged; previously, 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D22 (Synthesizing Unit Atomicity) settled item 2 | Supports | 2026-11-19 unaffected: only the wording of the rerun commands changed (now an entry script); conclusions, numbers and artifacts unchanged; previously, 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
+| D16 (Publish Semantics) settled item 6 | Supports | 2026-11-19 unaffected: only the wording of the rerun commands changed (now an entry script); conclusions, numbers and artifacts unchanged; previously, 2026-11-17 unaffected: only a pointer to a rule section was changed; conclusions, numbers and artifacts unchanged; previously, 2026-10-21 unaffected: only the trilingual language-switch row was added; previously, 2026-10-11 unaffected: only wording was changed (temporal terms, location references, and self-references); the conclusions, numbers, and artifacts remain unchanged |
 
 ## Historical Versions
 

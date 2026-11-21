@@ -173,11 +173,18 @@
 | 发布语义 | publish semantics | パブリッシュセマンティクス | D16（发布语义） 的简称<br>short name of that decision<br>その決定の略称 |
 | 块里携带什么信息 | information carried in a block | ブロックに含める情報 | D18（块里携带什么信息） 的简称<br>short name of that decision<br>その決定の略称 |
 | 后台整理与放置回收 | background compaction and placement reclamation | バックグラウンド整理と配置回収 | D26（后台整理与放置回收） 的简称<br>short name of that decision<br>その決定の略称 |
-| 单元键 | unit key | ユニットキー | 判定按它复用：函数单元指纹、工具链、依赖版本<br>the key a verdict is reused by: function-unit fingerprints, toolchain, dependency versions<br>判定の再利用の鍵: 関数ユニットの指紋、ツールチェーン、依存の版 |
+| 单元键 | unit key | ユニットキー | 判定按它复用：函数单元指纹<br>the key a verdict is reused by: function-unit fingerprints<br>判定の再利用の鍵: 関数ユニットの指紋 |
 | 函数单元 | function unit | 関数ユニット | |
 | 块键 | block key | ブロックキー | |
+| 测试服务代码 | test-service code | テストサービスコード | |
+| 复用哨兵 | reuse sentinel | 再利用番兵 | |
+| 录入键 | recording key | 記録キー | |
+| 块的输入数据 | the block's input data | ブロックの入力データ | |
 | 录入段 | recording stage | 記録段 | |
 | 判段 | judging stage | 判定段 | |
+| 写流摘要 | write-stream digest | 書き込みストリームのダイジェスト | |
+| 录入检测 | recording-completeness check | 記録完全性検査 | |
+| 判定项标识 | verdict-item identifier | 判定項目識別子 | |
 | 读集见证 | read-set witness | 読み出し集合の証人 | |
 | 恢复报告分桶 | recovery-report bucketing | リカバリ報告のバケット分け | |
 | 判表 | judge tables | 判定表 | |

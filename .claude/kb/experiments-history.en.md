@@ -401,6 +401,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E10 (Aging: Structural Resistance vs Post-hoc Compaction)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (1 places): references to the whole apparatus now name `main.rs` in the same-named directory.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e10_aging_compaction.rs` → `scripts/experiment-apparatus/e10_aging_compaction/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/10-老化结构抗老化vs事后整理.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/10-老化结构抗老化vs事后整理.md`, the affected-decisions table.
+
 ### 2026-10-26
 
 - Raw outputs now cited from git history: the four shard artifacts of the first segment are archived (neither in the working tree nor in the staging area), and the "measurement basis and artifacts" paragraph now reads `git show e1b1ceb95:research/results/e10-aging-compaction-2026-10-13/<shard>.out`; the same paragraph states that this registration yields only the compaction floor `N₀`, and that the product batch size and the three compaction watermarks do not belong to it. Numbers, conclusions and status unchanged; the two rows of "Affected Decisions" are reviewed on the same day.
@@ -4545,6 +4554,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E139 (Tightened Form of Per-Disk Rollback Floor)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (2 places): references to the whole apparatus now name `main.rs` in the same-named directory; 4 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e139_tightened_floor.rs` → `scripts/experiment-apparatus/e139_tightened_floor/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/139-按盘回退下界的收严形态.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/139-按盘回退下界的收严形态.md`, the affected-decisions table.
+
 ### 2026-10-29
 
 - Rerun 3 (reclamation threshold changed to how `crates/` writes it today) run: the apparatus adds CG (F_effective takes the maximum of three terms, min(F_effective, m) on the spot and the rest held until a root of this instance has landed on every surviving disk; a slot that fails self-test is pinned at the oldest txg it may have held; administrator rollback does not recompute F), tested arm `RGall_core_gate` compared line by line with Rerun 2's `RGall_ring_all` over 611 pairs, 0 pairs with a judgement bit 0 → 1, 0 pairs 1 → 0, no flip; the 8 red rows (write after delete failed, the `near_full` and `cost_growth` grown-to-c_max cells) were already in the Rerun 2 artifact, F3 and F9 triggered, recorded as "no flip, the premise of A has a separate gap"; the `activation_faults` positive control has 12 rows at 0 at S = 16, F4 covers only that class; discriminative power 220 pairs, all in trajectory and attribution rows; CG reached: d ≠ 0 in 12628 samples, dF ≠ 0 14080, pin effective 480, held portion waiting 0; `G2R_core_gate` not run after judgement was reached.
@@ -4635,6 +4653,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Basis**: knock-on from settled item 8 of D16 (Publish Semantics) and settled item 3 of D28 (Mount-Time Commitments); the half-paid cell of C126 (Worst-case amount of switching reservation has no measurement basis).
 
 ## E142 (New-Pool File Creation Dry Run)
+
+### 2026-11-20
+
+- The apparatus was changed in the crates code split and the lint closeout of the apparatus package and has not been formally run since: a paragraph in the section "What It Cannot Answer" of the experiment page says so, and the review dates of all rows of the table of decisions affected were set to the current day; the numbers the apparatus measured, the conclusions and the artifacts are unchanged.
+  - **Basis**: `scripts/experiment-apparatus/on-request-experiments.tsv` registers E142 (New-Pool File Creation Dry Run) as run on request; the evidence-in-repo cell of gate doc-experiments requires that, when the apparatus changed and there is no new artifact, the lines newly added to the experiment page say that it has not been formally run.
+  - **Before**: `git show HEAD:.claude/kb/experiments/142-新池新建文件的干跑.md`, the section "What It Cannot Answer" and the table of decisions affected.
+- The old single-file path in the sentences that state the current situation is changed to the path after the split: the line "Code" at the top of the page names `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run/main.rs` and the module files in the same directory, and the pointer to the `const GAPS` array names `structure_catalog_and_offset_explanations.rs`; the sentences that tell what those runs did still carry the single-file path of that time.
+  - **Basis**: the move register `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs` moved to `scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run/main.rs`; step 5 of "How to do it" in `.claude/rules/path-moves.md`: sentences about the move itself keep the old path, sentences about the current situation take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/142-新池新建文件的干跑.md`, the line "Code" at the top of the page and the sentence about `const GAPS`.
 
 ### 2026-11-01
 
@@ -4975,6 +5002,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E152 (Per-Milestone File Performance Against Six File Systems)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (2 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e152_file_system_benchmark.rs` → `scripts/experiment-apparatus/e152_file_system_benchmark/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md`, the affected-decisions table.
+
 ### 2026-11-17
 
 - Added the 2026-11-17 run: seven two-disk mirrors + singlefs, five rounds each, on top of working-tree changes, all 40 VM runs `vm_exit=0`; tables copied whole into a section of the experiment page and `scripts/experiment-apparatus/perf-by-milestone.md` III.5, compared cell by cell with the 2026-09-29 run (25 of 207 cells changed by more than 15%); the four affected-decision rows were reviewed to that date, unaffected.
@@ -5041,17 +5077,44 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E153 (Ledger Forms and Cost of Holes in Ring)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (1 places): references to the whole apparatus now name `main.rs` in the same-named directory.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes.rs` → `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/153-账本形态与环上有洞的代价.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/153-账本形态与环上有洞的代价.md`, the affected-decisions table.
+
 ### 2026-09-17
 
 - See the same-day entry "" in the E155 (Write Volume per Persistence: Three Fsync Forms and Counterfactual Upper Bounds) section.
 
 ## E154 (Cost of Two-Gate Serial Re-evaluation and Reclamation Timing)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (1 places): references to the whole apparatus now name `main.rs` in the same-named directory; 1 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_timing.rs` → `scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_timing/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/154-两道闸串-重判与回收时点的代价.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/154-两道闸串-重判与回收时点的代价.md`, the affected-decisions table.
+
 ### 2026-09-17
 
 - See the same-day entry "" in the E155 (Write Volume per Persistence: Three Fsync Forms and Counterfactual Upper Bounds) section.
 
 ## E155 (Write Volume per Persistence: Three Fsync Forms and Counterfactual Upper Bounds)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (3 places): references to the whole apparatus now name `main.rs` in the same-named directory; 1 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e155_fsync_write_volume.rs` → `scripts/experiment-apparatus/e155_fsync_write_volume/main.rs`、`scripts/experiment-apparatus/e155_second_run_fsync_write_volume.rs` → `scripts/experiment-apparatus/e155_second_run_fsync_write_volume/main.rs`、`scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency.rs` → `scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/155-每次持久化的写量三种fsync形态与反事实上界.md`, the affected-decisions table.
 
 ### 2026-09-24
 
@@ -5129,7 +5192,7 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Basis**: rerun registration `research/prompts/e156-r6-prereg.md`; artifacts `e156-alloc-basis-counts-2026-10-05-r2.out`, `research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`, `research/results/e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.txt`, `research/results/e156-alloc-basis-counts-2026-10-05-r6-point-sets.txt`; body [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md), section "6th rerun (2026-10-05)".
 
 - E156 (Cost Figures for Four Alloc-Basis Forks) 5th rerun: after the core assertion, the positive control of the W7 cell replaced by PC-pinned-floor, and the 4th run's readings recompared field by field on the new `crates/`
-  - **Before**: in the apparatus `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs` (5776 lines, 17 unit tests), the positive control of W7 was PC-allocator (`allocator_without_the_root_ring`, S = 4, ρ = 1, k = 0, swapping back an allocator without the root ring table, which A10 should judge red), artifact `e156-alloc-basis-counts-2026-09-26-r2.out` (4007 lines), with the E156 (Cost Figures for Four Alloc-Basis Forks) line of `replay.sh` pointing to it; once the user settled "core asserts when the allocator has no root ring table and a root is recorded", PC-allocator panicked at the first root recording.
+  - **Before**: in the apparatus `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs` (5776 lines, 17 unit tests), the positive control of W7 was PC-allocator (`allocator_without_the_root_ring`, S = 4, ρ = 1, k = 0, swapping back an allocator without the root ring table, which A10 should judge red), artifact `e156-alloc-basis-counts-2026-09-26-r2.out` (4007 lines), with the E156 (Cost Figures for Four Alloc-Basis Forks) line of `replay.sh` pointing to it; once the user settled "core asserts when the allocator has no root ring table and a root is recorded", PC-allocator panicked at the first root recording.
   - **After**: apparatus 5819 lines, 18 unit tests (PC-allocator removed, PC-pinned-floor added: the two lag sets of the six Hh(1, after, S, ρ) cells in the cell table fed to the A10 verdict at k = 0, printing six `name=pc_pinned_floor` lines and one summary line; new unit test U19); artifact `research/results/e156-alloc-basis-counts-2026-10-05.out` (3955 lines; rerunning the same binary is byte-identical). Line 1: the verdicts of both columns in all six cells are "mismatch", and the lag sets all contain 6S − 1, `v2_pc_pinned_floor_seen=true`. Line 2: after normalization 294 of 3948 lines differ (60 verdict lines, 234 count lines, including the count item of `name=done`): `f24_real_every_differ_points` 0 → 34, `s11_k10_violation_points` 0 → 34, the geometry sensitivity of `q1d_growth` changes from "consistent over 12 sampling points" to "unstable" (4 points `not_monotonic` in the "real" column), and F1 still triggers; the attribution run (with the 31-1 assertion reverse-patched in a copy) is byte-identical to the new artifact, so the differences do not come from 31-1. Stops S11 and S14 trigger, handed to the main agent; the E156 (Cost Figures for Four Alloc-Basis Forks) line of `replay.sh` now points to the new artifact, and the r2 one is kept. Inline unit tests and the whole mutation table not run (heavy tier, left for commit time).
   - **Basis**: rerun registration `research/prompts/e156-r5-prereg.md`; artifacts `research/results/e156-alloc-basis-counts-2026-10-05.out`, `research/results/e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out`, `research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`; two mutation files `research/results/e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv`, `research/results/e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`; body [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md).
   - **Before**: `git show ce1457c3:.claude/kb/experiments-history.md` (as it was before the 2026-10-12 document iron-rule fix: numbers in this block gained short names and clashing local arm names were lowercased; the original sentences are in this version)
@@ -5137,7 +5200,7 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 ### 2026-09-26
 
 - E156 (Cost Figures for Four Alloc-Basis Forks) 4th rerun: three premises reproduced on the apparatus, fork sheet line 3 invalid by premise 2, and line 1 measured over all 38 histories
-  - **Before**: the apparatus `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs` (4335 lines, 11 unit tests / 12 mutations) was written per the old implementation that rolled back at mount and did not reclaim within a mount: eight families H0 / HR / HK / HK-F0 / HF / HX / HY / Hh; fork 1 had only been measured at S = 8 and at S = 4, ρ = 1, reclamation timing "real", hole position "after", k ≤ 2; at the start of work, unit tests U11 and U13 were already red (rollback at mount had been removed). The index row status was "partly run (2026-09-22 first and second segments + 2026-09-23 R2 first segment + 2026-09-24 R2 second and third segments (narrowed scope, only at the one geometry sampling point S=8, ρ=1), committed apparatus, deterministic, 5 unit tests / all 4 mutations caught; forks 2 and 7 run; one geometry cell of fork 3 run (X8 (the two measurement bases of small-pool exhaustion construction)-A not done); three hole count sampling points of fork 1 run (full S×ρ scan not done))"; the conclusion column as it was: K1 checked verbatim and matching (disk 0 accounting items 1/2/5 at 13/211955/1); fork 2: list L (4 places) missed 41 places caught by the command (`|M∖L|=41`); gate number 51 itself needs no change (data-driven), but the two-step explanation the registration gave itself missed one copy of a formula; fork 7 (rerun after the R2 first segment changed to reading only the judged mirror): G27 has zero false reports on 168 real legal states of H0/HR/HK (Q7b); discriminating-power self-test ① (not subtracting item 5) did not show the required color change on any of the 7 reachable bases tested in that segment (β0/β1/β2 and the four observation points of HK), triggering the registration's void clause, and the whole Q7a table was voided per the registration rule; Q7d-2/Q7d-3 ruled out the explanation "the measure itself cannot see 0" (on HK-F0 and β_syn the measure can detect 0), and the root cause was then narrowed to "item 5 of reachable legal states is never 0"; **this conclusion was overturned by the continued dispatch segment of the 3rd rerun on 2026-09-25**: after adding a new reachable base (`beta_hr_rollback_row`, the rollback row-writing step of the HR family, `family=HR kind=rollback_row txg=76`, item 5 exactly 0), self-proof ① changed color on a reachable base for the first time (`flips_red_to_green=true`); see the 2026-09-25 continued dispatch segment in "Historical Versions" on the experiment page; fork 3 (one HF geometry cell): the D_rel of G7 (public entry regrouping) and F-deduct (real implementation) are identical (both 0, non-empty publishes counted), with little difference (`max_diff=0≤3`), and K9 did not verify the expected 3; fork 1 (three Hh(k) hole count sampling points, k=0/1/2): the difference Δ between Q1a and Q1b rises monotonically with hole count by +50 per hole (20→70→120), crossing both the 2-slot and 1-slot thresholds from h=0, but the mechanism behind the h=0 baseline value 20 itself was not fully traced.
+  - **Before**: the apparatus `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs` (4335 lines, 11 unit tests / 12 mutations) was written per the old implementation that rolled back at mount and did not reclaim within a mount: eight families H0 / HR / HK / HK-F0 / HF / HX / HY / Hh; fork 1 had only been measured at S = 8 and at S = 4, ρ = 1, reclamation timing "real", hole position "after", k ≤ 2; at the start of work, unit tests U11 and U13 were already red (rollback at mount had been removed). The index row status was "partly run (2026-09-22 first and second segments + 2026-09-23 R2 first segment + 2026-09-24 R2 second and third segments (narrowed scope, only at the one geometry sampling point S=8, ρ=1), committed apparatus, deterministic, 5 unit tests / all 4 mutations caught; forks 2 and 7 run; one geometry cell of fork 3 run (X8 (the two measurement bases of small-pool exhaustion construction)-A not done); three hole count sampling points of fork 1 run (full S×ρ scan not done))"; the conclusion column as it was: K1 checked verbatim and matching (disk 0 accounting items 1/2/5 at 13/211955/1); fork 2: list L (4 places) missed 41 places caught by the command (`|M∖L|=41`); gate number 51 itself needs no change (data-driven), but the two-step explanation the registration gave itself missed one copy of a formula; fork 7 (rerun after the R2 first segment changed to reading only the judged mirror): G27 has zero false reports on 168 real legal states of H0/HR/HK (Q7b); discriminating-power self-test ① (not subtracting item 5) did not show the required color change on any of the 7 reachable bases tested in that segment (β0/β1/β2 and the four observation points of HK), triggering the registration's void clause, and the whole Q7a table was voided per the registration rule; Q7d-2/Q7d-3 ruled out the explanation "the measure itself cannot see 0" (on HK-F0 and β_syn the measure can detect 0), and the root cause was then narrowed to "item 5 of reachable legal states is never 0"; **this conclusion was overturned by the continued dispatch segment of the 3rd rerun on 2026-09-25**: after adding a new reachable base (`beta_hr_rollback_row`, the rollback row-writing step of the HR family, `family=HR kind=rollback_row txg=76`, item 5 exactly 0), self-proof ① changed color on a reachable base for the first time (`flips_red_to_green=true`); see the 2026-09-25 continued dispatch segment in "Historical Versions" on the experiment page; fork 3 (one HF geometry cell): the D_rel of G7 (public entry regrouping) and F-deduct (real implementation) are identical (both 0, non-empty publishes counted), with little difference (`max_diff=0≤3`), and K9 did not verify the expected 3; fork 1 (three Hh(k) hole count sampling points, k=0/1/2): the difference Δ between Q1a and Q1b rises monotonically with hole count by +50 per hole (20→70→120), crossing both the 2-slot and 1-slot thresholds from h=0, but the mechanism behind the h=0 baseline value 20 itself was not fully traced.
   - **After**: the apparatus rewritten entirely (5755 lines, 17 unit tests; nine new rows M35–M43 and three re-anchored rows M32–M34 in `crates/mutations.tsv`; the 22 rows pointing at this apparatus all red one by one in the repository copy in the draft directory): only the first segment (minimal reproduction of premises 1–3, PC-c2, two unit tests of the form that hangs on rollback) and the second segment (38 schedulable histories of Hh(k, position, S, ρ) × "real" and "every") run. Premise 1 holds, premise 2 does not (fork sheet line 3 invalid, not measured), and premise 3 holds only for the fork 2 family under the old formula; at the 12 sampling points of line 1, Q1c-front crosses 2 slots everywhere, and F1 triggers. The first segment hit stop S1(i) (the apparatus's existing control mirror, "after issuing, change back only the root slot", differed from the recorded cut segment by one system configuration sector per disk, because the implementation rotates the system configuration after the root slot), and per the S1 line "change the apparatus and write it into section twelve", the control mirror was changed to also change back both system configuration slots, handed to the main agent to accept. The experiment page body was replaced with the current state of the 4th rerun, and the bodies of the 1st–3rd reruns were moved unchanged into "Historical Versions" on the page.
   - **Basis**: rerun registration `e156-r4-prereg.md` (revisions 1 and 2 of section twelve); artifact `e156-alloc-basis-counts-2026-09-26.out`; running `bash scripts/experiment-apparatus/replay.sh` for E156 (Cost Figures for Four Alloc-Basis Forks), the E156 (Cost Figures for Four Alloc-Basis Forks) cell reports byte-identical; unit tests `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 17 passed; body [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md).
 
@@ -5152,7 +5215,7 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 ### 2026-09-23
 
 - E156 (Cost Figures for Four Alloc-Basis Forks) R2 rerun, first segment: R3 (G27 reads the mirror instead), two new history families HK/HK-F0, and the full Q7a–Q7f of fork 7
-  - **Before**: in the first- and second-segment apparatus `crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs` (2 unit tests / 1 mutation), neither side of G27 read the judged mirror: the base side read the in-memory allocator, and the bad mirror side read a triple passed in by the caller (still this reading after fixing the field-semantics-reversed defect recorded by C471 (the same field name in the artifact points to two opposite quantities on two paths)); there were only three bases β0/β1/β2; fork 7 discriminating-power self-proof ① did not change color on any of the three bases, and Q7a was voided per V3; S1(c) only ran the existing test files live, with no apparatus-side replay; forks 1, 3 and 7 were all open, and there were none of the Q7d/Q7e/Q7f/S9 kinds of quantities.
+  - **Before**: in the first- and second-segment apparatus `crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs` (2 unit tests / 1 mutation), neither side of G27 read the judged mirror: the base side read the in-memory allocator, and the bad mirror side read a triple passed in by the caller (still this reading after fixing the field-semantics-reversed defect recorded by C471 (the same field name in the artifact points to two opposite quantities on two paths)); there were only three bases β0/β1/β2; fork 7 discriminating-power self-proof ① did not change color on any of the three bases, and Q7a was voided per V3; S1(c) only ran the existing test files live, with no apparatus-side replay; forks 1, 3 and 7 were all open, and there were none of the Q7d/Q7e/Q7f/S9 kinds of quantities.
   - **After**: pre-run registration `e156-r2-prereg.md` (covering only lines 9, 11 and 12 of the fork sheet; this segment only does line 12). R3: a new function `allocated_minus_deferred_mismatches_referenced(pool, accounting_slot, referenced)` parses only mirror bytes; the old in-memory reading is kept for U8's mutation counterpart. Two new real history families HK / HK-F0 (β0→O→E→reopen without crash→O×4→raise F to the upper bound→O→administrator rollback→O→c2 crash and recover→O, covering all publish kinds of the skeleton publish; HK-F0 is the same sequence of operations but with `ReuseWindow::ForcedToZero`, R7's unreachable positive control), together with β0/β1/β2, β_syn (the β0 mirror with (item 1 −1, item 5 −1, item 2 +1)) and β_F0 make 9 bases, each run through Q7a (Bd(+1)/(−1)/(+8)), Q7c ①②, and PC-check-Bk1/Bk2/Bk3; five new kinds of quantities Q7d-1/Q7d-2/Q7d-3, Q7e, Q7f; S1(c) changed to the apparatus itself replaying the rollback quarantine scenario of `rollback_by_a_forward_publish.rs` and checking item by item with `assert_eq!`; the three anchors anchor 1/anchor 2/anchor 3 computed live in the apparatus and compared back against the implementation's same-named constants or geometry functions. While writing the apparatus, two gaps in its own implementation were found and fixed (before the artifact; see revisions 1 and 2 of "twelve" in `e156-r2-prereg.md`): ① HK's rollback target selection must filter the candidate set by `effective_rollback_floor`, not directly take the one with the smallest `checkpoint_txg` in `readable_roots` (after HK raised F, genesis is no longer a candidate); ② the allocator rebuilt inside `mount_writable`/`mount_rollback` resets `ReuseWindow` to the product default, so `set_reuse_window` must be called again after every mount/rollback. Naming discipline changed over 40 single-letter / letter-plus-digit identifiers (`g8_prime_is_red` and so on), and `naming-lint.sh` is all green. 4 unit tests (new `new_pool_file_creation_self_release_is_one_slot` and `red_check_reads_the_corrupted_mirror_not_the_live_allocator`); the mutation table has 3 entries for this bin cumulatively, all verified by hand red→green→restored green. Artifact `e156-alloc-basis-counts-2026-09-23-stage1.out` (324 lines, two live runs byte-identical), with `replay.sh:175` now pointing to it. **Conclusion**: Q7b: G27 has zero false reports on 168 reachable legal states (H0/HR/HK); Q7d-2 shows item 5 is never 0 in these 168 states (minimum 1); Q7d-3 (positive control) proves the measure can see 0 (detected on both HK-F0 and β_syn); Q7c ① still does not change color on any of the 7 reachable bases, only on the 2 unreachable bases (β_syn, β_F0); per registration V3, **the whole Q7a table is still void**: continuing fork 7 (line 12 of the fork sheet) cannot flip it, and whether to change the criterion or accept it is handed to the main agent. HK-F0's raise-F probe hit S9 (the candidate root's tree table unreadable; under `ForcedToZero` genesis's tree table unit was reused too early) and stopped at that cell, which does not affect the verdicts already reported.
   - **Basis**: pre-run registration `e156-r2-prereg.md`; artifact `e156-alloc-basis-counts-2026-09-23-stage1.out`; rerun `bash scripts/experiment-apparatus/replay.sh E156` (Cost Figures for Four Alloc-Basis Forks) reports byte-identical; unit tests `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 4 passed; the 3 entries for this bin in mutation table `crates/mutations.tsv` verified one by one by hand; body [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md).
 
@@ -5175,6 +5238,12 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 - See the same-day entry "E155 (Write Volume per Persistence: Three Fsync Forms and Counterfactual Upper Bounds)…" in the E155 (Write Volume per Persistence: Three Fsync Forms and Counterfactual Upper Bounds) section.
 
 ## E158 (Four Forks for Root Selection and Repair)
+
+### 2026-11-20
+
+- The apparatus was changed in the crates code split and the lint closeout of the apparatus package and has not been formally run since: a paragraph in the section "What it cannot answer" of the experiment page says so, and the review dates of all rows of the table of decisions affected were set to the current day; the numbers the apparatus measured, the conclusions and the artifacts are unchanged.
+  - **Basis**: `scripts/experiment-apparatus/on-request-experiments.tsv` registers E158 (Four Forks for Root Selection and Repair) as run on request; the evidence-in-repo cell of gate doc-experiments requires that, when the apparatus changed and there is no new artifact, the lines newly added to the experiment page say that it has not been formally run.
+  - **Before**: `git show HEAD:.claude/kb/experiments/158-择根与修复四岔路.md`, the section "What it cannot answer" and the table of decisions affected.
 
 ### 2026-11-12
 
@@ -5257,7 +5326,7 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
     Φ1 fault injection, PC1-a/PC1-b, or Q1-1 to Q1-4, and there was not a single number; fork sheet line 2 (C331 (Root selection inversion overrides acknowledged writes) ①②)
     likewise had not a single number.
   - **After**: the main agent's message "keep going, this segment has not yet delivered the numbers the fork sheet needs, don't stop"; in
-    `crates/singlefs-verification/src/bin/e158_root_choice_repair.rs` about 500 lines added: H1 family enumeration (`h1_family`:
+    `crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs` about 500 lines added: H1 family enumeration (`h1_family`:
     n1∈{1,2,3}, j taking each readable root, m∈{0,1,2}), Φ1 fault injection (`attempt_op1`: precise injection by (device, offset), with the placement looked up fresh by
     `locate_allocation_record_tree` in two branches, tree table 0 entries / non-0), and PC1-a/PC1-b (`run_pc1_a_and_b`).
     **A bug was found and fixed along the way (before the artifact)**: `root_record_of` first fed `RootView::record_bytes` (truncated to 457
@@ -5327,6 +5396,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E159 (Fsync Latency vs Concurrency: Group Commit and WAL Arms)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (1 places): references to the whole apparatus now name `main.rs` in the same-named directory; 1 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e159_fsync_wait_group_commit.rs` → `scripts/experiment-apparatus/e159_fsync_wait_group_commit/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/159-fsync等待时间随并发数组提交与wal两臂.md`, the affected-decisions table.
+
 ### 2026-10-17
 
 - The heading "results copied whole from the artifact" gains the parenthetical "(lines whose artifacts have left the workspace are written as one pointer line)"; the parenthetical of the pointer line for the smoke run evidence changed from an empty `name=` to that line's actual form `E7RESULT E159RESULT arm=yi-M-K10`; conclusion, numbers and artifacts unchanged.
@@ -5344,6 +5422,12 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 ## E160 (Random Small Read Share: Three Sources and Synthesis of Reopening Criteria)
 
 ## E161 (Deduplication and Segmentation Timing of Crash Amplification)
+
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/161-崩溃放量的去重与分段耗时.md`, the affected-decisions table.
 
 ### 2026-10-26
 
@@ -5375,10 +5459,19 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 - E161 (Deduplication and Segmentation Timing of Crash Amplification) feasibility tier
   - **Before**: there was only the pre-run registration `research/prompts/e161-preregistration.md`, with no apparatus, artifact or experiment page.
-  - **After**: committed apparatus `crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs` (13 unit tests, 12 mutations appended to `crates/mutations.tsv`); per the user's decision only the feasibility tier was run (all of each segment of the first stream with fewer than 26 writes, the full domain of the A-two quick tier of both streams, and 4096 segment heads for each of the two 26-write segments); stop clauses S1–S6, all anchors of registration section seven, and the state-by-state differential against crates all pass; G1–G5 not judged.
+  - **After**: committed apparatus `crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs` (13 unit tests, 12 mutations appended to `crates/mutations.tsv`); per the user's decision only the feasibility tier was run (all of each segment of the first stream with fewer than 26 writes, the full domain of the A-two quick tier of both streams, and 4096 segment heads for each of the two 26-write segments); stop clauses S1–S6, all anchors of registration section seven, and the state-by-state differential against crates all pass; G1–G5 not judged.
   - **Basis**: 12.2 of registration section twelve (the user decided to verify feasibility only); artifact `e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out`.
 
 ## E162 (Storage Backend Selection for Crash Amplification Judgment)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (1 places): references to the whole apparatus now name `main.rs` in the same-named directory.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e162_crash_verdict_block_store.rs` → `scripts/experiment-apparatus/e162_crash_verdict_block_store/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/162-崩溃放量判定块存储选型.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/162-崩溃放量判定块存储选型.md`, the affected-decisions table.
 
 ### 2026-09-28
 
@@ -5415,6 +5508,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Basis**: pre-run registration `e163-preregistration.md`; artifacts `research/results/e163-gpu-multicard-crc32c-2026-09-27-{r1,r2,f1,f2,r1-merge}.out`.
 
 ## E164 (Small-Scale Functional Testing of New Crash Amplification Design)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (2 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs` → `scripts/experiment-apparatus/e164_crash_amplification_design_function_test/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/164-崩溃放量新设计的小范围功能测试.md`, the affected-decisions table.
 
 ### 2026-10-17
 
@@ -5501,6 +5603,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E166 (Shared State Partitioning for Parallel Commits)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (3 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split; 1 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition.rs` → `scripts/experiment-apparatus/e166_parallel_commit_shared_state_partition/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/166-并行提交的共享状态分法.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/166-并行提交的共享状态分法.md`, the affected-decisions table.
+
 ### 2026-10-01
 
 - E166 (Shared State Partitioning for Parallel Commits) page created, first segment run
@@ -5513,6 +5624,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Before**: `git show ce1457c3:.claude/kb/experiments-history.md` (as it was before the 2026-10-12 document iron-rule fix: numbers in this block gained short names and clashing local arm names were lowercased; the original sentences are in this version)
 
 ## E167 (Crash Enumeration Partitioning for Multiple In-Flight Publishes)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (5 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split; 3 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e167_multi_inflight_crash_cut.rs` → `scripts/experiment-apparatus/e167_multi_inflight_crash_cut/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/167-多在飞发布的崩溃枚举切法.md`, the affected-decisions table.
 
 ### 2026-10-15
 
@@ -5530,6 +5650,12 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E168 (Ring Window for Borrowing Reserve Capacity on Deletion)
 
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/168-删除借保留量的环窗口.md`, the affected-decisions table.
+
 ### 2026-10-17
 
 - The segment1 row of the artifact table gains "not committed: 115 MB, ignored by line 32 of .gitignore, only on the machine that ran it"; conclusion, numbers and artifacts unchanged.
@@ -5543,7 +5669,7 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 ### 2026-10-01
 
 - E168 (Ring Window for Borrowing Reserve Capacity on Deletion) page created, apparatus written
-  The runners of the first two dispatches did not hand back; the third took over and wrote the committed apparatus `crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs` (the deletion entry in the main workspace copy is a stub), the deletion path patch table `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv` (19 rows), 11 unit tests, and 15 apparatus mutation rows at the end of `crates/mutations.tsv`, all compiling; unit tests, mutations and the first-segment artifact were not run (checker tier), status "in progress (apparatus)".
+  The runners of the first two dispatches did not hand back; the third took over and wrote the committed apparatus `crates/singlefs-implementation-experiments/src/bin/e168_delete_ring_window_borrow/main.rs` (the deletion entry in the main workspace copy is a stub), the deletion path patch table `scripts/mutation/tables/e168_delete_ring_window_borrow_delete_path.tsv` (19 rows), 11 unit tests, and 15 apparatus mutation rows at the end of `crates/mutations.tsv`, all compiling; unit tests, mutations and the first-segment artifact were not run (checker tier), status "in progress (apparatus)".
 
 ### 2026-10-03
 
@@ -5554,6 +5680,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Basis**: the verdict line at line 177053 and the minimal counterexample at line 25777 of the segment1 artifact; the main agent split the refusals by arm on the committed artifact, `39 N-A landing 0`, `26 N-B no_space_after_raising_the_floor 0`; the user's pop-up choices "rerun on the real implementation after it is merged (recommended)" and "keep s1/positive controls, segment1 not in (recommended)".
 
 ## E169 (Append Discipline and Prefix Recovery for Parallel Commits)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (8 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split; 1 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery.rs` → `scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/169-并行提交的追加纪律与前缀恢复.md`, the affected-decisions table.
 
 ### 2026-10-01
 
@@ -5566,6 +5701,12 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Before**: `git show ce1457c3:.claude/kb/experiments-history.md` (as it was before the 2026-10-12 document iron-rule fix: numbers in this block gained short names and clashing local arm names were lowercased; the original sentences are in this version)
 
 ## E170 (First Version of O3 (independent specification executor))
+
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/170-O3规约执行器第一版.md`, the affected-decisions table.
 
 ### 2026-10-17
 
@@ -5729,6 +5870,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E172 (Dry Run of Bytes Written by Deletion)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (3 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e172_deletion_write_dry_run.rs` → `scripts/experiment-apparatus/e172_deletion_write_dry_run/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/172-删除写出的字节的干跑.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/172-删除写出的字节的干跑.md`, the affected-decisions table.
+
 ### 2026-11-02
 
 - Third rerun, third segment: the product `research/results/e172-r3-deletion-write-dry-run-2026-11-02.out` (966 lines) ran and row 2 of the question sheet `research/prompts/m3-close-b19-p5-forks.md` is decided as A. The page heading, the index row and the body now carry the third run's current status (pinned-value layer, provision layer, the discriminating arm R-ret, the 25 positive-control pairs, the eight A-journal mismatches, 52 unit tests, and all 49 mutations caught); the second run's current status, what was done, replay, verdict, readings, A-journal and unit tests and mutations moved into the second-run entry of the page's historical versions (the quoted second-product lines became pointers), items 10–13 were added to "What this cannot answer", the source line numbers of the paths and conclusions register were updated to current values, and two rows (D3 (Space Allocation) settled item 2 and D8 (Core Index Structure) settled item 9, both supporting material) were added to "Decisions affected" while every other row was reviewed again (unaffected).
@@ -5781,6 +5931,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E173 (Three Treatments for Upper Bound Blocked on Bad Slots)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (3 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs` → `scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/173-上限卡在读坏槽的三种处置.md`, the affected-decisions table.
+
 ### 2026-11-13
 
 - E173 (Three Treatments for Upper Bound Blocked on Bad Slots) rerun 2 (segment one reproduced on today's `crates/`, only line 2921 of the rerun table rerun) has been run: question one judged candidate ①, the new artifact differs from the 2026-11-02 one only in two `g_min_trial` lines, only in the outcome name inside `end=` (`NoSpaceAfterRaisingTheFloor` to `NoSpaceEvenWithEverythingAFloorRaiseCouldRelease`); question two judged candidate ①, R3 to R7 (27 X3 lines of nine geometries, G-min choice, `excess_slots` of X5, n_code = 21 of `s16_g_1`, segment-two geometry constant table) all unchanged, cited numbers unchanged; void clauses RV1 to RV7 not triggered, but the RV4 whole-tree hashes were not taken and a weaker file-time check replaced them; the page gains a "Rerun 2" part, status gains "rerun 2 done", five rows of "Affected Decisions" get new review dates with relationships unchanged; rerun table line 2921 now points to `…-2026-11-13-r2.out`
@@ -5807,6 +5966,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E174 (Wait and GPU Memory Return on Lost IOU)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (1 places): references to the whole apparatus now name `main.rs` in the same-named directory.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return.rs` → `scripts/experiment-apparatus/e174_lease_drop_wait_memory_return/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/174-借据丢掉时等待与显存回还.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/174-借据丢掉时等待与显存回还.md`, the affected-decisions table.
+
 ### 2026-10-17
 
 - The rerun block now starts from scripts/experiment-apparatus instead of `cd research`; the run command that goes onto the card changed to start through `scripts/experiment-apparatus/device-code-key.py run` per the apparatus file header, and the judging command now runs at the repository root; conclusion, numbers and artifacts unchanged.
@@ -5830,9 +5998,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E175 (Inode Number Watermark Rollback and Reissuance on Product Path)
 
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source, and task numbers and batch numbers were removed from the body; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md`, the affected-decisions table.
+
 ### 2026-11-09
 
-- The apparatus of E175 (Inode Number Watermark Rollback and Reissuance on Product Path) became the verification crate bin `crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs`, and the old file and directory are deleted; the replay notes, apparatus and source locations, and test and mutation status on the page now describe this bin: `driver_e175` runs `cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression` directly, with the environment variables unchanged; the entry argument `summarize` is new, and `E175_RESULT_FILE` and `E175_SUMMARY_FILE` are now required (a bin target has no `CARGO_TARGET_TMPDIR`); the row key of the registered replay row is built from the closure of function units (5831 units for this row); the retained artifact `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` is byte-identical to the bin's result lines. Conclusions, numbers and artifacts unchanged.
+- The apparatus of E175 (Inode Number Watermark Rollback and Reissuance on Product Path) became the verification crate bin `crates/singlefs-implementation-experiments/src/bin/e175_product_path_inode_watermark_regression/main.rs`, and the old file and directory are deleted; the replay notes, apparatus and source locations, and test and mutation status on the page now describe this bin: `driver_e175` runs `cargo run --release -p singlefs-verification --bin e175_product_path_inode_watermark_regression` directly, with the environment variables unchanged; the entry argument `summarize` is new, and `E175_RESULT_FILE` and `E175_SUMMARY_FILE` are now required (a bin target has no `CARGO_TARGET_TMPDIR`); the row key of the registered replay row is built from the closure of function units (5831 units for this row); the retained artifact `e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` is byte-identical to the bin's result lines. Conclusions, numbers and artifacts unchanged.
   - **Basis**: user settlement 「1 2都要彻底改」 (`records/2026-11-06-门禁判定全部入库.md`, section 「批 13」); task 11045, replay verdict “byte-identical 1”; task 11055, changing the `main` of this bin changes the key, while changing the `main` of the E183 (Capacity Slope, Read Cache Small-Disk Admission, and Sweep Cost Metrics) bin or an unrelated test file leaves it unchanged.
   - **Before**: `git show HEAD:scripts/experiment-apparatus/e175_product_path_inode_watermark_regression/device-source.rs`.
 
@@ -5862,6 +6036,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E176 (Capacity and Write Cost of Three Inode Leaf Merge Candidates)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (2 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites.rs` → `scripts/experiment-apparatus/e176_inode_leaf_merge_capacity_and_rewrites/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md`, the affected-decisions table.
+
 ### 2026-10-17
 
 - The rerun block now starts from scripts/experiment-apparatus instead of `cd research`, with the scripts/hosts and scripts/mutation paths changed along with it, and the mutation table pointing to scripts/mutation/tables/; conclusion, numbers and artifacts unchanged.
@@ -5882,6 +6065,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E177 (Resurrection Count Without Per-Tree Tombstones)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (4 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones.rs` → `scripts/experiment-apparatus/e177_per_tree_resurrection_without_tombstones/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/177-逐树不写墓碑的复活数.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/177-逐树不写墓碑的复活数.md`, the affected-decisions table.
+
 ### 2026-10-17
 
 - The rerun block now starts from scripts/experiment-apparatus instead of `cd research`, with the scripts/hosts and scripts/mutation paths changed along with it, and the mutation table pointing to scripts/mutation/tables/; conclusion, numbers and artifacts unchanged.
@@ -5897,6 +6089,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Basis**: K1 "how F1 and F2 are judged" and K4 (the G-tight reason sentence, the affected decisions table) in section two of the verdict `research/prompts/m3-leaf-death-r1-main-verification.md`; the subsection on F2 in section two of `research/prompts/m3-leaf-death-r2-main-verification.md` (the judgment that F2 is hit stands, with impact only on the experiment page's wording); section five and the decision review of `research/prompts/m3-leaf-death-r3-main-verification.md`.
 
 ## E178 (Counts of Leaf Containers and Record Death)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (9 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e178_leaf_and_record_death_counts.rs` → `scripts/experiment-apparatus/e178_leaf_and_record_death_counts/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/178-叶容器与记录死亡的计数.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/178-叶容器与记录死亡的计数.md`, the affected-decisions table.
 
 ### 2026-10-17
 
@@ -5933,12 +6134,24 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E180 (Acceptance Reading vs Truly Writable Amount)
 
+### 2026-11-20
+
+- The apparatus was changed in the crates code split and has not been formally run since: a paragraph in the section "What it cannot answer" of the experiment page says so, and the review dates of all rows of the table of decisions affected were set to the current day; the numbers the apparatus measured, the conclusions and the artifacts are unchanged.
+  - **Basis**: `scripts/experiment-apparatus/on-request-experiments.tsv` registers E180 (Acceptance Reading vs Truly Writable Amount) as run on request (settled by the user, `records/2026-11-17-里程碑四收口续做.md`, line 255); the evidence-in-repo cell of gate doc-experiments requires that, when the apparatus changed and there is no new artifact, the lines newly added to the experiment page say that it has not been formally run.
+  - **Before**: `git show HEAD:.claude/kb/experiments/180-准入读数与真可写量.md`, the section "What it cannot answer" and the table of decisions affected.
+
 ### 2026-10-21
 
 - Newly set up, not run: page created and registered in the experiments.md index. The first-segment reading apparatus, 45 unit tests, 22 mutation rows and the 29-shard long-run script `scripts/experiment-apparatus/e180-reading-shards.sh` written; neither of the two long reading runs finished, the shards are outside the repository and not committed, and there is no artifact; the second-segment held-position apparatus not written. Pre-run registration `research/prompts/e180-preregistration.md` (revisions 1–4 in section twelve: three columns of verdicts added for states where T is truncated by the journal record ceiling, large bytes stripped from the probe's session copy, six deviations of the first segment, and truncated states tightened on demand with the first segment run in shards and then merged).
-  - **Basis**: the four rows F2, F5, F6 and F8 of the fork sheet `research/prompts/m3-close-admission-and-shadow-ledger-forks.md`; lines 230 and 310 of the dispatch record `records/2026-10-18-里程碑三收尾与近期欠账.md` (the two long runs did not finish and were stopped); apparatus `crates/singlefs-verification/src/bin/e180_admission_reading_versus_writable_bytes.rs` (`grep -c '#\[test\]'` = 45), and the 22 rows in `crates/mutations.tsv` whose names start with lowercase `e180`.
+  - **Basis**: the four rows F2, F5, F6 and F8 of the fork sheet `research/prompts/m3-close-admission-and-shadow-ledger-forks.md`; lines 230 and 310 of the dispatch record `records/2026-10-18-里程碑三收尾与近期欠账.md` (the two long runs did not finish and were stopped); apparatus `crates/singlefs-implementation-experiments/src/bin/e180_admission_reading_versus_writable_bytes/main.rs` (`grep -c '#\[test\]'` = 45), and the 22 rows in `crates/mutations.tsv` whose names start with lowercase `e180`.
 
 ## E181 (Landing Determination and Mount Lower Bound)
+
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/181-落得下那一判与挂载下界.md`, the affected-decisions table.
 
 ### 2026-11-10
 
@@ -5953,9 +6166,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E182 (Three Forks for Unreadable Abandoned Roots)
 
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/182-被抛弃根读不出的三条岔路.md`, the affected-decisions table.
+
 ### 2026-10-18
 
-- Newly set up, first-segment apparatus written, artifact not run: page created, pre-run registration `research/prompts/e182-preregistration.md` (revisions 12.1 to 12.10 in section twelve: the resume key replaced with the function unit closure fingerprint, wall clock rewritten per measurement, the identity of a dropped disk in single-disk recovery still present but unreadable, `Overwrite` taking `publish_overwrite`, states taking only two states, how the positive controls run, arm artifact names, mutation rows, unit tests could not run, `walk.rs` fingerprint differing from the registration); committed apparatus `crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs`, long-run script `scripts/experiment-apparatus/e182-single-device-long-run.sh`, 6 mutation rows; unit tests handed to the main agent to run, and the first-segment artifacts (B1, B4) and the second segment (B2) not run.
+- Newly set up, first-segment apparatus written, artifact not run: page created, pre-run registration `research/prompts/e182-preregistration.md` (revisions 12.1 to 12.10 in section twelve: the resume key replaced with the function unit closure fingerprint, wall clock rewritten per measurement, the identity of a dropped disk in single-disk recovery still present but unreadable, `Overwrite` taking `publish_overwrite`, states taking only two states, how the positive controls run, arm artifact names, mutation rows, unit tests could not run, `walk.rs` fingerprint differing from the registration); committed apparatus `crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks/main.rs`, long-run script `scripts/experiment-apparatus/e182-single-device-long-run.sh`, 6 mutation rows; unit tests handed to the main agent to run, and the first-segment artifacts (B1, B4) and the second segment (B2) not run.
   - **Basis**: the three rows B1, B2 and B4 of the fork sheet `research/prompts/m3-close-admission-and-shadow-ledger-forks.md`, dispatch record `records/2026-10-18-里程碑三收尾与近期欠账.md`.
 
 ### 2026-10-19
@@ -6001,10 +6220,16 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ### 2026-10-18
 
-- Newly set up, first segment (H4) run: page created, pre-run registration `research/prompts/e183-preregistration.md` (three revisions in section twelve: the empty-pool half of PC-admission counted as one loss per the original text of V33, a positive control PC-admission-file added, and the empty-pool half of K32 judged only at the `writable_mount` entry while the `before_a_publish` entry is recorded per G8), committed apparatus `crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs`, artifacts `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` and `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`; the V33 empty-pool half is hit, the 4 items of PC-admission-file hold, H4 is enough to judge, and the second to fourth segments (H2, H5, H3) not run.
+- Newly set up, first segment (H4) run: page created, pre-run registration `research/prompts/e183-preregistration.md` (three revisions in section twelve: the empty-pool half of PC-admission counted as one loss per the original text of V33, a positive control PC-admission-file added, and the empty-pool half of K32 judged only at the `writable_mount` entry while the `before_a_publish` entry is recorded per G8), committed apparatus `crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs`, artifacts `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18.out` and `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h4-2026-10-18-anchor-check.out`; the V33 empty-pool half is hit, the 4 items of PC-admission-file hold, H4 is enough to judge, and the second to fourth segments (H2, H5, H3) not run.
   - **Basis**: the H4 row of the question sheet `research/prompts/m3-close-cost-measurement-questions.md`, dispatch record `records/2026-10-18-里程碑三收尾与近期欠账.md`.
 
 ## E184 (Cost Counts of Regular Layer and Large Workload Layer)
+
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/184-常规层与大负载层的代价计数.md`, the affected-decisions table.
 
 ### 2026-10-26
 
@@ -6027,7 +6252,7 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ### 2026-10-19
 
-- Newly set up, first segment (J1, corresponding to fork G1) run: page created, pre-run registration `research/prompts/e184-preregistration.md` (ten revisions in section twelve: revision 1 calls `crash_points_of_the_steps` directly, revision 6 switches the overwrite chains u = 4 and 16 to sequential writes, revision 10 does not schedule expansions whose block count upper bound exceeds 2^26), committed apparatus `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts.rs` and `crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts_write_dump.rs`, long-run script `scripts/experiment-apparatus/e184-segment-one-long-run.sh`, artifact `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out` (950 lines, 17 of 18 items judged fresh); J1-B random history by step count tier: overlap, overlap, partial, separate (the step count row recorded as unstable), overwrite chains separate at all three tiers, J1-C all independent, 9 streams cannot be extracted, and anchor B1 triggers failure clause F6; G1 is enough to judge, and the second to fourth segments (J3, J2, J4) not run.
+- Newly set up, first segment (J1, corresponding to fork G1) run: page created, pre-run registration `research/prompts/e184-preregistration.md` (ten revisions in section twelve: revision 1 calls `crash_points_of_the_steps` directly, revision 6 switches the overwrite chains u = 4 and 16 to sequential writes, revision 10 does not schedule expansions whose block count upper bound exceeds 2^26), committed apparatus `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts/main.rs` and `crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts_write_dump.rs`, long-run script `scripts/experiment-apparatus/e184-segment-one-long-run.sh`, artifact `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out` (950 lines, 17 of 18 items judged fresh); J1-B random history by step count tier: overlap, overlap, partial, separate (the step count row recorded as unstable), overwrite chains separate at all three tiers, J1-C all independent, 9 streams cannot be extracted, and anchor B1 triggers failure clause F6; G1 is enough to judge, and the second to fourth segments (J3, J2, J4) not run.
   - **Basis**: the J1 row of the question sheet `research/prompts/m3-close-c409-cost-questions.md`, the G1 row of the fork sheet `research/prompts/m3-close-c409-r1-forks.md`, dispatch record `records/2026-10-18-里程碑三收尾与近期欠账.md`.
 - The rerun table registers the deterministic shard: `E184|@driver_e184||e184-regular-layer-cost-counts-selfcheck-2026-10-19.out|exact` (`selfcheck`; the kept artifact `research/results/e184-regular-layer-cost-counts-selfcheck-2026-10-19.out` is lines 31 to 69 of the whole artifact plus a closing line added by the driver); the other items contain wall-clock fields and are not registered.
   - **Basis**: lines 30 to 69 of artifact `research/results/e184-regular-layer-cost-counts-segment-one-2026-10-19.out`.
@@ -6035,6 +6260,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Basis**: lines 7931, 7932, 19065 and 19066 of artifact `research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h5-2026-10-19.out`, and the line "main agent judges five places in E183 before running artifacts" in the dispatch record `records/2026-10-18-里程碑三收尾与近期欠账.md`.
 
 ## E185 (Wall-Clock Breakdown of a Batch of GC Migrations)
+
+### 2026-11-19
+
+- The current-state line at the top of the page and `registered_apparatus_sha256` in the three launch scripts `scripts/experiment-apparatus/e185-r2-segment-run.sh`, `e185-r3-segment-run.sh` and `e185-r4-segment-run.sh` re-pinned to the freshly computed `d312b9aa71d0518976fd383b48300705f4598d2e79d4a3d59488657e684a51eb` (apparatus `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs`, 26562 lines, 240 `#[test]`, computed three times with the same result); conclusions, numbers and artifacts unchanged. Since the previous pin the apparatus gained 827 lines and lost 27; whether the measurement method and criteria moved was not checked place by place.
+  - **Basis**: item 22 of section 224 of the old ledger `records/2026-11-17-subagent账本自上而下清欠.md` (registered a5b48b73, computed d312b9aa); item 4 of the write-back clerk report `~/.local/share/singlefs/work/ledger-open-kb-writeback/result.md`; the three launch scripts were really swapped in by the swap tool (outcome 「换上了 3 份」), and after the swap the self-tests of all three exit 0.
+  - **Before**: the pin `a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082` (second item of the 2026-11-02 block in the same section).
+- The re-pin of the same day withdrawn: the `registered_apparatus_sha256` of the three launch scripts is back to the value each registration's section 12 writes (second rerun `0bd22743…`, third rerun `4368c0e7…`, fourth rerun `9e813cbd…`); the current-state line at the top of the page now says the apparatus was changed after the registration, section 12 has no revision line, and a start stops under the stop clause with exit 3; the apparatus still computes `d312b9aa…`.
+  - **Basis**: item 13 of「二、判决」in the first-round governance verdict `research/prompts/ledger-open-fixes-governance-r1-main-verification.md`: the re-pin turned stop clauses K-S6 and J-S7 into running anyway; the fourth-rerun registration `research/prompts/e185-r4-prereg.md:579`, section 12 of the second and third rerun registrations in `git show a24379563^:research/prompts/e185-r2-prereg.md` and `git show a24379563^:research/prompts/e185-r3-prereg.md`.
+  - **Before**: the pin `d312b9aa71d0…` written earlier the same day.
 
 ### 2026-11-02
 
@@ -6231,10 +6465,19 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ### 2026-10-19
 
-- Newly set up, apparatus written, not run: page created, pre-run registration `research/prompts/e185-preregistration.md` (section twelve records only 12.1: the mutation table lands in `crates/mutations.tsv`, criteria untouched); committed apparatus `crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs` with four subcommands and 45 inline unit tests written, and 22 mutation rows appended to `crates/mutations.tsv`; unit tests, the three mutation numbers and the four segments' artifacts all not run.
+- Newly set up, apparatus written, not run: page created, pre-run registration `research/prompts/e185-preregistration.md` (section twelve records only 12.1: the mutation table lands in `crates/mutations.tsv`, criteria untouched); committed apparatus `crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs` with four subcommands and 45 inline unit tests written, and 22 mutation rows appended to `crates/mutations.tsv`; unit tests, the three mutation numbers and the four segments' artifacts all not run.
   - **Basis**: line 1 of the question sheet `research/prompts/m4-gpugc-measure-forks.md` and the single-run half of line 4 (the forks this dispatched segment must answer), dispatch record `records/2026-10-19-里程碑四GPU垃圾回收开工.md`.
 
 ## E186 (Unknown Trees: Accounting Dimension Rederived)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (4 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split; 3 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive.rs` → `scripts/experiment-apparatus/e186_unknown_tree_accounting_rederive/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/186-不认识的树-记账维重推.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/186-不认识的树-记账维重推.md`, the affected-decisions table.
 
 ### 2026-10-20
 
@@ -6248,6 +6491,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Before**: status "run (Q1 and Q2 enough to judge; all 17 mutations in the table caught)".
 
 ## E187 (Cost of Persisting Quarantine Marks)
+
+### 2026-11-20
+
+- The apparatus was changed in the crates code split and the lint closeout of the apparatus package and has not been formally run since: a paragraph in the section "What it cannot answer" of the experiment page says so, and the review dates of all rows of the table of decisions affected were set to the current day; the numbers the apparatus measured, the conclusions and the artifacts are unchanged.
+  - **Basis**: `scripts/experiment-apparatus/on-request-experiments.tsv` registers E187 (Cost of Persisting Quarantine Marks) as run on request; the evidence-in-repo cell of gate doc-experiments requires that, when the apparatus changed and there is no new artifact, the lines newly added to the experiment page say that it has not been formally run.
+  - **Before**: `git show HEAD:.claude/kb/experiments/187-隔离落盘代价.md`, the section "What it cannot answer" and the table of decisions affected.
+- The old single-file path in the sentences that state the current situation is changed to the path after the split: the line "Apparatus" at the top of the page names `scripts/experiment-apparatus/e187_quarantine_mark_cost/main.rs` and the module files in the same directory, the mutation command of the section on reruns uses `e187_quarantine_mark_cost/main.rs`, and the two source anchors of the registry of paths and conclusions name the files and lines after the split; the sentences that tell what those runs did and the copied commands and outputs still carry the single-file path of that time.
+  - **Basis**: the move register `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e187_quarantine_mark_cost.rs` moved to `scripts/experiment-apparatus/e187_quarantine_mark_cost/main.rs`; step 5 of "How to do it" in `.claude/rules/path-moves.md`: sentences about the move itself keep the old path, sentences about the current situation take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/187-隔离落盘代价.md`, the line "Apparatus" at the top of the page, the mutation command of the section on reruns and the source anchors of the registry of paths and conclusions.
 
 ### 2026-11-08
 
@@ -6266,12 +6518,20 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 - Newly set up, first segment run, second segment and mutation table not run: page created, pre-run registration `research/prompts/e187-preregistration.md` (revisions one to five in section twelve, written after the unit tests and before the artifact; revision one refines the model's two placement rules per `crates/`, for the main agent to accept), apparatus `scripts/experiment-apparatus/e187_quarantine_mark_cost.rs` (30 unit tests, plus 2 thread registration slots), mutation table `scripts/mutation/tables/e187_quarantine_mark_cost.tsv` (17 entries, not run), first-segment artifact `research/results/e187-quarantine-mark-cost-segment-one-2026-10-21.out` (250 lines), rerun table registration `E187|e187-quarantine-mark-cost|segment-one|e187-quarantine-mark-cost-segment-one-2026-10-21.out|exact`. Status "partly run (first segment run; second-segment workload and mutation table not run)".
   - **Basis**: that row of the fork sheet `research/prompts/m4-i315-quarantine-mark-cost-forks.md`, the m4-i315-quarantine-mark-cost section of batch `records/2026-10-13-里程碑四预开发.md`; the second segment (320 cells × three arms) ran 42 cells in 225 s in the foreground with this host fully loaded, handed to the main agent to start.
 
+## E197 (Ring scan glue memory by device count)
+
+### 2026-11-20
+
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/197-扫环胶水内存随盘数.md`, the affected-decisions table.
+
 ## E198 (Premise for number-acquisition skips by birth generation)
 
 ### 2026-11-11
 
 - The apparatus closing line changed from `name=done result_lines=` to `name=done emitted=` (counting the closing line itself) and both segments were re-produced: segment one `research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-10.out` (task 13021, 1445 lines), segment two `research/results/e198-instance-table-pointer-birth-skip-premise-segment-two-2026-11-10.out` (task 13022, 2107 lines); unit-test task 12588 passed all 26; compared line by line with the old artifacts only the last line differs. The two E198 rows of `replay.sh` now point to the new artifact names; the page got one bullet in "Current state", the two "Replay" commands now name the new artifacts, and the two "Decisions affected" rows were reviewed again; the state and the judgements of both rows of the question sheet are unchanged.
-  - **Basis**: apparatus `crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs:4770-4771`; old artifacts `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out`, `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-two.out`.
+  - **Basis**: apparatus `crates/singlefs-implementation-experiments/src/bin/e198_instance_table_pointer_birth_skip_premise/main.rs:300-301` (before the split: `HEAD:crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs:4770-4771`); old artifacts `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-one-2026-11-02.out`, `git show 84b4ae23f^:research/results/e198-instance-table-pointer-birth-skip-premise-segment-two.out`.
 
 ### 2026-11-05
 
@@ -6289,10 +6549,19 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ### 2026-10-29
 
-- Created, apparatus written, artifact not run: page created; pre-registration `research/prompts/e198-preregistration.md` (section 12 revision 1 follows the main agent's decisions on the four pending items in the dispatch prompt: the product default sweep threshold changes from 369 to 365 and G1 uses 365; revision 2 fixes the sampling points and unit tests of V4 and V7), in-repo apparatus `crates/singlefs-verification/src/bin/e198_instance_table_pointer_birth_skip_premise.rs` (25 unit tests, written in the runner's scratch directory; compiling and unit tests belong to the main agent), 9 mutation rows staged in the scratch directory, rerun table rows `E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one.out|exact` and `E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact`. State "apparatus written, artifact not run".
+- Created, apparatus written, artifact not run: page created; pre-registration `research/prompts/e198-preregistration.md` (section 12 revision 1 follows the main agent's decisions on the four pending items in the dispatch prompt: the product default sweep threshold changes from 369 to 365 and G1 uses 365; revision 2 fixes the sampling points and unit tests of V4 and V7), in-repo apparatus `crates/singlefs-implementation-experiments/src/bin/e198_instance_table_pointer_birth_skip_premise/main.rs` (25 unit tests, written in the runner's scratch directory; compiling and unit tests belong to the main agent), 9 mutation rows staged in the scratch directory, rerun table rows `E198|@driver_e198||e198-instance-table-pointer-birth-skip-premise-segment-one.out|exact` and `E198|@driver_e198_segment_two||e198-instance-table-pointer-birth-skip-premise-segment-two.out|exact`. State "apparatus written, artifact not run".
   - **Basis**: both rows of question sheet `research/prompts/m3-close-b19-c699-forks.md`, batch 19-3 of `records/2026-10-18-里程碑三收尾与近期欠账.md`; stop clause S5 is expected from reading the code to fire in segment two and its wording is for the main agent, recorded in the page's "Current state" and in the runner's report `~/.local/share/singlefs/work/m3-close-b19-e198-run/result.md`.
 
 ## E199 (Cost of Copying the Previous Version at Publish)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (1 places): references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split; 1 place(s) that say what those runs did, or copy a command and its output, still write the single-file path of that time.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e199_transaction_output_copy.rs` → `scripts/experiment-apparatus/e199_transaction_output_copy/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/199-发布照抄上一版的代价.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/199-发布照抄上一版的代价.md`, the affected-decisions table.
 
 ### 2026-11-05
 
@@ -6332,6 +6601,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E201 (Three-oracle collusion full table on the current tree)
 
+### 2026-11-18
+
+- First rerun run and judgeable (rerun registration `research/prompts/e201-r1-prereg.md`, question list `research/prompts/e201-r1-questions.md`): of the 57 mutation-table rows 56 caught; row 57 「判法 E171 目录只在 e171_research_side 里插」 survived and is judged equivalent; all 124 tests of the six unit-test modules pass (the red in the unit test that reads the real repository falls in U1; `test_full_table_run.py` lists the repository root itself separately and gains three hand-made test cases); the mutation driver starts (the `mutation_driver.py` run that exited 2, `type=command-failed exit=2`, was caused by the red baseline unit tests). The page gains a "First rerun" section and three fork-table rows, the unit-test and mutation counts in "Current state" are marked as the counts of that time, and the rerun table registers `driver_e201_mutations`; the state changes from "apparatus written, artifacts not run" to "apparatus written, both segments' artifacts not run; first rerun run (judgeable)". The disposition of row 57 (record an equivalence test, replace it with a mutation that changes behaviour) is left to the main agent; the apparatus and the table are unchanged.
+  - **Basis**: `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations.out` line 117 `E7RESULT name=verdict mutations=57 caught=56 invalid=0 survived=1 timed_out=0 restored_and_baseline_green=true`; `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-unit-tests-after.out` lines 217 and 219 (`Ran 124 tests`, `OK`); the two control artifacts match 5.2 item by item; the three tree digests are equal and the apparatus digest is the same before and after (void clauses Z2 and Z3 do not fire); the equivalence reading is in `PythonModule.search_directories` of `scripts/gate/lib_function_units.py`.
+  - **Before**: `git show HEAD:.claude/kb/experiments/201-三oracle合谋今树整表.md`.
+- Row 57 disposition landed and the rerun registration re-pointed to the new artifact: the equivalence test `JudgeImportTests.test_without_the_drivers_own_insertion_the_key_library_still_resolves_the_e171_modules_through_the_research_side` (`ok` with default switches; exactly this test goes red when the key library has the breakage switch `python-imported-sys-path-ignored` on) went into `test_current_tree_row_driver.py`, the comment above the row driver's line was rewritten, and table row 57 was replaced with "判法 E171 目录不进 import 路径" (the insertion line in `e171_research_side.py` becomes `pass`); after the swap all 125 unit tests pass and all 57 rows are caught. The `replay.sh` rerun table row for E201, the E201 row of `.claude/gate.d/replay-comparison-units.tsv` and row 1 of the comparison-object table in section eleven of the rerun registration now point at the new artifact; the r1 artifact (56 caught, 1 survived) is kept with its readings unchanged; `driver_e201_mutations` gives the six unit-test modules one by one with `--unit-test-module` (the `replay.sh --selftest` run (`type=command-failed exit=1`) was red in "静态核 mutation-driver-tables": that cell reads `TEST_MODULES` by line, and the E201 driver writes it across two lines). Rerun registration revision 3. The page's status parenthesis, the counts under "Current state", the sentence on line 22 (the two `FrozenO3Is496Tests` tests and two mutation-table rows ran on 2026-11-11), the opening sentence, the fork table, the "First rerun" section and the "Decisions affected" review were updated accordingly; the index row's "50-row mutation table", "115 unit tests" and "all 50 mutations caught" now give the current numbers.
+  - **Basis**: `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations-2026-11-18.out` line 117 `E7RESULT name=verdict mutations=57 caught=57 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`, line 116 `E7RESULT name=mutation number=57 outcome=✅ mutation=判法_E171_目录不进_import_路径 unit_test_exit=1`; `research/results/e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-unit-tests-after-2026-11-18.out` lines 182 and 184 (`Ran 125 tests in 13.567s`, `OK`); the run of only `JudgeImportTests` with `python-imported-sys-path-ignored` on `FAILED (failures=1)` (the red one is the equivalence test); the `replay.sh --selftest` run, log line 310 (the `ast.literal_eval` traceback); the dispatch prompt (batch `records/2026-11-17-subagent账本清欠调度记录.md#13`).
+  - **Before**: status parenthesis "of the 57 mutation-table rows 56 caught and 1 survived, judged equivalent", the rerun table row pointed at `e201-three-oracle-collusion-full-table-on-the-current-tree-2026-11-18-r1-mutations.out`, the opening sentence said "unit tests, mutations, self-test and artifacts have not run yet", and the last sentence of the "O3 side" bullet said "neither has run yet"; the committed version is `git show HEAD:.claude/kb/experiments/201-三oracle合谋今树整表.md`.
+
 ### 2026-11-11
 
 - The O3 side moved from the 487 directory and the r2 freeze reference to the 496 directory and the freeze reference of the third rerun of E171 (Three-Oracle Collusion Test): registration section 12 revision 8; the apparatus only replaces three constants of `frozen_o3` inside its own process in `e171_research_side.py`, two unit tests and two mutation rows were added, and the page got one sentence each in "Current state" and "Measurement basis"; the state stays "apparatus written, artifacts not run".
@@ -6346,6 +6624,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Evidence**: question list `research/prompts/e171-current-tree-full-table-questions.md`, two rows; batch `records/2026-10-31-删兼容旧版本代码.md` batch 18; the user's decision "close the second rerun, set up the whole table as a new experiment" and the three dialog choices of 2026-11-02 (options recorded in that batch).
 
 ## E203 (Step cost of the scans before admission)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (4 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e203_admission_scan_cost.rs` → `scripts/experiment-apparatus/e203_admission_scan_cost/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/203-准入之前扫类的步代价.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/203-准入之前扫类的步代价.md`, the affected-decisions table.
 
 ### 2026-11-05
 
@@ -6384,6 +6671,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E206 (Cost of the publish fixed point rounds)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (2 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e206_fixed_point_cost.rs` → `scripts/experiment-apparatus/e206_fixed_point_cost/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/206-发布固定点轮数的代价.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/206-发布固定点轮数的代价.md`, the affected-decisions table.
+
 ### 2026-11-13
 
 - The merged report was replaced by the whole report recomputed by today's apparatus: `research/results/e206-fixed-point-cost-report-2026-11-13.out` (792 lines) is new, the registration line now points to it, and `-r2` (754 lines) and the original report of 11-09 (753 lines) are kept; compared with `-r2` it has only 38 more lines `name=by_delta_pooled_fallback` and a different count on the closing line, every other line is byte-identical; the two items in the line `question=q4 arm=p1` on the page were put in the order of the new report (the original report of 11-09 has them the other way round than `-r2`, the same set), the three lines of void clause 1 got the line numbers 607, 609 and 611 of the retained report, and the decision table was reviewed up to 2026-11-13; readings, artifacts and conclusions are unchanged.
@@ -6409,6 +6705,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
   - **Before**: none, this section is new.
 
 ## E207 (Steps of scans under the strict criterion)
+
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (5 places): references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e207_strict_scan_steps.rs` → `scripts/experiment-apparatus/e207_strict_scan_steps/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/207-严格判据下的扫类步数.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/207-严格判据下的扫类步数.md`, the affected-decisions table.
 
 ### 2026-11-13
 
@@ -6441,6 +6746,15 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E209 (Cause of the spike)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (2 places): references that name a function, constant or test now name the module file it lives in.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e209_spike_cause.rs` → `scripts/experiment-apparatus/e209_spike_cause/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/209-尖峰成因.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/209-尖峰成因.md`, the affected-decisions table.
+
 ### 2026-11-13
 
 - New, not run: the apparatus (counters script, history cases, script table, model, entry and library script), unit tests and mutation table are written and the page is built so the gate knows the number; no product has been run and there is not a single reading.
@@ -6464,8 +6778,23 @@ The history of [experiments.md](experiments.md) and of each experiment's text un
 
 ## E210 (Four reader rules for rewriting the capacity table when a disk grows)
 
+### 2026-11-20
+
+- Path references to the apparatus source in sentences that state the present were changed to the paths after the crates code split (2 places): references to the whole apparatus now name `main.rs` in the same-named directory; references that name a function, constant or test now name the module file it lives in; line numbers were replaced with the line numbers after the split.
+  - **Basis**: the move registry `.claude/gate.d/path-moves.tsv` registers `scripts/experiment-apparatus/e210_capacity_grow_reader_rules.rs` → `scripts/experiment-apparatus/e210_capacity_grow_reader_rules/main.rs`; `.claude/rules/path-moves.md` "How to do it" step 5: sentences that describe the move itself keep the old path, sentences that state the present take the new one.
+  - **Before**: `git show HEAD:.claude/kb/experiments/210-盘变大改容量表的读者规则四臂.md`, the sentences that state the present and cite the apparatus source path.
+- The review dates of every row in the affected-decisions table were changed to today and the rows say "unaffected": the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged.
+  - **Basis**: the decision-links cell of the doc-experiments gate: when the body of an experiment page changes, the affected-decisions table needs a review; the move registry `.claude/gate.d/path-moves.tsv` registers the move of the apparatus source into a same-named directory.
+  - **Before**: `git show HEAD:.claude/kb/experiments/210-盘变大改容量表的读者规则四臂.md`, the affected-decisions table.
+
 ### 2026-11-18
 
 - Newly set up, not run: the independently hand-written counting model (bin `e210-capacity-grow-reader-rules`, a command-line argument selects one of two artifact segments), 36 unit tests and a mutation table of 23 rows are written, two replay rows are added to `replay.sh`, and the page and index row are created so the gate recognizes the number; the build, the unit tests, the mutation table and the artifacts have not been run once, so there is not a single reading.
   - **Basis**: pre-run registration `research/prompts/e210-preregistration.md`; fork sheet `research/prompts/m4-capacity-grow-r1-forks.md`.
   - **Before**: none, this section is new.
+- The apparatus changed the invariance check: in that unit-test run 36 passed and 2 were red, and the red ones were the invariance check. The alternative-integers renumbering is now one renumbering table per disk, and the same main number becomes the same new number in every shape; the grown probe has two forms (renumbered together with the rest, and the registration's literal form of adding 100 on top of the renumbered sizes), and the verdict line is split into `invariance_mismatches` (the registration's literal wording) and `order_preserving_mismatches` (the added criterion), with the differing fields listed field by field on `name=invariance_detail` lines; 38 unit tests and a mutation table of 27 rows; section 12 of the registration gets a "revisions" paragraph. The artifacts are still unrun, so there is no reading.
+  - **Basis**: section 12 "revisions" of the registration `research/prompts/e210-preregistration.md`; unit-test output.
+  - **Before**: the previous item of the same day (36 unit tests, 23 mutation rows, the invariance check renumbered by each shape's own ranking).
+- Both artifact segments run and read: 40 unit tests pass, all 27 mutation rows caught, the rows 2 and 3 segment 32 lines and the row 1 segment 165 lines. Rows 2 and 3 are sufficient to judge (Arm C writes 2 more slots and 1 more barrier; crossing one and crossing two boundaries each 17228 whole slots, the synthetic control point 812, the level cross-check all agrees); row 1 is sufficient within the apparatus (writable leak Arms A and D 103 / 1487 each, read-only Arm A 103, Arms B, C and the baseline arm 0; avoidable misrefusal Arm A 30, B 284, C 66, D 30, baseline arm 619); the writable leaks of Arms A and D and the read-only leak of Arm C disagree with the attacking side's enumeration model (E210 builds no lagging-disk branch, and its images have only two time points and carry no intent marker) and the page lists them side by side marked "the two apparatuses disagree, not judged"; the invariance check has 5 mismatches on the registration's literal wording (all in the number of observation classes, 474 to 490 and 684 to 716) and 0 on the order-preserving criterion, the disposition of voiding clause 1 awaits the main agent; the 103 writable leaks are classified by hand from the source (early image 99, front image 4) on the page, without a per-history detail; page and index row changed in all three languages.
+  - **Basis**: `research/results/e210-capacity-grow-reader-rules-write-counts-and-root-level-2026-11-18.out` lines 2 to 24 and 28 to 31; `research/results/e210-capacity-grow-reader-rules-reader-rules-on-histories-2026-11-18.out` lines 7 to 31 and 142 to 164; two-run output of the attacking side's model.
+  - **Before**: the previous item of the same day (the apparatus changed the invariance check, artifacts not run once, no readings).

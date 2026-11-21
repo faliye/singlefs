@@ -277,6 +277,8 @@
   ".claude/kb/experiments/201-三oracle合谋今树整表.ja.md": ".claude/kb/experiments/201-3オラクル共謀現ツリー全表.ja.md",
   ".claude/kb/experiments/202-GPU与CPU两种模式GC对照组.en.md": ".claude/kb/experiments/202-gpu-vs-cpu-gc-comparison.en.md",
   ".claude/kb/experiments/202-GPU与CPU两种模式GC对照组.ja.md": ".claude/kb/experiments/202-GPUとCPUの2方式GC対照群.ja.md",
+  ".claude/kb/experiments/210-盘变大改容量表的读者规则四臂.en.md": ".claude/kb/experiments/210-four-reader-rules-for-rewriting-the-capacity-table-when-a-disk-grows.en.md",
+  ".claude/kb/experiments/210-盘变大改容量表的读者规则四臂.ja.md": ".claude/kb/experiments/210-ディスク拡大時の容量表書き換えにおける読者規則四案.ja.md",
   ".claude/kb/experiments/203-准入之前扫类的步代价.en.md": ".claude/kb/experiments/203-step-cost-of-scans-before-admission.en.md",
   ".claude/kb/experiments/203-准入之前扫类的步代价.ja.md": ".claude/kb/experiments/203-受理前スキャン系のステップコスト.ja.md",
   ".claude/kb/experiments/205-多处读坏倒挂三条改法的代价.en.md": ".claude/kb/experiments/205-cost-of-three-fixes-for-the-inverted-root-after-multiple-read-failures.en.md",

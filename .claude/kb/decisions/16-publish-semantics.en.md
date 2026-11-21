@@ -1,4 +1,4 @@
-## D16 (Publish Semantics) —— Settled
+## D16 Publish Semantics —— Settled
 
 [中文](16-发布语义.md) · **English** · [日本語](16-パブリッシュセマンティクス.ja.md)
 

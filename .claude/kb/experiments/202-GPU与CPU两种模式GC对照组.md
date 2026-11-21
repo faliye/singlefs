@@ -4,7 +4,7 @@
 
 跑前登记 `research/prompts/e202-preregistration.md`。回答问题单 `research/prompts/m4-gpugc-compare-questions.md`：比较同一负载、同一池下 `background_compute=cpu` 与 `background_compute=gpu` 两种模式的 GC 挂钟、占用的主机 CPU 时间与省下的时间、前台 fsync 延迟分布，以及省下的 CPU 时间随盘容量的变化。
 
-装置 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison.rs`（入库装置，住在产品 GPU 的测试包 background-gpu-tests 里）。**这一页只记跑前登记与装置骨架已写，产物一次没跑。**
+装置 `crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs`（入库装置，住在产品 GPU 的测试包 background-gpu-tests 里）。**这一页只记跑前登记与装置骨架已写，产物一次没跑。**
 
 ### 现状
 
@@ -12,7 +12,7 @@
 - 第一段的几何核起过一次、没跑完、没留产物：造起步池太慢，照量到的速度过不了任务服务的四小时上限。量到的：2288MiB 档顺序写那一半约 34 分钟，交错写那一半约 60 秒做 95 步、共 18304 步；8GiB 档 2100 秒做到顺序写 18292 步、共 65536 步；三档同时造，常驻内存 2100 秒时 9.4 GiB。用户定这一次不跑，等造池提速做完再跑。
 - 盘容量采用定占用读法（容量涨，活数据占单元区比例固定 50%）。
 - 装置约束：GPU 模式每张卡上限 1 GiB、按卡的顺序填满；一张卡与多张卡各跑；判定逐条与 CPU 参照相同才计一组数。
-- 多张卡那一臂用几张卡由 `lockstep --cards <张数>` 定（给 0 或 1、或多于服务交来的张数退 2；不给就用服务交来的全部卡），产物里 `name=every_card_arm_cards` 那一行记 `cards_named` 与它是怎么定的（`named_by=cards_option` 或 `every_handed_over_card`）；续跑时张数与要续的产物不同，打 `name=stopped clause=cards_option_differs_from_the_product_being_resumed` 退 2。
+- 多张卡那一臂用几张卡由 `lockstep --cards <张数>` 定（给 0 或 1、或多于服务交来的张数退 2；不给就用服务交来的全部卡）。产物里有两种记卡的行：`name=every_card_arm_cards` 记 `cards_named`、它是怎么定的（`named_by=cards_option` 或 `every_handed_over_card`）与每张卡的 PCI 地址与型号；`name=one_card_arm_card` 记点名一张卡那条臂那一张卡的 PCI 地址与型号，交替跑与并发跑都打。续跑时这几样与要续的产物里已有的同种行有一处不同，或产物里有这条臂跑出的结果行（`name=run`、`name=concurrent_run`）而没有这种行，打 `name=stopped clause=cards_differ_from_the_product_being_resumed` 退 2；一条结果行都没跑出来的那一趟不挡以后的续跑。
 
 ### 复跑
 
@@ -39,7 +39,7 @@ task-server/task submit -- cargo run --release -p singlefs-background-gpu-tests 
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D26（后台整理与放置回收） 已定项 13 | 备料 | 2026-11-14 不受影响：这一轮改的是装置搬进测试包与起法、多张卡那一臂的张数定法，判据、臂与口径没改，产物一次没跑，仍是跑前登记已写、装置未跑 |
+| D26（后台整理与放置回收） 已定项 13 | 备料 | 2026-11-18 不受影响：这一次只把多张卡那一条的说法照登记修订第 12 条回写（两种记卡的行、续跑核卡的停机分句名），判据、臂与口径没改，产物仍一次没跑。2026-11-14 那一次改的是装置搬进测试包与起法、多张卡那一臂的张数定法，判据、臂与口径没改，产物一次没跑，仍是跑前登记已写、装置未跑 |
 
 ## 历史版本
 

@@ -1,4 +1,4 @@
-## D19 (Block Pointer Structure & Width Budget) —— Settled
+## D19 Block Pointer Structure & Width Budget —— Settled
 
 [中文](19-块指针的结构与宽度预算.md) · **English** · [日本語](19-ブロックポインタ構造と幅予算.ja.md)
 

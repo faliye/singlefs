@@ -53,7 +53,7 @@ bash scripts/experiment-apparatus/replay.sh E153
 cd scripts/experiment-apparatus && cargo run --release --bin e153-ledger-shape-and-ring-holes
 ```
 
-Code: `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes.rs`. `replay.sh` now points to `e153-ledger-shape-and-ring-holes-2026-09-24-rename.out` (2487 lines, final `emitted=2487`; rerun after the 2026-09-24 suffix rename, differing from `e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out` only in renamed identifiers). `-stage5.out` and earlier `e153-ledger-shape-and-ring-holes-2026-09-17.out` (39 lines), `-stage3.out` (604 lines), and `-stage4.out` (1047 lines) are archived in git history (retrieve using `git show 3cff909^:research/results/<文件名>`). K1–K5/A1–A7 values match across all four artifacts. Checked line by line: after stripping fields added in segment five, stage5 `q_family` rows are byte-identical to stage4; six row types `name=k1_new_pool_file_creation_placement`, `name=a6_new_pool_file_creation_accounting`, `name=a4_steady_state`, `name=k4_rollback`, `name=k5_raise_floor`, `name=q9a_extra_write` all match line by line (pre-registration section twelve segment five). Mutation table `scripts/mutation/tables/e153_ledger_shape_and_ring_holes.tsv`: 31, all caught, zero invalid or not failing.
+Code: `scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes/main.rs`. `replay.sh` now points to `e153-ledger-shape-and-ring-holes-2026-09-24-rename.out` (2487 lines, final `emitted=2487`; rerun after the 2026-09-24 suffix rename, differing from `e153-ledger-shape-and-ring-holes-2026-09-17-stage5.out` only in renamed identifiers). `-stage5.out` and earlier `e153-ledger-shape-and-ring-holes-2026-09-17.out` (39 lines), `-stage3.out` (604 lines), and `-stage4.out` (1047 lines) are archived in git history (retrieve using `git show 3cff909^:research/results/<文件名>`). K1–K5/A1–A7 values match across all four artifacts. Checked line by line: after stripping fields added in segment five, stage5 `q_family` rows are byte-identical to stage4; six row types `name=k1_new_pool_file_creation_placement`, `name=a6_new_pool_file_creation_accounting`, `name=a4_steady_state`, `name=k4_rollback`, `name=k5_raise_floor`, `name=q9a_extra_write` all match line by line (pre-registration section twelve segment five). Mutation table `scripts/mutation/tables/e153_ledger_shape_and_ring_holes.tsv`: 31, all caught, zero invalid or not failing.
 
 ### This is a deterministic model, not a measurement
 
@@ -128,9 +128,9 @@ Pre-registration section twelve segment three records the causes, supporting uni
 
 | Decision item | Relationship | Review |
 |---|---|---|
-| D28 (Mount-Time Commitments) settled item 1 | Evidence preparation | 2026-10-11 unaffected: only wording changed (temporal words, location references and self-reference); conclusions, numbers and artifacts unchanged |
-| D16 (Publish Semantics) | Evidence preparation | 2026-10-11 unaffected: only wording changed (temporal words, location references and self-reference); conclusions, numbers and artifacts unchanged |
-| D23 (Journal Role & Format) settled item 14 | Unaffected | 2026-10-11 unaffected: only wording changed (temporal words, location references and self-reference); conclusions, numbers and artifacts unchanged |
+| D28 (Mount-Time Commitments) settled item 1 | Evidence preparation | 2026-11-20 unaffected: the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only wording changed (temporal words, location references and self-reference); conclusions, numbers and artifacts unchanged |
+| D16 (Publish Semantics) | Evidence preparation | 2026-11-20 unaffected: the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only wording changed (temporal words, location references and self-reference); conclusions, numbers and artifacts unchanged |
+| D23 (Journal Role & Format) settled item 14 | Unaffected | 2026-11-20 unaffected: the split only changed the file layout of the apparatus source; conclusions, numbers and artifacts unchanged; previously, 2026-10-11 unaffected: only wording changed (temporal words, location references and self-reference); conclusions, numbers and artifacts unchanged |
 
 ## Historical Versions
 

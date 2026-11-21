@@ -1,4 +1,4 @@
-## D15 (Format Freeze Policy) —— Settled
+## D15 Format Freeze Policy —— Settled
 
 [中文](15-格式冻结政策.md) · **English** · [日本語](15-フォーマット凍結ポリシー.ja.md)
 

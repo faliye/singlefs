@@ -1,4 +1,4 @@
-## D17 (Implementation Layering & Third-Party Pipeline) —— Settled
+## D17 Implementation Layering & Third-Party Pipeline —— Settled
 
 [中文](17-实现分层与第三方管道.md) · **English** · [日本語](17-実装階層とサードパーティパイプライン.ja.md)
 
