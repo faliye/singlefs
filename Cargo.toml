@@ -9,9 +9,11 @@ members = [
     "crates/singlefs-replay-prefix",
     "crates/singlefs-checker",
     "crates/singlefs-verification",
+    "crates/singlefs-implementation-experiments",
     "crates/singlefs-reference-filesystem",
     "crates/singlefs-unit-graph",
     "crates/singlefs-background-gpu",
+    "crates/singlefs-background-gpu-pairing-keys",
     "crates/singlefs-background-gpu-tests",
     "crates/singlefs-device-library",
     "crates/singlefs-mount-runtime",
@@ -26,3 +28,7 @@ debug = "line-tables-only"
 overflow-checks = true
 # debug_assert! 在 release 下也开（.claude/singlefs-ai-sop/rules/test-script-discipline.md「编译与算法都要快」）
 debug-assertions = true
+
+# 调试构建只留行号表：完整调试信息占每个测试二进制的 73%–94%，几百个测试二进制一起链时盘写不过来。
+[profile.dev]
+debug = "line-tables-only"

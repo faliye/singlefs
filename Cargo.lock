@@ -811,21 +811,30 @@ version = "0.1.0"
 dependencies = [
  "ash",
  "libc",
+ "prune-server",
+ "singlefs-background-gpu-pairing-keys",
  "singlefs-core",
+ "singlefs-format",
  "singlefs-mount-runtime",
  "singlefs-replay-prefix",
+ "singlefs-unit-graph",
  "wgpu",
+]
+
+[[package]]
+name = "singlefs-background-gpu-pairing-keys"
+version = "0.1.0"
+dependencies = [
+ "singlefs-core",
+ "singlefs-unit-graph",
 ]
 
 [[package]]
 name = "singlefs-background-gpu-tests"
 version = "0.1.0"
 dependencies = [
- "ash",
  "singlefs-background-gpu",
  "singlefs-core",
- "singlefs-mount-runtime",
- "singlefs-replay-prefix",
  "singlefs-unit-graph",
  "singlefs-verification",
  "wgpu",
@@ -855,6 +864,22 @@ version = "0.1.0"
 [[package]]
 name = "singlefs-format"
 version = "0.1.0"
+
+[[package]]
+name = "singlefs-implementation-experiments"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "singlefs-checker",
+ "singlefs-core",
+ "singlefs-device-library",
+ "singlefs-format",
+ "singlefs-reference-filesystem",
+ "singlefs-replay-prefix",
+ "singlefs-unit-graph",
+ "singlefs-verification",
+ "wgpu",
+]
 
 [[package]]
 name = "singlefs-mount-runtime"
@@ -893,10 +918,8 @@ dependencies = [
  "prune-server",
  "singlefs-checker",
  "singlefs-core",
- "singlefs-device-library",
  "singlefs-format",
  "singlefs-reference-filesystem",
- "singlefs-replay-prefix",
  "singlefs-unit-graph",
  "wgpu",
 ]

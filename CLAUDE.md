@@ -18,7 +18,7 @@
 
 别的会话、别的贡献者、派出去的 subagent 可能撞上的坑与约定，写进项目：规则（`.claude/rules/`）、agent 定义与 `.claude/agent-common.md`、kb、`records/`。私有 memory 只放用户个人的偏好（提交时间窗、回复语言这类）。往 `CLAUDE.md` 加内容之前先问它属于哪个 agent，属于就写进那个定义或共用约束。
 
-subagent 与协作工具的欠账与优化项记在现行账本 `records/2026-11-17-subagent账本自上而下清欠.md`，不占 `.claude/kb/` 的 C / D / E 编号，kb 只管文件系统本身；`records/2026-09-16-subagent拆分提案.md`、`records/2026-10-23-subagent拆分提案.md`、`records/2026-10-29-subagent拆分提案.md` 三版封存，不再改（除非要查来历，别读它们）。定义、共用约束、三方流程与配套脚本的问题：修它们本身就是这一轮的出口时，直接改，不先问，改完记进现行账本；做别的任务时撞上的，照 `.claude/main-agent.md`「禁止」一节「禁止自行扩大任务范围」记下或弹窗。改了定义、共用约束、规则、技能、门禁、钩子、脚本与两个服务的，按批走一轮三方（`.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条）。脚本自证与门禁样本登记在 `.claude/hooks/selftest-registry.tsv`，改了就由主 agent 照钩子拒绝说明里写的起法经任务服务交。改了触发文件的，写阶段同步记录（门禁 doc-process-records 的 knowledge-sync 格判）。
+subagent 与协作工具（定义、共用约束、三方流程、技能、钩子、门禁、脚本、统一任务服务与判定库服务）的问题不记账：发现即在当场对话里解决，派人修、换上、验，当场走一轮三方，不登账本、不攒批、不留到以后，也不先弹窗问要不要修（归别的会话正在改的，照 `.claude/main-agent.md`「一轮怎么开、怎么收」第 15 条发给它）。`records/2026-11-17-subagent账本自上而下清欠.md` 是旧账本，不再往里登；kb 只管文件系统本身，不占 `.claude/kb/` 的 C / D / E 编号。`records/2026-09-16-subagent拆分提案.md`、`records/2026-10-23-subagent拆分提案.md`、`records/2026-10-29-subagent拆分提案.md` 三版封存，不再改（除非要查来历，别读它们）。改了定义、共用约束、规则、技能、门禁、钩子、脚本与两个服务的，改完当场走一轮三方（`.claude/main-agent.md`「一轮怎么开、怎么收」第 4 条）。脚本自证与门禁样本登记在 `.claude/hooks/selftest-registry.tsv`，改了就由主 agent 照钩子拒绝说明里写的起法经任务服务交。改了触发文件的，写阶段同步记录（门禁 doc-process-records 的 knowledge-sync 格判）。
 
 ## 规则（始终生效）
 
