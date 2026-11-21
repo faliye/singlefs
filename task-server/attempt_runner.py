@@ -24,7 +24,8 @@
      起命令之前到的照记、命令起来之后照发给它；
      命令起不来（argv 头一个不在、没有执行权限、格式不对）：日志记一行，result.json 照写（exit_code 找不到是 127、别的 126，start_error 写原因），退同一个码，
      服务照命令退非 0 记结局，不记 launcher-lost（说明里 start_error_uncaught 为真时照抛出去、result.json 写不出，只给弄坏开关 runner-start-error-uncaught 用）；
-  ⑤ 子进程退了，编译目录不删（任务有了结局由服务删，task_server_lib.py 文件头「编译目录」）。
+  ⑤ 子进程退了，这里不删编译目录：本机组里的归这棵树的组，服务收尾这一次尝试时放回组里，任务记下结局、task clean、取消都不删它，树删了服务才跟着删；
+     派到第二台的（命令是 multi-host-run.sh）中途失败或被停、没等到退出码的，那一边的 ⑥ 连它用的组里那一个一起删，服务收尾时组里删掉那一行（task_server_lib.py 文件头「编译目录」）。
   ⑥ 写结果 result.json（先写临时文件再改名）：exit_code（被信号杀的记 128 + 信号号）、started_at、ended_at、seconds、memory_peak（③ 按轮采到的进程内存的最大值与说明里 exit_peak_file 那一份取大的
      （服务经 RUN_WITH_MEMORY_CAP_PEAK_OUTPUT 交给内存包装，包装退出之前把这一条扣页缓存的峰值写进去：它每 0.1 秒采一次，按轮之间冒出来的也在里面；第二台同一个口径，task_server_lib.py 文件头「资源记录」的退出时峰值）；字节，两样都没有是 null，不记 0；
      说明里 exit_peak_only_when_unsampled 为真时按轮采到了就不看那一份，只给弄坏开关 exit-peak-only-when-unsampled 用；
@@ -33,7 +34,7 @@
      服务拿它对 earlyoom 与内核日志里杀进程那一行，认出被不是服务发的信号杀掉的尝试，task_server.py 的 external_kill_note）、build_directory_peak（编译目录占盘的最大值，字节；没给编译目录或一次都没量到是 null）；退出码照子进程的。
      写之前停单元里留下的进程（stop_unit_leftovers）出了没料到的异常的，往日志记一行告警、unit_leftovers 写 null，result.json 照写、退出码照旧
      （records/2026-11-03-task-server与prune-server深入对攻审核.md「TS-02」；说明里 leftovers_error_uncaught 为真时照改前不隔离，只给弄坏开关 leftovers-error-uncaught 用）。
-说明读不了、工作目录进不去：退 2，不写结果（服务按单元不在、没留结果记 launcher-lost；编译目录由服务对账时删）。
+说明读不了、工作目录进不去：退 2，不写结果（服务按单元不在、没留结果记 launcher-lost；编译目录照样由服务收尾时放回这棵树的组里）。
 自证换 scope：说明里 fake_scope_directory 非空时把它当外层 scope 读（假的 memory.current、memory.stat、memory.peak、cpu.stat）。
 """
 import os

@@ -45,6 +45,26 @@ def load_control():
 
 control = load_control()
 
+
+def server_modules():
+    """服务拆成的各份模块：入口 server 加同目录里已经 import 进来、名字以 task_server_ 起头的各份（库与自证本身的各份不算）。"""
+    others = [module for name, module in sorted(sys.modules.items())
+              if name.startswith("task_server_") and not name.startswith(("task_server_lib", "task_server_selftest"))
+              and str(getattr(module, "__file__", "") or "").endswith(".py") and Path(module.__file__).resolve().parent == PROJECT]
+    return [server] + others
+
+
+@contextlib.contextmanager
+def patch_server(name, new=unittest.mock.DEFAULT, **keywords):
+    """patch.object(server, 名字, …) 在服务拆成几份之后的写法：一个名字在每份模块里各有一个绑定（定义它的那一份、import 它的几份与入口），
+    把每一份里有这个名字的绑定都换成同一个替身（没给 new 就建一个 MagicMock(**keywords)，各份共用它的返回值与调用记录），出来时还原。"""
+    replacement = unittest.mock.MagicMock(**keywords) if new is unittest.mock.DEFAULT else new
+    with contextlib.ExitStack() as stack:
+        for module in server_modules():
+            if hasattr(module, name):
+                stack.enter_context(patch.object(module, name, replacement))
+        yield
+
 HAND_LISTED_TABLES = ("log_growth", "log_offsets", "cpu_windows", "unit_checked_at", "unit_gone_since", "peer_memory", "peer_io_wait", "io_waits")   # 只给弄坏开关
 
 
@@ -114,7 +134,7 @@ class CleanupProtocolTests(unittest.TestCase):
                       unit_leftovers=dict(processes=[], remaining=[], verified=True))
         scheduler = self.scheduler()
         scheduler.store.task.return_value = (task, True)
-        with patch.object(server, "cgroup_processes", return_value=None), patch.object(server, "say"):
+        with patch_server("cgroup_processes", return_value=None), patch_server("say"):
             scheduler.finish_attempt(task, attempt, result)
         self.assertEqual(attempt["state"], "running")
         self.assertIn("cleanup_pending", attempt)
@@ -125,7 +145,7 @@ class CleanupProtocolTests(unittest.TestCase):
         restored.store.select.return_value = [(persisted, True)]
         restored.store.task.return_value = (task, True)
         persisted["cleanup_retry_at"] = 0
-        with patch.object(server, "cgroup_processes", return_value=[]), patch.object(server, "say"):
+        with patch_server("cgroup_processes", return_value=[]), patch_server("say"):
             restored.finish_attempt(task, persisted, result)
         self.assertEqual(persisted["state"], "ended")
         self.assertNotIn("cleanup_pending", persisted)
@@ -135,17 +155,17 @@ class CleanupProtocolTests(unittest.TestCase):
         scheduler = self.scheduler()
         result = dict(scope="/sys/fs/cgroup/regression.scope",
                       unit_leftovers=dict(processes=[], remaining=[], verified=True))
-        with patch.object(server, "cgroup_processes", return_value=["123"]), \
-                patch.object(server.subprocess, "run"), patch.object(server, "LEFTOVER_STOP_SECONDS", -1), \
-                patch.object(server, "say"):
+        with patch_server("cgroup_processes", return_value=["123"]), \
+                patch.object(server.subprocess, "run"), patch_server("LEFTOVER_STOP_SECONDS", -1), \
+                patch_server("say"):
             clean, note = scheduler.stop_leftovers(self.attempt(), result)
         self.assertFalse(clean)
         self.assertIn("保留资源占用", note)
-        with patch.object(server, "cgroup_processes", return_value=[]):
+        with patch_server("cgroup_processes", return_value=[]):
             self.assertTrue(scheduler.stop_leftovers(self.attempt(), result)[0])
 
     def test_scope_read_failure_after_kill_is_not_empty(self):
-        with patch.object(server, "cgroup_processes", side_effect=[["123"], None]), \
+        with patch_server("cgroup_processes", side_effect=[["123"], None]), \
                 patch.object(server.subprocess, "run"):
             clean, _ = self.scheduler().stop_leftovers(
                 self.attempt(), dict(scope="/sys/fs/cgroup/regression.scope",
@@ -154,14 +174,14 @@ class CleanupProtocolTests(unittest.TestCase):
 
     def test_unit_snapshot_is_rechecked_without_killing_a_stale_pid(self):
         result = dict(unit_leftovers=dict(processes=["123"], remaining=["123"], verified=True))
-        with patch.object(server, "unit_processes", return_value=[]), \
-                patch.object(server.subprocess, "run") as run, patch.object(server, "say"):
+        with patch_server("unit_processes", return_value=[]), \
+                patch.object(server.subprocess, "run") as run, patch_server("say"):
             clean, _ = self.scheduler().stop_leftovers(self.attempt(), result)
         self.assertTrue(clean)
         run.assert_not_called()
 
     def test_unit_read_failure_is_not_empty(self):
-        with patch.object(server, "unit_processes", return_value=None):
+        with patch_server("unit_processes", return_value=None):
             self.assertFalse(self.scheduler().stop_leftovers(self.attempt(), None)[0])
 
     def test_missing_scope_location_is_unknown(self):

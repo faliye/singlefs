@@ -2,11 +2,13 @@
 """task-server 的客户端：一切跑项目代码的任务都经它交给服务。任务只由主 agent 与人手交；子 agent 只用 status、log 看结局，submit、confirm、wait、cancel、clean 由钩子在执行前拒（共用约束「子 agent 不交任务」）。提交时不选机器、不给内存、不要卡（卡归 GPU 批处理验证服务，任务不领卡）。
 
   task-server/task submit [--cwd <目录>] [--manual] [--full-gate] [--whole-package-confirmed <确认文件>] -- <命令…>
-                                                    交给服务、当场打任务号（stdout 一行「TASK_SERVER submit task=<号> session=<会话号> state=awaiting-confirmation」），退 0；
-                                                    交了的任务待确认、不进队：stdout 接着打服务回的确认单（整条命令、范围声明四段原文、项数 N、这个会话在排在跑的条数 M
+                                                    交给服务、当场打任务号（stdout 一行「TASK_SERVER submit task=<号> session=<会话号> state=queued|awaiting-confirmation」），退 0；
+                                                    只有服务判成长任务的才待确认、不进队（判据四条：同一命令键库里记过的用时超过 1800 秒、不指定范围的整趟、要分片的、没有用时记录又是会编译的 cargo 测试或按项跑的门禁 --item；
+                                                    task_server.py 文件头 ⑦）：stdout 接着打服务回的确认单（整条命令、判成长任务的依据、范围声明四段原文、项数 N、这个会话在排在跑的条数 M
                                                     与其中命令键相同或点的项交叠的号、内存上限与记录来源、交的时候就判得出的异常），末行
                                                     「TASK_SERVER confirm-needed task=<号> items=<N> tasks=<M> timeout=<秒>」与「→ 核对之后确认：task-server/task confirm <号> --items <N> --tasks <M>」；
                                                     不确认的满 30 分钟服务取消（task_server.py 文件头 ⑦）。
+                                                    其余直接进队、不出确认单：stdout 接着打一行「直接进队：<为什么不是长任务>」。
                                                     工作目录不给取此刻的目录。调用方环境里的变量照 task_server_lib.py 文件头「环境变量」分三种：白名单的带进去，
                                                     会话自带的不带，别的当场拒并点名（退 3）。命令自己套了内存包装或派发器的拒、给的编译目录指到仓里的拒（退 3）。
                                                     要分片的（task_server_lib.py 文件头「分片」）照样一条 submit，服务拆、合，stdout 那一行另带 sharded=<入口>；
@@ -25,7 +27,8 @@
                                                     要是共享根下读得到的绝对路径、有 ①②③ 起头的三段（.claude/agent-common.md「日常开发的测试不跑整个包」），不合的同样退 3、点名缺哪一段。
   task-server/task confirm <号> --items <N> --tasks <M>  确认待确认的那一条（task_server.py 文件头 ⑦）：两个数是确认单里服务算的项数与这个会话在排在跑的条数，
                                                     核过范围对了照抄；都与服务此刻现算的相同才进队（照提交时刻排位置），退 0；对不上的打服务此刻算的确认单与
-                                                    「TASK_SERVER confirm-needed …」那一行、退 3（异常表 confirm-counts-mismatch）；不是你的会话、不在待确认的退 3，没有这个任务退 4
+                                                    「TASK_SERVER confirm-needed …」那一行、退 3（异常表 confirm-counts-mismatch）；直接进队的任务（没判成长任务）不用确认：照旧认得，
+                                                    回「已在队里，不用确认」、退 0、不核两个数；不是你的会话、不在待确认又不是直接进队的退 3，没有这个任务退 4
   task-server/task confirm <号> --why '<为什么要跑这么久、范围为什么是这些>'  确认这条任务确是要跑过两小时（异常表 long-run-unconfirmed；task_server.py 文件头 ⑦「跑满两小时」）：--why 去掉空白至少 12 个字，
                                                     只许提交它的会话（人手交的同样可以确认），只对在跑、累计满两小时、没带 --full-gate 的任务；确认了记「长跑已确认」、不再提醒，退 0；不合退 3，没有这个任务退 4；确认放不过四小时硬上限（异常表 over-four-hours）：没带 --full-gate 的累计满四小时服务照停
   task-server/task wait <号>                        阻塞到结局：逐次尝试一行（分片的逐个子任务），末行「TASK_SERVER_RESULT task=<号> type=<错误类型> exit=<码> attempts=<次数> log=<日志路径>」，
@@ -38,16 +41,17 @@
                                                     在跑的那一次疑似卡住（task_server.py 文件头 ①「疑似卡住」：CPU 满窗口几乎不涨，服务不停它）：打一行
                                                     「TASK_SERVER_SUSPECT task=<号> attempt=<第几次> host=<本机|第二台> window=<秒> cores=<平均核数> log=<日志> why=<依据>」、
                                                     退 231（SUSPECT_EXIT，错误类型表里没用过的码），不打 TASK_SERVER_RESULT；任务照跑，提交方自己查，再起 wait <号> 接着等（同一段只报一次）
-                                                    要处置的提醒（task_server.py 文件头 ①「要处置的提醒」，task_server_lib.py 的 ATTENTION_KINDS 那十五种之一：排队过久 queued-too-long、
+                                                    要处置的提醒（task_server.py 文件头 ①「要处置的提醒」，task_server_lib.py 的 ATTENTION_KINDS 那十七种之一：排队过久 queued-too-long、
                                                     清理没收尾 cleanup-pending、读不到在跑尝试的单元状态 unit-unreadable、分片父任务推不动 shard-advance-failed、
                                                     日志长期不涨而服务没停它 quiet-log-busy、卡在 IO 上而服务没停它 io-wait、
                                                     改主工作区的命令没正常结束 workspace-write-interrupted（可能写了一半，只报有结局的）、
-                                                    预算贴着整台 oversized-budget、跑得久而核没用起来 long-run-idle-cores、按给的上限开并行 fills-any-cap、连着撞上限还在重排 repeated-cap-hits、跑满两小时没确认 long-run-unconfirmed、出结局时用时超过 7200 秒要拆 long-run-split、换钩子被上一趟没写完成的挡住 workspace-write-blocked、线程总数连着几轮超过登记数的两倍而其中可跑的也超过登记数 threads-over-registered）：打一行
+                                                    预算贴着整台 oversized-budget、跑得久而核没用起来 long-run-idle-cores、按给的上限开并行 fills-any-cap、连着撞上限还在重排 repeated-cap-hits、跑满两小时没确认 long-run-unconfirmed、出结局时用时超过 7200 秒要拆 long-run-split、换钩子被上一趟没写完成的挡住 workspace-write-blocked、换钩子时上一趟还在跑 previous-swap-running、线程总数连着几轮超过登记数的两倍而其中可跑的也超过登记数 threads-over-registered、
+                                                    日志里有用例本次未跑的标记行 gpu-cases-not-run）：打一行
                                                     「TASK_SERVER_ATTENTION task=<号> [part=<子任务号>] type=needs-attention kind=<种类> [reminded_after_seconds=<这一回跨过的提醒门槛，秒；时长判的那几种才有>] basis=<依据的数> why=<原因> next=<出路>」（值照 shlex 引；
                                                     next= 的头一段是 task_server_lib.py 文件头「异常表」里这一种那一行的修改意见；
                                                     why= 超过 300 个字符（ATTENTION_WHY_LIMIT）的按字符截到那么长、尾巴接「…」，全文在服务发给会话的那一条的「原因：」一行，排队过久的另在 task status 的「在等：」）、
                                                     退 230（ATTENTION_EXIT，错误类型表里没用过的码），不打 TASK_SERVER_RESULT；任务照旧在排或在跑，服务没动它，提交方按 next= 处置，再起 wait <号> 接着等
-                                                    （同一条任务同一种提醒、同一道提醒门槛只叫一次，跨过下一道门槛才再叫）；任务已有结局的（改主工作区的命令没正常结束、出结局时用时超过 7200 秒要拆）
+                                                    （同一条任务同一种提醒、同一道提醒门槛只叫一次，跨过下一道门槛才再叫）；任务已有结局的（改主工作区的命令没正常结束、出结局时用时超过 7200 秒要拆、换钩子被挡的两种、用例本次未跑）
                                                     这一行打在 TASK_SERVER_REASON 之前，退码仍是任务的。
                                                     wait 留着、照旧取得到结局与提醒；记着会话收件地址的任务，结局、提醒、疑似卡住与服务健康由服务直接发消息给会话
                                                     （task_server.py 文件头 ⑥，与 wait 同一份记账），会话不必为了被叫醒起 wait。服务健康不归 wait
@@ -59,10 +63,13 @@
                                                     有了结局的另打 wait 那一行 TASK_SERVER_REASON（点到 /tmp 下的在提交时就拒，task_server.py 文件头 ②「提交时拒」①）；
                                                     提交时打过严厉警告的（task_server.py 文件头 ②「提交时警告」）两种 status 都照打那两行
   task-server/task cancel <号>                      只许提交它的会话取消：在队里的当场取消；在跑的服务停它的单元、回读停了才退 0。服务在同一次取消里删这条任务各次尝试的
-                                                    编译目录与现场目录（task_server.py 文件头「接口」的取消），删了的逐份打一行删前删后多大；没删成的逐份打「✗」与出路、退 5
+                                                    现场目录（派到第二台的连同那一趟的本地目录；task_server.py 文件头「接口」的取消），删了的逐份打一行删前删后多大；没删成的逐份打「✗」与出路、退 5；
+                                                    本机组里的编译目录不删：它归这棵树的组，尝试停了就放回；派到第二台、中途被停的那一趟没等到退出码，
+                                                    multi-host-run.sh 的 ⑥ 连它用的组里那一个一起删，组里删掉那一行（task_server_lib.py 文件头「编译目录」）
   task-server/task log <号> [--attempt <第几次>] [--all]  打那一次尝试（默认最后一次）的日志：默认最后 LOG_TAIL_LINES 行，--all 整份
-  task-server/task clean <号>                       只许提交它的会话、有了结局才删：这条任务留下的编译目录（删完回读不在），打删了几份；
-                                                    没删干净退 5，逐份写明哪个编译目录、为什么没删成（服务的 remove_run_build_directory 交回的原因），还没有结局的另说一句、同样退 5
+  task-server/task clean <号>                       只许提交它的会话、有了结局才删：这条任务（分片的连同子任务）各次尝试的现场，分片的父任务另删计划目录下的测试二进制（删完回读不在），打删了几份；
+                                                    编译目录不删：它归这棵树的组，树删了服务才跟着删（task_server_lib.py 文件头「编译目录」「现场」）；
+                                                    没删干净退 5，逐份写明是哪一份现场或测试二进制、为什么没删成（服务的 remove_scenes、shard_binaries_removal 交回的原因），还没有结局的另说一句、同样退 5
   task-server/task promote <号>                     提前（执行前由钩子弹窗要用户确认）：只许提交它的会话，任务要在排或是分片确认过的父任务（连同它此刻在排的子任务，之后建的也提前）；
                                                     排最前、不过 CPU 闸、起不来不挡后面（task_server.py 的 promote）；退 0，不是你的会话退 3，不在排退 3，没有这个任务退 4
 
@@ -224,7 +231,7 @@ def submit(arguments):
         fail(f"命令自己套了一层：{nested}", "去掉那一层再提交：task-server/task submit -- <里面那条命令…>；挑机器、定上限都由服务做，卡归 GPU 批处理验证服务", REFUSED_EXIT)
     target = lib.target_directory_refusal(carried, command, cwd)
     if target:
-        fail(target, "去掉它再提交：服务给每一次尝试一个仓外的编译目录、跑完删（task_server_lib.py 文件头「编译目录」）；真要自己的，给仓外的路径", REFUSED_EXIT)
+        fail(target, "去掉它再提交：会编的命令服务按树给仓外的编译目录（同一棵树在同一台上接着用它那一组，树删了服务才跟着删；task_server_lib.py 文件头「编译目录」）；真要自己的，给仓外的路径", REFUSED_EXIT)
     try:
         status, reply = lib.call_server(configuration.socket, "POST", "/tasks",
                                         {"command": command, "cwd": cwd, "environment": carried, "inbox": inbox,
@@ -258,6 +265,8 @@ def submit(arguments):
         print_confirmation(reply["id"], confirmation, reply.get("confirm_timeout_seconds") or 0)
         print(f"  · 任务 {reply['id']} 待确认{what}：确认之后照提交时刻排进队；{tail}")
         return 0
+    if reply.get("direct_queue"):   # 没判成长任务、不用确认（task_server.py 文件头 ⑦「只有长任务要确认」）：打一行为什么
+        print(f"{lib.DIRECT_QUEUE_MARK}{reply['direct_queue']}")
     print(f"  · 任务 {reply['id']} 排进队了{what}；{tail}")
     return 0
 
@@ -479,24 +488,24 @@ def clean(arguments):
     if code == 404:
         fail(f"没有任务 {task_id}", "task-server/task status 看这个会话的任务号", NO_SUCH_TASK_EXIT)
     if code == 403:
-        fail(f"服务拒了这次删除：{reply.get('detail')}", "只有提交它的那个会话能删它的编译目录", REFUSED_EXIT)
+        fail(f"服务拒了这次删除：{reply.get('detail')}", "只有提交它的那个会话能删它的现场", REFUSED_EXIT)
     detail = reply.get("detail", reply)
     if code == 409 and isinstance(detail, dict) and not lib.broken("clean-failure-unexplained"):   # 没删成的逐份写明是哪一份、为什么（服务照删法交回的原因）
         for item in detail.get("removed", []):
-            print(f"  · 删了编译目录 {item['path']}")
+            print(f"  · 删了 {item['path']}")
         for item in detail.get("left", []):
-            print(f"  ✗ 没删成{item.get('kind') or '编译目录'} {item['path']}：{item.get('why')}", file=sys.stderr)   # gate-lint:detail
+            print(f"  ✗ 没删成{item.get('kind') or '产物'} {item['path']}：{item.get('why')}", file=sys.stderr)   # gate-lint:detail
         fail(f"任务 {task_id} 没删干净：删了 {len(detail.get('removed', []))} 份、没删成 {len(detail.get('left', []))} 份（逐份在上面）",
              f"照没删成的那一句处理（停掉开着它的进程）之后再 task-server/task clean {task_id}", CLEAN_LEFT_EXIT)
     if code == 409 and not isinstance(detail, dict):
         fail(f"服务没删：{detail}", f"等 task-server/task wait {task_id} 拿到结局再 clean", CLEAN_LEFT_EXIT)
     if code != 200:
-        fail(f"编译目录没删干净（HTTP {code}：{detail.get('text', detail) if isinstance(detail, dict) else detail}）",
+        fail(f"任务 {task_id} 没删干净（HTTP {code}：{detail.get('text', detail) if isinstance(detail, dict) else detail}）",
              f"照上面那句处理之后再 task-server/task clean {task_id}", CLEAN_LEFT_EXIT)
     removed = reply.get("removed", [])
     for item in removed:
         print(f"  · 删了 {item['path']}（{lib.mebibytes_text(item.get('bytes', 0))}）")
-    print(f"  ✓ 任务 {task_id} 的编译目录删了 {len(removed)} 份，共 {lib.mebibytes_text(sum(item.get('bytes', 0) for item in removed))}")
+    print(f"  ✓ 任务 {task_id} 的现场与分片父任务的测试二进制删了 {len(removed)} 份（编译目录归树、不删），共 {lib.mebibytes_text(sum(item.get('bytes', 0) for item in removed))}")
     return 0
 
 
