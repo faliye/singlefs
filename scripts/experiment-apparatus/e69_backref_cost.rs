@@ -7,6 +7,7 @@
 //!
 //! 两条臂：甲 = 权威态（跟着提交增量维护）；乙 = 派生态（要用时全盘扫描重建）。
 
+use e7_index_bench::{u32_from_usize, usize_from_u64};
 use std::collections::{BTreeMap, BTreeSet};
 
 // ───────────────────────── 负载模型 ─────────────────────────
@@ -49,13 +50,13 @@ fn build(workload: Workload) -> Vec<Unit> {
     let mut referrer: u32 = 1_000_000;
     for snapshot_index in 0..workload.snapshots {
         for shared_index_in_snapshot in 0..workload.shared_per_snapshot {
-            let target_unit_index = ((snapshot_index * workload.shared_per_snapshot + shared_index_in_snapshot) % workload.units) as usize;
+            let target_unit_index = usize_from_u64((snapshot_index * workload.shared_per_snapshot + shared_index_in_snapshot) % workload.units);
             built_units[target_unit_index].extra_referrers.insert(referrer);
             referrer += 1;
         }
     }
     for reflink_index in 0..workload.reflinks {
-        let target_unit_index = (reflink_index % workload.units) as usize;
+        let target_unit_index = usize_from_u64(reflink_index % workload.units);
         built_units[target_unit_index].extra_referrers.insert(referrer);
         referrer += 1;
     }
@@ -80,7 +81,7 @@ impl Authoritative {
     fn commit(&mut self, units: &[Unit], first_unit_index: usize, end_unit_index: usize) {
         for (unit_index, unit) in units.iter().enumerate().take(end_unit_index).skip(first_unit_index) {
             for &extra_referrer in &unit.extra_referrers {
-                self.map.entry(unit_index as u32).or_default().insert(extra_referrer);
+                self.map.entry(u32_from_usize(unit_index)).or_default().insert(extra_referrer);
                 self.entries_written += 1;
             }
         }
@@ -100,7 +101,7 @@ impl Derived {
         for (unit_index, unit) in units.iter().enumerate() {
             read += 1; // 全盘扫描：每个单元都要读，不论它有没有共享引用
             if !unit.extra_referrers.is_empty() {
-                map.insert(unit_index as u32, unit.extra_referrers.clone());
+                map.insert(u32_from_usize(unit_index), unit.extra_referrers.clone());
             }
         }
         (map, Self { units_read_on_rebuild: read })
@@ -125,7 +126,7 @@ fn run(label: &'static str, workload: Workload) -> Row {
     let mut authoritative_arm = Authoritative::new();
     let mut transaction_start = 0usize;
     while transaction_start < units.len() {
-        let transaction_end = (transaction_start + workload.units_per_transaction as usize).min(units.len());
+        let transaction_end = (transaction_start + usize_from_u64(workload.units_per_transaction)).min(units.len());
         authoritative_arm.commit(&units, transaction_start, transaction_end);
         transaction_start = transaction_end;
     }

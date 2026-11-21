@@ -98,18 +98,18 @@ fn run(rule: Rule, seed: u64, small_write_per_mille: u64) -> RunTotals {
     let mut totals = RunTotals::default();
     let mut pending = 0u64; // 攒批用
     let mut batched = 0u64;
-    let emit = |totals: &mut RunTotals, payload: u64| {
+    let emit = |run_totals: &mut RunTotals, payload: u64| {
         if payload == 0 {
             return;
         }
         let width = width_for(rule, payload);
         let data_cells_per_stripe = width - 1;
         let stripes = payload.div_ceil(data_cells_per_stripe);
-        totals.data += payload;
-        totals.physical_cells += stripes * width;
-        totals.stripes += stripes;
-        totals.width_sum += stripes * width;
-        totals.hit_ppm_weighted += stripes * two_disk_hit_ppm(width);
+        run_totals.data += payload;
+        run_totals.physical_cells += stripes * width;
+        run_totals.stripes += stripes;
+        run_totals.width_sum += stripes * width;
+        run_totals.hit_ppm_weighted += stripes * two_disk_hit_ppm(width);
     };
     for _ in 0..WRITES_PER_RUN {
         // 小写 = 1 格；大写 = 8..15 格
@@ -133,7 +133,7 @@ fn run(rule: Rule, seed: u64, small_write_per_mille: u64) -> RunTotals {
 }
 
 fn ppm(numerator: u64, denominator: u64) -> u64 {
-    if denominator == 0 { 0 } else { numerator * 1_000_000 / denominator }
+    (numerator * 1_000_000).checked_div(denominator).unwrap_or(0)
 }
 
 fn main() {
@@ -174,7 +174,7 @@ fn main() {
                         ppm(totals.physical_cells, totals.data),
                         totals.stripes,
                         ppm(totals.width_sum, totals.stripes),
-                        if totals.stripes == 0 { 0 } else { totals.hit_ppm_weighted / totals.stripes },
+                        totals.hit_ppm_weighted.checked_div(totals.stripes).unwrap_or(0),
                     ))
                 );
             }
@@ -186,12 +186,7 @@ fn main() {
     for (label, rule) in rules {
         // 先用一个探针 payload 取到该臂的宽度，再按 w−1 喂它
         let width = width_for(rule, DEVICE_COUNT - 1);
-        let totals = {
-            let mut totals = RunTotals::default();
-            totals.data = width - 1;
-            totals.physical_cells = width;
-            totals
-        };
+        let totals = RunTotals { data: width - 1, physical_cells: width, ..Default::default() };
         println!(
             "{}",
             emitter.emit_raw(&format!(

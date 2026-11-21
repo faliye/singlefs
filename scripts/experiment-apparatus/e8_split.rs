@@ -23,6 +23,7 @@
 //! - **阴性对照**：1 GiB 文件上内联阈值根本够不着，内联臂必须与不分流臂**逐位相同**。
 //!   不同 = 模型里有一条不该存在的路径。
 
+use e7_index_bench::usize_from_u64;
 use e7_index_bench::{Emitter, Lru};
 use std::collections::BTreeMap;
 
@@ -279,7 +280,7 @@ impl StrategyRun {
                 let record_bytes = self.parameters.extent_record_bytes();
                 self.tree.upsert(extent_record_key, record_bytes, &mut self.ledger);
             }
-            _ => {
+            Strategy::NoSplit | Strategy::InlineInode | Strategy::MessageLayer => {
                 // 整块分配：不足一块也占一块，这是小文件在不分流臂上的全部代价来源。
                 let block_count = length_bytes.div_ceil(self.parameters.block_bytes);
                 self.ledger.write_data(block_count * self.parameters.block_bytes);
@@ -292,11 +293,11 @@ impl StrategyRun {
 
     /// 内联形态：数据不落独立块，跟着索引记录一起写出去。
     fn put_inline(&mut self, inode_number: u64, size: u64) {
-        let inode_record_bytes = INODE_FIXED_BYTES + size as usize;
+        let inode_record_bytes = INODE_FIXED_BYTES + usize_from_u64(size);
         match self.strategy {
             // 消息层：挂进缓冲，本次不碰叶子。
             Strategy::MessageLayer => self.tree.enqueue_message(inode_key(inode_number), inode_record_bytes),
-            _ => self.tree.upsert(inode_key(inode_number), inode_record_bytes, &mut self.ledger),
+            Strategy::NoSplit | Strategy::InlineInode | Strategy::KvSeparate => self.tree.upsert(inode_key(inode_number), inode_record_bytes, &mut self.ledger),
         }
     }
 
@@ -501,16 +502,16 @@ fn main() {
 
     // ── 正式扫描 ──
     for (pointer_width_bytes, pointer_width_name) in pointer_widths {
-        let mut parameters = base_parameters(pointer_width_bytes);
+        let mut scan_parameters = base_parameters(pointer_width_bytes);
         if is_selfcheck {
             // 自证会红：把内联阈值打到 0，内联/消息两臂应当退化成与不分流完全一样。
-            parameters.inline_threshold_bytes = 0;
+            scan_parameters.inline_threshold_bytes = 0;
         }
         for (form, form_name) in FORMS {
             for (size, size_name) in SIZES {
                 let file_count = file_count_for(size);
                 for (strategy, arm_name) in ARMS {
-                    let (ledger, logical_bytes) = run_case(parameters, strategy, size, form, file_count, 7);
+                    let (ledger, logical_bytes) = run_case(scan_parameters, strategy, size, form, file_count, 7);
                     let amplification = ledger.device_bytes_written() as f64 / logical_bytes.max(1) as f64;
                     let meta_per_file = ledger.meta_bytes as f64 / file_count as f64;
                     say(emitter.emit_raw(&format!(

@@ -66,7 +66,7 @@
 //! 记录与根的 txg 相等时有歧义**——那是「发布计数器与 checkpoint_txg 是否恒等」的决策，
 //! 本实验只证明「必须有一个水位」）；也不回答真实负载下 tail 能陈旧到什么程度。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 use std::collections::VecDeque;
 
 /// 逻辑对象数。
@@ -104,7 +104,7 @@ struct World {
 fn build_world(last_publish: u64, pin: u64, tail_every: u64, torn: bool) -> World {
     assert!(last_publish - (last_publish / tail_every) * tail_every < RING, "窗口必须落在环内");
     let mut content: Vec<u64> = vec![0; 4096];
-    let mut ring: Vec<Option<Record>> = vec![None; RING as usize];
+    let mut ring: Vec<Option<Record>> = vec![None; usize_from_u64(RING)];
     let mut block_of_object: Vec<u64> = (0..LOGICAL_OBJECT_COUNT).collect(); // 对象 i 初始占块 i，内容标签 0
     let mut next_fresh = LOGICAL_OBJECT_COUNT;
     let mut defer: VecDeque<(u64, u64)> = VecDeque::new(); // (freed_at, block)
@@ -123,13 +123,13 @@ fn build_world(last_publish: u64, pin: u64, tail_every: u64, torn: bool) -> Worl
         }
         let object = (publish % LOGICAL_OBJECT_COUNT) as usize;
         let new_block = if let Some(reused_block) = pool.pop_front() {
-            reallocated_at_publishes[reused_block as usize].push(publish);
+            reallocated_at_publishes[usize_from_u64(reused_block)].push(publish);
             reused_block
         } else {
             next_fresh += 1;
             next_fresh - 1
         };
-        content[new_block as usize] = publish;
+        content[usize_from_u64(new_block)] = publish;
         defer.push_back((publish, block_of_object[object]));
         block_of_object[object] = new_block;
         ring[(publish % RING) as usize] = Some(Record { jsn: publish, object: object as u64, block: new_block, tag: publish });
@@ -216,9 +216,9 @@ fn recover(world: &World, algorithm: RecoveryAlgorithm) -> Run {
     match algorithm {
         RecoveryAlgorithm::AbortOnMismatch | RecoveryAlgorithm::SkipOnMismatch | RecoveryAlgorithm::ReplayAboveWatermark => {
             for record in &prefix {
-                let is_content_valid = world.content[record.block as usize] == record.tag;
+                let is_content_valid = world.content[usize_from_u64(record.block)] == record.tag;
                 if is_content_valid {
-                    run.final_map[record.object as usize] = record.block;
+                    run.final_map[usize_from_u64(record.object)] = record.block;
                     run.replayed += 1;
                 } else {
                     run.mismatches += 1;
@@ -248,10 +248,10 @@ fn recover(world: &World, algorithm: RecoveryAlgorithm) -> Run {
             loop {
                 let mut candidate_map = world.root_map.clone();
                 for record in &prefix[..kept_record_count] {
-                    candidate_map[record.object as usize] = record.block;
+                    candidate_map[usize_from_u64(record.object)] = record.block;
                 }
                 // 收尾走读：逐对象验证映射指向的块内容（不复用施加代码的判定）。
-                let walk_succeeded = (0..LOGICAL_OBJECT_COUNT as usize).all(|object| {
+                let walk_succeeded = (0..usize_from_u64(LOGICAL_OBJECT_COUNT)).all(|object| {
                     let mapped_block = candidate_map[object];
                     // 找出该块应有的标签：真值是「最后写它的发布」，走读只有校验和 ⇒
                     // 模型里等价于「内容标签 == 施加进映射的那条记录的 tag 或根快照」。
@@ -259,10 +259,10 @@ fn recover(world: &World, algorithm: RecoveryAlgorithm) -> Run {
                     let expected_tag = prefix[..kept_record_count]
                         .iter()
                         .rev()
-                        .find(|record| record.object as usize == object)
+                        .find(|record| usize_from_u64(record.object) == object)
                         .map(|record| record.tag);
                     match expected_tag {
-                        Some(expected) => world.content[mapped_block as usize] == expected,
+                        Some(expected) => world.content[usize_from_u64(mapped_block)] == expected,
                         None => true, // 根快照自带一致性（上次发布已验过）
                     }
                 });
@@ -307,7 +307,7 @@ fn tracker_mismatches(world: &World) -> u64 {
     for publish in (world.tail + 1)..=world.last_publish {
         let record = world.ring[(publish % RING) as usize].expect("窗口在环内");
         assert_eq!(record.jsn, publish);
-        if world.reallocated_at_publishes[record.block as usize].iter().any(|&reallocated_at| reallocated_at > publish && reallocated_at <= world.last_publish) {
+        if world.reallocated_at_publishes[usize_from_u64(record.block)].iter().any(|&reallocated_at| reallocated_at > publish && reallocated_at <= world.last_publish) {
             mismatch_count += 1;
         }
     }
@@ -441,10 +441,10 @@ mod tests {
         assert!(audit_final(&healthy, &recovery_run));
 
         let torn = build_world(23, 1, 16, true);
-        let recovery_run = recover(&torn, RecoveryAlgorithm::ReplayAboveWatermark);
-        assert!(recovery_run.completed);
-        assert!(recovery_run.torn_flagged);
-        assert!(audit_final(&torn, &recovery_run));
+        let torn_recovery_run = recover(&torn, RecoveryAlgorithm::ReplayAboveWatermark);
+        assert!(torn_recovery_run.completed);
+        assert!(torn_recovery_run.torn_flagged);
+        assert!(audit_final(&torn, &torn_recovery_run));
     }
 
     /// **判据 3**：C 在健康镜像上零重试；torn 场景恰一轮尾删、旗标 1、终态 M。
@@ -457,12 +457,12 @@ mod tests {
         assert!(audit_final(&healthy, &recovery_run));
 
         let torn = build_world(23, 1, 16, true);
-        let recovery_run = recover(&torn, RecoveryAlgorithm::BlindReplayThenWalk);
-        assert!(recovery_run.completed);
-        assert_eq!(recovery_run.retries, 1, "撕裂 ⇒ 恰一轮尾删");
-        assert_eq!(recovery_run.replayed, 7, "尾删只许删掉撕裂那一条，窗口里其余 7 条要保住");
-        assert!(recovery_run.torn_flagged);
-        assert!(audit_final(&torn, &recovery_run));
+        let torn_recovery_run = recover(&torn, RecoveryAlgorithm::BlindReplayThenWalk);
+        assert!(torn_recovery_run.completed);
+        assert_eq!(torn_recovery_run.retries, 1, "撕裂 ⇒ 恰一轮尾删");
+        assert_eq!(torn_recovery_run.replayed, 7, "尾删只许删掉撕裂那一条，窗口里其余 7 条要保住");
+        assert!(torn_recovery_run.torn_flagged);
+        assert!(audit_final(&torn, &torn_recovery_run));
     }
 
     /// **失败条款那条构造不变量**：窗口内被复用块的记录，其对象必有更晚的记录在窗口内。
@@ -472,7 +472,7 @@ mod tests {
         let world = build_world(23, 1, 16, false);
         for publish in (world.tail + 1)..=world.last_publish {
             let record = world.ring[(publish % RING) as usize].unwrap();
-            let is_block_reused = world.reallocated_at_publishes[record.block as usize].iter().any(|&reallocated_at| reallocated_at > publish && reallocated_at <= world.last_publish);
+            let is_block_reused = world.reallocated_at_publishes[usize_from_u64(record.block)].iter().any(|&reallocated_at| reallocated_at > publish && reallocated_at <= world.last_publish);
             if is_block_reused {
                 let has_later_record = ((publish + 1)..=world.last_publish).any(|later_publish| {
                     let later_record = world.ring[(later_publish % RING) as usize].unwrap();
@@ -519,7 +519,7 @@ mod tests {
         let world = build_world(23, 1, 16, true);
         let torn_record = world.torn_record.expect("torn 场景必须有那条记录");
         assert_eq!(torn_record.jsn, 24);
-        assert_ne!(world.content[torn_record.block as usize], torn_record.tag, "单元真的没落盘");
+        assert_ne!(world.content[usize_from_u64(torn_record.block)], torn_record.tag, "单元真的没落盘");
     }
 
     /// 环槽映射自检：窗口内每条 jsn 都能在 slot = jsn % RING 找到自己。

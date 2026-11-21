@@ -23,7 +23,7 @@
 //! - 两种读法给出同一个机会数 ⇒ 这一维是死的，整轮作废。
 //! - **读法 B 下 32 位仍不够用 ⇒ 如实记录**，本实验不预设 32 位够用。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{i32_from_u32, Emitter};
 
 /// 一条记录。`origin` 是**真值标签**（哪条时间线），模型用它数「不同源」，
 /// **链检查本身不许读它**——那正是链要靠 hash 去分辨的东西。
@@ -100,7 +100,7 @@ fn chances_under_seam_reading(incidents: f64, seams_per_incident: f64, scans_bef
 }
 
 fn expected_false_accepts(chances: f64, bits: u32) -> f64 {
-    chances / 2f64.powi(bits as i32)
+    chances / 2f64.powi(i32_from_u32(bits))
 }
 fn at_least_once(expected: f64) -> f64 {
     1.0 - (-expected).exp()

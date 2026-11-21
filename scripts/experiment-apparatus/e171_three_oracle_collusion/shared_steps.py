@@ -15,7 +15,7 @@
   （LIBRARY_KIND）：items/<键>.out 是 row_driver.pack_directory 打的项目录（dumps/ 与 scratch/，同一份内容同一串字节），items/<键>.verdict 是判定（比法 timing：
   产物里带耗时）。
   键照 long_run_item_verdicts.py 文件头「请求文件」，由 admission.py 的 compute_unit_key 在 --repo-root 那棵树上算（item_request_lines）：
-    入口   装置二进制 e171_three_oracle_collusion 的 main（--device-features gpu 带 feature:singlefs-verification/gpu；profile:release）；prerequisites 另一条请求是
+    入口   装置二进制 e171_three_oracle_collusion 的 main（--device-features gpu 带 feature:singlefs-implementation-experiments/gpu；profile:release）；prerequisites 另一条请求是
            E170 导出装置 e170_specification_executor_export 的 main（同一项的几条请求合成一把键）
     judge  本文件的 make_shared_step；prerequisites 与 positive-control:O3 另加 o3_bad_image_judge.py 的 main，四条阳性对照另加 row_driver.py 的 run_row_on_the_lane
            （judge-root 是本文件所在的仓，只当索引）

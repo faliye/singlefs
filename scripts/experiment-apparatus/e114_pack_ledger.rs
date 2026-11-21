@@ -58,6 +58,7 @@
 //! 负载是**本实验自定**的——D25 目标负载里「小文件」出现 0 次，这一格不在它的定义域内。
 //! 整理触发策略未定（D26 已定项 4），本实验只算「整理一次」的字节，不算它多久跑一次。
 
+use e7_index_bench::{i32_from_u64, i64_from_u64, truncate_f64_to_u64};
 use e7_index_bench::Emitter;
 
 // ── 格式常量，全部有出处 ────────────────────────────────────────────────
@@ -120,7 +121,7 @@ fn pad_ledger(n: u64, _size: u64, m: u64, f: f64) -> Ledger {
     let map = n * (MAP_KEY + LOC_ENTRY * W);
     let alloc = units * grains(UNIT) * ALLOC_ENTRY;
     // 写：首次每对象一个整单元 × w；覆写走 RMW（读不计入写字节，写仍是一个整单元）。
-    let overwritten = (n as f64 * f).round() as u64;
+    let overwritten = truncate_f64_to_u64((n as f64 * f).round());
     let write_bytes = (n + overwritten) * UNIT * W;
     let _ = m; // pad 的写与发布节奏无关：每个对象自己一个单元
     Ledger { data_bytes, meta_bytes: map + alloc, write_bytes, units,
@@ -134,7 +135,7 @@ fn pack_ledger(n: u64, size: u64, m: u64, f: f64, slot_extra: u64) -> Ledger {
     // ⚠️ 末次发布不满 m 个对象，不许按满算（阳性对照抓到的建模 bug）
     let containers = containers_of(n, m, cap);
     // 覆写：搬出成独立单元，旧槽死、容器不释放（不整理）
-    let overwritten = (n as f64 * f).round() as u64;
+    let overwritten = truncate_f64_to_u64((n as f64 * f).round());
     let units = containers + overwritten;
     let data_bytes = units * UNIT;
     // 元数据：中央映射每对象一条（两臂同）+ 分配记录按落点 + 容器索引每容器一条 + 活槽记账每容器一条
@@ -160,7 +161,7 @@ fn pack_ledger(n: u64, size: u64, m: u64, f: f64, slot_extra: u64) -> Ledger {
 fn pack_bg_ledger(n: u64, size: u64, m: u64, f: f64, slot_extra: u64) -> Ledger {
     let cap = capacity(size, slot_extra);
     if cap == 0 { return pad_ledger(n, size, m, f); }
-    let overwritten = (n as f64 * f).round() as u64;
+    let overwritten = truncate_f64_to_u64((n as f64 * f).round());
     let containers = n.div_ceil(cap); // 与 m 无关
     let units = containers + overwritten;
     let data_bytes = units * UNIT;
@@ -179,11 +180,11 @@ fn compaction_bytes(n: u64, size: u64, m: u64, f: f64, slot_extra: u64) -> u64 {
     let cap = capacity(size, slot_extra);
     if cap == 0 { return 0; }
     let containers = containers_of(n, m, cap);
-    let overwritten = (n as f64 * f).round() as u64;
+    let overwritten = truncate_f64_to_u64((n as f64 * f).round());
     // 被碰到的容器数：overwritten 个死槽均匀散在 containers 个容器上
     let touched = if containers == 0 { 0 } else {
-        let p = 1.0 - (1.0 - 1.0 / containers as f64).powi(overwritten as i32);
-        (containers as f64 * p).round() as u64
+        let p = 1.0 - (1.0 - 1.0 / containers as f64).powi(i32_from_u64(overwritten));
+        truncate_f64_to_u64((containers as f64 * p).round())
     };
     touched * UNIT * W
 }
@@ -234,7 +235,7 @@ fn main() {
                 let p = pad_ledger(N, size, m, f);
                 let k = pack_ledger(N, size, m, f, SLOT_FULL);
                 let kmin = pack_ledger(N, size, m, f, SLOT_MIN);
-                let ledger = p.total() as i64 - k.total() as i64;
+                let ledger = i64_from_u64(p.total()) - i64_from_u64(k.total());
                 let ratio = p.total() as f64 / k.total() as f64;
                 let data_ratio = p.data_bytes as f64 / k.data_bytes as f64;
                 let bg = pack_bg_ledger(N, size, m, f, SLOT_FULL);

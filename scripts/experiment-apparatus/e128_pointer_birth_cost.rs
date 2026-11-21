@@ -25,6 +25,7 @@
 //! 67 与 111 两档必须落回 E20 产物里那两个数（`show-me-test.md`「立在装置之间」）。
 //! ⚠️ 闸只钉 DRAM 档那两个点，抄漏在别的档上不会被它抓住。
 
+use e7_index_bench::{truncate_f64_to_u32, u32_from_usize, u64_from_nanoseconds, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::time::Instant;
 
@@ -78,7 +79,7 @@ impl Tree {
     #[inline(always)]
     fn child_at(&self, node: usize, slot_index: usize) -> usize {
         let offset = node * self.node_bytes + NODE_HEADER_BYTES + slot_index * self.entry_bytes + 8;
-        u64::from_le_bytes(self.buffer[offset..offset + 8].try_into().unwrap()) as usize
+        usize_from_u64(u64::from_le_bytes(self.buffer[offset..offset + 8].try_into().unwrap()))
     }
 
     #[inline(always)]
@@ -91,9 +92,9 @@ impl Tree {
     fn lookup(&self, key: u64) -> usize {
         let mut node = 0usize;
         let mut slot = 0usize;
-        let bits_per_level = (self.slots as f64).log2().ceil() as u32;
+        let bits_per_level = truncate_f64_to_u32((self.slots as f64).log2().ceil());
         for level in 0..self.depth {
-            let level_search_key = (key >> (level as u32 * bits_per_level)) % (self.slots as u64);
+            let level_search_key = (key >> (u32_from_usize(level) * bits_per_level)) % (self.slots as u64);
             let (mut lower_bound, mut upper_bound) = (0usize, self.slots);
             while lower_bound < upper_bound {
                 let midpoint = (lower_bound + upper_bound) / 2;
@@ -127,7 +128,7 @@ fn bench(tree: &Tree, keys: &[u64]) -> u64 {
         let chained_key = (key ^ (previous_slot as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)) % key_span;
         previous_slot = tree.lookup(chained_key);
     }
-    let elapsed_nanoseconds = start_time.elapsed().as_nanos() as u64;
+    let elapsed_nanoseconds = u64_from_nanoseconds(start_time.elapsed().as_nanos());
     std::hint::black_box(previous_slot);
     elapsed_nanoseconds
 }
@@ -366,7 +367,7 @@ mod tests {
         let tree = Tree::new(100, 93, NODE_BYTES);
         assert_eq!(tree.depth, 1);
         for key in 0..tree.slots as u64 {
-            assert_eq!(tree.lookup(key), (key as usize) % tree.slots, "key={key}");
+            assert_eq!(tree.lookup(key), usize_from_u64(key) % tree.slots, "key={key}");
         }
     }
 

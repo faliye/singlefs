@@ -122,7 +122,7 @@ impl Fault {
     fn destroyed(self, slot: u64) -> bool {
         match self {
             Fault::Span { start_slot, length_in_slots } => slot >= start_slot && slot < start_slot + length_in_slots,
-            Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot % period_in_slots == 0,
+            Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot.is_multiple_of(period_in_slots),
         }
     }
 }

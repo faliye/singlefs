@@ -640,6 +640,7 @@ mod tests {
     /// 宽度 22 / 30 / 34 / 50 依次是 narrow、middle、S2、wide；每行是 (宽度, 臂, 树数, 设备数, 新口径字节, 新口径过界, 旧口径字节, 旧口径过界)。
     #[test]
     fn independent_anchor_rows_match_on_every_width_arm_and_cell() {
+        #[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
         let anchor_rows: [(EntryWidth, Arm, u64, u64, u64, bool, u64, bool); 48] = [
         (NARROW_WIDTH, Arm::UpperBound, 1024, 64, 12976128, false, 25952256, true),
         (NARROW_WIDTH, Arm::PerStatisticNarrow, 1024, 64, 50754, false, 101508, false),
@@ -724,7 +725,8 @@ mod tests {
     fn every_cell_the_device_prints_is_computed_without_overflow_and_counted() {
         let cells = all_publish_budget_cells();
         assert_eq!(cells.len(), 4 * 5 * 3 * 3);
-        assert_eq!(cells.iter().map(|cell| publish_budget_line(*cell)).count(), 180);
+        let budget_lines: Vec<_> = cells.iter().map(|cell| publish_budget_line(*cell)).collect();
+        assert_eq!(budget_lines.len(), 180);
         assert_eq!(cells.iter().filter_map(|cell| original_format_checkpoint_budget_line(*cell)).count(), 90);
         assert_eq!(cells.iter().map(|cell| cell.old_bytes).max(), Some(2 * 9 * 8192 * 64 * 50));
         for chunk in cells.chunks(ARMS.len()) {

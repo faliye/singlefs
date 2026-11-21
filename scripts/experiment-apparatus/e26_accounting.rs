@@ -79,10 +79,10 @@ fn comparable(world: &World, snapshot_identifier: u64) -> BTreeSet<u64> {
     // 后代：父链能走到 snapshot_identifier 的那些
     let mut comparable_set = ancestors.clone();
     for snapshot in world.snapshots.values() {
-        let mut next_ancestor = Some(snapshot.snapshot_identifier);
-        while let Some(ancestor) = next_ancestor {
+        let mut next_ancestor_of_snapshot = Some(snapshot.snapshot_identifier);
+        while let Some(ancestor) = next_ancestor_of_snapshot {
             if ancestor == snapshot_identifier { comparable_set.insert(snapshot.snapshot_identifier); break; }
-            next_ancestor = world.snapshots.get(&ancestor).and_then(|ancestor_snapshot| ancestor_snapshot.parent);
+            next_ancestor_of_snapshot = world.snapshots.get(&ancestor).and_then(|ancestor_snapshot| ancestor_snapshot.parent);
         }
     }
     comparable_set
@@ -245,14 +245,14 @@ fn main() {
     // ⚠️ **绝对值会误导**：上面那张表是 64 快照 × 8 extent 的玩具世界，
     // 「13 次查找」听起来很便宜。真正要问的是**标度**——
     // 一次反向索引查找是一次 btree 下降，在真盘上是 I/O。
-    for extents_per_snapshot in [4u64, 8, 16, 32, 64, 128] {
+    for swept_extents_per_snapshot in [4u64, 8, 16, 32, 64, 128] {
         for topology in [Topology::Linear, Topology::MultiHead] {
-            let deadlist_measurement = measure(topology, Arm::Deadlist, 64, extents_per_snapshot, 70, 42);
-            let reference_count_measurement = measure(topology, Arm::ReferenceCount, 64, extents_per_snapshot, 70, 42);
+            let deadlist_measurement = measure(topology, Arm::Deadlist, 64, swept_extents_per_snapshot, 70, 42);
+            let reference_count_measurement = measure(topology, Arm::ReferenceCount, 64, swept_extents_per_snapshot, 70, 42);
             println!("{}", emitter.emit_raw(&format!(
-                "name=scale topo={topology:?} exts_per_snap={extents_per_snapshot} total_exts={} \
+                "name=scale topo={topology:?} exts_per_snap={swept_extents_per_snapshot} total_exts={} \
                  deadlist_lookups={} refcount_lookups={}",
-                64 * extents_per_snapshot, deadlist_measurement.lookups, reference_count_measurement.lookups)));
+                64 * swept_extents_per_snapshot, deadlist_measurement.lookups, reference_count_measurement.lookups)));
         }
     }
 

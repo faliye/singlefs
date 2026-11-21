@@ -15,6 +15,7 @@
 //! 形态同 bcachefs `disk_accounting.h:208 this_cpu_add(e->v[gc][i], a.v->d[i])`——
 //! 运行时与 GC 重建只差一个下标。
 
+use e7_index_bench::i64_from_u64;
 use e7_index_bench::Emitter;
 use std::collections::BTreeMap;
 
@@ -35,7 +36,7 @@ fn generate_operations(operation_count: usize, seed: u64) -> Vec<Operation> {
     let mut next_random = || { xorshift_state ^= xorshift_state >> 12; xorshift_state ^= xorshift_state << 25; xorshift_state ^= xorshift_state >> 27; xorshift_state.wrapping_mul(0x2545F4914F6CDD1D) };
     (0..operation_count).map(|_| {
         let key = next_random() % KEY_COUNT;
-        if next_random() % 4 == 0 { Operation::Delete(key) } else { Operation::Set(key, (next_random() % 1000 + 1) as i64) }
+        if next_random() % 4 == 0 { Operation::Delete(key) } else { Operation::Set(key, i64_from_u64(next_random() % 1000 + 1)) }
     }).collect()
 }
 
@@ -61,7 +62,7 @@ fn flush_idempotent(buffered_entries: &[(u64, Option<i64>)], tree: &mut BTreeMap
         match bug {
             Bug::MergeReversed => { merged.entry(key).or_insert(size_or_tombstone); }        // 取先者胜
             Bug::TombstoneIgnored => { if size_or_tombstone.is_some() { merged.insert(key, size_or_tombstone); } } // 墓碑当普通值
-            _ => { merged.insert(key, size_or_tombstone); }
+            Bug::None | Bug::DropMessage | Bug::DoubleApply => { merged.insert(key, size_or_tombstone); }
         }
     }
     for (&key, &size_or_tombstone) in &merged {
@@ -97,7 +98,7 @@ fn run_idempotent(operations: &[Operation], bug: Bug) -> Reading {
 
 /// 运行时与 checker **共用的同一个累加函数**。bug 注在这里，于是两侧一起错。
 fn accumulate(accumulator: &mut i64, delta: i64, bug: Bug) {
-    match bug { Bug::MergeReversed => *accumulator -= delta, _ => *accumulator += delta }
+    match bug { Bug::MergeReversed => *accumulator -= delta, Bug::None | Bug::TombstoneIgnored | Bug::DropMessage | Bug::DoubleApply => *accumulator += delta }
 }
 
 fn run_delta(operations: &[Operation], bug: Bug) -> Reading {

@@ -1,4 +1,4 @@
-//! E207（B8严格判据下的步数）历史用例的紧凑盘：入口把这份拷进副本当 `crates/singlefs-verification/tests/e207_compact_device/mod.rs`，
+//! E207（严格判据下的扫类步数）历史用例的紧凑盘：入口把这份拷进副本当 `crates/singlefs-verification/tests/e207_compact_device/mod.rs`，
 //! 历史用例 `e207_strict_scan_steps_histories.rs` 经 `#[path]` 引它。只存一次的内存办法，不改 `crates/`。
 //!
 //! 为什么要它：稀疏盘（`SparseDevice`）每个写过的 512 字节扇区各占一个 `Vec<u8>`，加 `BTreeMap` 的项、堆块头，约 590 字节。

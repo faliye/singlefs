@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # admission: always 每一趟现读这一次尝试的内存上限与共享根里此刻的峰值记录，上一趟的结论不替这一趟作保
 # run-condition: command python3
-"""复跑入口 scripts/experiment-apparatus/replay.sh 派行要的读数：这一次尝试的内存上限、每一行量过的峰值与线程数；开跑之后盯着在跑的每一行、量峰值、报进度。
-只报资源用量，不判、不存判定：判定只在 prune-server 那一份库里（.claude/rules/verification.md「判定库只有一份」）。自证在 replay.sh 自证的派行那一组（它文件头「派行」），这一份不另带。
+"""复跑入口 scripts/experiment-apparatus/replay.sh 派行要的读数：这一次尝试的内存上限、这一台能给的内存、每一行量过的峰值与线程数；开跑之后盯着在跑的每一行、量峰值、报进度。
+只报资源用量，不判、不存判定：判定只在 prune-server 那一份库里（.claude/rules/verification.md「判定库只有一份」）。自证在 replay.sh 自证的派行那一组（它文件头「派行」），这一份不另带：
+  这一台能给的内存取得到的是 dispatch-task-cap-not-binding 那一格、取不到的是 dispatch-memory-bound 那一格，弄坏开关 replay.sh 的 REPLAY_BREAK=host-cap-unreported 交下来 --no-host-cap。
 
-上限与量法都用 scripts/hosts/task_memory.py 的（task_memory_cap_bytes、process_tree_usage），import 它，不另写一套；不按路径载入 crates-mutation-rows.py：
+上限、这一台能给的内存与量法都用 scripts/hosts/task_memory.py 的（task_memory_cap_bytes、host_slice_cap_bytes、process_tree_usage），import 它，不另写一套；
+replay.sh 不另起 python 去 import 它，这一台能给的内存经 read 报给它；不按路径载入 crates-mutation-rows.py：
 整份载入会把它的自证与它载入的整份脚本都拉进 scripts/gate/admission.py 的闭包，闭包里有拒算，按条复用整张表拒算。
 
 峰值记录（运行记录，放共享根，两台读写同一份）：<共享根>/replay-row-peaks/<这一行身份的 sha256 前 24 位>/<记录名>，
@@ -15,8 +17,11 @@
   读（row_measurement）：每个键只看名字排在最后的 RECENT_RECORDS 份、更旧的读的时候删掉，峰值与线程数各取最大；有一份写法不对的，这一行照没量过办，打一行点名那一份与出路。
 
 用法（参数都是绝对路径或相对当前目录）：
-  replay_row_costs.py read <请求文件>   请求文件一行「<tag><制表符><身份>」。标准输出：一行「cap<制表符><字节或 -><制表符><说明>」、一行「records<制表符><目录或 -><制表符><说明>」，
-                                        量过的行各一行「row<制表符><tag><制表符><峰值字节><制表符><线程数>」。
+  replay_row_costs.py read <请求文件> [--no-host-cap]
+                                        请求文件一行「<tag><制表符><身份>」。标准输出：一行「cap<制表符><字节或 -><制表符><说明>」、
+                                        一行「host-cap<制表符><字节或 -><制表符><说明>」（这一台能给的内存，host_slice_cap_bytes 取的；取的时候出了异常报 - 与「<异常类名>：<异常>」）、
+                                        一行「records<制表符><目录或 -><制表符><说明>」，量过的行各一行「row<制表符><tag><制表符><峰值字节><制表符><线程数>」。
+                                        --no-host-cap 是 replay.sh 的弄坏开关 host-cap-unreported 交下来的：不打 host-cap 那一行。
   replay_row_costs.py sample <监看目录> <峰值记录目录或 -> [--progress-seconds <秒，0 不报>] [--no-records] [--record-failed]
                                         起来先写一份 ready，一直跑到监看目录里出现 stop，或起它的进程没了。在跑的行由 replay.sh 往监看目录里写：
                                         <tag>.payload 一行「<进程号><制表符><身份>」；<tag>.end 一行「<退出码> <线程数>」（都是改名换上）。
@@ -132,10 +137,21 @@ def write_record(records_directory, identity, peak, threads):
     write_replacing(os.path.join(key_directory(records_directory, identity), task_memory.new_worker_peak_record_name()), f"{peak} {threads}\t{identity}\n")
 
 
-def command_read(request_path):
+def host_cap_reading(environment):
+    """这一台能给的内存 (字节或 None, 说明)：取的时候出了异常（多机配置或它要读的库读不进来）交 None 与异常，replay.sh 照取不到办。"""
+    try:
+        return task_memory.host_slice_cap_bytes(environment)
+    except Exception as error:   # 取不到不挡读数的别几行：replay.sh 退回这一次拿到的上限
+        return None, f"{type(error).__name__}：{error}"
+
+
+def command_read(request_path, report_host_cap):
     cap, cap_text = task_memory.task_memory_cap_bytes(os.environ)
     directory, directory_text = records_directory_of(os.environ)
     print(f"cap\t{cap if cap is not None else '-'}\t{' '.join(str(cap_text).split())}")
+    if report_host_cap:
+        host_cap, host_text = host_cap_reading(os.environ)
+        print(f"host-cap\t{host_cap if host_cap is not None else '-'}\t{' '.join(str(host_text).split())}")
     print(f"records\t{directory or '-'}\t{' '.join(directory_text.split())}")
     with open(request_path, encoding="utf-8", errors="surrogateescape") as handle:
         for line in handle:
@@ -217,7 +233,9 @@ def command_sample(watch, records_directory, progress_seconds, record_success, r
 
 def main(arguments):
     if arguments[:1] == ["read"] and len(arguments) == 2:
-        return command_read(arguments[1])
+        return command_read(arguments[1], True)
+    if arguments[:1] == ["read"] and len(arguments) == 3 and arguments[2] == "--no-host-cap":
+        return command_read(arguments[1], False)
     if arguments[:1] == ["record"] and len(arguments) == 5 and arguments[3].isdigit() and arguments[4].isdigit():
         write_record(arguments[1], arguments[2], int(arguments[3]), int(arguments[4]))
         return 0

@@ -34,7 +34,7 @@
 //! 不答一致性（E96 已量混合形态的静默错读，本实验不重复）；
 //! 不答空间效率（`.claude/rules/fs-design.md`「比谁省不构成任何判据」）。
 
-use e7_index_bench::{Emitter, Sample};
+use e7_index_bench::{i64_from_u64, Emitter, Sample};
 
 /// 数据单元 32768 含头（D4 已定项 1 / 已定项 5）。
 const DATA_UNIT_BYTES: u64 = 32768;
@@ -232,7 +232,7 @@ fn main() {
                 - publish_bytes(Arm::Pointer, MAIN_LEAVES, total_units, key_bytes, MINIMUM_REPLICA_WIDTH);
             let bytes_saved_per_move = move_bytes(Arm::Pointer, referencing_tree_count, leaves_per_tree, total_units, key_bytes, MINIMUM_REPLICA_WIDTH)
                 .saturating_sub(move_bytes(Arm::Map, referencing_tree_count, leaves_per_tree, total_units, key_bytes, MINIMUM_REPLICA_WIDTH));
-            let moves_to_break_even = if bytes_saved_per_move == 0 { -1i64 } else { map_publish_extra_bytes.div_ceil(bytes_saved_per_move) as i64 };
+            let moves_to_break_even = if bytes_saved_per_move == 0 { -1i64 } else { i64_from_u64(map_publish_extra_bytes.div_ceil(bytes_saved_per_move)) };
             output_text.push_str(&emitter.emit_raw(&format!(
                 "name=crossover key_bytes={key_bytes} k={referencing_tree_count} publish_extra={map_publish_extra_bytes} \
                  saved_per_move={bytes_saved_per_move} moves_per_publish_to_break_even={moves_to_break_even}"

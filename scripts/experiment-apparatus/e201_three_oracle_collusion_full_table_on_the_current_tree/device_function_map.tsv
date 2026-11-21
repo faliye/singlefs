@@ -1,4 +1,4 @@
-# E201（三oracle合谋今树整表） 读法 8 归因 G5 的对应表：判定格（产物, 行种, 字段）→ 入库装置 crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs 里算它的函数。
+# E201（三oracle合谋今树整表） 读法 8 归因 G5 的对应表：判定格（产物, 行种, 字段）→ 入库装置 crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs 里算它的函数。
 # 写于 2026-11-03，今天任何产物之前（只读了装置源码与 P1–P3 的字段名）；sha256 记在跑前登记第十二节修订 2，之后不改（attribution.py 开跑时核）。
 # 两种行：
 #   group<TAB><组名><TAB><函数名,…>        一组函数（按函数名的最后一段认：装置里同名的几个一并比）

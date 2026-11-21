@@ -35,6 +35,7 @@
 //! 不含事务与 checkpoint 摊销（真实写路径会把多个改动并进一次发布）；不含分配器；
 //! 不含并发；`pad` 那一臂是算术不是实测；换设备要重跑。
 
+use e7_index_bench::{low_byte_of_u64, low_byte_of_usize, u64_from_nanoseconds, usize_from_u64};
 use aes_gcm::{
     aead::{AeadInOut, KeyInit},
     Aes256Gcm, Nonce,
@@ -59,16 +60,27 @@ struct Aligned { pointer: *mut u8, length_in_bytes: usize, layout: Layout }
 impl Aligned {
     fn new(length_in_bytes: usize) -> Self {
         let layout = Layout::from_size_align(length_in_bytes, ALIGNMENT_BYTES).expect("对齐参数非法");
+        // SAFETY: `layout` 由 `Layout::from_size_align` 校验过；`alloc` 要求布局大小非零，调用处传的都是 O_DIRECT 用的正的整块长度。
         let pointer = unsafe { alloc(layout) };
         assert!(!pointer.is_null(), "分配失败");
+        // SAFETY: `pointer` 刚由 `alloc` 分配，布局长度就是 `length_in_bytes`，上一行已断言非空；`u8` 没有对齐或取值限制，可以写 `length_in_bytes` 个字节。
         unsafe { std::ptr::write_bytes(pointer, 0xA5, length_in_bytes) };
         Self { pointer, length_in_bytes, layout }
     }
-    fn as_slice(&self) -> &[u8] { unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) } }
-    fn as_mut_slice(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) } }
+    fn as_slice(&self) -> &[u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) }
+    }
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；独占借用 `&mut self`，同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
+    }
 }
 impl Drop for Aligned {
-    fn drop(&mut self) { unsafe { dealloc(self.pointer, self.layout) } }
+    fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局，`drop` 只跑一次，之后没有别的引用。
+        unsafe { dealloc(self.pointer, self.layout) }
+    }
 }
 
 fn next_random_word(state: &mut u64) -> u64 {
@@ -124,23 +136,23 @@ fn write_arm(path: &str, grain_bytes: usize, units: u64, operation_count: u64, s
             sink = sink.wrapping_add(
                 cipher.encrypt_inout_detached(nonce, b"", (&mut unit_buffer.as_mut_slice()[..grain_bytes]).into())
                     .expect("验旧单元失败")[0] as u64);
-            verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
+            verify_nanoseconds += u64_from_nanoseconds(verify_start.elapsed().as_nanos());
         }
         // 改掉其中 4 KiB
         let random_word = next_random_word(&mut random_state);
-        for (byte_index, byte) in unit_buffer.as_mut_slice()[..USER_WRITE as usize].iter_mut().enumerate() {
-            *byte = (random_word >> (byte_index % 8 * 8)) as u8;
+        for (byte_index, byte) in unit_buffer.as_mut_slice()[..usize_from_u64(USER_WRITE)].iter_mut().enumerate() {
+            *byte = low_byte_of_u64(random_word >> (byte_index % 8 * 8));
         }
         let verify_start = Instant::now();
         sink = sink.wrapping_add(
             cipher.encrypt_inout_detached(nonce, b"", (&mut unit_buffer.as_mut_slice()[..grain_bytes]).into())
                 .expect("算新 MAC 失败")[0] as u64);
-        verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
+        verify_nanoseconds += u64_from_nanoseconds(verify_start.elapsed().as_nanos());
         file.write_all_at(unit_buffer.as_slice(), cursor * grain_bytes as u64).expect("写失败");
         if sync { file.sync_data().expect("fdatasync 失败"); }
         cursor = (cursor + 1) % units;
     }
-    Arm { elapsed_nanoseconds: start_instant.elapsed().as_nanos() as u64, verify_nanoseconds, operation_count, sink }
+    Arm { elapsed_nanoseconds: u64_from_nanoseconds(start_instant.elapsed().as_nanos()), verify_nanoseconds, operation_count, sink }
 }
 
 fn fill(path: &str, region: u64) {
@@ -151,7 +163,7 @@ fn fill(path: &str, region: u64) {
     eprintln!("填充测试区 {} MiB …", region / (1024 * 1024));
     let mut fill_buffer = Aligned::new(SEQUENTIAL_FILL_CHUNK_BYTES);
     for (byte_index, byte) in fill_buffer.as_mut_slice().iter_mut().enumerate() {
-        *byte = (byte_index as u8).wrapping_mul(31).wrapping_add(7);
+        *byte = low_byte_of_usize(byte_index).wrapping_mul(31).wrapping_add(7);
     }
     file.seek(SeekFrom::Start(0)).expect("seek 失败");
     for _ in 0..(region / SEQUENTIAL_FILL_CHUNK_BYTES as u64) { file.write_all(fill_buffer.as_slice()).expect("填充失败"); }

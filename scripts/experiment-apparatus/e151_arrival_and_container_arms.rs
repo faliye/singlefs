@@ -23,6 +23,9 @@
 //! 容量 1、不打包、M = 0 时，七条 E93 臂 × 两组负载的 14 个 `aging_median` 必须逐字复现 E93 入库产物
 //! `e93-aging-placement-2026-09-03.out`（与 E95 的闸同型，E95 已证过这套放置代码能复现）。
 
+#[cfg(test)]
+use e7_index_bench::truncate_f64_to_u64;
+use e7_index_bench::{u32_from_usize, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::collections::BTreeSet;
 
@@ -72,7 +75,7 @@ impl Rng {
         self.0
     }
     fn below(&mut self, exclusive_upper_bound: usize) -> usize {
-        (self.next() % exclusive_upper_bound as u64) as usize
+        usize_from_u64(self.next() % exclusive_upper_bound as u64)
     }
 }
 
@@ -190,12 +193,12 @@ struct Sim {
 impl Sim {
     /// 初始布局：key k 住槽 k（顺序创建的形态），与 E93 逐字同一套；每个 key 自成一个节点。
     fn new(object_count: usize, slot_count: usize, slots_per_segment: usize) -> Sim {
-        assert!(object_count < slot_count && slot_count % slots_per_segment == 0);
+        assert!(object_count < slot_count && slot_count.is_multiple_of(slots_per_segment));
         let mut slot_occupancy = vec![0u8; slot_count];
-        for slot in 0..object_count {
-            slot_occupancy[slot] = 1;
+        for occupancy in slot_occupancy.iter_mut().take(object_count) {
+            *occupancy = 1;
         }
-        let free: BTreeSet<u32> = (object_count as u32..slot_count as u32).collect();
+        let free: BTreeSet<u32> = (u32_from_usize(object_count)..u32_from_usize(slot_count)).collect();
         let mut free_slots_per_segment = vec![0u16; slot_count / slots_per_segment];
         for slot in object_count..slot_count {
             free_slots_per_segment[slot / slots_per_segment] += 1;
@@ -204,9 +207,9 @@ impl Sim {
         Sim {
             slot_count,
             slots_per_segment,
-            order: (0..object_count as u32).collect(),
-            node_keys: (0..object_count as u32).map(|key| vec![key]).collect(),
-            node_slot: (0..object_count as u32).collect(),
+            order: (0..u32_from_usize(object_count)).collect(),
+            node_keys: (0..u32_from_usize(object_count)).map(|key| vec![key]).collect(),
+            node_slot: (0..u32_from_usize(object_count)).collect(),
             node_alive: vec![true; object_count],
             slot_occupancy,
             free,
@@ -358,7 +361,7 @@ impl Sim {
         identifier
     }
     fn new_node(&mut self, keys: Vec<u32>, slot: u32) -> u32 {
-        let identifier = self.node_keys.len() as u32;
+        let identifier = u32_from_usize(self.node_keys.len());
         self.node_keys.push(keys);
         self.node_slot.push(slot);
         self.node_alive.push(true);
@@ -435,8 +438,8 @@ impl Sim {
     /// 没有就回落到减数臂（全池最低空槽），回落单独计。目录 = key / OBJECTS_PER_DIRECTORY。
     fn allocate_directory_hint(&mut self, key: u32) -> u32 {
         let directory = key as usize / OBJECTS_PER_DIRECTORY;
-        let first_member = (directory * OBJECTS_PER_DIRECTORY) as u32;
-        let last_member = (((directory + 1) * OBJECTS_PER_DIRECTORY).min(self.last_write.len())) as u32;
+        let first_member = u32_from_usize(directory * OBJECTS_PER_DIRECTORY);
+        let last_member = u32_from_usize(((directory + 1) * OBJECTS_PER_DIRECTORY).min(self.last_write.len()));
         let mut member_segments: BTreeSet<usize> = BTreeSet::new();
         for member in first_member..last_member {
             member_segments.insert(self.slot_of_key(member) as usize / self.slots_per_segment);
@@ -445,8 +448,8 @@ impl Sim {
             if self.open_segment == Some(segment_index) {
                 continue;
             }
-            let segment_start = (segment_index * self.slots_per_segment) as u32;
-            let segment_end = segment_start + self.slots_per_segment as u32;
+            let segment_start = u32_from_usize(segment_index * self.slots_per_segment);
+            let segment_end = segment_start + u32_from_usize(self.slots_per_segment);
             if let Some(&slot) = self.free.range(segment_start..segment_end).next() {
                 self.free.remove(&slot);
                 self.segment_free_decrement(slot);
@@ -475,8 +478,8 @@ impl Sim {
             if self.open_segment == Some(segment_index) {
                 continue;
             }
-            let segment_start = (segment_index * self.slots_per_segment) as u32;
-            let segment_end = segment_start + self.slots_per_segment as u32;
+            let segment_start = u32_from_usize(segment_index * self.slots_per_segment);
+            let segment_end = segment_start + u32_from_usize(self.slots_per_segment);
             if let Some(&slot) = self.free.range(segment_start..segment_end).next() {
                 self.free.remove(&slot);
                 self.segment_free_decrement(slot);
@@ -499,7 +502,7 @@ impl Sim {
         for directory in 0..directory_count {
             let first_member = directory * OBJECTS_PER_DIRECTORY;
             let last_member = ((directory + 1) * OBJECTS_PER_DIRECTORY).min(object_count);
-            let mut member_slots: Vec<u32> = (first_member..last_member).map(|member| self.slot_of_key(member as u32)).collect();
+            let mut member_slots: Vec<u32> = (first_member..last_member).map(|member| self.slot_of_key(u32_from_usize(member))).collect();
             for &slot in &member_slots {
                 slot_directory[slot as usize] = Some(directory);
             }
@@ -523,8 +526,8 @@ impl Sim {
             for chunk_start in (0..self.slot_count).step_by(*chunk_slots) {
                 let mut owner: Option<usize> = None;
                 let mut mixed = false;
-                for slot in chunk_start..(chunk_start + chunk_slots) {
-                    if let Some(directory) = slot_directory[slot] {
+                for &directory_of_slot in slot_directory.iter().skip(chunk_start).take(*chunk_slots) {
+                    if let Some(directory) = directory_of_slot {
                         match owner {
                             None => owner = Some(directory),
                             Some(current) if current != directory => {
@@ -585,8 +588,8 @@ impl Sim {
     }
     /// 一条整理意图：把 R 里的活节点全部搬走，目的地按政策函数（protect 为真排除 R，为假不排除）。
     fn run_compaction_intent(&mut self, region: usize, protect_region: bool) {
-        let region_start = (region * self.slots_per_segment) as u32;
-        let region_end = region_start + self.slots_per_segment as u32;
+        let region_start = u32_from_usize(region * self.slots_per_segment);
+        let region_end = region_start + u32_from_usize(self.slots_per_segment);
         let positions: Vec<usize> = (0..self.node_count())
             .filter(|&position| {
                 let slot = self.node_slot[self.order[position] as usize];
@@ -611,7 +614,7 @@ impl Sim {
         loop {
             if let Some(segment_index) = self.open_segment {
                 if self.bump < self.slots_per_segment {
-                    let slot = (segment_index * self.slots_per_segment + self.bump) as u32;
+                    let slot = u32_from_usize(segment_index * self.slots_per_segment + self.bump);
                     self.bump += 1;
                     debug_assert!(self.free.contains(&slot));
                     self.free.remove(&slot);
@@ -673,7 +676,7 @@ impl Sim {
         if let Some(segment_index) = self.open_segment {
             if self.slots_per_segment - self.bump >= chunk_length {
                 for &position in positions {
-                    let slot = (segment_index * self.slots_per_segment + self.bump) as u32;
+                    let slot = u32_from_usize(segment_index * self.slots_per_segment + self.bump);
                     self.bump += 1;
                     self.take_slot(slot);
                     self.move_node(position, slot);
@@ -685,7 +688,7 @@ impl Sim {
             self.open_segment = Some(segment_index);
             self.bump = 0;
             for &position in positions {
-                let slot = (segment_index * self.slots_per_segment + self.bump) as u32;
+                let slot = u32_from_usize(segment_index * self.slots_per_segment + self.bump);
                 self.bump += 1;
                 self.take_slot(slot);
                 self.move_node(position, slot);
@@ -694,7 +697,7 @@ impl Sim {
         }
         if let Some(start) = self.find_free_run(chunk_length) {
             for (offset_in_run, &position) in positions.iter().enumerate() {
-                let slot = start + offset_in_run as u32;
+                let slot = start + u32_from_usize(offset_in_run);
                 self.take_slot(slot);
                 self.move_node(position, slot);
             }
@@ -820,7 +823,7 @@ fn extend_neighbors(dirty: &[usize], radius: usize, object_count: usize) -> Vec<
 
 /// 单对象或容器成员的 COW 重写：单对象节点搬槽，容器成员搬出。
 fn rewrite_key(sim: &mut Sim, key: usize, slot: u32, checkpoint: u64) {
-    sim.extract_key_to_slot(key as u32, slot);
+    sim.extract_key_to_slot(u32_from_usize(key), slot);
     sim.last_write[key] = checkpoint;
 }
 
@@ -831,12 +834,12 @@ fn pack_step(sim: &mut Sim, checkpoint: u64, hysteresis: u64) {
     let mut run_start: Option<u32> = None;
     let mut run_length = 0usize;
     while looked < sim.pack_sweep_per_checkpoint {
-        let key = sim.pack_cursor as u32;
+        let key = u32_from_usize(sim.pack_cursor);
         sim.pack_cursor = (sim.pack_cursor + 1) % object_count;
         looked += 1;
         let position = sim.position_holding(key);
         let eligible = sim.key_count_at(position) == 1 && checkpoint.saturating_sub(sim.last_write[key as usize]) >= hysteresis;
-        let contiguous = run_start.is_some_and(|start| start + run_length as u32 == key) && key != 0;
+        let contiguous = run_start.is_some_and(|start| start + u32_from_usize(run_length) == key) && key != 0;
         if eligible && (run_length == 0 || contiguous) {
             if run_length == 0 {
                 run_start = Some(key);
@@ -904,6 +907,7 @@ fn run_arm_with_home_overflow(arm: Arm, load: Load, seed: u64, metadata_blocks: 
     run_arm_with_knobs(arm, load, seed, metadata_blocks, checkpoint_count, sample_every, PACK_SWEEP_PER_CHECKPOINT, Some(home_overflow_segments))
 }
 
+#[allow(clippy::too_many_arguments, reason = "入参就是一次运行的全部旋钮（臂、负载、种子、元数据块数、检查点数、采样间隔、整理扫描量、溢出段数），拆结构体不会少传哪一项")]
 fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, checkpoint_count: u64, sample_every: u64, pack_sweep_per_checkpoint: usize, home_overflow_segments: Option<usize>) -> Outcome {
     let mut sim = Sim::new(OBJECT_COUNT, SLOT_COUNT, SLOTS_PER_SEGMENT);
     sim.pack_sweep_per_checkpoint = pack_sweep_per_checkpoint;
@@ -959,13 +963,13 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
             }
             Arm::DirectoryHint => {
                 for &key in &dirty {
-                    let slot = sim.allocate_directory_hint(key as u32);
+                    let slot = sim.allocate_directory_hint(u32_from_usize(key));
                     rewrite_key(&mut sim, key, slot, checkpoint);
                 }
             }
             Arm::DirectoryHome => {
                 for &key in &dirty {
-                    let slot = sim.allocate_directory_home(key as u32);
+                    let slot = sim.allocate_directory_home(u32_from_usize(key));
                     rewrite_key(&mut sim, key, slot, checkpoint);
                 }
             }
@@ -1043,7 +1047,7 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
         empty_segments_peak_after_drain,
         rounds_with_empty_segments_after_drain,
         write_amp: sim.total_writes as f64 / sim.user_writes as f64,
-        fallback_percent: 100.0 * sim.fallback_allocations as f64 / (sim.total_writes + (checkpoint_count as usize * metadata_blocks) as u64) as f64,
+        fallback_percent: 100.0 * sim.fallback_allocations as f64 / (sim.total_writes + (usize_from_u64(checkpoint_count) * metadata_blocks) as u64) as f64,
         metadata_fallback_allocations: sim.metadata_fallback_allocations,
         container_writes: sim.container_writes,
         hint_fallback_allocations: sim.hint_fallback_allocations,
@@ -1060,12 +1064,12 @@ fn run_arm_with_knobs(arm: Arm, load: Load, seed: u64, metadata_blocks: usize, c
 fn measurement_control(sim: &mut Sim) -> (u64, u64, u64, u64) {
     let node_count = sim.node_count();
     for position in 0..node_count {
-        let target = if position < node_count / 2 { 2 * position as u32 } else { (2 * (position - node_count / 2) + 1) as u32 };
+        let target = if position < node_count / 2 { 2 * u32_from_usize(position) } else { u32_from_usize(2 * (position - node_count / 2) + 1) };
         force_to(sim, position, target);
     }
     let scatter = (sim.runs_incremental(), sim.audit_runs());
     for position in 0..node_count {
-        force_to(sim, position, position as u32);
+        force_to(sim, position, u32_from_usize(position));
     }
     let compact = (sim.runs_incremental(), sim.audit_runs());
     (scatter.0, scatter.1, compact.0, compact.1)
@@ -1224,6 +1228,7 @@ fn main() {
     }
 
     // 判据 5 / 6：主格
+    #[allow(clippy::type_complexity, reason = "主格每一行就是八列读数，按位取用，只在这个函数里用，命名结构体不会让哪一步更好验")]
     let mut grid: Vec<(String, &'static str, usize, u64, u64, f64, u64, u64)> = Vec::new();
     for &arm in &arms {
         for load in [Load::Uniform, Load::Runs8] {
@@ -1377,6 +1382,7 @@ fn main() {
     let mut home_stays_in_few_segments_everywhere = true;
     for load in [Load::Uniform, Load::Runs8] {
         for metadata_blocks in directory_metadata_samples {
+            #[allow(clippy::type_complexity, reason = "每个臂一行八列读数，按位取用，只在这个循环里用，命名结构体不会让哪一步更好验")]
             let mut by_arm: Vec<(String, u64, u64, u64, u64, u64, u64, u64)> = Vec::new();
             for arm in directory_arms {
                 let mut directory_runs = Vec::new();
@@ -1635,8 +1641,8 @@ mod tests {
         assert_eq!(sim.runs_incremental(), 3, "[0,1,2]@8 | 3@9 | [4,5,6]@8 | 7@7：容器槽 8 与单对象 9 相邻不断，9 → 8 断，8 → 7 断");
         assert_eq!(sim.keys_held(), 8);
         // 再把 0 搬走：原节点留住 [1,2]，两片仍同槽、占用仍是 2
-        let slot = sim.allocate_bump();
-        sim.extract_key_to_slot(0, slot);
+        let slot_for_key_zero = sim.allocate_bump();
+        sim.extract_key_to_slot(0, slot_for_key_zero);
         assert_eq!(sim.slot_occupancy[8], 2);
         assert_eq!(sim.node_count(), 5, "0 | [1,2] | 3 | [4,5,6] | 7");
         assert_eq!(sim.keys_held(), 8);
@@ -1670,7 +1676,7 @@ mod tests {
             let slot = sim.allocate_bump();
             sim.extract_key_to_slot(key, slot);
             let expected = if key == 6 { 1 } else { 0 };
-            assert_eq!(sim.deferred.iter().filter(|&&slot| slot == 8).count(), expected, "key {key}");
+            assert_eq!(sim.deferred.iter().filter(|&&deferred_slot| deferred_slot == 8).count(), expected, "key {key}");
         }
         assert_eq!(sim.slot_occupancy[8], 0);
         assert_eq!(sim.keys_held(), 8);
@@ -1755,7 +1761,7 @@ mod tests {
         assert_eq!(sim.free.len(), 64, "下一轮收尾才回到空闲");
         let zero = run_arm(Arm::BumpSegment, Load::Uniform, 0, 0, 300, 50);
         let nine = run_arm(Arm::BumpSegment, Load::Uniform, 0, 9, 300, 50);
-        assert_ne!((zero.fallback_percent * 10.0) as u64, (nine.fallback_percent * 10.0) as u64, "M 不同回落率要变");
+        assert_ne!(truncate_f64_to_u64(zero.fallback_percent * 10.0), truncate_f64_to_u64(nine.fallback_percent * 10.0), "M 不同回落率要变");
     }
 
     /// 全空段计数：增量与全扫逐点相等，且初始等于 (S − L) / G。

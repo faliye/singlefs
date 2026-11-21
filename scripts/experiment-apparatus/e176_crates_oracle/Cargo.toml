@@ -6,8 +6,8 @@
 # 自己一个 workspace（下面的空 [workspace]），不进 research 的工作区，replay.sh 与门禁的研究构建都不编它。目录里没有 main.rs，
 # e7-index-bench 的 bin 自动发现也不会把它当成一个 bin。
 #
-# 编：task-server/task submit -- cargo build --release --manifest-path scripts/experiment-apparatus/e176_crates_oracle/Cargo.toml（编译目录由服务给这一次的 CARGO_TARGET_DIR，task wait 末行 build=<目录>，用完 task-server/task clean <号>）
-# 跑：task-server/task submit -- cargo run --release --manifest-path scripts/experiment-apparatus/e176_crates_oracle/Cargo.toml --bin e176-inode-leaf-merge-crates-oracle（编与跑在同一条任务里：派到第二台时编译目录在那一台本地、命令结束就删，不能编一条、再另交一条去跑编出来的文件）
+# 编：task-server/task submit -- cargo build --release --manifest-path scripts/experiment-apparatus/e176_crates_oracle/Cargo.toml（编译目录由服务按树给、经 CARGO_TARGET_DIR 交给命令；归树、不归任务，不用自己删：树删了服务跟着删，task-server/README.md「编译目录」）
+# 跑：task-server/task submit -- cargo run --release --manifest-path scripts/experiment-apparatus/e176_crates_oracle/Cargo.toml --bin e176-inode-leaf-merge-crates-oracle（编与跑在同一条任务里：派到第二台时编译目录在那一台本地盘上，编的那一条与跑的那一条不一定派到同一台，不能编一条、再另交一条去跑编出来的文件）
 [package]
 name = "e176-crates-oracle"
 version = "0.1.0"

@@ -253,7 +253,7 @@ mod tests {
     /// 绝对值：间距 0 / 512 / 4096 在 io_min = 4096 下分别是 2 / 2 / 1。
     #[test]
     fn one_read_modify_write_reaches_both_regions_exactly_when_the_gap_is_smaller() {
-        assert_eq!(regions_hit_by_one_read_modify_write(0, REGION_BYTES + 0, REGION_BYTES, 4096), 2);
+        assert_eq!(regions_hit_by_one_read_modify_write(0, REGION_BYTES, REGION_BYTES, 4096), 2);
         assert_eq!(regions_hit_by_one_read_modify_write(0, REGION_BYTES + 512, REGION_BYTES, 4096), 2);
         assert_eq!(regions_hit_by_one_read_modify_write(0, REGION_BYTES + 4095, REGION_BYTES, 4096), 2);
         assert_eq!(regions_hit_by_one_read_modify_write(0, REGION_BYTES + 4096, REGION_BYTES, 4096), 1); // 恰好等于就够

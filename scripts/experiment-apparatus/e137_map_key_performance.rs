@@ -500,7 +500,7 @@ fn build_image(shape: ImageShape, map_scope: MapScope, code1_order: Code1KeyOrde
             image.checkpoint();
         }
     }
-    if total_units % shape.checkpoint_every_writes != 0 {
+    if !total_units.is_multiple_of(shape.checkpoint_every_writes) {
         image.checkpoint();
     }
     image
@@ -687,7 +687,7 @@ fn run_background_workload(base: &Image, shape: ImageShape, workload: Background
                     checkpoint_count += 1;
                 }
             }
-            if unit_count % BACKGROUND_CHECKPOINT_EVERY_UNITS != 0 {
+            if !unit_count.is_multiple_of(BACKGROUND_CHECKPOINT_EVERY_UNITS) {
                 totals.add(&image.checkpoint());
                 checkpoint_count += 1;
             }
@@ -706,7 +706,7 @@ fn run_background_workload(base: &Image, shape: ImageShape, workload: Background
                     checkpoint_count += 1;
                 }
             }
-            if unit_count % BACKGROUND_CHECKPOINT_EVERY_UNITS != 0 {
+            if !unit_count.is_multiple_of(BACKGROUND_CHECKPOINT_EVERY_UNITS) {
                 totals.add(&image.checkpoint());
                 checkpoint_count += 1;
             }

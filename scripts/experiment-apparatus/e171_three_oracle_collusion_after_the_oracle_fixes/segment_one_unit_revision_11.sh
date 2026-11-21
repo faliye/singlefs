@@ -17,7 +17,13 @@
 # 弄坏开关（只在 UNITS_R11_SELFTEST=1 时认）。逐项写开关名、弄坏哪一处，下一行写打开后红的格（segment_one_units_revision_11.py 的自证打的）：
 #   UNITS_R11_BREAK=report-only-dropped  取来的驱动行起驱动不带 --report-only
 #       「✗ 自证 unit-script-driver-report-only：」
+#   平常跑（UNITS_R11_SELFTEST 不是 1）设了 UNITS_R11_BREAK 就在读参数之前退 2、点名它只在自证里认，不管值是什么。
 set -u
+if [ -n "${UNITS_R11_BREAK:-}" ] && [ "${UNITS_R11_SELFTEST:-}" != 1 ]; then
+  echo "  ✗ UNITS_R11_BREAK=$UNITS_R11_BREAK 是弄坏开关，只在自证（UNITS_R11_SELFTEST=1，segment_one_units_revision_11.py --selftest 起的单元）里认；平常跑设了就拒，这一次什么都没做" >&2
+  echo "     → 怎么办：unset UNITS_R11_BREAK 再来；要看开关红在哪一格，跑 UNITS_R11_BREAK=<项> python3 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/segment_one_units_revision_11.py --selftest" >&2
+  exit 2
+fi
 UNIT=${1:?要单元名}
 source "$(dirname "${BASH_SOURCE[0]}")/../../hosts/heavy-threads.sh" || exit 2
 THREADS="$(heavy_thread_default)" || exit 2  # 取每台默认重活线程数；单元编排起的单元里 SINGLEFS_THREAD_CAP 就是它分到的数

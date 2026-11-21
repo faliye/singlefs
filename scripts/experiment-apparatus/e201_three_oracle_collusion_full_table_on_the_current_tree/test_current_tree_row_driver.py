@@ -245,6 +245,32 @@ class JudgeImportTests(unittest.TestCase):
         self.assertEqual(from_the_driver, {name: ("repo", os.path.join(e171_relative, name + ".py")) for name in self.MODULES_FROM_E171})
         self.assertEqual(from_the_research_side, ("repo", os.path.join(e171_relative, "frozen_o3.py")))
 
+    DRIVERS_OWN_INSERTION = ("if e171_research_side.E171_DIRECTORY not in sys.path:\n"
+                             "    sys.path.insert(1, e171_research_side.E171_DIRECTORY)\n")
+
+    def test_without_the_drivers_own_insertion_the_key_library_still_resolves_the_e171_modules_through_the_research_side(self) -> None:
+        """驱动自己那一句 sys.path 插入与 e171_research_side.py 那一句同值（变异表不收改这一句的变异，等价）：拷进小树的驱动去掉这一句，
+        算键的库照样从模块级 import 进来的 e171_research_side 加的目录解得出那四份（PythonModule.search_directories 认 import 进来的模块加的 sys.path）。
+        算键的库的弄坏开关 python-imported-sys-path-ignored 下这一条红。"""
+        import attribution
+        units = attribution.function_units()
+        e171_relative = driver.e171_research_side.E171_RELATIVE
+        with open(os.path.join(driver.HERE, "current_tree_row_driver.py"), encoding="utf-8") as handle:
+            driver_text = handle.read()
+        self.assertEqual(driver_text.count(self.DRIVERS_OWN_INSERTION), 1)
+        with tempfile.TemporaryDirectory() as root:
+            own_directory = os.path.join(root, self.OWN_RELATIVE)
+            os.makedirs(own_directory)
+            with open(os.path.join(own_directory, "current_tree_row_driver.py"), "w", encoding="utf-8") as handle:
+                handle.write(driver_text.replace(self.DRIVERS_OWN_INSERTION, ""))
+            self.copy_into(os.path.join(driver.HERE, "e171_research_side.py"), os.path.join(own_directory, "e171_research_side.py"))
+            for name in self.MODULES_FROM_E171:
+                self.copy_into(os.path.join(driver.E171_DIRECTORY, name + ".py"), os.path.join(root, e171_relative, name + ".py"))
+            index = units.PythonIndex(root)
+            row_driver_module = index.module(os.path.join(self.OWN_RELATIVE, "current_tree_row_driver.py"))
+            from_the_driver = {name: row_driver_module.resolve_module(name, 0) for name in self.MODULES_FROM_E171}
+        self.assertEqual(from_the_driver, {name: ("repo", os.path.join(e171_relative, name + ".py")) for name in self.MODULES_FROM_E171})
+
 
 if __name__ == "__main__":
     unittest.main()

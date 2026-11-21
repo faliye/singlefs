@@ -194,7 +194,7 @@ mod tests {
     #[test]
     fn one_slot_per_region_already_satisfies_the_lower_bound() {
         for region_count in [2u64, 3, 4] {
-            let total_slot_count = region_count * 1;
+            let total_slot_count = region_count;
             assert!(total_slot_count >= 2);
             assert!(surviving_slots(region_count, 1) >= 1, "R={region_count}");
         }

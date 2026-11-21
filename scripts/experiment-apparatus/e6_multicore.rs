@@ -27,8 +27,9 @@
 // 换 API 就换了被测对象，那个对照当场失去意义。
 // ⇒ 这里压制弃用警告是**有理由的压制**，不是忽略警告
 // （`.claude/singlefs-ai-sop/rules/command-safety.md`：警告是免费的信号，不许略过）。
-#![allow(deprecated)]
+#![allow(deprecated, reason = "阳性对照 1 复现 E6，E6 口径写明用 encrypt_in_place_detached，换 API 就换了被测对象")]
 
+use e7_index_bench::u64_from_nanoseconds;
 use aes_gcm::{aead::{AeadInPlace, KeyInit}, Aes256Gcm, Nonce};
 use chacha20poly1305::ChaCha20Poly1305;
 use e7_index_bench::Emitter;
@@ -94,7 +95,7 @@ fn time_parallel_seal_in_nanoseconds(cipher_algorithm: CipherAlgorithm, thread_c
         worker_handles.push(std::thread::spawn(move || { let sealed_byte_count = seal_buffer_in_place(cipher_algorithm, &mut thread_buffer); std::hint::black_box(&thread_buffer); sealed_byte_count }));
     }
     let total_sealed_byte_count: usize = worker_handles.into_iter().map(|worker_handle| worker_handle.join().unwrap()).sum();
-    (start_instant.elapsed().as_nanos() as u64, total_sealed_byte_count)
+    (u64_from_nanoseconds(start_instant.elapsed().as_nanos()), total_sealed_byte_count)
 }
 
 /// **阳性对照 2 的臂：算力受限。** 固定总工作量按线程均分 ⇒ 完美并行时比值 ≈ 线程数。
@@ -113,7 +114,7 @@ fn compute(thread_count: usize, total_iterations: u64) -> u64 {
     let mut combined_chain_state = 0u64;
     for worker_handle in worker_handles { combined_chain_state ^= worker_handle.join().unwrap(); }
     std::hint::black_box(combined_chain_state);
-    start_instant.elapsed().as_nanos() as u64
+    u64_from_nanoseconds(start_instant.elapsed().as_nanos())
 }
 
 fn throughput_in_mebibytes_per_second(byte_count: usize, elapsed_nanoseconds: u64) -> f64 {
@@ -145,8 +146,8 @@ fn main() {
     let mut emitter = Emitter::new();
     let mut output_text = String::new();
     let mut append_output_line = |output_line: String| { output_text.push_str(&output_line); output_text.push('\n'); };
-    let flush_output_and_abort_round = |output_text: &mut String, emitter: &mut Emitter, failure_message: &str| -> ! {
-        output_text.push_str(&emitter.finish()); output_text.push('\n'); print!("{output_text}");
+    let flush_output_and_abort_round = |pending_output: &mut String, finishing_emitter: &mut Emitter, failure_message: &str| -> ! {
+        pending_output.push_str(&finishing_emitter.finish()); pending_output.push('\n'); print!("{pending_output}");
         eprintln!("E6MC: {failure_message}"); std::process::exit(4);
     };
 

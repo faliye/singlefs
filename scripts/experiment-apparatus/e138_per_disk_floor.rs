@@ -5,6 +5,7 @@
 //! ② 两种 df 都报，判据只用扣掉保留池与推空最坏残留的那一种；
 //! ③ 新增 activation_faults：把根槽写失败与丢盘注入到抬 F 到生效那段区间里（E135 从没注入过）。
 
+use e7_index_bench::truncate_f64_to_usize;
 use e7_index_bench::Emitter;
 use std::collections::{BTreeSet, HashSet, VecDeque};
 use std::rc::Rc;
@@ -249,13 +250,13 @@ impl Metrics {
         if self.minimum_candidates == u64::MAX { 0 } else { self.minimum_candidates }
     }
     fn average_candidates_in_hundredths(&self) -> u64 {
-        if self.checks == 0 { 0 } else { self.candidate_sum * 100 / self.checks }
+        (self.candidate_sum * 100).checked_div(self.checks).unwrap_or(0)
     }
     fn average_nonempty_candidates_in_hundredths(&self) -> u64 {
-        if self.checks == 0 { 0 } else { self.nonempty_candidate_sum * 100 / self.checks }
+        (self.nonempty_candidate_sum * 100).checked_div(self.checks).unwrap_or(0)
     }
     fn forced_publications_per_window_in_hundredths(&self) -> u64 {
-        if self.user_windows == 0 { 0 } else { self.forced_publications * 100 / self.user_windows }
+        (self.forced_publications * 100).checked_div(self.user_windows).unwrap_or(0)
     }
 }
 
@@ -583,7 +584,7 @@ impl Simulation {
     }
 
     fn prefill(&mut self, fill: f64) {
-        let target_live = (CAPACITY_BLOCKS as f64 * fill) as usize;
+        let target_live = truncate_f64_to_usize(CAPACITY_BLOCKS as f64 * fill);
         let mut next_block = 0usize;
         while next_block + USER_BLOCKS_PER_OBJECT <= target_live {
             let mut object = [0usize; USER_BLOCKS_PER_OBJECT];
@@ -990,7 +991,7 @@ fn schedule(seed: u64, ring_depth: u64, world: World) -> (u64, u64) {
     let event_window = 2 * ring_depth + 20 + state % 150;
     let lead = match world {
         World::AdminRollback => TXG_ARITHMETIC_GENERATIONS + 2,
-        World::TornNewest | World::DiskLoss | World::SlotWriteFail => if seed % 2 == 0 { 0 } else { TXG_ARITHMETIC_GENERATIONS },
+        World::TornNewest | World::DiskLoss | World::SlotWriteFail => if seed.is_multiple_of(2) { 0 } else { TXG_ARITHMETIC_GENERATIONS },
         World::Steady | World::RollbackFirstPublish => 0,
     };
     (event_window, lead)
@@ -1286,9 +1287,9 @@ fn main() {
                 };
                 for pattern in &patterns {
                     for crash_window in 1..=ACTIVATION_FAULT_CRASH_WINDOWS {
-                        for lost_disk in 0..DISK_COUNT {
+                        for (lost_disk, class_metrics) in by_class.iter_mut().enumerate() {
                             let case = run_activation_fault_case(&prefix, pattern, crash_window, lost_disk);
-                            by_class[lost_disk][pattern.len()].add(&case);
+                            class_metrics[pattern.len()].add(&case);
                             if arm.is_candidate() && (case.fake_candidates > 0 || case.unrecoverable > 0) && detail_lines < DETAIL_LINES_MAXIMUM {
                                 detail_lines += 1;
                                 println!("{}", emitter.emit_raw(&format!(

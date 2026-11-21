@@ -3,6 +3,7 @@
 //! 起因是两条已定项**正面相撞**：
 //!   - D8：write buffer 的 sort-merge-sweep **本质单线程且在关键路径上**；
 //!   - D9：加密路径**必须能并行**（E6 实测无 AES-NI 时单核 267.55 MiB/s，低于单盘顺序带宽）。
+//!
 //! 若合并这一段也卡在单线程，那并行化加密买到的东西会被它吃掉。
 //!
 //! ## 三条臂共用同一份输入，且输出必须逐位相同
@@ -21,6 +22,7 @@
 //! 「每线程各排一份互不相交的数据」必须接近线性加速。测不出加速 ⇒ 机器或 harness 有问题，
 //! 整轮作废——不许把「没加速」记成算法的结论。
 
+use e7_index_bench::u64_from_nanoseconds;
 use e7_index_bench::Emitter;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -188,7 +190,7 @@ fn main() {
     for _ in 0..rounds {
         let t0 = Instant::now();
         let r = arm_single(&input);
-        let ns = t0.elapsed().as_nanos() as u64;
+        let ns = u64_from_nanoseconds(t0.elapsed().as_nanos());
         std::hint::black_box(&r);
         best_single = best_single.min(ns);
     }
@@ -203,7 +205,7 @@ fn main() {
         for _ in 0..rounds {
             let t0 = Instant::now();
             let r = arm_parallel(&input, th);
-            let ns = t0.elapsed().as_nanos() as u64;
+            let ns = u64_from_nanoseconds(t0.elapsed().as_nanos());
             std::hint::black_box(&r);
             best = best.min(ns);
         }
@@ -218,7 +220,7 @@ fn main() {
     for _ in 0..rounds {
         let t0 = Instant::now();
         let v = arm_control(n, 1, 99);
-        let ns = t0.elapsed().as_nanos() as u64;
+        let ns = u64_from_nanoseconds(t0.elapsed().as_nanos());
         std::hint::black_box(v);
         ctl1 = ctl1.min(ns);
     }
@@ -227,7 +229,7 @@ fn main() {
         for _ in 0..rounds {
             let t0 = Instant::now();
             let v = arm_control(n, th, 99);
-            let ns = t0.elapsed().as_nanos() as u64;
+            let ns = u64_from_nanoseconds(t0.elapsed().as_nanos());
             std::hint::black_box(v);
             best = best.min(ns);
         }

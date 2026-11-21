@@ -16,6 +16,7 @@
 //! 6. 盘满：near_full 下报假性 ENOSPC、卡死、可退代数；臂 D 卡死多于臂 A 则 D 在这一格输一次。
 //! 7. C281：rollback_first_publish 里各臂的不可恢复数，单独报。
 
+use e7_index_bench::{truncate_f64_to_u64, truncate_f64_to_usize, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::collections::{HashSet, VecDeque};
 
@@ -192,7 +193,7 @@ impl Simulation {
             pool: PoolState { blocks: vec![BlockState::Unused; CAPACITY_BLOCKS], objects: Vec::new(), metadata: Vec::new() },
             damaged_txgs: HashSet::new(),
             // mkfs 把第 0 代种进全部槽（D22（单元原子性怎么合成） 已定项 8）
-            ring: vec![Some(seed_root); ring_depth as usize],
+            ring: vec![Some(seed_root); usize_from_u64(ring_depth)],
             disk0_lost: false,
             instance: 1,
             instance_rows: Vec::new(),
@@ -384,7 +385,7 @@ impl Simulation {
     }
 
     fn prefill(&mut self, fill: f64) {
-        let target_live = (CAPACITY_BLOCKS as f64 * fill) as usize;
+        let target_live = truncate_f64_to_usize(CAPACITY_BLOCKS as f64 * fill);
         let mut next_block = 0usize;
         while next_block + USER_BLOCKS_PER_OBJECT <= target_live {
             let mut object = [0usize; USER_BLOCKS_PER_OBJECT];
@@ -410,7 +411,7 @@ impl Simulation {
     /// 预热之后按正常写路径只建不删，直到占用到 fill：走同一条准入与盘紧处置，复用照记损坏。
     /// 到不了就停——那一截就是这条臂在这个 S 上被窗口扣住的空间。返回实际达到的占用块数。
     fn fill_by_creating(&mut self, fill: f64) -> u64 {
-        let target_live = (CAPACITY_BLOCKS as f64 * fill) as u64;
+        let target_live = truncate_f64_to_u64(CAPACITY_BLOCKS as f64 * fill);
         for _ in 0..CAPACITY_BLOCKS {
             if self.halted || self.live_count() >= target_live {
                 break;
@@ -738,7 +739,7 @@ fn schedule(seed: u64, ring_depth: u64, world: World) -> (u64, u64) {
         // 盘紧那个窗口算第 1 个：回退落在第 K_min + 3 个非空窗口
         World::AdminRollback => MINIMUM_PROTECTED_GENERATIONS + 2,
         // 盘紧那个窗口算第 1 个：故障落在第 1 个或第 K_min + 1 个非空窗口
-        World::TornNewest | World::Disk0Loss | World::SlotWriteFail => if seed % 2 == 0 { 0 } else { MINIMUM_PROTECTED_GENERATIONS },
+        World::TornNewest | World::Disk0Loss | World::SlotWriteFail => if seed.is_multiple_of(2) { 0 } else { MINIMUM_PROTECTED_GENERATIONS },
         World::Steady | World::NearFull | World::RollbackFirstPublish => 0,
     };
     (event_window, lead)
@@ -916,7 +917,7 @@ fn main() {
             for slots_per_region in SLOTS_PER_REGION_SWEEP {
                 for (arm_index, arm) in ARMS.iter().enumerate() {
                     let total = sum_metrics(*arm, world, slots_per_region, empty_publication_cost);
-                    let average_candidates_in_hundredths = if total.checks == 0 { 0 } else { total.candidate_sum * 100 / total.checks };
+                    let average_candidates_in_hundredths = (total.candidate_sum * 100).checked_div(total.checks).unwrap_or(0);
                     let minimum_candidates = if total.minimum_candidates == u64::MAX { 0 } else { total.minimum_candidates };
                     println!("{}", emitter.emit_raw(&format!(
                         "name=cell arm={} world={} s={slots_per_region} empty_cost={empty_publication_cost} fakes={} checks={} \

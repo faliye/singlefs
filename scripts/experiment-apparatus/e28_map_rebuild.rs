@@ -20,6 +20,8 @@
 //! ⚠️ **不是「能不能重建出一张表」，是「重建出的表与原表逐条相同」。**
 //! 只判条数会让「重建出一张全错的表」也通过。
 
+#[cfg(test)]
+use e7_index_bench::usize_from_u64;
 use e7_index_bench::Emitter;
 use std::collections::BTreeMap;
 
@@ -49,6 +51,7 @@ type PlaintextMap = BTreeMap<(u64, u64, u64), u64>;
 /// 所以「缺的那一条是元数据还是数据」只能从这里查。
 /// 不靠 `对象号 >= 10_000` 这个约定去分类：`Unit.kind` 同时也记着同一件事，
 /// **两份表示会漂移**，所以只留一份。
+#[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
 fn build(metadata_unit_count: u64, data_unit_count: u64, data_units_carry_self_description: bool) -> (Vec<Unit>, PlaintextMap, BTreeMap<(u64, u64, u64), UnitClass>) {
     let mut units = Vec::new();
     let mut plaintext_map = PlaintextMap::new();
@@ -192,7 +195,7 @@ mod tests {
         for moved_unit_count in [1usize, 3, 7] {
             let tally = measure_with_moved(16, 16, true, moved_unit_count);
             assert_eq!(tally.rebuilt, tally.total, "搬运不改变条数");
-            assert_eq!(tally.wrong as usize, moved_unit_count,
+            assert_eq!(usize_from_u64(tally.wrong), moved_unit_count,
                 "搬走 {moved_unit_count} 个单元，逐条比对该报出 {moved_unit_count} 处地址不同，实测 {}", tally.wrong);
             assert_eq!(tally.missing, 0, "搬运不该造成缺条");
         }

@@ -33,6 +33,7 @@
 //! 计数模型，零文件操作，没有并发。「盘」是 loc → 单元的映射，复用一个 loc 就是把旧头盖掉。
 //! 真值由生成器在每个根发布那一刻记下，不经过任何重建代码。
 
+use e7_index_bench::usize_from_u64;
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
@@ -221,7 +222,7 @@ enum Operation {
     Overwrite(Key),
     DeleteObject(Key),
     /// 先把新版本写到盘上，再在同一事务里删掉——只在单测里构造
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg_attr(not(test), allow(dead_code, reason = "这个变体只在单测里构造"))]
     WriteThenDelete(Key),
     /// 一个已死的 key 重新写出（同一对象的同一锚点在 truncate 之后再写）
     Recreate(Key),
@@ -240,6 +241,7 @@ struct World {
     /// defer 窗口：发布后再等 DEFER 次发布才进可分配集合（I-7.4 的 K 代保护，回退用）
     defer: VecDeque<(Txg, Vec<u64>)>,
     /// 最近几次发布的全部根视图（回退用）：(发布的 txg, 实例, 头视图, 当时的快照, 当时的祖先表)
+    #[allow(clippy::type_complexity, reason = "每一项就是回退要原样放回的五样东西，只在回退与发布两处按位取用，命名结构体不会让哪一步更好验")]
     history: Vec<(Txg, u32, BTreeMap<Tree, View>, Vec<View>, BTreeMap<Tree, (Tree, Txg)>)>,
     /// 回退抛弃的根仍留在根环里：(txg, 实例)。下次择新按 txg 最大者——新时间线的根必须压过它们
     abandoned_roots: Vec<(Txg, u32)>,
@@ -354,7 +356,7 @@ impl World {
         };
         let tree = world.new_tree();
         world.heads.insert(tree, Head {
-            tree: tree,
+            tree,
             data: BTreeMap::new(),
             containers: Vec::new(),
             open_tombstone_container: None,
@@ -458,11 +460,11 @@ impl World {
                     }
                 }
                 Operation::Recreate(key) => {
-                    if !head.data.contains_key(&key) {
+                    head.data.entry(key).or_insert_with(|| {
                         let location = self.write_unit(key, tree, Payload::Data);
                         written_this_transaction.push(location);
-                        head.data.insert(key, location);
-                    }
+                        location
+                    });
                 }
                 Operation::WriteThenDelete(key) => {
                     if let Some(old_location) = head.data.remove(&key) {
@@ -611,8 +613,8 @@ impl World {
 
     /// 从一个已发布视图重建头（回退用）：记录内容从盘上那一版读回。
     fn head_from_view(&self, view: &View) -> Head {
-        let inode_records_of = |location: u64| -> BTreeMap<u64, u64> { match &self.disk[&location].payload { Payload::Inodes(inode_map) => inode_map.clone(), _ => unreachable!() } };
-        let tombstone_records_of = |location: u64| -> Vec<TombstoneRecord> { match &self.disk[&location].payload { Payload::Tombstones(tombstone_list) => tombstone_list.clone(), _ => unreachable!() } };
+        let inode_records_of = |location: u64| -> BTreeMap<u64, u64> { match &self.disk[&location].payload { Payload::Inodes(inode_map) => inode_map.clone(), Payload::Data | Payload::Tombstones(_) => unreachable!() } };
+        let tombstone_records_of = |location: u64| -> Vec<TombstoneRecord> { match &self.disk[&location].payload { Payload::Tombstones(tombstone_list) => tombstone_list.clone(), Payload::Data | Payload::Inodes(_) => unreachable!() } };
         Head {
             tree: view.tree,
             data: view.data.clone(),
@@ -708,9 +710,9 @@ impl World {
         // 新头共享 origin 在快照那一刻的单元：数据 map 与容器都照抄，容器标 shared
         let mut containers: Vec<ContainerLeaf> = Vec::new();
         let mut seen: BTreeSet<Key> = BTreeSet::new();
-        for (_, (container_key, container_location, _)) in &snapshot_view.inodes {
+        for (container_key, container_location, _) in snapshot_view.inodes.values() {
             if seen.insert(*container_key) {
-                let inode_records = match &self.disk[container_location].payload { Payload::Inodes(inode_map) => inode_map.clone(), _ => unreachable!() };
+                let inode_records = match &self.disk[container_location].payload { Payload::Inodes(inode_map) => inode_map.clone(), Payload::Data | Payload::Tombstones(_) => unreachable!() };
                 containers.push(ContainerLeaf { key: *container_key, location: *container_location, inode_records, dirty: false, shared: true });
             }
         }
@@ -775,7 +777,7 @@ impl World {
         let trees: Vec<Tree> = self.heads.keys().copied().collect();
         for tree in trees {
             let mut head = self.heads.remove(&tree).unwrap();
-            let stale = |disk: &BTreeMap<u64, Unit>, location: u64| location != 0 && disk.get(&location).map_or(false, |unit| unit.birth == txg && unit.write_sequence.instance == previous_instance);
+            let stale = |disk: &BTreeMap<u64, Unit>, location: u64| location != 0 && disk.get(&location).is_some_and(|unit| unit.birth == txg && unit.write_sequence.instance == previous_instance);
             for container in head.containers.iter_mut() {
                 if stale(&self.disk, container.location) {
                     let old_location = container.location;
@@ -922,14 +924,14 @@ impl World {
             let mut kept: Vec<(Key, u64, Vec<TombstoneRecord>)> = Vec::new();
             for (key, location, tombstone_records) in head.closed_tombstone_containers.drain(..) {
                 let keep: Vec<TombstoneRecord> = tombstone_records.iter().copied().filter(|tombstone_record| match tombstone_record {
-                    TombstoneRecord::Kill { key, death_txg, .. } => {
+                    TombstoneRecord::Kill { key: killed_key, death_txg, .. } => {
                         // D18 已定项 10 的量词是「全部还引用它的根（含快照与可写头）」：
                         // 克隆头是头不是快照，凡是它里面还活着、而 origin 后来删掉的对象，按「全部还引用它的快照」这个窄量词它的 kill 记录可以被回收，
                         // 而克隆引用的那具尸体一直可读
                         // ⚠️ 模型这道门是**按 key** 判的，而规则问的是「还有没有根引用那个死掉的版本」——
                         // 两者在「先删后重建」上就分岔（同一个 key 既有 kill 记录、又被本头引用着新版本）。
                         // 所以模型分不出两个量词：加上可写头这一半只是更保守，没有能让它承重的世界。
-                        let referenced_by_snapshot_or_head = snapshots.iter().any(|snapshot_view| snapshot_view.data.contains_key(key)) || heads.values().any(|head_view: &View| head_view.data.contains_key(key));
+                        let referenced_by_snapshot_or_head = snapshots.iter().any(|snapshot_view| snapshot_view.data.contains_key(killed_key)) || heads.values().any(|head_view: &View| head_view.data.contains_key(killed_key));
                         let gated = gate && scrub_watermark < (*death_txg).max(floor);
                         referenced_by_snapshot_or_head || gated
                     }
@@ -957,7 +959,7 @@ impl World {
 
     /// scrub：抹掉可读、已发布、不属于任何根现行版本的单元的头；抹头水位 = 上一个已发布 txg。
     /// 神谕清扫（真值判据）：只给单测当对照，世界里不用。
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg_attr(not(test), allow(dead_code, reason = "神谕清扫只给单测当对照，世界里不用"))]
     fn scrub_oracle_set(&self) -> BTreeSet<u64> {
         let deferred: BTreeSet<u64> = self.defer.iter().flat_map(|(_, deferred_locations)| deferred_locations.iter().copied()).chain(self.pending_free.iter().copied()).collect();
         self.disk.keys().copied().filter(|location| !self.referenced_by_root(*location) && !deferred.contains(location)).collect()
@@ -976,9 +978,8 @@ impl World {
                 Some(AllocationState::Allocated) => {}
                 Some(AllocationState::Freed(freed_txg)) => { if *freed_txg <= oldest_ring_txg { candidates.push(*location); } }
                 None => {
-                    if unit.write_sequence.instance < self.instance {
-                        if !row_published(&self.watermarks, unit) { candidates.push(*location); }
-                    }
+                    if unit.write_sequence.instance < self.instance
+                        && !row_published(&self.watermarks, unit) { candidates.push(*location); }
                 }
             }
         }
@@ -1121,7 +1122,7 @@ fn rebuild_root(world: &World, root: &View, arm: Arm) -> Rebuilt {
         candidates.entry(unit.key).or_default().push((*location, unit));
     }
     // 择新
-    let pick = |versions: &Vec<(u64, &Unit)>, ambiguous_count: &mut u64| -> (u64, WriteSequence, Txg) {
+    let pick = |versions: &Vec<(u64, &Unit)>, ambiguous_total: &mut u64| -> (u64, WriteSequence, Txg) {
         let data_by_birth = arm.write_sequence_metadata_only && versions.iter().all(|(_, unit)| matches!(unit.key, Key::Data { .. }));
         // 第八版 P3：择新键按单元类分——码 1 取写序；码 3 只在 checkpoint 的固定点写出，
         // 写序的事务号是 checkpoint 的属性、给不出全序，键取 (诞生代号, 实例代号)。
@@ -1131,19 +1132,19 @@ fn rebuild_root(world: &World, root: &View, arm: Arm) -> Rebuilt {
         if use_container_birth_key {
             let highest_container_key = versions.iter().map(|(_, unit)| (unit.birth, unit.write_sequence.instance, unit.write_sequence.counter)).max().unwrap();
             let ties: Vec<&(u64, &Unit)> = versions.iter().filter(|(_, unit)| (unit.birth, unit.write_sequence.instance, unit.write_sequence.counter) == highest_container_key).collect();
-            if ties.len() > 1 { *ambiguous_count += 1; }
+            if ties.len() > 1 { *ambiguous_total += 1; }
             let (location, unit) = ties.iter().min_by_key(|(location, _)| *location).unwrap();
             (*location, unit.write_sequence, unit.birth)
         } else if arm.use_write_sequence && !data_by_birth {
             let highest_write_sequence = versions.iter().map(|(_, unit)| unit.write_sequence).max().unwrap();
             let ties: Vec<&(u64, &Unit)> = versions.iter().filter(|(_, unit)| unit.write_sequence == highest_write_sequence).collect();
-            if ties.len() > 1 { *ambiguous_count += 1; }
+            if ties.len() > 1 { *ambiguous_total += 1; }
             let (location, unit) = ties.iter().min_by_key(|(location, _)| *location).unwrap();
             (*location, unit.write_sequence, unit.birth)
         } else {
             let highest_birth = versions.iter().map(|(_, unit)| unit.birth).max().unwrap();
             let ties: Vec<&(u64, &Unit)> = versions.iter().filter(|(_, unit)| unit.birth == highest_birth).collect();
-            if ties.len() > 1 { *ambiguous_count += 1; }
+            if ties.len() > 1 { *ambiguous_total += 1; }
             let (location, unit) = ties.iter().max_by_key(|(location, _)| *location).unwrap();
             (*location, unit.write_sequence, unit.birth)
         }
@@ -1171,7 +1172,7 @@ fn rebuild_root(world: &World, root: &View, arm: Arm) -> Rebuilt {
     for (current_key, (location, write_sequence, birth)) in &current {
         match current_key {
             Key::Data { .. } => {
-                let dead = kills.get(current_key).map_or(false, |kill_entries| kill_entries.iter().any(|(kill_death_write_sequence, kill_death_txg)| {
+                let dead = kills.get(current_key).is_some_and(|kill_entries| kill_entries.iter().any(|(kill_death_write_sequence, kill_death_txg)| {
                     if arm.use_death_write_sequence && !arm.write_sequence_metadata_only { if arm.tie_unit_wins { kill_death_write_sequence > write_sequence } else { kill_death_write_sequence >= write_sequence } } else {
                         if kill_death_txg == birth { ambiguous_count += 1; false } else { kill_death_txg > birth }
                     }
@@ -1221,7 +1222,7 @@ fn measure(world: &World, arm: Arm, corrupt: usize) -> MeasureOutcome {
 
 // ── 世界 ──
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct ClosedFormCounts {
     /// 崩溃后没再被写过的被抛弃单元数（去水位臂应当把它们全判成现行）
     abandoned_unrewritten: u64,
@@ -1585,17 +1586,17 @@ fn world_mixed(seed: u64, configuration: WorldConfiguration, rounds: u32) -> (Wo
         let mut crash_at: Option<u64> = None;
         if world.random_source.chance_basis_points(1500) { crash_at = Some(world.random_source.below(transaction_count)); }
         for transaction_index in 0..transaction_count {
-            let tree = trees[world.random_source.below(trees.len() as u64) as usize];
+            let tree = trees[usize_from_u64(world.random_source.below(trees.len() as u64))];
             let mut operations: Vec<Operation> = Vec::new();
             let keys: Vec<Key> = world.heads[&tree].data.keys().copied().collect();
             let inode_numbers: Vec<u64> = world.heads[&tree].containers.iter().flat_map(|container| container.inode_records.keys().copied()).collect();
             for _ in 0..(1 + world.random_source.below(4)) {
                 match world.random_source.below(6) {
                     0 => operations.push(Operation::CreateObject),
-                    1 | 2 if !keys.is_empty() => operations.push(Operation::Overwrite(keys[world.random_source.below(keys.len() as u64) as usize])),
-                    3 if !keys.is_empty() => operations.push(Operation::DeleteObject(keys[world.random_source.below(keys.len() as u64) as usize])),
+                    1 | 2 if !keys.is_empty() => operations.push(Operation::Overwrite(keys[usize_from_u64(world.random_source.below(keys.len() as u64))])),
+                    3 if !keys.is_empty() => operations.push(Operation::DeleteObject(keys[usize_from_u64(world.random_source.below(keys.len() as u64))])),
                     4 => operations.push(Operation::CreateInode),
-                    5 if !inode_numbers.is_empty() => operations.push(Operation::DeleteInode(inode_numbers[world.random_source.below(inode_numbers.len() as u64) as usize])),
+                    5 if !inode_numbers.is_empty() => operations.push(Operation::DeleteInode(inode_numbers[usize_from_u64(world.random_source.below(inode_numbers.len() as u64))])),
                     _ => operations.push(Operation::CreateObject),
                 }
             }
@@ -1605,9 +1606,9 @@ fn world_mixed(seed: u64, configuration: WorldConfiguration, rounds: u32) -> (Wo
             operations.retain(|operation| match operation {
                 Operation::Overwrite(key) | Operation::DeleteObject(key) | Operation::WriteThenDelete(key) | Operation::Recreate(key) => seen.insert(*key),
                 Operation::DeleteInode(inode_number) => seen_inode_numbers.insert(*inode_number),
-                _ => true,
+                Operation::CreateObject | Operation::CreateInode => true,
             });
-            let abandon = crash_at.map_or(false, |crash_index| transaction_index >= crash_index);
+            let abandon = crash_at.is_some_and(|crash_index| transaction_index >= crash_index);
             world.apply_transaction(tree, &operations, abandon);
         }
         if crash_at.is_some() {
@@ -1617,10 +1618,10 @@ fn world_mixed(seed: u64, configuration: WorldConfiguration, rounds: u32) -> (Wo
             world.publish();
         }
         match world.random_source.below(10) {
-            0 | 1 => { let tree = trees[world.random_source.below(trees.len() as u64) as usize]; world.snapshot(tree); }
-            2 if world.snapshot_count() > 0 && world.heads.len() < 4 => { let snapshot_index = world.random_source.below(world.snapshot_count() as u64) as usize; world.clone_head(snapshot_index); }
+            0 | 1 => { let tree = trees[usize_from_u64(world.random_source.below(trees.len() as u64))]; world.snapshot(tree); }
+            2 if world.snapshot_count() > 0 && world.heads.len() < 4 => { let snapshot_index = usize_from_u64(world.random_source.below(world.snapshot_count() as u64)); world.clone_head(snapshot_index); }
             3 if world.snapshot_count() > 0 => {
-                let snapshot_index = world.random_source.below(world.snapshot_count() as u64) as usize;
+                let snapshot_index = usize_from_u64(world.random_source.below(world.snapshot_count() as u64));
                 let snapshot_view = &world.snapshots[snapshot_index];
                 let is_fork = world.ancestry.values().any(|(origin_tree, clone_txg)| *origin_tree == snapshot_view.tree && *clone_txg == snapshot_view.txg);
                 if !is_fork { world.destroy_snapshot(snapshot_index); }
@@ -1632,12 +1633,6 @@ fn world_mixed(seed: u64, configuration: WorldConfiguration, rounds: u32) -> (Wo
         }
     }
     (world, ClosedFormCounts::default())
-}
-
-impl Default for ClosedFormCounts {
-    fn default() -> Self {
-        ClosedFormCounts { abandoned_unrewritten: 0, reclaimed_readable: 0, cross_head_keys: 0, same_txg_pairs: 0, same_txg_overwrites: 0, retired_then_deleted: 0, rollback_abandoned: 0, live_versions: 0 }
-    }
 }
 
 fn emit_cell(emitter: &mut Emitter, world_name: &str, seed: u64, arm: Arm, measured: MeasureOutcome, closed_form: ClosedFormCounts) -> String {

@@ -47,7 +47,7 @@
 //! 不答第 2 行（journal 记录、共享内生块、崩溃点轨迹）；不答挂钟；不答 `crates/` 今天走的
 //! 「按位次定位」读法（登记第三节：那是这条条款没定时的绕行，不是本模型要建的两条候选之一）。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{i64_from_u64, Emitter};
 
 // ── 格式常量（逐条带出处，第二节已整段抄） ──────────────────────────────
 
@@ -475,7 +475,7 @@ fn main() {
                      delta={} unit_index_correct_count={unit_index_correct_count} \
                      byte_interval_correct_count={byte_interval_correct_count} aad_anchor_correct_count={aad_anchor_correct_count}",
                     arm.label(),
-                    capacity_at_read_time as i64 - capacity_at_write_time as i64,
+                    i64_from_u64(capacity_at_read_time) - i64_from_u64(capacity_at_write_time),
                 )));
             }
         }
@@ -517,8 +517,8 @@ mod tests {
     #[test]
     fn 锚点甲一与锚点乙二_一条记录装六十四个点名项() {
         assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 64);
-        assert!(64 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES <= JOURNAL_RECORD_BYTES);
-        assert!(JOURNAL_RECORD_BYTES < 65 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES);
+        assert!(std::hint::black_box(64 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES <= JOURNAL_RECORD_BYTES));
+        assert!(std::hint::black_box(JOURNAL_RECORD_BYTES < 65 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES));
     }
 
     /// B7：头 487 时的余数（25，D23 已定项 4「4096 上余 3609」）——分得开同一档里
@@ -575,8 +575,8 @@ mod tests {
     #[test]
     fn 锚点乙一_一叶一百四十四条() {
         assert_eq!(extent_leaf_capacity(16384), 144);
-        assert!(144 * EXTENT_LEAF_RECORD_BYTES + EXTENT_NODE_HEADER_BYTES <= 16384);
-        assert!(16384 < 145 * EXTENT_LEAF_RECORD_BYTES + EXTENT_NODE_HEADER_BYTES);
+        assert!(std::hint::black_box(144 * EXTENT_LEAF_RECORD_BYTES + EXTENT_NODE_HEADER_BYTES <= 16384));
+        assert!(std::hint::black_box(16384 < 145 * EXTENT_LEAF_RECORD_BYTES + EXTENT_NODE_HEADER_BYTES));
     }
 
     /// 树高的绝对值断言（不与另一次调用互比）：M2「树高从零起数」把 `extent_tree_height` 里

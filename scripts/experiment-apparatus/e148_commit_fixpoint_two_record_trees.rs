@@ -3,7 +3,7 @@
 //! 模型逐字沿用 E81（提交的固定点）的放置三臂，只把「一棵记录树」推广成「若干棵」。
 //! 判据与失败条款在 `research/prompts/e148-preregistration.md`，装置写之前。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 /// E81 的分配记录树几何：叶 512 条、扇出 256、65536 叶（≈ 1 TiB 池 / 32 KiB）。
 const ALLOCATION_RECORDS_PER_LEAF: u64 = 512;
@@ -170,7 +170,7 @@ fn publish(trees: &[RecordTree], arm: Arm, user_block_count: u64, accounting_nod
     let mut states: Vec<TreeState> = trees
         .iter()
         .map(|tree| TreeState {
-            dirty: tree.levels.iter().map(|&node_count| vec![false; node_count as usize]).collect(),
+            dirty: tree.levels.iter().map(|&node_count| vec![false; usize_from_u64(node_count)]).collect(),
             bump: initial_cursor(tree),
             dirty_count: 0,
         })
@@ -201,8 +201,8 @@ fn publish(trees: &[RecordTree], arm: Arm, user_block_count: u64, accounting_nod
                 records_inserted += 1;
                 let mut node_index = key / tree.records_per_leaf;
                 for level in state.dirty.iter_mut() {
-                    if !level[node_index as usize] {
-                        level[node_index as usize] = true;
+                    if !level[usize_from_u64(node_index)] {
+                        level[usize_from_u64(node_index)] = true;
                         newly_dirty_count += 1;
                         state.dirty_count += 1;
                     }

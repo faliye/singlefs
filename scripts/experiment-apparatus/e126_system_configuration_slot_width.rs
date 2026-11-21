@@ -36,6 +36,7 @@
 //! 不答 C212 整条冲突（还管根槽与 journal 记录两类）。
 //! 不答真设备行为——`io_min` 三档是扫的参数。
 
+use e7_index_bench::u32_from_u64;
 use e7_index_bench::Emitter;
 
 /// D18 已定项 9：池内最小单元大小，第一版 16384。
@@ -108,7 +109,7 @@ fn honors_minimum_input_output_size(width: u64, io_min: u64) -> bool {
 /// 三点上 n ≤ 32 全都不溢出；跑起来在候选乙的 65536（n = 128）上当场 panic。
 /// 这正是 `.claude/rules/mutation-sampling.md` 说的**取样点不敏感**，不是等价变异。
 fn tear_states(width: u64) -> (u32, Option<u64>) {
-    let sector_count = width.div_ceil(SECTOR_BYTES) as u32;
+    let sector_count = u32_from_u64(width.div_ceil(SECTOR_BYTES));
     // n = 1 时 2¹ − 2 = 0：一个扇区内不存在「部分可读」的中间态。
     let readable_inconsistent_state_count = if sector_count <= 63 { Some((1u64 << sector_count) - 2) } else { None };
     (sector_count, readable_inconsistent_state_count)

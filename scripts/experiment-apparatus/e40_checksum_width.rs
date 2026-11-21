@@ -23,7 +23,7 @@
 //! **字节交换它一次都检不出**（和不变），而 CRC 全检得出。
 //! 测不出这个差别 ⇒ 损坏根本没注入进去，整轮作废。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{i32_from_u32, u32_from_u64, usize_from_u64, Emitter};
 
 const BLOCK_BYTES: usize = 512;
 const TRIALS_PER_SEED: u64 = 50_000;
@@ -183,7 +183,10 @@ impl ChecksumAlgorithm {
     fn trials(self) -> u64 {
         match self {
             ChecksumAlgorithm::Sha256Truncated32 => SHA256_TRIALS,
-            _ => TRIALS_PER_SEED,
+            ChecksumAlgorithm::Sum8
+            | ChecksumAlgorithm::Crc32cTruncated(_)
+            | ChecksumAlgorithm::Crc32cFull
+            | ChecksumAlgorithm::CyclicRedundancyCheck64Full => TRIALS_PER_SEED,
         }
     }
 }
@@ -212,8 +215,8 @@ impl Damage {
     fn apply(self, block: &mut [u8], other_block: &[u8], generator: &mut XorshiftGenerator) -> bool {
         match self {
             Damage::BitFlip => {
-                let flip_byte_index = generator.below(block.len() as u64) as usize;
-                let flip_bit = generator.below(8) as u32;
+                let flip_byte_index = usize_from_u64(generator.below(block.len() as u64));
+                let flip_bit = u32_from_u64(generator.below(8));
                 block[flip_byte_index] ^= 1 << flip_bit;
                 true
             }
@@ -239,8 +242,8 @@ impl Damage {
                 true
             }
             Damage::ByteSwap => {
-                let first_index = generator.below(block.len() as u64) as usize;
-                let mut second_index = generator.below(block.len() as u64) as usize;
+                let first_index = usize_from_u64(generator.below(block.len() as u64));
+                let mut second_index = usize_from_u64(generator.below(block.len() as u64));
                 if first_index == second_index {
                     second_index = (second_index + 1) % block.len();
                 }
@@ -308,7 +311,7 @@ fn corrupt_reads(inputs: Inputs) -> f64 {
 }
 
 fn expected_misses(inputs: Inputs, bit_width: u32) -> f64 {
-    corrupt_reads(inputs) * 2f64.powi(-(bit_width as i32))
+    corrupt_reads(inputs) * 2f64.powi(-i32_from_u32(bit_width))
 }
 
 /// 满足 `漏检期望 < target` 的最小位宽。
@@ -411,7 +414,7 @@ fn main() {
                 missed_total += missed;
             }
             // 理论值 2^-n，用「每百万次漏检数」表达，避免打印极小浮点
-            let theory_parts_per_million = 1e6 / 2f64.powi(algorithm.bits() as i32);
+            let theory_parts_per_million = 1e6 / 2f64.powi(i32_from_u32(algorithm.bits()));
             let measured_parts_per_million = if injected_total == 0 { 0.0 } else { 1e6 * missed_total as f64 / injected_total as f64 };
             println!(
                 "{}",
@@ -512,7 +515,7 @@ mod tests {
             injected_total += injected;
             missed_total += missed;
         }
-        let miss_probability = 2f64.powi(-(truncated_bits as i32));
+        let miss_probability = 2f64.powi(-i32_from_u32(truncated_bits));
         let mean = injected_total as f64 * miss_probability;
         let sigma = (injected_total as f64 * miss_probability * (1.0 - miss_probability)).sqrt();
         assert!(injected_total > 24_000, "注入 {injected_total} 次太少");

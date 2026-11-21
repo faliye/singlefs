@@ -56,7 +56,7 @@ plan / record / finish，本地不建库目录）：
   一行一项（项名 row-<序号>），存进 prune-server 的 apparatus-items 族、种类 e171_three_oracle_collusion（LIBRARY_KIND）：items/<键>.out 是 pack_directory
   打的整个行目录（按相对路径排好序、修改时刻置 0，同一份内容同一串字节），items/<键>.verdict 是判定（比法 timing：行目录里带耗时）。
   键照 long_run_item_verdicts.py 文件头「请求文件」，由 admission.py 的 compute_unit_key 在这一趟的快照上算（快照当 --root；row_request_lines）：
-    入口   装置二进制 e171_three_oracle_collusion 的 main（feature:singlefs-verification/gpu、profile:release）：单元闭包、工具链、闭包真引到的依赖版本
+    入口   装置二进制 e171_three_oracle_collusion 的 main（feature:singlefs-implementation-experiments/gpu、profile:release）：单元闭包、工具链、闭包真引到的依赖版本
     judge  本文件的 run_row_on_the_lane，`--positive-control O3` 另加 o3_bad_image_judge.py 的 main（judge-root 是本文件所在的仓，只当索引）
     line:  行号、名单那一行原文、改坏用的变异行原文（改坏之后的源码不进闭包，由这一行进键）、是不是空变异、--positive-control、--disable-oracle、
            --no-executor、判的路线（多机配置开没开 GPU，judging_route）、冻结 O3 的冻结行摘要（o3_freeze_digest；--no-executor 写 -）；原文照 JSON 转写
@@ -212,7 +212,7 @@ from bad_implementation_table import (MAXIMUM_SUBSTITUTIONS_PER_ROW, STATUS_ANCH
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEVICE_BINARY_NAME = "e171_three_oracle_collusion"
-DEVICE_PACKAGE = "singlefs-verification"
+DEVICE_PACKAGE = "singlefs-implementation-experiments"
 DEVICE_FEATURES = ("gpu",)
 TOOLCHAIN_MISSING_SENTENCE = "判法单元指纹要记编这个测试二进制的工具链"   # crash_point_replay_progress.rs 里环境没有 CARGO 时的 panic 句
 ENGINE_START_REFUSED_SENTENCE = "起不了给定状态表的引擎"   # e171_three_oracle_collusion.rs 的 given_states_engine_of_this_experiment 起引擎失败的 panic 句（原因行跟在后面）
@@ -476,7 +476,7 @@ def compile_command() -> list[str]:
 
 
 def run_compile(lane_tree: str, lane_target: str, repo_root: str, threads: int, log_path: str, artifacts_path: str) -> tuple[int, int]:
-    """`cargo build --release --offline --message-format=json-render-diagnostics -p singlefs-verification --features gpu --bin e171_three_oracle_collusion`
+    """`cargo build --release --offline --message-format=json-render-diagnostics -p singlefs-implementation-experiments --features gpu --bin e171_three_oracle_collusion`
     （只编不跑，不是重型测试）：诊断照常写进 `log_path`，每个编译单元的 JSON 消息（带 `fresh`）写进 `artifacts_path`。交回 (退出码, 耗时 ns)。"""
     environment = frozen_o3.thread_environment(threads, dict(os.environ, CARGO_TARGET_DIR=lane_target))
     command = compile_command()

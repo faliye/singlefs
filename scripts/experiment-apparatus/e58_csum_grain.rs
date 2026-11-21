@@ -67,6 +67,7 @@
 //! 不碰崩溃一致性；不碰写路径；单盘无 RAID；校验用 AES-256-GCM（本机有 AES-NI），
 //! 换算法要重跑；`rand` 的随机是全域均匀，没有热点分布；不建模预读命中。
 
+use e7_index_bench::{low_byte_of_usize, u64_from_nanoseconds};
 use aes_gcm::{
     aead::{AeadInOut, KeyInit},
     Aes256Gcm, Nonce,
@@ -101,27 +102,32 @@ struct Aligned {
     len: usize,
     layout: Layout,
 }
-// 每个线程独占一个缓冲，不共享 —— 跨线程移动是安全的。
+// SAFETY: `Aligned` 里的裸指针指向它自己独占的分配；每个线程独占一个缓冲、不共享，跨线程移动不会产生别名。
 unsafe impl Send for Aligned {}
 
 impl Aligned {
     fn new(len: usize) -> Self {
         let layout = Layout::from_size_align(len, ALIGN).expect("对齐参数非法");
+        // SAFETY: `layout` 由 `Layout::from_size_align` 校验过；`alloc` 要求布局大小非零，调用处传的都是 O_DIRECT 用的正的整块长度。
         let ptr = unsafe { alloc(layout) };
         assert!(!ptr.is_null(), "分配失败");
+        // SAFETY: `ptr` 刚由 `alloc` 分配，布局长度就是 `len`，上一行已断言非空；`u8` 没有对齐或取值限制，可以写 `len` 个字节。
         unsafe { std::ptr::write_bytes(ptr, 0xA5, len) };
         Self { ptr, len, layout }
     }
     fn as_slice(&self) -> &[u8] {
+        // SAFETY: `ptr` 指向构造时 `alloc` 出的 `len` 字节，构造时已用 `write_bytes` 填满；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
     }
     fn as_mut_slice(&mut self) -> &mut [u8] {
+        // SAFETY: `ptr` 指向构造时 `alloc` 出的 `len` 字节，构造时已用 `write_bytes` 填满；独占借用 `&mut self`，同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts_mut(self.ptr, self.len) }
     }
 }
 
 impl Drop for Aligned {
     fn drop(&mut self) {
+        // SAFETY: `ptr` 与布局正是构造时 `alloc` 用的指针与布局，`drop` 只跑一次，之后没有别的引用。
         unsafe { dealloc(self.ptr, self.layout) }
     }
 }
@@ -215,10 +221,10 @@ fn rand_arm(path: &str, direct: bool, g: usize, units: u64, ops: u64, seed: u64)
             .expect("读失败");
         let tv = Instant::now();
         sink = sink.wrapping_add(verify(&c, nonce, &mut buf.as_mut_slice()[..g]) as u64);
-        verify_ns += tv.elapsed().as_nanos() as u64;
+        verify_ns += u64_from_nanoseconds(tv.elapsed().as_nanos());
     }
     Arm {
-        elapsed_ns: t0.elapsed().as_nanos() as u64,
+        elapsed_ns: u64_from_nanoseconds(t0.elapsed().as_nanos()),
         verify_ns,
         // ⚠️ **记账，不是观测**：它按定义等于 ops × G。观测那一侧是 `proc_read_bytes`。
         dev_bytes: ops * g as u64,
@@ -247,7 +253,7 @@ fn randq_arm(path: &str, direct: bool, g: usize, units: u64, ops: u64, seed: u64
         acc.sink = acc.sink.wrapping_add(a.sink);
     }
     // 挂钟按整个并发段算，不是各线程之和 —— 要的是聚合带宽。
-    acc.elapsed_ns = t0.elapsed().as_nanos() as u64;
+    acc.elapsed_ns = u64_from_nanoseconds(t0.elapsed().as_nanos());
     acc
 }
 
@@ -269,10 +275,10 @@ fn seq_arm(path: &str, direct: bool, g: usize, total_bytes: u64) -> Arm {
         for ch in buf.as_mut_slice().chunks_mut(g) {
             sink = sink.wrapping_add(verify(&c, nonce, ch) as u64);
         }
-        verify_ns += tv.elapsed().as_nanos() as u64;
+        verify_ns += u64_from_nanoseconds(tv.elapsed().as_nanos());
     }
     Arm {
-        elapsed_ns: t0.elapsed().as_nanos() as u64,
+        elapsed_ns: u64_from_nanoseconds(t0.elapsed().as_nanos()),
         verify_ns,
         dev_bytes: ios * SEQ_IO as u64,
         ops: ios,
@@ -300,7 +306,7 @@ fn fill(path: &str, region: u64) {
     eprintln!("填充测试区 {} MiB …", region / (1024 * 1024));
     let mut buf = Aligned::new(SEQ_IO);
     for (i, b) in buf.as_mut_slice().iter_mut().enumerate() {
-        *b = (i as u8).wrapping_mul(31).wrapping_add(7);
+        *b = low_byte_of_usize(i).wrapping_mul(31).wrapping_add(7);
     }
     f.seek(SeekFrom::Start(0)).expect("seek 失败");
     for _ in 0..(region / SEQ_IO as u64) {
@@ -376,7 +382,7 @@ fn main() {
             let r1 = proc_read_bytes();
             // 读不到 ≠ 读到 0：取不到就报 NA，不许填 0。
             let pr = match (r0, r1) {
-                (Some(a), Some(b)) => format!("{}", b.saturating_sub(a)),
+                (Some(read_before), Some(read_after)) => format!("{}", read_after.saturating_sub(read_before)),
                 _ => "NA".into(),
             };
             // 阳性对照就落在这一格：内核记的字节 ÷ 程序记账的字节，直连档必须 ≈1。

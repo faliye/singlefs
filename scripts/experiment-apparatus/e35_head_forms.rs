@@ -38,7 +38,7 @@
 
 use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Nonce};
-use e7_index_bench::Emitter;
+use e7_index_bench::{low_byte_of_u32, low_byte_of_usize, low_word_of_u64, u32_from_usize, Emitter};
 use std::collections::BTreeMap;
 
 /// 两个可写头。**由构造给出，不从被测代码读回来。**
@@ -123,7 +123,7 @@ fn derive_nonce(identity: &Ident, version: u64) -> [u8; 12] {
     mix(version);
     let mut nonce_bytes = [0u8; 12];
     nonce_bytes[..8].copy_from_slice(&hash_state.to_le_bytes());
-    nonce_bytes[8..].copy_from_slice(&(hash_state.rotate_left(17) as u32).to_le_bytes());
+    nonce_bytes[8..].copy_from_slice(&low_word_of_u64(hash_state.rotate_left(17)).to_le_bytes());
     nonce_bytes
 }
 
@@ -180,10 +180,10 @@ fn measure(arm: Arm) -> ArmMeasurement {
     // 两个可写头各写一次同一个 (inode, offset)，内容不同
     let mut store: BTreeMap<Ident, (Vec<u8>, [u8; 16])> = BTreeMap::new();
     let mut nonces: Vec<([u8; 12], Vec<u8>, Vec<u8>)> = Vec::new(); // (nonce, 明文, 密文)
-    for head in 0..HEADS as u32 {
+    for head in 0..u32_from_usize(HEADS) {
         let identity = Ident::of(arm, head, INODE, OFFSET);
         // 两个头各自是第一次写这个位置 ⇒ 各自的版本号都是 1
-        let plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| (byte_index as u8).wrapping_add(head as u8 * 31)).collect();
+        let plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| low_byte_of_usize(byte_index).wrapping_add(low_byte_of_u32(head) * 31)).collect();
         let (nonce, ciphertext, tag) = seal(&identity, 1, &plaintext);
         nonces.push((nonce, plaintext.clone(), ciphertext.clone()));
         store.insert(identity, (ciphertext, tag));
@@ -205,9 +205,9 @@ fn measure(arm: Arm) -> ArmMeasurement {
     }
 
     // 判据二：各头读回自己那一份
-    for head in 0..HEADS as u32 {
+    for head in 0..u32_from_usize(HEADS) {
         let identity = Ident::of(arm, head, INODE, OFFSET);
-        let want: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| (byte_index as u8).wrapping_add(head as u8 * 31)).collect();
+        let want: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| low_byte_of_usize(byte_index).wrapping_add(low_byte_of_u32(head) * 31)).collect();
         if let Some((ciphertext, tag)) = store.get(&identity) {
             if open(&identity, 1, ciphertext, tag).as_deref() == Some(want.as_slice()) {
                 measurement.own_reads_ok += 1;
@@ -350,8 +350,8 @@ mod tests {
     /// 少了这条，`xor_identity_holds` 可能恒真而没人发现。
     #[test]
     fn the_xor_identity_is_not_vacuous() {
-        let first_plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| byte_index as u8).collect();
-        let second_plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| (byte_index as u8).wrapping_add(31)).collect();
+        let first_plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(low_byte_of_usize).collect();
+        let second_plaintext: Vec<u8> = (0..PLAINTEXT_LENGTH_BYTES).map(|byte_index| low_byte_of_usize(byte_index).wrapping_add(31)).collect();
         let head0_identity = Ident::of(Arm::Key4Derived, 0, INODE, OFFSET);
         let head1_identity = Ident::of(Arm::Key4Derived, 1, INODE, OFFSET);
         let (_, first_ciphertext_distinct_nonces, _) = seal(&head0_identity, 1, &first_plaintext);

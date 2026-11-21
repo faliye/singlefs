@@ -372,7 +372,7 @@ class DeviceEnvironmentTests(unittest.TestCase):
         command = row_driver.compile_command()
         position = command.index("--features")
         self.assertEqual(command[position + 1], "gpu")
-        self.assertEqual(command[command.index("-p") + 1], "singlefs-verification")
+        self.assertEqual(command[command.index("-p") + 1], "singlefs-implementation-experiments")
         self.assertEqual(command[command.index("--bin") + 1], "e171_three_oracle_collusion")
 
     def test_a_device_output_that_says_not_run_or_lacks_the_toolchain_is_a_defect(self) -> None:
@@ -390,7 +390,7 @@ class DeviceEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             write(os.path.join(directory, "device.out"), "E7RESULT name=verdict streams_not_exported=2\n")
             write(os.path.join(directory, "device.err"),
-                  "thread 'e171-judging' panicked at crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs:1872:35:\n"
+                  "thread 'e171-judging' panicked at crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion.rs:1872:35:\n"
                   "起不了给定状态表的引擎：多机配置判法认不出这一台（bash x/crash-point-replay-shard-configuration-check.sh 退 127）\n")
             self.assertEqual(row_driver.device_output_defects(directory), ["device.err:engine_start_refused"])
             write(os.path.join(directory, "device.err"), "thread 'main' panicked at crates/singlefs-core/src/a.rs:1:1:\nindex out of bounds\n")

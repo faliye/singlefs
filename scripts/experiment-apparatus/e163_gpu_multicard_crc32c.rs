@@ -27,6 +27,7 @@
 //! 参数照 D18（块里携带什么信息） 已定项 17：多项式 0x1EDC6F41（反射 0x82F63B78）、
 //! 输入输出反射、初值 0xFFFFFFFF、输出取反——两份实现都在本文件里，逐处标注行号供执行员核对。
 
+use e7_index_bench::u32_from_usize;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
@@ -1152,7 +1153,7 @@ struct ShardInputs {
 
 /// 八个锚点向量拼成 8 个满槽的连续缓冲区与各自的长度（`run_gpu_crc` 的输入）。
 fn anchor_slots_of(vectors: &[Vec<u8>; 8]) -> (Vec<u8>, [u32; 8]) {
-    let anchor_lengths: [u32; 8] = std::array::from_fn(|index| vectors[index].len() as u32);
+    let anchor_lengths: [u32; 8] = std::array::from_fn(|index| u32_from_usize(vectors[index].len()));
     let mut anchor_slots = vec![0u8; 8 * UNIT_BYTE_LENGTH];
     for (index, vector) in vectors.iter().enumerate() {
         anchor_slots[index * UNIT_BYTE_LENGTH..index * UNIT_BYTE_LENGTH + vector.len()].copy_from_slice(vector);

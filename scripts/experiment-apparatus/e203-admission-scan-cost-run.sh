@@ -60,7 +60,7 @@
 #       a_rejudged_sentinel_turns_the_run_red、a_forced_rejudge_with_another_verdict_turns_the_run_red、a_forced_point_left_unrun_turns_the_run_red
 #   E203_RUN_BREAK=key-with-copy-path  键另加副本根的绝对路径
 #       the_point_key_does_not_depend_on_the_copy_path
-#   E203_RUN_BREAK=key-by-whole-histories-file  键另加副本里整份历史用例的内容（改前的文件级键）
+#   E203_RUN_BREAK=key-by-whole-histories-file  键另加副本里整份历史用例的内容（整份文件进键：文件里别的用例变了，这个点的键也变）
 #       reuse-three-questions
 #   E203_RUN_BREAK=sentinel-skipped  不抽复用哨兵与强制现判、跑完不判
 #       reuse_sentinel_draws_and_the_forced_point_is_run_again、a_rejudged_sentinel_turns_the_run_red、

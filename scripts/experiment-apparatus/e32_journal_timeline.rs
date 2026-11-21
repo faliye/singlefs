@@ -59,7 +59,7 @@
 //! 它不是一个概率小到可以忽略的巧合：第一次崩溃刚恢复完就再崩一次，
 //! 正是掉电反复、盘将坏、以及崩溃点重放 harness **本来就要枚举**的那一类序列。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Arm {
@@ -139,7 +139,7 @@ impl Ring {
         }
     }
     fn slot_index(&self, jsn: u64) -> usize {
-        (jsn as usize) % self.slot.len()
+        usize_from_u64(jsn) % self.slot.len()
     }
     fn put(&mut self, record: JournalRecord) {
         let slot_index = self.slot_index(record.jsn);
@@ -216,7 +216,7 @@ const TIMELINE_AFTER_FIRST_RECOVERY: u32 = 2;
 /// * `settled` —— 崩溃前已经安定下来的记录条数（`jsn` 1..=settled，全部有效）
 /// * `stale` —— 时间线 A 在空洞**之后**留下的、校验和完好的记录条数
 /// * `new_after` —— 恢复之后时间线 B 写成的记录条数
-/// 建出崩溃前那一刻的环。返回 `(环, tail, 空洞的 jsn, 链锚)`。
+///   建出崩溃前那一刻的环。返回 `(环, tail, 空洞的 jsn, 链锚)`。
 ///
 /// 抽出来是为了让「模型确实处于稳态」这条性质可以被单测直接判——
 /// 它不是布景，是断号即止这条闸有没有被走到的前提。
@@ -289,7 +289,7 @@ fn run(arm: Arm, slots: usize, settled: u64, stale: u64, new_after: u64) -> ArmO
     };
 
     // ── 时间线 B 写 new_after 条 ──
-    let mut chain_hash = first_recovery_records.last().map(|record| record_hash(record)).unwrap_or(anchor);
+    let mut chain_hash = first_recovery_records.last().map(record_hash).unwrap_or(anchor);
     for new_record_offset in 0..new_after {
         let jsn = resume_jsn + new_record_offset;
         let record = JournalRecord { jsn, timeline: TIMELINE_AFTER_FIRST_RECOVERY, previous_record_hash: chain_hash, is_checksum_valid: true };

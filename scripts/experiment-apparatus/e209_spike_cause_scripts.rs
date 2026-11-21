@@ -182,12 +182,11 @@ pub fn script_steps(name: &str) -> Option<Vec<Step>> {
                 let mut steps: Vec<Step> = (0..count).map(|distance| Step::Overwrite(YoungMinus(distance))).collect();
                 steps.extend(tail);
                 steps
-            } else if let Some(count) = number_after(other, "presweep_") {
+            } else {
+                let count = number_after(other, "presweep_")?;
                 let mut steps: Vec<Step> = (1..=count).map(|number| Step::Overwrite(Cold(number))).collect();
                 steps.extend(tail);
                 steps
-            } else {
-                return None;
             }
         }
     };

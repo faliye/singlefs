@@ -91,8 +91,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.." || { echo "进不去仓根"; echo "→
 SCRIPT_KEY="scripts/experiment-apparatus/e185-r4-segment-run.sh"
 ITEM_VERDICTS="scripts/experiment-apparatus/long_run_item_verdicts.py"   # 按段判定的读写（文件头 long-run-resume）
 LIBRARY_KIND="e185_gc_batch_wall_clock_split"                            # 判定库的种类：装置的 bin 名
-registered_apparatus_sha256=a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082
-apparatus_source=crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs
+registered_apparatus_sha256=9e813cbd36900f1b0c7001e6de0f98de01080bbf7ac6aab39d8e7c9854bd97f8
+apparatus_source=crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs
 attack_ledger=research/prompts/m4-gpugc-design-r1-opus-model/out/g1.out
 stage_split_product=research/results/e185-gc-batch-wall-clock-split-stage-split-r2-2026-10-23.out
 host_cpu_product=research/results/e185-gc-batch-wall-clock-split-host-cpu-per-submission-r3-2026-10-24-2.out
@@ -171,7 +171,7 @@ segment_arguments() { # <段>
 segment_request() { # <段>（long_run_item_verdicts.py 文件头「请求文件」）
   local feature=""
   [[ -n "$(segment_features "$1")" ]] && feature=$'\t'"feature:singlefs-verification/$(segment_features "$1")"
-  printf '%s\tcrates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs::main\tprofile:release%s\tline:arguments=%s\tline:compare=timing\n' \
+  printf '%s\tcrates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs::main\tprofile:release%s\tline:arguments=%s\tline:compare=timing\n' \
     "$1" "$feature" "$(segment_arguments "$1")"
   if [[ "$1" == host-cpu-drift-control ]]; then
     printf '@input\t%s\tstage-split-product\t%s\n@input\t%s\tattack-ledger\t%s\n' "$1" "$stage_split_product" "$1" "$attack_ledger"
@@ -465,7 +465,7 @@ for segment in "${segments[@]}"; do
       cpu-writings) echo "写法与拆分段不起卡，不查 nvidia-smi" ;;
     esac
     sha256sum "$attack_ledger" "$stage_split_product" "$host_cpu_product" "$function_split_product"
-    cargo tree -p singlefs-verification -e normal,build,features -i singlefs-core --offline ${build_features[@]+"${build_features[@]}"}
+    cargo tree -p singlefs-implementation-experiments -e normal,build,features -i singlefs-core --offline ${build_features[@]+"${build_features[@]}"}
     echo "nproc $(nproc)"
     echo "getconf CLK_TCK $(getconf CLK_TCK)"
     echo "RUSTFLAGS=${RUSTFLAGS:-}（拆法乙撤了，这一趟两段都不带 -C force-frame-pointers=yes）"
@@ -522,7 +522,7 @@ for segment in "${segments[@]}"; do
   if [[ -z "${built_with[x$features]:-}" ]]; then
     build_features=()
     [[ -z "$features" ]] || build_features=(--features "$features")
-    cargo build --release -p singlefs-verification ${build_features[@]+"${build_features[@]}"} --bin e185_gc_batch_wall_clock_split
+    cargo build --release -p singlefs-implementation-experiments ${build_features[@]+"${build_features[@]}"} --bin e185_gc_batch_wall_clock_split
     built_with[x$features]=1
   fi
   apparatus="$CARGO_TARGET_DIR/release/e185_gc_batch_wall_clock_split"

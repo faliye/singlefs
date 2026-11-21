@@ -10,7 +10,7 @@
 客户端的标准输出领卡那一回收成卡串（take_card）、还卡那一回转到标准错误（return_card），都不进调用方的标准输出：scripts/gate/lib_function_units.py 因此不把
 统一任务服务的代码收进 E171（三oracle合谋测试）行键（UNKEYED_PROGRAM_WORDS 里这两个函数的那两行，三格自证 CARD_LEASE_CLIENT_WORDS_*_CELL）。
 客户端是起这一趟的那棵树里的 task-server/task（client_of），在那棵树的根上起。
-装置分录入、判两段起（record_then_judge_on_a_leased_card；装置的点段参数 --stage record|judge，crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs）：
+装置分录入、判两段起（record_then_judge_on_a_leased_card；装置的点段参数 --stage record|judge，crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion.rs）：
   录入段只在 CPU 上录、把要判的盘写进判定库，不领卡，环境里不给卡串（environment_of_the_stage 去掉 GPU_CARDS_BY_PRIORITY）；
   录入段退非 0：不领卡、判段不起，这一步的结局就是录入段的退出码；录入段退 0 才领一张卡（领卡没成同上：take 抛 CardLeaseRefused，判段不起），
   判段带这张卡起，判段结束照卡串还掉（判段退非 0、抛异常照还）。几条线道的录入段可以同时跑，判段各领各的。

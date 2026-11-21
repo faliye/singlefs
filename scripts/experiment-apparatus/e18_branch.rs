@@ -25,7 +25,7 @@
 //! - **判别力对照**：多分叉档必须真的构造出跨分支引用（打印计数）；
 //!   计数为 0 ⇒ 「没测出问题」与「没测到」分不开，整轮作废。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// 历史里的一个提交点。`parent` 为 None 表示创世。
@@ -101,16 +101,16 @@ fn build(shape: Shape, prefix: u64, commits_per_branch: u64, seed: u64) -> Histo
     // 每条分支各自往下走
     let mut branch_tips: Vec<Vec<u64>> = Vec::new(); // 每条分支上的 txg 列表
     for &branch_point in branch_points.iter() {
-        let mut previous_commit = Some(branch_point);
+        let mut previous_branch_commit = Some(branch_point);
         let mut tips = Vec::new();
         for _ in 0..commits_per_branch {
             let new_commit_txg = next_txg; next_txg += 1;
-            commits.insert(new_commit_txg, Commit { txg: new_commit_txg, parent: previous_commit, is_root: true });
+            commits.insert(new_commit_txg, Commit { txg: new_commit_txg, parent: previous_branch_commit, is_root: true });
             for _ in 0..3 {
                 blocks.push(Block { birth: new_commit_txg, deaths: BTreeMap::new(), single_value_death_earliest: NO_DEATH, single_value_death_latest: 0, single_value_death_conservative: NO_DEATH });
             }
             tips.push(new_commit_txg);
-            previous_commit = Some(new_commit_txg);
+            previous_branch_commit = Some(new_commit_txg);
         }
         branch_tips.push(tips);
     }
@@ -127,10 +127,10 @@ fn build(shape: Shape, prefix: u64, commits_per_branch: u64, seed: u64) -> Histo
             let _ = branch_index;
             for &deleting_commit_txg in tips.iter() {
                 // 每个 txg 删一个**本分支还没删过的**前缀块
-                let mut victim_block_index = prefix_blocks[(next_random() as usize) % prefix_blocks.len()];
+                let mut victim_block_index = prefix_blocks[usize_from_u64(next_random()) % prefix_blocks.len()];
                 let mut tries = 0;
                 while deleted_on_this_branch.contains(&victim_block_index) && tries < 64 {
-                    victim_block_index = prefix_blocks[(next_random() as usize) % prefix_blocks.len()];
+                    victim_block_index = prefix_blocks[usize_from_u64(next_random()) % prefix_blocks.len()];
                     tries += 1;
                 }
                 if deleted_on_this_branch.contains(&victim_block_index) { continue; }

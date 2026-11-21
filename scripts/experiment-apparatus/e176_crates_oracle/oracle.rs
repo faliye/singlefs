@@ -1,13 +1,13 @@
 //! E176（inode 树叶合并三候选的容量与写代价）的对拍 bin：跑前登记 `research/prompts/e176-preregistration.md` 第三、五、十一节与第十二节修订 2。
 //!
-//! 把每一条登记序列在 M1 被拒之前的每一步，同时喂给模型的 M1（`../e176_inode_leaf_merge_capacity_and_rewrites.rs`，以 `#[path]` 引进来）
+//! 把每一条登记序列在 M1 被拒之前的每一步，同时喂给模型的 M1（`../e176_inode_leaf_merge_capacity_and_rewrites/main.rs`，以 `#[path]` 引进来）
 //! 与 `crates/singlefs-core/src/inode_tree.rs` 的两个纯函数（`write_records_into_leaf_containers` / `remove_record_from_leaf_containers`），逐步比：
 //! 片数、每片（容器号、记录数、最小号、最大号）、重写清单（位置记法逐项、内容记法 = 清单里内容真变了的那几片）、摘掉的片数、被拒的那一步与拒的格。
 //! 另回比模型的本地常量（233、135）与 `crates/` 单测钉住的三种形态。只读 `crates/`，不改它。
 //! 用同一目录下自己的 `Cargo.toml` 编（编法与为什么不挂在 e7-index-bench 的可选特性上，写在那份 manifest 的文件头）。
 //! 第一处不同就停这条序列、整段退 1（第十一节停机：两边都查，不改模型迁就 `crates/`）。
 
-#[path = "../e176_inode_leaf_merge_capacity_and_rewrites.rs"]
+#[path = "../e176_inode_leaf_merge_capacity_and_rewrites/main.rs"]
 #[allow(dead_code, reason = "模型那份文件自带 main、臂的 M2 / M3 与判定，对拍只用它的 M1、生成器与登记")]
 mod model;
 

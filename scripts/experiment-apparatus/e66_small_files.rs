@@ -22,6 +22,7 @@
 //!    就写「补齐没有改变 E8 的结论」。**不许因为补齐的空间倍数很大就断言内联更好**——
 //!    空间不是本工程的判据，要赢得赢在 I/O 或延迟上。
 
+use e7_index_bench::{low_byte_of_u64, low_byte_of_usize, u64_from_nanoseconds, usize_from_u64};
 use aes_gcm::{aead::{AeadInOut, KeyInit}, Aes256Gcm, Nonce};
 use e7_index_bench::Emitter;
 use std::alloc::{alloc, dealloc, Layout};
@@ -47,16 +48,30 @@ const WARMUP: u64 = 64;
 struct Aligned { pointer: *mut u8, length_in_bytes: usize, layout: Layout }
 impl Aligned {
     fn new(length_in_bytes: usize) -> Self {
+        assert!(length_in_bytes > 0, "缓冲长度必须为正");
         let layout = Layout::from_size_align(length_in_bytes, ALIGNMENT_BYTES).expect("对齐参数非法");
+        // SAFETY: `layout` 的大小是 `length_in_bytes`，上一行断言了它大于 0，满足 `alloc` 要求的布局大小非零。
         let allocation_pointer = unsafe { alloc(layout) };
         assert!(!allocation_pointer.is_null(), "分配失败");
+        // SAFETY: `allocation_pointer` 刚由 `alloc` 按 `layout` 分配，布局长度就是 `length_in_bytes`，上一行已断言非空；`u8` 没有对齐或取值限制，可以写 `length_in_bytes` 个字节。
         unsafe { std::ptr::write_bytes(allocation_pointer, 0xA5, length_in_bytes) };
         Self { pointer: allocation_pointer, length_in_bytes, layout }
     }
-    fn as_slice(&self) -> &[u8] { unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) } }
-    fn as_mut_slice(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) } }
+    fn as_slice(&self) -> &[u8] {
+        // SAFETY: `pointer` 非空、指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 全部写成 0xA5，字节都已初始化；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) }
+    }
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 非空、指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 全部写成 0xA5，字节都已初始化；独占借用 `&mut self`，指针只存在这一个值里（类型没有派生也没有手写复制），同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
+    }
 }
-impl Drop for Aligned { fn drop(&mut self) { unsafe { dealloc(self.pointer, self.layout) } } }
+impl Drop for Aligned {
+    fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局；只在 `new` 里构造、类型没有派生也没有手写复制，每个值只会 `drop` 一次，`drop` 之后没有别的引用。
+        unsafe { dealloc(self.pointer, self.layout) }
+    }
+}
 
 fn next_random_word(state: &mut u64) -> u64 {
     let mut mixed_state = *state;
@@ -115,9 +130,9 @@ fn read_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, seed: u6
         let verify_start = Instant::now();
         sink = sink.wrapping_add(
             cipher.encrypt_inout_detached(nonce, b"", chunk_buffer.as_mut_slice().into()).expect("验失败")[0] as u64);
-        verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
+        verify_nanoseconds += u64_from_nanoseconds(verify_start.elapsed().as_nanos());
     }
-    Arm { elapsed_nanoseconds: arm_start.elapsed().as_nanos() as u64, verify_nanoseconds, operation_count, sink }
+    Arm { elapsed_nanoseconds: u64_from_nanoseconds(arm_start.elapsed().as_nanos()), verify_nanoseconds, operation_count, sink }
 }
 
 fn write_one_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, seed: u64, does_read_modify_write: bool) -> Arm {
@@ -134,18 +149,18 @@ fn write_one_arm(path: &str, chunk: usize, slots: u64, operation_count: u64, see
             let verify_start = Instant::now();
             sink = sink.wrapping_add(
                 cipher.encrypt_inout_detached(nonce, b"", chunk_buffer.as_mut_slice().into()).expect("验失败")[0] as u64);
-            verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
+            verify_nanoseconds += u64_from_nanoseconds(verify_start.elapsed().as_nanos());
         }
         let random_word = next_random_word(&mut random_state);
-        chunk_buffer.as_mut_slice()[0] = random_word as u8;
+        chunk_buffer.as_mut_slice()[0] = low_byte_of_u64(random_word);
         let verify_start = Instant::now();
         sink = sink.wrapping_add(
             cipher.encrypt_inout_detached(nonce, b"", chunk_buffer.as_mut_slice().into()).expect("算 MAC 失败")[0] as u64);
-        verify_nanoseconds += verify_start.elapsed().as_nanos() as u64;
+        verify_nanoseconds += u64_from_nanoseconds(verify_start.elapsed().as_nanos());
         device_file.write_all_at(chunk_buffer.as_slice(), cursor * chunk as u64).expect("写失败");
         cursor = (cursor + 1) % slots;
     }
-    Arm { elapsed_nanoseconds: arm_start.elapsed().as_nanos() as u64, verify_nanoseconds, operation_count, sink }
+    Arm { elapsed_nanoseconds: u64_from_nanoseconds(arm_start.elapsed().as_nanos()), verify_nanoseconds, operation_count, sink }
 }
 
 fn fill(path: &str, region: u64) {
@@ -155,7 +170,7 @@ fn fill(path: &str, region: u64) {
     if device_file.seek(SeekFrom::End(0)).expect("取不到大小") >= region { return; }
     eprintln!("填充测试区 {} MiB …", region / (1024 * 1024));
     let mut fill_buffer = Aligned::new(SEQUENTIAL_FILL_CHUNK_BYTES);
-    for (byte_index, byte) in fill_buffer.as_mut_slice().iter_mut().enumerate() { *byte = (byte_index as u8).wrapping_mul(31).wrapping_add(7); }
+    for (byte_index, byte) in fill_buffer.as_mut_slice().iter_mut().enumerate() { *byte = low_byte_of_usize(byte_index).wrapping_mul(31).wrapping_add(7); }
     device_file.seek(SeekFrom::Start(0)).expect("seek 失败");
     for _ in 0..(region / SEQUENTIAL_FILL_CHUNK_BYTES as u64) { device_file.write_all(fill_buffer.as_slice()).expect("填充失败"); }
     device_file.sync_all().expect("sync 失败");
@@ -229,10 +244,10 @@ fn main() {
             let write_device_bytes = write_bytes_of(arm, file_size);
             let (read_slots, write_slots) = (region / read_device_bytes, region / write_device_bytes);
             let read_bytes_before = read_process_input_output_counter("read_bytes:");
-            let read_result = read_arm(&path, read_device_bytes as usize, read_slots, operation_count, seed);
+            let read_result = read_arm(&path, usize_from_u64(read_device_bytes), read_slots, operation_count, seed);
             let read_bytes_after = read_process_input_output_counter("read_bytes:");
             let write_bytes_before = read_process_input_output_counter("write_bytes:");
-            let write_result = write_one_arm(&path, write_device_bytes as usize, write_slots, operation_count, seed, needs_read_modify_write(arm));
+            let write_result = write_one_arm(&path, usize_from_u64(write_device_bytes), write_slots, operation_count, seed, needs_read_modify_write(arm));
             let write_bytes_after = read_process_input_output_counter("write_bytes:");
             let ratio = |before: Option<u64>, after: Option<u64>, expected_bytes: u64| match (before, after) {
                 (Some(before_value), Some(after_value)) if expected_bytes > 0 => format!("{:.4}", after_value.saturating_sub(before_value) as f64 / expected_bytes as f64),

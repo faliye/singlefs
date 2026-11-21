@@ -162,7 +162,7 @@ enum RegionKind {
 fn region_kind(offset: u64, length: u64) -> RegionKind {
     if length == SYSTEM_CONFIGURATION_SLOT_BYTES && (offset == 0 || offset == SYSTEM_CONFIGURATION_SLOT_BYTES) {
         RegionKind::SystemConfiguration
-    } else if length == ROOT_RECORD_SLOT_BYTES && offset >= RING_START_OFFSET && offset < RING_START_OFFSET + RING_REGIONS * RING_PRIME_STEP * RING_CHUNK_BYTES {
+    } else if length == ROOT_RECORD_SLOT_BYTES && (RING_START_OFFSET..RING_START_OFFSET + RING_REGIONS * RING_PRIME_STEP * RING_CHUNK_BYTES).contains(&offset) {
         RegionKind::Root
     } else {
         RegionKind::Other

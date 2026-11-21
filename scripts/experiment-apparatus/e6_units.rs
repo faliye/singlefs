@@ -30,8 +30,9 @@
 // ⚠️ **故意沿用已弃用的 `encrypt_in_place_detached`**：E6 口径写明用的就是它，
 // 换 API 就换了被测对象，与 08-27 那组数字再也不可并列。
 // 这是**有理由的压制**，不是忽略警告（`rules/command-safety.md`）。
-#![allow(deprecated)]
+#![allow(deprecated, reason = "E6 口径写明用 encrypt_in_place_detached，换 API 就换了被测对象")]
 
+use e7_index_bench::u64_from_nanoseconds;
 use aes_gcm::{
     aead::{AeadInPlace, KeyInit},
     Aes256Gcm, Nonce,
@@ -103,7 +104,7 @@ fn run(alg: CipherAlgorithm, unit: usize, rounds: usize) -> (u64, usize, u64, u6
     for _ in 0..rounds {
         let round_start = Instant::now();
         let (byte_count, round_tagchk) = seal(alg, &mut buffer, unit);
-        let elapsed_nanoseconds = round_start.elapsed().as_nanos() as u64;
+        let elapsed_nanoseconds = u64_from_nanoseconds(round_start.elapsed().as_nanos());
         std::hint::black_box(&buffer);
         if elapsed_nanoseconds < best {
             best = elapsed_nanoseconds;
@@ -114,11 +115,7 @@ fn run(alg: CipherAlgorithm, unit: usize, rounds: usize) -> (u64, usize, u64, u6
         }
         last_tagchk = round_tagchk;
     }
-    let spread = if best == 0 {
-        0
-    } else {
-        (worst - best) * 10_000 / best
-    };
+    let spread = ((worst - best) * 10_000).checked_div(best).unwrap_or(0);
     (best, best_round_bytes, last_tagchk, spread)
 }
 

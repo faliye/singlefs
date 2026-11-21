@@ -20,7 +20,7 @@
 //! ⚠️ **两条臂互比不够**：还要一条把绝对值钉死的断言——漏掉的记录数**恰等于**
 //! 窗口内写入的记录数，该数由环几何独立算出，不从被测代码取。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 /// 环里的一个槽。`None` = 从没写过。
 type Slot = Option<Record>;
@@ -57,7 +57,7 @@ impl Journal {
     fn write(&mut self, ckpt: u64) {
         let written_jsn = self.next_jsn;
         let ring_slot_count = self.ring.len();
-        self.ring[(written_jsn as usize) % ring_slot_count] = Some(Record { jsn: written_jsn, ckpt });
+        self.ring[usize_from_u64(written_jsn) % ring_slot_count] = Some(Record { jsn: written_jsn, ckpt });
         self.next_jsn += 1;
     }
     /// checkpoint 完成：真实 tail 推到最新，但**持久 tail 只有在真的写了才动**。
@@ -76,7 +76,7 @@ impl Journal {
                 let mut replayed_jsns = Vec::new();
                 let mut expected_jsn = self.tail_persisted;
                 loop {
-                    match self.ring[(expected_jsn as usize) % ring_slot_count] {
+                    match self.ring[usize_from_u64(expected_jsn) % ring_slot_count] {
                         Some(slot_record) if slot_record.jsn == expected_jsn => { replayed_jsns.push(slot_record.jsn); expected_jsn += 1; }
                         // 断号即止 —— D23 已定的前缀规则
                         _ => break,
@@ -94,7 +94,7 @@ impl Journal {
                 if highest_jsn < self.tail_persisted { return Vec::new(); }
                 let mut lowest_replayed_jsn = highest_jsn;
                 while lowest_replayed_jsn > self.tail_persisted {
-                    match self.ring[((lowest_replayed_jsn - 1) as usize) % ring_slot_count] {
+                    match self.ring[usize_from_u64(lowest_replayed_jsn - 1) % ring_slot_count] {
                         Some(slot_record) if slot_record.jsn == lowest_replayed_jsn - 1 => lowest_replayed_jsn -= 1,
                         _ => break,
                     }
@@ -273,7 +273,7 @@ mod tests {
         for gap in [0u64, 1, 5, 20, 63] {
             let outcome = run_one(ring_block_count, 200, gap, Recovery::ScanAll);
             assert_eq!(outcome.missed, 0, "全环扫描不该丢");
-            assert_eq!(outcome.spurious, ring_block_count - gap as usize,
+            assert_eq!(outcome.spurious, ring_block_count - usize_from_u64(gap),
                 "gap={gap}：多重放的条数应是环槽数减去窗口内新记录数");
         }
     }

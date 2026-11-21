@@ -143,6 +143,7 @@ fn main() {
     output_text.push('\n');
 
     for &rounds in &[100u64, 1000, 10000] {
+        #[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
         let workloads: [(&str, fn(u64) -> u64); 2] = [("main", main_leaves), ("mixed", mixed_leaves)];
         for (workload_name, leaves_of_round) in workloads {
             let (stripe_table_arm_total_bytes, full_mirror_arm_total_bytes, overflow_rounds, rounds_where_stripe_table_arm_cheaper) = steady(rounds, leaves_of_round, 4);

@@ -20,7 +20,7 @@
 //! ⚠️ 合法性是**按状态判的，不是按边界判的**：重放出来的 map 要与某个真值 map 逐条相等。
 //! 只查「前缀是不是落在边界上」等于把结论当判据用。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{u32_from_usize, Emitter};
 use std::collections::BTreeMap;
 
 /// 一个事务：若干条「幂等完整值」写入（D8 已定项 1 已定的形态）。
@@ -55,12 +55,12 @@ fn encode(transactions: &[Transaction], arm: Arm, chunk: u32) -> Vec<Record> {
     let mut encoded_records = Vec::new();
     for (transaction_index, transaction) in transactions.iter().enumerate() {
         match arm {
-            Arm::OneToOne => encoded_records.push(Record { writes: transaction.writes.clone(), transaction_number: transaction_index as u32, commit: true }),
-            _ => {
+            Arm::OneToOne => encoded_records.push(Record { writes: transaction.writes.clone(), transaction_number: u32_from_usize(transaction_index), commit: true }),
+            Arm::SplitNoBoundary | Arm::SplitWithBoundary => {
                 let write_chunks: Vec<&[(u32, u64)]> = transaction.writes.chunks(chunk.max(1) as usize).collect();
                 let last_chunk_index = write_chunks.len() - 1;
                 for (chunk_index, chunk_writes) in write_chunks.iter().enumerate() {
-                    encoded_records.push(Record { writes: chunk_writes.to_vec(), transaction_number: transaction_index as u32, commit: chunk_index == last_chunk_index });
+                    encoded_records.push(Record { writes: chunk_writes.to_vec(), transaction_number: u32_from_usize(transaction_index), commit: chunk_index == last_chunk_index });
                 }
             }
         }
@@ -121,7 +121,7 @@ fn measure(transactions: &[Transaction], arm: Arm, chunk: u32) -> ArmMeasurement
         // 「落在事务中间」= 前缀的最后一条记录不是该事务的提交记录
         if prefix_record_count > 0 && !encoded_records[prefix_record_count - 1].commit { cut_prefix_count += 1; }
         let replayed_state = replay(&encoded_records, prefix_record_count, honor_boundary);
-        if !truth.iter().any(|truth_state| *truth_state == replayed_state) { illegal += 1; }
+        if !truth.contains(&replayed_state) { illegal += 1; }
     }
     ArmMeasurement { records: encoded_records.len() as u64, prefixes: enumerated, cut_prefixes: cut_prefix_count, illegal }
 }
@@ -181,7 +181,7 @@ mod tests {
         assert_eq!(measure(&two_hundred_transactions_of_eight_writes(), Arm::OneToOne, 1).cut_prefixes, 0, "一事务一条，切不开");
         assert_eq!(measure(&two_hundred_transactions_of_eight_writes(), Arm::SplitNoBoundary, 1).cut_prefixes, 200 * (8 - 1));
         assert_eq!(measure(&two_hundred_transactions_of_eight_writes(), Arm::SplitNoBoundary, 2).cut_prefixes, 200 * (4 - 1));
-        assert_eq!(measure(&two_hundred_transactions_of_eight_writes(), Arm::SplitNoBoundary, 4).cut_prefixes, 200 * (2 - 1));
+        assert_eq!(measure(&two_hundred_transactions_of_eight_writes(), Arm::SplitNoBoundary, 4).cut_prefixes, 200);
     }
 
     /// **判据 1**：一事务一条记录 ⇒ 任意前缀都合法，违反数恒为 0。

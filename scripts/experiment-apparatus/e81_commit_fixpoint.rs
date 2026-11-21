@@ -50,7 +50,7 @@
 //! ——若实现边插边 COW，放大更大，本模型给的是下界。scattered 的期望值是生日碰撞量级，
 //! 只报实测不推公式。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 /// 16 KiB 节点 / ~32 B 分配记录条目的量级。
 const LEAF_CAPACITY_IN_RECORDS: u64 = 512;
@@ -138,7 +138,7 @@ fn publish(geometry: &Geometry, arm: Arm, user_block_count: u64, accounting_node
     let fanout = FANOUT;
     let mut random_generator = XorshiftGenerator::new(seed);
     // 逐层脏标记
-    let mut dirty: Vec<Vec<bool>> = geometry.levels.iter().map(|&node_count| vec![false; node_count as usize]).collect();
+    let mut dirty: Vec<Vec<bool>> = geometry.levels.iter().map(|&node_count| vec![false; usize_from_u64(node_count)]).collect();
     let mut bump = geometry.total_keys() / 2; // 聚簇段起点：key 空间中部的一个空段
     let mut records_inserted = 0u64;
     let mut blocks_allocated = 0u64;
@@ -181,8 +181,8 @@ fn publish(geometry: &Geometry, arm: Arm, user_block_count: u64, accounting_node
             records_inserted += 1;
             let mut node_index = placement_key / geometry.records_per_leaf;
             for level in dirty.iter_mut() {
-                if !level[node_index as usize] {
-                    level[node_index as usize] = true;
+                if !level[usize_from_u64(node_index)] {
+                    level[usize_from_u64(node_index)] = true;
                     newly_dirty_count += 1;
                 }
                 node_index /= fanout;

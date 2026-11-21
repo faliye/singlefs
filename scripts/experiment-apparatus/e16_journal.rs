@@ -3,7 +3,7 @@
 //! 起因是 [decisions.md] D23 已定项 1，它自陈「**必须先定角色，才能定大小**」：
 //!   - **WAL**：每个操作提交时同步写 journal ⇒ 操作即持久，fsync 只是把尾块刷下去；
 //!   - **意图日志**：只记批的游标，持久性靠 checkpoint ⇒ **fsync = 提前触发一次完整 checkpoint**。
-//! D16 原文两处指向意图日志，而「所有结构、所有操作先进同一个 journal」读起来像 WAL。
+//!     D16 原文两处指向意图日志，而「所有结构、所有操作先进同一个 journal」读起来像 WAL。
 //!
 //! ## 口径：本实验量的是**设备写块数**，不是时间
 //!
@@ -11,7 +11,7 @@
 //!   - 「fsync 代价」的单位是**块**，不是微秒。p99 是块数分布的 p99。
 //!   - 真实的 fsync 延迟还含 FUA 往返与队列排队，本实验**够不着**，
 //!     那一半要等 E12 harness 与事务层（E16 注册时已写明这条前置）。
-//! **拿本实验的数去谈延迟是误用。**
+//!     **拿本实验的数去谈延迟是误用。**
 //!
 //! ## 三条臂，不是两条 —— 这是本实验最先得到的东西
 //!
@@ -46,6 +46,9 @@
 //! ⚠️ 这两条都是**对照**，不是结论：它们判的是「这套测量有没有判别力」，
 //! 不判「哪种角色更好」。后者是本实验要产出的东西，测出来什么就是什么。
 
+#[cfg(test)]
+use e7_index_bench::usize_from_u64;
+use e7_index_bench::truncate_f64_to_usize;
 use e7_index_bench::Emitter;
 use std::collections::HashSet;
 
@@ -191,7 +194,7 @@ fn copy_on_write_blocks(dirty: &HashSet<u64>) -> u64 {
 /// 本实验第一版按脏叶计费，把 `wal_full` 的环峰值虚报到 192048 字节（47 块）——
 /// 而那正是本实验要产出的那个数。是反推腿抓出来的，不是跑出来的。
 fn named_subtree_roots(dirty: &HashSet<u64>) -> usize {
-    debug_assert!(HEIGHT >= 2, "树高不足 2 时「根的子节点」这一层不存在");
+    debug_assert!(std::hint::black_box(HEIGHT >= 2), "树高不足 2 时「根的子节点」这一层不存在");
     let mut subtree_roots: HashSet<u64> = HashSet::new();
     for &leaf in dirty {
         subtree_roots.insert(leaf / FANOUT.pow(HEIGHT - 1));
@@ -302,12 +305,12 @@ impl ArmOutcome {
     }
 }
 
-fn percentile(samples: &mut Vec<u64>, quantile: f64) -> u64 {
+fn percentile(samples: &mut [u64], quantile: f64) -> u64 {
     if samples.is_empty() {
         return 0;
     }
     samples.sort_unstable();
-    let rank = (((samples.len() - 1) as f64) * quantile).round() as usize;
+    let rank = truncate_f64_to_usize((((samples.len() - 1) as f64) * quantile).round());
     samples[rank]
 }
 
@@ -324,17 +327,17 @@ fn run(operations: &[Operation], arm: Arm, fsync_every: usize, checkpoint_interv
     // journal 环占用：本 checkpoint 窗口内累计写进 journal 的字节
     let mut ring_occupancy_bytes = 0u64;
 
-    let append = |outcome: &mut ArmOutcome, ring_occupancy_bytes: &mut u64, bytes: u64| {
+    let append = |arm_outcome: &mut ArmOutcome, occupancy_in_bytes: &mut u64, bytes: u64| {
         if inject_skip_journal {
             return 0;
         }
-        outcome.journal_bytes += bytes;
-        *ring_occupancy_bytes += bytes;
-        outcome.ring_peak_bytes = outcome.ring_peak_bytes.max(*ring_occupancy_bytes);
+        arm_outcome.journal_bytes += bytes;
+        *occupancy_in_bytes += bytes;
+        arm_outcome.ring_peak_bytes = arm_outcome.ring_peak_bytes.max(*occupancy_in_bytes);
         // 一条记录至少占一个块：本工程的记录是**同步发布指令**，不与后续记录合并成一块。
         // ⚠️ 这是保守取法，真实实现可以合并；合并只会让两条 WAL 臂更便宜，不改变结论方向。
         let blocks_written = bytes.div_ceil(BLOCK).max(1);
-        outcome.journal_blocks += blocks_written;
+        arm_outcome.journal_blocks += blocks_written;
         blocks_written
     };
 
@@ -403,7 +406,7 @@ fn conserve(outcome: &ArmOutcome, operation_count: usize, fsync_every: usize, ch
     if outcome.total_blocks() != outcome.journal_blocks + outcome.checkpoint_blocks + outcome.root_blocks {
         return Err("三项之和对不上总数".into());
     }
-    let expected_fsyncs = if fsync_every == 0 { 0 } else { operation_count / fsync_every };
+    let expected_fsyncs = operation_count.checked_div(fsync_every).unwrap_or(0);
     if outcome.fsyncs != expected_fsyncs as u64 {
         return Err(format!("fsync 次数 {} ≠ 预期 {}", outcome.fsyncs, expected_fsyncs));
     }
@@ -578,10 +581,10 @@ fn main() {
         output.push_str(&line);
         output.push('\n');
     };
-    let abort_with_message = |output: &mut String, emitter: &mut Emitter, message: &str| -> ! {
-        output.push_str(&emitter.finish());
-        output.push('\n');
-        print!("{output}");
+    let abort_with_message = |abort_output: &mut String, abort_emitter: &mut Emitter, message: &str| -> ! {
+        abort_output.push_str(&abort_emitter.finish());
+        abort_output.push('\n');
+        print!("{abort_output}");
         eprintln!("E16: {message}");
         std::process::exit(4);
     };
@@ -828,7 +831,7 @@ mod tests {
     fn record_names_subtree_roots_not_leaves() {
         let dirty_leaves: HashSet<u64> = (0..8_000).collect();
         let named_entry_count = named_subtree_roots(&dirty_leaves);
-        assert!(named_entry_count <= FANOUT as usize, "点名条数 {named_entry_count} 超过了根的子节点数 {FANOUT}");
+        assert!(named_entry_count <= usize_from_u64(FANOUT), "点名条数 {named_entry_count} 超过了根的子节点数 {FANOUT}");
         assert!(
             write_ahead_log_record_bytes(named_entry_count, true) <= BLOCK,
             "checkpoint 记录（父在盘上）不该越块：{} 字节",
@@ -888,8 +891,8 @@ mod tests {
         // 每次 fsync 攒 1000 个操作 × 8 叶 = 8000 个脏叶，远多于 FANOUT 个子树根槽位
         let operations = generate_operations(20_000, Workload::Sequential, 53);
         let outcome = run(&operations, Arm::WriteAheadLogFull, 1000, 1000, false);
-        let journal_bytes_upper_bound = outcome.fsyncs * write_ahead_log_record_bytes(FANOUT as usize, false)
-            + outcome.checkpoints * write_ahead_log_record_bytes(FANOUT as usize, true);
+        let journal_bytes_upper_bound = outcome.fsyncs * write_ahead_log_record_bytes(usize_from_u64(FANOUT), false)
+            + outcome.checkpoints * write_ahead_log_record_bytes(usize_from_u64(FANOUT), true);
         assert!(
             outcome.journal_bytes <= journal_bytes_upper_bound,
             "记录没按子树根计费：journal_bytes={} 超过上限 {journal_bytes_upper_bound}",
@@ -916,14 +919,14 @@ mod tests {
     fn multistream_streams_do_not_share_a_spine() {
         let operations = generate_operations(1_024, Workload::MultiStream, 59);
         // 取前 STREAMS 个操作：按构造它们应当分属 STREAMS 条不同的流
-        let first_streams_leaves: HashSet<u64> = operations[..streams() as usize].iter().flatten().copied().collect();
-        assert_eq!(first_streams_leaves.len(), streams() as usize, "前 {} 个操作没有落在同样多条流上", streams());
+        let first_streams_leaves: HashSet<u64> = operations[..usize_from_u64(streams())].iter().flatten().copied().collect();
+        assert_eq!(first_streams_leaves.len(), usize_from_u64(streams()), "前 {} 个操作没有落在同样多条流上", streams());
         assert_eq!(
-            named_subtree_roots(&first_streams_leaves), streams() as usize,
+            named_subtree_roots(&first_streams_leaves), usize_from_u64(streams()),
             "各流没有在「根的子节点」那一层分开——那它们仍共享脊柱，本负载没有判别力"
         );
         // 对照：同样多的 seq 操作只占 1 个子树根
-        let sequential_leaves: HashSet<u64> = generate_operations(STREAMS as usize, Workload::Sequential, 59).iter().flatten().copied().collect();
+        let sequential_leaves: HashSet<u64> = generate_operations(usize_from_u64(STREAMS), Workload::Sequential, 59).iter().flatten().copied().collect();
         assert_eq!(named_subtree_roots(&sequential_leaves), 1, "seq 应当只占一个子树根，否则对照没意义");
     }
 

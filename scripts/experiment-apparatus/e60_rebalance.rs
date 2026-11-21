@@ -145,11 +145,11 @@ fn rebalance(used: &mut [u64], device_capacities: &[u64]) -> u64 {
         device_index = (device_index + 1) % goal.len();
     }
     let mut moved = 0;
-    for device_index in 0..used.len() {
-        if used[device_index] > goal[device_index] {
-            moved += used[device_index] - goal[device_index];
+    for used_device_index in 0..used.len() {
+        if used[used_device_index] > goal[used_device_index] {
+            moved += used[used_device_index] - goal[used_device_index];
         }
-        used[device_index] = goal[device_index];
+        used[used_device_index] = goal[used_device_index];
     }
     moved
 }
@@ -185,8 +185,7 @@ fn run(arm: Arm, seed: u64, new_device_capacity: u64) -> RunResult {
                 run_result.physical_units = used.iter().sum::<u64>()
                     - (0..device_count)
                         .map(|device_index| if device_index == OLD_DEVICE_COUNT { 0 } else { DEVICE_CAPACITY_CELLS * PREFILL_PERCENT / 100 })
-                        .sum::<u64>()
-                    + run_result.moved * 0; // 搬动量单独计，不混进物理消耗
+                        .sum::<u64>(); // 搬动量 `run_result.moved` 单独计，不混进物理消耗
                 return run_result;
             }
             // 这条条带最多能承载 w-1 格数据；每块盘的剩余格数也是上限（这里恒为 1 格/盘/条带）
@@ -257,7 +256,7 @@ fn main() {
                     run_result.physical_units,
                     efficiency_parts_per_million(&run_result),
                     run_result.stripes,
-                    if run_result.stripes == 0 { 0 } else { run_result.width_sum * 1_000_000 / run_result.stripes },
+                    (run_result.width_sum * 1_000_000).checked_div(run_result.stripes).unwrap_or(0),
                     run_result.minimum_width,
                     run_result.moved,
                     run_result.stranded,
@@ -307,7 +306,7 @@ mod tests {
         let used = vec![0u64; 5];
         let stripe_devices = choose(Arm::NarrowEmptiest(2), &used, &device_capacities);
         assert_eq!(stripe_devices.len(), 2);
-        assert_eq!(2 * 1_000_000 / 1, 2_000_000, "w=2 ⇒ 物理是数据的 2 倍");
+        assert_eq!(2 * 1_000_000, 2_000_000, "w=2 ⇒ 物理是数据的 2 倍");
     }
 
     /// **绝对值断言**：搬平 4 盘各 900、新盘 0 ⇒ 目标水位 720，搬动量恰好 4×180=720。

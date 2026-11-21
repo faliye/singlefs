@@ -10,7 +10,8 @@ E171 研究一侧与 r1 产物要从真的仓根取）。scripts/mutation/mutate
 ✅ 抓到、⏭ 无效、❌ 没红、⏱ 超时。结果行不带耗时，两次跑逐字节相同。
 
 跑法（在本目录，整条命令交 `task-server/task submit --`）：
-  python3 mutation_driver.py --table <变异表> --scratch <草稿目录> --output <新文件>
+  python3 mutation_driver.py --table <变异表> --scratch <草稿目录> --output <新文件> [--unit-test-module <TEST_MODULES 里的模块>]…
+--unit-test-module 只收 TEST_MODULES 里的名字（跑的次序仍是 TEST_MODULES 的次序）；给了别的名字，基线直接记红、退 2、一条不跑。
 """
 
 from __future__ import annotations
@@ -79,7 +80,7 @@ def fresh_copy(scratch: str, label: str) -> str:
     return destination
 
 
-def run_unit_tests(directory: str, test_modules: tuple[str, ...] = TEST_MODULES) -> tuple[str, int]:
+def run_unit_tests(directory: str, test_modules: tuple[str, ...] | list[str] = TEST_MODULES) -> tuple[str, int]:
     """本目录全部单测；交回 (结局 抓到 / 没红 / 超时, 退出码)。"""
     # 单测读本目录拷贝里的表与真仓里的 E171 研究一侧（经变量交仓根），自己的输入都在临时目录里造
     environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", **{e171_research_side.COPY_REPOSITORY_ROOT_VARIABLE: e171_research_side.REPOSITORY_ROOT})
@@ -96,13 +97,20 @@ def main(argument_list: list[str]) -> int:
     parser.add_argument("--table", required=True)
     parser.add_argument("--scratch", required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--unit-test-module", action="append", help="要跑的单测模块（可给几次）；不给跑 TEST_MODULES")
+    parser.add_argument("--unit-test-module", action="append",
+                        help="要跑的单测模块（可给几次，只收 TEST_MODULES 里的名字，别的名字基线记红）；不给跑 TEST_MODULES")
     arguments = parser.parse_args(argument_list)
-    test_modules = tuple(arguments.unit_test_module) if arguments.unit_test_module else TEST_MODULES
+    requested = list(arguments.unit_test_module) if arguments.unit_test_module else list(TEST_MODULES)
+    # 交给 unittest 的模块只从 TEST_MODULES 里选：算判定键时 -m unittest 点名的模块折得出是这一整组（命令行给的名字折不出，闭包收不全）
+    test_modules = []
+    for module_name in TEST_MODULES:
+        if module_name in requested:
+            test_modules.append(module_name)
+    unlisted = [entry for entry in requested if entry not in TEST_MODULES]
     rows = read_table(arguments.table)
     digest_before = directory_digest(DIRECTORY)
     lines = ResultLines(arguments.output)
-    lines.result(f"name=config table_rows={len(rows)} unit_test_modules={','.join(test_modules)} timeout_seconds={TIMEOUT_SECONDS}")
+    lines.result(f"name=config table_rows={len(rows)} unit_test_modules={','.join(requested)} timeout_seconds={TIMEOUT_SECONDS}")
     anchor_problems = 0
     for name, original, _ in rows:
         hits = anchor_hits(DIRECTORY, original)
@@ -114,7 +122,10 @@ def main(argument_list: list[str]) -> int:
         lines.finish()
         return 3
     baseline_directory = fresh_copy(arguments.scratch, "baseline-before")
-    baseline_outcome, _ = run_unit_tests(baseline_directory, test_modules)
+    if unlisted:
+        baseline_outcome = CAUGHT
+    else:
+        baseline_outcome, _ = run_unit_tests(baseline_directory, test_modules)
     lines.result(f"name=baseline unit_tests={'green' if baseline_outcome == SURVIVED else 'red'}")
     if baseline_outcome != SURVIVED:
         lines.finish()

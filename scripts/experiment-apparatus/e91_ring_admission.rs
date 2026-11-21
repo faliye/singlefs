@@ -10,7 +10,7 @@
 //!   三、准入水位：搅动量 4.0（祖先不延后）与 0.0567（延后，多流 ckpt=1000）
 //!       各代入 D23 的准入公式，配 E19 形态的 pending 队列模拟对起点。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 // ── 已定常量（各自的出处在 kb 正文引用条款一节）─────────────────────────────
 const RECORD_BYTES: u64 = 4096; // D23 已定项 12
@@ -124,7 +124,7 @@ fn admission_bound_blocks(churn_micro: u64, operations_per_checkpoint: u64, dela
 /// 独立路线——不用上面的闭式，逐窗推队列。
 fn simulate_held_peak(churn_micro: u64, operations_per_checkpoint: u64, delay: u64, windows: u64) -> u64 {
     let blocks_freed_per_window = churn_micro * operations_per_checkpoint / 1_000_000;
-    let mut pending: Vec<u64> = vec![0; delay as usize];
+    let mut pending: Vec<u64> = vec![0; usize_from_u64(delay)];
     let mut freeing_now: u64;
     let mut peak: u64 = 0;
     for _ in 0..windows {
@@ -240,7 +240,7 @@ mod tests {
     #[test]
     fn settled_caliber_bound_is_pinned() {
         assert_eq!(dirty_threshold_window_items(), 131_072);
-        assert!(71 * 1846 < 131_072 && 131_072 <= 71 * 1847, "记录数该恰为 1847");
+        assert!(std::hint::black_box(71 * 1846 < 131_072 && 131_072 <= 71 * 1847), "记录数该恰为 1847");
         assert_eq!(records_for_items(131_072), 1847);
         assert_eq!(transaction_occupancy_bytes(131_072) / 1024, 1847 * 4);
         assert_eq!(ring_bound_bytes(131_072, 2) / 1024, 14_776);

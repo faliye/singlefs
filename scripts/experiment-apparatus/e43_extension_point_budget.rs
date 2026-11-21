@@ -45,6 +45,8 @@
 //! **全整数运算**：占比用 0.001% 为单位的整数，不走浮点——
 //! 复跑要逐字节一致，而浮点格式化是最常见的那种「今天不一样了」。
 
+#[cfg(test)]
+use e7_index_bench::truncate_f64_to_u64;
 use e7_index_bench::Emitter;
 
 // ── D21 对照表的常量（单位：0.1 字节，避免浮点）──
@@ -110,12 +112,7 @@ fn height(node_bytes: u64, extension_point_bytes: u64, carrier: Carrier, leaves:
 fn height_threshold(node_bytes: u64, carrier: Carrier, leaves: u64) -> Option<u64> {
     let base_height = height(node_bytes, 0, carrier, leaves);
     // 上界取到「节点里一个指针都放不下」为止
-    for extension_point_bytes in 0..=node_bytes {
-        if height(node_bytes, extension_point_bytes, carrier, leaves) > base_height {
-            return Some(extension_point_bytes);
-        }
-    }
-    None
+    (0..=node_bytes).find(|&extension_point_bytes| height(node_bytes, extension_point_bytes, carrier, leaves) > base_height)
 }
 
 /// 段一的上界：D21「128 KiB 单元上比 ZFS 省」在计入口径下容得下的最大 `N`。
@@ -568,7 +565,7 @@ mod tests {
     /// 「比谁省」本来就不是判据（D21），这里只钉数字没有漂。
     #[test]
     fn both_rows_are_dearer_than_zfs_at_zero() {
-        assert!(BASE_METADATA_RAID_TENTHS > ZFS_TENTHS);
+        assert!(std::hint::black_box(BASE_METADATA_RAID_TENTHS > ZFS_TENTHS));
         // 写成加法而不是减法：常量相减在变异下会**编译期溢出**，
         // 那时变异被记成「无效」而不是「被抓到」——一条本该会红的断言就静默失效了。
         assert_eq!(BASE_METADATA_RAID_TENTHS, ZFS_TENTHS + 740); // 条带档超出 74.0 字节
@@ -852,7 +849,7 @@ mod tests {
             for extension_point_bytes in EXTENSION_POINT_BYTES_SCANNED {
                 let metadata_tenths = BASE_METADATA_TENTHS + 10 * extension_point_bytes;
                 let share_percent_via_float = (metadata_tenths as f64 / 10.0) / unit_bytes as f64 * 100.0;
-                let via_float = (share_percent_via_float * 1000.0).round() as u64;
+                let via_float = truncate_f64_to_u64((share_percent_via_float * 1000.0).round());
                 assert_eq!(share_in_thousandths_of_a_percent(metadata_tenths, unit_bytes), via_float, "单元 {unit_bytes}、N {extension_point_bytes} 两条路径不一致");
             }
         }
@@ -864,7 +861,7 @@ mod tests {
     fn the_cross_check_itself_can_go_red() {
         let metadata_tenths = BASE_METADATA_TENTHS;
         let wrong = share_in_thousandths_of_a_percent(metadata_tenths, 4096 * 2); // 把单元大小弄错一倍
-        let right = ((metadata_tenths as f64 / 10.0) / 4096.0 * 100.0 * 1000.0).round() as u64;
+        let right = truncate_f64_to_u64(((metadata_tenths as f64 / 10.0) / 4096.0 * 100.0 * 1000.0).round());
         assert_ne!(wrong, right, "把分母弄错一倍之后两条路径居然还一致，这条校验是摆设");
     }
 }

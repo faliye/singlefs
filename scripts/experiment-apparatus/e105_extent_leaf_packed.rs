@@ -17,7 +17,7 @@
 //!
 //! 纯算术，文件操作 0 处；不答挂钟、不答缓存；不答 D11 缓冲那一格（那是 E56 的题）。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{i32_from_u64, Emitter};
 
 const NODE_BYTES: u64 = 16384;
 const UNIT_BYTES: u64 = 32768;
@@ -58,7 +58,7 @@ fn touched(level_node_count: u64, update_count: u64) -> f64 {
     if level_node_count == 0 || update_count == 0 { return 0.0; }
     if update_count == 1 { return 1.0; }
     let level_node_count_float = level_node_count as f64;
-    level_node_count_float * (1.0 - (1.0 - 1.0 / level_node_count_float).powi(update_count as i32))
+    level_node_count_float * (1.0 - (1.0 - 1.0 / level_node_count_float).powi(i32_from_u64(update_count)))
 }
 
 fn copy_on_write_nodes(levels: &[u64], update_count: u64) -> f64 {
@@ -83,7 +83,7 @@ fn geometry(record_count: u64, node_header_bytes: u64, record_bytes: u64, unit_b
     let records_per_container = fanout(unit_bytes, unit_header_bytes, record_bytes);
     let container_count = record_count.div_ceil(records_per_container);
     let packed_internal_levels = tree_levels(container_count, inner_fanout, inner_fanout);
-    Geometry { index_leaf_tree_levels, container_count: container_count, packed_internal_levels, index_leaf_fanout: index_leaf_fanout, records_per_container: records_per_container }
+    Geometry { index_leaf_tree_levels, container_count, packed_internal_levels, index_leaf_fanout, records_per_container }
 }
 
 fn index_leaf_form_update_bytes(tree_geometry: &Geometry, update_count: u64) -> f64 {
@@ -270,7 +270,7 @@ mod tests {
                 let read_bytes_ratio = packed_read_bytes as f64 / index_leaf_read_bytes as f64;
                 assert!((1.25..=2.0).contains(&read_bytes_ratio), "n={record_count} hdr={node_header_bytes} r={read_bytes_ratio}");
                 assert!(read_bytes_ratio >= 1.0, "解析下界：容器扇出 ≥ 叶扇出 ⇒ 乙不比甲高，也至多矮一层 ⇒ 比值 ≥ 1");
-                assert!(tree_geometry.packed_internal_levels.len() + 1 <= tree_geometry.index_leaf_tree_levels.len(), "码 3 叶的树高不许比码 2 叶高");
+                assert!(tree_geometry.packed_internal_levels.len() < tree_geometry.index_leaf_tree_levels.len(), "码 3 叶的树高不许比码 2 叶高");
             }
         }
     }

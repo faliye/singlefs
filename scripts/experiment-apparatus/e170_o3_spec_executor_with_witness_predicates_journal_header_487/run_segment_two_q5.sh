@@ -109,7 +109,7 @@ Z="$ROOT/scripts/experiment-apparatus/target/e170-r2-today-dumps"
 Z1="$Z/e170-dump"; Z1R="$Z/e170-dump-repeat"; Z3="$Z/e170-bad-states-second-run"; Z4="$Z/e170-bad-states-copy-s2"; ZKB="$Z/known-bad-s2"; Z5="$Z/e171-baseline-run1"
 I2="$ROOT/scripts/experiment-apparatus/target/e170-second-run-dumps"; I4="$ROOT/scripts/experiment-apparatus/target/e171-dumps/e170-bad-states-copy-s2"; IKB="$ROOT/scripts/experiment-apparatus/target/e171-dumps/known-bad-s2"
 TREE="$ROOT/scripts/experiment-apparatus/target/e170-r2-today-tree"
-DEVICE="crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs"; TEST_FILE="crates/singlefs-verification/tests/checker_known_bad_images.rs"; KNOWN_BAD_TABLE="crates/singlefs-verification/src/known_bad_images.rs"
+DEVICE="crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion.rs"; TEST_FILE="crates/singlefs-verification/tests/checker_known_bad_images.rs"; KNOWN_BAD_TABLE="crates/singlefs-verification/src/known_bad_images.rs"
 IMAGE_RS="crates/singlefs-checker/src/image.rs"
 FORMAT_LIBRARY_FILE="crates/singlefs-format/src/lib.rs"; FORMAT_JOURNAL_FILE="crates/singlefs-core/src/journal.rs"   # comparator_q5_format_constants.py 读的那几份
 FORMAT_DECISION_FILE=".claude/kb/decisions/23-journal的角色与格式.md"; FORMAT_LAYOUT_FILE=".claude/kb/layout/01-first-txn.md"

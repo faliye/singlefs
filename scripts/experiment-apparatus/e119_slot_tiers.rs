@@ -75,7 +75,7 @@
 //! **对象大小分布是自定的**，全仓没有实测分布（C174）；三个分布一起报，不挑代表。
 //! 不答「同时开着的容器数」的绝对值——那要乘树数，而全仓没有树数的上界。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 const UNIT_BYTES: u64 = 32768; // D4 已定项 5
 const PACKED_UNIT_HEADER_BYTES: u64 = 107; // D18 已定项 11
@@ -100,12 +100,12 @@ fn tiers(arm: &str) -> Vec<u64> {
 
 /// 权重表：下标 s（1..=PACKING_LIMIT_BYTES）上的对象个数。三个分布都按整数权重展开，不用随机源。
 fn weights(distribution: &str) -> Vec<u64> {
-    let mut weight_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    let mut weight_by_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
     match distribution {
-        "uniform" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_size[object_size as usize] = 1; } }
+        "uniform" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_size[usize_from_u64(object_size)] = 1; } }
         // 权重 ∝ 1/s，用整数近似：PACKING_LIMIT_BYTES / s，保证 s 小的权重大
-        "logunif" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_size[object_size as usize] = PACKING_LIMIT_BYTES / object_size; } }
-        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_size[object_size as usize] = 1; } }
+        "logunif" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_size[usize_from_u64(object_size)] = PACKING_LIMIT_BYTES / object_size; } }
+        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_size[usize_from_u64(object_size)] = 1; } }
         _ => {}
     }
     weight_by_size
@@ -115,11 +115,11 @@ fn weights(distribution: &str) -> Vec<u64> {
 fn counts(distribution: &str, object_count: u64) -> Vec<u64> {
     let weight_by_size = weights(distribution);
     let total_weight: u64 = weight_by_size.iter().sum();
-    if total_weight == 0 || object_count == 0 { return vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize]; }
-    let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    if total_weight == 0 || object_count == 0 { return vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)]; }
+    let mut count_by_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
     let mut assigned_count = 0u64;
     let mut last_nonzero_size = 0usize;
-    for object_size in 1..=PACKING_LIMIT_BYTES as usize {
+    for object_size in 1..=usize_from_u64(PACKING_LIMIT_BYTES) {
         if weight_by_size[object_size] == 0 { continue; }
         count_by_size[object_size] = object_count * weight_by_size[object_size] / total_weight;
         assigned_count += count_by_size[object_size];
@@ -143,7 +143,7 @@ fn run_tiered(arm: &str, count_by_size: &[u64]) -> Arm {
     let mut minimum_slots_per_container = u64::MAX;
     for (tier_index, &tier_width) in tier_widths.iter().enumerate() {
         let smallest_size_in_tier = if tier_index == 0 { 1 } else { tier_widths[tier_index - 1] + 1 };
-        let objects_in_tier: u64 = (smallest_size_in_tier..=tier_width).map(|object_size| count_by_size[object_size as usize]).sum();
+        let objects_in_tier: u64 = (smallest_size_in_tier..=tier_width).map(|object_size| count_by_size[usize_from_u64(object_size)]).sum();
         let tier_slots_per_container = slots_per_container(tier_width);
         if tier_slots_per_container < minimum_slots_per_container { minimum_slots_per_container = tier_slots_per_container; }
         if objects_in_tier > 0 { containers += objects_in_tier.div_ceil(tier_slots_per_container.max(1)); }
@@ -160,7 +160,7 @@ fn run_variable_length_arm(count_by_size: &[u64]) -> Arm {
     let mut remaining_payload_bytes = 0u64; // 当前容器剩余净荷；0 表示还没开容器
     for object_size in 1..=PACKING_LIMIT_BYTES {
         let bytes_per_slot = object_size + SLOT_EXTRA_BYTES;
-        let mut objects_left = count_by_size[object_size as usize];
+        let mut objects_left = count_by_size[usize_from_u64(object_size)];
         while objects_left > 0 {
             if remaining_payload_bytes < bytes_per_slot {
                 containers += 1;
@@ -186,8 +186,8 @@ fn main() {
 
     // 阳性对照：所有对象恰好等于某一档宽 ⇒ 有那一档的定宽臂必须与 var 逐字节相同
     for &tier_width in [512u64, 1024, 2048, 4096].iter() {
-        let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
-        count_by_size[tier_width as usize] = OBJECTS_PER_DISTRIBUTION;
+        let mut count_by_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
+        count_by_size[usize_from_u64(tier_width)] = OBJECTS_PER_DISTRIBUTION;
         let variable_length_result = run_variable_length_arm(&count_by_size);
         for &arm in arms.iter() {
             if !tiers(arm).contains(&tier_width) { continue; }
@@ -200,7 +200,7 @@ fn main() {
 
     // 判别力：single 在全 512 的分布上，每对象占用应是 var 的 (4096+43)/(512+43) 倍
     {
-        let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+        let mut count_by_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
         count_by_size[512] = OBJECTS_PER_DISTRIBUTION;
         let variable_length_result = run_variable_length_arm(&count_by_size);
         let single_result = run_tiered("single", &count_by_size);
@@ -267,8 +267,8 @@ mod tests {
     #[test]
     fn positive_control_exact_tier_matches_variable_length() {
         for &tier_width in [512u64, 1024, 2048, 4096].iter() {
-            let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
-            count_by_size[tier_width as usize] = OBJECTS_PER_DISTRIBUTION;
+            let mut count_by_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
+            count_by_size[usize_from_u64(tier_width)] = OBJECTS_PER_DISTRIBUTION;
             let variable_length_result = run_variable_length_arm(&count_by_size);
             for &arm in ["gran64", "gran256", "pow2", "tier4", "single"].iter() {
                 if !tiers(arm).contains(&tier_width) { continue; }
@@ -281,7 +281,7 @@ mod tests {
     /// 判别力：补齐真的被建模了 —— single 在全 512 上比 var 差，且差得正好是那个比。
     #[test]
     fn discrimination_padding_is_modeled() {
-        let mut count_by_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+        let mut count_by_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
         count_by_size[512] = OBJECTS_PER_DISTRIBUTION;
         let variable_length_result = run_variable_length_arm(&count_by_size);
         let single_result = run_tiered("single", &count_by_size);
@@ -356,7 +356,7 @@ mod tests {
         }
         // uniform 下 var 的绝对值：Σ (s+43)，s 从 1 到 4096 各 24 个（100000/4096=24 余 1696）
         let count_by_size = counts("uniform", OBJECTS_PER_DISTRIBUTION);
-        let total_slot_bytes: u64 = (1..=PACKING_LIMIT_BYTES).map(|object_size| count_by_size[object_size as usize] * (object_size + SLOT_EXTRA_BYTES)).sum();
+        let total_slot_bytes: u64 = (1..=PACKING_LIMIT_BYTES).map(|object_size| count_by_size[usize_from_u64(object_size)] * (object_size + SLOT_EXTRA_BYTES)).sum();
         assert_eq!(total_slot_bytes, 212_622_560);
         assert_eq!(run_variable_length_arm(&count_by_size).containers, 6815);
     }

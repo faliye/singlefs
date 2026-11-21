@@ -354,13 +354,13 @@ fn main() {
         }
     }
     // ── 规模扫描（判据 2）：固定树（拓扑流不动），extent 数 ×32，谁在长 ──
-    for extents_per_snapshot in [4u64, 8, 16, 32, 64, 128] {
-        let paylookup_outcome = measure(Topology::MultiHead, Arm::PayLookup, snapshot_count, extents_per_snapshot, 70, 42);
-        let frontier_outcome = measure(Topology::MultiHead, Arm::Frontier, snapshot_count, extents_per_snapshot, 70, 42);
+    for swept_extents_per_snapshot in [4u64, 8, 16, 32, 64, 128] {
+        let paylookup_outcome = measure(Topology::MultiHead, Arm::PayLookup, snapshot_count, swept_extents_per_snapshot, 70, 42);
+        let frontier_outcome = measure(Topology::MultiHead, Arm::Frontier, snapshot_count, swept_extents_per_snapshot, 70, 42);
         println!("{}", emitter.emit_raw(&format!(
             "name=scale total_exts={} paylookup_lookups={} frontier_lookups={} \
              frontier_snap_checks={} frontier_max={}",
-            snapshot_count * extents_per_snapshot, paylookup_outcome.lookups, frontier_outcome.lookups, frontier_outcome.snapshot_table_checks, frontier_outcome.maximum_frontier)));
+            snapshot_count * swept_extents_per_snapshot, paylookup_outcome.lookups, frontier_outcome.lookups, frontier_outcome.snapshot_table_checks, frontier_outcome.maximum_frontier)));
     }
     // ── 分支扫描：候选臂的结构规模跟着快照数走，不跟 extent 总数走 ──
     for swept_snapshot_count in [16u64, 32, 64, 128] {

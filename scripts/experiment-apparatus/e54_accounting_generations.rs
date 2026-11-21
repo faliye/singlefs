@@ -252,6 +252,6 @@ mod tests {
     fn kept_generations_lower_bounds_from_measured_rollback() {
         assert_eq!(keys_when_keeping_recent_generations(64, 1_000_000, 1 + 1), 128);
         assert_eq!(keys_when_keeping_recent_generations(64, 1_000_000, 8 + 1), 576);
-        assert!(576 < 64_000_000, "两个下界都远小于甲");
+        assert!(std::hint::black_box(576 < 64_000_000), "两个下界都远小于甲");
     }
 }

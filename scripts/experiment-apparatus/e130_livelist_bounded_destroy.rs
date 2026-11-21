@@ -21,6 +21,7 @@
 //! （D3 已定项 7 与 D5 已定项 5 同宽口径）。这两个数不在本文件里自己发明，
 //! 对不上 kb 就是口径漂了（`show-me-test.md`「立在装置之间」）。
 
+use e7_index_bench::truncate_f64_to_u64;
 use e7_index_bench::Emitter;
 
 /// 单元字节数，含头。D4（校验和位置） 已定项 3 / 已定项 7。
@@ -81,7 +82,7 @@ struct Load {
 
 impl Load {
     fn new(live_block_count: u64, churn: u64, share: f64) -> Self {
-        let inherited_block_count = (live_block_count as f64 * share).round() as u64;
+        let inherited_block_count = truncate_f64_to_u64((live_block_count as f64 * share).round());
         Load { live_block_count, churn, inherited_block_count }
     }
     /// 头自己出生的块数（`birth > origin.txg`）。只有这些进 livelist。
@@ -164,6 +165,7 @@ fn no_structure(load: &Load) -> Reading {
     }
 }
 
+#[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
 const ARMS: [(&str, fn(&Load) -> Reading); 3] =
     [("naive", naive), ("condense", condense), ("no_structure", no_structure)];
 

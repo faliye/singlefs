@@ -399,6 +399,7 @@ mod tests {
     /// 敏感取样点落在别的臂上；映射内部扇出与 extent 内部扇出没有断言（变异 M10 / M17）。
     #[test]
     fn every_arm_fanout_is_pinned_including_the_header_sensitive_cells() {
+        #[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
         let expected: [(&str, u64, u64, u64, u64, u64, u64, u64); 12] = [
             ("bing", 196, 196, 175, 201, 134, 267, 177),
             ("k1", 164, 164, 149, 168, 118, 236, 140),

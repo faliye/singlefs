@@ -30,6 +30,7 @@
 //! **不答**：挂钟、真实分配器的落点分布、多盘同坏（w = 3 只容一格）、
 //! 修复的写放大（E80 量过那一格）。落点分布取均匀随机是**建模选择**，不是实测。
 
+use e7_index_bench::{truncate_f64_to_u64, usize_from_u64};
 use e7_index_bench::Emitter;
 
 /// 码 3 容器 32768、头 107（D18 已定项 11）。
@@ -83,7 +84,7 @@ impl LinearCongruentialGenerator {
         let mut device_pool: Vec<usize> = (0..device_count).collect();
         let mut picked = Vec::with_capacity(pick_count);
         for pick_index in 0..pick_count {
-            let swap_index = pick_index + (self.next_random() as usize) % (device_pool.len() - pick_index);
+            let swap_index = pick_index + usize_from_u64(self.next_random()) % (device_pool.len() - pick_index);
             device_pool.swap(pick_index, swap_index);
             picked.push(device_pool[pick_index]);
         }
@@ -251,7 +252,7 @@ fn build_layout(arm: Arm, ordinary_unit_count: u64, parameters: LayoutParameters
     if !containers.is_empty() {
         let mut grids_in_key_order: Vec<usize> = (0..grids.len()).collect();
         grids_in_key_order.sort_by_key(|&grid_index| (grids[grid_index].device, grids[grid_index].slot));
-        let container_capacity_in_records = parameters.container_capacity_in_records as usize;
+        let container_capacity_in_records = usize_from_u64(parameters.container_capacity_in_records);
         // 落点数比不动点估的多一格就会溢出最后一个容器 —— 静默夹住会让「记录都装得下」
         // 这件事永远为真而没人发现，所以这里判死
         assert!(grids_in_key_order.len().div_ceil(container_capacity_in_records) <= containers.len(),
@@ -322,7 +323,7 @@ fn lost_count(layout: &Layout, failed_device: usize) -> u64 {
 /// 第一版把它当成「数据格数」，于是往一块声称 90% 填充的盘里摆了 126.3% 的格
 /// （攻击腿 5.5 算出来的）。判据 5 只钉了数据格数，没钉这个量。
 fn occupied_slots() -> u64 {
-    (POOL_CAPACITY_BYTES as f64 * FILL_RATIO / UNIT_BYTES as f64) as u64
+    truncate_f64_to_u64(POOL_CAPACITY_BYTES as f64 * FILL_RATIO / UNIT_BYTES as f64)
 }
 
 /// 一条臂在固定 90% 占用下装得下多少**数据格**。
@@ -335,12 +336,12 @@ fn data_units(arm: Arm, stripe_widths: &[usize], container_capacity_in_records: 
         let mut lower_bound = 0u64;
         let mut upper_bound = occupied_slot_count;
         while lower_bound < upper_bound {
-            let midpoint = (lower_bound + upper_bound + 1) / 2;
+            let midpoint = (lower_bound + upper_bound).div_ceil(2);
             if midpoint + stripe_count(midpoint, stripe_widths) <= occupied_slot_count { lower_bound = midpoint; } else { upper_bound = midpoint - 1; }
         }
         lower_bound
     };
-    let copies_per_container = match arm { Arm::MirroredContainer => 2, Arm::PooledContainer => 1, _ => 0 };
+    let copies_per_container = match arm { Arm::MirroredContainer => 2, Arm::PooledContainer => 1, Arm::ParityHeader | Arm::NoMemberTable => 0 };
     if copies_per_container == 0 { return (member_count, 0); }
     // 记录数 = 全部落点（含 parity 与容器自己）；容器数 = 记录数 / container_capacity_in_records，副本数 × copies_per_container
     let mut container_total = 0u64;
@@ -457,7 +458,7 @@ mod tests {
         assert_eq!(total_slot_count, 536_870_912);
         for arm in [Arm::NoMemberTable, Arm::ParityHeader, Arm::PooledContainer, Arm::MirroredContainer] {
             let (data_unit_count, container_total) = data_units(arm, &STRIPE_WIDTH_CYCLE, records_per_container());
-            let copies_per_container = match arm { Arm::MirroredContainer => 2, Arm::PooledContainer => 1, _ => 0 };
+            let copies_per_container = match arm { Arm::MirroredContainer => 2, Arm::PooledContainer => 1, Arm::ParityHeader | Arm::NoMemberTable => 0 };
             let member_count = data_unit_count + copies_per_container * container_total;
             let occupied_location_count = member_count + stripe_count(member_count, &STRIPE_WIDTH_CYCLE);
             assert!(occupied_location_count <= occupied_slots(), "{arm:?}: locs={occupied_location_count} 超过占用槽数");

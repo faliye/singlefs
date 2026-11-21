@@ -3,7 +3,7 @@
 //! 跑前登记 `research/prompts/e145-preregistration.md`。计数模型加一段扫描解头的模拟：三条码 2 头臂（A 今天、B 自描述、C 定宽区间）
 //! 在五棵树上的头宽、扇出、树高；扫描期没有树表时各臂解得出几个头；映射树三条装法的条目宽、扇出、树高、一次点查读几个节点。确定性。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{low_byte_of_u32, low_byte_of_u64, usize_from_u64, Emitter};
 
 const NODE_BYTES: u64 = 16384;
 const NONCE_MAC_RESERVED_BYTES: u64 = 28;
@@ -120,7 +120,7 @@ fn wide_checksum_with_field_zeroed(bytes: &[u8], cover_end: usize) -> [u8; 32] {
         salted.extend_from_slice(&covered);
         field[seed as usize * 8..seed as usize * 8 + 4].copy_from_slice(&castagnoli_crc32(&salted).to_le_bytes());
         let mut twice = salted.clone();
-        twice.push(seed as u8);
+        twice.push(low_byte_of_u32(seed));
         field[seed as usize * 8 + 4..seed as usize * 8 + 8].copy_from_slice(&castagnoli_crc32(&twice).to_le_bytes());
     }
     field
@@ -131,14 +131,14 @@ struct Generator(u64);
 impl Generator {
     fn next_byte(&mut self) -> u8 {
         self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        (self.0 >> 40) as u8
+        low_byte_of_u64(self.0 >> 40)
     }
 }
 
 /// 造一个码 2 节点：共同前缀（magic、类标签 2）+ 伪随机的类身份段 + 校验和；B 臂在偏移 51 放 key 宽，C 臂同样放 key 宽但头宽固定。
 fn build_node(arm: HeaderArm, key_width: u64, generator: &mut Generator) -> Vec<u8> {
-    let header_end = arm.header_bytes(key_width) as usize;
-    let mut node = vec![0u8; NODE_BYTES as usize];
+    let header_end = usize_from_u64(arm.header_bytes(key_width));
+    let mut node = vec![0u8; usize_from_u64(NODE_BYTES)];
     for byte in node.iter_mut().take(header_end) {
         *byte = generator.next_byte();
     }
@@ -170,7 +170,7 @@ struct ScanTally {
 fn scan_header(arm: HeaderArm, node: &[u8]) -> Option<u64> {
     match arm {
         HeaderArm::Today => {
-            let passing: Vec<u64> = REGISTERED_KEY_WIDTHS.iter().copied().filter(|width| header_checksum_holds(node, arm.header_bytes(*width) as usize)).collect();
+            let passing: Vec<u64> = REGISTERED_KEY_WIDTHS.iter().copied().filter(|width| header_checksum_holds(node, usize_from_u64(arm.header_bytes(*width)))).collect();
             match passing.as_slice() {
                 [only] => Some(*only),
                 _ => None,
@@ -178,13 +178,13 @@ fn scan_header(arm: HeaderArm, node: &[u8]) -> Option<u64> {
         }
         HeaderArm::SelfDescribing | HeaderArm::FixedKeyRange => {
             let key_width = u64::from(node[KEY_WIDTH_FIELD_OFFSET]);
-            header_checksum_holds(node, arm.header_bytes(key_width) as usize).then_some(key_width)
+            header_checksum_holds(node, usize_from_u64(arm.header_bytes(key_width))).then_some(key_width)
         }
     }
 }
 
 fn scan_ambiguity_count(node: &[u8]) -> usize {
-    REGISTERED_KEY_WIDTHS.iter().filter(|width| header_checksum_holds(node, HeaderArm::Today.header_bytes(**width) as usize)).count()
+    REGISTERED_KEY_WIDTHS.iter().filter(|width| header_checksum_holds(node, usize_from_u64(HeaderArm::Today.header_bytes(**width)))).count()
 }
 
 fn scan_pool(arm: HeaderArm, key_widths: &[u64], nodes_per_width: usize, generator: &mut Generator) -> ScanTally {

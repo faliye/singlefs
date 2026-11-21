@@ -1,4 +1,4 @@
-//! E207（B8严格判据下的步数）的历史用例：拷进副本当 `crates/singlefs-verification/tests/e207_strict_scan_steps_histories.rs`，
+//! E207（严格判据下的扫类步数）的历史用例：拷进副本当 `crates/singlefs-verification/tests/e207_strict_scan_steps_histories.rs`，
 //! 副本由 `e207_strict_scan_steps_counters.py` 套上读数（`--build counts`）或一个字节不插（`--build plain`，只比盘）。
 //! 读数行怎么打在副本的 `tests/e207_readings/mod.rs`（两种构建各一份，都由插计数脚本写）；第 3 组声明行（`name=declared`）由这里按驱动自己的单元记账打。
 //! 量窗的取法（声明行的式子与写法、W2 冷文件池、探针前缀、扩展窗口、阴性对照的点）在入口一并拷进副本的 `tests/e207_window_choices/mod.rs`，

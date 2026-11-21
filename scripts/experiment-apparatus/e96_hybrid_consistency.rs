@@ -17,6 +17,7 @@
 //! 6. 搬迁三步各截断一次：错读恒 0、守恒恒成立。
 //! 7. 只报数：活根 / 快照根的多跳率随轮数。
 
+use e7_index_bench::{i64_from_u64, u32_from_usize, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -45,7 +46,7 @@ impl XorshiftRandomGenerator {
         self.0
     }
     fn below(&mut self, upper_bound_exclusive: usize) -> usize {
-        (self.next() % upper_bound_exclusive as u64) as usize
+        usize_from_u64(self.next() % upper_bound_exclusive as u64)
     }
 }
 
@@ -161,9 +162,9 @@ impl World {
         let mut level: Vec<u32> = (0..key_count / fanout)
             .map(|leaf_ordinal| {
                 let leaf_entries: Vec<Entry> =
-                    (0..fanout).map(|entry_ordinal| Entry { version_number: (leaf_ordinal * fanout + entry_ordinal) as u32, hint: (leaf_ordinal * fanout + entry_ordinal) as u32 }).collect();
+                    (0..fanout).map(|entry_ordinal| Entry { version_number: u32_from_usize(leaf_ordinal * fanout + entry_ordinal), hint: u32_from_usize(leaf_ordinal * fanout + entry_ordinal) }).collect();
                 nodes.push(Node::Leaf(leaf_entries));
-                (nodes.len() - 1) as u32
+                u32_from_usize(nodes.len() - 1)
             })
             .collect();
         while level.len() > 1 {
@@ -171,7 +172,7 @@ impl World {
                 .chunks(fanout)
                 .map(|child_chunk| {
                     nodes.push(Node::Inner(child_chunk.to_vec()));
-                    (nodes.len() - 1) as u32
+                    u32_from_usize(nodes.len() - 1)
                 })
                 .collect();
         }
@@ -186,13 +187,13 @@ impl World {
             snaps: Vec::new(),
             head_deadlist: Vec::new(),
             previous_snapshot_txg: 0,
-            versions: (0..key_count).map(|key| Version { key: key as u32, birth: 1 }).collect(),
-            free: (key_count as u32..slot_count as u32).collect(),
+            versions: (0..key_count).map(|key| Version { key: u32_from_usize(key), birth: 1 }).collect(),
+            free: (u32_from_usize(key_count)..u32_from_usize(slot_count)).collect(),
             free_order: Vec::new(),
             deferred: Vec::new(),
             sweep: 0,
-            occupant: (0..key_count as u32).map(|key| (key, key)).collect(),
-            map_slot: (0..key_count as u32).map(|key| (key, key)).collect(),
+            occupant: (0..u32_from_usize(key_count)).map(|key| (key, key)).collect(),
+            map_slot: (0..u32_from_usize(key_count)).map(|key| (key, key)).collect(),
             txg: 1,
             free_via_hint_misfree: 0,
         }
@@ -243,8 +244,8 @@ impl World {
     fn update(&mut self, key: usize) {
         self.txg += 1;
         let slot = self.allocate_slot();
-        let version_number = self.versions.len() as u32;
-        self.versions.push(Version { key: key as u32, birth: self.txg });
+        let version_number = u32_from_usize(self.versions.len());
+        self.versions.push(Version { key: u32_from_usize(key), birth: self.txg });
         self.occupant.insert(slot, version_number);
         self.map_slot.insert(version_number, slot);
         let key_digits = self.digits(key);
@@ -265,7 +266,7 @@ impl World {
         let old_entry = leaf_entries[entry_position];
         leaf_entries[entry_position] = Entry { version_number, hint: slot };
         self.nodes.push(Node::Leaf(leaf_entries));
-        let mut child = (self.nodes.len() - 1) as u32;
+        let mut child = u32_from_usize(self.nodes.len() - 1);
         for &(node_index, child_position) in path.iter().rev().skip(1) {
             let mut children = match &self.nodes[node_index as usize] {
                 Node::Inner(children) => children.clone(),
@@ -273,7 +274,7 @@ impl World {
             };
             children[child_position] = child;
             self.nodes.push(Node::Inner(children));
-            child = (self.nodes.len() - 1) as u32;
+            child = u32_from_usize(self.nodes.len() - 1);
         }
         self.live_root = child;
         if self.versions[old_entry.version_number as usize].birth > self.previous_snapshot_txg {
@@ -541,7 +542,7 @@ fn crash_truncation(base: &World, version_number: u32) -> Vec<(usize, i64)> {
         world.end_round();
         world.audit().unwrap_or_else(|error| panic!("截断 {cut} 后守恒破了：{error}"));
         let (wrong, _, _, _) = world.read_everything();
-        wrong_deltas.push((cut, wrong as i64 - baseline as i64));
+        wrong_deltas.push((cut, i64_from_u64(wrong) - i64_from_u64(baseline)));
     }
     wrong_deltas
 }
@@ -670,20 +671,20 @@ mod tests {
         let mut world = small(Header::KeyBirth);
         world.map_slot.insert(3, 9);
         assert!(world.audit().is_err());
-        let mut world = small(Header::KeyBirth);
-        let occupant_of_slot_3 = world.occupant.remove(&3).unwrap();
-        let occupant_of_slot_4 = world.occupant.remove(&4).unwrap();
-        world.occupant.insert(3, occupant_of_slot_4);
-        world.occupant.insert(4, occupant_of_slot_3);
-        let (wrong, _, _, _) = world.read_everything();
+        let mut world_with_removed_occupants = small(Header::KeyBirth);
+        let occupant_of_slot_3 = world_with_removed_occupants.occupant.remove(&3).unwrap();
+        let occupant_of_slot_4 = world_with_removed_occupants.occupant.remove(&4).unwrap();
+        world_with_removed_occupants.occupant.insert(3, occupant_of_slot_4);
+        world_with_removed_occupants.occupant.insert(4, occupant_of_slot_3);
+        let (wrong, _, _, _) = world_with_removed_occupants.read_everything();
         assert_eq!(wrong, 2);
         // 反向核对也要有牙：一个没人引用的版本占着槽 20 而映射说它在 21——
         // 正向只查被引用的版本、长度又相等，只有反向核对能红
-        let mut world = small(Header::KeyBirth);
-        world.occupant.insert(20, 99);
-        world.map_slot.insert(99, 21);
-        assert_eq!(world.occupant.len(), world.map_slot.len());
-        assert!(world.audit().is_err());
+        let mut world_with_a_foreign_occupant = small(Header::KeyBirth);
+        world_with_a_foreign_occupant.occupant.insert(20, 99);
+        world_with_a_foreign_occupant.map_slot.insert(99, 21);
+        assert_eq!(world_with_a_foreign_occupant.occupant.len(), world_with_a_foreign_occupant.map_slot.len());
+        assert!(world_with_a_foreign_occupant.audit().is_err());
     }
 
     /// 更新必须刷新自己那条叶条目的提示：活根读刚写的 key 不许多跳，提示 == 映射。

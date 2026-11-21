@@ -31,8 +31,8 @@ research/prompts/e174-preregistration.md 修订 2 之五与修订 3）；装置�
   构建根定三样：Cargo.lock 与 [profile.release] 读哪一份、cargo build 在哪起、装置编到哪（<构建根>/<CARGO_TARGET_DIR 或 target>/release/<bin 名>）。
   入口的写法两种包一样，照 unit-graph：<包的 crate 名>::<模块…>::<函数名>，头一段是 crate 名（[lib] name，没写就是包名把 - 换成 _），
     不是 bin 名；bin 由 --binary 给、交 unit-graph 的 --target bin:<bin 名>。例 装置在
-    crates/singlefs-verification 的 bin <bin 名> 里：--package-directory crates/singlefs-verification
-    --binary <bin 名> --entry singlefs_verification::<函数名>。头一段对不上包的 crate 名，取键之前退 2、点名该写什么。
+    crates/singlefs-implementation-experiments 的 bin <bin 名> 里：--package-directory crates/singlefs-implementation-experiments
+    --binary <bin 名> --entry singlefs_implementation_experiments::<函数名>。头一段对不上包的 crate 名，取键之前退 2、点名该写什么。
 
 键的组成（每个入口一把代码键；代码键 = unit-graph key 打的 key 那一个 hex，它把单元、工具链行、依赖行一起算进去）：
   单元     unit-graph closure 与 key：<unit-graph 的根> <入口> --target bin:<bin 名> [--cfg feature="<特性>"]… --threads <N>

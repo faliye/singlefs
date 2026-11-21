@@ -5,6 +5,7 @@
 
 // admission: always 每次照此刻的仓与自己的常量现算，上一次跑出的产物不替这一次作保
 // run-condition: command python3
+use e7_index_bench::u64_from_nanoseconds;
 use e7_index_bench::{Emitter, Sample};
 use std::alloc::{alloc, dealloc, Layout};
 use std::fs::OpenOptions;
@@ -29,21 +30,26 @@ struct AlignedBuffer {
 impl AlignedBuffer {
     fn new(length_in_bytes: usize) -> Self {
         let layout = Layout::from_size_align(length_in_bytes, ALIGNMENT_BYTES).expect("对齐参数非法");
+        // SAFETY: `layout` 由 `Layout::from_size_align` 校验过；`alloc` 要求布局大小非零，调用处传的都是 O_DIRECT 用的正的整块长度。
         let allocated_pointer = unsafe { alloc(layout) };
         assert!(!allocated_pointer.is_null(), "分配失败");
+        // SAFETY: `allocated_pointer` 刚由 `alloc` 分配，布局长度就是 `length_in_bytes`，上一行已断言非空；`u8` 没有对齐或取值限制，可以写 `length_in_bytes` 个字节。
         unsafe { std::ptr::write_bytes(allocated_pointer, 0xA5, length_in_bytes) };
         Self { pointer: allocated_pointer, length_in_bytes, layout }
     }
     fn as_slice(&self) -> &[u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) }
     }
     fn as_mut_slice(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；独占借用 `&mut self`，同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
     }
 }
 
 impl Drop for AlignedBuffer {
     fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局，`drop` 只跑一次，之后没有别的引用。
         unsafe { dealloc(self.pointer, self.layout) }
     }
 }
@@ -114,7 +120,7 @@ fn main() {
     let sequential_write_sample = Sample {
         operation_count: sequential_write_count,
         bytes_per_operation: sequential_chunk_bytes as u64,
-        elapsed_nanoseconds: sequential_write_start.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(sequential_write_start.elapsed().as_nanos()),
     };
     println!("{}", emitter.emit("seq_write_1m", &sequential_write_sample));
 
@@ -134,7 +140,7 @@ fn main() {
     let random_write_sample = Sample {
         operation_count: random_operation_count,
         bytes_per_operation: random_block_bytes as u64,
-        elapsed_nanoseconds: random_write_start.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(random_write_start.elapsed().as_nanos()),
     };
     println!("{}", emitter.emit("rand_write_4k", &random_write_sample));
 
@@ -151,45 +157,11 @@ fn main() {
     let random_read_sample = Sample {
         operation_count: random_operation_count,
         bytes_per_operation: random_block_bytes as u64,
-        elapsed_nanoseconds: random_read_start.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(random_read_start.elapsed().as_nanos()),
     };
     println!("{}", emitter.emit("rand_read_4k", &random_read_sample));
     println!("{}", emitter.emit_raw(&format!("name=checksum_guard acc={read_byte_accumulator}")));
     println!("{}", emitter.finish());
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// **`O_DIRECT` 要求缓冲按 `ALIGNMENT_BYTES` 对齐。** 不对齐会 `EINVAL`，
-    /// 而那表现为「I/O 计数为 0」——看起来像很省，实际是根本没跑。
-    /// 这是本 harness 里唯一一个「出错时看起来像好消息」的地方。
-    #[test]
-    fn aligned_buffer_is_actually_aligned() {
-        for length_in_bytes in [ALIGNMENT_BYTES, ALIGNMENT_BYTES * 4, ALIGNMENT_BYTES * 256] {
-            let buffer = AlignedBuffer::new(length_in_bytes);
-            assert_eq!(buffer.as_slice().as_ptr() as usize % ALIGNMENT_BYTES, 0, "长度 {length_in_bytes} 的缓冲没有按 {ALIGNMENT_BYTES} 对齐");
-        }
-    }
-
-    /// 随机数必须散开：它决定随机读写的落点，退化成常数会让「随机」这一档
-    /// 实际变成「反复读同一个块」，而那会被缓存吃掉、量出一个虚高的吞吐。
-    #[test]
-    fn next_random_spreads_out() {
-        let mut random_state = 7u64;
-        let distinct_values: std::collections::HashSet<u64> = (0..1000).map(|_| next_random(&mut random_state) % 100_000).collect();
-        assert!(distinct_values.len() > 900, "1000 次只取到 {} 个不同值，没散开", distinct_values.len());
-    }
-
-    /// 同一个种子必须给出同一串随机数——实验的可复现性靠这一条。
-    #[test]
-    fn next_random_is_reproducible_from_the_seed() {
-        let (mut first_state, mut second_state) = (11u64, 11u64);
-        let first_sequence: Vec<u64> = (0..50).map(|_| next_random(&mut first_state)).collect();
-        let second_sequence: Vec<u64> = (0..50).map(|_| next_random(&mut second_state)).collect();
-        assert_eq!(first_sequence, second_sequence, "同种子给出了不同的序列，实验不可复现");
-    }
 }
 
 /// 准入用的仓根：环境变量 SINGLEFS_REPOSITORY_ROOT，没设取当前目录（replay.sh 与实验页的命令都在仓根起）；不取「清单目录/../..」（单元键把它当运行期路径拒算）。
@@ -227,5 +199,39 @@ fn preflight() {
         eprint!("{}", String::from_utf8_lossy(&output.stderr));
         print!("{}", String::from_utf8_lossy(&output.stdout));
         std::process::exit(output.status.code().unwrap_or(1));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// **`O_DIRECT` 要求缓冲按 `ALIGNMENT_BYTES` 对齐。** 不对齐会 `EINVAL`，
+    /// 而那表现为「I/O 计数为 0」——看起来像很省，实际是根本没跑。
+    /// 这是本 harness 里唯一一个「出错时看起来像好消息」的地方。
+    #[test]
+    fn aligned_buffer_is_actually_aligned() {
+        for length_in_bytes in [ALIGNMENT_BYTES, ALIGNMENT_BYTES * 4, ALIGNMENT_BYTES * 256] {
+            let buffer = AlignedBuffer::new(length_in_bytes);
+            assert_eq!(buffer.as_slice().as_ptr() as usize % ALIGNMENT_BYTES, 0, "长度 {length_in_bytes} 的缓冲没有按 {ALIGNMENT_BYTES} 对齐");
+        }
+    }
+
+    /// 随机数必须散开：它决定随机读写的落点，退化成常数会让「随机」这一档
+    /// 实际变成「反复读同一个块」，而那会被缓存吃掉、量出一个虚高的吞吐。
+    #[test]
+    fn next_random_spreads_out() {
+        let mut random_state = 7u64;
+        let distinct_values: std::collections::HashSet<u64> = (0..1000).map(|_| next_random(&mut random_state) % 100_000).collect();
+        assert!(distinct_values.len() > 900, "1000 次只取到 {} 个不同值，没散开", distinct_values.len());
+    }
+
+    /// 同一个种子必须给出同一串随机数——实验的可复现性靠这一条。
+    #[test]
+    fn next_random_is_reproducible_from_the_seed() {
+        let (mut first_state, mut second_state) = (11u64, 11u64);
+        let first_sequence: Vec<u64> = (0..50).map(|_| next_random(&mut first_state)).collect();
+        let second_sequence: Vec<u64> = (0..50).map(|_| next_random(&mut second_state)).collect();
+        assert_eq!(first_sequence, second_sequence, "同种子给出了不同的序列，实验不可复现");
     }
 }

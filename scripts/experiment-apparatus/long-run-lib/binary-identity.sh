@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 长跑脚本共用的一段：装置二进制在一趟里不许换，每一片记下打它的是哪一版装置，续跑只沿用同一版装置打的片（欠账 C862）。
-# 被长跑脚本 source（binary_identity_build 另给 e6-units.sh 与 scripts/devices/e152-run.sh 取编出来的装置），不单独起（库，没有准入与运行条件）；里面只有函数定义与四个全局变量（PINNED_BINARY、PINNED_BINARY_SHA256、BUILT_BINARY、BUILT_BINARIES），source 的时候什么都不做。
+# 被长跑脚本 source（binary_identity_build 另给 e6-units.sh、scripts/devices/e152-run.sh 与 scripts/experiment-apparatus/e56-vm-bench-run.sh 取编出来的装置），不单独起（库，没有准入与运行条件）；里面只有函数定义与四个全局变量（PINNED_BINARY、PINNED_BINARY_SHA256、BUILT_BINARY、BUILT_BINARIES），source 的时候什么都不做。
 #   binary_identity_pin <装置二进制> <私有目录>   开跑时拷一份进私有目录（按 sha256 分子目录、拷完只读），设 PINNED_BINARY（拷贝的路径）与 PINNED_BINARY_SHA256（拷贝的 sha256）；
 #                                                  之后每片每段只按 PINNED_BINARY 起，不再 exec 仓根 target/release 下那一份（别的编译随时会把它换掉）
 #   binary_identity_assert_unchanged [<路径> <sha>]  起每一片之前核私有副本的 sha256 还是开跑时那个（不给参数核最近拷的那份；一趟里拷了几份装置的，逐份带参数核）

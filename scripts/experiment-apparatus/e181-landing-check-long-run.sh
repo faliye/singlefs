@@ -2,7 +2,7 @@
 # admission: always 整个脚本每次都起：哪一片已有判定、键对不对得上由 prune-server 里的按片判定现答（scripts/experiment-apparatus/long_run_item_verdicts.py），上一次跑完不替这一次作保
 # run-condition: command cargo git python3
 # E181（落得下那一判与挂载下界）第一段（固定点与落得下段，跑前登记 research/prompts/e181-preregistration.md 5.5 节第一段）的长跑跑法：
-#   装置是入库装置 crates/singlefs-verification/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs；装置按「段」（命令行参数）一段一段跑，
+#   装置是入库装置 crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs；装置按「段」（命令行参数）一段一段跑，
 #   本脚本把它们切成八个互不依赖的片，每片一个进程、一份输出，全部判完再按固定次序拼成产物
 #   research/results/e181-landing-check-fixed-point-and-mount-lower-bound-landing.out（多段产物，每段有自己的 name=done 收尾行），
 #   第一片（常量回比、锚点、自证、小几何的阳性对照）另存一份 …-checks.out（逐字节可比，不含计时与线程数）。
@@ -75,7 +75,7 @@ PRODUCT_DIRECTORY="${E181_PRODUCT_DIRECTORY:-research/results}"
 LANDING_STEM="$PRODUCT_DIRECTORY/e181-landing-check-fixed-point-and-mount-lower-bound-landing"
 CHECKS_STEM="$PRODUCT_DIRECTORY/e181-landing-check-fixed-point-and-mount-lower-bound-checks"
 BINARY_NAME="e181_landing_check_fixed_point_and_mount_lower_bound"
-APPARATUS_ENTRY="crates/singlefs-verification/src/bin/$BINARY_NAME.rs::main"
+APPARATUS_ENTRY="crates/singlefs-implementation-experiments/src/bin/$BINARY_NAME.rs::main"
 BINARY="${E181_BINARY:-}"   # 没给：build_the_binary 照 cargo 报的这一趟编出来的位置填
 LOG_DIRECTORY="${E181_LOG_DIRECTORY:-}"
 if [[ -z "$LOG_DIRECTORY" ]]; then   # 没设：工作根（.claude/hooks/lib_work_root.py，两台同一份）下的 e181-long-run；自证的临时树各格都给了目录，不走这里
@@ -205,7 +205,7 @@ library_failure_exit() { # <哪一步> <退出码>：打原因，交该退的码
 # 装置取 cargo 报的这一趟编出来的位置（binary_identity_build；编译目录由服务给，不是仓根 target/）。弄坏开关 binary-from-root-target 下取仓根 target/release 下那一份
 build_the_binary() {
   local build_status
-  binary_identity_build "$BINARY_NAME" --release -p singlefs-verification --bin "$BINARY_NAME"; build_status=$?
+  binary_identity_build "$BINARY_NAME" --release -p singlefs-implementation-experiments --bin "$BINARY_NAME"; build_status=$?
   if ((build_status == 1)); then
     echo "  ✗ 装置编不过" >&2
     echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本（判完的片在库里，复用）" >&2
@@ -412,7 +412,7 @@ printf '{"reason":"build-finished","success":true}\n'
 FAKE
   chmod +x -- "$cell/fake-cargo/cargo"
   E181_SELFTEST_BUILT="$cell/build/release/e181_landing_check_fixed_point_and_mount_lower_bound" INVOKE_BUILDS=1 invoke "$cell"; exit_code=$?
-  expect "没给 E181_BINARY：装置取 cargo 报的这一趟编出来的那一份、不取仓根 target/release 下早先编的那一份" '((exit_code == 0)) && grep -qF "build --release -p singlefs-verification --bin e181_landing_check_fixed_point_and_mount_lower_bound --message-format=json-render-diagnostics" "$cell/calls.cargo" && (($(calls_of "$cell" .self-sha) == 8)) && [[ "$(awk "{print \$NF}" "$cell/calls.self-sha" | sort -u)" == "$original_sha" ]] && grep -qF "源 $cell/build/release/e181_landing_check_fixed_point_and_mount_lower_bound" "$cell/out" && [[ "$old_sha" != "$original_sha" ]]'
+  expect "没给 E181_BINARY：装置取 cargo 报的这一趟编出来的那一份、不取仓根 target/release 下早先编的那一份" '((exit_code == 0)) && grep -qF "build --release -p singlefs-implementation-experiments --bin e181_landing_check_fixed_point_and_mount_lower_bound --message-format=json-render-diagnostics" "$cell/calls.cargo" && (($(calls_of "$cell" .self-sha) == 8)) && [[ "$(awk "{print \$NF}" "$cell/calls.self-sha" | sort -u)" == "$original_sha" ]] && grep -qF "源 $cell/build/release/e181_landing_check_fixed_point_and_mount_lower_bound" "$cell/out" && [[ "$old_sha" != "$original_sha" ]]'
   cell="$work/list"; make_tree "$cell"
   invoke "$cell" --list-segments; exit_code=$?
   expect "--list-segments：列八片、不起装置" '((exit_code == 0)) && (($(grep -c "（上限 " "$cell/out") == 8)) && (($(calls_of "$cell") == 0))'

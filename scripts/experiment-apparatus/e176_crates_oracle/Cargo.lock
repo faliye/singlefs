@@ -69,6 +69,7 @@ dependencies = [
  "libc",
  "singlefs-format",
  "singlefs-replay-prefix",
+ "vstd",
 ]
 
 [[package]]

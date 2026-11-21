@@ -27,7 +27,7 @@
 //! `previous_hash` 覆盖哪些字段（**不满足时误接受 100%，与位宽无关**）；两个分母都是场景点不是测量；
 //! hash 算法未定 ⇒ 「误接受 = 2⁻ⁿ」条件于链值均匀（E40 已实测截断 CRC 不满足）。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{i32_from_u32, Emitter};
 
 const ITEM_BYTES: u64 = 56;
 
@@ -90,7 +90,7 @@ fn is_free(divergent_count: u64, tolerance: u64) -> bool {
 
 /// 误接受期望次数 = 机会数 × 2⁻ⁿ。
 fn expected_false_accepts(chances: f64, bits: u32) -> f64 {
-    chances / 2f64.powi(bits as i32)
+    chances / 2f64.powi(i32_from_u32(bits))
 }
 
 /// 「一生至少出一次」的概率。泊松近似：1 − e^(−λ)。

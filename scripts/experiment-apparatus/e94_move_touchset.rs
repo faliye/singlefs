@@ -26,6 +26,7 @@
 //! 计数模型；映射树按「key 空间同几何」近似（叶装该 key 全部代的条目）；
 //! deadlist 载体的 COW 不建模（只数条目重写）；无崩溃语义；无读路径代价。
 
+use e7_index_bench::{u32_from_usize, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -50,7 +51,7 @@ impl PseudoRandomGenerator {
         self.0
     }
     fn below(&mut self, upper_bound_exclusive: usize) -> usize {
-        (self.next() % upper_bound_exclusive as u64) as usize
+        usize_from_u64(self.next() % upper_bound_exclusive as u64)
     }
 }
 
@@ -120,10 +121,10 @@ impl World {
         let mut level: Vec<u32> = (0..key_count / fanout)
             .map(|leaf_index| {
                 let entries: Vec<Entry> = (0..fanout)
-                    .map(|position_in_leaf| Entry { version_index: (leaf_index * fanout + position_in_leaf) as u32, slot: (leaf_index * fanout + position_in_leaf) as u32 })
+                    .map(|position_in_leaf| Entry { version_index: u32_from_usize(leaf_index * fanout + position_in_leaf), slot: u32_from_usize(leaf_index * fanout + position_in_leaf) })
                     .collect();
                 nodes.push(Node::Leaf(entries));
-                (nodes.len() - 1) as u32
+                u32_from_usize(nodes.len() - 1)
             })
             .collect();
         while level.len() > 1 {
@@ -131,14 +132,14 @@ impl World {
                 .chunks(fanout)
                 .map(|child_group| {
                     nodes.push(Node::Inner(child_group.to_vec()));
-                    (nodes.len() - 1) as u32
+                    u32_from_usize(nodes.len() - 1)
                 })
                 .collect();
         }
         let versions: Vec<Version> =
-            (0..key_count).map(|key| Version { key: key as u32, birth: 1, death: u64::MAX }).collect();
-        let occupant: BTreeMap<u32, u32> = (0..key_count as u32).map(|initial_index| (initial_index, initial_index)).collect();
-        let map_slot: BTreeMap<u32, u32> = (0..key_count as u32).map(|initial_index| (initial_index, initial_index)).collect();
+            (0..key_count).map(|key| Version { key: u32_from_usize(key), birth: 1, death: u64::MAX }).collect();
+        let occupant: BTreeMap<u32, u32> = (0..u32_from_usize(key_count)).map(|initial_index| (initial_index, initial_index)).collect();
+        let map_slot: BTreeMap<u32, u32> = (0..u32_from_usize(key_count)).map(|initial_index| (initial_index, initial_index)).collect();
         World {
             fanout,
             key_count,
@@ -149,7 +150,7 @@ impl World {
             head_deadlist: Vec::new(),
             previous_snapshot_txg: 0,
             versions,
-            free_slots: (key_count as u32..slot_count as u32).collect(),
+            free_slots: (u32_from_usize(key_count)..u32_from_usize(slot_count)).collect(),
             occupant,
             map_slot,
             txg: 1,
@@ -174,8 +175,8 @@ impl World {
         self.txg += 1;
         let slot = *self.free_slots.iter().next().expect("槽用尽");
         self.free_slots.remove(&slot);
-        let version_index = self.versions.len() as u32;
-        self.versions.push(Version { key: key as u32, birth: self.txg, death: u64::MAX });
+        let version_index = u32_from_usize(self.versions.len());
+        self.versions.push(Version { key: u32_from_usize(key), birth: self.txg, death: u64::MAX });
         self.occupant.insert(slot, version_index);
         self.map_slot.insert(version_index, slot);
 
@@ -203,7 +204,7 @@ impl World {
         };
         entries[index_in_leaf] = Entry { version_index, slot };
         self.nodes.push(Node::Leaf(entries));
-        let mut new_child = (self.nodes.len() - 1) as u32;
+        let mut new_child = u32_from_usize(self.nodes.len() - 1);
         // 自底向上复制内部节点
         for &(path_node, child_index) in path.iter().rev().skip(1) {
             let mut children = match &self.nodes[path_node as usize] {
@@ -212,7 +213,7 @@ impl World {
             };
             children[child_index] = new_child;
             self.nodes.push(Node::Inner(children));
-            new_child = (self.nodes.len() - 1) as u32;
+            new_child = u32_from_usize(self.nodes.len() - 1);
         }
         self.live_root = new_child;
 
@@ -420,7 +421,7 @@ fn pointer_rewrite_move(world: &mut World, plan: &BTreeMap<u32, (u32, u32)>) -> 
         }
     }
     apply_allocation_records(world, plan);
-    Cost { copy_on_write_nodes: created_nodes, root_references, deadlist_rewrites: deadlist_rewrites, moved: plan.len() as u64, skipped_shared: 0 }
+    Cost { copy_on_write_nodes: created_nodes, root_references, deadlist_rewrites, moved: plan.len() as u64, skipped_shared: 0 }
 }
 
 /// 记忆化重建：返回 Some(新节点) 当且仅当子树里有被搬的版本。
@@ -446,7 +447,7 @@ fn rebuild(
             if subtree_changed {
                 world.nodes.push(Node::Leaf(entries));
                 *created_nodes += 1;
-                Some((world.nodes.len() - 1) as u32)
+                Some(u32_from_usize(world.nodes.len() - 1))
             } else {
                 None
             }
@@ -463,7 +464,7 @@ fn rebuild(
             if subtree_changed {
                 world.nodes.push(Node::Inner(new_children));
                 *created_nodes += 1;
-                Some((world.nodes.len() - 1) as u32)
+                Some(u32_from_usize(world.nodes.len() - 1))
             } else {
                 None
             }
@@ -654,7 +655,7 @@ fn run_architecture(base: &World, architecture: Architecture, batch: &[u32]) -> 
             let skipped = (batch.len() - movable.len()) as u64;
             (movable, skipped)
         }
-        _ => (batch.to_vec(), 0),
+        Architecture::PointerRewrite | Architecture::CentralMap => (batch.to_vec(), 0),
     };
     let slots_total = world.occupant.len() + world.free_slots.len();
     let plan = plan_moves(&world, &version_indices);
@@ -684,7 +685,7 @@ fn injection_control(base: &World, architecture: Architecture, batch: &[u32]) {
             let references_by_tree = world.snapshot_references_by_tree();
             batch.iter().copied().filter(|version_index| !references_by_tree.contains_key(version_index)).collect()
         }
-        _ => batch.to_vec(),
+        Architecture::PointerRewrite | Architecture::CentralMap => batch.to_vec(),
     };
     if version_indices.is_empty() {
         return;
@@ -723,7 +724,7 @@ fn new_birth_violations(base: &World, batch: &[u32]) -> (u64, u64) {
     let mut world = base.clone();
     let references_by_tree = world.snapshot_references_by_tree();
     let expected: u64 = batch.iter().filter(|version_index| references_by_tree.contains_key(version_index)).count() as u64;
-    let plan = plan_moves(&world, &batch.to_vec());
+    let plan = plan_moves(&world, batch);
     pointer_rewrite_move(&mut world, &plan);
     let reassigned_birth = world.txg + 1;
     for &version_index in batch {

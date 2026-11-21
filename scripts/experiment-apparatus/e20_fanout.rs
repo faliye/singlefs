@@ -24,6 +24,7 @@
 //! ## 本机缓存（现读  `/sys/devices/system/cpu/cpu0/cache/`）
 //! 每核 L1d 48 KiB、L2 1 MiB；L3 32 MiB（每 CCX 共享）；缓存行 64 字节。
 
+use e7_index_bench::{truncate_f64_to_u32, u32_from_usize, u64_from_nanoseconds, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::time::Instant;
 
@@ -83,7 +84,7 @@ impl Tree {
     #[inline(always)]
     fn child_at(&self, node: usize, slot_index: usize) -> usize {
         let offset = node * self.node_bytes + NODE_HEADER_BYTES + slot_index * self.entry_bytes + 8;
-        u64::from_le_bytes(self.buffer[offset..offset + 8].try_into().unwrap()) as usize
+        usize_from_u64(u64::from_le_bytes(self.buffer[offset..offset + 8].try_into().unwrap()))
     }
 
     #[inline(always)]
@@ -98,11 +99,11 @@ impl Tree {
     fn lookup(&self, key: u64) -> usize {
         let mut node = 0usize;
         let mut slot = 0usize;
-        let bits_per_level = (self.slots as f64).log2().ceil() as u32;
+        let bits_per_level = truncate_f64_to_u32((self.slots as f64).log2().ceil());
         for level in 0..self.depth {
             // 按层取 key 的不同位段作为本层的搜索键 —— 保证每层的二分都落在节点值域内，
             // 且落点随 key 均匀铺开（基数下降）
-            let level_search_key = (key >> (level as u32 * bits_per_level)) % (self.slots as u64);
+            let level_search_key = (key >> (u32_from_usize(level) * bits_per_level)) % (self.slots as u64);
             // 节点内二分 —— 每次比较读一个 key，而 key 之间隔着 entry_bytes
             let (mut lower_bound, mut upper_bound) = (0usize, self.slots);
             while lower_bound < upper_bound {
@@ -119,16 +120,6 @@ impl Tree {
     }
 
     fn footprint(&self) -> usize { self.buffer.len() }
-    #[allow(dead_code)]
-    /// 一次点查最少要碰几个缓存行：每层二分约 log2(slots) 次比较，
-    /// 每次比较大概率落在不同的缓存行上（条目跨步 ≥ entry_bytes）。
-    fn lines_per_lookup(&self) -> usize {
-        let comparisons = (self.slots as f64).log2().ceil() as usize;
-        // 一个缓存行里能装下几个条目的 key（跨步 entry_bytes）
-        let entries_per_cache_line = (CACHE_LINE_BYTES / self.entry_bytes).max(1);
-        self.depth * comparisons.div_ceil(entries_per_cache_line).max(1) * entries_per_cache_line.min(comparisons).max(1) / entries_per_cache_line.max(1)
-            + self.depth * comparisons / entries_per_cache_line.max(1)
-    }
 }
 
 /// **查找 key 在计时区之外预先生成** —— 否则随机数与取模会淹没树下降本身。
@@ -154,7 +145,7 @@ fn bench(tree: &Tree, keys: &[u64]) -> u64 {
         let chained_key = (key ^ (previous_slot as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)) % key_span;
         previous_slot = tree.lookup(chained_key);
     }
-    let elapsed_nanoseconds = start_time.elapsed().as_nanos() as u64;
+    let elapsed_nanoseconds = u64_from_nanoseconds(start_time.elapsed().as_nanos());
     std::hint::black_box(previous_slot);
     elapsed_nanoseconds
 }
@@ -292,7 +283,7 @@ mod tests {
         let tree = Tree::new(100, 16, 4096);
         assert_eq!(tree.depth, 1);
         for key in 0..tree.slots as u64 {
-            assert_eq!(tree.lookup(key), (key as usize) % tree.slots, "key={key}");
+            assert_eq!(tree.lookup(key), usize_from_u64(key) % tree.slots, "key={key}");
         }
     }
 

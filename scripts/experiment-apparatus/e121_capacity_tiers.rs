@@ -60,7 +60,7 @@
 //! **不答同时开着的容器数的绝对值**（要乘整理器同时处理的树数；D19 已定项 6 定了 key，按它重算没做）。
 //! 不答「整理器怎么在多档之间调度」——那归 D27 已定项 6。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 const UNIT_BYTES: u64 = 32768;
 const PACKED_UNIT_HEADER_BYTES: u64 = 107;
@@ -117,7 +117,7 @@ fn capgeo_tiers(ratio_in_thousandths: u64, minimum_slot_width: u64) -> Vec<u64> 
         if next <= objects_per_container { break; }
         objects_per_container = next;
     }
-    let mut tier_widths: Vec<u64> = objects_per_container_steps.iter().filter_map(|&objects_per_container| widest_slot_width_for_objects_per_container(objects_per_container, minimum_slot_width)).collect();
+    let mut tier_widths: Vec<u64> = objects_per_container_steps.iter().filter_map(|&objects_per_container_step| widest_slot_width_for_objects_per_container(objects_per_container_step, minimum_slot_width)).collect();
     tier_widths.push(LIMIT);
     tier_widths.sort_unstable();
     tier_widths.dedup();
@@ -135,11 +135,11 @@ fn capall_tiers(minimum_slot_width: u64) -> Vec<u64> {
 }
 
 fn weights(distribution: &str) -> Vec<u64> {
-    let mut weight_by_object_size = vec![0u64; (LIMIT + 1) as usize];
+    let mut weight_by_object_size = vec![0u64; usize_from_u64(LIMIT + 1)];
     match distribution {
-        "uniform" => { for object_size in 1..=LIMIT { weight_by_object_size[object_size as usize] = 1; } }
-        "logunif" => { for object_size in 1..=LIMIT { weight_by_object_size[object_size as usize] = LIMIT / object_size; } }
-        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_object_size[object_size as usize] = 1; } }
+        "uniform" => { for object_size in 1..=LIMIT { weight_by_object_size[usize_from_u64(object_size)] = 1; } }
+        "logunif" => { for object_size in 1..=LIMIT { weight_by_object_size[usize_from_u64(object_size)] = LIMIT / object_size; } }
+        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_object_size[usize_from_u64(object_size)] = 1; } }
         _ => {}
     }
     weight_by_object_size
@@ -148,10 +148,10 @@ fn weights(distribution: &str) -> Vec<u64> {
 fn counts(distribution: &str, object_count: u64) -> Vec<u64> {
     let weight_by_object_size = weights(distribution);
     let total: u64 = weight_by_object_size.iter().sum();
-    if total == 0 || object_count == 0 { return vec![0u64; (LIMIT + 1) as usize]; }
-    let mut count_by_object_size = vec![0u64; (LIMIT + 1) as usize];
+    if total == 0 || object_count == 0 { return vec![0u64; usize_from_u64(LIMIT + 1)]; }
+    let mut count_by_object_size = vec![0u64; usize_from_u64(LIMIT + 1)];
     let (mut assigned_object_count, mut last_nonzero_object_size) = (0u64, 0usize);
-    for object_size in 1..=LIMIT as usize {
+    for object_size in 1..=usize_from_u64(LIMIT) {
         if weight_by_object_size[object_size] == 0 { continue; }
         count_by_object_size[object_size] = object_count * weight_by_object_size[object_size] / total; assigned_object_count += count_by_object_size[object_size]; last_nonzero_object_size = object_size;
     }
@@ -163,7 +163,7 @@ fn containers_tiered(tier_widths: &[u64], count_by_object_size: &[u64]) -> u64 {
     let mut total = 0u64;
     for (tier_index, &slot_width) in tier_widths.iter().enumerate() {
         let tier_smallest_object_size = if tier_index == 0 { 1 } else { tier_widths[tier_index - 1] + 1 };
-        let objects_in_tier: u64 = (tier_smallest_object_size..=slot_width).map(|object_size| count_by_object_size[object_size as usize]).sum();
+        let objects_in_tier: u64 = (tier_smallest_object_size..=slot_width).map(|object_size| count_by_object_size[usize_from_u64(object_size)]).sum();
         if objects_in_tier > 0 { total += objects_in_tier.div_ceil(objects_per_container_for_slot_width(slot_width).max(1)); }
     }
     total
@@ -173,7 +173,7 @@ fn containers_variable_length(count_by_object_size: &[u64]) -> u64 {
     let (mut container_count, mut room) = (0u64, 0u64);
     for object_size in 1..=LIMIT {
         let need = object_size + SLOT_EXTRA;
-        let mut left = count_by_object_size[object_size as usize];
+        let mut left = count_by_object_size[usize_from_u64(object_size)];
         while left > 0 {
             if room < need { container_count += 1; room = UNIT_PAYLOAD_BYTES; }
             let fit = (room / need).min(left);
@@ -217,8 +217,8 @@ fn main() {
     for &arm in ARMS.iter() {
         let tier_widths = arm_tiers(arm, 64);
         for &slot_width in tier_widths.iter() {
-            let mut count_by_object_size = vec![0u64; (LIMIT + 1) as usize];
-            count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+            let mut count_by_object_size = vec![0u64; usize_from_u64(LIMIT + 1)];
+            count_by_object_size[usize_from_u64(slot_width)] = OBJECT_COUNT;
             let (variable_length_containers, tiered_containers) = (containers_variable_length(&count_by_object_size), containers_tiered(&tier_widths, &count_by_object_size));
             if variable_length_containers != tiered_containers {
                 println!("{}", emitter.emit_raw(&format!(
@@ -308,8 +308,8 @@ mod tests {
         for &arm in ARMS.iter() {
             let tier_widths = arm_tiers(arm, 64);
             for &slot_width in tier_widths.iter() {
-                let mut count_by_object_size = vec![0u64; (LIMIT + 1) as usize];
-                count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+                let mut count_by_object_size = vec![0u64; usize_from_u64(LIMIT + 1)];
+                count_by_object_size[usize_from_u64(slot_width)] = OBJECT_COUNT;
                 assert_eq!(containers_tiered(&tier_widths, &count_by_object_size), containers_variable_length(&count_by_object_size), "arm={arm} 档宽={slot_width}");
             }
         }

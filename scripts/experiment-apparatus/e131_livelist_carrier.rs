@@ -18,6 +18,8 @@
 //! ⇒ 每层 81 棵。本装置**照抄那一种读法并注明出处**，不自己挑——
 //! `.claude/rules/mutation-sampling.md` 第五类正是从 E128 那次立的。
 
+#[cfg(test)]
+use e7_index_bench::truncate_f64_to_u64;
 use e7_index_bench::Emitter;
 
 /// 索引节点字节数。D8 已定项 2。
@@ -126,6 +128,7 @@ fn capacity_parts_per_million(reading: &Reading) -> f64 {
     CAPACITY_PARTS_PER_MILLION_PER_ENTRY_BYTE_AT_E97 * reading.entry_bytes as f64 * (reading.entries_total as f64 / E97_ENTRIES)
 }
 
+#[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
 const ARMS: [(&str, fn(u64, u64) -> Reading); 2] = [("per_head", per_head), ("shared", shared)];
 const HEADS_SWEPT: [u64; 7] = [1, 4, 16, 64, 256, 1024, 4096];
 const BLOCKS_PER_HEAD_SWEPT: [u64; 3] = [1024, 65536, 1048576];
@@ -394,7 +397,7 @@ mod tests {
             livelist_trees: 1,
             tree_table_entries: 1,
             tree_table_levels: 1,
-            entries_total: E97_ENTRIES as u64,
+            entries_total: truncate_f64_to_u64(E97_ENTRIES),
             entry_bytes: 20,
             descents: 1,
             destroy_touch: 0,

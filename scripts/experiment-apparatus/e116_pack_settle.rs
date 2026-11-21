@@ -70,6 +70,7 @@
 //! 不答「这个收益够不够格进格式」——那一问由 `.claude/rules/fs-design.md` 的格式分支判据答，不由数答。
 //! 负载是 E116 自定的，不在 D25（目标负载优先级） 的定义域内。
 
+use e7_index_bench::{i32_from_u64, truncate_f64_to_u64};
 use e7_index_bench::Emitter;
 
 // ── 有出处的格式常量 ────────────────────────────────────────────────
@@ -103,9 +104,9 @@ fn alloc_leaf_cap() -> u64 { (NODE - NODE_HDR) / ALLOC_ENTRY }
 fn leaves_touched_scattered(n: u64, total_leaves: u64, b: u64) -> u64 {
     if n == 0 || total_leaves == 0 || b == 0 { return 0; }
     let l = total_leaves as f64;
-    let per_batch = l * (1.0 - (1.0 - 1.0 / l).powi(b.min(n) as i32));
+    let per_batch = l * (1.0 - (1.0 - 1.0 / l).powi(i32_from_u64(b.min(n))));
     let batches = (n as f64 / b.min(n) as f64).ceil();
-    (batches * per_batch).round() as u64
+    truncate_f64_to_u64((batches * per_batch).round())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -169,12 +170,12 @@ fn payback(pad: &Ledger, pk: &Ledger) -> f64 {
 /// 死槽比例 d 下的稳态占用。correlated=false 时槽独立死亡（容器全死的概率 d^cap），
 /// correlated=true 时整容器一起死（容器存活比例 = 1 − d）。
 fn occupancy_at_death(n: u64, size: u64, slot_extra: u64, d: f64, correlated: bool) -> (u64, u64) {
-    let pad_live = ((n as f64) * (1.0 - d)).round() as u64 * UNIT;
+    let pad_live = truncate_f64_to_u64(((n as f64) * (1.0 - d)).round()) * UNIT;
     let cap = capacity(size, slot_extra);
     if cap == 0 { return (pad_live, pad_live); }
     let containers = n.div_ceil(cap);
-    let alive_frac = if correlated { 1.0 - d } else { 1.0 - d.powi(cap as i32) };
-    let pack_live = ((containers as f64) * alive_frac).round() as u64 * UNIT;
+    let alive_frac = if correlated { 1.0 - d } else { 1.0 - d.powi(i32_from_u64(cap)) };
+    let pack_live = truncate_f64_to_u64(((containers as f64) * alive_frac).round()) * UNIT;
     (pad_live, pack_live)
 }
 
@@ -332,7 +333,7 @@ mod tests {
         assert_eq!(capacity(16384, SLOT_EXTRA), 1);
         // 头宽敏感的取样点：头 107 时 1，头 0 时 2
         assert_eq!(capacity(16286, SLOT_EXTRA), 1);
-        assert_eq!((UNIT - 0) / (16286 + SLOT_EXTRA), 2);
+        assert_eq!(UNIT / (16286 + SLOT_EXTRA), 2);
     }
 
     /// bg_key 的搬迁写钉绝对值：512 B 档，四项分别算出来再加。

@@ -19,7 +19,7 @@
 //! ⚠️ 本实验的模型独立于 E32 / E36 重写，不共用它们的代码。
 //! 关链那一臂的数应当与 E32 同向（非零），那是一次免费的交叉核对。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 /// 槽位怎么映射。E32 只测了 `Mod` 一种，E36 补了解耦那一种。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -78,7 +78,7 @@ impl Ring {
     fn new(slots: usize) -> Self { Ring { slots, cells: vec![None; slots], head: 0 } }
     fn put(&mut self, map: Slots, record: JournalRecord) {
         let cell_index = match map {
-            Slots::ByJsn => (record.jsn as usize) % self.slots,
+            Slots::ByJsn => usize_from_u64(record.jsn) % self.slots,
             Slots::Decoupled => { let head_position = self.head; self.head = (head_position + 1) % self.slots; head_position }
         };
         self.cells[cell_index] = Some(record);
@@ -87,7 +87,7 @@ impl Ring {
     /// `Decoupled` 下位置从 0 顺序推进——两种映射的读侧对齐方式不同。
     fn at(&self, map: Slots, expected: u64, step: usize) -> Option<JournalRecord> {
         let cell_index = match map {
-            Slots::ByJsn => (expected as usize) % self.slots,
+            Slots::ByJsn => usize_from_u64(expected) % self.slots,
             Slots::Decoupled => step % self.slots,
         };
         self.cells[cell_index]
@@ -107,6 +107,7 @@ struct ReplayOutcome {
 /// 造一条被丢弃的时间线：`settled` 条落定、第 `settled` 条是空洞（csum 坏）、
 /// 其后 `stale` 条写成了（校验和好，`jsn` 连续）—— 这就是 E32 复现出的那个形态。
 /// 然后恢复、新时间线续写 `new_after` 条，再崩一次，最后做第二次恢复。
+#[allow(clippy::too_many_arguments, reason = "这些参数是这一次计算彼此独立的输入，合成只用一次的结构体只多一层包装")]
 fn run(map: Slots, resume: Resume, chain_on: bool, bits: u32,
        slots: usize, settled: u64, stale: u64, new_after: u64, seed: u64) -> ReplayOutcome {
     let mut ring = Ring::new(slots);
@@ -142,7 +143,7 @@ fn run(map: Slots, resume: Resume, chain_on: bool, bits: u32,
     // ⚠️ 解耦映射下，恢复要把写头**退回断点位置**再续写——jbd2 恢复收尾就是这么做的
     // （`j_head = info.head_block`）。不退回的话新记录写在残留后面，
     // 顺序扫描根本走不到它们，量出来的是「新记录全丢」而不是「残留被重放」。
-    if map == Slots::Decoupled { ring.head = (settled as usize) % slots; }
+    if map == Slots::Decoupled { ring.head = usize_from_u64(settled) % slots; }
     let mut new_timeline_previous_hash = anchor;
     for new_record_index in 0..new_after {
         let record = JournalRecord { jsn: start + new_record_index, timeline: 1, previous_record_hash: new_timeline_previous_hash, is_checksum_valid: true };
@@ -156,8 +157,7 @@ fn run(map: Slots, resume: Resume, chain_on: bool, bits: u32,
     let mut accepted = 0u64;
     let mut stale_hit = 0u64;
     let mut step = 0usize;
-    loop {
-        let Some(record) = ring.at(map, expected, step) else { break };
+    while let Some(record) = ring.at(map, expected, step) {
         if !record.is_checksum_valid || record.jsn != expected { break }
         if chain_on && record.previous_record_hash != expected_previous_hash { break }
         accepted += 1;
@@ -165,7 +165,7 @@ fn run(map: Slots, resume: Resume, chain_on: bool, bits: u32,
         expected_previous_hash = hash(&record, bits, seed);
         expected += 1;
         step += 1;
-        if accepted as usize > slots { break }        // 防环
+        if usize_from_u64(accepted) > slots { break }        // 防环
     }
     // 新时间线本该被接受的条数：从 start 起、且 jsn 连着前缀的那些
     let own_expected = if start == settled { new_after } else { 0 };
@@ -208,6 +208,7 @@ fn packed_bytes(chain_bytes: u64, named_items: u64) -> u64 {
 /// 跑 `trials` 轮独立试验，数有多少轮里残留骗过了反向链。
 /// **一轮试验量不出概率**：碰撞在每轮只有一次机会（新时间线最后一条 → 第一条活着的残留），
 /// 概率约 2⁻ⁿ，所以要靠轮数把它逼出来。
+#[allow(clippy::too_many_arguments, reason = "这些参数是这一次计算彼此独立的输入，合成只用一次的结构体只多一层包装")]
 fn count_trials_with_a_false_accept(map: Slots, resume: Resume, bits: u32,
                      slots: usize, settled: u64, stale: u64, new_after: u64,
                      trials: u64) -> u64 {

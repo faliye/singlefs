@@ -11,6 +11,7 @@
 //! ⚠️ 三个 hash 各自独立实现，不复用 E40（密文校验和位宽） 的那一份：
 //! 复用等于让被测对象与它的正确性证据共享代码（C48（多条校验路径共用同一个前提））。
 
+use e7_index_bench::{low_byte_of_u64, low_byte_of_usize, low_word_of_u64, u32_from_usize};
 use std::collections::HashMap;
 
 // ───────────────────────── 被测的三个函数，各自独立实现 ─────────────────────────
@@ -39,7 +40,7 @@ fn cyclic_redundancy_check_64_xz(data: &[u8]) -> u64 {
     !register
 }
 fn cyclic_redundancy_check_64_truncated_to_32_bits(data: &[u8]) -> u32 {
-    cyclic_redundancy_check_64_xz(data) as u32
+    low_word_of_u64(cyclic_redundancy_check_64_xz(data))
 }
 
 /// 乙：SHA-256，取前 4 字节（大端）。从头实现，由 FIPS 180-4 的测试向量钉死。
@@ -126,14 +127,14 @@ fn make_header(header_length_in_bytes: usize, jsn: u64, epoch: u32, checkpoint_t
     header_bytes[4..6].copy_from_slice(&1u16.to_be_bytes());             // version/type
     header_bytes[6] = 0;                                                 // algo_type
     header_bytes[7] = 0;                                                 // 对齐填充
-    header_bytes[8..12].copy_from_slice(&(header_length_in_bytes as u32).to_be_bytes()); // record_length
+    header_bytes[8..12].copy_from_slice(&u32_from_usize(header_length_in_bytes).to_be_bytes()); // record_length
     header_bytes[12..16].copy_from_slice(&7u32.to_be_bytes());            // named_count
     header_bytes[16..20].copy_from_slice(&epoch.to_be_bytes());           // jsn 高段：实例代号 32 位
     header_bytes[20..26].copy_from_slice(&jsn.to_be_bytes()[2..]);        // jsn 低段：计数器 48 位
     header_bytes[26..34].copy_from_slice(&checkpoint_txg.to_be_bytes());             // checkpoint_txg
     header_bytes[34..42].copy_from_slice(&(jsn ^ 0x5A5A).to_be_bytes());  // tail_lsn
-    for nonce_byte_index in 42..54 {
-        header_bytes[nonce_byte_index] = (jsn as u8).wrapping_add(nonce_byte_index as u8);              // nonce 12 字节
+    for (nonce_byte_index, byte) in header_bytes.iter_mut().enumerate().take(54).skip(42) {
+        *byte = low_byte_of_u64(jsn).wrapping_add(low_byte_of_usize(nonce_byte_index));              // nonce 12 字节
     }
     // 54..54+32 是 header_csum，按已定项 10 的纪律留零，不进输入
     header_bytes
@@ -152,9 +153,9 @@ fn binary_field_rank(mut image_vectors: Vec<u32>) -> usize {
         if let Some(pivot_row) = (rank..image_vectors.len()).find(|&row_index| image_vectors[row_index] >> bit_position & 1 == 1) {
             image_vectors.swap(rank, pivot_row);
             let pivot = image_vectors[rank];
-            for row_index in 0..image_vectors.len() {
-                if row_index != rank && (image_vectors[row_index] >> bit_position & 1 == 1) {
-                    image_vectors[row_index] ^= pivot;
+            for (row_index, row) in image_vectors.iter_mut().enumerate() {
+                if row_index != rank && (*row >> bit_position & 1 == 1) {
+                    *row ^= pivot;
                 }
             }
             rank += 1;
@@ -167,7 +168,7 @@ fn binary_field_rank(mut image_vectors: Vec<u32>) -> usize {
 /// ⚠️ 不是核的大小——核含零向量，而零差异是同源比较，按 E51（反向链的碰撞机会有多少次）
 /// 判据 1 根本不构成碰撞机会。
 fn colliding_differences(rank: usize) -> u64 {
-    (1u64 << (32 - rank as u32)) - 1
+    (1u64 << (32 - u32_from_usize(rank))) - 1
 }
 
 /// 一个 32 比特窗口的像基：`f(base XOR e_i) XOR f(base)`。
@@ -220,7 +221,7 @@ fn birthday<HashFunction: Fn(&[u8]) -> u32>(hash_function: &HashFunction, header
         let header = make_header(
             header_length_in_bytes,
             splitmix64(&mut splitmix_state) & 0xFFFF_FFFF_FFFF,
-            splitmix64(&mut splitmix_state) as u32,
+            low_word_of_u64(splitmix64(&mut splitmix_state)),
             splitmix64(&mut splitmix_state),
         );
         let hash_value = hash_function(&header);

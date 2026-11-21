@@ -48,6 +48,7 @@
 //! （那是 C88（根环的时间线判别未实现）的射程）；S（每区槽数）取 1 简化——
 //! 槽多只加深同区回退，不改跨区结局。
 
+use e7_index_bench::usize_from_u64;
 use e7_index_bench::Emitter;
 
 const DEVICE_COUNT: usize = 2;
@@ -60,7 +61,7 @@ fn device_of_region(region: usize) -> usize {
 
 /// 发布 g 落区域 g mod R（D16 已定项 6 的逐发布计数）。
 fn region_of(generation: u64) -> usize {
-    (generation % RING_REGION_COUNT as u64) as usize
+    usize_from_u64(generation % RING_REGION_COUNT as u64)
 }
 
 /// 掉 `dead_device` 后，从代 g 往回找幸存区域里最新的代；返回回退了几代。

@@ -3,7 +3,7 @@
 # run-condition: command python3 flock
 # task-server-shards: *
 # E184（常规层与大负载层的代价计数）第一段（岔路 G1，跑前登记 research/prompts/e184-preregistration.md 5.6 的第一段与第十二节修订 6 至 10）的长活跑法：
-#   装置是入库装置 crates/singlefs-verification/src/bin/e184_regular_layer_cost_counts.rs 与转储 bin
+#   装置是入库装置 crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts.rs 与转储 bin
 #   e184_regular_layer_cost_counts_write_dump.rs（都由主 agent 经 compile-then-swap.py 编好；二进制路径见「环境」）。
 #   本脚本把第一段的产物拆成若干件活，每件活的输出落进工作目录、齐了拼成一份产物
 #   research/results/e184-regular-layer-cost-counts-segment-one-<日期>.out。
@@ -457,7 +457,7 @@ resolve_binaries() {
 # 两份装置取 cargo 报的这一趟编出来的位置（long-run-lib/binary-identity.sh 的 binary_identity_build；编译目录由 task-server 给，不是这棵树的 target/）
 build_here() {
   break_is build-jobs-from-thread-limit && export CARGO_BUILD_JOBS="$THREAD_LIMIT"
-  binary_identity_build "$MAIN_BINARY_NAME,$DUMP_BINARY_NAME" --release -p singlefs-verification --bin "$MAIN_BINARY_NAME" --bin "$DUMP_BINARY_NAME" \
+  binary_identity_build "$MAIN_BINARY_NAME,$DUMP_BINARY_NAME" --release -p singlefs-implementation-experiments --bin "$MAIN_BINARY_NAME" --bin "$DUMP_BINARY_NAME" \
     2> "$WORK_DIRECTORY/logs/build-$RUN_STAMP.log" || {
     echo "  ✗ 装置编不过，或编过了 cargo 没报出它编在哪（$WORK_DIRECTORY/logs/build-$RUN_STAMP.log）" >&2
     echo "     → 怎么办：照那份日志里 cargo 的第一处 error（或末尾那两行的出路）改，再起本脚本" >&2
@@ -531,11 +531,11 @@ make_share_link_directory() {
 # 装置退 3 时把它报的不合格行转出来；退 4 时转出没过的对照。
 show_stop_lines() {
   local file="$1"
-  grep -E 'result=fail|match=false|name=flow_failed|name=dump_failed|STOP' -- "$file" 2> /dev/null | head -n 10 | cut -c1-400 >&2
+  grep -E 'result=fail|match=false|name=flow_failed|name=dump_failed|STOP' -- "$file" 2> /dev/null | head -n 10 | clip_text 400 >&2
 }
 show_control_lines() {
   local file="$1"
-  grep -E 'passed=false|result=fail' -- "$file" 2> /dev/null | head -n 10 | cut -c1-400 >&2
+  grep -E 'passed=false|result=fail' -- "$file" 2> /dev/null | head -n 10 | clip_text 400 >&2
 }
 
 # 写完成记录：输出先写临时名再改名，记录最后写（有记录就是做完了）。
@@ -1167,7 +1167,7 @@ run_selftest() {
   new_cell build-here
   # 这一格的 CARGO_BUILD_JOBS 是 5、E184_THREADS 是 7：编译线程要照前一个
   CARGO_BUILD_JOBS=5 INVOKE_BINARY= invoke "$cell" --build-here --only selfcheck; exit_code=$?
-  expect "--build-here：编一次（两个 bin 一条 cargo，直接起、编译线程照服务交的 CARGO_BUILD_JOBS）、用这棵树 target/release 下的装置" '((exit_code == 0)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-verification --bin e184_regular_layer_cost_counts --bin e184_regular_layer_cost_counts_write_dump --message-format=json-render-diagnostics | jobs=5$") == 1)) && grep -q "^device main selfcheck" "$cell/calls"'
+  expect "--build-here：编一次（两个 bin 一条 cargo，直接起、编译线程照服务交的 CARGO_BUILD_JOBS）、用这棵树 target/release 下的装置" '((exit_code == 0)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-implementation-experiments --bin e184_regular_layer_cost_counts --bin e184_regular_layer_cost_counts_write_dump --message-format=json-render-diagnostics | jobs=5$") == 1)) && grep -q "^device main selfcheck" "$cell/calls"'
   new_cell binary-missing
   INVOKE_BINARY="$cell/bin/not-built" invoke "$cell" --only selfcheck; exit_code=$?
   expect "装置二进制没编好退 78、装置一次没起" '((exit_code == 78)) && grep -qF "装置还没编好" "$cell/out" && [[ ! -e "$cell/calls" ]]'

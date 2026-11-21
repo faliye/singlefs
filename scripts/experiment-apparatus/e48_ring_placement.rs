@@ -25,6 +25,7 @@
 //! 物理失败域；**设备集合变化之后归属会变**（`(r×P) mod device_count` 依赖 devs，而区域位置是 mkfs 时的既成事实
 //! ⇒ D2 已定项 3 的一个实例，D2 已定项 5 已定不重放置）；P 取 8191 只是「素数且大于任何合理设备数」，不是搜出来的。
 
+use e7_index_bench::usize_from_u64;
 use e7_index_bench::Emitter;
 
 /// 条带布局下 LBA 落在哪块盘。与 E46 / E47 同形，本文件独立重写并单测。
@@ -121,7 +122,7 @@ fn worst_case(
         for steps_back in 0..ring_slot_count {
             let candidate_txg = latest_txg - steps_back;
             let region_index = order.region_of(candidate_txg, regions, slots);
-            if device_of_region[region_index as usize] == failed_device {
+            if device_of_region[usize_from_u64(region_index)] == failed_device {
                 continue;
             }
             alive_slots += 1;
@@ -285,7 +286,7 @@ fn main() {
     let mut positive_control_holds = true;
     for placement in placements {
         for &regions in REGIONS.iter() {
-            let device_of_region: Vec<u64> = vec![0; regions as usize];
+            let device_of_region: Vec<u64> = vec![0; usize_from_u64(regions)];
             let (surviving_slots, _) = worst_case(SlotOrder::AcrossRegions, regions, 4, &device_of_region, 0);
             if surviving_slots != 0 {
                 positive_control_holds = false;
@@ -477,7 +478,7 @@ mod tests {
     #[test]
     fn positive_control_all_regions_on_one_device() {
         for regions in [1u64, 2, 3, 4] {
-            let device_of_region = vec![0u64; regions as usize];
+            let device_of_region = vec![0u64; usize_from_u64(regions)];
             let (surviving_slots, rollback) = worst_case(SlotOrder::AcrossRegions, regions, 4, &device_of_region, 0);
             assert_eq!(surviving_slots, 0);
             assert_eq!(rollback, None);

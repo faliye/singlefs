@@ -57,9 +57,10 @@ import threading
 import time
 
 import e171_research_side
-# E171 修后版目录在 import e171_research_side 时已插进 sys.path，这里的判断为假、运行期不动 sys.path。这一句写在本模块里，是给算键的库看的：
-# scripts/gate/lib_function_units.py 解一份模块的 import 只在本目录与这份模块自己写的 sys.path 插入里找（PythonModule.search_directories），
-# 不写，device_timing、frozen_o3、run_directory、bad_implementation_table 这四份解不出，每行的判法闭包拒算 import-unresolved（test_current_tree_row_driver.py 的 JudgeImportTests 钉住）
+# E171 修后版目录在 import e171_research_side 时已插进 sys.path，这里的判断为假、运行期不动 sys.path。算键的库（scripts/gate/lib_function_units.py 的
+# PythonModule.search_directories）解这份模块的 import 时，认这份模块自己写的 sys.path 插入，也认模块级 import 进来的 e171_research_side 加的目录，
+# 两条都让 device_timing、frozen_o3、run_directory、bad_implementation_table 这四份解得出，所以这一句与 e171_research_side.py 那一句同值
+# （test_current_tree_row_driver.py 的 JudgeImportTests 两条钉住；算键的库的弄坏开关 python-imported-sys-path-ignored 下只剩这一句让四份解得出）
 if e171_research_side.E171_DIRECTORY not in sys.path:
     sys.path.insert(1, e171_research_side.E171_DIRECTORY)
 import device_timing  # noqa: E402
@@ -77,7 +78,7 @@ BULKY_DUMP_FILES = ("base-sectors.bin", "ops-payload.bin", "torn-payload.bin")
 DEVICE_POSITIVE_CONTROLS = ("O1-对拍", "O1-对拍-卸载", "O1-崩溃判官", "RefFS", "O2", "交回值", "内存对象", "panic")
 E171_DIRECTORY = e171_research_side.E171_DIRECTORY
 DEVICE_FEATURES = ("--features", "gpu")
-DEVICE_PACKAGE = "singlefs-verification"
+DEVICE_PACKAGE = "singlefs-implementation-experiments"
 # 同步到线道树的仓根条目（目录或单个文件；与 full_table_run.SYNCED_ENTRIES 是同一组）：不在这里写，取 scripts/hosts/lib_repository_copy.py 的
 # copy_closure（共用清单加闭包：prune-server 是 crates 经 path 依赖到的目录（登记修订 5）；.claude/heavy-thread-default 是编译期 include_str! 读的，
 # 多机配置判法、规范副本的准入脚本与它们 source、起的是装置运行期从编它的那棵树起的（登记修订 6））。共用库按仓根找：变异驱动把本目录拷到仓外跑单测时，
@@ -281,7 +282,7 @@ def device_compile_command(broken: str) -> list[str]:
 
 
 def run_compile(lane_tree: str, lane_target: str, repo_root: str, threads: int, log_path: str, artifacts_path: str) -> tuple[int, int]:
-    """`cargo build --release --offline --features gpu --message-format=json-render-diagnostics -p singlefs-verification --bin e171_three_oracle_collusion_after_the_oracle_fixes`
+    """`cargo build --release --offline --features gpu --message-format=json-render-diagnostics -p singlefs-implementation-experiments --bin e171_three_oracle_collusion_after_the_oracle_fixes`
     （只编不跑）：诊断照常写进 `log_path`，每个编译单元的 JSON 消息（带 `fresh`）写进 `artifacts_path`。交回 (退出码, 耗时 ns)。不套 nice 与任何包装。"""
     environment = frozen_o3.thread_environment(threads, dict(os.environ, CARGO_TARGET_DIR=lane_target))
     command = device_compile_command(os.environ.get(BREAK_VARIABLE, ""))

@@ -532,7 +532,7 @@ def today_over_r2_lines(r4_today_rows, r2_rows):
 
 
 def unstable_count_lines(r3_point_lines):
-    """D5：r3 第一段每张卡全部点行的 judgement 列里 unstable 几行（口径同第二轮判决数 1054 的那一列）。"""
+    """D5：r3 第一段每张卡全部点行的 judgement 列里 unstable 几行（口径同 r3 第一段产物 host_cpu_per_submission_point 行 judgement 列的 unstable 数，那一列是 1054）。"""
     counts = {}
     for fields in r3_point_lines:
         entry = counts.setdefault(fields["index"], [0, 0])

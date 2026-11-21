@@ -6,8 +6,8 @@
 //! **四档，第四档是阳性对照**：哈希打散的 key 在遍历局部性上必须最差。
 //! 若度量分不出「哈希打散」和「全路径」，那它就没有判别力，前三档的结论一并作废。
 
-use e7_index_bench::{Emitter, Lru};
-use std::alloc::{alloc, dealloc, Layout};
+use e7_index_bench::{u32_from_usize, u8_from_usize, usize_from_u64, Emitter, Lru};
+use std::alloc::{alloc_zeroed, dealloc, handle_alloc_error, Layout};
 use std::os::unix::fs::OpenOptionsExt;
 use std::io::{Read, Seek, SeekFrom, Write};
 
@@ -32,14 +32,14 @@ struct FileObject {
 }
 
 fn build_tree(interleave: bool, seed: u64) -> (Vec<FileObject>, usize) {
-    let directory_count = DIRECTORY_FANOUT.pow(DEPTH as u32);
+    let directory_count = DIRECTORY_FANOUT.pow(u32_from_usize(DEPTH));
     let mut objects: Vec<FileObject> = Vec::with_capacity(directory_count * FILES_PER_DIRECTORY);
     // 先按深度优先列出所有叶目录的路径
     let mut leaf_directories: Vec<[u8; DEPTH]> = Vec::with_capacity(directory_count);
     let mut path_prefix = [0u8; DEPTH];
     fn collect_leaf_directory_paths(level: usize, path_prefix: &mut [u8; DEPTH], collected_paths: &mut Vec<[u8; DEPTH]>) {
         if level == DEPTH { collected_paths.push(*path_prefix); return; }
-        for branch in 0..DIRECTORY_FANOUT { path_prefix[level] = branch as u8; collect_leaf_directory_paths(level + 1, path_prefix, collected_paths); }
+        for branch in 0..DIRECTORY_FANOUT { path_prefix[level] = u8_from_usize(branch); collect_leaf_directory_paths(level + 1, path_prefix, collected_paths); }
     }
     collect_leaf_directory_paths(0, &mut path_prefix, &mut leaf_directories);
 
@@ -53,14 +53,14 @@ fn build_tree(interleave: bool, seed: u64) -> (Vec<FileObject>, usize) {
         let mut shuffle_state = seed | 1;
         for shuffle_index in (1..order.len()).rev() {
             shuffle_state ^= shuffle_state >> 12; shuffle_state ^= shuffle_state << 25; shuffle_state ^= shuffle_state >> 27;
-            let swap_index = (shuffle_state.wrapping_mul(0x2545F4914F6CDD1D) as usize) % (shuffle_index + 1);
+            let swap_index = usize_from_u64(shuffle_state.wrapping_mul(0x2545F4914F6CDD1D)) % (shuffle_index + 1);
             order.swap(shuffle_index, swap_index);
         }
     }
     let mut next_inode = 0u64;
     for &directory_index in &order {
         for _file_in_directory in 0..FILES_PER_DIRECTORY {
-            objects.push(FileObject { path: leaf_directories[directory_index], inode: next_inode, locality: locality_of_path(&leaf_directories[directory_index]), directory_index: directory_index });
+            objects.push(FileObject { path: leaf_directories[directory_index], inode: next_inode, locality: locality_of_path(&leaf_directories[directory_index]), directory_index });
             next_inode += 1;
         }
     }
@@ -82,10 +82,10 @@ fn apply_renames(objects: &mut [FileObject], rename_count: usize, seed: u64) -> 
         // 只有当子树跨过 locality 组边界时，它才与当前路径失配。
         // ⚠️ 前缀相同的交换（同一父目录内换位）测不出退化——组内换位不拆散任何组；
         // 顶层整体交换也测不出——整组换个位置被访问，组内仍然连续。
-        let subtree_level = 1 + (next_random() as usize) % DEPTH;           // 子树根所在的层，1..=DEPTH
+        let subtree_level = 1 + usize_from_u64(next_random()) % DEPTH;           // 子树根所在的层，1..=DEPTH
         let mut first_prefix = [0u8; DEPTH]; let mut second_prefix = [0u8; DEPTH];
-        for level_index in 0..subtree_level { first_prefix[level_index] = ((next_random() as usize) % DIRECTORY_FANOUT) as u8;
-                          second_prefix[level_index] = ((next_random() as usize) % DIRECTORY_FANOUT) as u8; }
+        for level_index in 0..subtree_level { first_prefix[level_index] = u8_from_usize(usize_from_u64(next_random()) % DIRECTORY_FANOUT);
+                          second_prefix[level_index] = u8_from_usize(usize_from_u64(next_random()) % DIRECTORY_FANOUT); }
         if first_prefix[..subtree_level] == second_prefix[..subtree_level] { continue; }
         for object in objects.iter_mut() {
             if object.path[..subtree_level] == first_prefix[..subtree_level] {
@@ -128,12 +128,26 @@ fn key_of(object: &FileObject, layout: Layout4) -> u64 {
 struct Aligned { aligned_pointer: *mut u8, length_in_bytes: usize, layout: Layout }
 impl Aligned {
     fn new(length_in_bytes: usize) -> Self {
+        assert!(length_in_bytes > 0, "缓冲长度必须为正");
         let layout = Layout::from_size_align(length_in_bytes, PAGE).unwrap();
-        Aligned { aligned_pointer: unsafe { alloc(layout) }, length_in_bytes, layout }
+        // SAFETY: `layout` 的大小是 `length_in_bytes`，上一行断言了它大于 0，满足 `alloc_zeroed` 要求的布局大小非零。
+        let aligned_pointer = unsafe { alloc_zeroed(layout) };
+        if aligned_pointer.is_null() {
+            handle_alloc_error(layout);
+        }
+        Aligned { aligned_pointer, length_in_bytes, layout }
     }
-    fn as_mut(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.aligned_pointer, self.length_in_bytes) } }
+    fn as_mut(&mut self) -> &mut [u8] {
+        // SAFETY: `aligned_pointer` 非空、指向构造时 `alloc_zeroed` 出的 `length_in_bytes` 字节，字节在分配时已全部置零、都已初始化；独占借用 `&mut self`，指针只存在这一个值里（类型没有派生也没有手写复制），同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts_mut(self.aligned_pointer, self.length_in_bytes) }
+    }
 }
-impl Drop for Aligned { fn drop(&mut self) { unsafe { dealloc(self.aligned_pointer, self.layout) } } }
+impl Drop for Aligned {
+    fn drop(&mut self) {
+        // SAFETY: `aligned_pointer` 与布局正是构造时 `alloc_zeroed` 用的指针与布局；只在 `new` 里构造、类型没有派生也没有手写复制，每个值只会 `drop` 一次，`drop` 之后没有别的引用。
+        unsafe { dealloc(self.aligned_pointer, self.layout) }
+    }
+}
 
 struct Device { file: std::fs::File, reads: u64, writes: u64 }
 impl Device {
@@ -164,7 +178,7 @@ fn assign_leaves(objects: &[FileObject], layout: Layout4) -> (Vec<usize>, usize)
     keys_with_object_index.sort_unstable();
     let mut leaf_of_object = vec![0usize; objects.len()];
     for (sorted_position, &(_, object_index)) in keys_with_object_index.iter().enumerate() { leaf_of_object[object_index] = sorted_position / SLOTS; }
-    (leaf_of_object, (keys_with_object_index.len() + SLOTS - 1) / SLOTS)
+    (leaf_of_object, keys_with_object_index.len().div_ceil(SLOTS))
 }
 
 fn run(device: &mut Device, objects: &[FileObject], directory_count: usize, layout: Layout4, cache_leaves: usize)
@@ -186,8 +200,8 @@ fn run(device: &mut Device, objects: &[FileObject], directory_count: usize, layo
 
     let mut leaf_cache = Lru::new(cache_leaves);
     let mut distinct_total = 0usize;
-    for directory in 0..directory_count {
-        let mut seen: Vec<usize> = objects_by_directory[directory].iter().map(|&object_index| leaf_of_object[object_index]).collect();
+    for objects_of_directory in objects_by_directory.iter().take(directory_count) {
+        let mut seen: Vec<usize> = objects_of_directory.iter().map(|&object_index| leaf_of_object[object_index]).collect();
         seen.sort_unstable(); seen.dedup();
         distinct_total += seen.len();
         for leaf in seen {
@@ -256,7 +270,7 @@ mod tests {
     #[test]
     fn tree_shape_is_as_declared() {
         let (objects, directory_count) = build_tree(false, 1);
-        assert_eq!(directory_count, DIRECTORY_FANOUT.pow(DEPTH as u32));
+        assert_eq!(directory_count, DIRECTORY_FANOUT.pow(u32_from_usize(DEPTH)));
         assert_eq!(objects.len(), directory_count * FILES_PER_DIRECTORY);
         let mut files_per_directory_count = std::collections::HashMap::new();
         for object in &objects { *files_per_directory_count.entry(object.directory_index).or_insert(0usize) += 1; }
@@ -303,7 +317,7 @@ mod tests {
             let mut objects_by_directory: Vec<Vec<usize>> = vec![Vec::new(); directory_count];
             for (object_index, object) in objects.iter().enumerate() { objects_by_directory[object.directory_index].push(object_index); }
             let mut union = std::collections::HashSet::new();
-            for directory in 0..directory_count { for &object_index in &objects_by_directory[directory] { union.insert(leaf_of_object[object_index]); } }
+            for objects_of_directory in objects_by_directory.iter().take(directory_count) { for &object_index in objects_of_directory { union.insert(leaf_of_object[object_index]); } }
             assert_eq!(union.len(), leaf_count, "{layout:?} 臂没有触到全部叶");
             assert_eq!(union.len(), 122, "{layout:?} 臂的无限缓存读次数不是 122");
         }

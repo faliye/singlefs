@@ -68,6 +68,7 @@
 //! 修复与前台写的争用、parity ≥ 2（D2 自陈 parity 几格从没定过）。
 //! 批大小分布取均匀 1..=3；skew 取 80/20，都是选定的场景点。
 
+use e7_index_bench::{u32_from_usize, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::collections::VecDeque;
 
@@ -201,7 +202,7 @@ impl World {
         let mut stripe_devices: Vec<usize> = self.device_group_by_object[object].to_vec();
         stripe_devices.sort_by_key(|&device| self.used_cell_count(device));
         stripe_devices.truncate(stripe_width);
-        let stripe_number = self.stripes.len() as u32;
+        let stripe_number = u32_from_usize(self.stripes.len());
         self.stripes.push(Stripe {
             data_members: Vec::new(),
             parity_cell: (usize::MAX, usize::MAX),
@@ -212,7 +213,7 @@ impl World {
         for (member_index, &unit) in units.iter().enumerate() {
             let device = stripe_devices[member_index];
             let cell_index = self.take_cell(device);
-            self.cells[device][cell_index] = Cell::Live(object as u32, unit as u32, stripe_number);
+            self.cells[device][cell_index] = Cell::Live(u32_from_usize(object), u32_from_usize(unit), stripe_number);
             self.stripes[stripe_number as usize].data_members.push((device, cell_index));
             self.stripes[stripe_number as usize].live_count += 1;
             self.total_writes += 1;
@@ -221,7 +222,7 @@ impl World {
             let (old_stripe_number, _) = self.stripe_member_by_object_unit[object][unit];
             self.stripe_member_by_object_unit[object][unit] = (stripe_number, member_index);
             if old_stripe_number != u32::MAX {
-                self.free_member(old_stripe_number, object as u32, unit as u32, arm);
+                self.free_member(old_stripe_number, u32_from_usize(object), u32_from_usize(unit), arm);
             }
         }
         let parity_device = stripe_devices[stripe_width - 1];
@@ -259,7 +260,7 @@ impl World {
             .iter()
             .filter_map(|&(device, cell_index)| match self.cells[device][cell_index] {
                 Cell::Live(object, unit, owner_stripe_number) if owner_stripe_number == stripe_number => Some((object, unit)),
-                _ => None,
+                Cell::Live(..) | Cell::Parity(_) | Cell::FreedIntact(_) | Cell::Reused | Cell::Free => None,
             })
             .collect();
         // 旧格整条放掉（活格、钉住格、parity 都进池）
@@ -273,7 +274,7 @@ impl World {
                     self.cells[device][cell_index] = Cell::Free;
                     self.free_pool.push((device, cell_index));
                 }
-                _ => {}
+                Cell::Live(..) | Cell::Parity(_) | Cell::FreedIntact(_) | Cell::Reused | Cell::Free => {}
             }
         }
         let parity_cell = self.stripes[stripe_number as usize].parity_cell;
@@ -292,7 +293,7 @@ impl World {
         let mut stripe_devices: Vec<usize> = self.device_group_by_object[object].to_vec();
         stripe_devices.sort_by_key(|&device| self.used_cell_count(device));
         stripe_devices.truncate(stripe_width);
-        let new_stripe_number = self.stripes.len() as u32;
+        let new_stripe_number = u32_from_usize(self.stripes.len());
         self.stripes.push(Stripe {
             data_members: Vec::new(),
             parity_cell: (usize::MAX, usize::MAX),
@@ -300,13 +301,13 @@ impl World {
             is_queued_for_repair: false,
             is_retired: false,
         });
-        for (member_index, &(object, unit)) in survivors.iter().enumerate() {
+        for (member_index, &(survivor_object, unit)) in survivors.iter().enumerate() {
             let device = stripe_devices[member_index];
             let cell_index = self.take_cell(device);
-            self.cells[device][cell_index] = Cell::Live(object, unit, new_stripe_number);
+            self.cells[device][cell_index] = Cell::Live(survivor_object, unit, new_stripe_number);
             self.stripes[new_stripe_number as usize].data_members.push((device, cell_index));
             self.stripes[new_stripe_number as usize].live_count += 1;
-            self.stripe_member_by_object_unit[object as usize][unit as usize] = (new_stripe_number, member_index);
+            self.stripe_member_by_object_unit[survivor_object as usize][unit as usize] = (new_stripe_number, member_index);
             self.total_writes += 1;
         }
         let parity_device = stripe_devices[stripe_width - 1];
@@ -456,7 +457,7 @@ fn run_arm(seed: u64, arm: Arm, width_two_only: bool, is_skewed_workload: bool) 
     for object in 0..OBJECT_COUNT {
         let mut next_unit = 0;
         while next_unit < UNITS_PER_OBJECT {
-            let batch_size = if width_two_only { 1 } else { (random_generator.below(3) + 1) as usize };
+            let batch_size = if width_two_only { 1 } else { usize_from_u64(random_generator.below(3) + 1) };
             let batch_size = batch_size.min(UNITS_PER_OBJECT - next_unit);
             let units: Vec<usize> = (next_unit..next_unit + batch_size).collect();
             world.write_stripe(object, &units, arm);
@@ -466,12 +467,12 @@ fn run_arm(seed: u64, arm: Arm, width_two_only: bool, is_skewed_workload: bool) 
     let hot_object_count = (OBJECT_COUNT / 5).max(1);
     for _ in 0..ROUNDS {
         let object = if is_skewed_workload && random_generator.below(10) < 8 {
-            random_generator.below(hot_object_count as u64) as usize
+            usize_from_u64(random_generator.below(hot_object_count as u64))
         } else {
-            random_generator.below(OBJECT_COUNT as u64) as usize
+            usize_from_u64(random_generator.below(OBJECT_COUNT as u64))
         };
-        let batch_size = if width_two_only { 1 } else { (random_generator.below(3) + 1) as usize };
-        let start_unit = random_generator.below((UNITS_PER_OBJECT - batch_size + 1) as u64) as usize;
+        let batch_size = if width_two_only { 1 } else { usize_from_u64(random_generator.below(3) + 1) };
+        let start_unit = usize_from_u64(random_generator.below((UNITS_PER_OBJECT - batch_size + 1) as u64));
         let units: Vec<usize> = (start_unit..start_unit + batch_size).collect();
         world.write_stripe(object, &units, arm);
         if arm == Arm::LazyRestripe {

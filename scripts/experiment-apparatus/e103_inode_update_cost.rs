@@ -41,6 +41,7 @@
 //! 纯算术几何模型：没有 btree 实现、没有 I/O、没有崩溃点重放，文件操作 0 处；不答挂钟，不答缓存命中；
 //! 更新均匀散开是选定的场景点，真实负载的局部性只用聚簇格给一个上界。
 
+use e7_index_bench::i32_from_u64;
 use e7_index_bench::Emitter;
 
 const NODE_BYTES: u64 = 16384;
@@ -121,7 +122,7 @@ fn touched(nodes_in_level: u64, update_count: u64) -> f64 {
         return 1.0; // 一次更新恰碰一个节点：精确值，不走浮点
     }
     let nodes_in_level_as_float = nodes_in_level as f64;
-    nodes_in_level_as_float * (1.0 - (1.0 - 1.0 / nodes_in_level_as_float).powi(update_count as i32))
+    nodes_in_level_as_float * (1.0 - (1.0 - 1.0 / nodes_in_level_as_float).powi(i32_from_u64(update_count)))
 }
 
 /// 一棵 COW 树里 k 次散开更新写出的节点数（脏叶 + 全部祖先，D23 已定项 1 甲）。
@@ -268,12 +269,12 @@ fn main() {
         }
     }
     // 判据 4：爆炸半径（与节点头无关的那一半按 58 报）
-    let tree_geometry = geometry(1_000_000, 58);
+    let blast_radius_geometry = geometry(1_000_000, 58);
     output_lines.push(emitter.emit_raw(&format!(
         "name=blast a_records_per_leaf={} b_records_per_container={} b_over_a={:.3}",
-        tree_geometry.in_leaf_records_per_leaf,
-        tree_geometry.packed_records_per_container,
-        ratio(tree_geometry.packed_records_per_container as f64, tree_geometry.in_leaf_records_per_leaf as f64)
+        blast_radius_geometry.in_leaf_records_per_leaf,
+        blast_radius_geometry.packed_records_per_container,
+        ratio(blast_radius_geometry.packed_records_per_container as f64, blast_radius_geometry.in_leaf_records_per_leaf as f64)
     )));
     // 判据 5：先前估算
     let tree_geometry = geometry(1_000_000, 58);
@@ -493,7 +494,7 @@ mod tests {
             for &inode_count in INODE_COUNTS.iter() {
                 let tree_geometry = geometry(inode_count, node_header);
                 let single_update_ratio = ratio(write_packed_bytes(&tree_geometry, 1, UNIT_BYTES, true), write_in_leaf_bytes(&tree_geometry, 1));
-                assert!(single_update_ratio >= 1.25 - 1e-9 && single_update_ratio < 2.0, "头 {node_header} N={inode_count} 比值 {single_update_ratio}");
+                assert!((1.25 - 1e-9..2.0).contains(&single_update_ratio), "头 {node_header} N={inode_count} 比值 {single_update_ratio}");
             }
         }
     }

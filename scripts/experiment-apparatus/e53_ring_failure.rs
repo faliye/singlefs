@@ -24,8 +24,8 @@
 //! 全程 O_DIRECT，绕开来宾页缓存——否则「抹掉之后还读得到」会变成读缓存的假通过。
 //! 只报计数，不报时间（本机唯一可读的内核带 lockdep，虚机时间不可与宿主比）。
 
-use e7_index_bench::Emitter;
-use std::alloc::{alloc, dealloc, Layout};
+use e7_index_bench::{u32_from_u64, usize_from_u64, Emitter};
+use std::alloc::{alloc, dealloc, handle_alloc_error, Layout};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::OpenOptionsExt;
@@ -45,20 +45,29 @@ struct AlignedBuffer {
 }
 impl AlignedBuffer {
     fn new(length_in_bytes: usize) -> Self {
+        assert!(length_in_bytes > 0, "缓冲长度必须为正");
         let allocation_layout = Layout::from_size_align(length_in_bytes, ALIGNMENT_BYTES).unwrap();
+        // SAFETY: `allocation_layout` 的大小是 `length_in_bytes`，上一行断言了它大于 0，满足 `alloc` 要求的布局大小非零。
         let pointer = unsafe { alloc(allocation_layout) };
+        if pointer.is_null() {
+            handle_alloc_error(allocation_layout);
+        }
+        // SAFETY: `pointer` 刚由 `alloc` 按 `allocation_layout` 分配，上面已排除空指针；布局长度就是 `length_in_bytes`；`u8` 没有对齐或取值限制，可以写 `length_in_bytes` 个字节。
         unsafe { std::ptr::write_bytes(pointer, 0, length_in_bytes) };
         AlignedBuffer { pointer, length_in_bytes, allocation_layout }
     }
     fn as_mut(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 非空、指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 全部置零，字节都已初始化；独占借用 `&mut self`，指针只存在这一个值里（类型没有派生也没有手写复制），同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
     }
     fn as_ref(&self) -> &[u8] {
+        // SAFETY: `pointer` 非空、指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 全部置零，字节都已初始化；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) }
     }
 }
 impl Drop for AlignedBuffer {
     fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局；只在 `new` 里构造、类型没有派生也没有手写复制，每个值只会 `drop` 一次，`drop` 之后没有别的引用。
         unsafe { dealloc(self.pointer, self.allocation_layout) }
     }
 }
@@ -82,7 +91,7 @@ fn encode_root(generation: u64, slot: u64, buffer: &mut [u8]) {
     }
     buffer[0..4].copy_from_slice(&MAGIC.to_le_bytes());
     buffer[4..12].copy_from_slice(&generation.to_le_bytes());
-    buffer[12..16].copy_from_slice(&(slot as u32).to_le_bytes());
+    buffer[12..16].copy_from_slice(&u32_from_u64(slot).to_le_bytes());
     let checksum = cyclic_redundancy_check_32(&buffer[0..16]);
     buffer[16..20].copy_from_slice(&checksum.to_le_bytes());
 }
@@ -112,7 +121,7 @@ fn slot_offset(slot_in_region: u64) -> u64 {
 
 fn write_slot(device_path: &str, slot_in_region: u64, generation: u64, global_slot: u64) -> std::io::Result<()> {
     let mut file = OpenOptions::new().write(true).custom_flags(O_DIRECT).open(device_path)?;
-    let mut buffer = AlignedBuffer::new(SLOT_BYTES as usize);
+    let mut buffer = AlignedBuffer::new(usize_from_u64(SLOT_BYTES));
     encode_root(generation, global_slot, buffer.as_mut());
     file.seek(SeekFrom::Start(slot_offset(slot_in_region)))?;
     file.write_all(buffer.as_ref())?;
@@ -122,7 +131,7 @@ fn write_slot(device_path: &str, slot_in_region: u64, generation: u64, global_sl
 
 fn read_slot(device_path: &str, slot_in_region: u64) -> std::io::Result<Option<(u64, u64)>> {
     let mut file = OpenOptions::new().read(true).custom_flags(O_DIRECT).open(device_path)?;
-    let mut buffer = AlignedBuffer::new(SLOT_BYTES as usize);
+    let mut buffer = AlignedBuffer::new(usize_from_u64(SLOT_BYTES));
     file.seek(SeekFrom::Start(slot_offset(slot_in_region)))?;
     file.read_exact(buffer.as_mut())?;
     Ok(decode_root(buffer.as_ref()))
@@ -131,7 +140,7 @@ fn read_slot(device_path: &str, slot_in_region: u64) -> std::io::Result<Option<(
 /// **真注入**：把这块盘承载的整个区域写零。真写，走同一条 O_DIRECT 路径。
 fn wipe_region(device_path: &str) -> std::io::Result<()> {
     let mut file = OpenOptions::new().write(true).custom_flags(O_DIRECT).open(device_path)?;
-    let zero_buffer = AlignedBuffer::new((SLOT_BYTES * SLOTS_PER_REGION) as usize);
+    let zero_buffer = AlignedBuffer::new(usize_from_u64(SLOT_BYTES * SLOTS_PER_REGION));
     file.seek(SeekFrom::Start(REGION_OFFSET_BYTES))?;
     file.write_all(zero_buffer.as_ref())?;
     file.sync_all()?;
@@ -157,7 +166,7 @@ fn lay_down(device_paths: &[String]) -> std::io::Result<()> {
     let region_count = device_paths.len() as u64;
     for generation in 0..GENERATIONS {
         let (region, slot) = placement_of_generation(generation, region_count, SLOTS_PER_REGION);
-        write_slot(&device_paths[region as usize], slot, generation, region * SLOTS_PER_REGION + slot)?;
+        write_slot(&device_paths[usize_from_u64(region)], slot, generation, region * SLOTS_PER_REGION + slot)?;
     }
     Ok(())
 }
@@ -305,13 +314,13 @@ mod tests {
     /// **编解码的往返与判别力**：改一位 CRC 必须判不过。
     #[test]
     fn encode_decode_roundtrip_and_checksum_catches_a_flipped_bit() {
-        let mut buffer = vec![0u8; SLOT_BYTES as usize];
+        let mut buffer = vec![0u8; usize_from_u64(SLOT_BYTES)];
         encode_root(23, 7, &mut buffer);
         assert_eq!(decode_root(&buffer), Some((23, 7)));
         buffer[5] ^= 1;
         assert_eq!(decode_root(&buffer), None, "改一位必须判不过");
         // 全零（被抹掉的槽）也必须判不过——magic 就对不上
-        let zero_buffer = vec![0u8; SLOT_BYTES as usize];
+        let zero_buffer = vec![0u8; usize_from_u64(SLOT_BYTES)];
         assert_eq!(decode_root(&zero_buffer), None);
     }
 
@@ -320,7 +329,7 @@ mod tests {
     /// 这里造一条 **magic 错、而 CRC 自洽**的记录——只有 magic 拦得住它。
     #[test]
     fn foreign_block_with_valid_checksum_is_rejected_by_magic() {
-        let mut buffer = vec![0u8; SLOT_BYTES as usize];
+        let mut buffer = vec![0u8; usize_from_u64(SLOT_BYTES)];
         // 别人的块：magic 不是 SRKR，但它自己的 CRC 是对的
         buffer[0..4].copy_from_slice(&0xDEAD_BEEFu32.to_le_bytes());
         buffer[4..12].copy_from_slice(&99u64.to_le_bytes());

@@ -52,6 +52,7 @@
 //! 确定性模型，**跑 N 轮说明的是没有隐藏状态，不是统计上稳定**。
 
 /// D3 已定项 7：落点粒度 16384 字节。
+use e7_index_bench::usize_from_u64;
 const GRAIN: u64 = 16384;
 /// D4 已定项 5：数据单元恒 32768 含头 ⇒ 占 2 个槽。
 const SLOTS_PER_UNIT: u64 = 32768 / GRAIN;
@@ -92,7 +93,7 @@ fn next_linear_congruential(state: u64) -> u64 {
 /// `directory_count` 个目录、每目录 `files_per_directory` 个文件、交错步长 `stride`
 /// （每次从一个目录连着放 `stride` 个文件再换下一个目录）。
 fn place(arm: Arm, directory_count: u64, files_per_directory: u64, stride: u64) -> Vec<Vec<u64>> {
-    let mut slots_by_directory: Vec<Vec<u64>> = vec![Vec::new(); directory_count as usize];
+    let mut slots_by_directory: Vec<Vec<u64>> = vec![Vec::new(); usize_from_u64(directory_count)];
     let total = directory_count * files_per_directory;
     match arm {
         Arm::Grouped => {
@@ -100,23 +101,23 @@ fn place(arm: Arm, directory_count: u64, files_per_directory: u64, stride: u64) 
             for directory_index in 0..directory_count {
                 for file_index in 0..files_per_directory {
                     let unit = directory_index * files_per_directory + file_index;
-                    slots_by_directory[directory_index as usize].push(unit * SLOTS_PER_UNIT);
+                    slots_by_directory[usize_from_u64(directory_index)].push(unit * SLOTS_PER_UNIT);
                 }
             }
         }
         Arm::Arrival => {
             // 到达顺序：每个目录连着放 stride 个，再换下一个目录
             let files_per_turn = stride.max(1);
-            let mut placed = vec![0u64; directory_count as usize];
+            let mut placed = vec![0u64; usize_from_u64(directory_count)];
             let mut unit = 0u64;
             'placement: loop {
                 for directory_index in 0..directory_count {
                     for _ in 0..files_per_turn {
-                        if placed[directory_index as usize] >= files_per_directory {
+                        if placed[usize_from_u64(directory_index)] >= files_per_directory {
                             break;
                         }
-                        slots_by_directory[directory_index as usize].push(unit * SLOTS_PER_UNIT);
-                        placed[directory_index as usize] += 1;
+                        slots_by_directory[usize_from_u64(directory_index)].push(unit * SLOTS_PER_UNIT);
+                        placed[usize_from_u64(directory_index)] += 1;
                         unit += 1;
                         if unit >= total {
                             break 'placement;
@@ -141,7 +142,7 @@ fn place(arm: Arm, directory_count: u64, files_per_directory: u64, stride: u64) 
                             break;
                         }
                     }
-                    slots_by_directory[directory_index as usize].push(slot);
+                    slots_by_directory[usize_from_u64(directory_index)].push(slot);
                 }
             }
         }

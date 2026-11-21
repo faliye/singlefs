@@ -3,6 +3,7 @@
 //! 两条已定项叠在同一个数上：
 //!   - D16 新规则：checkpoint 内的释放**在发布前不得进入可分配集合**；
 //!   - D22：**最近 K 代根引用的块不许重用**（根环深度 = 块重用延迟）。
+//!
 //! ⇒ 删掉的空间不是立刻可用。盘接近满时，「明明删了却写不进」会真实发生。
 //!
 //! ## 两个数必须分开算，否则是恒等式
@@ -29,6 +30,7 @@
 //! - **判别力对照**：`defer + K > 0` 的档必须真的扣住了字节（打印 `held_peak`）。
 //!   为 0 ⇒「没测出问题」与「没扣住」分不开，整轮作废。
 
+use e7_index_bench::{truncate_f64_to_u64, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::collections::VecDeque;
 
@@ -111,7 +113,7 @@ struct Run {
 
 /// `fill` = 目标填充率；`delay` = defer 窗口 + 根环 K 合计的代数；
 /// `file_blocks` = 每个临时文件多大；`ops_per_ckpt` = 一个 checkpoint 窗口里做多少次创建删除。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "入参就是一格扫描的各个维度（容量、填充率、延迟、文件块数、窗口内操作数、窗口数、窗口代价、保留、种子），拆结构体不会少传哪一项")]
 fn run(capacity: u64, fill: f64, delay: usize, file_blocks: u64, operations_per_checkpoint: u64,
        checkpoint_count: u64, checkpoint_cost_blocks: u64, reserve: u64, seed: u64) -> Run {
     let mut xorshift_state = seed | 1;
@@ -119,7 +121,7 @@ fn run(capacity: u64, fill: f64, delay: usize, file_blocks: u64, operations_per_
     let mut file_system = FileSystemModel::new(capacity, delay, checkpoint_cost_blocks, reserve);
 
     // 预填到目标填充率。预填期间不走 defer（它模拟的是「盘上本来就有这些数据」）
-    let target_live_blocks = (capacity as f64 * fill) as u64;
+    let target_live_blocks = truncate_f64_to_u64(capacity as f64 * fill);
     while file_system.live + file_blocks <= target_live_blocks {
         file_system.live += file_blocks;
         file_system.files.push(File { blocks: file_blocks });
@@ -130,7 +132,7 @@ fn run(capacity: u64, fill: f64, delay: usize, file_blocks: u64, operations_per_
         for _ in 0..operations_per_checkpoint {
             // 先删一个（模拟「极速创建删除临时文件」里的删）
             if !file_system.files.is_empty() {
-                let victim_file_index = (next_random() as usize) % file_system.files.len();
+                let victim_file_index = usize_from_u64(next_random()) % file_system.files.len();
                 file_system.free_one(victim_file_index);
             }
             // 再建一个
@@ -198,7 +200,7 @@ fn main() {
                  free_at_fill={} ",
                 sweep_run.allocation_attempts, sweep_run.false_enospc, sweep_run.false_enospc as f64 / sweep_run.allocation_attempts as f64,
                 sweep_run.true_enospc, sweep_run.checkpoint_stall, sweep_run.held_peak, sweep_run.held_final,
-                (capacity_blocks as f64 * (1.0 - fill)) as u64
+                truncate_f64_to_u64(capacity_blocks as f64 * (1.0 - fill))
             )));
         }
     }
@@ -217,7 +219,7 @@ fn main() {
         let (mut agreeing_cell_count, mut total_cell_count) = (0u32, 0u32);
         for fill in [0.90f64, 0.95, 0.98, 0.99, 0.995, 0.999] {
             for delay in [1usize, 2, 4, 8, 16, 32] {
-                let free_blocks_at_fill = (capacity_blocks as f64 * (1.0 - fill)) as u64;
+                let free_blocks_at_fill = truncate_f64_to_u64(capacity_blocks as f64 * (1.0 - fill));
                 let predicted_trouble = free_blocks_at_fill <= churn_blocks_per_checkpoint * (delay as u64 + 1) + checkpoint_cost_blocks;
                 let admission_run = run(capacity_blocks, fill, delay, file_blocks, operations_per_checkpoint, checkpoint_count, checkpoint_cost_blocks, 0, 13);
                 let observed_trouble = admission_run.false_enospc > 0 || admission_run.checkpoint_stall > 0;

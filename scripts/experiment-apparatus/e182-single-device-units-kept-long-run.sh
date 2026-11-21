@@ -3,7 +3,7 @@
 # run-condition: command cargo git
 # task-server-shards: *
 # E182（被抛弃根读不出的三条岔路）第一段补臂「覆盖写保持 s 个单元」（跑前登记 research/prompts/e182-preregistration.md 修订 12.11）的长活跑法：
-#   装置是入库装置 crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs（bin e182_unreadable_abandoned_root_forks）的
+#   装置是入库装置 crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks.rs（bin e182_unreadable_abandoned_root_forks）的
 #   single-device-units-kept 模式，按「一条历史 × 它录制流里的一个段」切片判，片结果按复用键存进片结果库（下面「片结果库」），片齐了由装置自己合并计数、打产物
 #   research/results/e182-unreadable-abandoned-root-forks-single-device-units-kept.out。第一段的 18 条历史用同目录的 e182-single-device-long-run.sh，两个脚本互不改动对方的产物。
 #
@@ -203,7 +203,7 @@ next_free_product_path() {
 # 编译与跑装置都直接起、不再套线程包装：整条命令交 task-server，线程照服务交的 SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS
 build_the_binary() {
   # 装置取 cargo 报的这一趟编出来的位置（long-run-lib/binary-identity.sh 的 binary_identity_build），不拿仓根 target/ 下那一份（可能是早先编的旧二进制）
-  if binary_identity_build e182_unreadable_abandoned_root_forks --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks; then
+  if binary_identity_build e182_unreadable_abandoned_root_forks --release -p singlefs-implementation-experiments --bin e182_unreadable_abandoned_root_forks; then
     BINARY="$BUILT_BINARY"
     return 0
   fi
@@ -337,7 +337,7 @@ FAKE
   local first=0 second=0
   cell="$work/fresh"; make_tree "$cell"
   invoke "$cell"; exit_code=$?
-  expect "单机全新：构建一次、六片现判、产物按本名落进 research/results，六片并回服务、本地不建库" '((exit_code == 0)) && grep -qF "产物：$stem.out（7 行）；现判 6、复用 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem.out") == 7)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks") == 1)) && grep -qF "device $DEVICE_MODE | library=$cell/logs/$LIBRARY_KIND-" "$cell/calls" && grep -qF ".transit-shards share=unset" "$cell/calls" && [[ "$(fetched_count "$cell")" == 6 && ! -e "$cell/tree/.git/singlefs-unit-verdicts" ]] && ! compgen -G "$cell/logs/*.transit-shards" > /dev/null'
+  expect "单机全新：构建一次、六片现判、产物按本名落进 research/results，六片并回服务、本地不建库" '((exit_code == 0)) && grep -qF "产物：$stem.out（7 行）；现判 6、复用 0" "$cell/out" && (($(wc -l < "$cell/tree/$stem.out") == 7)) && (($(count_calls "$cell" "^cargo build --release -p singlefs-implementation-experiments --bin e182_unreadable_abandoned_root_forks") == 1)) && grep -qF "device $DEVICE_MODE | library=$cell/logs/$LIBRARY_KIND-" "$cell/calls" && grep -qF ".transit-shards share=unset" "$cell/calls" && [[ "$(fetched_count "$cell")" == 6 && ! -e "$cell/tree/.git/singlefs-unit-verdicts" ]] && ! compgen -G "$cell/logs/*.transit-shards" > /dev/null'
   cell="$work/restart"; make_tree "$cell"
   invoke "$cell"; first=$?
   invoke "$cell"; exit_code=$?
@@ -475,7 +475,7 @@ if [[ "$task_server_phase" == merge && -n "${TASK_SERVER_SHARD_MISSING:-}" ]] &&
 fi
 
 if ((list_items)); then
-  [[ -x "$BINARY" ]] || break_is list-items-binary-unchecked || { echo "  ✗ 装置还没编好：$BINARY" >&2; echo "     → 怎么办：先不带 --list-items 跑一次本脚本，或 cargo build --release -p singlefs-verification --bin e182_unreadable_abandoned_root_forks" >&2; exit 78; }
+  [[ -x "$BINARY" ]] || break_is list-items-binary-unchecked || { echo "  ✗ 装置还没编好：$BINARY" >&2; echo "     → 怎么办：先不带 --list-items 跑一次本脚本，或 cargo build --release -p singlefs-implementation-experiments --bin e182_unreadable_abandoned_root_forks" >&2; exit 78; }
   "$BINARY" list-items
   exit $?
 fi

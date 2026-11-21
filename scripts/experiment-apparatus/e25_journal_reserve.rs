@@ -53,6 +53,7 @@ struct RunOutcome {
 /// 加上 D22（单元原子性怎么合成）的根环 K 代扣住 —— 那部分空间在窗口内拿不回来。
 const LEAK_PER_WINDOW: u64 = 8;
 
+#[allow(clippy::too_many_arguments, reason = "这些参数是这一次计算彼此独立的输入，合成只用一次的结构体只多一层包装")]
 fn simulate_reserve_run(shape: Shape, reserve: u64, capacity: u64, fill_percent: u64,
        operation_count: u64, checkpoint_every: u64, ckpt_cost: u64, blocks_per_operation: u64) -> RunOutcome {
     let mut outcome = RunOutcome { minimum_free_blocks_seen: capacity, ..Default::default() };

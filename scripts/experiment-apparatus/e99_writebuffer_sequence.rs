@@ -50,7 +50,7 @@
 //! 纯计数模型：没有 write buffer 实现、没有真 flush、没有并发、没有崩溃点重放。
 //! 不答「write buffer 落不落盘」——按两种读法各报一次影响，不替它定。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{u32_from_u64, Emitter};
 
 /// D22 已定项 7：`checkpoint_txg` 8 字节 = 64 位。
 const TXG_BITS: u32 = 64;
@@ -64,7 +64,7 @@ const ACCOUNTING_ENTRY_BYTES_WHEN_THIS_EXPERIMENT_RAN: u64 = 30;
 /// **判据 1**：`seq` 取 `w` 字节时，装完 `txg_bits` 位的 txg 之后还剩几位给窗口序号。
 /// 装不下时返回 `None`——**读不到 ≠ 读到 0**，不许退化成 0 位。
 fn window_bits(sequence_bytes: u64, txg_bits: u32) -> Option<u32> {
-    let total_bits = sequence_bytes.checked_mul(8)? as u32;
+    let total_bits = u32_from_u64(sequence_bytes.checked_mul(8)?);
     total_bits.checked_sub(txg_bits)
 }
 
@@ -504,7 +504,7 @@ mod tests {
                 }
                 let mut wrong_winner_count = 0u64;
                 let mut undefined_winner_count = 0u64;
-                for (_, truths) in truths_by_key.iter() {
+                for truths in truths_by_key.values() {
                     if truths.len() > 1 { undefined_winner_count += 1 } else { wrong_winner_count += 0 }
                 }
                 (wrong_winner_count, undefined_winner_count)
@@ -519,13 +519,13 @@ mod tests {
         let updates = make_updates(4, 4, None);
         assert_eq!(updates.len(), 16);
         // 打乱之后，至少有一个 key 的最后一条不是它 truth 最大的那条
-        let last_of_key0 = updates.iter().filter(|update| update.key == 0).last().unwrap().truth;
+        let last_of_key0 = updates.iter().rfind(|update| update.key == 0).unwrap().truth;
         let maximum_of_key0 = updates.iter().filter(|update| update.key == 0).map(|update| update.truth).max().unwrap();
         assert_eq!(maximum_of_key0, 4);
         assert_eq!(last_of_key0, 1, "偶数 key 的子序列被翻转 ⇒ 残留次序的最后一条是最旧的");
         assert_ne!(last_of_key0, maximum_of_key0, "输入没被打乱，判据 2 就没有对象");
         // 奇数 key 不翻转 ⇒ 残留次序的最后一条恰好是最新的
-        let last_of_key1 = updates.iter().filter(|update| update.key == 1).last().unwrap().truth;
+        let last_of_key1 = updates.iter().rfind(|update| update.key == 1).unwrap().truth;
         assert_eq!(last_of_key1, 4);
     }
 }

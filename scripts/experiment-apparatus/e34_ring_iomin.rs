@@ -285,7 +285,7 @@ mod tests {
         ));
         assert!(!wipes_whole_ring(Placement::PrimeStride { prime_stride_factor: 11 }, 65536, 65536, 16, 512));
         // 已被换掉的候选：2 区 × 4 槽 × 256 = 2048 B，整个装得进一个 64 KiB 单元
-        assert!(2 * 4 * 256 <= 65536);
+        assert!(std::hint::black_box(2 * 4 * 256 <= 65536));
         assert!(wipes_whole_ring(Placement::Contiguous, 65536, 65536, 4, 256));
         assert_eq!(slots_hit_by_one_write(256, 65536, 4), 4, "候选的 4 个槽全打掉");
     }

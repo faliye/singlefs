@@ -3,8 +3,8 @@
 以及第七节 K1–K3。
 
 取法与逐行驱动同一份：`bad_implementation_table.read_mutation_rows`（跳过 `#` 起头的行、只收恰 6 列的行），名单第 5 列逐字比变异表第 1 列，数命中次数；
-命中 0 次是「取不到」，2 次以上是「名字不唯一」（另列）。改之前的名单从开工那一刻的提交（`--reference-commit`，登记修订记的 HEAD）里取，
-改之后的名单读工作区；变异表读工作区（HEAD 加暂存区加未暂存），sha256 写进产物（S21）。
+命中 0 次是「取不到」，2 次以上是「名字不唯一」（另列）。基准名单（对照用的那一版）从开工那一刻的提交（`--reference-commit`，登记修订记的 HEAD）里取，
+现行名单读工作区；变异表读工作区（HEAD 加暂存区加未暂存），sha256 写进产物（S21）。
 
 读法 3 的三类（登记第十二节修订写了「r1 用的那张表那一行」的取法）：
 - 甲：名字在开工那一刻提交的变异表里有、工作区表里没有，且删兼容的记录里写着这个坏实现（名字最后一个「：」之后那一截原样出现在记录里）。
@@ -304,7 +304,7 @@ def numbers_text(numbers) -> str:
 
 def after_lines(lines: ResultLines, repository: str, before: dict[str, list[SelectedRow]], classified: dict[int, Classification],
                 worktree_table: list[TableLine]) -> bool:
-    """名单改后（第六节）：两个目录逐字节相同、每张表等于应有全文、行集 = 改之前减甲丙、编号不重、未分类之外每一项在今天的表里恰命中 1 次。"""
+    """名单改后（第六节）：两个目录逐字节相同、每张表等于应有全文、行集 = 基准名单减甲丙、编号不重、未分类之外每一项在今天的表里恰命中 1 次。"""
     expected = expected_after_lists(before, classified)
     texts = {}
     for directory in LIST_DIRECTORIES:
@@ -413,7 +413,7 @@ QUESTION_ROW = 236  # 问题单 Q1 点名的那一项（扩表第 119 行），Q
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser(description="E171 第 2 次重跑的名单核对（登记第六节 Q2、名单改后、钉值·名单、现状·可取行，第七节 K1–K3）")
     parser.add_argument("--repository", required=True, help="仓根")
-    parser.add_argument("--reference-commit", required=True, help="开工那一刻的提交（改之前的名单与 HEAD 那一版变异表从这里取）")
+    parser.add_argument("--reference-commit", required=True, help="开工那一刻的提交（基准名单与 HEAD 那一版变异表从这里取）")
     parser.add_argument("--r1-rows-driver-product", required=True, help="r1 第二段逐行驱动合成产物（对照行的 mutation_line_sha256）")
     parser.add_argument("--output", required=True)
     arguments = parser.parse_args(argument_list)

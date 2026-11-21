@@ -34,7 +34,7 @@
 //! 计数模型：没有文件系统、没有块设备、文件操作 0 处。不建模三盘同坏、不建模重建窗口、
 //! 不建模「同一对象的条带在时间上分散」带来的额外相关性。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 const DEVS: usize = 8;
 const WIDTH: usize = 4;
@@ -133,7 +133,7 @@ fn layout_full(pick: Pick, seed: u64, width: usize, skew: bool) -> (Vec<Vec<usiz
                     Pick::Random => {
                         let mut d: Vec<usize> = (0..DEVS).collect();
                         for i in 0..width {
-                            let j = i + (rng.next() as usize) % (DEVS - i);
+                            let j = i + usize_from_u64(rng.next()) % (DEVS - i);
                             d.swap(i, j);
                         }
                         d.truncate(width);

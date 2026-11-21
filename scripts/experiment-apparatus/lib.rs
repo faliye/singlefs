@@ -229,12 +229,282 @@ pub fn read_archived_products_or_exit_not_run(device_name: &str, paths: &[&str])
     texts
 }
 
-/// E175 的装置是验证包的 bin（`crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs`），
+/// 整数宽度之间会丢值的转换：装置里的计数、下标、字节数都远小于目标类型的上限，
+/// 这一处断言它们装得下；装不下是装置参数越界，当场 panic，不带着截断或翻转了的数往下算。
+/// `usize` 与 `u64` 同宽（装置只在 64 位目标上跑），所以 `u64` 转 `usize` 同样走这一条断言。
+#[inline]
+#[track_caller]
+pub fn usize_from_u64(value: u64) -> usize {
+    usize::try_from(value).expect("装置只在 64 位目标上跑，u64 装得进 usize")
+}
+
+#[inline]
+#[track_caller]
+pub fn u32_from_usize(value: usize) -> u32 {
+    u32::try_from(value).expect("这个计数在装置的参数范围内小于 u32::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn u32_from_u64(value: u64) -> u32 {
+    u32::try_from(value).expect("这个数在装置的参数范围内小于 u32::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn i32_from_u64(value: u64) -> i32 {
+    i32::try_from(value).expect("这个数在装置的参数范围内小于 i32::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn i64_from_u64(value: u64) -> i64 {
+    i64::try_from(value).expect("这个数在装置的参数范围内小于 i64::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn i64_from_usize(value: usize) -> i64 {
+    i64::try_from(value).expect("这个计数在装置的参数范围内小于 i64::MAX")
+}
+
+/// `Duration::as_nanos` 的 `u128` 转成 `u64`：装得下约 584 年，一次装置运行远不到。
+#[inline]
+#[track_caller]
+pub fn u64_from_nanoseconds(nanoseconds: u128) -> u64 {
+    u64::try_from(nanoseconds).expect("一次装置运行的纳秒数小于 u64::MAX（约 584 年）")
+}
+
+/// 浮点数转整数没有 `try_from`：语言规定的 `as` 就是向零截断、负数与非数得 0、超出范围得类型上限，
+/// 装置产物里的数字靠这一条语义逐字节复现，所以这几个入口只把 `as` 收在一处，
+/// 并在调用点上用名字说明“这里是浮点数向零截断”；取整（`round`、`ceil`、`floor`）由调用方先做。
+#[inline]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "浮点数转整数没有 try_from，这一处按语言规定的饱和语义截断")]
+pub fn truncate_f64_to_u64(value: f64) -> u64 {
+    value as u64
+}
+
+#[inline]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "浮点数转整数没有 try_from，这一处按语言规定的饱和语义截断")]
+pub fn truncate_f64_to_u32(value: f64) -> u32 {
+    value as u32
+}
+
+#[inline]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "浮点数转整数没有 try_from，这一处按语言规定的饱和语义截断")]
+pub fn truncate_f64_to_usize(value: f64) -> usize {
+    value as usize
+}
+
+#[inline]
+#[allow(clippy::cast_possible_truncation, reason = "浮点数转整数没有 try_from，这一处按语言规定的饱和语义截断")]
+pub fn truncate_f64_to_i64(value: f64) -> i64 {
+    value as i64
+}
+
+#[inline]
+#[track_caller]
+pub fn u16_from_u64(value: u64) -> u16 {
+    u16::try_from(value).expect("这个数在装置的参数范围内小于 u16::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn u8_from_u64(value: u64) -> u8 {
+    u8::try_from(value).expect("这个数在装置的参数范围内小于 u8::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn u8_from_usize(value: usize) -> u8 {
+    u8::try_from(value).expect("这个数在装置的参数范围内小于 u8::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn u8_from_u32(value: u32) -> u8 {
+    u8::try_from(value).expect("这个数在装置的参数范围内小于 u8::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn i32_from_u32(value: u32) -> i32 {
+    i32::try_from(value).expect("这个数在装置的参数范围内小于 i32::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn isize_from_usize(value: usize) -> isize {
+    isize::try_from(value).expect("这个计数在装置的参数范围内小于 isize::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn usize_from_i64(value: i64) -> usize {
+    usize::try_from(value).expect("这个数在装置的参数范围内非负")
+}
+
+#[inline]
+#[track_caller]
+pub fn u32_from_i64(value: i64) -> u32 {
+    u32::try_from(value).expect("这个数在装置的参数范围内非负且小于 u32::MAX")
+}
+
+#[inline]
+#[track_caller]
+pub fn usize_from_isize(value: isize) -> usize {
+    usize::try_from(value).expect("这个数在装置的参数范围内非负")
+}
+
+#[inline]
+#[track_caller]
+pub fn u64_from_i64(value: i64) -> u64 {
+    u64::try_from(value).expect("这个数在装置的参数范围内非负")
+}
+
+#[inline]
+#[track_caller]
+pub fn u64_from_i32(value: i32) -> u64 {
+    u64::try_from(value).expect("这个数在装置的参数范围内非负")
+}
+
+#[inline]
+#[track_caller]
+pub fn u64_from_u128(value: u128) -> u64 {
+    u64::try_from(value).expect("这个数在装置的参数范围内小于 u64::MAX")
+}
+
+/// 数组长度与 `const` 初值里没有 `try_from` 可用：先断言装得进 `usize`，再转。
+#[inline]
+#[track_caller]
+#[allow(clippy::cast_possible_truncation, reason = "上一行断言了装得进 usize；const 上下文里没有 try_from")]
+pub const fn usize_from_u64_in_const(value: u64) -> usize {
+    assert!(value <= usize::MAX as u64, "装置只在 64 位目标上跑，u64 装得进 usize");
+    value as usize
+}
+
+/// 取低 8 位，与 `as u8` 逐位相同；用在“取字节”“填充花样”这类本来就要丢高位的地方。
+#[inline]
+pub fn low_byte_of_u64(value: u64) -> u8 {
+    u8::try_from(value & 0xFF).expect("掩码之后装得进 u8")
+}
+
+/// 取低 8 位，与 `as u8` 逐位相同。
+#[inline]
+pub fn low_byte_of_usize(value: usize) -> u8 {
+    u8::try_from(value & 0xFF).expect("掩码之后装得进 u8")
+}
+
+/// 取低 8 位，与 `as u8` 逐位相同。
+#[inline]
+pub fn low_byte_of_u32(value: u32) -> u8 {
+    u8::try_from(value & 0xFF).expect("掩码之后装得进 u8")
+}
+
+/// 取低 32 位，与 `as u32` 逐位相同；用在哈希折叠这类本来就要丢高位的地方。
+#[inline]
+pub fn low_word_of_u64(value: u64) -> u32 {
+    u32::try_from(value & 0xFFFF_FFFF).expect("掩码之后装得进 u32")
+}
+
+/// 取低 64 位，与 `as u64` 逐位相同；用在把 128 位值拆成两个 64 位字去混的地方，高 64 位另取，这里本来就要丢。
+#[inline]
+pub fn low_half_of_u128(value: u128) -> u64 {
+    u64::try_from(value & u128::from(u64::MAX)).expect("掩码之后装得进 u64")
+}
+
+#[cfg(test)]
+mod checked_conversion_tests {
+    use super::*;
+
+    #[test]
+    fn in_range_integers_convert_to_the_same_number_as_the_language_cast() {
+        assert_eq!(usize_from_u64(u64::from(u32::MAX)), 4_294_967_295usize);
+        assert_eq!(u32_from_usize(4_096), 4_096u32);
+        assert_eq!(u32_from_u64(70_000), 70_000u32);
+        assert_eq!(i32_from_u64(2_000_000), 2_000_000i32);
+        assert_eq!(i64_from_u64(1 << 40), 1i64 << 40);
+        assert_eq!(i64_from_usize(123), 123i64);
+        assert_eq!(u64_from_nanoseconds(1_500_000_000), 1_500_000_000u64);
+    }
+
+    #[test]
+    #[should_panic(expected = "u32::MAX")]
+    fn a_count_above_the_u32_range_is_refused_instead_of_truncated() {
+        u32_from_usize(usize::MAX);
+    }
+
+    #[test]
+    #[should_panic(expected = "i64::MAX")]
+    fn a_number_above_the_i64_range_is_refused_instead_of_wrapped() {
+        i64_from_u64(u64::MAX);
+    }
+
+    #[test]
+    #[should_panic(expected = "584")]
+    fn nanoseconds_above_the_u64_range_are_refused_instead_of_truncated() {
+        u64_from_nanoseconds(u128::MAX);
+    }
+
+    #[test]
+    fn float_helpers_truncate_toward_zero_and_saturate_like_the_language_cast() {
+        assert_eq!(truncate_f64_to_u64(2.9), 2);
+        assert_eq!(truncate_f64_to_u64(-3.5), 0, "负数按语言规定得 0");
+        assert_eq!(truncate_f64_to_u64(f64::NAN), 0, "非数按语言规定得 0");
+        assert_eq!(truncate_f64_to_u64(1e30), u64::MAX, "超出范围按语言规定得上限");
+        assert_eq!(truncate_f64_to_u32(7.99), 7);
+        assert_eq!(truncate_f64_to_usize(41.5), 41);
+        assert_eq!(truncate_f64_to_i64(-2.9), -2, "有符号的向零截断");
+    }
+
+    const USIZE_IN_CONST: usize = usize_from_u64_in_const(4_096);
+
+    #[test]
+    fn the_new_integer_entries_convert_in_range_values_to_the_same_number_as_the_language_cast() {
+        assert_eq!(u16_from_u64(4_096), 4_096u16);
+        assert_eq!(u8_from_u64(200), 200u8);
+        assert_eq!(u8_from_usize(5), 5u8);
+        assert_eq!(u8_from_u32(7), 7u8);
+        assert_eq!(i32_from_u32(40), 40i32);
+        assert_eq!(isize_from_usize(9), 9isize);
+        assert_eq!(usize_from_i64(12), 12usize);
+        assert_eq!(u32_from_i64(70_000), 70_000u32);
+        assert_eq!(usize_from_isize(3), 3usize);
+        assert_eq!(u64_from_i64(15), 15u64);
+        assert_eq!(u64_from_i32(21), 21u64);
+        assert_eq!(u64_from_u128(1u128 << 40), 1u64 << 40);
+        assert_eq!(USIZE_IN_CONST, 4_096usize);
+        assert_eq!(low_byte_of_u64(0x1234), 0x34u8);
+        assert_eq!(low_byte_of_u64(u64::MAX), u8::MAX);
+        assert_eq!(low_byte_of_usize(300), 44u8, "300 的低 8 位是 44，与 as u8 相同");
+        assert_eq!(low_byte_of_u32(0x0102_0304), 0x04u8);
+        assert_eq!(low_word_of_u64(0x1_2345_6789), 0x2345_6789u32);
+        assert_eq!(low_word_of_u64(u64::MAX), u32::MAX);
+        assert_eq!(low_half_of_u128(0x1_0000_0000_0000_0002), 2u64, "高于 64 位的部分丢掉，与 as u64 相同");
+        assert_eq!(low_half_of_u128(1u128 << 64), 0u64);
+        assert_eq!(low_half_of_u128(u128::MAX), u64::MAX);
+        assert_eq!(low_half_of_u128((0xDEAD_BEEF_u128 << 96) | 0x0123_4567_89AB_CDEF), 0x0123_4567_89AB_CDEFu64);
+    }
+
+    #[test]
+    #[should_panic(expected = "u8::MAX")]
+    fn a_count_above_the_u8_range_is_refused_instead_of_truncated() {
+        u8_from_usize(256);
+    }
+
+    #[test]
+    #[should_panic(expected = "非负")]
+    fn a_negative_number_is_refused_instead_of_wrapped_to_a_huge_count() {
+        usize_from_i64(-1);
+    }
+}
+
+/// E175 的装置是验证包的 bin（`crates/singlefs-implementation-experiments/src/bin/e175_product_path_inode_watermark_regression/main.rs`），
 /// `replay.sh` 的 `driver_e175` 用环境变量把臂、族、结果文件和线程数交给它。
 /// 这里钉住驱动设的那几个变量名，bin 里改了名字驱动就起不来，这一条先红。
 #[cfg(test)]
 mod e175_bin_tests {
-    const BIN_SOURCE: &str = include_str!("../../crates/singlefs-verification/src/bin/e175_product_path_inode_watermark_regression.rs");
+    const BIN_SOURCE: &str = include_str!("../../crates/singlefs-implementation-experiments/src/bin/e175_product_path_inode_watermark_regression/main.rs");
 
     #[test]
     fn the_e175_bin_reads_the_variables_the_replay_driver_sets() {

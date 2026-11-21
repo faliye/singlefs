@@ -43,6 +43,8 @@
 //! `baseline` 那条臂**必须**重放残留，且条数服从 E32（上一条时间线的残留）测出的式子
 //! `max(0, 残留 − (新写 − 1))`。对不上说明本实验的模型跑偏了。
 
+#[cfg(test)]
+use e7_index_bench::usize_from_u64;
 use e7_index_bench::Emitter;
 
 /// epoch 占序号的高位从第几位起。取 48 ⇒ 低 48 位给计数器，高 16 位给代号。
@@ -374,8 +376,8 @@ mod tests {
         let masked_slot_under_epoch_3 = odd.slot_index_of(compose(3, 7));
         let masked_slot_under_epoch_9 = odd.slot_index_of(compose(9, 7));
         assert_eq!(masked_slot_under_epoch_3, masked_slot_under_epoch_9, "掩码之后，同一计数器在不同代号下仍落同一槽");
-        let unmasked_slot_under_epoch_3 = (compose(3, 7) as usize) % 60;
-        let unmasked_slot_under_epoch_9 = (compose(9, 7) as usize) % 60;
+        let unmasked_slot_under_epoch_3 = usize_from_u64(compose(3, 7)) % 60;
+        let unmasked_slot_under_epoch_9 = usize_from_u64(compose(9, 7)) % 60;
         assert_ne!(
             unmasked_slot_under_epoch_3, unmasked_slot_under_epoch_9,
             "不掩码的话它们会落到不同的槽——这正是掩码在挡的事"

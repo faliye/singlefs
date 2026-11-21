@@ -188,7 +188,8 @@ mod tests {
         // 直接按定义算：bytes_per_lock_cycle = 0 ⇒ 0 / bytes_per_publish = 0
         let bytes_per_publish = map_per_publish(CAPACITY_16_TEBIBYTES, 2);
         assert!(bytes_per_publish > 0);
-        assert_eq!(0 / bytes_per_publish, 0);
+        let bytes_per_lock_cycle = std::hint::black_box(0u64);
+        assert_eq!(bytes_per_lock_cycle / bytes_per_publish, 0);
     }
 
     /// 交叉点随容量线性涨（两侧都随容量走，但每次发布那一侧只随树高走 ⇒ 阶梯）。

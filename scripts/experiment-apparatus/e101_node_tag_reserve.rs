@@ -38,7 +38,7 @@
 //!
 //! 纯算术：没有老化负载、没有整理实现、没有 E95 的实测。不答「哪一条抗老化形态更好」。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{u32_from_u64, u64_from_u128, Emitter};
 
 const NODE_BYTES: u64 = 16384;
 const NODE_HEADERS: [u64; 3] = [58, 67, 76];
@@ -112,7 +112,7 @@ fn tag_capacity(tag_bytes: u64) -> u128 {
     if tag_bytes >= 16 {
         return u128::MAX;
     }
-    1u128 << (8 * tag_bytes as u32)
+    1u128 << (8 * u32_from_u64(tag_bytes))
 }
 
 /// **判据 4**：`groups` 个组塞进 `w` 字节的标签，被迫合并几个组。
@@ -123,7 +123,7 @@ fn forced_merges(groups: Option<u64>, tag_bytes: u64) -> Option<u64> {
     if (group_count as u128) <= capacity {
         Some(0)
     } else {
-        Some(group_count - capacity as u64)
+        Some(group_count - u64_from_u128(capacity))
     }
 }
 

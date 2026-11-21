@@ -117,12 +117,12 @@ impl Div for RationalNumber {
 }
 impl PartialOrd for RationalNumber {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some((self.numerator * other.denominator).cmp(&(other.numerator * self.denominator)))
+        Some(self.cmp(other))
     }
 }
 impl Ord for RationalNumber {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).expect("RationalNumber 全序，比较恒有结果")
+        (self.numerator * other.denominator).cmp(&(other.numerator * self.denominator))
     }
 }
 

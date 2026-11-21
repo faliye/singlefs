@@ -39,7 +39,7 @@
 //! （头校验和 32 字节把它压到可忽略，E76（载荷校验和的判别力）同型），不建模；
 //! 混布比例取 1:2（节点:数据单元的槽数比），是选定的场景点。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 const SLOTS: usize = 4096; // 16 KiB 槽
 
@@ -110,7 +110,7 @@ fn build(arm: ScanStepArm, seed: u64) -> Vec<Slot> {
         let ok = if want_node {
             if arm.pad_nodes() {
                 // 节点独占 32K 槽对
-                let base = (rng.below((SLOTS / 2) as u64) * 2) as usize;
+                let base = usize_from_u64(rng.below((SLOTS / 2) as u64) * 2);
                 if disk[base] == Slot::Free && disk[base + 1] == Slot::Free {
                     disk[base] = Slot::NodeStart;
                     disk[base + 1] = Slot::NodePad;
@@ -119,7 +119,7 @@ fn build(arm: ScanStepArm, seed: u64) -> Vec<Slot> {
                     false
                 }
             } else {
-                let at = rng.below(SLOTS as u64) as usize;
+                let at = usize_from_u64(rng.below(SLOTS as u64));
                 if disk[at] == Slot::Free {
                     disk[at] = Slot::NodeStart;
                     true
@@ -128,7 +128,7 @@ fn build(arm: ScanStepArm, seed: u64) -> Vec<Slot> {
                 }
             }
         } else {
-            let base = (rng.below((SLOTS / 2) as u64) * 2) as usize;
+            let base = usize_from_u64(rng.below((SLOTS / 2) as u64) * 2);
             if disk[base] == Slot::Free && disk[base + 1] == Slot::Free {
                 disk[base] = Slot::DataStart;
                 disk[base + 1] = Slot::DataTail;
@@ -178,7 +178,7 @@ fn census(disk: &[Slot]) -> (u64, u64, u64) {
                 }
             }
             Slot::DataStart => data += 1,
-            _ => {}
+            Slot::Free | Slot::DataTail | Slot::NodePad => {}
         }
     }
     (nodes, data, odd_nodes)

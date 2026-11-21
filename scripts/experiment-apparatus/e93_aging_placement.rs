@@ -25,7 +25,7 @@
 //!
 //! 计数模型，文件操作 0 处；无耗时轴；对象定宽；两组负载是端点不是分布。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{u32_from_usize, usize_from_u64, Emitter};
 use std::collections::BTreeSet;
 
 const OBJECT_COUNT: usize = 8192; // 对象数
@@ -50,7 +50,7 @@ impl XorshiftGenerator {
         self.0
     }
     fn below(&mut self, bound: usize) -> usize {
-        (self.next() % bound as u64) as usize
+        usize_from_u64(self.next() % bound as u64)
     }
 }
 
@@ -107,13 +107,13 @@ struct AgingSimulation {
 impl AgingSimulation {
     /// 初始布局：key k 住槽 k（顺序创建的形态）。
     fn new(object_count: usize, slot_count: usize, segment_slots: usize) -> AgingSimulation {
-        assert!(object_count < slot_count && slot_count % segment_slots == 0);
-        let slot_of: Vec<u32> = (0..object_count as u32).collect();
+        assert!(object_count < slot_count && slot_count.is_multiple_of(segment_slots));
+        let slot_of: Vec<u32> = (0..u32_from_usize(object_count)).collect();
         let mut key_at: Vec<Option<u32>> = vec![None; slot_count];
-        for key in 0..object_count {
-            key_at[key] = Some(key as u32);
+        for (key, slot) in key_at.iter_mut().enumerate().take(object_count) {
+            *slot = Some(u32_from_usize(key));
         }
-        let free: BTreeSet<u32> = (object_count as u32..slot_count as u32).collect();
+        let free: BTreeSet<u32> = (u32_from_usize(object_count)..u32_from_usize(slot_count)).collect();
         let mut free_slots_per_segment = vec![0u16; slot_count / segment_slots];
         for slot in object_count..slot_count {
             free_slots_per_segment[slot / segment_slots] += 1;
@@ -170,7 +170,7 @@ impl AgingSimulation {
         self.key_at[old_slot as usize] = None;
         self.deferred.push(old_slot);
         self.slot_of[key] = new_slot;
-        self.key_at[new_slot as usize] = Some(key as u32);
+        self.key_at[new_slot as usize] = Some(u32_from_usize(key));
         // 加回新贡献
         if key >= 1 && self.pair_broken(key) {
             self.broken += 1;
@@ -204,7 +204,7 @@ impl AgingSimulation {
         loop {
             if let Some(segment) = self.open_segment {
                 if self.bump < self.slots_per_segment {
-                    let slot = (segment * self.slots_per_segment + self.bump) as u32;
+                    let slot = u32_from_usize(segment * self.slots_per_segment + self.bump);
                     self.bump += 1;
                     // 开段时全空，bump 只前进；段内后来被 defer 释放的槽要等整段回空才复用
                     debug_assert!(self.free.contains(&slot));
@@ -277,7 +277,7 @@ impl AgingSimulation {
         if let Some(segment) = self.open_segment {
             if self.slots_per_segment - self.bump >= chunk_length {
                 for &key in keys {
-                    let slot = (segment * self.slots_per_segment + self.bump) as u32;
+                    let slot = u32_from_usize(segment * self.slots_per_segment + self.bump);
                     self.bump += 1;
                     self.take_slot(slot);
                     self.move_key(key, slot);
@@ -289,7 +289,7 @@ impl AgingSimulation {
             self.open_segment = Some(segment);
             self.bump = 0;
             for &key in keys {
-                let slot = (segment * self.slots_per_segment + self.bump) as u32;
+                let slot = u32_from_usize(segment * self.slots_per_segment + self.bump);
                 self.bump += 1;
                 self.take_slot(slot);
                 self.move_key(key, slot);
@@ -298,7 +298,7 @@ impl AgingSimulation {
         }
         if let Some(start) = self.find_free_run(chunk_length) {
             for (offset_in_run, &key) in keys.iter().enumerate() {
-                let slot = start + offset_in_run as u32;
+                let slot = start + u32_from_usize(offset_in_run);
                 self.take_slot(slot);
                 self.move_key(key, slot);
             }
@@ -385,7 +385,7 @@ fn run_arm(policy: Policy, load: Load, seed: u64, checkpoint_limit: u64, sample_
         simulation.user_writes += dirty.len() as u64;
         let (batch, _neighbor_extension_count) = match policy {
             Policy::BumpNeighbor(neighbor_radius) => extend_neighbors(&dirty, neighbor_radius, OBJECT_COUNT),
-            _ => (dirty, 0),
+            Policy::FirstFit | Policy::BumpSegment | Policy::BumpCompact(_) => (dirty, 0),
         };
         match policy {
             Policy::FirstFit => {
@@ -452,13 +452,13 @@ fn measurement_control(simulation: &mut AgingSimulation) -> (u64, u64, u64, u64)
     let object_count = simulation.object_count;
     // 全隔离：前一半 key 住偶数槽、后一半住奇数槽 ⇒ 任何邻接都断
     for key in 0..object_count {
-        let target = if key < object_count / 2 { 2 * key as u32 } else { (2 * (key - object_count / 2) + 1) as u32 };
+        let target = if key < object_count / 2 { 2 * u32_from_usize(key) } else { u32_from_usize(2 * (key - object_count / 2) + 1) };
         force_to(simulation, key, target);
     }
     let scatter = (simulation.runs_incremental(), simulation.audit_runs());
     // 连续：key k 回槽 k
     for key in 0..object_count {
-        force_to(simulation, key, key as u32);
+        force_to(simulation, key, u32_from_usize(key));
     }
     let compact = (simulation.runs_incremental(), simulation.audit_runs());
     (scatter.0, scatter.1, compact.0, compact.1)

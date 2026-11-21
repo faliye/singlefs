@@ -256,9 +256,9 @@ mod tests {
         assert_eq!(TREE_DIMENSION_ROWS_PER_HEAD, 1);
         assert_eq!(POOL_LEVEL_ROWS, 11);
         assert_eq!(TREE_DIMENSION_ROWS_PER_HEAD + POOL_LEVEL_ROWS, 12, "在用十二个统计量");
-        assert!(KNOWN_WRITABLE_HEAD_COUNT <= KNOWN_TREE_COUNT);
-        assert!(UNKNOWN_WRITABLE_HEAD_COUNT <= UNKNOWN_TREE_COUNT);
-        assert!(PUBLISHED_GENERATIONS > KEPT_GENERATIONS, "代数要大过保留代数，否则丢弃看不见");
+        assert!(std::hint::black_box(KNOWN_WRITABLE_HEAD_COUNT <= KNOWN_TREE_COUNT));
+        assert!(std::hint::black_box(UNKNOWN_WRITABLE_HEAD_COUNT <= UNKNOWN_TREE_COUNT));
+        assert!(std::hint::black_box(PUBLISHED_GENERATIONS > KEPT_GENERATIONS), "代数要大过保留代数，否则丢弃看不见");
     }
 
     /// **阳性对照甲**：Skip + NoCarry 且 G > K，必须丢行。

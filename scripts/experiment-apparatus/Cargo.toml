@@ -129,7 +129,7 @@ path = "e138_per_disk_floor.rs"
 
 [[bin]]
 name = "e139_tightened_floor"
-path = "e139_tightened_floor.rs"
+path = "e139_tightened_floor/main.rs"
 
 [[bin]]
 name = "e141_switch_reserve_mount_admission"
@@ -543,7 +543,7 @@ path = "e140_header_alignment.rs"
 
 [[bin]]
 name = "e142-new-pool-file-creation-dry-run"
-path = "e142_new_pool_file_creation_dry_run.rs"
+path = "e142_new_pool_file_creation_dry_run/main.rs"
 
 [[bin]]
 name = "e143-one-unit-per-txn-journal"
@@ -575,23 +575,23 @@ path = "e148_commit_fixpoint_two_record_trees.rs"
 
 [[bin]]
 name = "e152-file-system-benchmark"
-path = "e152_file_system_benchmark.rs"
+path = "e152_file_system_benchmark/main.rs"
 
 [[bin]]
 name = "e153-ledger-shape-and-ring-holes"
-path = "e153_ledger_shape_and_ring_holes.rs"
+path = "e153_ledger_shape_and_ring_holes/main.rs"
 
 [[bin]]
 name = "e154-two-gates-serial-rejudge-and-reclaim-timing"
-path = "e154_two_gates_serial_rejudge_and_reclaim_timing.rs"
+path = "e154_two_gates_serial_rejudge_and_reclaim_timing/main.rs"
 
 [[bin]]
 name = "e155-fsync-write-volume"
-path = "e155_fsync_write_volume.rs"
+path = "e155_fsync_write_volume/main.rs"
 
 [[bin]]
 name = "e155-second-run-fsync-write-volume"
-path = "e155_second_run_fsync_write_volume.rs"
+path = "e155_second_run_fsync_write_volume/main.rs"
 
 [[bin]]
 name = "e155-third-run-release-cascade"
@@ -599,7 +599,7 @@ path = "e155_third_run_release_cascade.rs"
 
 [[bin]]
 name = "e155-fourth-run-group-commit-concurrency"
-path = "e155_fourth_run_group_commit_concurrency.rs"
+path = "e155_fourth_run_group_commit_concurrency/main.rs"
 
 [[bin]]
 name = "e157-parallel-line-one-clauses"
@@ -611,7 +611,7 @@ path = "e160_random_small_read_share.rs"
 
 [[bin]]
 name = "e159-fsync-wait-group-commit"
-path = "e159_fsync_wait_group_commit.rs"
+path = "e159_fsync_wait_group_commit/main.rs"
 
 [[bin]]
 name = "e142-region-diff-independent"
@@ -639,7 +639,7 @@ e174-gpu = ["dep:wgpu", "dep:pollster"]
 
 [[bin]]
 name = "e162-crash-verdict-block-store"
-path = "e162_crash_verdict_block_store.rs"
+path = "e162_crash_verdict_block_store/main.rs"
 required-features = ["e162-block-stores"]
 
 # E163（GPU 多卡算单元校验和）跑前登记第五节：只这一个 bin 用，设成可选、挂在不默认打开的
@@ -669,13 +669,13 @@ path = "e162_verdict_store_sender.rs"
 # 编这个 bin：cargo build --release -p e7-index-bench --features e162-block-stores --bin e162-verdict-store-network
 [[bin]]
 name = "e162-verdict-store-network"
-path = "e162_verdict_store_network.rs"
+path = "e162_verdict_store_network/main.rs"
 required-features = ["e162-block-stores"]
 
 # E162（崩溃放量判定块存储选型）第四段 S4 掉电装置（跑前登记补 5 开头那张表）：来宾里跑 glibc 动态链接的这一份，库由附加根带进去。
 [[bin]]
 name = "e162-verdict-store-power-cut"
-path = "e162_verdict_store_power_cut.rs"
+path = "e162_verdict_store_power_cut/main.rs"
 required-features = ["e162-block-stores"]
 
 # E16 第五次跑（今天单元宽度下的峰值落点、预测式误差、适用范围句）：独立手写计数模型，不与 crates/ 共用代码。
@@ -686,60 +686,60 @@ path = "e16_fifth_run_peak_under_today_widths.rs"
 # E164（崩溃放量新设计的小范围功能测试）：跑前登记 research/prompts/e164-preregistration.md。不依赖 crates/，只在仓副本上起白名单子进程。
 [[bin]]
 name = "e164-crash-amplification-design-function-test"
-path = "e164_crash_amplification_design_function_test.rs"
+path = "e164_crash_amplification_design_function_test/main.rs"
 
 # E167（多在飞发布的崩溃枚举切法）：跑前登记 research/prompts/e167-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e167-multi-inflight-crash-cut"
-path = "e167_multi_inflight_crash_cut.rs"
+path = "e167_multi_inflight_crash_cut/main.rs"
 
 # E169（并行提交的追加纪律与前缀恢复）：跑前登记 research/prompts/e169-preregistration.md。独立手写模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e169-parallel-commit-append-and-prefix-recovery"
-path = "e169_parallel_commit_append_and_prefix_recovery.rs"
+path = "e169_parallel_commit_append_and_prefix_recovery/main.rs"
 
 # E166（并行提交的共享状态分法）：跑前登记 research/prompts/e166-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e166-parallel-commit-shared-state-partition"
-path = "e166_parallel_commit_shared_state_partition.rs"
+path = "e166_parallel_commit_shared_state_partition/main.rs"
 
 # E172（删除写出的字节的干跑）：跑前登记 research/prompts/e172-preregistration.md。独立解码器，不与 crates/ 共用代码，读 crates/ 侧导出 deletion_write_dump 的输出。
 [[bin]]
 name = "e172-deletion-write-dry-run"
-path = "e172_deletion_write_dry_run.rs"
+path = "e172_deletion_write_dry_run/main.rs"
 
 # E173（上限卡在读坏槽的三种处置）：跑前登记 research/prompts/e173-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e173-admission-ceiling-bad-ring-slot-dispositions"
-path = "e173_admission_ceiling_bad_ring_slot_dispositions.rs"
+path = "e173_admission_ceiling_bad_ring_slot_dispositions/main.rs"
 
 # E174（借据丢掉时等待与显存回还）：跑前登记 research/prompts/e174-preregistration.md。独立手写装置，不与 crates/ 共用代码；
 # 依赖沿用上面 [dependencies.wgpu]、[dependencies.pollster]，挂在不默认打开的特性 e174-gpu 上。
 # 编这个 bin：cargo build --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return
 [[bin]]
 name = "e174-lease-drop-wait-memory-return"
-path = "e174_lease_drop_wait_memory_return.rs"
+path = "e174_lease_drop_wait_memory_return/main.rs"
 required-features = ["e174-gpu"]
 
 # E176（inode 树叶合并三候选的容量与写代价）：跑前登记 research/prompts/e176-preregistration.md。独立手写模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e176-inode-leaf-merge-capacity-and-rewrites"
-path = "e176_inode_leaf_merge_capacity_and_rewrites.rs"
+path = "e176_inode_leaf_merge_capacity_and_rewrites/main.rs"
 
 # E177（逐树不写墓碑的复活数）：跑前登记 research/prompts/e177-preregistration.md（含修订 1 与执行员修订 2）。独立手写模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e177-per-tree-resurrection-without-tombstones"
-path = "e177_per_tree_resurrection_without_tombstones.rs"
+path = "e177_per_tree_resurrection_without_tombstones/main.rs"
 
 # E178（叶容器与记录死亡的计数）：跑前登记 research/prompts/e178-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e178-leaf-and-record-death-counts"
-path = "e178_leaf_and_record_death_counts.rs"
+path = "e178_leaf_and_record_death_counts/main.rs"
 
 # E10（老化：结构抗老化 vs 事后整理）：跑前登记 research/prompts/e10-r1-prereg.md。独立手写计数模型，不与 crates/ 共用代码；第一段只跑计数模型九格与六个反向点。
 [[bin]]
 name = "e10-aging-compaction"
-path = "e10_aging_compaction.rs"
+path = "e10_aging_compaction/main.rs"
 
 # E71（记账 key 的条目数与宽度）第 1 次重跑：重跑登记 research/prompts/e71-r1-prereg.md。独立手写算术模型，不与 crates/ 共用代码；原装置 e71-accounting-keys 不动。
 [[bin]]
@@ -754,12 +754,12 @@ path = "e97_entry_encoding_single_generation.rs"
 # E186（不认识的树·记账维重推）：跑前登记 research/prompts/e186-preregistration.md。独立手写模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e186-unknown-tree-accounting-rederive"
-path = "e186_unknown_tree_accounting_rederive.rs"
+path = "e186_unknown_tree_accounting_rederive/main.rs"
 
 # E187（隔离落盘代价）：跑前登记 research/prompts/e187-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e187-quarantine-mark-cost"
-path = "e187_quarantine_mark_cost.rs"
+path = "e187_quarantine_mark_cost/main.rs"
 
 [workspace]
 resolver = "2"
@@ -779,22 +779,22 @@ overflow-checks = true
 # E199（发布照抄上一版的代价）第一段：跑前登记 research/prompts/e199-preregistration-r4.md（第四份，没写到的照第三份）。纯算术计数模型，不与 crates/ 共用代码。
 [[bin]]
 name = "e199-transaction-output-copy"
-path = "e199_transaction_output_copy.rs"
+path = "e199_transaction_output_copy/main.rs"
 
 # E203（准入之前扫类的步代价）第一段：跑前登记 research/prompts/e203-preregistration.md。计数模型，纯算术，不与 crates/ 共用代码；读量的那一路（插了计数的副本）打出的产物。
 [[bin]]
 name = "e203-admission-scan-cost"
-path = "e203_admission_scan_cost.rs"
+path = "e203_admission_scan_cost/main.rs"
 
 # E206（发布固定点轮数的代价）：跑前登记 research/prompts/e206-preregistration.md。计数模型，纯算术，不与 crates/ 共用代码；读量的那一路（插了读数的副本）打出的产物。
 [[bin]]
 name = "e206-fixed-point-cost"
-path = "e206_fixed_point_cost.rs"
+path = "e206_fixed_point_cost/main.rs"
 
 # E207（B8严格判据下的步数）：跑前登记 research/prompts/e207-preregistration.md。推的那一路，纯算术，不与 crates/ 共用代码；读量的那一路（插了读数的副本）打出的产物与 E206 的 p2a 产物（回扫）。
 [[bin]]
 name = "e207-strict-scan-steps"
-path = "e207_strict_scan_steps.rs"
+path = "e207_strict_scan_steps/main.rs"
 
 # E207 历史用例里量窗的取法（声明行、冷文件池、探针前缀、扩展窗口、阴性对照）：同一份文件由入口拷进副本给历史用例 #[path] 引，这里只为单测与变异。
 [[bin]]
@@ -804,7 +804,7 @@ path = "e207_strict_scan_steps_window_choices.rs"
 # E209（尖峰成因）的推的那一路：读产物、判问题单五行；脚本表与选择子在 e209_spike_cause_scripts.rs（经 #[path] 引，不单独编）
 [[bin]]
 name = "e209-spike-cause"
-path = "e209_spike_cause.rs"
+path = "e209_spike_cause/main.rs"
 
 # E209 的脚本表与选择子：同一份文件由入口拷进副本给历史用例 #[path] 引、模型也引；这里另编成 bin，只为单测与变异（mutate.sh 要一个编得出这份源文件的 bin 名）。
 [[bin]]
@@ -814,4 +814,4 @@ path = "e209_spike_cause_scripts.rs"
 # E210（盘变大改容量表的读者规则四臂）：跑前登记 research/prompts/e210-preregistration.md。计数模型，纯算术，不与 crates/ 共用代码；两段产物由命令行参数选。
 [[bin]]
 name = "e210-capacity-grow-reader-rules"
-path = "e210_capacity_grow_reader_rules.rs"
+path = "e210_capacity_grow_reader_rules/main.rs"

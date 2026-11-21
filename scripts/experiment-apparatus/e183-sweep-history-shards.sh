@@ -3,7 +3,7 @@
 # run-condition: command cargo git sha256sum python3
 # task-server-shards: *
 # E183（容量斜率、读缓存、小盘准入与清扫阈值的代价数）第三段（问题单 H5，跑前登记 research/prompts/e183-preregistration.md 5.5「第三段」与其下的分片、续跑、多机三行）的分片跑法：
-#   装置是入库装置 crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs（bin 同名）。一片 = 装置的一次
+#   装置是入库装置 crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs（bin 同名）。一片 = 装置的一次
 #   h5 shard <片名> --shard-output <片目录>/<片名> --binary-sha256 <装置程序文件的 sha256>；片齐了由装置 h5 merge <片目录> --binary-sha256 <…> 按片的固定次序
 #   接成产物 research/results/e183-capacity-read-cache-reserve-and-sweep-costs-h5-<日期>.out 并算判定（装置单测
 #   sweep_summary_judges_the_page_reading_the_write_amplification_and_the_candidate_clause_on_answer_known_synthetic_shards 钉判定那一半）。
@@ -201,7 +201,7 @@ prepare_binary() {
     # 编译直接起、不再套线程包装：整条命令交 task-server，编译线程照服务交的 CARGO_BUILD_JOBS（弄坏开关 build-jobs-from-device-threads 下改成本脚本的 THREADS）
     break_is build-jobs-from-device-threads && export CARGO_BUILD_JOBS="$THREADS"
     local build_status
-    binary_identity_build e183_capacity_read_cache_reserve_and_sweep_costs --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs 2> "$LOG_DIRECTORY/build-$RUN_STAMP.log"; build_status=$?
+    binary_identity_build e183_capacity_read_cache_reserve_and_sweep_costs --release -p singlefs-implementation-experiments --bin e183_capacity_read_cache_reserve_and_sweep_costs 2> "$LOG_DIRECTORY/build-$RUN_STAMP.log"; build_status=$?
     if ((build_status == 1)); then
       echo "  ✗ 装置编不过（$LOG_DIRECTORY/build-$RUN_STAMP.log）" >&2
       echo "     → 怎么办：照 cargo 打的第一处 error 改装置，再起本脚本" >&2
@@ -514,7 +514,7 @@ print(len(plan["shards"]), "|".join(",".join(sorted(shard)) for shard in plan["s
   INVOKE_ENVIRONMENT=("E183_BINARY=" "PATH=$fakes/bin:$PATH" "CARGO_BUILD_JOBS=5")
   invoke "$cell" 1; exit_code=$?
   INVOKE_ENVIRONMENT=()
-  expect "不给装置就直接起 cargo build 编、编译线程照服务交的 CARGO_BUILD_JOBS：编不过退 1、点名编不过" '((exit_code == 1)) && grep -q "装置编不过" "$cell/out" && [[ "$(cat -- "$cell/calls.cargo" 2> /dev/null)" == "cargo build --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs --message-format=json-render-diagnostics | jobs=5" ]]'
+  expect "不给装置就直接起 cargo build 编、编译线程照服务交的 CARGO_BUILD_JOBS：编不过退 1、点名编不过" '((exit_code == 1)) && grep -q "装置编不过" "$cell/out" && [[ "$(cat -- "$cell/calls.cargo" 2> /dev/null)" == "cargo build --release -p singlefs-implementation-experiments --bin e183_capacity_read_cache_reserve_and_sweep_costs --message-format=json-render-diagnostics | jobs=5" ]]'
   rm -rf -- "$work"
   if ((failures > 0)); then echo "e183-sweep-history-shards.sh 自证：$failures 格红"; return 1; fi
   echo "e183-sweep-history-shards.sh 自证：19 格全绿"
@@ -553,7 +553,7 @@ if [[ "$mode" == list ]]; then
   BINARY="${BINARY_OPTION:-${E183_BINARY:-}}"
   # --list-items 不编：没给装置就拒（仓根 target/ 下那一份可能是早先编的旧二进制，不拿它顶）
   [[ -n "$BINARY" ]] || { echo "  ✗ --list-items 不编装置，也没给装置（E183_BINARY 或 --binary 都空着）" >&2; echo "     → 怎么办：E183_BINARY 或 --binary 指到这一趟编出来的那一份，或开跑时拷的私有副本（$LOG_DIRECTORY/pinned-binary/<sha256>/ 下）" >&2; exit 78; }
-  [[ -x "$BINARY" ]] || { echo "  ✗ 装置还没编好：$BINARY" >&2; echo "     → 怎么办：先不带 --list-items 跑一次本脚本，或 cargo build --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs" >&2; exit 78; }
+  [[ -x "$BINARY" ]] || { echo "  ✗ 装置还没编好：$BINARY" >&2; echo "     → 怎么办：先不带 --list-items 跑一次本脚本，或 cargo build --release -p singlefs-implementation-experiments --bin e183_capacity_read_cache_reserve_and_sweep_costs" >&2; exit 78; }
   load_shard_list
   BINARY_SHA256=$(binary_identity_sha256_of "$BINARY") || { echo "  ✗ 算不出装置程序文件的 sha256（$BINARY）" >&2; echo "     → 怎么办：核这个文件在、当前用户读得了；装置没编好就先 cargo build --release，或设 E183_BINARY 指到编好的一份" >&2; exit 1; }
   for line in "${SHARD_LINES[@]}"; do

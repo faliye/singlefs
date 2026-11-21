@@ -47,7 +47,7 @@
 //! `header_csum` 的**摘要函数** D23 没定（只定了宽度 32 字节与覆盖范围），
 //! 所以四行判决对两个不同的摘要函数各跑一遍，证明判决不依赖函数选择。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{low_byte_of_u64, low_byte_of_usize, low_word_of_u64, u32_from_usize, usize_from_u64_in_const, Emitter};
 
 /// D23 已定项 4 的十个字段合计 78 字节（三笔已定增量不在里面，头是 95）。**格式常量**，与 kb 的 format-const 标记绑定。
 const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
@@ -58,7 +58,7 @@ const ADDED_BACK_CHAIN_BYTES: u64 = 4;
 /// 已定项 13 的载荷校验和，CRC32C 32 位。
 const ADDED_PAYLOAD_CHECKSUM_BYTES: u64 = 4;
 /// 三笔增量落地后的头部宽度，E75 已量。
-const HEADER_BYTES: usize = (JOURNAL_HEADER_TEN_FIELD_BYTES + ADDED_TRANSACTION_BOUNDARY_BYTES + ADDED_BACK_CHAIN_BYTES + ADDED_PAYLOAD_CHECKSUM_BYTES) as usize;
+const HEADER_BYTES: usize = usize_from_u64_in_const(JOURNAL_HEADER_TEN_FIELD_BYTES + ADDED_TRANSACTION_BOUNDARY_BYTES + ADDED_BACK_CHAIN_BYTES + ADDED_PAYLOAD_CHECKSUM_BYTES);
 /// E23 字段表的点名项宽度。
 const NAMED_ITEM_BYTES: usize = 56;
 
@@ -98,7 +98,7 @@ fn fnv1a32(data: &[u8]) -> u32 {
         hash_state ^= byte as u64;
         hash_state = hash_state.wrapping_mul(0x0000_0100_0000_01B3);
     }
-    (hash_state ^ (hash_state >> 32)) as u32
+    low_word_of_u64(hash_state ^ (hash_state >> 32))
 }
 
 /// `header_csum` 覆盖的范围：它自己之前那 63 字节（含 `payload_csum` 那 4 字节）。
@@ -201,17 +201,17 @@ fn encode(named: u32, jsn: u64, scheme: Scheme, digest: Digest) -> Vec<u8> {
 
     record_bytes[OFF_MAGIC..OFF_MAGIC + 4].copy_from_slice(&MAGIC);
     record_bytes[OFF_RECORD_LENGTH..OFF_RECORD_LENGTH + 4]
-        .copy_from_slice(&((HEADER_BYTES + payload_length_in_bytes) as u32).to_le_bytes());
+        .copy_from_slice(&u32_from_usize(HEADER_BYTES + payload_length_in_bytes).to_le_bytes());
     record_bytes[OFF_NAMED_COUNT..OFF_NAMED_COUNT + 4].copy_from_slice(&named.to_le_bytes());
     record_bytes[OFF_JSN..OFF_JSN + 8].copy_from_slice(&jsn.to_le_bytes());
     record_bytes[OFF_TRANSACTION_IDENTIFIER..OFF_TRANSACTION_IDENTIFIER + 8].copy_from_slice(&(jsn ^ 0x5A5A).to_le_bytes());
     record_bytes[OFF_COMMIT_FLAG] = 1;
-    record_bytes[OFF_PREVIOUS_HASH..OFF_PREVIOUS_HASH + 4].copy_from_slice(&(jsn as u32).wrapping_mul(2654435761).to_le_bytes());
+    record_bytes[OFF_PREVIOUS_HASH..OFF_PREVIOUS_HASH + 4].copy_from_slice(&low_word_of_u64(jsn).wrapping_mul(2654435761).to_le_bytes());
 
     // 点名项数组：每项 56 字节，内容与 jsn 绑定，好让不同记录的载荷真的不同。
     for item_index in 0..named as usize {
         for byte_in_item in 0..NAMED_ITEM_BYTES {
-            record_bytes[HEADER_BYTES + item_index * NAMED_ITEM_BYTES + byte_in_item] = (jsn as u8).wrapping_add((item_index * NAMED_ITEM_BYTES + byte_in_item) as u8);
+            record_bytes[HEADER_BYTES + item_index * NAMED_ITEM_BYTES + byte_in_item] = low_byte_of_u64(jsn).wrapping_add(low_byte_of_usize(item_index * NAMED_ITEM_BYTES + byte_in_item));
         }
     }
 
@@ -387,16 +387,16 @@ fn main() {
 
     // ── 扫点名项数：判决不许随载荷长度变 ─────────────────────────────────
     for named in [1u32, 2, 12, 71] {
-        let record_bytes = encode(named, 0x0102_0304, Scheme::Yi, Digest::Crc32c);
-        let medium_bytes = lay_on_medium(&record_bytes, Construction::HalfPayloadStale, 0xEE);
-        let (header_verdict, payload_verdict) = verify(&medium_bytes, Scheme::Yi, Digest::Crc32c);
+        let named_record_bytes = encode(named, 0x0102_0304, Scheme::Yi, Digest::Crc32c);
+        let named_medium_bytes = lay_on_medium(&named_record_bytes, Construction::HalfPayloadStale, 0xEE);
+        let (named_header_verdict, named_payload_verdict) = verify(&named_medium_bytes, Scheme::Yi, Digest::Crc32c);
         println!(
             "{}",
             emitter.emit_raw(&format!(
                 "name=sweep_named named={named} bytes={} header={} payload={}",
-                record_bytes.len(),
-                header_verdict.tag(),
-                payload_verdict.tag()
+                named_record_bytes.len(),
+                named_header_verdict.tag(),
+                named_payload_verdict.tag()
             ))
         );
     }
@@ -537,7 +537,7 @@ mod tests {
     /// `header_csum` 必须覆盖 `payload_csum` 那 4 字节——否则改掉载荷校验和本身是静默的。
     #[test]
     fn header_checksum_covers_the_payload_checksum_field() {
-        assert!(OFF_PAYLOAD_CHECKSUM < OFF_HEADER_CHECKSUM, "载荷校验和必须落在头校验和覆盖范围内");
+        assert!(std::hint::black_box(OFF_PAYLOAD_CHECKSUM < OFF_HEADER_CHECKSUM), "载荷校验和必须落在头校验和覆盖范围内");
         let mut record_bytes = encode(12, 7, Scheme::Yi, Digest::Crc32c);
         record_bytes[OFF_PAYLOAD_CHECKSUM] ^= 0x01;
         let (header_verdict, _) = verify(&record_bytes, Scheme::Yi, Digest::Crc32c);

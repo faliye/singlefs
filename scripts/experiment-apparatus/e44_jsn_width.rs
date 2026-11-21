@@ -17,8 +17,8 @@
 //! 判据是「盘上占几字节」与「一个原子单元装几个点名项」，不是「头涨百分之几」——
 //! D23 已定项 4 已定「记录头完整落在一个原子单元内」，记录要向上取整到原子单元。
 
-use e7_index_bench::Emitter;
-use std::alloc::{alloc, dealloc, Layout};
+use e7_index_bench::{u64_from_u128, u8_from_usize, Emitter};
+use std::alloc::{alloc_zeroed, dealloc, handle_alloc_error, Layout};
 use std::io::{Seek, SeekFrom, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::time::Instant;
@@ -30,12 +30,26 @@ const BLOCK_BYTES: usize = 4096;
 struct AlignedBuffer { pointer: *mut u8, length_in_bytes: usize, layout: Layout }
 impl AlignedBuffer {
     fn new(length_in_bytes: usize) -> Self {
+        assert!(length_in_bytes > 0, "缓冲长度必须为正");
         let layout = Layout::from_size_align(length_in_bytes, DIRECT_INPUT_OUTPUT_ALIGNMENT_BYTES).unwrap();
-        AlignedBuffer { pointer: unsafe { alloc(layout) }, length_in_bytes, layout }
+        // SAFETY: `layout` 的大小是 `length_in_bytes`，上一行断言了它大于 0，满足 `alloc_zeroed` 要求的布局大小非零。
+        let pointer = unsafe { alloc_zeroed(layout) };
+        if pointer.is_null() {
+            handle_alloc_error(layout);
+        }
+        AlignedBuffer { pointer, length_in_bytes, layout }
     }
-    fn as_mut(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) } }
+    fn as_mut(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 非空、指向构造时 `alloc_zeroed` 出的 `length_in_bytes` 字节，字节在分配时已全部置零、都已初始化；独占借用 `&mut self`，指针只存在这一个值里（类型没有派生也没有手写复制），同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
+    }
 }
-impl Drop for AlignedBuffer { fn drop(&mut self) { unsafe { dealloc(self.pointer, self.layout) } } }
+impl Drop for AlignedBuffer {
+    fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc_zeroed` 用的指针与布局；只在 `new` 里构造、类型没有派生也没有手写复制，每个值只会 `drop` 一次，`drop` 之后没有别的引用。
+        unsafe { dealloc(self.pointer, self.layout) }
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Arm {
@@ -63,7 +77,7 @@ fn one_round(path: &str, arm: Arm, sync_count: u64, file_block_count: u64) -> st
     let mut device_file = std::fs::OpenOptions::new().read(true).write(true)
         .custom_flags(O_DIRECT).open(path)?;
     let mut block_buffer = AlignedBuffer::new(BLOCK_BYTES);
-    for (byte_index, byte) in block_buffer.as_mut().iter_mut().enumerate() { *byte = (byte_index % 251) as u8; }
+    for (byte_index, byte) in block_buffer.as_mut().iter_mut().enumerate() { *byte = u8_from_usize(byte_index % 251); }
     let mut xorshift_state: u64 = 0x2545_F491_4F6C_DD1D;
     let start_instant = Instant::now();
     for _ in 0..sync_count {
@@ -87,7 +101,7 @@ fn measurement(sync_count: u64, elapsed_nanoseconds: u128) -> Option<(u64, u128)
 
 /// 每秒多少次 fsync。整数千分之一，避免浮点在产物里抖。
 fn rate_in_thousandths_per_second(sync_count: u64, elapsed_nanoseconds: u128) -> u64 {
-    ((sync_count as u128) * 1_000_000_000_000 / elapsed_nanoseconds) as u64
+    u64_from_u128((sync_count as u128) * 1_000_000_000_000 / elapsed_nanoseconds)
 }
 
 // ── B 段：字节账 ──────────────────────────────────────────────────────
@@ -123,7 +137,7 @@ fn item_counts_that_cost_a_unit(narrow_jsn_bytes: u64, wide_jsn_bytes: u64, atom
 fn counter_lifetime_years(counter_bits: u32, rate_in_thousandths_per_second: u64) -> u64 {
     if rate_in_thousandths_per_second == 0 { return u64::MAX }
     let counter_value_space = if counter_bits >= 64 { u128::from(u64::MAX) } else { 1u128 << counter_bits };
-    (counter_value_space * 1000 / rate_in_thousandths_per_second as u128 / 31_557_600) as u64
+    u64_from_u128(counter_value_space * 1000 / rate_in_thousandths_per_second as u128 / 31_557_600)
 }
 
 fn main() {
@@ -299,7 +313,7 @@ mod tests {
     fn counter_lifetime_matches_independently_computed_arithmetic() {
         let rate_of_one_million_per_second = 1_000_000_000u64;                    // 10⁶ 次/秒
         // 2^48 / 1e6 / 31557600 秒每年 ≈ 8.9 年
-        assert_eq!(counter_lifetime_years(48, rate_of_one_million_per_second), (1u128 << 48) as u64 / 1_000_000 / 31_557_600);
+        assert_eq!(counter_lifetime_years(48, rate_of_one_million_per_second), u64_from_u128(1u128 << 48) / 1_000_000 / 31_557_600);
         assert_eq!(counter_lifetime_years(48, rate_of_one_million_per_second), 8);
         assert!(counter_lifetime_years(56, rate_of_one_million_per_second) > 2000);
     }
@@ -323,7 +337,7 @@ mod tests {
     /// **阳性对照的判据本身要有意义**：不 fsync 必须至少快一倍才算「到了设备」。
     #[test]
     fn the_positive_control_threshold_is_a_factor_of_two() {
-        assert!(!(100u64 > 100 * 2), "同速不算通过");
-        assert!(300u64 > 100 * 2, "快三倍算通过");
+        assert!(std::hint::black_box(!(100u64 > 100 * 2)), "同速不算通过");
+        assert!(std::hint::black_box(300u64 > 100 * 2), "快三倍算通过");
     }
 }

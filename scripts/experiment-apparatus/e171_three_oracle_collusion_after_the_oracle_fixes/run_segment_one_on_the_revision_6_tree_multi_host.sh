@@ -26,7 +26,7 @@ WORK_ROOT=$SCRATCH/rows-work$RESUME_TAG
 TREE=scripts/experiment-apparatus/target/e171-r1-frozen-tree-revision-6
 BIN=$TREE/target/release/e171_three_oracle_collusion_after_the_oracle_fixes
 E170_BIN=$TREE/target/release/e170_o3_spec_executor_export
-DEVICE_SOURCE=crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
+DEVICE_SOURCE=crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
 RESEARCH=scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes
 TIMING=$RESEARCH/device_timing.py
 # 编排器、check_product.py（与编排器同目录的 peer_side.py、 由编排器按它自己的目录取）用仓里入库的那一份（与草稿里的逐字节相同）；

@@ -36,7 +36,7 @@
   一行一项（项名 row-<行号>），存进 prune-server 的 apparatus-items 族、种类 three_oracle_collusion_full_table_on_the_current_tree：items/<键>.out 是
   pack_row_directory 打的那一包（同一份内容同一串字节），items/<键>.verdict 是判定（判绿，退出码记 0；那一包里带耗时，比法写 timing）。
   键照 long_run_item_verdicts.py 文件头「请求文件」，由 admission.py 的 compute_unit_key 在拷进计划目录的那棵树上算（计划目录里的树当 --root；row_request_lines）：
-    入口   装置二进制 e171_three_oracle_collusion_after_the_oracle_fixes 的 main（feature:singlefs-verification/gpu、profile:release）：单元闭包、工具链、
+    入口   装置二进制 e171_three_oracle_collusion_after_the_oracle_fixes 的 main（feature:singlefs-implementation-experiments/gpu、profile:release）：单元闭包、工具链、
            闭包真引到的依赖版本
     judge  current_tree_row_driver.py 的 run_row_on_the_lane（judge-root 写仓根，只当索引）：判一行的那几个函数连同 import 时执行的模块级语句
     line:  行号、名单那一行原文、改坏用的变异行原文（改坏之后的源码不进闭包，由这一行进键）、装置参数、判的路线、O3 冻结件的摘要（o3_freeze_digest）；
@@ -118,7 +118,7 @@ REPOSITORY_ROOT = e171_research_side.REPOSITORY_ROOT
 SCRIPT_KEY = os.path.relpath(os.path.join(HERE, "full_table_run.py"), REPOSITORY_ROOT)
 LIBRARY_KIND = "three_oracle_collusion_full_table_on_the_current_tree"
 # 判定请求（文件头「判定库」）：装置入口、判一行的函数、long_run_item_verdicts 的状态目录（计划目录下）与不入库的那几包（各片产物目录下）
-DEVICE_PACKAGE = "singlefs-verification"
+DEVICE_PACKAGE = "singlefs-implementation-experiments"
 DEVICE_ENTRY = f"{e171_research_side.DEVICE_SOURCE}::main"
 ROW_JUDGE = os.path.relpath(os.path.join(HERE, "current_tree_row_driver.py"), REPOSITORY_ROOT) + "::run_row_on_the_lane"
 ITEM_STATE_DIRECTORY = "items"
@@ -1086,7 +1086,7 @@ def compile_clean_binaries(tree: str, work: str, threads: int, log: str) -> tupl
         import frozen_o3
         environment = frozen_o3.thread_environment(threads, dict(os.environ, CARGO_TARGET_DIR=lane_target))
         with open(log, "a", encoding="utf-8") as handle:
-            exit_code = subprocess.run(["cargo", "build", "--release", "--offline", "-p", "singlefs-verification", "--bin", EXPORT_BINARY_NAME],
+            exit_code = subprocess.run(["cargo", "build", "--release", "--offline", "-p", "singlefs-implementation-experiments", "--bin", EXPORT_BINARY_NAME],
                                        cwd=lane_tree, env=environment, stdout=handle, stderr=subprocess.STDOUT).returncode
     release = os.path.join(lane_target, "release")
     return exit_code, os.path.join(release, DEVICE_BINARY_NAME), os.path.join(release, EXPORT_BINARY_NAME)

@@ -3,7 +3,7 @@
 # run-condition: command cargo python3 git sha256sum getconf nproc
 # task-server-card-lease: on-demand
 # E185（GC一批搬迁的挂钟拆分）第 3 次重跑一段的跑法（跑前登记 research/prompts/e185-r3-prereg.md 第五节「跑法」）：
-#   写输入清单 → 有段要现判才在这一趟自己的编译目录里编装置（crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs；
+#   写输入清单 → 有段要现判才在这一趟自己的编译目录里编装置（crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs；
 #   第一、二段带 gpu 特性，第三段不带；编译目录经 scripts/hosts/run-build-directory.sh 建、跑完删）→ 跑那一段 → 产物写进产物目录。
 # 按段判定（.claude/rules/test-script-discipline.md「判定可复用：按输入存，按前缀剪」）：一段一条判定，在 prune-server 的 apparatus-items 族、种类 e185_gc_batch_wall_clock_split
 #   （long_run_item_verdicts.py 文件头「判定库」）。键 = 装置入口 main 的单元闭包（release 档、这一段的特性；admission.py 的 compute_unit_key 算）、工具链、闭包真引到的依赖版本、
@@ -85,8 +85,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.." || { echo "进不去仓根"; echo "→
 SCRIPT_KEY="scripts/experiment-apparatus/e185-r3-segment-run.sh"
 ITEM_VERDICTS="scripts/experiment-apparatus/long_run_item_verdicts.py"   # 按段判定的读写（文件头「按段判定」）
 LIBRARY_KIND="e185_gc_batch_wall_clock_split"                            # 判定库的种类：装置的 bin 名
-registered_apparatus_sha256=a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082
-apparatus_source=crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs
+registered_apparatus_sha256=4368c0e7a7870a09810fa5667173f9cf14625f4d64c4e0287ee10ec7ef80e6ea
+apparatus_source=crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs
 attack_ledger=research/prompts/m4-gpugc-design-r1-opus-model/out/g1.out
 stage_split_product=research/results/e185-gc-batch-wall-clock-split-stage-split-r2-2026-10-23.out
 # 输入清单 sha256 的那几份（自证照这张表搭树）
@@ -163,7 +163,7 @@ segment_arguments() { # <段>
 segment_request() { # <段>（long_run_item_verdicts.py 文件头「请求文件」）
   local feature=""
   [[ -n "$(segment_features "$1")" ]] && feature=$'\t'"feature:singlefs-verification/$(segment_features "$1")"
-  printf '%s\tcrates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs::main\tprofile:release%s\tline:arguments=%s\tline:compare=timing\n' \
+  printf '%s\tcrates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs::main\tprofile:release%s\tline:arguments=%s\tline:compare=timing\n' \
     "$1" "$feature" "$(segment_arguments "$1")"
   if [[ "$1" == host-cpu-per-submission ]]; then
     printf '@input\t%s\tstage-split-product\t%s\n@input\t%s\tattack-ledger\t%s\n' "$1" "$stage_split_product" "$1" "$attack_ledger"
@@ -454,7 +454,7 @@ for segment in "${segments[@]}"; do
     if [[ "$segment" == host-cpu-per-submission ]]; then
       sha256sum "$attack_ledger" "$stage_split_product"
     fi
-    cargo tree -p singlefs-verification -e normal,build,features -i singlefs-core --offline ${build_features[@]+"${build_features[@]}"}
+    cargo tree -p singlefs-implementation-experiments -e normal,build,features -i singlefs-core --offline ${build_features[@]+"${build_features[@]}"}
     echo "nproc $(nproc)"
     echo "getconf CLK_TCK $(getconf CLK_TCK)"
     echo "上限：外层不套内存包装（额度由任务服务给）；装置内存预算：$memory_cap_note；编译与装置的线程读服务交的变量（SINGLEFS_THREAD_CAP=${SINGLEFS_THREAD_CAP:-没设}，CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-没设}）"
@@ -502,7 +502,7 @@ for segment in "${segments[@]}"; do
   if [[ -z "${built_with[x$features]:-}" ]]; then
     build_features=()
     [[ -z "$features" ]] || build_features=(--features "$features")
-    cargo build --release -p singlefs-verification ${build_features[@]+"${build_features[@]}"} --bin e185_gc_batch_wall_clock_split
+    cargo build --release -p singlefs-implementation-experiments ${build_features[@]+"${build_features[@]}"} --bin e185_gc_batch_wall_clock_split
     built_with[x$features]=1
   fi
   apparatus="$CARGO_TARGET_DIR/release/e185_gc_batch_wall_clock_split"

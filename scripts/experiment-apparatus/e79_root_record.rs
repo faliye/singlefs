@@ -185,8 +185,8 @@ mod tests {
             .collect();
         assert_eq!(per_tier, vec![243, 242, 242]);
         // 边界各钉一格：243 装得下、244 装不下（最宽那一档）。
-        assert!(67 * 243 <= 16284);
-        assert!(67 * 244 > 16284);
+        assert!(std::hint::black_box(67 * 243 <= 16284));
+        assert!(std::hint::black_box(67 * 244 > 16284));
     }
 
     /// 每头一棵树（D6）：8 个可写头 + 7 棵基础树 = 15 棵，两种 512 形态都装不下，
@@ -216,6 +216,6 @@ mod tests {
     /// 固定头必须装得进最窄的槽——装不进说明字段表本身写爆了。
     #[test]
     fn head_fits_smallest_slot() {
-        assert!(HEAD_BASE + WATERMARK < 512);
+        assert!(std::hint::black_box(HEAD_BASE + WATERMARK < 512));
     }
 }

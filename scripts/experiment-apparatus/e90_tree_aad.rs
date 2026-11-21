@@ -156,6 +156,7 @@ fn measure(arm: Arm) -> ArmOutcome {
     let head_3_private_extent  = (Birth { tree: 3, txg: 25 }, 42u64, 0u64, b"private-head-3".to_vec());
     let head_4_private_extent  = (Birth { tree: 4, txg: 30 }, 42u64, 0u64, b"private-head-4".to_vec());
 
+    #[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
     let sealed: Vec<(&(Birth, u64, u64, Vec<u8>), BlockPointer)> = [&shared_pre_clone_extent, &shared_mid_chain_extent, &head_2_private_extent, &head_3_private_extent, &head_4_private_extent]
         .into_iter()
         .enumerate()

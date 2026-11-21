@@ -76,7 +76,7 @@ fn build_disk() -> Vec<DropPoint> {
     // 活 ×37：第 0 个 birth 恰 == ROOT_TXG（边界）；前 5 个嵌外来镜像、随后 4 个嵌自身镜像
     for live_index in 0..LIVE_UNIT_COUNT {
         let mut live_drop_point = make_live_drop_point(if live_index == 0 { ROOT_TXG } else { 1 + live_index });
-        if live_index >= 1 && live_index <= NESTED_FOREIGN_IMAGE_COUNT {
+        if (1..=NESTED_FOREIGN_IMAGE_COUNT).contains(&live_index) {
             live_drop_point.nested_image_at_payload_probe = Some(HeaderImage { fsid: FOREIGN_FSID, birth: 7, is_header_parseable: true });
         } else if live_index > NESTED_FOREIGN_IMAGE_COUNT && live_index <= NESTED_FOREIGN_IMAGE_COUNT + NESTED_SELF_IMAGE_COUNT {
             live_drop_point.nested_image_at_payload_probe = Some(HeaderImage { fsid: OWN_FSID, birth: 7, is_header_parseable: true });

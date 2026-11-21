@@ -447,9 +447,9 @@ fn main() {
     output_lines.push(emitter.emit_raw(&format!(
         "name=coverage registry=proposal unmapped={unmapped_name_count} multi_code={multi_code_name_count} unregistered={unregistered_name_count}"
     )));
-    let (unmapped_name_count, multi_code_name_count, unregistered_name_count) = coverage(&REGISTRY_FROM_DECISION_NINE_ROW, &USED_NAMES);
+    let (derived_unmapped_name_count, derived_multi_code_name_count, derived_unregistered_name_count) = coverage(&REGISTRY_FROM_DECISION_NINE_ROW, &USED_NAMES);
     output_lines.push(emitter.emit_raw(&format!(
-        "name=coverage registry=d9_only unmapped={unmapped_name_count} multi_code={multi_code_name_count} unregistered={unregistered_name_count} \
+        "name=coverage registry=d9_only unmapped={derived_unmapped_name_count} multi_code={derived_multi_code_name_count} unregistered={derived_unregistered_name_count} \
          note=positive_control_tombstone_missing"
     )));
 

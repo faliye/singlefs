@@ -22,7 +22,7 @@ E171_RESEARCH_SIDE_FILES = tuple(os.path.join(E171_RELATIVE, name) for name in (
     "bad_implementation_table.py", "run_directory.py", "result_lines.py", "device_timing.py", "o3_bad_image_judge.py", "row_driver.py",
     "bad-implementations-step-8.tsv", "bad-implementations-step-4-only.tsv"))
 NAME_LISTS = (os.path.join(E171_RELATIVE, "bad-implementations-step-8.tsv"), os.path.join(E171_RELATIVE, "bad-implementations-step-4-only.tsv"))
-DEVICE_SOURCE = "crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
+DEVICE_SOURCE = "crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs"
 
 if E171_DIRECTORY not in sys.path:
     sys.path.insert(1, E171_DIRECTORY)

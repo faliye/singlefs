@@ -8,6 +8,7 @@
 //! 负载是**对已存在 key 空间的随机更新**，因此不需要节点分裂——
 //! 三条臂都是真结构，不是 stub。分裂/合并行为不在本实验射程内。
 
+use e7_index_bench::{u64_from_nanoseconds, usize_from_u64};
 use e7_index_bench::{Emitter, Lru};
 use std::alloc::{alloc, dealloc, Layout};
 use std::fs::OpenOptions;
@@ -20,7 +21,10 @@ const PAGE_BYTES: usize = 4096;
 /// 节点占几个 4 KiB 页 —— 运行期参数（D8 已定：节点大小是每套布局的**格式参数**）。
 /// 用 static mut 是因为它在 main 里定一次就不再变；所有读取都在单线程里。
 static mut NODE_PAGE_COUNT: usize = 1;
-fn node_page_count() -> usize { unsafe { NODE_PAGE_COUNT } }
+fn node_page_count() -> usize {
+    // SAFETY: `static mut` 的读写不加同步，只在同一时刻只有一个线程碰它时成立：`main` 路径不起线程，满足；单测路径要靠 `RUST_TEST_THREADS=1` 串行才满足，并行跑几个会读写它的测试是数据竞争。
+    unsafe { NODE_PAGE_COUNT }
+}
 fn node_bytes() -> usize { node_page_count() * PAGE_BYTES }
 fn slots() -> usize { (node_bytes() - 16) / 16 }
 const FANOUT: usize = 32;
@@ -36,22 +40,35 @@ const DEFAULT_CACHE_PAGES: usize = 64;
 fn root_page_number() -> u64 { 0 }
 fn internal_page_number(internal_index: usize) -> u64 { 1 + internal_index as u64 }
 fn leaf_page_number(leaf_index: usize) -> u64 { 1 + FANOUT as u64 + leaf_index as u64 }
-fn leaf_of(key: u64) -> usize { (key / KEYS_PER_LEAF as u64) as usize }
+fn leaf_of(key: u64) -> usize { usize_from_u64(key / KEYS_PER_LEAF as u64) }
 fn internal_of(leaf: usize) -> usize { leaf / FANOUT }
 
 struct AlignedBuffer { pointer: *mut u8, length_in_bytes: usize, layout: Layout }
 impl AlignedBuffer {
     fn new(length_in_bytes: usize) -> Self {
         let layout = Layout::from_size_align(length_in_bytes, PAGE_BYTES).unwrap();
+        // SAFETY: `layout` 由 `Layout::from_size_align` 校验过；`alloc` 要求布局大小非零，调用处传的都是 O_DIRECT 用的正的整块长度。
         let allocated_pointer = unsafe { alloc(layout) };
         assert!(!allocated_pointer.is_null());
+        // SAFETY: `allocated_pointer` 刚由 `alloc` 分配，布局长度就是 `length_in_bytes`，上一行已断言非空；`u8` 没有对齐或取值限制，可以写 `length_in_bytes` 个字节。
         unsafe { std::ptr::write_bytes(allocated_pointer, 0, length_in_bytes) };
         Self { pointer: allocated_pointer, length_in_bytes, layout }
     }
-    fn as_slice(&self) -> &[u8] { unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) } }
-    fn as_mut_slice(&mut self) -> &mut [u8] { unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) } }
+    fn as_slice(&self) -> &[u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) }
+    }
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；独占借用 `&mut self`，同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
+        unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
+    }
 }
-impl Drop for AlignedBuffer { fn drop(&mut self) { unsafe { dealloc(self.pointer, self.layout) } } }
+impl Drop for AlignedBuffer {
+    fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局，`drop` 只跑一次，之后没有别的引用。
+        unsafe { dealloc(self.pointer, self.layout) }
+    }
+}
 
 /// 一个节点的内存形态：条目数 + 条目。日志结构臂用它做「追加」，排序臂用它做「原地」。
 #[derive(Clone)]
@@ -59,7 +76,7 @@ struct Node { entry_count: usize, entries: Vec<(u64, u64)> }
 impl Node {
     fn new() -> Self { Self { entry_count: 0, entries: vec![(0, 0); slots()] } }
     fn decode(buffer: &AlignedBuffer) -> Self {
-        let entry_count = u64::from_le_bytes(buffer.as_slice()[0..8].try_into().unwrap()) as usize;
+        let entry_count = usize_from_u64(u64::from_le_bytes(buffer.as_slice()[0..8].try_into().unwrap()));
         let entry_count = entry_count.min(slots());
         let mut entries = vec![(0u64, 0u64); slots()];
         for (entry_position, slot) in entries.iter_mut().enumerate().take(entry_count) {
@@ -191,12 +208,12 @@ fn arm_log_structured_with_write_buffer(
     let mut buffer = AlignedBuffer::new(node_bytes());
     let mut random_state = seed;
     let mut write_buffer: Vec<(u64, u64)> = Vec::with_capacity(write_buffer_capacity.max(1));
-    let flush = |write_buffer: &mut Vec<(u64, u64)>, cache: &mut Cache, device: &mut Device, buffer: &mut AlignedBuffer| {
-        if write_buffer.is_empty() { return; }
+    let flush = |pending_writes: &mut Vec<(u64, u64)>, cache_to_fill: &mut Cache, device_to_write: &mut Device, flush_buffer: &mut AlignedBuffer| {
+        if pending_writes.is_empty() { return; }
         // 攒批 → 排序 → 去重（后者胜），正是 D8 write buffer 的形态
-        write_buffer.sort_unstable_by_key(|buffered_update| (leaf_of(buffered_update.0), buffered_update.0));
-        let mut deduplicated: Vec<(u64, u64)> = Vec::with_capacity(write_buffer.len());
-        for &(key, value) in write_buffer.iter() {
+        pending_writes.sort_unstable_by_key(|buffered_update| (leaf_of(buffered_update.0), buffered_update.0));
+        let mut deduplicated: Vec<(u64, u64)> = Vec::with_capacity(pending_writes.len());
+        for &(key, value) in pending_writes.iter() {
             if let Some(previous_update) = deduplicated.last_mut() { if previous_update.0 == key { previous_update.1 = value; continue; } }
             deduplicated.push((key, value));
         }
@@ -215,7 +232,7 @@ fn arm_log_structured_with_write_buffer(
             }
             let mut shuffle_state = 0x1234_5678_9ABC_DEF0u64 ^ (groups.len() as u64);
             for group_position in (1..groups.len()).rev() {
-                let swap_position = (next_random(&mut shuffle_state) % (group_position as u64 + 1)) as usize;
+                let swap_position = usize_from_u64(next_random(&mut shuffle_state) % (group_position as u64 + 1));
                 groups.swap(group_position, swap_position);
             }
             deduplicated = groups.into_iter().flatten().collect();
@@ -224,15 +241,15 @@ fn arm_log_structured_with_write_buffer(
         while update_position < deduplicated.len() {
             let leaf_index = leaf_of(deduplicated[update_position].0);
             let page_number = leaf_page_number(leaf_index);
-            let mut leaf_node = cache.get(device, page_number, buffer);
+            let mut leaf_node = cache_to_fill.get(device_to_write, page_number, flush_buffer);
             while update_position < deduplicated.len() && leaf_of(deduplicated[update_position].0) == leaf_index {
                 if leaf_node.full() { leaf_node.compact(); }    // 日志结构：满了才压实
                 leaf_node.push(deduplicated[update_position].0, deduplicated[update_position].1); // 追加，不插入
                 update_position += 1;
             }
-            cache.put(page_number, leaf_node);
+            cache_to_fill.put(page_number, leaf_node);
         }
-        write_buffer.clear();
+        pending_writes.clear();
     };
     for operation_index in 0..operation_count {
         let key = next_random(&mut random_state) % KEY_COUNT;
@@ -265,22 +282,22 @@ fn arm_message_buffered_tree(
             cache.put(root_page_number(), root);
             for internal_index in 0..FANOUT {
                 let messages_for_internal_node: Vec<(u64, u64)> =
-                    messages.iter().copied().filter(|(key, _)| internal_of(leaf_of(*key)) == internal_index).collect();
+                    messages.iter().copied().filter(|(message_key, _)| internal_of(leaf_of(*message_key)) == internal_index).collect();
                 if messages_for_internal_node.is_empty() { continue; }
                 let internal_node_page = internal_page_number(internal_index);
                 let mut internal_node = cache.get(device, internal_node_page, &mut buffer);
-                for (key, value) in messages_for_internal_node { internal_node.push(key, value); }
+                for (message_key, value) in messages_for_internal_node { internal_node.push(message_key, value); }
                 // 内部缓冲满 → 下刷到它的 16 个叶子
                 if internal_node.entry_count >= effective_buffer_capacity.max(1) {
                     let internal_messages: Vec<(u64, u64)> = internal_node.entries[..internal_node.entry_count].to_vec();
                     internal_node.entry_count = 0;
                     cache.put(internal_node_page, internal_node);
                     let mut messages_by_leaf: std::collections::BTreeMap<usize, Vec<(u64, u64)>> = Default::default();
-                    for (key, value) in internal_messages { messages_by_leaf.entry(leaf_of(key)).or_default().push((key, value)); }
+                    for (message_key, value) in internal_messages { messages_by_leaf.entry(leaf_of(message_key)).or_default().push((message_key, value)); }
                     for (leaf_index, leaf_messages) in messages_by_leaf {
                         let page_number = leaf_page_number(leaf_index);
                         let mut leaf_node = cache.get(device, page_number, &mut buffer);
-                        for (key, value) in leaf_messages { if leaf_node.full() { leaf_node.compact(); } leaf_node.push(key, value); }
+                        for (message_key, value) in leaf_messages { if leaf_node.full() { leaf_node.compact(); } leaf_node.push(message_key, value); }
                         cache.put(page_number, leaf_node);
                     }
                 } else {
@@ -351,6 +368,7 @@ fn main() {
     let cache_pages: usize = std::env::args().nth(4).and_then(|argument| argument.parse().ok()).unwrap_or(DEFAULT_CACHE_PAGES);
     // 第 5 个参数：一个节点占几个 4 KiB 页。节点大小是 D8 已定的每套布局格式参数。
     let node_pages: usize = std::env::args().nth(5).and_then(|argument| argument.parse().ok()).unwrap_or(1);
+    // SAFETY: `static mut` 的读写不加同步，只在同一时刻只有一个线程碰它时成立：`main` 路径不起线程，满足；单测路径要靠 `RUST_TEST_THREADS=1` 串行才满足，并行跑几个会读写它的测试是数据竞争。
     unsafe { NODE_PAGE_COUNT = node_pages.max(1) };
     let write_buffer_capacity = if selfcheck { 1 } else { 512 };
     let message_buffer_capacity = if selfcheck { 1 } else { 200 };
@@ -383,7 +401,7 @@ fn main() {
             1 => arm_log_structured_with_write_buffer(&mut device, operation_count, seed, cache_pages, write_buffer_capacity, checkpoint_interval, mode == "shuffle"),
             _ => arm_message_buffered_tree(&mut device, operation_count, seed, cache_pages, message_buffer_capacity, checkpoint_interval),
         };
-        let elapsed_nanoseconds = update_start.elapsed().as_nanos() as u64;
+        let elapsed_nanoseconds = u64_from_nanoseconds(update_start.elapsed().as_nanos());
         let block_counter_text = block_counter_delta(block_counters_before_updates, read_block_layer_counters(&device_path));
         println!("{}", emitter.emit_raw(&format!(
             "name=update arm={name} reads={reads} writes={writes} io={} io_per_op={:.6} bytes_per_op={:.1} elapsed_ns={elapsed_nanoseconds} {block_counter_text}",
@@ -398,7 +416,7 @@ fn main() {
         let (reads_before_queries, query_start) = (device.reads, Instant::now());
         let mut hits = 0u64;
         for _ in 0..query_count { hits += point_query(&mut device, &mut cache, &mut buffer, next_random(&mut query_random_state) % KEY_COUNT); }
-        let query_elapsed_nanoseconds = query_start.elapsed().as_nanos() as u64;
+        let query_elapsed_nanoseconds = u64_from_nanoseconds(query_start.elapsed().as_nanos());
         println!("{}", emitter.emit_raw(&format!(
             "name=query arm={name} reads={} reads_per_query={:.4} elapsed_ns={query_elapsed_nanoseconds} {} probe_reads={hits}",
             device.reads - reads_before_queries, (device.reads - reads_before_queries) as f64 / query_count as f64, block_counter_delta(block_counters_before_queries, read_block_layer_counters(&device_path)))));

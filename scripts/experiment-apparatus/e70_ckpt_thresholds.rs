@@ -34,6 +34,7 @@
 //! 「每个脏节点在 journal 里恰好占一个条目」是**假设**，D23 未定项里那条
 //! 「一个事务恰不恰好产生一条记录」还开着（C37）。
 
+use e7_index_bench::truncate_f64_to_u64;
 use e7_index_bench::Emitter;
 
 const RECORD_HEADER_BYTES: u64 = 78;
@@ -100,9 +101,9 @@ fn main() {
                 emitter.emit_raw(&format!(
                     "name=t_time load={workload_name} budget_x1000={} ops_needed={} \
                      t_time_ms_x10={} extrapolated={} already_ok={}",
-                    (budget_blocks_per_operation * 1000.0) as u64,
-                    operations_needed as u64,
-                    (time_threshold_milliseconds * 10.0) as u64,
+                    truncate_f64_to_u64(budget_blocks_per_operation * 1000.0),
+                    truncate_f64_to_u64(operations_needed),
+                    truncate_f64_to_u64(time_threshold_milliseconds * 10.0),
                     u8::from(is_extrapolated),
                     u8::from(is_budget_met_at_checkpoint_100)
                 ))

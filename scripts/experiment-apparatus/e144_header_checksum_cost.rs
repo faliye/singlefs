@@ -4,6 +4,7 @@
 //! 加一条明知会漏的阳性对照（8 位加法和），在五个真实头宽（95 / 105 / 107 / 250 / 413）上量：单比特、双比特穷举、随机改字节的漏检数，
 //! 随机前缀的探针误认数，以及每个头的纳秒数。计时是有变化的观测，7 轮取最小；判别力那一半确定性。
 
+use e7_index_bench::{low_word_of_u64, u64_from_nanoseconds, u8_from_u64, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::hint::black_box;
 use std::time::Instant;
@@ -104,10 +105,10 @@ fn sha256(bytes: &[u8]) -> [u8; 32] {
         padded.push(0);
     }
     padded.extend_from_slice(&bit_length.to_be_bytes());
-    for block in padded.chunks_exact(64) {
+    for block in padded.as_chunks::<64>().0 {
         let mut schedule = [0u32; 64];
-        for (word_index, word) in block.chunks_exact(4).enumerate() {
-            schedule[word_index] = u32::from_be_bytes(word.try_into().expect("切了 4 字节"));
+        for (word_index, word) in block.as_chunks::<4>().0.iter().enumerate() {
+            schedule[word_index] = u32::from_be_bytes(*word);
         }
         for word_index in 16..64 {
             let sigma0 = schedule[word_index - 15].rotate_right(7) ^ schedule[word_index - 15].rotate_right(18) ^ (schedule[word_index - 15] >> 3);
@@ -170,21 +171,21 @@ fn blake2_small_256(bytes: &[u8]) -> [u8; 32] {
     if padded.is_empty() {
         padded.resize(64, 0);
     }
-    while padded.len() % 64 != 0 {
+    while !padded.len().is_multiple_of(64) {
         padded.push(0);
     }
     let block_count = padded.len() / 64;
-    for (block_index, block) in padded.chunks_exact(64).enumerate() {
+    for (block_index, block) in padded.as_chunks::<64>().0.iter().enumerate() {
         let is_last = block_index + 1 == block_count;
         let counter = if is_last { bytes.len() as u64 } else { ((block_index + 1) * 64) as u64 };
         let mut message = [0u32; 16];
-        for (word_index, word) in block.chunks_exact(4).enumerate() {
-            message[word_index] = u32::from_le_bytes(word.try_into().expect("切了 4 字节"));
+        for (word_index, word) in block.as_chunks::<4>().0.iter().enumerate() {
+            message[word_index] = u32::from_le_bytes(*word);
         }
         let mut vector = [0u32; 16];
         vector[..8].copy_from_slice(&state);
         vector[8..].copy_from_slice(&BLAKE2_SMALL_INITIAL_VECTOR);
-        vector[12] ^= counter as u32;
+        vector[12] ^= low_word_of_u64(counter);
         vector[13] ^= (counter >> 32) as u32;
         if is_last {
             vector[14] = !vector[14];
@@ -292,7 +293,7 @@ fn crc64_table() -> &'static [u64; 256] {
             for _ in 0..8 {
                 remainder = if remainder & 1 == 1 { (remainder >> 1) ^ CRC64_XZ_POLYNOMIAL_REFLECTED } else { remainder >> 1 };
             }
-            table[byte_value as usize] = remainder;
+            table[usize_from_u64(byte_value)] = remainder;
         }
         table
     })
@@ -336,8 +337,8 @@ fn castagnoli_tables() -> &'static [[u32; 256]; 8] {
 fn castagnoli_crc32(bytes: &[u8]) -> u32 {
     let tables = castagnoli_tables();
     let mut remainder = !0u32;
-    let mut chunks = bytes.chunks_exact(8);
-    for chunk in &mut chunks {
+    let (chunks, chunk_remainder) = bytes.as_chunks::<8>();
+    for chunk in chunks {
         let low = read_u32(chunk) ^ remainder;
         let high = read_u32(&chunk[4..]);
         remainder = tables[7][(low & 0xff) as usize]
@@ -349,7 +350,7 @@ fn castagnoli_crc32(bytes: &[u8]) -> u32 {
             ^ tables[1][((high >> 16) & 0xff) as usize]
             ^ tables[0][(high >> 24) as usize];
     }
-    for &byte in chunks.remainder() {
+    for &byte in chunk_remainder {
         remainder = tables[0][((remainder ^ u32::from(byte)) & 0xff) as usize] ^ (remainder >> 8);
     }
     !remainder
@@ -393,7 +394,7 @@ fn header_verifies(header: &[u8], arm: Arm) -> bool {
 
 fn is_inside_checksum_field(bit: usize) -> bool {
     let byte = bit / 8;
-    byte >= CHECKSUM_FIELD_OFFSET && byte < CHECKSUM_FIELD_OFFSET + CHECKSUM_FIELD_BYTES
+    (CHECKSUM_FIELD_OFFSET..CHECKSUM_FIELD_OFFSET + CHECKSUM_FIELD_BYTES).contains(&byte)
 }
 
 /// 单比特翻转：每个位置翻一次（校验和字段自己的位也翻——改坏字段同样必须判红）。
@@ -437,10 +438,10 @@ fn random_corruption_misses(header: &[u8], arm: Arm, trials: u64, generator: &mu
     let mut trial = 0;
     while trial < trials {
         let mut damaged = header.to_vec();
-        let count = 1 + generator.below(8) as usize;
+        let count = 1 + usize_from_u64(generator.below(8));
         for _ in 0..count {
-            let byte = outside[generator.below(outside.len() as u64) as usize];
-            let delta = 1 + (generator.below(255) as u8);
+            let byte = outside[usize_from_u64(generator.below(outside.len() as u64))];
+            let delta = 1 + u8_from_u64(generator.below(255));
             damaged[byte] = damaged[byte].wrapping_add(delta);
         }
         // 同一字节被改两次可能抵消成原样，那不是损坏，重抽（不重抽时每臂每宽会误记 1 到 6 次「漏」，全是这一形）。
@@ -497,12 +498,12 @@ fn cost_nanoseconds(header: &[u8], arm: Arm, rounds: usize, iterations: u64) -> 
             sink ^= field[0];
         }
         black_box(sink);
-        let elapsed = started.elapsed().as_nanos() as u64;
+        let elapsed = u64_from_nanoseconds(started.elapsed().as_nanos());
         per_round.push(elapsed / iterations);
     }
     let minimum = *per_round.iter().min().expect("至少一轮");
     let maximum = *per_round.iter().max().expect("至少一轮");
-    let spread_bp = if minimum == 0 { 0 } else { (maximum - minimum) * 10_000 / minimum };
+    let spread_bp = ((maximum - minimum) * 10_000).checked_div(minimum).unwrap_or(0);
     (minimum, spread_bp)
 }
 
@@ -564,7 +565,7 @@ fn main() {
     emit(&mut emitter, &format!(
         "name=verdict formal_single_bit_missed={formal_single_bit_missed} formal_double_bit_missed={formal_double_bit_missed} formal_random_missed={formal_random_missed} control_double_bit_missed={control_double_bit_missed} control_has_teeth={} sha256_over_crc32c_ratio_bp={}",
         control_double_bit_missed > 0,
-        if crc_nanoseconds == 0 { 0 } else { sha_nanoseconds * 10_000 / crc_nanoseconds }
+        (sha_nanoseconds * 10_000).checked_div(crc_nanoseconds).unwrap_or(0)
     ));
     println!("{}", emitter.finish());
 }
@@ -597,7 +598,7 @@ mod tests {
         assert_eq!(xx_hash64(b"", 0), 0xEF46_DB37_51D8_E999);
         assert_eq!(xx_hash64(b"abc", 0), 0x44BC_2CF5_AD77_0999);
         let long: Vec<u8> = (0..100u8).collect();
-        assert_eq!(xx_hash64(&long, 0), 0x6AC1_E580_32166597 ^ (0x6AC1_E580_32166597 ^ xx_hash64(&long, 0)), "长输入自洽（≥ 32 字节走四路累加）");
+        assert_eq!(xx_hash64(&long, 0), 0x6AC1_E580_3216_6597 ^ (0x6AC1_E580_3216_6597 ^ xx_hash64(&long, 0)), "长输入自洽（≥ 32 字节走四路累加）");
         assert_eq!(crc64_xz(b"123456789"), 0x995D_C9BB_DF19_39FA);
         assert_eq!(castagnoli_crc32(b"123456789"), 0xE306_9283);
     }

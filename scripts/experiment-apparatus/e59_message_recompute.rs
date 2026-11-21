@@ -137,6 +137,7 @@ impl Arm {
     fn geng_allocator_reuses_low_addresses() -> Self { Arm { allocator_reuses_low_addresses: true, ..Arm::jia_units_only() } }
 }
 
+#[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
 const ARMS: [(&str, fn() -> Arm); 7] = [
     ("jia_units_only", Arm::jia_units_only),
     ("yi_units_plus_acct", Arm::yi_units_plus_accounting),
@@ -174,30 +175,28 @@ fn build(load: Load, arm: Arm) -> (Vec<Unit>, State) {
     let mut truth = State::default();
     // 三段互不相交的落点空间。**覆写落在哪一段是臂的变量**：
     // 单调向前 ⇒ 新副本地址更大；复用释放空间 ⇒ 新副本地址更小。
-    let mut physical_address = 1_000_000u64;      // ① 建对象
     let mut overwrite_physical_address = 2_000_000u64;   // ② 覆写（单调向前）
     let mut reused_physical_address = 999_999u64;  // ② 覆写（复用低地址）
     let mut tombstone_physical_address = 3_000_000u64; // ③ 墓碑单元
     let mut write_sequence_counter = 0u64;
     let mut current_mapping: BTreeMap<Key, u64> = BTreeMap::new();
 
-    let make_header = |load: &Load, object_index: u64, write_sequence: u64, is_tombstone: bool, arm: Arm| UnitHeader {
+    let make_header = |header_load: &Load, object_index: u64, write_sequence: u64, is_tombstone: bool, header_arm: Arm| UnitHeader {
         kind: if is_tombstone { 2 } else { 1 },
-        tree: object_index % load.tree_count,
+        tree: object_index % header_load.tree_count,
         object_identifier: object_index,
         object_birth_generation: 1, // 对象出生代：覆写不改它，这正是 D18 已定项 3 字段集的形状
         anchor: 0,
-        rewrite_sequence: if arm.carries_rewrite_sequence { Some(write_sequence) } else { None },
+        rewrite_sequence: if header_arm.carries_rewrite_sequence { Some(write_sequence) } else { None },
         is_tombstone,
     };
 
     // ① 建 object_count 个对象
-    for object_index in 0..load.object_count {
+    for (object_index, physical_address) in (0..load.object_count).zip(1_000_000u64..) {
         write_sequence_counter += 1;
         let unit_header = make_header(&load, object_index, write_sequence_counter, false, arm);
         units.push(Unit { physical_address, header: Some(unit_header), live: true });
         current_mapping.insert((unit_header.tree, unit_header.object_identifier, unit_header.anchor), physical_address);
-        physical_address += 1;
     }
     // ② 覆写前 overwrite_count 个：新单元，旧单元按臂决定留不留
     for object_index in 0..load.overwrite_count {

@@ -174,7 +174,6 @@ fn main() {
         differing_cells += 1;
     }
     line(format!("name=discriminate cells_differing={differing_cells}"));
-    drop(line);
     println!("{}", emitter.finish());
 }
 

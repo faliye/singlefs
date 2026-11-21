@@ -40,7 +40,7 @@
 //! 它是 E32（上一条时间线的残留）已经测出的那一格，两个实验必须给同一个答案。
 //! 对不上说明本实验的模型跑偏了。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum SlotMap {
@@ -170,6 +170,7 @@ struct RecoveryOutcome {
 /// * `stale` —— 断点之后时间线 A 留下的、校验和完好的记录条数
 /// * `new_after` —— 恢复之后时间线 B 写成的记录条数
 /// * `old_record_length` / `new_record_length` —— 旧 / 新记录各占几个位置
+#[allow(clippy::too_many_arguments, reason = "这些参数是这一次计算彼此独立的输入，合成只用一次的结构体只多一层包装")]
 fn run(
     slot_map: SlotMap,
     resume: Resume,
@@ -236,7 +237,7 @@ fn run(
     let resume_position = match slot_map {
         // 没有 `_ =>`
         // 位置是序号的函数 ⇒ 由 resume_jsn 决定
-        SlotMap::ByJsn => ((resume_jsn - tail_jsn) as usize * old_record_length) % slots,
+        SlotMap::ByJsn => (usize_from_u64(resume_jsn - tail_jsn) * old_record_length) % slots,
         // 位置由游标顺序推进 ⇒ 回退到断点位置（jbd2 的 `j_head = info.head_block`）
         SlotMap::Decoupled => hole_position,
     };

@@ -23,11 +23,11 @@
 //!   ⇒ **索引节点是 16 KiB（D8 已定项 2）且按 16384 对齐 ⇒ 半数索引节点不在 32768 边界上。**
 //!   E86 实测：64 MiB 区域 998 个节点里 **496 个落在奇数 16 KiB 槽**。
 //!   - **D5 已定项 2 的骑手条款（由 D16 已定项 6 收口）逐字**：
-//!   「**代按发布走，不按 5 秒窗口走**……代段宽度 **≥ 48 位**
-//!   （2785 发布/秒下 32 位 17.8 天回绕，E71 的宽度算术要按此重算）」。
-//!   发布率 2785/秒来自 E44 本机实测。
-//!   ⚠️ 回绕期按发布率算：按 `T_time` = 5 s 算会**差约 14000 倍**，
-//!   而正确口径就写在被引条款自己的正上方。**「代 ≥ 48 位」是已定条款，不是本实验的发现。**
+//!     「**代按发布走，不按 5 秒窗口走**……代段宽度 **≥ 48 位**
+//!     （2785 发布/秒下 32 位 17.8 天回绕，E71 的宽度算术要按此重算）」。
+//!     发布率 2785/秒来自 E44 本机实测。
+//!     ⚠️ 回绕期按发布率算：按 `T_time` = 5 s 算会**差约 14000 倍**，
+//!     而正确口径就写在被引条款自己的正上方。**「代 ≥ 48 位」是已定条款，不是本实验的发现。**
 //! - **D8 write buffer 硬要求 3 逐字**：「**条目必须自带序号（seq），这是格式要求**」。
 //!   ⚠️ 段清单里必须有 seq，
 //!   而判据 2 只查已列出的段 ⇒ 漏掉一整段是它的盲区。判据 9 就是补这个。
@@ -72,8 +72,8 @@
 //!    **判据 2 只查已列出的段，漏掉一整段它一个字也说不出来**——
 //!    例如 D8 write buffer 硬要求 3 的 `seq`。
 //! 10. **预算按脏节点算，不按条目字节算**：记账树按 COW 挂在根下（D5 已定项 3 第 4 条）
-//!    ⇒ 一条几十字节的插入要脏一个完整的 16 KiB 节点。判据 4 数脏叶：按条目字节量会
-//!    **系统性低估**。
+//!     ⇒ 一条几十字节的插入要脏一个完整的 16 KiB 节点。判据 4 数脏叶：按条目字节量会
+//!     **系统性低估**。
 //!
 //! ## 失败条款（跑前写死）
 //!
@@ -92,7 +92,7 @@
 //! **确定性模型**：同一个二进制跑 N 遍必然逐字节相同 ⇒ N 轮说明的是没有隐藏状态，
 //! 不是统计上稳定；证据强度来自判据 1 的绝对值断言与变异测试。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{u32_from_u64, usize_from_u64_in_const, Emitter};
 
 /// D8 已定项 2：节点 16 KiB。**格式常量**。
 const NODE_BYTES: u64 = 16384;
@@ -161,7 +161,7 @@ fn capacity(bytes: u64) -> u128 {
     if bytes >= 16 {
         return u128::MAX;
     }
-    1u128 << (8 * bytes as u32)
+    1u128 << (8 * u32_from_u64(bytes))
 }
 
 fn coverage(segment: &Segment) -> Coverage {
@@ -330,7 +330,7 @@ struct Statistic {
     per_device: bool,
     per_tree_narrow: bool,
 }
-const STATISTICS_TABLE: [Statistic; STATISTIC_COUNT as usize] = [
+const STATISTICS_TABLE: [Statistic; usize_from_u64_in_const(STATISTIC_COUNT)] = [
     Statistic { per_device: true,  per_tree_narrow: false }, // 1 已分配字节
     Statistic { per_device: true,  per_tree_narrow: false }, // 2 空闲字节
     Statistic { per_device: true,  per_tree_narrow: false }, // 3 不可回收字节
@@ -501,6 +501,7 @@ fn main() {
     // (名字, dev 宽, 偏移宽, 按槽号编码, 编码粒度, 代宽, 跨度段宽, 一条记一个单元)
     // ⚠️ **粒度是参数**：硬编成 32768 的话，
     // 提案采纳的 16 KiB 那条编码就没有一条完整的臂。
+    #[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
     let allocation_arms: [(&str, u64, u64, bool, u64, u64, u64, bool); 7] = [
         ("alloc_ptrcoord_15B",  1, 6, false, DATA_UNIT_BYTES, 8, 0, false),
         ("alloc_e74_20B",       4, 8, false, DATA_UNIT_BYTES, 8, 0, false),
@@ -922,7 +923,7 @@ mod tests {
         // ⇒ 5×8192×64 + 6×8192 = 2621440 + 49152 = 2670592，一写一删 ⇒ ×2
         assert_eq!(touched, 5_341_184);
         assert_eq!(ACCOUNTING_WRITE_BUDGET_BYTES / touched, 4, "21474836 / 5341184 = 4.02… ⇒ 4");
-        assert!(4 < ACCOUNTING_VALUE_BYTES, "条目连 value 都装不下 ⇒ 无可行 key 宽度");
+        assert!(std::hint::black_box(4 < ACCOUNTING_VALUE_BYTES), "条目连 value 都装不下 ⇒ 无可行 key 宽度");
         // 窄读同一格照样可行
         let narrow = accounting_entries(8192, 64, 1, false) * 2;
         // 手算：窄读 ⇒ 只有第 8、9 项按树分（2×8192）、5 项带设备维（5×64）、

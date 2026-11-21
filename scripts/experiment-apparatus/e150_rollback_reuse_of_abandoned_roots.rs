@@ -20,12 +20,13 @@
 //! mkfs 把实例表单元放在单元区最高的槽（让锚点的编号照跑前登记走）；journal 记录不占单元槽；
 //! 空发布只写记录与根；单元的「内容」就是写者的身份，不建校验和——覆写即可判。
 
+use e7_index_bench::{u32_from_usize, usize_from_u64, usize_from_u64_in_const};
 use e7_index_bench::Emitter;
 use std::collections::{BTreeMap, BTreeSet};
 
 const RING_REGIONS: u64 = 3;
 const RING_SLOTS_PER_REGION: u64 = 4;
-const RING_CAPACITY: usize = (RING_REGIONS * RING_SLOTS_PER_REGION) as usize;
+const RING_CAPACITY: usize = usize_from_u64_in_const(RING_REGIONS * RING_SLOTS_PER_REGION);
 const UNIT_SLOTS: usize = 32;
 const DIRTY_UNITS_PER_PUBLISH: usize = 1;
 const INITIAL_DATA_UNITS: usize = 3;
@@ -36,7 +37,7 @@ const FOLLOW_UP_PUBLISHES_MAXIMUM: u64 = 12;
 
 /// 根槽在环里的编号：区域 = txg mod R，槽 = (txg div R) mod S（D22 已定项 2 的跨区轮转）。
 fn ring_slot_for(txg: u64) -> usize {
-    ((txg % RING_REGIONS) * RING_SLOTS_PER_REGION + (txg / RING_REGIONS) % RING_SLOTS_PER_REGION) as usize
+    usize_from_u64((txg % RING_REGIONS) * RING_SLOTS_PER_REGION + (txg / RING_REGIONS) % RING_SLOTS_PER_REGION)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -184,7 +185,7 @@ impl RecoveryOutcome {
 /// 最新可读的根 + 它自己指的实例表判它有效 ⇒ 选它；实例表单元被覆写的根自证不过、跳过。
 fn recover(disk: &Disk, tables: &[InstanceTable]) -> RecoveryOutcome {
     let mut candidates = disk.readable_roots();
-    candidates.sort_by(|left, right| (right.txg, right.instance).cmp(&(left.txg, left.instance)));
+    candidates.sort_by_key(|left| std::cmp::Reverse((left.txg, left.instance)));
     for candidate in candidates {
         let table_content = disk.units[candidate.instance_table_slot];
         let table = match table_content {
@@ -331,7 +332,7 @@ impl Model {
         let mut references = self.current.references.clone();
         let (instance_table_slot, instance_table) = match new_instance_table {
             Some(table) => {
-                let table_identifier = self.tables.len() as u32;
+                let table_identifier = u32_from_usize(self.tables.len());
                 self.tables.push(table);
                 // 回退的判定（哪些根被抛弃）从这一刻起对分配器生效；表单元的槽号随后才定
                 self.current.instance_table = table_identifier;
@@ -489,7 +490,7 @@ fn run_case_one(arm: Arm) -> CaseOneOutcome {
     for _ in 0..NORMAL_PUBLISHES_BEFORE_ROLLBACK {
         roots.push(model.publish(DIRTY_UNITS_PER_PUBLISH, None));
     }
-    let target = roots[ROLLBACK_TARGET_TXG as usize].clone();
+    let target = roots[usize_from_u64(ROLLBACK_TARGET_TXG)].clone();
     let base = model.disk.clone();
     model.operations.clear();
     model.rollback_to(&target, DIRTY_UNITS_PER_PUBLISH);
@@ -515,7 +516,7 @@ fn model_after_rollback(arm: Arm, warm_up: bool, follow_up_publishes: u64) -> (M
     for _ in 0..NORMAL_PUBLISHES_BEFORE_ROLLBACK {
         roots.push(model.publish(DIRTY_UNITS_PER_PUBLISH, None));
     }
-    let target = roots[ROLLBACK_TARGET_TXG as usize].clone();
+    let target = roots[usize_from_u64(ROLLBACK_TARGET_TXG)].clone();
     let abandoned_identities: BTreeSet<u32> = roots.iter().filter(|root| root.txg > target.txg).map(|root| root.identity).collect();
     let rollback_root = model.rollback_to(&target, DIRTY_UNITS_PER_PUBLISH);
     let rollback_instance = rollback_root.instance;
@@ -896,7 +897,7 @@ mod tests {
         let without = run_case_two(Arm::Baseline, false, 0);
         let with = run_case_two(Arm::Baseline, true, 0);
         assert_eq!(without.faults_injected, 1);
-        assert_eq!(with.faults_injected, 1 + WARM_UP_EMPTY_PUBLISHES_MAXIMUM as usize);
+        assert_eq!(with.faults_injected, 1 + usize_from_u64(WARM_UP_EMPTY_PUBLISHES_MAXIMUM));
     }
 
     /// 实例表判无效的根被跳过：给 txg 5 的根所属实例写一行 (实例, 3, 0)，恢复退到 txg 3。
@@ -920,7 +921,7 @@ mod tests {
             for _ in 0..NORMAL_PUBLISHES_BEFORE_ROLLBACK {
                 roots.push(model.publish(DIRTY_UNITS_PER_PUBLISH, None));
             }
-            let rollback_root = model.rollback_to(&roots[ROLLBACK_TARGET_TXG as usize].clone(), DIRTY_UNITS_PER_PUBLISH);
+            let rollback_root = model.rollback_to(&roots[usize_from_u64(ROLLBACK_TARGET_TXG)].clone(), DIRTY_UNITS_PER_PUBLISH);
             assert_eq!(rollback_root.txg, NORMAL_PUBLISHES_BEFORE_ROLLBACK + 1, "新根 txg = 环里最大 + 1");
             let outcome = recover(&model.disk, &model.tables);
             assert_eq!(outcome.chosen.as_ref().map(|root| root.identity), Some(rollback_root.identity), "{:?}", arm);
@@ -936,7 +937,7 @@ mod tests {
         for _ in 0..NORMAL_PUBLISHES_BEFORE_ROLLBACK {
             roots.push(model.publish(DIRTY_UNITS_PER_PUBLISH, None));
         }
-        model.rollback_to(&roots[ROLLBACK_TARGET_TXG as usize].clone(), DIRTY_UNITS_PER_PUBLISH);
+        model.rollback_to(&roots[usize_from_u64(ROLLBACK_TARGET_TXG)].clone(), DIRTY_UNITS_PER_PUBLISH);
         assert_eq!(model.tombstone_writes, 2);
         for txg in [4u64, 5] {
             assert_eq!(model.disk.ring[ring_slot_for(txg)], RingSlot::Tombstone);

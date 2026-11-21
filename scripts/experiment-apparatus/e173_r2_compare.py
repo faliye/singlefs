@@ -29,7 +29,7 @@ from project_preflight import preflight  # noqa: E402
 
 REPO = os.path.realpath(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", ".."))
 STORED_PATH = os.path.join(REPO, "research/results/e173-checkpoint-cost-against-empty-publish-cost-2026-11-02.out")
-SOURCE_PATH = os.path.join(REPO, "scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions.rs")
+SOURCE_PATH = os.path.join(REPO, "scripts/experiment-apparatus/e173_admission_ceiling_bad_ring_slot_dispositions/checkpoint_cost_reserve_mode.rs")
 # 登记第四节第 3 条：留存产物
 STORED_SHA256 = "85bed2435162a532566e64a1fc73bcaf4ab1f8c6a26b1b7a03c76135c89b07d9"
 STORED_LINES = 3523

@@ -61,7 +61,7 @@
 //! 而后者取决于 D19 已定项 6（中央映射条目的 key 编码）——若 key 以树 ID 领头，
 //! 沿 key 序走一次只碰一棵树，那个乘数就是 1；D19 已定项 6 定成按类复用写序键（类标签之后以出生树打头），这一格按它重算没做。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 const UNIT_BYTES: u64 = 32768;
 const PACKED_UNIT_HEADER_BYTES: u64 = 107;
@@ -92,11 +92,11 @@ fn geometric_tiers(ratio_in_thousandths: u64) -> Vec<u64> {
 }
 
 fn weights(distribution: &str) -> Vec<u64> {
-    let mut weight_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    let mut weight_by_object_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
     match distribution {
-        "uniform" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_object_size[object_size as usize] = 1; } }
-        "logunif" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_object_size[object_size as usize] = PACKING_LIMIT_BYTES / object_size; } }
-        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_object_size[object_size as usize] = 1; } }
+        "uniform" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_object_size[usize_from_u64(object_size)] = 1; } }
+        "logunif" => { for object_size in 1..=PACKING_LIMIT_BYTES { weight_by_object_size[usize_from_u64(object_size)] = PACKING_LIMIT_BYTES / object_size; } }
+        "discrete" => { for object_size in [512u64, 1024, 4096] { weight_by_object_size[usize_from_u64(object_size)] = 1; } }
         _ => {}
     }
     weight_by_object_size
@@ -105,10 +105,10 @@ fn weights(distribution: &str) -> Vec<u64> {
 fn counts(distribution: &str, object_count: u64) -> Vec<u64> {
     let weight_by_object_size = weights(distribution);
     let total_weight: u64 = weight_by_object_size.iter().sum();
-    if total_weight == 0 || object_count == 0 { return vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize]; }
-    let mut count_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
+    if total_weight == 0 || object_count == 0 { return vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)]; }
+    let mut count_by_object_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
     let (mut assigned_object_count, mut last_nonzero_object_size) = (0u64, 0usize);
-    for object_size in 1..=PACKING_LIMIT_BYTES as usize {
+    for object_size in 1..=usize_from_u64(PACKING_LIMIT_BYTES) {
         if weight_by_object_size[object_size] == 0 { continue; }
         count_by_object_size[object_size] = object_count * weight_by_object_size[object_size] / total_weight; assigned_object_count += count_by_object_size[object_size]; last_nonzero_object_size = object_size;
     }
@@ -120,7 +120,7 @@ fn containers_tiered(tier_widths: &[u64], count_by_object_size: &[u64]) -> u64 {
     let mut total_containers = 0u64;
     for (tier_index, &slot_width) in tier_widths.iter().enumerate() {
         let tier_smallest_object_size = if tier_index == 0 { 1 } else { tier_widths[tier_index - 1] + 1 };
-        let objects_in_tier: u64 = (tier_smallest_object_size..=slot_width).map(|object_size| count_by_object_size[object_size as usize]).sum();
+        let objects_in_tier: u64 = (tier_smallest_object_size..=slot_width).map(|object_size| count_by_object_size[usize_from_u64(object_size)]).sum();
         if objects_in_tier > 0 { total_containers += objects_in_tier.div_ceil(slots_per_container(slot_width).max(1)); }
     }
     total_containers
@@ -130,7 +130,7 @@ fn containers_variable_length(count_by_object_size: &[u64]) -> u64 {
     let (mut container_count, mut remaining_payload_bytes) = (0u64, 0u64);
     for object_size in 1..=PACKING_LIMIT_BYTES {
         let bytes_per_slot = object_size + SLOT_EXTRA_BYTES;
-        let mut objects_left = count_by_object_size[object_size as usize];
+        let mut objects_left = count_by_object_size[usize_from_u64(object_size)];
         while objects_left > 0 {
             if remaining_payload_bytes < bytes_per_slot { container_count += 1; remaining_payload_bytes = UNIT_PAYLOAD_BYTES; }
             let objects_fitting = (remaining_payload_bytes / bytes_per_slot).min(objects_left);
@@ -170,8 +170,8 @@ fn main() {
     for &ratio_in_thousandths in RATIOS.iter() {
         let tier_widths = geometric_tiers(ratio_in_thousandths);
         for &slot_width in tier_widths.iter() {
-            let mut count_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
-            count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+            let mut count_by_object_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
+            count_by_object_size[usize_from_u64(slot_width)] = OBJECT_COUNT;
             let variable_length_containers = containers_variable_length(&count_by_object_size);
             let tiered_containers = containers_tiered(&tier_widths, &count_by_object_size);
             println!("{}", emitter.emit_raw(&format!(
@@ -240,8 +240,8 @@ mod tests {
         for &ratio_in_thousandths in RATIOS.iter() {
             let tier_widths = geometric_tiers(ratio_in_thousandths);
             for &slot_width in tier_widths.iter() {
-                let mut count_by_object_size = vec![0u64; (PACKING_LIMIT_BYTES + 1) as usize];
-                count_by_object_size[slot_width as usize] = OBJECT_COUNT;
+                let mut count_by_object_size = vec![0u64; usize_from_u64(PACKING_LIMIT_BYTES + 1)];
+                count_by_object_size[usize_from_u64(slot_width)] = OBJECT_COUNT;
                 assert_eq!(containers_tiered(&tier_widths, &count_by_object_size), containers_variable_length(&count_by_object_size),
                            "r={ratio_in_thousandths} 档宽={slot_width}");
             }

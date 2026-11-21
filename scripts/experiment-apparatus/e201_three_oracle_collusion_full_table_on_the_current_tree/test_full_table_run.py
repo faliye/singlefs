@@ -83,7 +83,7 @@ class RequestTests(unittest.TestCase):
         快照摘要、变异表与各文件的 sha256 不进请求（闭包代替它们）。"""
         tokens = run.row_request_lines(TREE, run.RowInput(15, "15\t1\tcrates/a/src/lib.rs", "m15", ""))[0].split("\t")
         self.assertEqual(tokens[:2], ["row-15", run.DEVICE_ENTRY])
-        for token in ("feature:singlefs-verification/gpu", "profile:release", f"judge:{run.ROW_JUDGE}", f"judge-root:{run.REPOSITORY_ROOT}", "line:row=15",
+        for token in ("feature:singlefs-implementation-experiments/gpu", "profile:release", f"judge:{run.ROW_JUDGE}", f"judge-root:{run.REPOSITORY_ROOT}", "line:row=15",
                       'line:list-line="15\\t1\\tcrates/a/src/lib.rs"', "line:device-arguments=row --streams 1,2", "line:judging-route=gpu",
                       f"line:o3-freeze={'d' * 64}", "line:compare=timing"):
             self.assertIn(token, tokens)
@@ -398,18 +398,43 @@ def paths_not_covered_by(paths, entries) -> list[str]:
     return sorted(path for path in paths if not any(path == entry or path.startswith(entry + "/") for entry in entries))
 
 
+def is_the_repository_root_itself(resolved: str) -> bool:
+    """解出来恰是仓根自身（`.`，`concat!(env!("CARGO_MANIFEST_DIR"), "/../..")` 这种从包目录往上数两层的写法）：它是个目录、不是一份要拷的文件，
+    它下面被读的文件各自要被罩住，所以这一条不要求被 SYNCED_ENTRIES 罩住。"""
+    return resolved == "."
+
+
+def paths_to_synchronize(named: dict[str, list[str]]) -> list[str]:
+    """扫到的路径里要被 SYNCED_ENTRIES 罩住的：去掉仓根自身，别的（含以点起头的目录与文件）一条不少。"""
+    return sorted(path for path in named if not is_the_repository_root_itself(path))
+
+
+def origins_of_the_repository_root_without_the_manifest_directory(repository_root: str, named: dict[str, list[str]]) -> list[str]:
+    """仓根自身的每条出处（文件:行）所在那一行的文本里要有 CARGO_MANIFEST_DIR（cargo 给的包目录往上数的写法）；没有的出处交回。"""
+    without_it = []
+    for origin in named.get(".", []):
+        file_name, line_number = origin.rsplit(":", 1)
+        with open(os.path.join(repository_root, file_name), encoding="utf-8", errors="replace") as handle:
+            line = handle.read().splitlines()[int(line_number) - 1]
+        if "CARGO_MANIFEST_DIR" not in line:
+            without_it.append(origin)
+    return without_it
+
+
 class RepositoryRootReferenceTests(unittest.TestCase):
     """登记修订 6：计划拷树与线道树同步罩住 crates 编、跑时读的仓根文件（任务 5606 第 0 片停在 S6：拷出的树里没有 .claude/heavy-thread-default）。"""
 
     def test_every_repository_root_path_the_crates_name_outside_test_code_is_copied_and_synchronized(self):
-        """读真仓：crates 非测试代码里 `../` 起头的字面路径解到仓根下的，都在两份 SYNCED_ENTRIES 罩住的范围里。"""
+        """读真仓：crates 非测试代码里 `../` 起头的字面路径解到仓根下的，都在两份 SYNCED_ENTRIES 罩住的范围里；
+        解到仓根自身的（从包目录往上数两层）除外，它的每条出处所在行要带 CARGO_MANIFEST_DIR。"""
         import current_tree_row_driver as driver
         named = repository_root_paths_named_outside_test_code(run.REPOSITORY_ROOT)
         # 判例（免得扫法失效时空过）：编译期 include_str! 那一份与运行期起的多机配置判法都扫得到
         self.assertIn(".claude/heavy-thread-default", named)
         self.assertIn("scripts/crash/crash-point-replay-shard-configuration-check.sh", named)
-        self.assertEqual(paths_not_covered_by(named, run.SYNCED_ENTRIES), [], named)
-        self.assertEqual(paths_not_covered_by(named, driver.SYNCED_ENTRIES), [], named)
+        self.assertEqual(paths_not_covered_by(paths_to_synchronize(named), run.SYNCED_ENTRIES), [], named)
+        self.assertEqual(paths_not_covered_by(paths_to_synchronize(named), driver.SYNCED_ENTRIES), [], named)
+        self.assertEqual(origins_of_the_repository_root_without_the_manifest_directory(run.REPOSITORY_ROOT, named), [], named)
 
     def test_every_file_the_named_shell_scripts_source_or_run_is_copied_and_synchronized(self):
         """读真仓：上一条扫到的 shell 脚本传递地 source、起的仓内文件，都在两份 SYNCED_ENTRIES 罩住的范围里。"""
@@ -471,6 +496,40 @@ class RepositoryRootReferenceTests(unittest.TestCase):
             named = repository_root_paths_named_outside_test_code(root)
         self.assertEqual(sorted(named), [".cargo/after-the-tests.toml", ".claude/registered-number", "Cargo.lock", "scripts/check.sh"])
         self.assertEqual(named[".claude/registered-number"], ["crates/alpha/src/lib.rs:4"])
+
+    def test_the_repository_root_itself_is_let_through_and_needs_no_copy(self):
+        """从包目录往上数两层的写法解到仓根自身：扫得到，但不要求被 SYNCED_ENTRIES 罩住。"""
+        with tempfile.TemporaryDirectory() as root:
+            write_file(os.path.join(root, "crates", "alpha", "Cargo.toml"), "[package]\n")
+            write_file(os.path.join(root, "crates", "alpha", "src", "lib.rs"), 'pub const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");\n')
+            named = repository_root_paths_named_outside_test_code(root)
+        self.assertEqual(sorted(named), ["."])
+        self.assertEqual(paths_not_covered_by(paths_to_synchronize(named), ()), [])
+
+    def test_a_file_below_the_repository_root_is_still_reported_next_to_the_root_itself(self):
+        """仓根自身的放行不波及它下面的文件：`scripts/` 下的与以点起头的目录下的都照旧要被罩住，罩不住的照旧报。"""
+        with tempfile.TemporaryDirectory() as root:
+            write_file(os.path.join(root, "crates", "alpha", "Cargo.toml"), "[package]\n")
+            write_file(os.path.join(root, "crates", "alpha", "src", "lib.rs"), "\n".join((
+                'pub const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");',
+                'pub const SCRIPT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/not_copied.sh");',
+                'pub const HIDDEN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../.claude/not_copied");',
+            )) + "\n")
+            named = repository_root_paths_named_outside_test_code(root)
+        self.assertEqual(sorted(named), [".", ".claude/not_copied", "scripts/not_copied.sh"])
+        self.assertEqual(paths_not_covered_by(paths_to_synchronize(named), ("Cargo.toml",)), [".claude/not_copied", "scripts/not_copied.sh"])
+
+    def test_the_repository_root_itself_stays_in_what_the_scan_returns_and_needs_the_manifest_directory_on_its_line(self):
+        """仓根自身不被扫描吞掉，每条出处都可见；出处所在行没有 CARGO_MANIFEST_DIR 的（不是从包目录往上数的写法）另报。"""
+        with tempfile.TemporaryDirectory() as root:
+            write_file(os.path.join(root, "crates", "alpha", "Cargo.toml"), "[package]\n")
+            write_file(os.path.join(root, "crates", "alpha", "src", "lib.rs"), 'pub const ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../..");\n')
+            write_file(os.path.join(root, "crates", "beta", "Cargo.toml"), "[package]\n")
+            write_file(os.path.join(root, "crates", "beta", "src", "lib.rs"), 'pub fn up() -> &\'static str { "../.." }\n')
+            named = repository_root_paths_named_outside_test_code(root)
+            without_it = origins_of_the_repository_root_without_the_manifest_directory(root, named)
+        self.assertEqual(named["."], ["crates/alpha/src/lib.rs:1", "crates/beta/src/lib.rs:1"])
+        self.assertEqual(without_it, ["crates/beta/src/lib.rs:1"])
 
     def test_the_shell_follow_collects_sourced_and_run_files_transitively_and_skips_comments_and_missing_paths(self):
         with tempfile.TemporaryDirectory() as root:

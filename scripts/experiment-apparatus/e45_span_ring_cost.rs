@@ -33,14 +33,14 @@ impl Ring {
     /// 摆一条带 `items` 个点名项的记录，返回摆完之后游标在哪。
     fn place_record(&mut self, items: u64) {
         // 头要落进一个单元 ⇒ 从单元边界开始
-        if self.cursor % self.atomic_unit_bytes != 0 {
+        if !self.cursor.is_multiple_of(self.atomic_unit_bytes) {
             self.cursor += self.atomic_unit_bytes - self.cursor % self.atomic_unit_bytes;
         }
         self.cursor += record_header_bytes() + items * NAMED_ITEM_BYTES;
     }
     /// 一个事务摆完之后，它一共吃掉了环里多少字节（含尾部对齐到单元）。
     fn finish(&mut self) -> u64 {
-        if self.cursor % self.atomic_unit_bytes != 0 {
+        if !self.cursor.is_multiple_of(self.atomic_unit_bytes) {
             self.cursor += self.atomic_unit_bytes - self.cursor % self.atomic_unit_bytes;
         }
         self.cursor

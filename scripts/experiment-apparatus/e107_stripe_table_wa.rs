@@ -32,6 +32,7 @@
 //! 不答镜像两份落在不同盘对乙臂延迟的干扰（只测单盘）；空间效率那一维**不进判据**
 //! （`.claude/rules/fs-design.md`「比谁省不构成任何判据」）。
 
+use e7_index_bench::{i64_from_u64, u64_from_nanoseconds, usize_from_u64};
 use e7_index_bench::{Emitter, Sample};
 use std::io::Write;
 use std::time::Instant;
@@ -224,6 +225,8 @@ mod device {
     use std::os::unix::fs::OpenOptionsExt;
     use std::os::unix::io::AsRawFd;
 
+    use e7_index_bench::{i64_from_u64, usize_from_isize};
+
     pub const ALIGNMENT_BYTES: usize = 4096;
 
     /// 4096 对齐的缓冲，O_DIRECT 要求。
@@ -234,17 +237,20 @@ mod device {
     impl AlignedBuffer {
         pub fn new(length_bytes: usize) -> Self {
             let layout = std::alloc::Layout::from_size_align(length_bytes, ALIGNMENT_BYTES).unwrap();
+            // SAFETY: `layout` 由 `Layout::from_size_align` 校验过；`alloc_zeroed` 要求布局大小非零，调用处传的都是正的整块长度。
             let pointer = unsafe { std::alloc::alloc_zeroed(layout) };
             assert!(!pointer.is_null(), "alloc_zeroed 失败");
             AlignedBuffer { pointer, length_bytes }
         }
         pub fn as_slice(&self) -> &[u8] {
+            // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_bytes` 字节，构造时用 `alloc_zeroed` 清零；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
             unsafe { std::slice::from_raw_parts(self.pointer, self.length_bytes) }
         }
     }
     impl Drop for AlignedBuffer {
         fn drop(&mut self) {
             let layout = std::alloc::Layout::from_size_align(self.length_bytes, ALIGNMENT_BYTES).unwrap();
+            // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局，`drop` 只跑一次，之后没有别的引用。
             unsafe { std::alloc::dealloc(self.pointer, layout) };
         }
     }
@@ -267,12 +273,13 @@ mod device {
     pub fn pwrite_all(file: &File, buffer: &[u8], offset_bytes: u64) -> io::Result<()> {
         let mut bytes_written = 0usize;
         while bytes_written < buffer.len() {
+            // SAFETY: `buffer.as_ptr().add(bytes_written)` 落在 `buffer` 之内，剩余长度 `buffer.len() - bytes_written` 不越界；fd 来自还开着的 `File`，`pwrite` 只读这块内存。
             let bytes_written_this_call = unsafe {
                 pwrite_raw(
                     file.as_raw_fd(),
                     buffer.as_ptr().add(bytes_written) as *const core::ffi::c_void,
                     buffer.len() - bytes_written,
-                    (offset_bytes + bytes_written as u64) as i64,
+                    i64_from_u64(offset_bytes + bytes_written as u64),
                 )
             };
             if bytes_written_this_call < 0 {
@@ -281,7 +288,7 @@ mod device {
             if bytes_written_this_call == 0 {
                 return Err(io::Error::other("pwrite 返回 0"));
             }
-            bytes_written += bytes_written_this_call as usize;
+            bytes_written += usize_from_isize(bytes_written_this_call);
         }
         Ok(())
     }
@@ -299,6 +306,7 @@ mod device {
     }
 
     pub fn fdatasync(file: &File) -> io::Result<()> {
+        // SAFETY: fd 来自还开着的 `File`；`fdatasync` 不碰任何 Rust 内存。
         let return_code = unsafe { fdatasync_raw(file.as_raw_fd()) };
         if return_code != 0 {
             return Err(io::Error::last_os_error());
@@ -382,7 +390,7 @@ fn main() {
     }
     output_text.push_str(&emitter.emit_raw(&format!(
         "name=crossover first_leaves_where_arm_a_cheaper={} main_workload_leaves={}",
-        crossover_leaf_count.map(|crossover_leaves| crossover_leaves as i64).unwrap_or(-1),
+        crossover_leaf_count.map(i64_from_u64).unwrap_or(-1),
         MAIN_LEAVES
     )));
     output_text.push('\n');
@@ -425,9 +433,9 @@ fn main() {
         let path = format!("{temporary_directory}/e107-latency.img");
         match device::open_direct(&path) {
             Ok(latency_file) => {
-                let data_buffer = device::AlignedBuffer::new((MAIN_LEAVES * DATA_UNIT_SIZE_BYTES) as usize);
-                let parity_buffer = device::AlignedBuffer::new((3 * DATA_UNIT_SIZE_BYTES) as usize);
-                let container_buffer = device::AlignedBuffer::new(DATA_UNIT_SIZE_BYTES as usize);
+                let data_buffer = device::AlignedBuffer::new(usize_from_u64(MAIN_LEAVES * DATA_UNIT_SIZE_BYTES));
+                let parity_buffer = device::AlignedBuffer::new(usize_from_u64(3 * DATA_UNIT_SIZE_BYTES));
+                let container_buffer = device::AlignedBuffer::new(usize_from_u64(DATA_UNIT_SIZE_BYTES));
                 let rounds = 5;
 
                 // 预热：文件是新建的，第一次写要走首触分配，那一轮的耗时不是被测量。
@@ -453,10 +461,10 @@ fn main() {
                         if is_durable_semantics {
                             device::fdatasync(&latency_file).unwrap();
                         }
-                        one_shot.push(start_instant.elapsed().as_nanos() as u64);
+                        one_shot.push(u64_from_nanoseconds(start_instant.elapsed().as_nanos()));
 
                         // 走法二：先数据 + parity，等完成，再记录容器，再等完成。
-                        let start_instant = Instant::now();
+                        let staged_commit_start_instant = Instant::now();
                         device::pwrite_all(&latency_file, data_buffer.as_slice(), 0).unwrap();
                         device::pwrite_all(&latency_file, parity_buffer.as_slice(), 1 << 20).unwrap();
                         if is_durable_semantics {
@@ -466,10 +474,10 @@ fn main() {
                         if is_durable_semantics {
                             device::fdatasync(&latency_file).unwrap();
                         }
-                        two_phase.push(start_instant.elapsed().as_nanos() as u64);
+                        two_phase.push(u64_from_nanoseconds(staged_commit_start_instant.elapsed().as_nanos()));
 
                         // 阳性对照：同一条路径里插一个已知 5 ms。
-                        let start_instant = Instant::now();
+                        let known_delay_start_instant = Instant::now();
                         device::pwrite_all(&latency_file, data_buffer.as_slice(), 0).unwrap();
                         device::pwrite_all(&latency_file, parity_buffer.as_slice(), 1 << 20).unwrap();
                         if is_durable_semantics {
@@ -480,7 +488,7 @@ fn main() {
                         if is_durable_semantics {
                             device::fdatasync(&latency_file).unwrap();
                         }
-                        two_phase_sleep.push(start_instant.elapsed().as_nanos() as u64);
+                        two_phase_sleep.push(u64_from_nanoseconds(known_delay_start_instant.elapsed().as_nanos()));
                     }
                     let median_nanoseconds = |samples: &mut Vec<u64>| {
                         samples.sort_unstable();
@@ -496,7 +504,7 @@ fn main() {
                     let median_one_shot_nanoseconds = median_nanoseconds(&mut one_shot);
                     let median_two_phase_nanoseconds = median_nanoseconds(&mut two_phase);
                     let median_two_phase_with_sleep_nanoseconds = median_nanoseconds(&mut two_phase_sleep);
-                    let injected_recovered_nanoseconds = median_two_phase_with_sleep_nanoseconds as i64 - median_two_phase_nanoseconds as i64;
+                    let injected_recovered_nanoseconds = i64_from_u64(median_two_phase_with_sleep_nanoseconds) - i64_from_u64(median_two_phase_nanoseconds);
                     let semantics_label = if is_durable_semantics { "durable" } else { "ack" };
                     output_text.push_str(&emitter.emit_raw(&format!(
                         "name=latency semantics={semantics_label} rounds={rounds} one_shot_ns={median_one_shot_nanoseconds} two_phase_ns={median_two_phase_nanoseconds} \
@@ -509,12 +517,12 @@ fn main() {
                 // 对照：不带 O_DIRECT、不 fdatasync 的那条路必须快一个数量级。
                 let plain_path = format!("{temporary_directory}/e107-nosync.img");
                 if let Ok(mut plain_file) = std::fs::File::create(&plain_path) {
-                    let plain_buffer = vec![0u8; (MAIN_LEAVES * DATA_UNIT_SIZE_BYTES) as usize];
+                    let plain_buffer = vec![0u8; usize_from_u64(MAIN_LEAVES * DATA_UNIT_SIZE_BYTES)];
                     let start_instant = Instant::now();
                     for _ in 0..5 {
                         plain_file.write_all(&plain_buffer).unwrap();
                     }
-                    let per_round_nanoseconds = start_instant.elapsed().as_nanos() as u64 / 5;
+                    let per_round_nanoseconds = u64_from_nanoseconds(start_instant.elapsed().as_nanos()) / 5;
                     output_text.push_str(&emitter.emit_raw(&format!("name=nosync_control per_round_ns={per_round_nanoseconds}")));
                     output_text.push('\n');
                     let _ = std::fs::remove_file(&plain_path);
@@ -629,7 +637,7 @@ mod tests {
         let stripe_table_arm = publish_on_stripe_table_arm(publish, 4, 0, true, 3);
         assert_eq!(stripe_table_arm.data_stripe_width, 2);
         assert_eq!(stripe_table_arm.spine_stripe_width, 4);
-        assert_eq!(stripe_table_arm.parity_bytes, 1 * 32768 + 2 * 16384);
+        assert_eq!(stripe_table_arm.parity_bytes, 32768 + 2 * 16384);
         assert_eq!(stripe_table_arm.with_redundancy(), 102912 + 65536 + 163840);
         assert_eq!(stripe_table_arm.with_redundancy(), 332288);
         assert_eq!(publish_on_full_mirror_arm(publish), 201216);

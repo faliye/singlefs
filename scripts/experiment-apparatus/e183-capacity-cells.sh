@@ -3,7 +3,7 @@
 # run-condition: command bash python3 sha256sum stat cargo
 # task-server-shards: run
 # E183（容量斜率读缓存小盘准入与清扫阈值的代价数）第二段（问题单 H2）的跑法，照第 2 次重跑登记 research/prompts/e183-r2-prereg.md 5.3（X22–X27）：
-#   装置是入库装置 crates/singlefs-verification/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs（bin 同名），一格一轮是装置的一个进程 h2 shard <片名> …；
+#   装置是入库装置 crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs（bin 同名），一格一轮是装置的一个进程 h2 shard <片名> …；
 #   统一任务服务照上面那一行分片声明把 run 拆成计划、各片（一片一轮，5 片）、合并三步（task-server/task_server_lib.py 文件头「分片」）。
 #   任务里不套任何包装：内存上限、哪台机器、线程都归服务（编译的线程读服务交的 CARGO_BUILD_JOBS）；「内存上限之外」由装置读进程高水位、与登记写死的阈值比（X22）。
 #
@@ -150,7 +150,7 @@ prepare_binary_in() {
     own_target=1
   fi
   mkdir -p -- "$run_directory/logs" || return 1
-  CARGO_TARGET_DIR="$target" cargo build --release -p singlefs-verification --bin e183_capacity_read_cache_reserve_and_sweep_costs \
+  CARGO_TARGET_DIR="$target" cargo build --release -p singlefs-implementation-experiments --bin e183_capacity_read_cache_reserve_and_sweep_costs \
     > "$run_directory/logs/build-$$.log" 2>&1
   build_exit=$?
   if ((build_exit == 0)); then

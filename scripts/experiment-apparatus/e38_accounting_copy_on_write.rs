@@ -29,7 +29,7 @@ use std::collections::BTreeSet;
 struct Tree { fanout: u64, height: u32 }
 
 impl Tree {
-    fn leaves(&self) -> u64 { (self.fanout as u64).pow(self.height) }
+    fn leaves(&self) -> u64 { self.fanout.pow(self.height) }
     /// 叶 `leaf` 在第 `level` 层的祖先编号（level = 1 是叶的父，level = height 是根）。
     fn ancestor(&self, leaf: u64, level: u32) -> u64 { leaf / self.fanout.pow(level) }
 }

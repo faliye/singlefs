@@ -14,6 +14,9 @@
 //! ⇒ 对照另设一条**算力受限**的臂：数据只有 L1 那么大、每个元素做一条长依赖链，
 //! 它必须接近线性扩展。它测不出加速才说明 harness 看不见并行度，那时才整轮作废。
 
+#[cfg(test)]
+use e7_index_bench::u64_from_i32;
+use e7_index_bench::u64_from_nanoseconds;
 use e7_index_bench::Emitter;
 use std::sync::Arc;
 use std::time::Instant;
@@ -50,7 +53,7 @@ fn time_xor_scan_in_nanoseconds(shared_words: &Arc<Vec<u64>>, thread_count: usiz
         combined_checksum ^= worker_handle.join().unwrap();
     }
     std::hint::black_box(combined_checksum);
-    start_instant.elapsed().as_nanos() as u64
+    u64_from_nanoseconds(start_instant.elapsed().as_nanos())
 }
 
 /// **阳性对照臂：算力受限。** 每线程做一条长依赖链，内存带宽完全不是瓶颈。
@@ -76,7 +79,7 @@ fn time_compute_bound_chain_in_nanoseconds(thread_count: usize, total_iterations
     let mut combined_chain_state = 0u64;
     for worker_handle in worker_handles { combined_chain_state ^= worker_handle.join().unwrap(); }
     std::hint::black_box(combined_chain_state);
-    start_instant.elapsed().as_nanos() as u64
+    u64_from_nanoseconds(start_instant.elapsed().as_nanos())
 }
 
 fn decimal_gigabytes_per_second(bytes: usize, nanoseconds: u64) -> f64 {
@@ -198,7 +201,7 @@ mod tests {
     /// 分块后各线程的结果异或起来，必须等于整段折叠——否则多线程臂算的不是同一件事。
     #[test]
     fn chunked_fold_equals_whole() {
-        let words: Vec<u64> = (0..100_000).map(|word_index| word_index as u64 * 7 + 3).collect();
+        let words: Vec<u64> = (0..100_000).map(|word_index| u64_from_i32(word_index) * 7 + 3).collect();
         let whole_fold = xor_fold_words(&words);
         for thread_count in [2usize, 3, 8] {
             let mut combined_fold = 0u64;

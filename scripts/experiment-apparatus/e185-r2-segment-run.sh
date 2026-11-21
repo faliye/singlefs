@@ -2,7 +2,7 @@
 # admission: always 整个脚本每次都起：这一段的每一项已有没有判定、键对不对得上由 prune-server 里的按项判定现答（scripts/experiment-apparatus/long_run_item_verdicts.py）
 # run-condition: command cargo python3 git sha256sum findmnt lsblk getconf
 # E185（GC一批搬迁的挂钟拆分）第 2 次重跑一段的跑法（跑前登记 research/prompts/e185-r2-prereg.md 第五节「跑法」）：
-#   写输入清单 → 有项要现判才在这一趟的编译目录（CARGO_TARGET_DIR：派到第二台的，multi-host-run.sh 在第二台本地盘上这一趟新建、跑完删；本机那一支，脚本里的 cargo 不在命令位置上，服务不设，是树里的 target）里编一次装置（crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs，
+#   写输入清单 → 有项要现判才在这一趟的编译目录（CARGO_TARGET_DIR：派到第二台的，multi-host-run.sh 在第二台本地盘上这一趟新建、跑完删；本机那一支，脚本里的 cargo 不在命令位置上，服务不设，是树里的 target）里编一次装置（crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs，
 #   不带 gpu 特性）→ 跑这一段的各项（键相同、库里判绿的取库里的产物，不起装置）→ 产物写进产物目录。三趟先后跑，每趟一条命令，主 agent 在本机仓根起：
 #     task-server/task submit -- env E185_RUN_DATE=<日期> bash scripts/experiment-apparatus/e185-r2-segment-run.sh <段> --disk-model <盘的型号>
 #   这个入口整条交统一任务服务起，派哪台由服务定（records/2026-10-31-task-server巡检.md 问题 94：不登只派一台的表）；两台在同一棵共享的树里跑
@@ -58,7 +58,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")/../.." || { echo "进不去仓根"; echo "→
 SCRIPT_KEY="scripts/experiment-apparatus/e185-r2-segment-run.sh"
 ITEM_VERDICTS="scripts/experiment-apparatus/long_run_item_verdicts.py"   # 按项判定的读写（文件头「按项判定」）
 LIBRARY_KIND="e185_gc_batch_wall_clock_split"                            # 判定库的种类：装置的 bin 名
-APPARATUS_ENTRY="crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs::main"
+APPARATUS_ENTRY="crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs::main"
 
 # 弄坏开关只在自证起的那几趟里认（标记文件在、内容对得上）
 e185_r2_break_is() {
@@ -210,7 +210,7 @@ if [[ "${1:-}" == --selftest ]]; then
   exit $?
 fi
 
-registered_apparatus_sha256=a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082
+registered_apparatus_sha256=0bd2274383f12e88beab3f96f354148698cfcd2043263b5d5709e32e1946784d
 segments=()
 while (($# > 0)) && [[ "$1" != --disk-model ]]; do
   case "$1" in
@@ -245,13 +245,13 @@ e185_r2_settle_memory_cap "$PWD"
 
 for segment in "${segments[@]}"; do
   {
-    sha256sum crates/singlefs-verification/src/bin/e185_gc_batch_wall_clock_split.rs \
+    sha256sum crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split.rs \
       crates/singlefs-core/src/transaction.rs crates/singlefs-core/src/mounted_session.rs crates/singlefs-core/src/region_scan.rs \
       crates/singlefs-core/src/compaction_plan.rs crates/singlefs-core/src/unit.rs crates/singlefs-core/src/checksum.rs \
       crates/singlefs-core/src/block_device.rs crates/singlefs-core/src/allocator.rs crates/singlefs-format/src/lib.rs Cargo.lock
     echo "HEAD $(git rev-parse HEAD 2>/dev/null || echo none)（两台都在主工作区那棵共享的树里跑，同一棵树）"
     echo "点名的盘：型号 $disk_model"
-    cargo tree -p singlefs-verification -e normal,build,features -i singlefs-core --offline
+    cargo tree -p singlefs-implementation-experiments -e normal,build,features -i singlefs-core --offline
     image_device=$(findmnt -no SOURCE --target "$image_directory")
     echo "镜像目录所在盘（lsblk -s，NAME MODEL LOG-SEC）："
     lsblk -s -no NAME,MODEL,LOG-SEC "$image_device"
@@ -278,7 +278,7 @@ product_stem=$product_directory/e185-gc-batch-wall-clock-split
 need_build=0
 for item in "${items[@]}"; do [[ "$(decision_of "$item")" == reuse ]] && ! e185_r2_break_is reuse-ignored || need_build=1; done
 if (( need_build )); then
-  cargo build --release -p singlefs-verification --bin e185_gc_batch_wall_clock_split
+  cargo build --release -p singlefs-implementation-experiments --bin e185_gc_batch_wall_clock_split
 fi
 apparatus=${CARGO_TARGET_DIR:-target}/release/e185_gc_batch_wall_clock_split
 

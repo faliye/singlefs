@@ -25,6 +25,7 @@
 //! 主格几何：初始 8192 个节点、每节点 4 个 key（容量 8）、key 空间 65536（初始 key 取偶数，留一半空位给插入）、
 //! 每 checkpoint 插 16 删 16。
 
+use e7_index_bench::{i64_from_usize, u32_from_i64, u32_from_usize, usize_from_i64, usize_from_u64};
 use e7_index_bench::Emitter;
 use std::collections::BTreeSet;
 
@@ -69,7 +70,7 @@ impl Rng {
         self.0
     }
     fn below(&mut self, exclusive_upper_bound: usize) -> usize {
-        (self.next() % exclusive_upper_bound as u64) as usize
+        usize_from_u64(self.next() % exclusive_upper_bound as u64)
     }
 }
 
@@ -177,11 +178,11 @@ impl PresenceIndex {
         assert_ne!(self.present[key], is_present, "key {key} 的在场状态没变，调用方逻辑错");
         self.present[key] = is_present;
         let delta: i64 = if is_present { 1 } else { -1 };
-        self.live_count = (self.live_count as i64 + delta) as usize;
+        self.live_count = usize_from_i64(i64_from_usize(self.live_count) + delta);
         let mut index = key + 1;
         while index < self.tree.len() {
-            self.tree[index] = (self.tree[index] as i64 + delta) as u32;
-            index += index & index.wrapping_neg();
+            self.tree[index] = u32_from_i64(self.tree[index] as i64 + delta);
+            index += index.isolate_lowest_one();
         }
     }
     fn is_present(&self, key: usize) -> bool {
@@ -191,7 +192,7 @@ impl PresenceIndex {
     fn key_at_rank(&self, rank: usize) -> usize {
         assert!(rank < self.live_count, "rank {rank} 超出存活 key 数 {}", self.live_count);
         let mut position = 0usize;
-        let mut remaining = rank as u32 + 1;
+        let mut remaining = u32_from_usize(rank) + 1;
         let mut step = 1usize;
         while step * 2 < self.tree.len() {
             step *= 2;
@@ -245,14 +246,14 @@ impl Sim {
     /// 初始布局：位置 p 的节点住槽 p（顺序创建的形态），与 E93 / E95 逐字同一套；
     /// 位置 p 的第 j 个 key = (p × 每节点 key 数 + j) × 步长。
     fn new(node_count: usize, slot_count: usize, slots_per_segment: usize, geometry: Geometry, nominal_group_size: usize) -> Sim {
-        assert!(node_count < slot_count && slot_count % slots_per_segment == 0);
+        assert!(node_count < slot_count && slot_count.is_multiple_of(slots_per_segment));
         assert!(geometry.initial_keys_per_node >= 1 && geometry.initial_keys_per_node <= geometry.node_capacity);
         let key_space = geometry.key_space(node_count);
         let mut presence = PresenceIndex::new(key_space);
         let mut node_keys: Vec<Vec<u32>> = Vec::with_capacity(node_count);
         for position in 0..node_count {
             let keys: Vec<u32> = (0..geometry.initial_keys_per_node)
-                .map(|offset| ((position * geometry.initial_keys_per_node + offset) * geometry.key_stride()) as u32)
+                .map(|offset| u32_from_usize((position * geometry.initial_keys_per_node + offset) * geometry.key_stride()))
                 .collect();
             for &key in &keys {
                 presence.set(key as usize, true);
@@ -260,17 +261,17 @@ impl Sim {
             node_keys.push(keys);
         }
         let mut slot_holder: Vec<Option<u32>> = vec![None; slot_count];
-        for position in 0..node_count {
-            slot_holder[position] = Some(position as u32);
+        for (position, holder) in slot_holder.iter_mut().enumerate().take(node_count) {
+            *holder = Some(u32_from_usize(position));
         }
-        let free: BTreeSet<u32> = (node_count as u32..slot_count as u32).collect();
+        let free: BTreeSet<u32> = (u32_from_usize(node_count)..u32_from_usize(slot_count)).collect();
         let mut free_slots_per_segment = vec![0u16; slot_count / slots_per_segment];
         for slot in node_count..slot_count {
             free_slots_per_segment[slot / slots_per_segment] += 1;
         }
         let group_count = node_count.div_ceil(nominal_group_size);
         let mut group_member_count = vec![0u32; group_count];
-        let node_group: Vec<u32> = (0..node_count).map(|position| (position / nominal_group_size) as u32).collect();
+        let node_group: Vec<u32> = (0..node_count).map(|position| u32_from_usize(position / nominal_group_size)).collect();
         for &group in &node_group {
             group_member_count[group as usize] += 1;
         }
@@ -279,13 +280,13 @@ impl Sim {
             nominal_group_size,
             slot_count,
             slots_per_segment,
-            order: (0..node_count as u32).collect(),
+            order: (0..u32_from_usize(node_count)).collect(),
             node_keys,
-            node_slot: (0..node_count as u32).collect(),
+            node_slot: (0..u32_from_usize(node_count)).collect(),
             node_group,
             node_alive: vec![true; node_count],
             group_member_count,
-            next_group_identifier: group_count as u32,
+            next_group_identifier: u32_from_usize(group_count),
             slot_holder,
             presence,
             key_space,
@@ -436,7 +437,7 @@ impl Sim {
         let (left, right) = keys.split_at(midpoint);
         assert!(!left.is_empty() && !right.is_empty(), "分裂要求两半都非空");
         self.node_keys[identifier] = left.to_vec();
-        let new_identifier = self.node_keys.len() as u32;
+        let new_identifier = u32_from_usize(self.node_keys.len());
         self.node_keys.push(right.to_vec());
         self.node_slot.push(UNPLACED_SLOT);
         self.node_alive.push(true);
@@ -495,7 +496,7 @@ impl Sim {
         let insert_at = keys.partition_point(|&existing| existing < key);
         keys.insert(insert_at, key);
         self.presence.set(key as usize, true);
-        dirty.insert(identifier as u32);
+        dirty.insert(u32_from_usize(identifier));
         if self.node_keys[identifier].len() > self.geometry.node_capacity {
             let new_identifier = self.split_at(position);
             dirty.insert(new_identifier);
@@ -511,7 +512,7 @@ impl Sim {
         let index = keys.iter().position(|&existing| existing == key).expect("首 key ≤ key 的那个节点必须装着它");
         keys.remove(index);
         self.presence.set(key as usize, false);
-        dirty.insert(identifier as u32);
+        dirty.insert(u32_from_usize(identifier));
         if self.node_keys[identifier].len() < self.geometry.merge_below() && self.node_count() >= 2 {
             let survivor_position = self.merge_at(position);
             let survivor = self.identifier_at(survivor_position);
@@ -545,7 +546,7 @@ impl Sim {
         loop {
             if let Some(segment_index) = self.open_segment {
                 if self.bump < self.slots_per_segment {
-                    let slot = (segment_index * self.slots_per_segment + self.bump) as u32;
+                    let slot = u32_from_usize(segment_index * self.slots_per_segment + self.bump);
                     self.bump += 1;
                     debug_assert!(self.free.contains(&slot));
                     self.free.remove(&slot);
@@ -611,7 +612,7 @@ impl Sim {
         if let Some(segment_index) = self.open_segment {
             if self.slots_per_segment - self.bump >= chunk_length {
                 for &position in positions {
-                    let slot = (segment_index * self.slots_per_segment + self.bump) as u32;
+                    let slot = u32_from_usize(segment_index * self.slots_per_segment + self.bump);
                     self.bump += 1;
                     self.take_slot(slot);
                     self.move_node(position, slot);
@@ -623,7 +624,7 @@ impl Sim {
             self.open_segment = Some(segment_index);
             self.bump = 0;
             for &position in positions {
-                let slot = (segment_index * self.slots_per_segment + self.bump) as u32;
+                let slot = u32_from_usize(segment_index * self.slots_per_segment + self.bump);
                 self.bump += 1;
                 self.take_slot(slot);
                 self.move_node(position, slot);
@@ -632,7 +633,7 @@ impl Sim {
         }
         if let Some(start) = self.find_free_run(chunk_length) {
             for (offset_in_run, &position) in positions.iter().enumerate() {
-                let slot = start + offset_in_run as u32;
+                let slot = start + u32_from_usize(offset_in_run);
                 self.take_slot(slot);
                 self.move_node(position, slot);
             }
@@ -713,7 +714,7 @@ fn dirty_keys(load: Load, rng: &mut Rng, sim: &Sim, dirty_count: usize) -> Vec<u
             }
         }
     }
-    ranks.into_iter().map(|rank| sim.presence.key_at_rank(rank) as u32).collect()
+    ranks.into_iter().map(|rank| u32_from_usize(sim.presence.key_at_rank(rank))).collect()
 }
 
 /// 一个 checkpoint 的插删：先插后删，都按随机数取；返回被弄脏的节点身份集合。
@@ -723,14 +724,14 @@ fn churn(sim: &mut Sim, rng: &mut Rng) -> BTreeSet<u32> {
         let key = loop {
             let candidate = rng.below(sim.key_space);
             if !sim.presence.is_present(candidate) {
-                break candidate as u32;
+                break u32_from_usize(candidate);
             }
         };
         sim.insert_key(key, &mut dirty);
     }
     for _ in 0..sim.geometry.deletes_per_checkpoint {
         let rank = rng.below(sim.live_key_count());
-        let key = sim.presence.key_at_rank(rank) as u32;
+        let key = u32_from_usize(sim.presence.key_at_rank(rank));
         sim.delete_key(key, &mut dirty);
     }
     dirty
@@ -830,7 +831,7 @@ fn step_key_interval(sim: &mut Sim, mandatory: &[usize], width: usize, extra: us
     let mut touched: Vec<usize> = mandatory.iter().map(|&position| sim.first_key_at(position) as usize / width).collect();
     touched.dedup();
     for group in touched {
-        let (range_start, range_end) = sim.positions_with_first_key_in((group * width) as u32, ((group + 1) * width) as u32);
+        let (range_start, range_end) = sim.positions_with_first_key_in(u32_from_usize(group * width), u32_from_usize((group + 1) * width));
         let clean = (range_start..range_end).filter(|position| !mandatory_set.contains(position)).count();
         let positions: Vec<usize> = if clean <= remaining {
             remaining -= clean;
@@ -848,7 +849,7 @@ fn step_key_interval(sim: &mut Sim, mandatory: &[usize], width: usize, extra: us
         let group = *group_cursor;
         *group_cursor = (*group_cursor + 1) % groups_total;
         scanned += 1;
-        let (range_start, range_end) = sim.positions_with_first_key_in((group * width) as u32, ((group + 1) * width) as u32);
+        let (range_start, range_end) = sim.positions_with_first_key_in(u32_from_usize(group * width), u32_from_usize((group + 1) * width));
         if range_start == range_end || (range_start..range_end).any(|position| written.contains(&position)) || range_end - range_start > remaining {
             continue;
         }
@@ -904,12 +905,12 @@ fn step_node_count_group(sim: &mut Sim, mandatory: &[usize], group_size: usize, 
 fn measurement_control(sim: &mut Sim) -> (u64, u64, u64, u64) {
     let node_count = sim.node_count();
     for position in 0..node_count {
-        let target = if position < node_count / 2 { 2 * position as u32 } else { (2 * (position - node_count / 2) + 1) as u32 };
+        let target = if position < node_count / 2 { 2 * u32_from_usize(position) } else { u32_from_usize(2 * (position - node_count / 2) + 1) };
         force_to(sim, position, target);
     }
     let scatter = (sim.runs_incremental(), sim.audit_runs());
     for position in 0..node_count {
-        force_to(sim, position, position as u32);
+        force_to(sim, position, u32_from_usize(position));
     }
     let compact = (sim.runs_incremental(), sim.audit_runs());
     (scatter.0, scatter.1, compact.0, compact.1)
@@ -1301,7 +1302,7 @@ mod tests {
         step_node_count_group(&mut sim, &[5], 4, 3, &mut cursor);
         let base = sim.slot_at(4);
         for (offset_in_group, position) in (4..8).enumerate() {
-            assert_eq!(sim.slot_at(position), base + offset_in_group as u32, "组 {{4..7}} 必须整组连续");
+            assert_eq!(sim.slot_at(position), base + u32_from_usize(offset_in_group), "组 {{4..7}} 必须整组连续");
         }
         assert_eq!(sim.total_writes, 4);
         let mut sim2 = Sim::new(32, 64, 4, Geometry::degenerate_e95(), 4);

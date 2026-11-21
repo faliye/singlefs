@@ -31,6 +31,7 @@
 //! 不建模分裂/合并；不碰 D11 代价 2（可重建性退化）；不答 ε 是格式参数还是运行时参数；
 //! 写放大按节点 I/O 次数与字节数计，不含 CPU；单盘、无并发、无崩溃。
 
+use e7_index_bench::{u64_from_nanoseconds, usize_from_u64};
 use e7_index_bench::{Emitter, Lru};
 use std::alloc::{alloc, dealloc, Layout};
 use std::fs::OpenOptions;
@@ -57,6 +58,7 @@ const LEAF_ENTRY_CAPACITY: usize = (NODE_BYTES - NODE_HEADER_BYTES) / MESSAGE_BY
 /// 那件事量得出来，不该只靠嘴上让步。main 在构造任何 Geom 之前设定它一次，此后不再改。
 static mut LEAF_COUNT_AT_RUNTIME: usize = 1024;
 fn nleaf() -> usize {
+    // SAFETY: 全文件只有 `main` 写它，而且只写一次、写的时候 `main` 还没起任何线程（本文件不起线程）；单测进程不运行 `main`，没有任何写，所有测试并行读到的都是静态初值，读与读之间没有数据竞争。
     unsafe { LEAF_COUNT_AT_RUNTIME }
 }
 /// 叶按半满装（B 树的常规占用率），不是 E7 那种「16 KiB 节点里只放 64 个 key」。
@@ -70,6 +72,7 @@ fn key_count() -> u64 {
 /// `.claude/kb/experiments/56-消息缓冲的收益vsε.md`「稳态可用区」。
 static mut OPERATION_COUNT_AT_RUNTIME: u64 = 200_000;
 fn operation_count() -> u64 {
+    // SAFETY: 全文件只有 `main` 写它，而且只写一次、写的时候 `main` 还没起任何线程（本文件不起线程）；单测进程不运行 `main`，没有任何写，所有测试并行读到的都是静态初值，读与读之间没有数据竞争。
     unsafe { OPERATION_COUNT_AT_RUNTIME }
 }
 const POINT_QUERIES_PER_KEY_SET: u64 = 10_000;
@@ -162,7 +165,7 @@ impl Geometry {
     }
     /// key 落在哪个叶。
     fn leaf_of(&self, key: u64) -> usize {
-        (key / KEYS_PER_LEAF as u64) as usize
+        usize_from_u64(key / KEYS_PER_LEAF as u64)
     }
     /// 第 l 层里，key 落在哪个节点。l=0 是最靠近叶的那层。
     fn node_of(&self, level: usize, key: u64) -> usize {
@@ -188,20 +191,25 @@ struct AlignedBuffer {
 impl AlignedBuffer {
     fn new(length_in_bytes: usize) -> Self {
         let layout = Layout::from_size_align(length_in_bytes, ALIGNMENT_BYTES).unwrap();
+        // SAFETY: `layout` 由 `Layout::from_size_align` 校验过；`alloc` 要求布局大小非零，调用处传的都是 O_DIRECT 用的正的整块长度。
         let pointer = unsafe { alloc(layout) };
         assert!(!pointer.is_null());
+        // SAFETY: `pointer` 刚由 `alloc` 分配，布局长度就是 `length_in_bytes`，上一行已断言非空；`u8` 没有对齐或取值限制，可以写 `length_in_bytes` 个字节。
         unsafe { std::ptr::write_bytes(pointer, 0, length_in_bytes) };
         Self { pointer, length_in_bytes, layout }
     }
     fn bytes(&self) -> &[u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) }
     }
     fn bytes_mut(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；独占借用 `&mut self`，同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
     }
 }
 impl Drop for AlignedBuffer {
     fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局，`drop` 只跑一次，之后没有别的引用。
         unsafe { dealloc(self.pointer, self.layout) }
     }
 }
@@ -216,7 +224,7 @@ impl Node {
         Self { entry_count: 0, entries: vec![(0, 0); capacity] }
     }
     fn decode(buffer: &AlignedBuffer, capacity: usize) -> Self {
-        let entry_count = (u64::from_le_bytes(buffer.bytes()[0..8].try_into().unwrap()) as usize).min(capacity);
+        let entry_count = usize_from_u64(u64::from_le_bytes(buffer.bytes()[0..8].try_into().unwrap())).min(capacity);
         let mut entries = vec![(0u64, 0u64); capacity];
         for (entry_index, slot) in entries.iter_mut().enumerate().take(entry_count) {
             let entry_offset = NODE_HEADER_BYTES + entry_index * MESSAGE_BYTES;
@@ -311,6 +319,7 @@ struct Cache {
 /// 不是「三条臂互相比」（`.claude/rules/test-discipline.md`）。
 static mut RESIDENT_NODES_PEAK: usize = 0;
 fn note_resident(resident_node_count: usize) {
+    // SAFETY: 它只在 `note_resident`、`resident_nodes_peak`、`reset_resident` 里读写，这三个函数只在 `main` 调用的链上（`note_resident` 由 `Cache::get`、`Cache::put` 调），`main` 不起线程；单测不构造 `Cache`、不调这三个函数，单测进程里没有任何线程碰它。
     unsafe {
         if resident_node_count > RESIDENT_NODES_PEAK {
             RESIDENT_NODES_PEAK = resident_node_count;
@@ -318,9 +327,11 @@ fn note_resident(resident_node_count: usize) {
     }
 }
 fn resident_nodes_peak() -> usize {
+    // SAFETY: 它只在 `note_resident`、`resident_nodes_peak`、`reset_resident` 里读写，这三个函数只在 `main` 调用的链上（`note_resident` 由 `Cache::get`、`Cache::put` 调），`main` 不起线程；单测不构造 `Cache`、不调这三个函数，单测进程里没有任何线程碰它。
     unsafe { RESIDENT_NODES_PEAK }
 }
 fn reset_resident() {
+    // SAFETY: 它只在 `note_resident`、`resident_nodes_peak`、`reset_resident` 里读写，这三个函数只在 `main` 调用的链上（`note_resident` 由 `Cache::get`、`Cache::put` 调），`main` 不起线程；单测不构造 `Cache`、不调这三个函数，单测进程里没有任何线程碰它。
     unsafe { RESIDENT_NODES_PEAK = 0 }
 }
 impl Cache {
@@ -402,12 +413,28 @@ static mut FLUSH_CHILD_TOUCHES: u64 = 0;
 /// **`landed + residual` 必须恰好等于操作数**——少一条就是有消息被静默丢了，
 /// 而丢消息在 io/op 上表现为「更省」，是最坏的一类静默错误。
 static mut LEAF_LANDED: u64 = 0;
-fn bump_compaction() { unsafe { COMPACTIONS += 1 } }
-fn bump_flush(children: u64) { unsafe { FLUSH_EVENTS += 1; FLUSH_CHILD_TOUCHES += children } }
-fn bump_landed() { unsafe { LEAF_LANDED += 1 } }
-fn landed() -> u64 { unsafe { LEAF_LANDED } }
-fn reset_landed() { unsafe { LEAF_LANDED = 0 } }
+fn bump_compaction() {
+    // SAFETY: 读它的只有 `take_counters`，只由 `main` 调；`main` 路径不起线程。单测进程里只有 `later_write_wins_within_a_node` 一个测试走到 `Node::compact`（也就是写它），没有任何读，所以任一时刻至多一个线程碰它。再有测试调 `Node::compact`，这一条不再成立，要先把它改成原子量。
+    unsafe { COMPACTIONS += 1 }
+}
+fn bump_flush(children: u64) {
+    // SAFETY: 这两个量只在 `bump_flush`（由 `flush_node` 调）里写、在 `take_counters` 里读，两处都只在 `main` 调用的链上，`main` 不起线程；单测不调 `flush_node`、`take_counters`，单测进程里没有任何线程碰它们。
+    unsafe { FLUSH_EVENTS += 1; FLUSH_CHILD_TOUCHES += children }
+}
+fn bump_landed() {
+    // SAFETY: 它只在 `bump_landed`、`landed`、`reset_landed` 里读写，这几个函数只在 `main` 调用的链上，`main` 不起线程；单测不调它们，单测进程里没有任何线程碰它。
+    unsafe { LEAF_LANDED += 1 }
+}
+fn landed() -> u64 {
+    // SAFETY: 它只在 `bump_landed`、`landed`、`reset_landed` 里读写，这几个函数只在 `main` 调用的链上，`main` 不起线程；单测不调它们，单测进程里没有任何线程碰它。
+    unsafe { LEAF_LANDED }
+}
+fn reset_landed() {
+    // SAFETY: 它只在 `bump_landed`、`landed`、`reset_landed` 里读写，这几个函数只在 `main` 调用的链上，`main` 不起线程；单测不调它们，单测进程里没有任何线程碰它。
+    unsafe { LEAF_LANDED = 0 }
+}
 fn take_counters() -> (u64, u64, u64) {
+    // SAFETY: 只在 `main` 调用的链上，`main` 不起线程，所以这里读与清零这三个量时没有别的线程；单测不调它，单测进程里没有任何线程读这三个量。
     unsafe {
         let counters = (COMPACTIONS, FLUSH_EVENTS, FLUSH_CHILD_TOUCHES);
         COMPACTIONS = 0; FLUSH_EVENTS = 0; FLUSH_CHILD_TOUCHES = 0;
@@ -478,7 +505,7 @@ fn arm_sorted(device: &mut Device, geometry: &Geometry, operation_count: u64, se
     let started_at = Instant::now();
     for _ in 0..operation_count {
         let key = next_random(&mut random_state) % key_count();
-        touched[key as usize] = true;
+        touched[usize_from_u64(key)] = true;
         let page_number = geometry.leaf_page_number(geometry.leaf_of(key));
         let mut leaf_node = node_cache.get(device, page_number, LEAF_ENTRY_CAPACITY, &mut page_buffer);
         leaf_node.upsert(key, key ^ 0xABCD);
@@ -493,7 +520,7 @@ fn arm_sorted(device: &mut Device, geometry: &Geometry, operation_count: u64, se
         bytes_read: device.bytes_read - bytes_read_before,
         bytes_written: device.bytes_written - bytes_written_before,
         touches: 0,
-        elapsed_nanoseconds: started_at.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(started_at.elapsed().as_nanos()),
         residual: 0,
         drain_device_operations: 0,
         block_layer_delta: String::new(),
@@ -509,15 +536,15 @@ fn arm_logstruct_wb(device: &mut Device, geometry: &Geometry, operation_count: u
     let mut write_buffer: Vec<(u64, u64)> = Vec::with_capacity(write_buffer_capacity.max(1));
     let mut touches = 0u64;
     let started_at = Instant::now();
-    let flush = |write_buffer: &mut Vec<(u64, u64)>, node_cache: &mut Cache, device: &mut Device, page_buffer: &mut AlignedBuffer, touches: &mut u64| {
-        if write_buffer.is_empty() {
+    let flush = |pending_writes: &mut Vec<(u64, u64)>, cache_to_fill: &mut Cache, device_to_write: &mut Device, flush_page_buffer: &mut AlignedBuffer, touch_counter: &mut u64| {
+        if pending_writes.is_empty() {
             return;
         }
         // 稳定排序：unstable 会打乱同 key 的相对次序，于是「后者胜」胜出的是任意一条。
         // D8 已定项 3 要的 seq 正是为了这件事，本 harness 用稳定排序代替。
-        write_buffer.sort_by_key(|entry| (entry.0 / KEYS_PER_LEAF as u64, entry.0));
-        let mut deduplicated_entries: Vec<(u64, u64)> = Vec::with_capacity(write_buffer.len());
-        for &(key, value) in write_buffer.iter() {
+        pending_writes.sort_by_key(|entry| (entry.0 / KEYS_PER_LEAF as u64, entry.0));
+        let mut deduplicated_entries: Vec<(u64, u64)> = Vec::with_capacity(pending_writes.len());
+        for &(key, value) in pending_writes.iter() {
             if let Some(last) = deduplicated_entries.last_mut() {
                 if last.0 == key {
                     last.1 = value;
@@ -528,24 +555,24 @@ fn arm_logstruct_wb(device: &mut Device, geometry: &Geometry, operation_count: u
         }
         let mut deduplicated_entry_index = 0;
         while deduplicated_entry_index < deduplicated_entries.len() {
-            let leaf_index = (deduplicated_entries[deduplicated_entry_index].0 / KEYS_PER_LEAF as u64) as usize;
+            let leaf_index = usize_from_u64(deduplicated_entries[deduplicated_entry_index].0 / KEYS_PER_LEAF as u64);
             let page_number = leaf_index as u64;
-            let mut leaf_node = node_cache.get(device, page_number, LEAF_ENTRY_CAPACITY, page_buffer);
-            *touches += 1;
-            while deduplicated_entry_index < deduplicated_entries.len() && (deduplicated_entries[deduplicated_entry_index].0 / KEYS_PER_LEAF as u64) as usize == leaf_index {
+            let mut leaf_node = cache_to_fill.get(device_to_write, page_number, LEAF_ENTRY_CAPACITY, flush_page_buffer);
+            *touch_counter += 1;
+            while deduplicated_entry_index < deduplicated_entries.len() && usize_from_u64(deduplicated_entries[deduplicated_entry_index].0 / KEYS_PER_LEAF as u64) == leaf_index {
                 if leaf_node.full() {
                     leaf_node.compact();
                 }
                 leaf_node.push(deduplicated_entries[deduplicated_entry_index].0, deduplicated_entries[deduplicated_entry_index].1);
                 deduplicated_entry_index += 1;
             }
-            node_cache.put(device, page_buffer, page_number, leaf_node);
+            cache_to_fill.put(device_to_write, flush_page_buffer, page_number, leaf_node);
         }
-        write_buffer.clear();
+        pending_writes.clear();
     };
     for operation_index in 0..operation_count {
         let key = next_random(&mut random_state) % key_count();
-        touched[key as usize] = true;
+        touched[usize_from_u64(key)] = true;
         write_buffer.push((key, key ^ 0xABCD));
         if write_buffer.len() >= write_buffer_capacity.max(1) {
             flush(&mut write_buffer, &mut node_cache, device, &mut page_buffer, &mut touches);
@@ -564,7 +591,7 @@ fn arm_logstruct_wb(device: &mut Device, geometry: &Geometry, operation_count: u
         bytes_read: device.bytes_read - bytes_read_before,
         bytes_written: device.bytes_written - bytes_written_before,
         touches,
-        elapsed_nanoseconds: started_at.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(started_at.elapsed().as_nanos()),
         residual: 0,
         drain_device_operations: 0,
         block_layer_delta: String::new(),
@@ -573,7 +600,7 @@ fn arm_logstruct_wb(device: &mut Device, geometry: &Geometry, operation_count: u
 
 // ── 臂 3：Bε —— 内部节点留 ε 比例的消息缓冲，消息沿树逐层下刷。
 //    缓冲条数与扇出都由 ε 导出，两者争同一块节点字节 —— 这正是 E7 缺的那条张力。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "Bε 臂的输入逐项摊开（缓冲条数、扇出、节点字节、种子与各计数器），拆结构体不会少传哪一项")]
 fn arm_betree(
     device: &mut Device,
     geometry: &Geometry,
@@ -587,7 +614,7 @@ fn arm_betree(
 ) -> Run {
     let mut page_buffer = AlignedBuffer::new(NODE_BYTES);
     let mut random_state = seed;
-    let internal_node_capacity = buffer_capacity.max(1).min(LEAF_ENTRY_CAPACITY);
+    let internal_node_capacity = buffer_capacity.clamp(1, LEAF_ENTRY_CAPACITY);
     // ── 预热相：先把各层缓冲填到稳态，**这一段的 I/O 不计费**。
     // ⚠️ 补它的理由：不预热的话各层缓冲一开始全空，进每个节点的前 B 条
     // 消息都是免费的，而**总缓冲容量可以超过整个负载**——实测 nleaf=8192、ε=0.95 时
@@ -598,7 +625,7 @@ fn arm_betree(
         let mut discarded_touches = 0u64;
         for _ in 0..warmup {
             let key = next_random(&mut random_state) % key_count();
-            touched[key as usize] = true;
+            touched[usize_from_u64(key)] = true;
             push_down(device, &mut warmup_cache, &mut page_buffer, geometry, geometry.height() - 1, 0, vec![(key, key ^ 0xABCD)], internal_node_capacity, &mut discarded_touches);
         }
         warmup_cache.checkpoint(device, &mut page_buffer);
@@ -616,7 +643,7 @@ fn arm_betree(
     let started_at = Instant::now();
     for operation_index in 0..operation_count {
         let key = next_random(&mut random_state) % key_count();
-        touched[key as usize] = true;
+        touched[usize_from_u64(key)] = true;
         push_down(device, &mut node_cache, &mut page_buffer, geometry, geometry.height() - 1, 0, vec![(key, key ^ 0xABCD)], internal_node_capacity, &mut touches);
         if (operation_index + 1) % CHECKPOINT_INTERVAL == 0 {
             node_cache.checkpoint(device, &mut page_buffer);
@@ -630,7 +657,7 @@ fn arm_betree(
         bytes_read: device.bytes_read - bytes_read_before,
         bytes_written: device.bytes_written - bytes_written_before,
         touches,
-        elapsed_nanoseconds: started_at.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(started_at.elapsed().as_nanos()),
         residual: residual_before_measurement,
         drain_device_operations: 0,
         block_layer_delta,
@@ -664,7 +691,7 @@ fn drain_phase(device: &mut Device, geometry: &Geometry, cache_node_count: usize
 
 /// 把一批消息塞进第 `level` 层第 `node_index` 个节点的缓冲；满了就按孩子分组下刷。
 /// `level == 0` 的孩子是叶。每次取用一个节点记一次 touch。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "下刷一批消息要带层号、节点号与各计数器，拆结构体不会少传哪一项")]
 fn push_down(
     device: &mut Device,
     node_cache: &mut Cache,
@@ -704,7 +731,7 @@ fn push_down(
 
 /// 把一个装满的缓冲整批推给孩子，推完把它清空。
 /// **内部缓冲不做压实**：清空由下刷负责，压实只属于叶。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "推空一个缓冲要带层号、节点号与各计数器，拆结构体不会少传哪一项")]
 fn flush_node(
     device: &mut Device,
     node_cache: &mut Cache,
@@ -850,8 +877,8 @@ fn query_phase(
     touched: &[bool],
     seed: u64,
 ) -> (f64, f64, u64, u64) {
-    let hot_keys: Vec<u64> = (0..key_count()).filter(|&key| touched[key as usize]).collect();
-    let cold_keys: Vec<u64> = (0..key_count()).filter(|&key| !touched[key as usize]).collect();
+    let hot_keys: Vec<u64> = (0..key_count()).filter(|&key| touched[usize_from_u64(key)]).collect();
+    let cold_keys: Vec<u64> = (0..key_count()).filter(|&key| !touched[usize_from_u64(key)]).collect();
     let mut reads_per_query = [0f64; 2];
     let mut key_set_sizes = [0u64; 2];
     for (key_set_index, key_set) in [&hot_keys, &cold_keys].iter().enumerate() {
@@ -864,7 +891,7 @@ fn query_phase(
             continue;
         }
         for _ in 0..POINT_QUERIES_PER_KEY_SET {
-            let key = key_set[(next_random(&mut random_state) % key_set.len() as u64) as usize];
+            let key = key_set[usize_from_u64(next_random(&mut random_state) % key_set.len() as u64)];
             let _ = point_query(device, &mut node_cache, &mut page_buffer, geometry, internal_node_capacity, key);
         }
         reads_per_query[key_set_index] = (device.reads - reads_before) as f64 / POINT_QUERIES_PER_KEY_SET as f64;
@@ -904,9 +931,11 @@ fn main() {
     let cache_node_count: usize = std::env::args().nth(4).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(DEFAULT_CACHE_NODE_COUNT);
     // 第 5 个参数：叶数。**在构造任何 Geom 之前设定，此后不再改。**
     let leaf_count_argument: usize = std::env::args().nth(5).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(REGISTERED_LEAF_COUNT);
+    // SAFETY: 这是对它唯一的写，`main` 此刻还没起任何线程（本文件不起线程），之后只有读。
     unsafe { LEAF_COUNT_AT_RUNTIME = leaf_count_argument.max(2) };
     // 第 6 个参数：负载次数。必须远大于总缓冲容量，见「稳态可用区」。
     let operation_count_argument: u64 = std::env::args().nth(6).and_then(|argument_text| argument_text.parse().ok()).unwrap_or(REGISTERED_OPERATION_COUNT);
+    // SAFETY: 这是对它唯一的写，`main` 此刻还没起任何线程（本文件不起线程），之后只有读。
     unsafe { OPERATION_COUNT_AT_RUNTIME = operation_count_argument.max(1) };
 
     let mut open_options = OpenOptions::new();
@@ -955,7 +984,7 @@ fn main() {
         ))
     );
 
-    let mut touched = vec![false; key_count() as usize];
+    let mut touched = vec![false; usize_from_u64(key_count())];
 
     // 基线两条臂用 ε=0 的几何：不留缓冲，节点字节全给 pivot。
     for (arm_name, arm_index) in [("sorted_bplus", 0u8), ("logstruct_wb", 1u8)] {

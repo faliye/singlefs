@@ -3,6 +3,7 @@
 //! 判据与失败条款见 kb/experiments.md E12。**必须真的碰设备**——
 //! 纯内存微基准会把这题测成「没有差别」，而差别恰恰全在 I/O 上。
 
+use e7_index_bench::{u64_from_nanoseconds, usize_from_u64};
 use e7_index_bench::{page_of, Emitter, IoCounters, Lru};
 use std::alloc::{alloc, dealloc, Layout};
 use std::fs::OpenOptions;
@@ -69,20 +70,25 @@ struct AlignedBuffer {
 impl AlignedBuffer {
     fn new(length_in_bytes: usize) -> Self {
         let layout = Layout::from_size_align(length_in_bytes, PAGE_BYTES).expect("对齐参数非法");
+        // SAFETY: `layout` 由 `Layout::from_size_align` 校验过；`alloc` 要求布局大小非零，调用处传的都是 O_DIRECT 用的正的整块长度。
         let allocation_pointer = unsafe { alloc(layout) };
         assert!(!allocation_pointer.is_null(), "分配失败");
+        // SAFETY: `allocation_pointer` 刚由 `alloc` 分配，布局长度就是 `length_in_bytes`，上一行已断言非空；`u8` 没有对齐或取值限制，可以写 `length_in_bytes` 个字节。
         unsafe { std::ptr::write_bytes(allocation_pointer, 0, length_in_bytes) };
         Self { pointer: allocation_pointer, length_in_bytes, layout }
     }
     fn as_slice(&self) -> &[u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；切片的借用与 `&self` 一样长，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts(self.pointer, self.length_in_bytes) }
     }
     fn as_mut_slice(&mut self) -> &mut [u8] {
+        // SAFETY: `pointer` 指向构造时 `alloc` 出的 `length_in_bytes` 字节，构造时已用 `write_bytes` 填满；独占借用 `&mut self`，同一时刻没有别的引用指向这块内存，缓冲在 `Drop` 之前不会释放。
         unsafe { std::slice::from_raw_parts_mut(self.pointer, self.length_in_bytes) }
     }
 }
 impl Drop for AlignedBuffer {
     fn drop(&mut self) {
+        // SAFETY: `pointer` 与布局正是构造时 `alloc` 用的指针与布局，`drop` 只跑一次，之后没有别的引用。
         unsafe { dealloc(self.pointer, self.layout) }
     }
 }
@@ -186,7 +192,7 @@ fn arm_reference_count(
             page_cache.touch(page);
         }
         // 减一：读-改-写那个「改」
-        let counter_offset = ((block % COUNTERS_PER_PAGE) * 8) as usize;
+        let counter_offset = usize_from_u64((block % COUNTERS_PER_PAGE) * 8);
         let counter_value = u64::from_le_bytes(page_buffer.as_slice()[counter_offset..counter_offset + 8].try_into().unwrap());
         page_buffer.as_mut_slice()[counter_offset..counter_offset + 8].copy_from_slice(&counter_value.saturating_sub(1).to_le_bytes());
         page_cache.mark_dirty(page);
@@ -211,7 +217,7 @@ fn arm_hybrid(
     device.input_output_counters = IoCounters::default();
     // 稀疏旁表的探测结构：每块 1 bit，常驻内存
     let bitmap: Vec<u64> = {
-        let bitmap_word_count = (counters as usize).div_ceil(64);
+        let bitmap_word_count = usize_from_u64(counters).div_ceil(64);
         let mut bitmap_words = vec![0u64; bitmap_word_count];
         let mut bitmap_random_state = seed ^ 0xDEAD_BEEF;
         for block in 0..counters {
@@ -254,7 +260,7 @@ fn arm_hybrid(
         } else {
             page_cache.touch(page);
         }
-        let counter_offset = ((block % COUNTERS_PER_PAGE) * 8) as usize;
+        let counter_offset = usize_from_u64((block % COUNTERS_PER_PAGE) * 8);
         let counter_value = u64::from_le_bytes(page_buffer.as_slice()[counter_offset..counter_offset + 8].try_into().unwrap());
         page_buffer.as_mut_slice()[counter_offset..counter_offset + 8].copy_from_slice(&counter_value.saturating_sub(1).to_le_bytes());
         page_cache.mark_dirty(page);
@@ -335,28 +341,28 @@ fn main() {
         let statistics_before = read_block_layer_statistics(&device_path);
         let arm_start = Instant::now();
         let time_order_counters = arm_time_order_deadlist(&mut device, operation_count, seed, deadlist_base);
-        let time_order_elapsed_nanoseconds = arm_start.elapsed().as_nanos() as u64;
+        let time_order_elapsed_nanoseconds = u64_from_nanoseconds(arm_start.elapsed().as_nanos());
         let time_order_block_layer = format_block_layer_delta(block_layer_delta(statistics_before, read_block_layer_statistics(&device_path)));
         println!("{}", emitter.emit_raw(&format!(
             "name=d5 ws={label} counters={counters} reads={} writes={} bytes_w={} elapsed_ns={time_order_elapsed_nanoseconds} io_per_op={:.6} {time_order_block_layer}",
             time_order_counters.reads, time_order_counters.writes, time_order_counters.bytes_written, time_order_counters.io_per_op(operation_count).unwrap()
         )));
 
-        let statistics_before = read_block_layer_statistics(&device_path);
-        let arm_start = Instant::now();
+        let statistics_before_reference_count = read_block_layer_statistics(&device_path);
+        let reference_count_arm_start = Instant::now();
         let reference_count_counters = arm_reference_count(&mut device, operation_count, seed, counters, cache_pages, fault_mode == "sequential");
-        let reference_count_elapsed_nanoseconds = arm_start.elapsed().as_nanos() as u64;
-        let reference_count_block_layer = format_block_layer_delta(block_layer_delta(statistics_before, read_block_layer_statistics(&device_path)));
+        let reference_count_elapsed_nanoseconds = u64_from_nanoseconds(reference_count_arm_start.elapsed().as_nanos());
+        let reference_count_block_layer = format_block_layer_delta(block_layer_delta(statistics_before_reference_count, read_block_layer_statistics(&device_path)));
         println!("{}", emitter.emit_raw(&format!(
             "name=refcount ws={label} counters={counters} reads={} writes={} elapsed_ns={reference_count_elapsed_nanoseconds} io_per_op={:.6} {reference_count_block_layer}",
             reference_count_counters.reads, reference_count_counters.writes, reference_count_counters.io_per_op(operation_count).unwrap()
         )));
 
-        let statistics_before = read_block_layer_statistics(&device_path);
-        let arm_start = Instant::now();
+        let statistics_before_hybrid = read_block_layer_statistics(&device_path);
+        let hybrid_arm_start = Instant::now();
         let (hybrid_counters, cloned_hit_count) = arm_hybrid(&mut device, operation_count, seed, counters, cache_pages, 10, deadlist_base);
-        let hybrid_elapsed_nanoseconds = arm_start.elapsed().as_nanos() as u64;
-        let hybrid_block_layer = format_block_layer_delta(block_layer_delta(statistics_before, read_block_layer_statistics(&device_path)));
+        let hybrid_elapsed_nanoseconds = u64_from_nanoseconds(hybrid_arm_start.elapsed().as_nanos());
+        let hybrid_block_layer = format_block_layer_delta(block_layer_delta(statistics_before_hybrid, read_block_layer_statistics(&device_path)));
         println!("{}", emitter.emit_raw(&format!(
             "name=hybrid ws={label} counters={counters} clone_permille=10 cloned_hits={cloned_hit_count} reads={} writes={} elapsed_ns={hybrid_elapsed_nanoseconds} io_per_op={:.6} {hybrid_block_layer}",
             hybrid_counters.reads, hybrid_counters.writes, hybrid_counters.io_per_op(operation_count).unwrap()

@@ -21,7 +21,7 @@
 //! ## 今天的宽度：三个常量，一处定义，回比 `crates/singlefs-format/src/lib.rs`
 //!
 //! 这不是入库装置，不受「入库装置不许引 `crates/` 常量」那条约束（那条只管
-//! `crates/singlefs-verification/src/bin/`）；但跑前登记仍把这几个数登记成本地常量、
+//! `crates/singlefs-implementation-experiments/src/bin/`）；但跑前登记仍把这几个数登记成本地常量、
 //! 靠停机条款 S1（第十三节命令二）人工核对，不在编译期 `use crates::…`——独立手写模型的意义
 //! 就在「不共用代码」，共用了常量定义就不独立了。
 //!
@@ -32,7 +32,7 @@
 //! 由主 agent 判要不要第二段补。
 // admission: always 独立手写的计数模型，每次现算今天几何下甲 / 乙的比值与预测式，判的是此刻装置的样子
 // run-condition: command python3
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 use std::collections::HashSet;
 
 // ── 今天的宽度：抄自 crates/singlefs-format/src/lib.rs，行号见跑前登记第十三节命令二 ──────
@@ -300,7 +300,7 @@ fn simulate_cell(geometry: &Geometry, stream_count: u64, batch: u64, format: Rec
     let units_per_stream = units_per_stream_for(geometry, stream_count);
 
     // 甲：脏集合每次 fsync 都清空，本批的单元不会跨批重复，用一个按批清空的 Vec 就够。
-    let mut intent_batch_units: Vec<u64> = Vec::with_capacity(batch as usize);
+    let mut intent_batch_units: Vec<u64> = Vec::with_capacity(usize_from_u64(batch));
     // 乙：脏集合累积到下一次 checkpoint 才清空；`persisted` 记录上一次 fsync 时已经落盘的那些，
     // 让「还没落过的」这句话（第一节「今天的记录宽」）在账上显式发生——M15 拿掉这个减法。
     let mut write_ahead_log_leaf_dirty: HashSet<u64> = HashSet::new();
@@ -721,6 +721,7 @@ fn emit_two_dimensional_maximum_summary(emitter: &mut Emitter, output: &mut Stri
 
 /// 两种相对误差分母（跑前登记第一节「相对误差」与 M11）：模型比值本身，或预测比值。
 /// PC2 核哪一种复现得出 9.6% / 20.5%，两种都报，判据在读产物的那一步选。
+#[allow(clippy::type_complexity, reason = "这个元组类型只在这一处出现，起类型别名只多一个只用一次的名字")]
 const ERROR_DENOMINATOR_SELECTORS: [(&str, fn(&PeakCellResult) -> f64); 2] =
     [("model", |cell: &PeakCellResult| cell.error_model_denominator), ("predicted", |cell: &PeakCellResult| cell.error_predicted_denominator)];
 

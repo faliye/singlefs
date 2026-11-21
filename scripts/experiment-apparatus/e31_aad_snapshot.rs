@@ -77,7 +77,7 @@ fn nonce_for(arm: Arm, key: &IndexKeyWithSnapshot, stored_nonce_number: u64) -> 
                 .wrapping_add((key.snapshot as u64).wrapping_mul(0xD6E8_FEB8_6659_FD93));
             nonce_bytes[..8].copy_from_slice(&derived_nonce_value.to_le_bytes());
         }
-        _ => nonce_bytes[..8].copy_from_slice(&stored_nonce_number.to_le_bytes()),
+        Arm::Current | Arm::ReaderSnapshot | Arm::BirthSnapshot => nonce_bytes[..8].copy_from_slice(&stored_nonce_number.to_le_bytes()),
     }
     Nonce::from(nonce_bytes)
 }

@@ -31,6 +31,7 @@
 //! - C88 那格答不出需求 ⇒ 如实标「空白」，不许编（也不许写成 0——读不到 ≠ 读到 0）。
 //! - 确定性模型：5 遍 md5 只证无隐藏状态，不证统计稳定。
 
+use e7_index_bench::{i64_from_u64, truncate_f64_to_i64, truncate_f64_to_u64, u32_from_usize, u64_from_i64};
 use e7_index_bench::Emitter;
 
 /// 需求的计价单位。三选一是判据 2 定死的。
@@ -115,15 +116,15 @@ fn window_seconds(window_generations: u64, publish_rate: f64) -> f64 {
 
 /// 闭式：违例数 = 扫描时长 × 发布率 − K（判据 4 逐字）。
 fn closed_form_violations(scan_seconds: f64, publish_rate: f64, window_generations: u64) -> u64 {
-    let publishes = (scan_seconds * publish_rate).floor() as i64;
-    (publishes - window_generations as i64).max(0) as u64
+    let publishes = truncate_f64_to_i64((scan_seconds * publish_rate).floor());
+    u64_from_i64((publishes - i64_from_u64(window_generations)).max(0))
 }
 
 /// 模拟：一步一次发布。消费者在 t=0 钉住当时最新的那一代，
 /// 该代在 K 次发布之后离开 K 代窗口，此后每一次发布记一次违例。
 /// **与闭式各写各的**，判据 4 要求两者恰等。
 fn simulate_violations(scan_seconds: f64, publish_rate: f64, window_generations: u64) -> u64 {
-    let publishes = (scan_seconds * publish_rate).floor() as u64;
+    let publishes = truncate_f64_to_u64((scan_seconds * publish_rate).floor());
     let mut pinned_generation_age = 0u64; // 钉住的那一代已经老了几代
     let mut violations = 0u64;
     for _ in 0..publishes {
@@ -204,7 +205,7 @@ fn main() {
 
     // ── 判据 4：假想墙钟消费者的定价表，闭式与模拟必须恰等 ──
     let mut cells_exceeding_window = 0u32;
-    let total_cells = (DURATIONS.len() * WINDOW_GENERATION_VALUES.len()) as u32;
+    let total_cells = u32_from_usize(DURATIONS.len() * WINDOW_GENERATION_VALUES.len());
     for (label, duration_seconds) in DURATIONS {
         for window_generations in WINDOW_GENERATION_VALUES {
             let simulated_violations = simulate_violations(duration_seconds, PUBLISH_RATE, window_generations);

@@ -33,7 +33,7 @@
 //!
 //! 物理失败域的真实形状（要真硬件）；`rollback` 是**代数不是字节**，换算要 D25 的负载模型。
 
-use e7_index_bench::Emitter;
+use e7_index_bench::{usize_from_u64, Emitter};
 
 /// 条带布局下 LBA 落在哪块盘。形态取自 Linux md（raid0/raid5 按 chunk 轮转）。
 /// ⚠️ **故意与 E46 各写一份并各自单测**：两处共用同一段代码，两个实验就不再是两条独立路径。
@@ -97,7 +97,7 @@ fn survey(
     for steps_back in 0..ring_slot_count {
         let generation = latest - steps_back;
         let region_index = order.region_of(generation, regions, slots);
-        if device_of_region[region_index as usize] == failed_device {
+        if device_of_region[usize_from_u64(region_index)] == failed_device {
             continue; // 这一代随区域一起没了
         }
         survivors += 1;
@@ -208,7 +208,7 @@ fn main() {
                             // usable 按三档 K 各判一次
                             let mut usable_bits = String::new();
                             for root_ring_depth in ROOT_RING_DEPTHS {
-                                let is_usable = rollback.map(|rollback_generations| rollback_generations <= root_ring_depth - 1).unwrap_or(false);
+                                let is_usable = rollback.map(|rollback_generations| rollback_generations < root_ring_depth).unwrap_or(false);
                                 usable_bits.push_str(&format!(" usable_k{root_ring_depth}={}", u8::from(is_usable)));
                                 if mountable && !is_usable {
                                     mountable_but_unusable += 1; // 计的是「格 × K 档」，分母 cases × 3
@@ -420,7 +420,7 @@ mod tests {
         assert_eq!(rollback, Some(8));
         assert!(rollback.unwrap() > 4 - 1, "K=4 时它不可用");
         assert!(rollback.unwrap() > 2 - 1, "K=2 时它同样不可用");
-        assert!(rollback.unwrap() <= 8 - 1 || rollback.unwrap() == 8); // K=8 时恰好卡在边界外
+        assert!(rollback.unwrap() < 8 || rollback.unwrap() == 8); // K=8 时恰好卡在边界外
     }
 
     /// **阳性对照**：R=1，承载它的盘失效 ⇒ 一个都不剩，回退记 None 而不是 0。

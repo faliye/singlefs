@@ -20,6 +20,7 @@
 //! 迭代整条不动点）——不是登记要求的全网格复算，这是执行员在报告与实验页里点名的范围缩减，
 //! 交主 agent 认。R8（组提交批量）与「不共享取随机」不在这一次范围（k=1 不用 R8）。
 
+use e7_index_bench::{i32_from_u32, truncate_f64_to_u64};
 use e7_index_bench::Emitter;
 
 // ============================================================
@@ -314,7 +315,7 @@ fn class_dirty_nodes_this_layer(
     if insert_count <= 0.0 && delete_count <= 0.0 {
         return 0.0;
     }
-    let node_count_at_layer_for_class = (region_entries / layer_coverage).ceil().max(1.0) as u64;
+    let node_count_at_layer_for_class = truncate_f64_to_u64((region_entries / layer_coverage).ceil().max(1.0));
     if node_count_at_layer_for_class <= 1 {
         return 1.0;
     }
@@ -471,7 +472,7 @@ impl AllocationVariant {
 fn release_backlog_units_for_variant(variant: AllocationVariant, previous_written_units: f64, distinct_data_units_touched: f64, extra_release_only_insertions_total: f64) -> f64 {
     match variant {
         AllocationVariant::ReleaseAppendOnly => 2.0 * (previous_written_units + distinct_data_units_touched) + extra_release_only_insertions_total,
-        _ => previous_written_units + distinct_data_units_touched + extra_release_only_insertions_total,
+        AllocationVariant::Baseline | AllocationVariant::ReleaseClusteredByEpoch { .. } => previous_written_units + distinct_data_units_touched + extra_release_only_insertions_total,
     }
 }
 
@@ -502,10 +503,10 @@ fn epoch_touched_bump_pieces(node_units: f64, touch_fraction: f64, bump_unit_cou
     let mut touched_pieces = 0.0;
     let mut generation = 2u32;
     loop {
-        let expected_count_at_generation = node_units * touch_fraction * decay_ratio.powi(generation as i32 - 1);
+        let expected_count_at_generation = node_units * touch_fraction * decay_ratio.powi(i32_from_u32(generation) - 1);
         let relative_to_piece_count = expected_count_at_generation / piece_count;
         if relative_to_piece_count < 1e-9 {
-            touched_pieces += node_units * decay_ratio.powi(generation as i32 - 1);
+            touched_pieces += node_units * decay_ratio.powi(i32_from_u32(generation) - 1);
             break;
         }
         if relative_to_piece_count < 1e-2 {
@@ -525,7 +526,7 @@ fn epoch_touched_bump_pieces(node_units: f64, touch_fraction: f64, bump_unit_cou
 
 /// 分配记录树一块盘一层的期望脏节点数，三种写法（登记第五节 5.1）；`bump_unit_count`（S）只有
 /// ② 用：一次持久化 bump 出的单元数（甲 S=X；WAL checkpoint S=X+I_node，由调用方算好传入）。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "分配树每层脏节点数的公式本身要这么多输入，拆结构体不会让哪一步更好验")]
 fn allocation_tree_dirty_this_layer_by_variant(
     variant: AllocationVariant,
     region_entries: f64,
@@ -543,7 +544,7 @@ fn allocation_tree_dirty_this_layer_by_variant(
     if node_units <= 0.0 && data_units <= 0.0 && extra_release_only_insertions_total <= 0.0 {
         return 0.0;
     }
-    let node_count_at_layer = (region_entries / layer_coverage).ceil().max(1.0) as u64;
+    let node_count_at_layer = truncate_f64_to_u64((region_entries / layer_coverage).ceil().max(1.0));
     if node_count_at_layer <= 1 {
         return 1.0;
     }
@@ -730,7 +731,7 @@ struct FixedPointCoreOutcome {
 /// `extra_allocation_release_insertions_node`（I_node）只喂 ② 的 `bump_unit_count`（S=X+I_node）；
 /// `extra_allocation_release_insertions_total`（I）喂 K5 与几何的 `extra_release_only_insertions`；
 /// `damping_alpha`/`maximum_iterations` 是第八节 8.2 的两个反向取样点（主取值 0.15 / 1000）。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "固定点核心的入参逐项对应登记公式里的变量，拆结构体不会让哪一步更好验")]
 fn solve_fixed_point_core_with_variant(
     data_unit_count: u64,
     file_count: u64,
@@ -804,7 +805,7 @@ fn solve_fixed_point_core_with_variant(
 
         let release_backlog_units = release_backlog_units_for_variant(variant, previous_written_units, distinct_data_units_touched, extra_allocation_release_insertions_total);
         let allocation_entries = device_count * (live_units + geometry.backlog_generations as f64 * release_backlog_units);
-        let allocation_layers_now = tree_layers(allocation_entries.round() as u64, allocation_leaf_cap, allocation_internal_cap, 1);
+        let allocation_layers_now = tree_layers(truncate_f64_to_u64(allocation_entries.round()), allocation_leaf_cap, allocation_internal_cap, 1);
         let allocation_touch = if allocation_layers_now.len() == previous_touch_allocation.len() { previous_touch_allocation.clone() } else { vec![0.0; allocation_layers_now.len()] };
         let per_device_allocation_entries = allocation_entries / device_count;
         let bump_unit_count = previous_written_units + extra_allocation_release_insertions_node;
@@ -853,7 +854,7 @@ fn solve_fixed_point_core_with_variant(
         let allocation_total_nodes_now: u64 = allocation_layers_now.iter().sum();
 
         let mapping_entries = data_unit_count as f64 + extent_total_nodes as f64 + inode_total_nodes as f64 + allocation_total_nodes_now as f64 + 1.0;
-        let mapping_layers_now = tree_layers(mapping_entries.round() as u64, mapping_leaf_cap, mapping_internal_cap, 1);
+        let mapping_layers_now = tree_layers(truncate_f64_to_u64(mapping_entries.round()), mapping_leaf_cap, mapping_internal_cap, 1);
         let mapping_touch = if mapping_layers_now.len() == previous_touch_mapping.len() { previous_touch_mapping.clone() } else { vec![0.0; mapping_layers_now.len()] };
         let mapping_classes = [
             TreeClassActivity { region_entries: data_unit_count as f64, insert_count: distinct_data_units_touched, delete_count: distinct_data_units_touched, data_unit_totals: Some((data_unit_count as f64, distinct_data_units_touched)) },
@@ -935,6 +936,7 @@ fn layer_zero_is_mostly_dirty(layers: &[u64], dirty: &[f64]) -> bool {
     }
 }
 
+#[allow(clippy::too_many_arguments, reason = "这些参数是这一次计算彼此独立的输入，合成只用一次的结构体只多一层包装")]
 fn convergence_and_saturation_status(
     iterations: u64,
     maximum_iterations: u64,
@@ -1033,7 +1035,7 @@ fn solve_jia_publish_with_variant(shape: PoolShape, variant: AllocationVariant, 
     );
 
     let written_units = fsync_data_unit_count as f64 + core.written_units;
-    let named_items = written_units.round() as u64;
+    let named_items = truncate_f64_to_u64(written_units.round());
     let record_count = named_items.div_ceil(NAMED_ITEMS_PER_RECORD_MAIN).max(1);
     let unit_write_calls = named_items * DEVICE_COUNT;
     let record_calls = record_count * DEVICE_COUNT;
@@ -1047,13 +1049,13 @@ fn solve_jia_publish_with_variant(shape: PoolShape, variant: AllocationVariant, 
 
     JiaPublishOutcomeWithVariant {
         data_bytes: fsync_data_unit_count * UNIT_BYTES * DEVICE_COUNT,
-        extent_bytes: (extent_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
-        inode_container_bytes: (inode_container_dirty * UNIT_BYTES as f64).round() as u64 * DEVICE_COUNT,
-        inode_root_bytes: (inode_root_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
-        allocation_bytes: (allocation_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
-        accounting_bytes: (core.accounting_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
-        mapping_bytes: (mapping_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
-        tree_table_bytes: (core.tree_table_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT,
+        extent_bytes: truncate_f64_to_u64((extent_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT,
+        inode_container_bytes: truncate_f64_to_u64((inode_container_dirty * UNIT_BYTES as f64).round()) * DEVICE_COUNT,
+        inode_root_bytes: truncate_f64_to_u64((inode_root_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT,
+        allocation_bytes: truncate_f64_to_u64((allocation_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT,
+        accounting_bytes: truncate_f64_to_u64((core.accounting_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT,
+        mapping_bytes: truncate_f64_to_u64((mapping_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT,
+        tree_table_bytes: truncate_f64_to_u64((core.tree_table_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT,
         record_bytes: record_count * RECORD_BYTES * DEVICE_COUNT,
         root_slot_bytes: geometry_root_slot_bytes(),
         system_configuration_bytes: SYSTEM_CONFIGURATION_SLOT_BYTES * DEVICE_COUNT,
@@ -1106,20 +1108,21 @@ fn solve_write_ahead_log_fsync_bytes(shape: PoolShape, arm: WriteAheadLogArm) ->
         WriteAheadLogArm::WriteAheadLogLeaf => {
             let extent_leaf = extent_dirty[0];
             let inode_leaf = inode_dirty[0];
-            let dirty_leaves = (extent_leaf + inode_leaf).round() as u64;
+            let dirty_leaves = truncate_f64_to_u64((extent_leaf + inode_leaf).round());
             (extent_leaf, inode_leaf, 0.0, dirty_leaves)
         }
     };
     let record_count = named_items.div_ceil(NAMED_ITEMS_PER_RECORD_MAIN).max(1);
     let data_bytes = fsync_data_unit_count * UNIT_BYTES * DEVICE_COUNT;
-    let extent_bytes = (extent_component * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT;
-    let inode_container_bytes = (inode_container_component * UNIT_BYTES as f64).round() as u64 * DEVICE_COUNT;
-    let inode_root_bytes = (inode_root_component * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT;
+    let extent_bytes = truncate_f64_to_u64((extent_component * NODE_BYTES as f64).round()) * DEVICE_COUNT;
+    let inode_container_bytes = truncate_f64_to_u64((inode_container_component * UNIT_BYTES as f64).round()) * DEVICE_COUNT;
+    let inode_root_bytes = truncate_f64_to_u64((inode_root_component * NODE_BYTES as f64).round()) * DEVICE_COUNT;
     let record_bytes = record_count * RECORD_BYTES * DEVICE_COUNT;
     data_bytes + extent_bytes + inode_container_bytes + inode_root_bytes + record_bytes
 }
 
 /// R7 中间版计数：数据、extent、inode 分开（与第二次逐字相同）。
+#[allow(clippy::too_many_arguments, reason = "这些参数是这一次计算彼此独立的输入，合成只用一次的结构体只多一层包装")]
 fn intermediate_version_counts(shape: PoolShape, arm: WriteAheadLogArm, interval_fsyncs: u64, extent_layers: &[u64], dedup_extent_dirty: &[f64], inode_layers: &[u64], dedup_inode_dirty: &[f64], dedup_data_units_touched: f64) -> (f64, f64, f64) {
     let geometry = shape.geometry;
     let fsync_data_unit_count = shape.family.data_units_per_fsync();
@@ -1163,7 +1166,7 @@ fn solve_write_ahead_log_checkpoint_with_variant(shape: PoolShape, arm: WriteAhe
     let interval_data_unit_touch_count = interval_fsyncs as f64 * fsync_data_unit_count as f64;
 
     let extent_touch = match shape.placement {
-        Placement::Sequential => TouchSpecification::Continuous(interval_data_unit_touch_count.round() as u64),
+        Placement::Sequential => TouchSpecification::Continuous(truncate_f64_to_u64(interval_data_unit_touch_count.round())),
         Placement::Random => TouchSpecification::ScatteredContinuousGroups { group_count: interval_fsyncs, group_size: fsync_data_unit_count },
     };
     let inode_touch = match shape.placement {
@@ -1194,19 +1197,19 @@ fn solve_write_ahead_log_checkpoint_with_variant(shape: PoolShape, arm: WriteAhe
         WriteAheadLogArm::WriteAheadLogLeaf => {
             let extent_ancestors: f64 = core.extent_dirty[1..].iter().sum();
             let inode_ancestors: f64 = core.inode_dirty[1..].iter().sum();
-            (extent_ancestors, inode_ancestors, (extent_ancestors + inode_ancestors).round() as u64)
+            (extent_ancestors, inode_ancestors, truncate_f64_to_u64((extent_ancestors + inode_ancestors).round()))
         }
     };
     let fixed_point_units = allocation_dirty_total + core.accounting_dirty_total + mapping_dirty_total + core.tree_table_dirty_total;
-    let named_items = fixed_point_units.round() as u64 + extra_named_items;
+    let named_items = truncate_f64_to_u64(fixed_point_units.round()) + extra_named_items;
     let record_count = named_items.div_ceil(NAMED_ITEMS_PER_RECORD_MAIN).max(1);
 
-    let total_bytes = (extent_catch_up * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT
-        + (inode_root_catch_up * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT
-        + (allocation_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT
-        + (core.accounting_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT
-        + (mapping_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT
-        + (core.tree_table_dirty_total * NODE_BYTES as f64).round() as u64 * DEVICE_COUNT
+    let total_bytes = truncate_f64_to_u64((extent_catch_up * NODE_BYTES as f64).round()) * DEVICE_COUNT
+        + truncate_f64_to_u64((inode_root_catch_up * NODE_BYTES as f64).round()) * DEVICE_COUNT
+        + truncate_f64_to_u64((allocation_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT
+        + truncate_f64_to_u64((core.accounting_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT
+        + truncate_f64_to_u64((mapping_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT
+        + truncate_f64_to_u64((core.tree_table_dirty_total * NODE_BYTES as f64).round()) * DEVICE_COUNT
         + record_count * RECORD_BYTES * DEVICE_COUNT
         + geometry_root_slot_bytes()
         + SYSTEM_CONFIGURATION_SLOT_BYTES * DEVICE_COUNT;
@@ -1265,7 +1268,7 @@ struct BranchExpansionSummary {
 }
 
 /// G：从一格求解结束时的状态出发，冻住形状与 q，只让 W 往前滚，不阻尼（登记第一节「分支比」）。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "分支比的输入逐项摊开（形状、q、各树状态、滚动代数），拆结构体不会让哪一步更好验")]
 fn generational_branch_expansion(
     variant: AllocationVariant,
     allocation_layers: &[u64],
@@ -1471,7 +1474,7 @@ fn path_ratio_readings_with_variant(shape: PoolShape, variant: AllocationVariant
     let path_ratio_actual_height = tree_bytes / (DEVICE_COUNT as f64 * one_path_sum as f64);
     let path_ratio_node_width_bound = tree_bytes / (maximum_tree_height as f64 * 6.0 * NODE_BYTES as f64 * DEVICE_COUNT as f64);
     let path_ratio_unit_width_bound = tree_bytes / (maximum_tree_height as f64 * 6.0 * UNIT_BYTES as f64 * DEVICE_COUNT as f64);
-    (path_ratio_actual_height, path_ratio_node_width_bound, path_ratio_unit_width_bound, outcome.total_bytes(), tree_bytes as u64)
+    (path_ratio_actual_height, path_ratio_node_width_bound, path_ratio_unit_width_bound, outcome.total_bytes(), truncate_f64_to_u64(tree_bytes))
 }
 
 #[cfg(test)]
@@ -1489,9 +1492,9 @@ mod allocation_entries_tests {
         let append = solve_jia_publish_with_variant(shape_at(1), AllocationVariant::ReleaseAppendOnly, MAIN_DAMPING_ALPHA, MAIN_MAXIMUM_ITERATIONS, false);
         let epoch64 = AllocationVariant::ReleaseClusteredByEpoch { cluster_segment_slots: Some(CLUSTER_SEGMENT_SLOTS) };
         let epoch = solve_jia_publish_with_variant(shape_at(1), epoch64, MAIN_DAMPING_ALPHA, MAIN_MAXIMUM_ITERATIONS, false);
-        assert_eq!(baseline.core.allocation_entries_final.round() as u64, 402, "基线");
-        assert_eq!(append.core.allocation_entries_final.round() as u64, 786, "①");
-        assert_eq!(epoch.core.allocation_entries_final.round() as u64, 402, "②（K5 与基线相同）");
+        assert_eq!(truncate_f64_to_u64(baseline.core.allocation_entries_final.round()), 402, "基线");
+        assert_eq!(truncate_f64_to_u64(append.core.allocation_entries_final.round()), 786, "①");
+        assert_eq!(truncate_f64_to_u64(epoch.core.allocation_entries_final.round()), 402, "②（K5 与基线相同）");
         assert_eq!(baseline.total_bytes(), 344_576, "写字节三种写法相同（B-r3-5）");
         assert_eq!(append.total_bytes(), 344_576);
         assert_eq!(epoch.total_bytes(), 344_576);
@@ -1510,12 +1513,12 @@ mod allocation_entries_tests {
         // 不是 814）。这条测试只钉「门槛出现在 P=14→15 之间」这个定性结论与 P=14 那一侧的精确值，
         // 不钉过门槛之后的精确条目数——过门槛之后的数字本来就不是「一阶估计」能钉住的东西。
         let append_at_boundary = solve_jia_publish_with_variant(shape_at(14), AllocationVariant::ReleaseAppendOnly, MAIN_DAMPING_ALPHA, MAIN_MAXIMUM_ITERATIONS, false);
-        assert_eq!(append_at_boundary.core.allocation_entries_final.round() as u64, 812, "P=14 恰 812 条");
+        assert_eq!(truncate_f64_to_u64(append_at_boundary.core.allocation_entries_final.round()), 812, "P=14 恰 812 条");
         assert_eq!(append_at_boundary.core.allocation_layers.len(), 1);
         let append_past_boundary = solve_jia_publish_with_variant(shape_at(15), AllocationVariant::ReleaseAppendOnly, MAIN_DAMPING_ALPHA, MAIN_MAXIMUM_ITERATIONS, false);
         assert_eq!(append_past_boundary.core.allocation_layers.len(), 2, "P=15 应长到第 2 层（B-r3-6 的定性结论）");
         let baseline_at_fifteen_files = solve_jia_publish_with_variant(shape_at(15), AllocationVariant::Baseline, MAIN_DAMPING_ALPHA, MAIN_MAXIMUM_ITERATIONS, false);
-        assert_eq!(baseline_at_fifteen_files.core.allocation_entries_final.round() as u64, 430, "基线同一个 P 仍是 1 节点，条目数与 `anchors_r3_k5.py` 的一阶估计一致（未过门槛，两种算法本该吻合）");
+        assert_eq!(truncate_f64_to_u64(baseline_at_fifteen_files.core.allocation_entries_final.round()), 430, "基线同一个 P 仍是 1 节点，条目数与 `anchors_r3_k5.py` 的一阶估计一致（未过门槛，两种算法本该吻合）");
         assert_eq!(baseline_at_fifteen_files.core.allocation_layers.len(), 1);
     }
 
@@ -1570,7 +1573,7 @@ const FULLY_REWRITTEN_TOUCH_FRACTION: f64 = 1.0;
 
 /// SQ 的六个来源（登记第一节 SQ、第七节 B-r3-11）：额定重写的根/固定点用
 /// `FULLY_REWRITTEN_TOUCH_FRACTION`，其余四个用各自这一轮的触达比例。
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "六个来源各带自己的脏节点数与触达比例，拆结构体不会让哪一步更好验")]
 fn sq_sources(extent_dirty_total: f64, extent_touch_fraction: f64, inode_dirty_total: f64, inode_touch_fraction: f64, accounting_dirty_total: f64, tree_table_dirty_total: f64, allocation_dirty_total: f64, allocation_touch_fraction: f64, mapping_dirty_total: f64, mapping_touch_fraction: f64) -> [(f64, f64); 6] {
     [
         (extent_dirty_total, extent_touch_fraction),
@@ -1589,7 +1592,7 @@ fn sq_far_count_and_value(region_entries: f64, layer_coverage: f64, sources: &[(
     let far: f64 = sources.iter().map(|&(count, touch_fraction)| count * (1.0 - touch_fraction)).sum();
     let total: f64 = sources.iter().map(|&(count, _)| count).sum();
     let tail = total + (total - far) + data_units;
-    let node_count_at_layer = (region_entries / layer_coverage).ceil().max(1.0) as u64;
+    let node_count_at_layer = truncate_f64_to_u64((region_entries / layer_coverage).ceil().max(1.0));
     let continuous = continuous_groups_touch(node_count_at_layer, layer_coverage, &[tail], &[]);
     let value = combine_touches(node_count_at_layer, continuous, &[scattered_group_touch(far + data_units, region_entries, layer_coverage)]);
     (far, value)
@@ -1707,13 +1710,13 @@ fn main() {
                     let (unconverged, saturated) = core_convergence_and_saturation_status(&checkpoint.core, MAIN_MAXIMUM_ITERATIONS);
                     let fsync_bytes = solve_write_ahead_log_fsync_bytes(shape, arm);
                     let amortized_bytes = amortize(fsync_bytes, checkpoint.total_bytes, interval_fsyncs);
-                    let allocation_layer0_nodes = checkpoint.core.allocation_layers[0];
-                    let round_count = checkpoint.core.round_records.len();
-                    let (peak_ratio, rounds_above_half, final_ratio, delta_sign_changes, delta_median_abs_ratio, delta_label, mapping_peak_ratio) = round_trace_summary(&checkpoint.core.round_records, allocation_layer0_nodes, checkpoint.core.mapping_layers[0]);
+                    let checkpoint_bottom_allocation_nodes = checkpoint.core.allocation_layers[0];
+                    let checkpoint_round_count = checkpoint.core.round_records.len();
+                    let (peak_ratio, rounds_above_half, final_ratio, delta_sign_changes, delta_median_abs_ratio, delta_label, mapping_peak_ratio) = round_trace_summary(&checkpoint.core.round_records, checkpoint_bottom_allocation_nodes, checkpoint.core.mapping_layers[0]);
                     println!(
                         "{}",
                         emitter.emit_raw(&format!(
-                            "name=row8_grid family={} placement={} policy={} p={file_count} arm={} variant={variant_tag} fsync_bytes={fsync_bytes} amortized_bytes={amortized_bytes:.3} unconverged={unconverged} saturated_trees={saturated:?} allocation_layers={:?} mapping_layers={:?} allocation_layer0_dirty={:.6} mapping_layer0_dirty={:.6} iterations={} intermediate_version_total={:.6} round_count={round_count} t_peak_ratio={peak_ratio:.6} t_rounds_ge_half={rounds_above_half} t_final_ratio={final_ratio:.6} t_delta_sign_changes_last100={delta_sign_changes} t_delta_median_abs_ratio_last100={delta_median_abs_ratio:.6} t_label={delta_label} t_mapping_peak_ratio={mapping_peak_ratio:.6}",
+                            "name=row8_grid family={} placement={} policy={} p={file_count} arm={} variant={variant_tag} fsync_bytes={fsync_bytes} amortized_bytes={amortized_bytes:.3} unconverged={unconverged} saturated_trees={saturated:?} allocation_layers={:?} mapping_layers={:?} allocation_layer0_dirty={:.6} mapping_layer0_dirty={:.6} iterations={} intermediate_version_total={:.6} round_count={checkpoint_round_count} t_peak_ratio={peak_ratio:.6} t_rounds_ge_half={rounds_above_half} t_final_ratio={final_ratio:.6} t_delta_sign_changes_last100={delta_sign_changes} t_delta_median_abs_ratio_last100={delta_median_abs_ratio:.6} t_label={delta_label} t_mapping_peak_ratio={mapping_peak_ratio:.6}",
                             family.tag(),
                             shape.placement.tag(),
                             shape.policy.tag(),
@@ -1848,7 +1851,7 @@ fn round_trace_summary(round_records: &[RoundRecord], layer0_node_count: u64, ma
     (peak_ratio, rounds_above_half, final_ratio, sign_changes, median_abs_ratio, label, mapping_peak_ratio)
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, reason = "输出一行要带的各项逐个摊开，拆结构体不会少传哪一项")]
 fn emit_branch_expansion(emitter: &mut Emitter, arm_tag: &str, family: Family, file_count: u64, variant_tag: &str, variant: AllocationVariant, core: &FixedPointCoreOutcome, shape: PoolShape) {
     let allocation_leaf_cap = shape.geometry.leaf_capacity(node_capacity(ALLOCATION_KEY_BYTES, ALLOCATION_LEAF_ENTRY_BYTES));
     let allocation_internal_cap = shape.geometry.internal_capacity(ALLOCATION_KEY_BYTES);

@@ -24,6 +24,7 @@
 //! 负载：`rand` QD=1、`randq` QD=16、`seq`（用户字节 512 MiB，I/O 固定 1 MiB）。
 //! 判据与失败条款写在 `research/prompts/e140-preregistration.md`，装置写之前。
 
+use e7_index_bench::{low_byte_of_u64, low_byte_of_usize, u64_from_nanoseconds, usize_from_u64};
 use aes_gcm::{
     aead::{AeadInOut, KeyInit},
     Aes256Gcm, Nonce,
@@ -62,7 +63,7 @@ struct Aligned {
     length: usize,
     layout: Layout,
 }
-// 每个线程独占一个缓冲，不共享，跨线程移动是安全的。
+// SAFETY: `Aligned` 里的裸指针指向它自己独占的分配；每个线程独占一个缓冲、不共享，跨线程移动不会产生别名。
 unsafe impl Send for Aligned {}
 
 impl Aligned {
@@ -157,7 +158,7 @@ fn straddle_fraction(payload: usize) -> f64 {
 /// 页 k 的首字节落在哪个单元、净荷内偏移多少（净荷连续打包，文件偏移 4096k）。
 fn locate_page(page_index: u64, payload: usize) -> (u64, usize) {
     let file_offset = page_index * PAGE_BYTES as u64;
-    (file_offset / payload as u64, (file_offset % payload as u64) as usize)
+    (file_offset / payload as u64, usize_from_u64(file_offset % payload as u64))
 }
 
 /// 页 k 是否跨在两个单元上。
@@ -182,7 +183,7 @@ fn device_bytes_per_user_byte(payload: usize) -> f64 {
 
 /// 装 n 个用户字节要几个单元。
 fn units_for_user_bytes(user_bytes: u64, payload: usize) -> u64 {
-    (user_bytes + payload as u64 - 1) / payload as u64
+    user_bytes.div_ceil(payload as u64)
 }
 
 /// 两条臂一赢一输时的交叉点：随机页读占比 p* 使混合代价相等。
@@ -284,7 +285,7 @@ fn random_arm(
                 device_bytes += UNIT_BYTES as u64;
                 let verify_started = Instant::now();
                 sink = sink.wrapping_add(verify_unit(&cipher, &nonce, &mut buffer.as_mut_slice()[..UNIT_BYTES]) as u64);
-                verify_nanoseconds += verify_started.elapsed().as_nanos() as u64;
+                verify_nanoseconds += u64_from_nanoseconds(verify_started.elapsed().as_nanos());
                 sink = sink.wrapping_add(buffer.as_slice()[offset_in_unit] as u64);
             }
             PayloadLayout::Header { header_bytes, copy_out } => {
@@ -309,7 +310,7 @@ fn random_arm(
                         verify_unit(&cipher, &nonce, &mut buffer.as_mut_slice()[slot..slot + UNIT_BYTES]) as u64,
                     );
                 }
-                verify_nanoseconds += verify_started.elapsed().as_nanos() as u64;
+                verify_nanoseconds += u64_from_nanoseconds(verify_started.elapsed().as_nanos());
                 let first_piece = PAGE_BYTES.min(payload - offset_in_payload);
                 let source_start = header_bytes + offset_in_payload;
                 if copy_out {
@@ -321,7 +322,7 @@ fn random_arm(
                         let second_start = UNIT_BYTES + header_bytes;
                         target[first_piece..].copy_from_slice(&source[second_start..second_start + PAGE_BYTES - first_piece]);
                     }
-                    copy_nanoseconds += copy_started.elapsed().as_nanos() as u64;
+                    copy_nanoseconds += u64_from_nanoseconds(copy_started.elapsed().as_nanos());
                     sink = sink.wrapping_add(destination.as_slice()[0] as u64);
                 } else {
                     sink = sink.wrapping_add(buffer.as_slice()[source_start] as u64);
@@ -333,14 +334,14 @@ fn random_arm(
         }
         if let (Some(source), Some(target)) = (control_source.as_mut(), control_destination.as_mut()) {
             let copy_started = Instant::now();
-            source.as_mut_slice()[0] = sink as u8;
+            source.as_mut_slice()[0] = low_byte_of_u64(sink);
             target.as_mut_slice().copy_from_slice(source.as_slice());
-            copy_nanoseconds += copy_started.elapsed().as_nanos() as u64;
+            copy_nanoseconds += u64_from_nanoseconds(copy_started.elapsed().as_nanos());
             sink = sink.wrapping_add(target.as_slice()[0] as u64);
         }
     }
     ArmResult {
-        elapsed_nanoseconds: started.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(started.elapsed().as_nanos()),
         verify_nanoseconds,
         copy_nanoseconds,
         device_bytes,
@@ -390,7 +391,7 @@ fn random_arm_queued(path: &str, direct: bool, layout: PayloadLayout, page_count
         total.straddled_pages += part.straddled_pages;
         total.sink = total.sink.wrapping_add(part.sink);
     }
-    total.elapsed_nanoseconds = started.elapsed().as_nanos() as u64;
+    total.elapsed_nanoseconds = u64_from_nanoseconds(started.elapsed().as_nanos());
     total
 }
 
@@ -406,7 +407,7 @@ fn sequential_arm(path: &str, direct: bool, layout: PayloadLayout) -> ArmResult 
         PayloadLayout::Header { header_bytes, copy_out } => (payload_bytes(header_bytes), header_bytes, copy_out),
     };
     let units = units_for_user_bytes(SEQUENTIAL_USER_BYTES, payload);
-    let request_count = (units + units_per_request as u64 - 1) / units_per_request as u64;
+    let request_count = units.div_ceil(units_per_request as u64);
     let mut sink = 0u64;
     let mut verify_nanoseconds = 0u64;
     let mut copy_nanoseconds = 0u64;
@@ -418,7 +419,7 @@ fn sequential_arm(path: &str, direct: bool, layout: PayloadLayout) -> ArmResult 
         for unit in buffer.as_mut_slice().chunks_mut(UNIT_BYTES) {
             sink = sink.wrapping_add(verify_unit(&cipher, &nonce, unit) as u64);
         }
-        verify_nanoseconds += verify_started.elapsed().as_nanos() as u64;
+        verify_nanoseconds += u64_from_nanoseconds(verify_started.elapsed().as_nanos());
         if copy_out {
             let copy_started = Instant::now();
             let source = buffer.as_slice();
@@ -429,14 +430,14 @@ fn sequential_arm(path: &str, direct: bool, layout: PayloadLayout) -> ArmResult 
                 target[target_start..target_start + payload]
                     .copy_from_slice(&source[source_start..source_start + payload]);
             }
-            copy_nanoseconds += copy_started.elapsed().as_nanos() as u64;
+            copy_nanoseconds += u64_from_nanoseconds(copy_started.elapsed().as_nanos());
             sink = sink.wrapping_add(destination.as_slice()[0] as u64);
         } else {
             sink = sink.wrapping_add(buffer.as_slice()[header_bytes] as u64);
         }
     }
     ArmResult {
-        elapsed_nanoseconds: started.elapsed().as_nanos() as u64,
+        elapsed_nanoseconds: u64_from_nanoseconds(started.elapsed().as_nanos()),
         verify_nanoseconds,
         copy_nanoseconds,
         device_bytes: request_count * SEQUENTIAL_REQUEST_BYTES as u64,
@@ -467,7 +468,7 @@ fn fill(path: &str, region: u64) {
     eprintln!("填充测试区 {} MiB …", region / (1024 * 1024));
     let mut buffer = Aligned::new(SEQUENTIAL_REQUEST_BYTES);
     for (index, byte) in buffer.as_mut_slice().iter_mut().enumerate() {
-        *byte = (index as u8).wrapping_mul(31).wrapping_add(7);
+        *byte = low_byte_of_usize(index).wrapping_mul(31).wrapping_add(7);
     }
     file.seek(SeekFrom::Start(0)).expect("seek 失败");
     for _ in 0..(region / SEQUENTIAL_REQUEST_BYTES as u64) {
@@ -574,7 +575,7 @@ fn main() {
         "{}",
         emitter.emit_raw(&format!(
             "name=warmup reads={WARM_UP_READS} elapsed_ns={} sink={warm_up_sink}",
-            warm_up_started.elapsed().as_nanos() as u64
+            u64_from_nanoseconds(warm_up_started.elapsed().as_nanos())
         ))
     );
 
