@@ -1,0 +1,677 @@
+//! 选段打分里每段活槽数那两份 WGSL 核在真显卡上与 CPU 参照（核心层的 `compaction_plan::live_slots_per_cluster_segment_by_the_records`）对拍、
+//! 两份核彼此对拍（D26（后台整理与放置回收） 已定项 13「GPU 路径与 CPU 路径是两份实现……两份实现在测试里对拍」）。
+//! 只开服务经 `GPU_CARDS_BY_PRIORITY` 交给这个进程、属于这一台的那几张卡（`common_discrete_gpus_of_this_host`）：服务没交这一台的卡时每条打一行
+//! `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、返回成功；交了卡却对不上本机的独显、或开不了判红。源头没声明张数，服务分一张。
+//! 只在开了特性 `tests-on-a-real-gpu` 时编；用 GPU。统一任务服务只调配 CPU，任务不拿卡（`.claude/rules/verification.md`「卡只归 GPU 服务，任务不拿卡」）：
+//! 卡经环境变量 `GPU_CARDS_BY_PRIORITY` 交来，没交来、也没有领卡通道的报「本次未跑」。
+//! 开卡时每张参与的卡的显存上限给 1 GiB（`common_discrete_gpus_of_this_host`），专门测小上限切片的几条照用更小的。
+//!
+//! 两块单元区：默认环长下的那一块（6 个整段加末尾 10 个槽），与起点在槽 2^32 − 128 的那一块（第 3 个整段从槽 2^32 起，槽号的高 32 位在段中间进位）。
+//! 每块上的记录：起点在单元区之前、罩进头一个段的；段里的普通记录；释放了的；别的盘上的；跨两段的；同一个落点两条（各算一次）；
+//! 跨好几个段的长记录；落在末尾凑不满一段那一截的；跨过槽 2^32 的；另有一串别的盘上的记录，只为让记录表大过参与的卡至少要装得下的那一片
+//! （区域扫描那一段切开的单元头一片，972 字节）：给小上限、要切段或切记录表的用例，上限不比那一片小、卡照样参与。
+//!
+//! 对拍分两段、经判定库交接（[`live_slot_batches_concluded_on_the_cards_through_the_pairing_library`]）：每条用例先把两块单元区连同各自的记录编成字节过库，
+//! 只录那一趟到此返回、不开卡；判段的对拍结论按键入库复用（读回输入的摘要、参照一侧与这条用例 GPU 一侧的判法单元键、交来的卡的适配器），库里有两边一致的不开卡；
+//! 要现判的从库里读回，交给 GPU 的记录与比的 CPU 参照都是读回的那一份。每条用例的持卡判入口是 `judged_on_the_cards_that_<用例名>`
+//! （登记在 `tests/pairing_units_entries.tsv` 的 GPU 一侧那几行）。
+//!
+//! 用例红了（panic）展开时照常丢后台 GPU：一批等超过上限、重交 3 次都没做完时那次提交可能还在卡上跑，产品的 `BackgroundGpu` 丢的时候不等它、
+//! 泄漏那张卡（wgpu-core 30.0.1 `Queue::drop` 调 `vkQueueWaitIdle`，不带上限），用例在等 GPU 的上限（连同重交）之内报出红。
+mod common_discrete_gpus_of_this_host;
+mod common_independent_reference_projections;
+mod common_independent_references;
+mod common_pairing_input_through_the_library;
+
+use common_discrete_gpus_of_this_host::{
+    background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_not_run,
+    handed_over_gpus_or_report_not_run, opened_background_gpu, selection_over_the_handed_over_gpus,
+    HandedOverGpusSeenThroughTheInstance,
+};
+use common_independent_reference_projections::live_slots_worked_out_independently_on;
+use common_pairing_input_through_the_library::PairingJudged;
+use common_pairing_input_through_the_library::{
+    append_count, append_number, judgement_of_the_assertions_on_the_cards,
+    pairing_concluded_on_the_cards_through_the_pairing_library, ComparisonOnTheCards,
+    PairingInputBeingRead,
+};
+use singlefs_background_gpu::background_gpu::{BackgroundGpu, LiveSlotBatchFailed};
+use singlefs_background_gpu::gpus_of_this_host::bytes_of_the_smallest_piece_every_participating_gpu_holds;
+use singlefs_background_gpu::live_slot_kernels::{
+    cpu_reference_live_slots, live_slot_chunk_footprint, AllocationRecordTablesForTheKernels,
+    SEGMENT_BOUND_BYTES,
+};
+use singlefs_background_gpu::memory_limit_and_chunks::EntryCountOfAChunk;
+use singlefs_background_gpu::two_kernel_reconciliation::{
+    ConsecutiveUncertaintyCounts, EntryDecision,
+};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
+use singlefs_core::allocator::{AllocationRecord, AllocationRecordQuarantineMark, UnitAreaStart};
+use singlefs_core::background_compute::GpuMemoryInBytes;
+use singlefs_core::compaction_plan::{
+    cluster_segment_entry_keys_of_the_unit_area, UnitAreaOfOneDevice,
+};
+use singlefs_core::logged_operations::CompactionRegion;
+use singlefs_core::system_configuration::JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION;
+
+/// 等 GPU 的上限：这几批在健康的卡上远用不了这么久。
+const WAIT_LIMIT_OF_THE_GPU_TESTS: std::time::Duration = std::time::Duration::from_secs(60);
+const UNIT_AREA_DEVICE: DeviceIdentity = DeviceIdentity(0);
+const OTHER_DEVICE: DeviceIdentity = DeviceIdentity(1);
+/// 别的盘上垫进记录表的记录条数：连同单元区那 13 条共 50 条、记录表 1200 字节，比参与的卡至少要装得下的那一片（972 字节）大，
+/// 小上限的用例才切得到段与记录表。它们不在单元区那块盘上，不改任何一段的活槽数。
+const RECORDS_ON_THE_OTHER_DEVICE_TO_FILL_THE_TABLE: u64 = 37;
+/// 每块单元区的整段数。
+const FULL_SEGMENTS_PER_UNIT_AREA: u64 = 6;
+/// 末尾凑不满一段的那一截有几个槽。
+const TRAILING_SLOTS_PAST_THE_FULL_SEGMENTS: u64 = 10;
+
+fn segment_slots() -> u64 {
+    CompactionRegion::of_one_cluster_segment(
+        UNIT_AREA_DEVICE,
+        UnitAreaStart::of_the_default_journal_ring().slot(),
+    )
+    .expect("单元区起点落在段边界上")
+    .slot_count()
+}
+
+/// 起点在 `start_slot` 的单元区：journal 环照第一版的环起点、长到这个槽为止（单元区起点就是环末尾的下一个槽）。
+fn unit_area_starting_at(start_slot: u64) -> UnitAreaOfOneDevice {
+    let slot_bytes = SlotNumber(1).to_device_offset().0;
+    let journal_ring_bytes =
+        (start_slot - JOURNAL_RING_START_SLOT_OF_THE_FIRST_VERSION.0) * slot_bytes;
+    let start = UnitAreaStart::following_the_journal_ring(journal_ring_bytes)
+        .expect("起点是段宽的整数倍：落在聚簇段边界上");
+    assert_eq!(
+        start.slot(),
+        SlotNumber(start_slot),
+        "环末尾的下一个槽就是这一块的起点"
+    );
+    UnitAreaOfOneDevice {
+        device: UNIT_AREA_DEVICE,
+        start,
+        slots: FULL_SEGMENTS_PER_UNIT_AREA * segment_slots()
+            + TRAILING_SLOTS_PAST_THE_FULL_SEGMENTS,
+    }
+}
+
+fn the_two_unit_areas() -> [UnitAreaOfOneDevice; 2] {
+    [
+        unit_area_starting_at(UnitAreaStart::of_the_default_journal_ring().slot().0),
+        unit_area_starting_at((1_u64 << 32) - 2 * segment_slots()),
+    ]
+}
+
+fn record(
+    device: DeviceIdentity,
+    slot: u64,
+    span_slots: u16,
+    is_released: bool,
+) -> AllocationRecord {
+    AllocationRecord {
+        device,
+        slot: SlotNumber(slot),
+        span_slots,
+        generation: CheckpointTxg(5),
+        is_released,
+        quarantine_mark: AllocationRecordQuarantineMark::NotQuarantined,
+    }
+}
+
+/// 一块单元区上的记录（见文件头），按与槽号无关的次序交（两份核一份按表的次序走、一份按排好的序号查）。
+fn records_on(unit_area: UnitAreaOfOneDevice) -> Vec<AllocationRecord> {
+    let start = unit_area.start.slot().0;
+    let width = segment_slots();
+    vec![
+        record(UNIT_AREA_DEVICE, start + 3 * width + 10, 2, false),
+        record(UNIT_AREA_DEVICE, start - 3, 5, false),
+        record(UNIT_AREA_DEVICE, start, 2, false),
+        record(UNIT_AREA_DEVICE, start + 5, 1, false),
+        record(UNIT_AREA_DEVICE, start + 7, 2, true),
+        record(OTHER_DEVICE, start + 9, 2, false),
+        record(UNIT_AREA_DEVICE, start + width - 1, 2, false),
+        record(UNIT_AREA_DEVICE, start + width + 6, 2, false),
+        record(UNIT_AREA_DEVICE, start + width + 6, 2, false),
+        record(UNIT_AREA_DEVICE, start + width + 36, 200, false),
+        record(UNIT_AREA_DEVICE, (1_u64 << 32) - 1, 2, false),
+        record(
+            UNIT_AREA_DEVICE,
+            start + FULL_SEGMENTS_PER_UNIT_AREA * width + 2,
+            3,
+            false,
+        ),
+        record(UNIT_AREA_DEVICE, start + 5 * width + 60, 2, true),
+    ]
+    .into_iter()
+    .chain(
+        (0..RECORDS_ON_THE_OTHER_DEVICE_TO_FILL_THE_TABLE).map(|position_on_the_other_device| {
+            record(
+                OTHER_DEVICE,
+                start + 2 * width + 2 * position_on_the_other_device,
+                2,
+                false,
+            )
+        }),
+    )
+    .collect()
+}
+
+/// 一块单元区连同它上面的记录：一条用例交给 GPU 与 CPU 参照的一批。
+struct LiveSlotBatch {
+    unit_area: UnitAreaOfOneDevice,
+    records: Vec<AllocationRecord>,
+    /// CPU 参照在只录那一段数好、写进库的每段活槽数。
+    reference_live_slots: Vec<u64>,
+}
+
+/// 两块单元区连同各自的记录编成对拍输入的字节：批数，逐批是单元区的起点槽、槽数、记录条数，
+/// 逐条记录是盘号、槽号、跨几个槽、代、释放没有（0 或 1），都是 8 字节小端。
+fn pairing_input_bytes_of_the_live_slot_batches() -> Vec<u8> {
+    let mut input_bytes = Vec::new();
+    let unit_areas = the_two_unit_areas();
+    append_count(&mut input_bytes, unit_areas.len());
+    for unit_area in unit_areas {
+        assert_eq!(unit_area.device, UNIT_AREA_DEVICE);
+        append_number(&mut input_bytes, unit_area.start.slot().0);
+        append_number(&mut input_bytes, unit_area.slots);
+        let records = records_on(unit_area);
+        append_count(&mut input_bytes, records.len());
+        for record_of_the_batch in records {
+            assert_eq!(
+                record_of_the_batch.quarantine_mark,
+                AllocationRecordQuarantineMark::NotQuarantined,
+                "这几批的记录都没隔离：隔离记号不进对拍输入"
+            );
+            append_number(&mut input_bytes, u64::from(record_of_the_batch.device.0));
+            append_number(&mut input_bytes, record_of_the_batch.slot.0);
+            append_number(&mut input_bytes, u64::from(record_of_the_batch.span_slots));
+            append_number(&mut input_bytes, record_of_the_batch.generation.0);
+            append_number(&mut input_bytes, u64::from(record_of_the_batch.is_released));
+        }
+    }
+    input_bytes
+}
+
+/// [`pairing_input_bytes_of_the_live_slot_batches`] 的反向。
+fn live_slot_batches_of_the_pairing_input_bytes(
+    input_bytes: &[u8],
+) -> Vec<(UnitAreaOfOneDevice, Vec<AllocationRecord>)> {
+    let mut input = PairingInputBeingRead::from_the_start_of(input_bytes);
+    let batch_count = input.take_count();
+    let batches = (0..batch_count)
+        .map(|_batch| {
+            let unit_area = unit_area_starting_at(input.take_number());
+            assert_eq!(
+                unit_area.slots,
+                input.take_number(),
+                "读回的单元区槽数与这份测试的单元区相同"
+            );
+            let record_count = input.take_count();
+            let records = (0..record_count)
+                .map(|_record| AllocationRecord {
+                    device: DeviceIdentity(
+                        u32::try_from(input.take_number()).expect("写下的盘号装得进 u32"),
+                    ),
+                    slot: SlotNumber(input.take_number()),
+                    span_slots: u16::try_from(input.take_number()).expect("写下的跨槽数装得进 u16"),
+                    generation: CheckpointTxg(input.take_number()),
+                    is_released: match input.take_number() {
+                        0 => false,
+                        1 => true,
+                        other => panic!("释放没有只写 0 或 1，读回 {other}"),
+                    },
+                    quarantine_mark: AllocationRecordQuarantineMark::NotQuarantined,
+                })
+                .collect();
+            (unit_area, records)
+        })
+        .collect();
+    input.finish();
+    batches
+}
+
+/// 一条活槽数真卡对拍用例走这一条：两块单元区连同各自的记录过判定库（项名用用例名），参照一侧是登记表里活槽核 CPU 参照那一组，
+/// 判段的对拍结论按键入库复用（`common_pairing_input_through_the_library::pairing_concluded_on_the_cards_through_the_pairing_library`）。
+/// 要现判的才调 `judged_on_the_cards`（这条用例的持卡判入口）。
+fn live_slot_batches_concluded_on_the_cards_through_the_pairing_library(
+    test_name: &str,
+    judged_on_the_cards: impl FnOnce(&str, &[u8], &[u8]) -> PairingJudged,
+) {
+    pairing_concluded_on_the_cards_through_the_pairing_library(
+        test_name,
+        "cpu_reference_of_the_live_slot_kernels",
+        pairing_input_bytes_of_the_live_slot_batches,
+        reference_bytes_of_the_live_slot_pairing_input,
+        judged_on_the_cards,
+    );
+}
+
+/// 持卡判那一段解读回的输入与参照：两批，各带 CPU 参照在只录那一段数好的每段活槽数；读回的 CPU 参照先与独立参照
+/// （`common_independent_references`）逐段比，GPU 两份核再各与 CPU 参照比：三方两两相等。
+fn live_slot_batches_read_back(input_bytes: &[u8], reference_bytes: &[u8]) -> Vec<LiveSlotBatch> {
+    let mut reference = PairingInputBeingRead::from_the_start_of(reference_bytes);
+    let batch_count = reference.take_count();
+    let batches_read_back = live_slot_batches_of_the_pairing_input_bytes(input_bytes);
+    assert_eq!(batch_count, batches_read_back.len(), "参照与输入的批数相同");
+    let batches: Vec<LiveSlotBatch> = batches_read_back
+        .into_iter()
+        .map(|(unit_area, records)| {
+            let segment_count = reference.take_count();
+            LiveSlotBatch {
+                unit_area,
+                records,
+                reference_live_slots: (0..segment_count)
+                    .map(|_segment| reference.take_number())
+                    .collect(),
+            }
+        })
+        .collect();
+    reference.finish();
+    for batch in &batches {
+        assert_eq!(
+            batch.reference_live_slots,
+            live_slots_worked_out_independently_on(&batch.records, batch.unit_area),
+            "读回的 CPU 参照与独立参照（差分表加前缀和数的每段活槽数）逐段相同（单元区起点槽 {}）",
+            batch.unit_area.start.slot().0
+        );
+    }
+    batches
+}
+
+/// 活槽数对拍参照一侧的入口（登记在 `tests/pairing_units_entries.tsv` 的参照一侧那几行）：对拍输入里每一批的 CPU 参照每段活槽数，编成字节
+/// （批数，逐批是段数与每段的活槽数，都是 8 字节小端）。只录那一段调它。
+fn reference_bytes_of_the_live_slot_pairing_input(input_bytes: &[u8]) -> Vec<u8> {
+    let batches = live_slot_batches_of_the_pairing_input_bytes(input_bytes);
+    let mut reference_bytes = Vec::new();
+    append_count(&mut reference_bytes, batches.len());
+    for (unit_area, records) in batches {
+        let reference = cpu_reference_live_slots(&records, unit_area);
+        assert!(
+            reference
+                .iter()
+                .filter(|live_slots| **live_slots > 0)
+                .count()
+                >= 4,
+            "参照里活槽不为 0 的段够多（不然对拍什么都没比）：{reference:?}"
+        );
+        append_count(&mut reference_bytes, reference.len());
+        for live_slots in reference {
+            append_number(&mut reference_bytes, live_slots);
+        }
+    }
+    reference_bytes
+}
+
+/// 两份核在一块单元区上各数一遍，交回每段两份的数与 CPU 参照的数。
+fn both_kernels_and_the_cpu_reference_on(
+    background_gpu: &mut BackgroundGpu,
+    LiveSlotBatch {
+        unit_area,
+        records,
+        reference_live_slots,
+    }: &LiveSlotBatch,
+) -> (Vec<(u64, u64)>, Vec<u64>) {
+    let unit_area = *unit_area;
+    let segments = cluster_segment_entry_keys_of_the_unit_area(unit_area);
+    let both = background_gpu
+        .both_kernel_live_slots_of_the_cluster_segments(records, unit_area, &segments)
+        .expect("健康的卡上一批交得成");
+    (both, reference_live_slots.clone())
+}
+
+#[test]
+fn the_kernel_walking_every_record_matches_the_cpu_reference_on_both_unit_areas() {
+    live_slot_batches_concluded_on_the_cards_through_the_pairing_library(
+        "the_kernel_walking_every_record_matches_the_cpu_reference_on_both_unit_areas",
+        judged_on_the_cards_that_the_kernel_walking_every_record_matches_the_cpu_reference_on_both_unit_areas,
+    );
+}
+
+/// 持卡判入口（登记在 `tests/pairing_units_entries.tsv` 的 GPU 一侧那几行）：开交来的卡，逐条走遍记录那一份核在两块单元区上逐段与读回的 CPU 参照比。
+fn judged_on_the_cards_that_the_kernel_walking_every_record_matches_the_cpu_reference_on_both_unit_areas(
+    test_name: &str,
+    input_bytes: &[u8],
+    reference_bytes: &[u8],
+) -> PairingJudged {
+    judgement_of_the_assertions_on_the_cards(test_name, || {
+        let batches = live_slot_batches_read_back(input_bytes, reference_bytes);
+        let Some(mut background_gpu) =
+            background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_not_run(
+                test_name,
+                WAIT_LIMIT_OF_THE_GPU_TESTS,
+            )
+        else {
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        };
+        for batch in &batches {
+            let unit_area = batch.unit_area;
+            let (both, reference) =
+                both_kernels_and_the_cpu_reference_on(&mut background_gpu, batch);
+            let walking: Vec<u64> = both.iter().map(|(walking, _searching)| *walking).collect();
+            assert_eq!(
+                walking, reference,
+                "逐条走遍记录那一份核与 CPU 参照逐段相同：单元区起点 {:?}",
+                unit_area.start
+            );
+        }
+        ComparisonOnTheCards::EveryComparisonHeld
+    })
+}
+
+#[test]
+fn the_kernel_searching_the_sorted_records_matches_the_cpu_reference_on_both_unit_areas() {
+    live_slot_batches_concluded_on_the_cards_through_the_pairing_library(
+        "the_kernel_searching_the_sorted_records_matches_the_cpu_reference_on_both_unit_areas",
+        judged_on_the_cards_that_the_kernel_searching_the_sorted_records_matches_the_cpu_reference_on_both_unit_areas,
+    );
+}
+
+/// 持卡判入口（登记在 `tests/pairing_units_entries.tsv` 的 GPU 一侧那几行）：开交来的卡，二分查排好的序号那一份核在两块单元区上逐段与读回的 CPU 参照比。
+fn judged_on_the_cards_that_the_kernel_searching_the_sorted_records_matches_the_cpu_reference_on_both_unit_areas(
+    test_name: &str,
+    input_bytes: &[u8],
+    reference_bytes: &[u8],
+) -> PairingJudged {
+    judgement_of_the_assertions_on_the_cards(test_name, || {
+        let batches = live_slot_batches_read_back(input_bytes, reference_bytes);
+        let Some(mut background_gpu) =
+            background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_not_run(
+                test_name,
+                WAIT_LIMIT_OF_THE_GPU_TESTS,
+            )
+        else {
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        };
+        for batch in &batches {
+            let unit_area = batch.unit_area;
+            let (both, reference) =
+                both_kernels_and_the_cpu_reference_on(&mut background_gpu, batch);
+            let searching: Vec<u64> = both
+                .iter()
+                .map(|(_walking, searching)| *searching)
+                .collect();
+            assert_eq!(
+                searching, reference,
+                "二分查排好的序号那一份核与 CPU 参照逐段相同：单元区起点 {:?}",
+                unit_area.start
+            );
+        }
+        ComparisonOnTheCards::EveryComparisonHeld
+    })
+}
+
+#[test]
+fn the_two_live_slot_kernels_confirm_every_segment_on_a_healthy_gpu() {
+    live_slot_batches_concluded_on_the_cards_through_the_pairing_library(
+        "the_two_live_slot_kernels_confirm_every_segment_on_a_healthy_gpu",
+        judged_on_the_cards_that_the_two_live_slot_kernels_confirm_every_segment_on_a_healthy_gpu,
+    );
+}
+
+/// 持卡判入口（登记在 `tests/pairing_units_entries.tsv` 的 GPU 一侧那几行）：开交来的卡，两份核对账逐段全部确认、确认的数与读回的 CPU 参照比。
+fn judged_on_the_cards_that_the_two_live_slot_kernels_confirm_every_segment_on_a_healthy_gpu(
+    test_name: &str,
+    input_bytes: &[u8],
+    reference_bytes: &[u8],
+) -> PairingJudged {
+    judgement_of_the_assertions_on_the_cards(test_name, || {
+        let batches = live_slot_batches_read_back(input_bytes, reference_bytes);
+        let Some(mut background_gpu) =
+            background_gpu_on_the_handed_over_gpus_under_one_gibibyte_each_or_report_not_run(
+                test_name,
+                WAIT_LIMIT_OF_THE_GPU_TESTS,
+            )
+        else {
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        };
+        let LiveSlotBatch {
+            unit_area,
+            records,
+            reference_live_slots,
+        } = &batches[0];
+        let unit_area = *unit_area;
+        let segments = cluster_segment_entry_keys_of_the_unit_area(unit_area);
+        let mut uncertainty = ConsecutiveUncertaintyCounts::with_no_entry_uncertain();
+        let reconciled = background_gpu
+            .count_live_slots_per_cluster_segment(records, unit_area, &segments, &mut uncertainty)
+            .expect("健康的卡上一批交得成");
+        assert_eq!(
+            (
+                reconciled.confirmed_entries,
+                reconciled.uncertain_entries,
+                reconciled.entries_judged_by_the_cpu_reference
+            ),
+            (segments.len(), 0, 0),
+            "两份核彼此逐段相同：全部确认"
+        );
+        let confirmed: Vec<u64> = reconciled
+            .decisions
+            .iter()
+            .map(|decision| match decision {
+                EntryDecision::ConfirmedByBothKernels(live_slots) => *live_slots,
+                EntryDecision::UncertainThisRound | EntryDecision::JudgedByTheCpuReference(_) => {
+                    panic!("健康的卡上不该有不确定的段：{decision:?}")
+                }
+            })
+            .collect();
+        assert_eq!(&confirmed, reference_live_slots);
+        ComparisonOnTheCards::EveryComparisonHeld
+    })
+}
+
+/// 第 3 条「一批放不下就切成几次交」：开卡就给每张卡「装得下两个段、装不下这块单元区的全部段」的显存上限（由这一批的记录表现算：
+/// 整份记录表与参数每段各占一份，每个段另占上下界与两份核的结果、回读暂存），两份核的数照样逐段与 CPU 参照相同。这个上限比量代价那一段小，
+/// 开卡时量代价那一段照它切成几片量，不拒挂载。
+#[test]
+fn the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_the_same_live_slots()
+{
+    live_slot_batches_concluded_on_the_cards_through_the_pairing_library(
+        "the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_the_same_live_slots",
+        judged_on_the_cards_that_the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_the_same_live_slots,
+    );
+}
+
+/// 持卡判入口（登记在 `tests/pairing_units_entries.tsv` 的 GPU 一侧那几行）：每批照「装得下两个段、装不下全部段」的上限开卡，切成几段交的两份核逐段与读回的 CPU 参照比。
+fn judged_on_the_cards_that_the_memory_limit_smaller_than_the_batch_cuts_the_segments_into_chunks_with_the_same_live_slots(
+    test_name: &str,
+    input_bytes: &[u8],
+    reference_bytes: &[u8],
+) -> PairingJudged {
+    judgement_of_the_assertions_on_the_cards(test_name, || {
+        let batches = live_slot_batches_read_back(input_bytes, reference_bytes);
+        let Some(HandedOverGpusSeenThroughTheInstance {
+            vulkan_instance,
+            gpus: handed_over_gpus,
+        }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+        else {
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        };
+        for batch in &batches {
+            let unit_area = batch.unit_area;
+            let footprint = live_slot_chunk_footprint(
+                &AllocationRecordTablesForTheKernels::of_the_allocation_records(&batch.records),
+            );
+            let segment_count = EntryCountOfAChunk::of_this_many_entries(
+                cluster_segment_entry_keys_of_the_unit_area(unit_area).len(),
+            );
+            let two_segments = footprint
+                .bytes_held_by_a_chunk(
+                    EntryCountOfAChunk(2).input_bytes_of_the_entries(SEGMENT_BOUND_BYTES),
+                    EntryCountOfAChunk(2),
+                )
+                .0;
+            let every_segment = footprint
+                .bytes_held_by_a_chunk(
+                    segment_count.input_bytes_of_the_entries(SEGMENT_BOUND_BYTES),
+                    segment_count,
+                )
+                .0;
+            assert!(
+                segment_count > EntryCountOfAChunk(2)
+                    && two_segments < every_segment
+                    && two_segments
+                        >= bytes_of_the_smallest_piece_every_participating_gpu_holds().0,
+                "上限 {two_segments} 字节装得下两个段、装不下全部 {} 个段（{every_segment} 字节）",
+                segment_count.0
+            );
+            // 上限比量代价那一段小：切开量，不拒挂载
+            let mut background_gpu = opened_background_gpu(
+                &vulkan_instance,
+                &selection_over_the_handed_over_gpus(
+                    &handed_over_gpus,
+                    GpuMemoryInBytes(two_segments),
+                    WAIT_LIMIT_OF_THE_GPU_TESTS,
+                ),
+            );
+            let (both, reference) =
+                both_kernels_and_the_cpu_reference_on(&mut background_gpu, batch);
+            assert_eq!(
+                both,
+                reference
+                    .iter()
+                    .map(|live_slots| (*live_slots, *live_slots))
+                    .collect::<Vec<_>>(),
+                "切成几段交，两份核的数照样逐段与 CPU 参照相同：单元区起点 {:?}",
+                unit_area.start
+            );
+        }
+        ComparisonOnTheCards::EveryComparisonHeld
+    })
+}
+
+/// 装不下自适应分片：上限取参与的卡至少要装得下的那一片（卡照样参与），连整份记录表加一个段都装不下，记录表按记录切成几片、
+/// 各片数出的逐段相加，两份核的数照样逐段与 CPU 参照相同。
+#[test]
+fn the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_same_live_slots() {
+    live_slot_batches_concluded_on_the_cards_through_the_pairing_library(
+        "the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_same_live_slots",
+        judged_on_the_cards_that_the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_same_live_slots,
+    );
+}
+
+/// 持卡判入口（登记在 `tests/pairing_units_entries.tsv` 的 GPU 一侧那几行）：上限取参与的卡至少要装得下的那一片开卡，记录表切成几片交的两份核逐段与读回的 CPU 参照比。
+fn judged_on_the_cards_that_the_memory_limit_smaller_than_the_record_table_cuts_it_into_slices_with_the_same_live_slots(
+    test_name: &str,
+    input_bytes: &[u8],
+    reference_bytes: &[u8],
+) -> PairingJudged {
+    judgement_of_the_assertions_on_the_cards(test_name, || {
+        let batches = live_slot_batches_read_back(input_bytes, reference_bytes);
+        let Some(HandedOverGpusSeenThroughTheInstance {
+            vulkan_instance,
+            gpus: handed_over_gpus,
+        }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+        else {
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        };
+        let memory_limit_holding_the_smallest_piece =
+            bytes_of_the_smallest_piece_every_participating_gpu_holds().0;
+        for batch in &batches {
+            let unit_area = batch.unit_area;
+            let whole_table_and_one_segment = live_slot_chunk_footprint(
+                &AllocationRecordTablesForTheKernels::of_the_allocation_records(&batch.records),
+            )
+            .bytes_held_by_a_chunk(SEGMENT_BOUND_BYTES, EntryCountOfAChunk(1))
+            .0;
+            assert!(
+                memory_limit_holding_the_smallest_piece < whole_table_and_one_segment,
+                "整份记录表加一个段（{whole_table_and_one_segment} 字节）装不下：要切"
+            );
+            // 上限装得下最小的一片：不拒挂载
+            let mut background_gpu = opened_background_gpu(
+                &vulkan_instance,
+                &selection_over_the_handed_over_gpus(
+                    &handed_over_gpus,
+                    GpuMemoryInBytes(memory_limit_holding_the_smallest_piece),
+                    WAIT_LIMIT_OF_THE_GPU_TESTS,
+                ),
+            );
+            let (both, reference) =
+                both_kernels_and_the_cpu_reference_on(&mut background_gpu, batch);
+            assert_eq!(
+                both,
+                reference
+                    .iter()
+                    .map(|live_slots| (*live_slots, *live_slots))
+                    .collect::<Vec<_>>(),
+                "记录表切成几片、各片相加，两份核的数照样逐段与 CPU 参照相同：单元区起点 {:?}",
+                unit_area.start
+            );
+        }
+        ComparisonOnTheCards::EveryComparisonHeld
+    })
+}
+
+/// 连一片都装不下就不用这张卡：每张卡的显存上限都比最小的一片少一个字节——开卡不拒挂载、不 panic，
+/// 参与的卡一张都不剩、每张都报出来（卡、上限、至少要多少），交一批报「连最小的一片都装不下」（核心层当 GPU 用不上那一态）。
+#[test]
+fn the_memory_limit_below_the_smallest_piece_leaves_every_gpu_out_without_refusing_the_opening() {
+    live_slot_batches_concluded_on_the_cards_through_the_pairing_library(
+        "the_memory_limit_below_the_smallest_piece_leaves_every_gpu_out_without_refusing_the_opening",
+        judged_on_the_cards_that_the_memory_limit_below_the_smallest_piece_leaves_every_gpu_out_without_refusing_the_opening,
+    );
+}
+
+/// 持卡判入口（登记在 `tests/pairing_units_entries.tsv` 的 GPU 一侧那几行）：上限比最小的一片少一个字节开卡：参与的卡一张不剩、每张都报出来，交一批报「连最小的一片都装不下」。
+fn judged_on_the_cards_that_the_memory_limit_below_the_smallest_piece_leaves_every_gpu_out_without_refusing_the_opening(
+    test_name: &str,
+    input_bytes: &[u8],
+    reference_bytes: &[u8],
+) -> PairingJudged {
+    judgement_of_the_assertions_on_the_cards(test_name, || {
+        let batches = live_slot_batches_read_back(input_bytes, reference_bytes);
+        let Some(HandedOverGpusSeenThroughTheInstance {
+            vulkan_instance,
+            gpus: handed_over_gpus,
+        }) = handed_over_gpus_or_report_not_run(test_name, WAIT_LIMIT_OF_THE_GPU_TESTS)
+        else {
+            return ComparisonOnTheCards::NotRunOnTheseCards;
+        };
+        let smallest_piece_bytes = bytes_of_the_smallest_piece_every_participating_gpu_holds().0;
+        // 上限装不下最小的一片：不用这些卡，不拒挂载
+        let mut background_gpu = opened_background_gpu(
+            &vulkan_instance,
+            &selection_over_the_handed_over_gpus(
+                &handed_over_gpus,
+                GpuMemoryInBytes(smallest_piece_bytes - 1),
+                WAIT_LIMIT_OF_THE_GPU_TESTS,
+            ),
+        );
+        assert!(
+            background_gpu.participating_gpus().is_empty(),
+            "参与的卡一张都不剩"
+        );
+        assert_eq!(
+            background_gpu
+                .gpus_left_out_under_their_memory_limit()
+                .len(),
+            handed_over_gpus.len(),
+            "交来的每张都报出来"
+        );
+        assert!(background_gpu
+            .gpus_left_out_under_their_memory_limit()
+            .iter()
+            .all(
+                |left_out| left_out.memory_limit == GpuMemoryInBytes(smallest_piece_bytes - 1)
+                    && left_out.smallest_piece_bytes == GpuMemoryInBytes(smallest_piece_bytes)
+            ));
+        let LiveSlotBatch {
+            unit_area, records, ..
+        } = &batches[0];
+        let unit_area = *unit_area;
+        let segments = cluster_segment_entry_keys_of_the_unit_area(unit_area);
+        assert!(
+            matches!(
+                background_gpu.both_kernel_live_slots_of_the_cluster_segments(
+                    records,
+                    unit_area,
+                    &segments
+                ),
+                Err(LiveSlotBatchFailed::EveryParticipatingGpuLeftOutUnderItsMemoryLimit(left_out))
+                    if left_out.as_slice() == background_gpu.gpus_left_out_under_their_memory_limit()
+            ),
+            "交一批：报参与的卡一张都不剩，带每张被晾下的卡"
+        );
+        ComparisonOnTheCards::EveryComparisonHeld
+    })
+}

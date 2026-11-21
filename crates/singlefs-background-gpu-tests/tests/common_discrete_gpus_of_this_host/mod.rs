@@ -14,8 +14,13 @@
 //! 照服务判跑错卡的同一个读法（`task-server/task_server.py` 的 `compute_processes_now`：`nvidia-smi --query-compute-apps` 列出的进程号与卡的 UUID，
 //! UUID 经 `--query-gpu=index,uuid` 对到序号）认这个进程在哪几张卡上，上了别的卡判红；读不成打 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、
 //! 交回 [`GpusThisProcessIsOn::NotReadSoThisRunIsNotRun`] 让调用方看得见（对拍用例照它交回没跑成、不入库），不当绿。
-//! 一条用例只建一个 Vulkan 实例：服务交了这一台的卡时 [`handed_over_gpus_or_report_not_run`] 建一份 [`VulkanInstanceOfThisProcess`]，连同交来的卡交回，
-//! 这条用例里对卡、开卡、再枚举都用它；服务没交卡时不建（不碰 GPU）。
+//! 一个进程只建一个 Vulkan 实例（[`VULKAN_INSTANCE_OF_THIS_TEST_PROCESS`]）：服务交了这一台的卡时，进程里头一次取卡的那条用例建它，
+//! 之后各条用例取卡（[`handed_over_gpus_or_report_not_run`]）都连同交来的卡交回它的克隆（指同一个实例），对卡、开卡、再枚举都用它；
+//! 服务没交卡时不建（不碰 GPU）。建它的是哪一条用例只看哪一条先取卡，单跑哪一条都由那一条建。
+//! 取卡打的那一行（「本次未跑」的记号行与交了卡的那一行）拼法在 [`line_reporting_the_gpus_taken`]；核这个进程在哪几张卡上时读不成、读到空打的
+//! 「本次未跑」记号行同样经 [`not_run_line_of_the_test`] 拼，结局与那一行由不打行的 [`gpus_this_process_is_on_and_the_line_to_print`] 定。
+//! 这几行的字、读不成与读到空时交回的结局、取卡时先读 `nvidia-smi` 后取实例的先后，
+//! 不要卡的单测在 `tests/real_gpu_tests_create_one_vulkan_instance_per_process_and_none_without_handed_over_gpus.rs`。
 #![allow(dead_code, reason = "几份测试文件各自 mod 进来，只用到其中一部分")]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -452,9 +457,10 @@ pub fn identifiers_of_the_handed_over_gpus(
         .collect()
 }
 
-/// 服务交来、对上了本机 Vulkan 独显的卡（照交来的次序），连同对卡时枚举用的那一份 Vulkan 实例：这条用例里开卡、再枚举都用它，不另建。
-pub struct HandedOverGpusSeenThroughTheInstance {
-    pub vulkan_instance: VulkanInstanceOfThisProcess,
+/// 服务交来、对上了本机 Vulkan 独显的卡（照交来的次序），连同对卡时枚举用的那一份 Vulkan 实例（这个进程的那一份的克隆，指同一个实例）：
+/// 用例里开卡、再枚举都用它，不另建。`Instance` 只在不要卡的单测里换成数建了几次的替身。
+pub struct HandedOverGpusSeenThroughTheInstance<Instance = VulkanInstanceOfThisProcess> {
+    pub vulkan_instance: Instance,
     pub gpus: Vec<HandedOverGpu>,
 }
 
@@ -589,7 +595,7 @@ pub enum GpusThisProcessIsOn {
 }
 
 /// 挂载之后、卸载之前调：这个进程此刻在哪几张卡上有设备（[`nvidia_smi_indices_the_process_is_on`]，读法同服务判跑错卡），判法在
-/// [`gpus_this_process_is_on_judged_against_the_handed_over`]。
+/// [`gpus_this_process_is_on_and_the_line_to_print`]，打行在 [`gpus_this_process_is_on_judged_against_the_handed_over`]。
 ///
 /// # Panics
 /// 这个进程上了交来的卡之外的卡。
@@ -613,34 +619,51 @@ pub fn assert_this_process_is_on_no_gpu_but_the_handed_over_or_report_not_run(
     )
 }
 
-/// 读到的这个进程所在的卡（`indices_the_process_is_on`，读不成是 `Err`）与交来的卡比：有一张不是交来的就判红；
-/// 读不成、或读到一张卡都不在（此刻交来的卡上开着设备，读到空就是这个读法看不见它的设备）打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>`、
-/// 交回 [`GpusThisProcessIsOn::NotReadSoThisRunIsNotRun`]，不判红；读到了打一行 `GPUS_THIS_PROCESS_IS_ON test=<用例名> nvidia_smi_indices=<序号，逗号隔开>`。
+/// 核这个进程在哪几张卡上的结局与要打的那一行（[`gpus_this_process_is_on_and_the_line_to_print`] 交回，还没打）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GpusThisProcessIsOnAndTheLineToPrint {
+    pub outcome: GpusThisProcessIsOn,
+    /// 结局是 [`GpusThisProcessIsOn::NotReadSoThisRunIsNotRun`] 时是 `NOT_RUN_NO_GPU_ADAPTER` 那一行，
+    /// 是 [`GpusThisProcessIsOn::OnlyTheHandedOver`] 时是 `GPUS_THIS_PROCESS_IS_ON` 那一行。
+    pub line_to_print: String,
+}
+
+/// 读到的这个进程所在的卡（`indices_the_process_is_on`，读不成是 `Err`）与交来的卡比，定结局与要打的那一行，自己不打（打在
+/// [`gpus_this_process_is_on_judged_against_the_handed_over`]）：读不成、或读到一张卡都不在（此刻交来的卡上开着设备，读到空就是这个读法看不见它的设备）
+/// 是 [`GpusThisProcessIsOn::NotReadSoThisRunIsNotRun`] 与 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>`（拼法在
+/// [`not_run_line_when_the_gpus_of_the_process_are_not_read`] 与 [`not_run_line_when_the_process_is_seen_on_no_gpu`]，进程号是 `process_identifier`）；
+/// 读到了、都是交来的卡，是 [`GpusThisProcessIsOn::OnlyTheHandedOver`] 与 `GPUS_THIS_PROCESS_IS_ON test=<用例名> nvidia_smi_indices=<序号，逗号隔开>`。
+/// 不打行是为了让不要卡的单测直接核交回的结局与那一行：测试自己打出 `NOT_RUN_NO_GPU_ADAPTER` 行，变异判法就把那条测试记成本次未跑。
 ///
 /// # Panics
-/// 这个进程上了交来的卡之外的卡。
-pub fn gpus_this_process_is_on_judged_against_the_handed_over(
+/// 这个进程上了交来的卡之外的卡（`GPUS_THIS_PROCESS_IS_ON` 那一行写在 panic 的话里）。
+pub fn gpus_this_process_is_on_and_the_line_to_print(
     test_name: &str,
     indices_the_process_is_on: Result<BTreeSet<NvidiaSmiIndex>, String>,
     handed_over_gpus: &[HandedOverGpu],
-) -> GpusThisProcessIsOn {
+    process_identifier: u32,
+) -> GpusThisProcessIsOnAndTheLineToPrint {
     let indices_the_process_is_on = match indices_the_process_is_on {
         Ok(indices_the_process_is_on) if indices_the_process_is_on.is_empty() => {
-            println!(
-                "NOT_RUN_NO_GPU_ADAPTER test={test_name} reason=nvidia-smi 列的计算进程里没有这个进程（进程号 {}），而交来的卡上开着它的设备：读法看不见它",
-                std::process::id()
-            );
-            return GpusThisProcessIsOn::NotReadSoThisRunIsNotRun;
+            return GpusThisProcessIsOnAndTheLineToPrint {
+                outcome: GpusThisProcessIsOn::NotReadSoThisRunIsNotRun,
+                line_to_print: not_run_line_when_the_process_is_seen_on_no_gpu(
+                    test_name,
+                    process_identifier,
+                ),
+            };
         }
         Ok(indices_the_process_is_on) => indices_the_process_is_on,
         Err(reason) => {
-            println!(
-                "NOT_RUN_NO_GPU_ADAPTER test={test_name} reason=读不成这个进程在哪几张卡上：{reason}"
-            );
-            return GpusThisProcessIsOn::NotReadSoThisRunIsNotRun;
+            return GpusThisProcessIsOnAndTheLineToPrint {
+                outcome: GpusThisProcessIsOn::NotReadSoThisRunIsNotRun,
+                line_to_print: not_run_line_when_the_gpus_of_the_process_are_not_read(
+                    test_name, &reason,
+                ),
+            };
         }
     };
-    println!(
+    let gpus_line = format!(
         "GPUS_THIS_PROCESS_IS_ON test={test_name} nvidia_smi_indices={}",
         indices_the_process_is_on
             .iter()
@@ -652,9 +675,31 @@ pub fn gpus_this_process_is_on_judged_against_the_handed_over(
         nvidia_smi_indices_not_handed_over(&indices_the_process_is_on, handed_over_gpus);
     assert!(
         not_handed_over.is_empty(),
-        "这个进程上了服务没交给它的卡（nvidia-smi 序号 {not_handed_over:?}；交来的是 {handed_over_gpus:?}）"
+        "这个进程上了服务没交给它的卡（nvidia-smi 序号 {not_handed_over:?}；交来的是 {handed_over_gpus:?}；读到的：{gpus_line}）"
     );
-    GpusThisProcessIsOn::OnlyTheHandedOver
+    GpusThisProcessIsOnAndTheLineToPrint {
+        outcome: GpusThisProcessIsOn::OnlyTheHandedOver,
+        line_to_print: gpus_line,
+    }
+}
+
+/// [`gpus_this_process_is_on_and_the_line_to_print`]（进程号取这个进程的）定的那一行打到标准输出，交回它定的结局。
+///
+/// # Panics
+/// 这个进程上了交来的卡之外的卡。
+pub fn gpus_this_process_is_on_judged_against_the_handed_over(
+    test_name: &str,
+    indices_the_process_is_on: Result<BTreeSet<NvidiaSmiIndex>, String>,
+    handed_over_gpus: &[HandedOverGpu],
+) -> GpusThisProcessIsOn {
+    let judged = gpus_this_process_is_on_and_the_line_to_print(
+        test_name,
+        indices_the_process_is_on,
+        handed_over_gpus,
+        std::process::id(),
+    );
+    println!("{}", judged.line_to_print);
+    judged.outcome
 }
 
 /// 这个进程按需领到的卡（与 `GPU_CARDS_BY_PRIORITY` 同格式）：服务起跑没交卡、给了领卡通道时，测试包到判段要开卡的那一刻才领
@@ -667,6 +712,16 @@ pub fn note_the_cards_leased_on_demand_for_this_process(cards: &str) {
     CARDS_LEASED_ON_DEMAND_FOR_THIS_PROCESS.get_or_init(|| cards.to_string());
 }
 
+/// 这个测试进程的那一份 Vulkan 实例：服务交了这一台的卡时，进程里头一次取卡（[`handed_over_gpus_or_report_not_run`]）建它，之后各次取卡都交它的克隆、
+/// 不再建；服务没交卡的进程里一直不建。为什么一个进程只建一个：同一个进程里新建的实例多了，Vulkan 驱动不一定还认得出独显
+/// （[`VulkanInstanceOfThisProcess`] 文档「为什么一个进程只建一个」那一段）。实例看到的驱动清单定在建它那一刻，要另看一份驱动清单的用例
+/// （Vulkan 驱动全藏起来的那一次）在它自己起的子进程里另建，不取这一份。
+/// 建它的那一次 panic 了，这一格照旧是空的（`OnceLock::get_or_init` 的初始化 panic 不留值），下一条取卡的用例再建一次：这一条不守。
+/// 建实例按 [`VulkanInstanceOfThisProcess::created_for_this_process`] 的约定不报错（驱动不在也交回实例），走到 panic 只有 wgpu 自己倒下这一种；
+/// 倒下的那条用例已经红了；下一条再建也只建一份（再倒下就照样红），一个进程里建的个数不超过取卡的用例数，建成之后不再建。
+static VULKAN_INSTANCE_OF_THIS_TEST_PROCESS: std::sync::OnceLock<VulkanInstanceOfThisProcess> =
+    std::sync::OnceLock::new();
+
 /// 跑一次 `nvidia-smi`（[`NVIDIA_SMI_INDEX_AND_PCI_BUS_ARGUMENTS`]）读每张卡的序号与总线地址。
 fn pci_buses_reported_by_nvidia_smi() -> Result<BTreeMap<NvidiaSmiIndex, String>, String> {
     pci_buses_by_nvidia_smi_index(&output_of_nvidia_smi(
@@ -674,8 +729,130 @@ fn pci_buses_reported_by_nvidia_smi() -> Result<BTreeMap<NvidiaSmiIndex, String>
     )?)
 }
 
-/// 服务交给这个进程、属于这一台的卡，逐张对上本机的 Vulkan 独显，照交来的次序；连同对卡时建的那一份 Vulkan 实例交回（这条用例里开卡、再枚举都用它）。
-/// 服务没交卡、或交的卡里没有这一台的：不建实例，打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 报「本次未跑」、交回 `None`。
+/// 照交来的卡取卡的结局（[`handed_over_gpus_through_the_instance_kept_for_this_process`]）。
+pub enum GpusTakenThroughTheInstanceKeptForThisProcess<Instance> {
+    /// 服务没交卡、或交的卡里没有这一台的（带一句原因）：没取实例，也没读 `nvidia-smi`。
+    NotRun { reason: String },
+    /// 这一台交来的卡逐张对上了这个进程那一份实例看得到的独显，连同那一份实例的克隆。
+    Handed(HandedOverGpusSeenThroughTheInstance<Instance>),
+}
+
+/// 照 `GPU_CARDS_BY_PRIORITY` 的值（`handover_variable_value`，没设是 `None`）挑这一台的卡（[`gpus_handed_to_this_host`]），读本机每张卡的序号与总线地址
+/// （`pci_buses_reported`），取这个进程的那一份实例，逐张对上它看得到的独显（`pci_bus_addresses_seen_through` 在这一份实例上枚举）。
+/// 实例放在 `instance_kept`：还没有时这一次由 `instance_created` 建、存进去，已有就交它的克隆，一个进程里取几次卡都只建一次。
+/// 服务没交卡、或交的卡里没有这一台的：在读 `nvidia-smi` 与取实例之前交回 [`GpusTakenThroughTheInstanceKeptForThisProcess::NotRun`]，不建实例、不碰 GPU。
+/// 交了这一台的卡：先读本机的卡、再取实例，读不成本机的卡就在建实例之前判红。
+/// 读本机的几样与建实例都从参数来：真卡那一份是 [`handed_over_gpus_or_report_not_run`]，不要卡的单测换上现造的输入与数建了几次的替身。
+///
+/// # Panics
+/// 变量读不成、认不出这一台、读不成本机的卡、交来的卡有一张对不上实例看得到的独显：判红。
+pub fn handed_over_gpus_through_the_instance_kept_for_this_process<Instance: Clone>(
+    handover_variable_value: Option<&str>,
+    this_host_address: impl FnOnce() -> Result<String, String>,
+    pci_buses_reported: impl FnOnce() -> Result<BTreeMap<NvidiaSmiIndex, String>, String>,
+    instance_kept: &std::sync::OnceLock<Instance>,
+    instance_created: impl FnOnce() -> Instance,
+    pci_bus_addresses_seen_through: impl FnOnce(&Instance) -> Vec<String>,
+) -> GpusTakenThroughTheInstanceKeptForThisProcess<Instance> {
+    let handed_to_this_host = gpus_handed_to_this_host(handover_variable_value, this_host_address)
+        .unwrap_or_else(|reason| panic!("服务交的卡认不成：{reason}"));
+    let handed_over_indices = match handed_to_this_host {
+        GpusHandedToThisHost::NotRun { reason } => {
+            return GpusTakenThroughTheInstanceKeptForThisProcess::NotRun { reason };
+        }
+        GpusHandedToThisHost::Handed(handed_over_indices) => handed_over_indices,
+    };
+    let pci_buses_by_index = pci_buses_reported().unwrap_or_else(|reason| {
+        panic!("服务交了卡（序号 {handed_over_indices:?}），读不成本机的卡：{reason}")
+    });
+    let vulkan_instance = instance_kept.get_or_init(instance_created).clone();
+    let pci_bus_addresses_of_the_discrete_adapters =
+        pci_bus_addresses_seen_through(&vulkan_instance);
+    let handed_over_gpus = handed_over_gpus_matched_to_the_adapters(
+        &handed_over_indices,
+        &pci_buses_by_index,
+        &pci_bus_addresses_of_the_discrete_adapters,
+    )
+    .unwrap_or_else(|not_matched| {
+        panic!(
+            "服务交的卡对不上本机的 Vulkan 独显：{not_matched:?}（nvidia-smi 报的 {pci_buses_by_index:?}，本机独显 {pci_bus_addresses_of_the_discrete_adapters:?}）"
+        )
+    });
+    GpusTakenThroughTheInstanceKeptForThisProcess::Handed(HandedOverGpusSeenThroughTheInstance {
+        vulkan_instance,
+        gpus: handed_over_gpus,
+    })
+}
+
+/// 这一条记「本次未跑」时打的那一行：`NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>`。门禁、变异判法与任务服务按行首这个记号认「本次未跑」
+/// （`scripts/mutation/crates-mutation-rows.py` 的 `NOT_RUN_LINE`：记号、空格、`test=` 接不带空白的用例名，再接 ` reason=` 与原因；
+/// `task-server/task_server.py` 的 `gpu_not_run_test`）。
+#[must_use]
+pub fn not_run_line_of_the_test(test_name: &str, reason: &str) -> String {
+    format!("NOT_RUN_NO_GPU_ADAPTER test={test_name} reason={reason}")
+}
+
+/// 读不成这个进程在哪几张卡上时（[`gpus_this_process_is_on_and_the_line_to_print`]）要打的那一行：
+/// [`not_run_line_of_the_test`]，原因带读不成的那一句 `reason_not_read`。
+#[must_use]
+pub fn not_run_line_when_the_gpus_of_the_process_are_not_read(
+    test_name: &str,
+    reason_not_read: &str,
+) -> String {
+    not_run_line_of_the_test(
+        test_name,
+        &format!("读不成这个进程在哪几张卡上：{reason_not_read}"),
+    )
+}
+
+/// 读到这个进程一张卡都不在时（[`gpus_this_process_is_on_and_the_line_to_print`]；此刻交来的卡上开着设备，读到空就是这个读法看不见它的设备）
+/// 要打的那一行：[`not_run_line_of_the_test`]，原因带这个进程的进程号 `process_identifier`。
+#[must_use]
+pub fn not_run_line_when_the_process_is_seen_on_no_gpu(
+    test_name: &str,
+    process_identifier: u32,
+) -> String {
+    not_run_line_of_the_test(
+        test_name,
+        &format!(
+            "nvidia-smi 列的计算进程里没有这个进程（进程号 {process_identifier}），而交来的卡上开着它的设备：读法看不见它"
+        ),
+    )
+}
+
+/// 取到这一台的卡时打的那一行：`GPUS_HANDED_OVER_BY_THE_TASK_SERVER test=<用例名> gpus=<nvidia-smi 序号>@<wgpu 报的总线地址>,…`，照交来的次序、逗号隔开。
+#[must_use]
+pub fn handed_over_gpus_line_of_the_test(test_name: &str, gpus: &[HandedOverGpu]) -> String {
+    format!(
+        "GPUS_HANDED_OVER_BY_THE_TASK_SERVER test={test_name} gpus={}",
+        gpus.iter()
+            .map(|gpu| format!("{}@{}", gpu.nvidia_smi_index.0, gpu.pci_bus_address))
+            .collect::<Vec<_>>()
+            .join(",")
+    )
+}
+
+/// 取卡的结局（[`handed_over_gpus_through_the_instance_kept_for_this_process`] 交回的）对应打的那一行：服务没交卡、或交的卡里没有这一台的
+/// 打 [`not_run_line_of_the_test`]（带结局里的原因），交了这一台的卡打 [`handed_over_gpus_line_of_the_test`]。
+#[must_use]
+pub fn line_reporting_the_gpus_taken<Instance>(
+    test_name: &str,
+    taken: &GpusTakenThroughTheInstanceKeptForThisProcess<Instance>,
+) -> String {
+    match taken {
+        GpusTakenThroughTheInstanceKeptForThisProcess::NotRun { reason } => {
+            not_run_line_of_the_test(test_name, reason)
+        }
+        GpusTakenThroughTheInstanceKeptForThisProcess::Handed(handed_over) => {
+            handed_over_gpus_line_of_the_test(test_name, &handed_over.gpus)
+        }
+    }
+}
+
+/// 服务交给这个进程、属于这一台的卡，逐张对上本机的 Vulkan 独显，照交来的次序；连同这个进程的那一份 Vulkan 实例（[`VULKAN_INSTANCE_OF_THIS_TEST_PROCESS`]，
+/// 进程里头一次取卡时建）的克隆交回（用例里开卡、再枚举都用它）。判法在 [`handed_over_gpus_through_the_instance_kept_for_this_process`]，
+/// 打哪一行在 [`line_reporting_the_gpus_taken`]：服务没交卡、或交的卡里没有这一台的，不建实例，打 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>`
+/// 报「本次未跑」、交回 `None`。
 ///
 /// # Panics
 /// 变量读不成、多机配置判法认不出这一台、`nvidia-smi` 起不来或读不成、交来的卡有一张对不上本机的独显：判红。
@@ -688,46 +865,21 @@ pub fn handed_over_gpus_or_report_not_run(
         std::env::var(VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER)
             .ok()
             .or_else(|| CARDS_LEASED_ON_DEMAND_FOR_THIS_PROCESS.get().cloned());
-    let handed_to_this_host = gpus_handed_to_this_host(
+    let taken = handed_over_gpus_through_the_instance_kept_for_this_process(
         handover_variable_value.as_deref(),
         this_host_address_by_the_configuration_check,
-    )
-    .unwrap_or_else(|reason| panic!("服务交的卡认不成：{reason}"));
-    let handed_over_indices = match handed_to_this_host {
-        GpusHandedToThisHost::NotRun { reason } => {
-            println!("NOT_RUN_NO_GPU_ADAPTER test={test_name} reason={reason}");
-            return None;
-        }
-        GpusHandedToThisHost::Handed(handed_over_indices) => handed_over_indices,
-    };
-    let pci_buses_by_index = pci_buses_reported_by_nvidia_smi().unwrap_or_else(|reason| {
-        panic!("服务交了卡（序号 {handed_over_indices:?}），读不成本机的卡：{reason}")
-    });
-    let vulkan_instance = VulkanInstanceOfThisProcess::created_for_this_process();
-    let pci_bus_addresses_of_the_discrete_adapters =
-        pci_bus_addresses_of_the_discrete_gpus_on_this_host(&vulkan_instance, wait_limit);
-    let handed_over_gpus = handed_over_gpus_matched_to_the_adapters(
-        &handed_over_indices,
-        &pci_buses_by_index,
-        &pci_bus_addresses_of_the_discrete_adapters,
-    )
-    .unwrap_or_else(|not_matched| {
-        panic!(
-            "服务交的卡对不上本机的 Vulkan 独显：{not_matched:?}（nvidia-smi 报的 {pci_buses_by_index:?}，本机独显 {pci_bus_addresses_of_the_discrete_adapters:?}）"
-        )
-    });
-    println!(
-        "GPUS_HANDED_OVER_BY_THE_TASK_SERVER test={test_name} gpus={}",
-        handed_over_gpus
-            .iter()
-            .map(|gpu| format!("{}@{}", gpu.nvidia_smi_index.0, gpu.pci_bus_address))
-            .collect::<Vec<_>>()
-            .join(",")
+        pci_buses_reported_by_nvidia_smi,
+        &VULKAN_INSTANCE_OF_THIS_TEST_PROCESS,
+        VulkanInstanceOfThisProcess::created_for_this_process,
+        |vulkan_instance| {
+            pci_bus_addresses_of_the_discrete_gpus_on_this_host(vulkan_instance, wait_limit)
+        },
     );
-    Some(HandedOverGpusSeenThroughTheInstance {
-        vulkan_instance,
-        gpus: handed_over_gpus,
-    })
+    println!("{}", line_reporting_the_gpus_taken(test_name, &taken));
+    match taken {
+        GpusTakenThroughTheInstanceKeptForThisProcess::NotRun { .. } => None,
+        GpusTakenThroughTheInstanceKeptForThisProcess::Handed(handed_over) => Some(handed_over),
+    }
 }
 
 /// 同 [`handed_over_gpus_or_report_not_run`]，再照交来的次序取头 `declared_gpu_count` 张（这一份源头声明的张数，[`handed_over_gpus_of_the_declared_count`]）。

@@ -2,9 +2,10 @@
 //! 录入键、清单、按内容摘要存都是验证包那一份逻辑，这里不另算键、不另存）。对拍分两段：录入段把输入写进库、登清单，只录那一趟到此返回、不开卡；
 //! 判段照同一份输入现算录入键、从库里读回，开卡之后交给 GPU 的与算 CPU 参照用的都是读回的那一份。
 //! 段由环境变量 `SINGLEFS_CRASH_AMPLIFICATION_STAGE` 定（`record` 只录、`judge` 只判、不设是同一个进程里先录后判）。
-//! 一边是 CPU 参照、一边要上卡的对拍，判段判完的结论也入库（[`pairing_concluded_on_the_cards_through_the_pairing_library`]）：键是读回输入的摘要、
-//! 参照一侧与 GPU 一侧的判法单元键（验证包 `crash_library::pairing_conclusion_reused_or_judged`，键与存法都是那一份），库里有两边一致的复用、
-//! 不领卡不开卡；没有、或记着红的，领卡、跑持卡判、照同一把键存（红的照存）。
+//! 一边是 CPU 参照、一边要上卡的对拍，判段判完的结论也入库（[`pairing_concluded_on_the_cards_through_the_pairing_library`]）：交给验证包
+//! `crash_library::pairing_conclusion_reused_or_judged` 的输入摘要是读回输入的摘要拼上参照一侧与 GPU 一侧的判法单元键
+//! （[`pairing_inputs_digest_with_both_sides`]：两边是被测的产品代码与用例的持卡判入口，单测的复用键照旧收它们），库里有两边一致的复用、
+//! 不领卡不开卡；没有、或记着红的，领卡、跑持卡判、照同一把键存（红的照存）；哪一边拒算照判、不入库。
 #![allow(dead_code, reason = "几份测试文件各自 mod 进来，只用到其中一部分")]
 
 use std::cell::Cell;
@@ -14,22 +15,38 @@ use crate::common_discrete_gpus_of_this_host::{
     VARIABLE_OF_THE_GPUS_HANDED_OVER_BY_THE_TASK_SERVER,
 };
 use singlefs_verification::crash_identity::{
-    judging_units_key, judging_units_key_of_the_group_in_the_table_text, JudgingUnits,
-    JudgingUnitsKey,
+    judging_units_key_of_the_group_in_the_table_text, JudgingUnitsKey,
 };
 use singlefs_verification::crash_library::{
     pairing_conclusion_reused_or_judged,
     pairing_input_and_reference_through_the_library_under_the_recording_key,
     pairing_input_and_reference_through_the_pairing_library,
     pairing_input_through_the_pairing_library,
-    recording_key_of_the_pairing_input_and_the_reference_units, toolchain_of_this_process,
-    CrashLibrary, CrashLibraryClass, ItemName, PairingConclusionSource, PairingJudged,
-    RecordingKeyOfThisRun, RunStage, StageOutcome,
+    recording_key_of_the_pairing_input_and_the_reference_units, CrashLibrary, CrashLibraryClass,
+    ItemName, PairingConclusionSource, PairingJudged, RecordingKeyOfThisRun, RunStage,
+    StageOutcome,
 };
 use singlefs_verification::gpu_card_configuration::{
     cards_handed_over_or_leased_on_demand, CardLeaseChannelOfTheCaller,
 };
+use singlefs_verification::sha256::{sha256_digest, DIGEST_BYTES};
 use singlefs_verification::verdict_store::PairingAgreement;
+
+/// 交给验证包对拍结论入口的输入摘要：读回输入的摘要、参照一侧与 GPU 一侧的判法单元指纹带标签接起来取 SHA-256。验证包的对拍结论键只是
+/// 输入摘要；这两边是被测的产品代码（参照与 GPU 那一份实现）与用例的持卡判入口，单测的复用键照旧收它们，拼进输入摘要里：哪一边的代码变了，
+/// 摘要跟着变、那一条现判。
+#[must_use]
+pub fn pairing_inputs_digest_with_both_sides(
+    input_digest: &[u8; DIGEST_BYTES],
+    reference_units: &JudgingUnitsKey,
+    gpu_side_units: &JudgingUnitsKey,
+) -> [u8; DIGEST_BYTES] {
+    let mut message = b"singlefs background gpu pairing inputs with both sides\n".to_vec();
+    message.extend_from_slice(input_digest);
+    message.extend_from_slice(reference_units.fingerprint());
+    message.extend_from_slice(gpu_side_units.fingerprint());
+    sha256_digest(&message)
+}
 
 /// 构建脚本写下的参照单元键表（`build.rs`，入口登记在 `src/reference_units_entries.rs`）。
 const REFERENCE_UNITS_KEYS_TEXT: &str =
@@ -229,19 +246,27 @@ pub fn pairing_concluded_on_the_cards_in_the_library(
         ),
     };
     let agreement_judged_now = Cell::new(None);
+    let judge_now = || {
+        let judged = judge_on_the_cards(read_back.input.bytes(), read_back.reference.bytes());
+        agreement_judged_now.set(Some(judged.agreement));
+        judged
+    };
     let concluded = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        pairing_conclusion_reused_or_judged(
-            library,
-            read_back.input.digest(),
-            &keys.reference_units,
-            &keys.gpu_side_units,
-            || {
-                let judged =
-                    judge_on_the_cards(read_back.input.bytes(), read_back.reference.bytes());
-                agreement_judged_now.set(Some(judged.agreement));
-                judged
-            },
-        )
+        match (&keys.reference_units, &keys.gpu_side_units) {
+            (Ok(reference_units), Ok(gpu_side_units)) => pairing_conclusion_reused_or_judged(
+                library,
+                &pairing_inputs_digest_with_both_sides(
+                    read_back.input.digest(),
+                    reference_units,
+                    gpu_side_units,
+                ),
+                judge_now,
+            ),
+            (Err(_), _) | (_, Err(_)) => {
+                println!("PAIRING_KEY_REFUSED test={test_name}：判了、不入库");
+                Ok((judge_now().conclusion, PairingConclusionSource::JudgedNow))
+            }
+        }
     }));
     let (conclusion, source) = match concluded {
         Ok(Ok(concluded)) => concluded,
@@ -311,8 +336,7 @@ pub fn pairing_concluded_on_the_cards_through_the_pairing_library(
         .unwrap_or_else(|refusal| panic!("对拍用例「{test_name}」开不了库：{refusal}"));
     let keys = KeysOfAPairingOnTheCards {
         recording: recording_key_of_the_pairing_input_and_the_reference_units(
-            &judging_units_key(&JudgingUnits::Recording, toolchain_of_this_process())
-                .map_err(|refused| refused.sentence()),
+            test_name,
             &input_bytes,
             &reference_units,
         ),

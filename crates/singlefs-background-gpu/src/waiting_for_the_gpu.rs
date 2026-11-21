@@ -13,8 +13,16 @@
 //!
 //! 等法与钟、完成信号拆开：钟是 [`MonotonicClock`]（产品用这个进程的单调钟 [`SteadyClockOfThisProcess`]），完成信号是调用方给的
 //! 「看一次做没做完、最多等这么久」的闭包。不要 GPU 的用例换上假钟与假完成信号，钉住「上限内完成照常、超过上限交回超时出错」。
+//!
+//! 调用方在停（运行库卸载、丢弃；第 4 条「卸载时不等还在跑的提交，有这种提交的那张卡整张泄漏、不析构」）时，等一批的结果那几等不再等：
+//! 期限带着调用方在停的标记（[`CallerStoppingSeenByTheWait`]），一次长等拆成至多 [`SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING`] 的短等，
+//! 每一轮没等到就读一次标记，置了就交回 [`GpuFailureCause::GaveUpWaitingForTheCallerIsStopping`]；那一次提交照没等到它做完留在这张卡的账上，
+//! 卸载与切换关卡时这张卡整张泄漏。放弃不是等超过上限：不重交、不算进一批在这张卡上的超时次数，也不判这张卡用不了。
+//! 不读标记的期限（开卡那几等）照旧在上限之内一次等满；读标记而标记没置时，等的上限与超时的数法逐项不变，只是每一轮至多等一个短等间隔。
 
 use std::time::{Duration, Instant};
+
+use singlefs_core::background_compute::CallerIsStoppingTheBackgroundGpu;
 
 use crate::background_gpu::GpuFailureCause;
 
@@ -44,20 +52,76 @@ impl MonotonicClock for SteadyClockOfThisProcess {
     }
 }
 
-/// 一次等的期限：从哪一刻起等、最多等多久。一次提交的几处等（等提交做完、等两份回读映射好）共用一个期限，合起来不超过上限。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// 等一批的结果时每一轮至多等多久就醒来读一次调用方在停的标记（[`CallerStoppingSeenByTheWait::ReadBetweenShortWaits`]）：
+/// 调用方置了标记之后，这一等至多再等这么久就放弃（运行库卸载、丢弃时等维护线程收尾，多等的就是它）。
+/// 取 100 毫秒的理由：短等只多醒几次，不拖慢等到的那一刻——等提交用的是 wgpu 带限时的 `poll`，提交做完它当场返回，不等到这一轮的限时满；
+/// 等回读映射收通道（`recv_timeout`），送到了同样当场醒。醒一次是一回 `poll` 或一回收通道，等满秒级到分钟级的 `background_gpu_wait_limit`
+/// 也只醒上限除以 100 毫秒那么多次（推的，没量过醒一次的开销）；卸载因它多等的至多 100 毫秒（推的，没量过卸载的挂钟）。
+pub const SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING: Duration = Duration::from_millis(100);
+
+/// 一次等读不读调用方在停的标记（第 4 条「卸载时不等还在跑的提交」）。封闭集合。
+#[derive(Clone, Debug)]
+pub enum CallerStoppingSeenByTheWait {
+    /// 不读，在上限之内一次等满：开卡那几等（挂载那一刻与切换时在会话锁外开卡，含开卡里量代价的那几次提交），
+    /// 与还没收到调用方标记的卡（建把手之前；切换开卡线程上开出、还没收进来的卡）的每一等。
+    NotReadByThisWait,
+    /// 等一批的结果：每一轮至多等 [`SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING`]，醒来没等到就读一次这个标记，置了就放弃这一等。
+    ReadBetweenShortWaits(CallerIsStoppingTheBackgroundGpu),
+}
+
+impl CallerStoppingSeenByTheWait {
+    /// 这一轮看一次至多等多久：读标记的不超过短等间隔，不读的等到期限。
+    fn longest_wait_of_one_check(&self, time_left: Duration) -> Duration {
+        match self {
+            CallerStoppingSeenByTheWait::NotReadByThisWait => time_left,
+            CallerStoppingSeenByTheWait::ReadBetweenShortWaits(_caller_is_stopping) => {
+                time_left.min(SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING)
+            }
+        }
+    }
+
+    /// 这一等此刻放不放弃：读标记的照标记答，不读的恒不放弃。
+    fn gives_up_the_wait_now(&self) -> bool {
+        match self {
+            CallerStoppingSeenByTheWait::NotReadByThisWait => false,
+            CallerStoppingSeenByTheWait::ReadBetweenShortWaits(caller_is_stopping) => {
+                caller_is_stopping.is_the_caller_stopping()
+            }
+        }
+    }
+}
+
+/// 一次等的期限：从哪一刻起等、最多等多久，与读不读调用方在停的标记。一次提交的几处等（等提交做完、等两份回读映射好）共用一个期限，合起来不超过上限。
+#[derive(Clone, Debug)]
 pub struct GpuWaitDeadline {
     started_at: Duration,
     wait_limit: Duration,
+    caller_stopping: CallerStoppingSeenByTheWait,
 }
 
 impl GpuWaitDeadline {
-    /// 从钟此刻的读数起等，最多等 `wait_limit`。
+    /// 从钟此刻的读数起等，最多等 `wait_limit`，不读调用方在停的标记（开卡那几等用它）。
     #[must_use]
     pub fn starting_now(wait_limit: Duration, clock: &impl MonotonicClock) -> Self {
+        Self::starting_now_seeing_the_caller_stopping(
+            wait_limit,
+            clock,
+            CallerStoppingSeenByTheWait::NotReadByThisWait,
+        )
+    }
+
+    /// 同 [`Self::starting_now`]，读不读调用方在停的标记照 `caller_stopping`（等一批的结果那几等从卡的账上取，
+    /// `gpus_of_this_host::GpuBudgetUnderTheSettings::deadline_of_a_wait_of_the_batch_starting_now`）。
+    #[must_use]
+    pub fn starting_now_seeing_the_caller_stopping(
+        wait_limit: Duration,
+        clock: &impl MonotonicClock,
+        caller_stopping: CallerStoppingSeenByTheWait,
+    ) -> Self {
         Self {
             started_at: clock.time_since_the_origin(),
             wait_limit,
+            caller_stopping,
         }
     }
 
@@ -88,14 +152,17 @@ pub enum CompletionCheck<Output> {
     Failed(GpuFailureCause),
 }
 
-/// 在期限之内反复看 `check_once_waiting_at_most`（参数是这一次最多等多久，即离期限还剩的那么久），直到做完、报错或等满上限。
+/// 在期限之内反复看 `check_once_waiting_at_most`（参数是这一次最多等多久：离期限还剩的那么久，期限读调用方在停的标记时至多
+/// [`SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING`]），直到做完、报错、等满上限，或调用方在停。
 /// 每一轮先看还剩多久：剩 0 就交回超时，不再看；所以一次都还没看就已经过了期限的（上限是 0）也交回超时。
+/// 每一轮看完没等到，期限读标记的就读一次：置了就交回放弃，不再看（醒来才读：标记置上之前已在等的那一轮照等完它那一个短等）。
 ///
-/// 循环的出口只有三个：做完、报错、等满上限。迭代次数没有静态上界：每一轮要么等到了、要么至少等了交给它的那么久或提前醒了，
+/// 循环的出口只有四个：做完、报错、等满上限、调用方在停。迭代次数没有静态上界：每一轮要么等到了、要么至少等了交给它的那么久或提前醒了，
 /// 钟单调往前走，期限总会到。
 ///
 /// # Errors
-/// 等满上限 ⇒ [`GpuFailureCause::WaitForTheGpuExceededTheLimit`]（带上限本身）；`check_once_waiting_at_most` 交回的出错照原样交回。
+/// 等满上限 ⇒ [`GpuFailureCause::WaitForTheGpuExceededTheLimit`]（带上限本身）；期限读标记而调用方在停 ⇒
+/// [`GpuFailureCause::GaveUpWaitingForTheCallerIsStopping`]；`check_once_waiting_at_most` 交回的出错照原样交回。
 pub fn wait_for_completion_before_the_deadline<Output>(
     deadline: &GpuWaitDeadline,
     clock: &impl MonotonicClock,
@@ -107,9 +174,17 @@ pub fn wait_for_completion_before_the_deadline<Output>(
                 wait_limit: deadline.wait_limit,
             });
         };
-        match check_once_waiting_at_most(time_left) {
+        match check_once_waiting_at_most(
+            deadline
+                .caller_stopping
+                .longest_wait_of_one_check(time_left),
+        ) {
             CompletionCheck::Completed(output) => return Ok(output),
-            CompletionCheck::NotYetComplete => {}
+            CompletionCheck::NotYetComplete => {
+                if deadline.caller_stopping.gives_up_the_wait_now() {
+                    return Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping);
+                }
+            }
             CompletionCheck::Failed(cause) => return Err(cause),
         }
     }
@@ -120,13 +195,14 @@ pub fn wait_for_completion_before_the_deadline<Output>(
 pub const RESUBMISSIONS_AFTER_A_TIMEOUT: u32 = 3;
 
 /// 是不是等超过上限的那三种：这一次提交自己等超过上限，交活之前、重交之前等前一次那一次又等满了上限，或建缓冲出错之后冲掉待写的那一次空提交等满了上限。
-/// 只有这三种重交、算进一批的超时次数。
+/// 只有这三种重交、算进一批的超时次数。调用方在停而放弃的那一等不是：不重交、不数（第 4 条「卸载时不等还在跑的提交」）。
 fn waited_past_the_limit(cause: &GpuFailureCause) -> bool {
     match cause {
         GpuFailureCause::WaitForTheGpuExceededTheLimit { .. }
         | GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit { .. }
         | GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit { .. } => true,
-        GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
+        GpuFailureCause::GaveUpWaitingForTheCallerIsStopping
+        | GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
         | GpuFailureCause::OpeningThreadNotStarted { .. }
         | GpuFailureCause::OpeningPanicked { .. }
         | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
@@ -196,6 +272,8 @@ impl TimeoutsOfTheBatchOnOneGpu {
 /// 一次交的结局说不说明那一次真交到了卡上：建缓冲出错（显存不足 [`GpuFailureCause::OutOfMemoryCreatingTheBuffers`]，或之后冲掉待写的那一次空提交等满了上限
 /// [`GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit`]）是在交之前判出的、那一段没交；
 /// 别的出错都是交了之后才判出的（等提交、回读、读回的判定字），做完了的当然交了。只给交一段那一次的结局用（`submit_once` 交回的）。
+/// 调用方在停而放弃的那一等算交到了：放弃的多半是等交出去的那一次提交（冲掉待写那一等放弃的分不出来，一并算交到了；放弃之后不再重交，
+/// 这个数只进这一批的记账）。
 fn the_attempt_reached_the_gpu<Outcome>(attempt: &Result<Outcome, GpuFailureCause>) -> bool {
     match attempt {
         Ok(_outcome) => true,
@@ -204,7 +282,8 @@ fn the_attempt_reached_the_gpu<Outcome>(attempt: &Result<Outcome, GpuFailureCaus
             | GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit { .. },
         ) => false,
         Err(
-            GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
+            GpuFailureCause::GaveUpWaitingForTheCallerIsStopping
+            | GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
             | GpuFailureCause::OpeningThreadNotStarted { .. }
             | GpuFailureCause::OpeningPanicked { .. }
             | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
@@ -225,7 +304,7 @@ fn the_attempt_reached_the_gpu<Outcome>(attempt: &Result<Outcome, GpuFailureCaus
 /// 在一张卡（`gpu`）上交一次提交（`submit_once`），等超过上限就在同一张卡上重交；超时记进这一批这张卡的那一份（`timeouts_of_the_batch`），
 /// 这一批在这张卡上超时的次数越过 [`RESUBMISSIONS_AFTER_A_TIMEOUT`] 就不再重交。每次重交之前先等前一次等超过上限、还没做完的那次
 /// （`wait_for_the_timed_out_submission`，照显存的账在等的上限之内等），等不到算这一次重交又超时了一次、不交。任何一次做完了交回它的结果。
-/// 不是等超过上限的出错当场交回，不重交。
+/// 不是等超过上限的出错当场交回，不重交；调用方在停而放弃的那一等（交这一次之后那一等，或重交之前等前一次那一等）同样当场交回，不再重交。
 ///
 /// 循环每一轮要么交回、要么这一批这张卡的超时次数加一；次数越过 [`RESUBMISSIONS_AFTER_A_TIMEOUT`] 就交回，所以至多 1 + [`RESUBMISSIONS_AFTER_A_TIMEOUT`] 轮。
 ///
@@ -408,8 +487,101 @@ pub fn gpu_opened_with_the_reopenings<Opened>(
     Err(causes_of_each_opening)
 }
 
+/// 用例要一个置得上的调用方在停的标记：核心层只让把手造它、置它（`singlefs_core::background_compute::BackgroundGpuComputeHandle`），
+/// 这里照核心层建把手的路造一份只收标记的替身实现，交回替身收到的那一份标记与置它的那一份把手。本包几个模块的用例共用。
+#[cfg(test)]
+pub(crate) mod caller_stopping_for_tests {
+    use std::sync::{Arc, Mutex};
+
+    use singlefs_core::allocator::AllocationRecord;
+    use singlefs_core::background_compute::{
+        AdmittedGpuSettings, BackgroundGpuCompute, BackgroundGpuComputeFailed,
+        BackgroundGpuComputeHandle, CallerIsStoppingTheBackgroundGpu, ClusterSegmentEntryKey,
+        GpuDeviceIdentifier, GpuEntryDecision, GpuInventory, GpuMemoryInBytes,
+        RegionRecordToClassifyOnTheGpu, UnitChecksumOutcome, UnitChecksumToVerifyOnTheGpu,
+    };
+    use singlefs_core::compaction_plan::UnitAreaOfOneDevice;
+    use singlefs_core::logged_operations::CompactionRegion;
+    use singlefs_core::region_scan::{AllocationInRegion, CentralMappingEntry};
+
+    /// 只记下建把手时交来的调用方在停的标记的替身（三段与换设置都不该被调）。
+    struct ImplementationKeepingTheCallerStoppingFlag {
+        flag_received: Arc<Mutex<Option<CallerIsStoppingTheBackgroundGpu>>>,
+    }
+
+    impl GpuInventory for ImplementationKeepingTheCallerStoppingFlag {
+        fn devices_with_total_memory(&self) -> Vec<(GpuDeviceIdentifier, GpuMemoryInBytes)> {
+            Vec::new()
+        }
+    }
+
+    impl BackgroundGpuCompute for ImplementationKeepingTheCallerStoppingFlag {
+        fn verify_unit_checksums(
+            &mut self,
+            _units: &[UnitChecksumToVerifyOnTheGpu<'_>],
+        ) -> Result<Vec<GpuEntryDecision<UnitChecksumOutcome>>, BackgroundGpuComputeFailed>
+        {
+            panic!("只收标记的替身不算一批");
+        }
+
+        fn classify_region_records(
+            &mut self,
+            _region: CompactionRegion,
+            _records: &[RegionRecordToClassifyOnTheGpu<'_>],
+            _mapping_entries: &[CentralMappingEntry],
+        ) -> Result<Vec<GpuEntryDecision<AllocationInRegion>>, BackgroundGpuComputeFailed> {
+            panic!("只收标记的替身不算一批");
+        }
+
+        fn count_live_slots_per_cluster_segment(
+            &mut self,
+            _allocation_records: &[AllocationRecord],
+            _unit_area: UnitAreaOfOneDevice,
+            _segments: &[ClusterSegmentEntryKey],
+        ) -> Result<Vec<GpuEntryDecision<u64>>, BackgroundGpuComputeFailed> {
+            panic!("只收标记的替身不算一批");
+        }
+
+        fn use_the_settings_from_the_next_batch(&mut self, _settings: &AdmittedGpuSettings) {
+            panic!("只收标记的替身不换设置");
+        }
+
+        fn give_up_waiting_for_the_cards_once_the_caller_is_stopping(
+            &mut self,
+            caller_is_stopping: CallerIsStoppingTheBackgroundGpu,
+        ) {
+            *self
+                .flag_received
+                .lock()
+                .expect("记标记的格子只在这里写，写的时候不 panic") = Some(caller_is_stopping);
+        }
+    }
+
+    /// 一份还没置的调用方在停的标记，与置它的那一份把手（`tell_the_implementation_the_caller_is_stopping`）。
+    pub(crate) fn caller_stopping_flag_and_the_handle_setting_it(
+    ) -> (CallerIsStoppingTheBackgroundGpu, BackgroundGpuComputeHandle) {
+        let flag_received = Arc::new(Mutex::new(None));
+        let handle = BackgroundGpuComputeHandle::of_an_implementation(
+            ImplementationKeepingTheCallerStoppingFlag {
+                flag_received: Arc::clone(&flag_received),
+            },
+        );
+        let caller_is_stopping = flag_received
+            .lock()
+            .expect("记标记的格子只在建把手时写过一次")
+            .clone()
+            .expect("核心层建把手时把调用方在停的标记交给实现");
+        assert!(
+            !caller_is_stopping.is_the_caller_stopping(),
+            "刚建的把手还没说调用方在停"
+        );
+        (caller_is_stopping, handle)
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::caller_stopping_for_tests::caller_stopping_flag_and_the_handle_setting_it;
     use super::*;
     use std::cell::Cell;
 
@@ -545,6 +717,156 @@ mod tests {
                 CompletionCheck::<u32>::Failed(failure.clone())
             }),
             Err(failure)
+        );
+    }
+
+    /// 短等间隔是 100 毫秒（取值的理由在常量那一处）。
+    #[test]
+    fn the_short_wait_between_readings_of_the_caller_stopping_is_one_hundred_milliseconds() {
+        assert_eq!(
+            SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING,
+            Duration::from_millis(100)
+        );
+    }
+
+    /// 第 4 条「卸载时不等还在跑的提交」：一次本来要等满 600 秒上限的等（提交一直没做完），等到第 101 秒调用方置了在停的标记——
+    /// 置标记那一轮醒来就放弃、交回放弃那一种，比置标记那一刻至多晚一个短等间隔；每一轮至多等一个短等间隔。
+    #[test]
+    fn a_wait_reading_the_caller_stopping_gives_up_within_one_short_wait_after_the_flag_is_set() {
+        let (caller_is_stopping, handle_setting_the_flag) =
+            caller_stopping_flag_and_the_handle_setting_it();
+        let clock = ClockMovedByTheTest {
+            now: Cell::new(Duration::from_secs(100)),
+        };
+        let deadline = GpuWaitDeadline::starting_now_seeing_the_caller_stopping(
+            Duration::from_secs(600),
+            &clock,
+            CallerStoppingSeenByTheWait::ReadBetweenShortWaits(caller_is_stopping),
+        );
+        let flag_set_at: Cell<Option<Duration>> = Cell::new(None);
+        let longest_wait_handed_to_a_check = Cell::new(Duration::ZERO);
+        let waited = wait_for_completion_before_the_deadline(&deadline, &clock, |time_left| {
+            longest_wait_handed_to_a_check.set(longest_wait_handed_to_a_check.get().max(time_left));
+            clock
+                .now
+                .set(clock.now.get() + time_left.max(Duration::from_nanos(1)));
+            if flag_set_at.get().is_none() && clock.now.get() >= Duration::from_secs(101) {
+                handle_setting_the_flag.tell_the_implementation_the_caller_is_stopping();
+                flag_set_at.set(Some(clock.now.get()));
+            }
+            CompletionCheck::<u32>::NotYetComplete
+        });
+        assert_eq!(
+            waited,
+            Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping),
+            "调用方在停：放弃这一等，不等满上限、不报超时"
+        );
+        let moment_the_flag_was_set = flag_set_at.get().expect("钟走过第 101 秒的那一轮置了标记");
+        assert_eq!(
+            clock.now.get(),
+            moment_the_flag_was_set,
+            "置标记那一轮醒来就放弃，不再看下一轮"
+        );
+        assert!(
+            moment_the_flag_was_set
+                < Duration::from_secs(101) + SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING,
+            "放弃比第 101 秒至多晚一个短等间隔（放弃在 {moment_the_flag_was_set:?}）"
+        );
+        assert_eq!(
+            longest_wait_handed_to_a_check.get(),
+            SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING,
+            "读标记的等每一轮至多等一个短等间隔"
+        );
+    }
+
+    /// 同一条在真钟上：上限 30 秒的等（提交一直没做完、每一轮睡满交给它的那么久），另一条线程 50 毫秒后置了在停的标记——
+    /// 这一等 5 秒之内就交回放弃（量级是一个短等间隔），不等满 30 秒。
+    #[test]
+    fn a_wait_reading_the_caller_stopping_on_the_steady_clock_returns_soon_after_another_thread_sets_the_flag(
+    ) {
+        let (caller_is_stopping, handle_setting_the_flag) =
+            caller_stopping_flag_and_the_handle_setting_it();
+        let clock = SteadyClockOfThisProcess::starting_now();
+        let deadline = GpuWaitDeadline::starting_now_seeing_the_caller_stopping(
+            Duration::from_secs(30),
+            &clock,
+            CallerStoppingSeenByTheWait::ReadBetweenShortWaits(caller_is_stopping),
+        );
+        let started_at = Instant::now();
+        let waited = std::thread::scope(|scope| {
+            let _thread_setting_the_flag_joined_at_the_end_of_the_scope = scope.spawn(move || {
+                std::thread::sleep(Duration::from_millis(50));
+                handle_setting_the_flag.tell_the_implementation_the_caller_is_stopping();
+            });
+            wait_for_completion_before_the_deadline(&deadline, &clock, |time_left| {
+                std::thread::sleep(time_left);
+                CompletionCheck::<u32>::NotYetComplete
+            })
+        });
+        let waited_for = started_at.elapsed();
+        assert_eq!(
+            waited,
+            Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping)
+        );
+        assert!(
+            waited_for < Duration::from_secs(5),
+            "置标记之后一个短等间隔的量级就交回，不等满 30 秒（等了 {waited_for:?}）"
+        );
+    }
+
+    /// 没置标记时等的上限与超时照旧：读标记的等，提交要到第 7 秒才做完、上限 5 秒——照旧在第 5 秒交回超时（带上限本身），
+    /// 只是每一轮至多等一个短等间隔、多看了几次。
+    #[test]
+    fn a_wait_reading_the_caller_stopping_not_yet_set_times_out_at_the_wait_limit_as_before() {
+        let (caller_is_stopping, _handle_never_setting_the_flag) =
+            caller_stopping_flag_and_the_handle_setting_it();
+        let clock = ClockMovedByTheTest {
+            now: Cell::new(Duration::from_secs(100)),
+        };
+        let deadline = GpuWaitDeadline::starting_now_seeing_the_caller_stopping(
+            Duration::from_secs(5),
+            &clock,
+            CallerStoppingSeenByTheWait::ReadBetweenShortWaits(caller_is_stopping),
+        );
+        let checks_made = Cell::new(0);
+        assert_eq!(
+            wait_for_completion_before_the_deadline(
+                &deadline,
+                &clock,
+                completion_at(&clock, Duration::from_secs(107), &checks_made),
+            ),
+            Err(GpuFailureCause::WaitForTheGpuExceededTheLimit {
+                wait_limit: Duration::from_secs(5)
+            }),
+            "没置标记：照旧等满 5 秒交回超时"
+        );
+        assert_eq!(clock.now.get(), Duration::from_secs(105), "等到期限为止");
+        assert_eq!(checks_made.get(), 50, "每一轮至多等 100 毫秒：5 秒看 50 次");
+    }
+
+    /// 不读标记的等（开卡那几等）不拆短等：头一次看就把离期限还剩的整段交给它。
+    #[test]
+    fn a_wait_not_reading_the_caller_stopping_hands_the_whole_time_left_to_one_check() {
+        let clock = ClockMovedByTheTest {
+            now: Cell::new(Duration::from_secs(100)),
+        };
+        let deadline = GpuWaitDeadline::starting_now(Duration::from_secs(300), &clock);
+        let waits_handed_to_the_checks = std::cell::RefCell::new(Vec::new());
+        let waited = wait_for_completion_before_the_deadline(&deadline, &clock, |time_left| {
+            waits_handed_to_the_checks.borrow_mut().push(time_left);
+            clock.now.set(clock.now.get() + time_left);
+            CompletionCheck::<u32>::NotYetComplete
+        });
+        assert_eq!(
+            waited,
+            Err(GpuFailureCause::WaitForTheGpuExceededTheLimit {
+                wait_limit: Duration::from_secs(300)
+            })
+        );
+        assert_eq!(
+            waits_handed_to_the_checks.into_inner(),
+            vec![Duration::from_secs(300)],
+            "一次等满上限"
         );
     }
 
@@ -1106,6 +1428,83 @@ mod tests {
             GpuWithScriptedSubmissions::scripted(vec![Err(device_lost.clone())], Vec::new());
         assert_eq!(gpu.outcome_with_resubmissions(), Err(device_lost));
         assert_eq!((gpu.submissions_made, gpu.waits_made), (1, 0));
+    }
+
+    /// 第 4 条「卸载时不等还在跑的提交」：交了一次、等它时调用方在停而放弃——当场交回放弃，不重交、不等前一次，
+    /// 不算进这一批这张卡的超时次数（不朝「这张卡用不了」数）。
+    #[test]
+    fn giving_up_the_wait_of_a_submission_for_the_caller_stopping_is_not_resubmitted_nor_counted_as_a_timeout(
+    ) {
+        let mut gpu = GpuWithScriptedSubmissions::scripted(
+            vec![Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping)],
+            Vec::new(),
+        );
+        let (outcome, timeouts_of_the_batch) = outcome_and_timeouts_of_one_submission(&mut gpu);
+        assert_eq!(
+            outcome,
+            Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping)
+        );
+        assert_eq!(
+            (
+                gpu.submissions_made,
+                gpu.waits_made,
+                timeouts_of_the_batch.timeouts(),
+                timeouts_of_the_batch.resubmissions()
+            ),
+            (1, 0, 0, 0),
+            "只交了那一次：不重交、不等、超时 0 次"
+        );
+    }
+
+    /// 头一次交等超过上限，重交之前等前一次那一等调用方在停而放弃——当场交回放弃，不再重交；超时只记头一次那 1 次。
+    #[test]
+    fn giving_up_the_wait_for_the_timed_out_submission_for_the_caller_stopping_does_not_resubmit() {
+        let mut gpu = GpuWithScriptedSubmissions::scripted(
+            vec![Err(this_submission_timed_out())],
+            vec![Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping)],
+        );
+        let (outcome, timeouts_of_the_batch) = outcome_and_timeouts_of_one_submission(&mut gpu);
+        assert_eq!(
+            outcome,
+            Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping)
+        );
+        assert_eq!(
+            (
+                gpu.submissions_made,
+                gpu.waits_made,
+                timeouts_of_the_batch.timeouts(),
+                timeouts_of_the_batch.resubmissions()
+            ),
+            (1, 1, 1, 0),
+            "交了头一次、等了一回就放弃：不重交"
+        );
+    }
+
+    /// 交活之前等前一次超时的那次提交时调用方在停而放弃：当场交回放弃，不再等下一回、不算一次超时。
+    #[test]
+    fn giving_up_the_wait_before_handing_over_for_the_caller_stopping_is_not_counted_as_a_timeout()
+    {
+        let mut gpu = GpuWithScriptedSubmissions::scripted(
+            Vec::new(),
+            vec![
+                Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping),
+                Err(earlier_submission_still_running()),
+            ],
+        );
+        let mut timeouts_of_the_batch = TimeoutsOfTheBatchOnOneGpu::none_yet();
+        assert_eq!(
+            outcome_waited_for_again_after_timeouts(
+                &mut gpu,
+                &mut timeouts_of_the_batch,
+                GpuWithScriptedSubmissions::wait_for_the_timed_out_submission,
+            ),
+            Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping)
+        );
+        assert_eq!(
+            (gpu.waits_made, timeouts_of_the_batch.timeouts()),
+            (1, 0),
+            "等了一回就放弃，不算超时"
+        );
     }
 
     /// 用例里第 `opening` 次开卡（从 1 数）开不成的原因。

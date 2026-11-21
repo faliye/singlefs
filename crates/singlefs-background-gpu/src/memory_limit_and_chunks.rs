@@ -588,7 +588,7 @@ pub fn pieces_cut_to_fit_on_the_gpu(
 pub enum SubmissionOfTheChunk<Submission> {
     /// 等到它在 GPU 上做完了：这一段的缓冲随它丢掉，显存还回去。
     CompletedOnTheGpu,
-    /// 没等到它做完（等超过上限，或等的时候出错）：GPU 上可能还在跑它，这一段的缓冲在卡上照旧占着显存。
+    /// 没等到它做完（等超过上限、调用方在停而放弃了那一等，或等的时候出错）：GPU 上可能还在跑它，这一段的缓冲在卡上照旧占着显存。
     MayStillBeRunningOnTheGpu(Submission),
 }
 
@@ -663,7 +663,8 @@ impl<Submission> GpuMemoryAccount<Submission> {
         self.memory_limit
     }
 
-    /// 这张卡上记着一次等超过上限、还没在 GPU 上做完的提交：丢后台 GPU 时这张卡的设备与队列不析构（析构要等队列空，不带上限）。
+    /// 这张卡上记着一次等超过上限（或调用方在停而放弃了那一等）、还没在 GPU 上做完的提交：丢后台 GPU 时这张卡的设备与队列不析构
+    /// （析构要等队列空，不带上限）。
     #[must_use]
     pub fn has_a_submission_running_past_its_wait(&self) -> bool {
         self.submission_running_past_its_wait.is_some()
@@ -749,7 +750,7 @@ impl<Submission> GpuMemoryAccount<Submission> {
     /// 冲掉待写的那一次提交（`flushing_submission`，调用方交的一次空提交）做完才放。等到它做完（`waited_for_the_flush` 是 `Ok`）就放掉这一段、
     /// 交回建缓冲那一次的错；没等到就把这一段记成这张卡上还在跑的那次提交（同 [`Self::settle_the_chunk_after_its_submission`]），
     /// 这张卡下一次交之前先等它做完：等满了上限交回 [`GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit`]（算这一批这张卡一次超时，
-    /// 这一段没交到卡上、不算重交），等的时候报的别的出错照原样交回。
+    /// 这一段没交到卡上、不算重交），等的时候报的别的出错照原样交回（调用方在停而放弃的那一等交回 [`GpuFailureCause::GaveUpWaitingForTheCallerIsStopping`]）。
     ///
     /// # Panics
     /// 同 [`Self::settle_the_chunk_after_its_submission`]。
@@ -783,7 +784,8 @@ impl<Submission> GpuMemoryAccount<Submission> {
     /// 做完放掉它那一段的账。没有这样的提交就当场交回。
     ///
     /// # Errors
-    /// 等满上限还没做完 ⇒ [`GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit`]；看的时候报的出错照原样交回。两种都不放账。
+    /// 等满上限还没做完 ⇒ [`GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit`]；期限读调用方在停的标记而调用方在停 ⇒
+    /// [`GpuFailureCause::GaveUpWaitingForTheCallerIsStopping`]；看的时候报的出错照原样交回。几种都不放账：那次提交照旧记成还在跑的那一次。
     pub fn wait_for_the_submission_running_past_its_wait(
         &mut self,
         deadline: &GpuWaitDeadline,
@@ -859,7 +861,7 @@ impl<Submission> GpuMemoryAccount<Submission> {
     }
 }
 
-/// 等冲掉待写的那一次空提交等满了上限：报成它自己的那一种（这一段没交到卡上）；别的出错照原样。
+/// 等冲掉待写的那一次空提交等满了上限：报成它自己的那一种（这一段没交到卡上）；别的出错照原样（调用方在停而放弃的那一等照原样报放弃，不报成等满上限）。
 fn failure_of_waiting_for_the_flush_of_the_pending_writes(
     cause: GpuFailureCause,
 ) -> GpuFailureCause {
@@ -867,7 +869,8 @@ fn failure_of_waiting_for_the_flush_of_the_pending_writes(
         GpuFailureCause::WaitForTheGpuExceededTheLimit { wait_limit } => {
             GpuFailureCause::FlushOfThePendingWritesNotCompleteWithinTheWaitLimit { wait_limit }
         }
-        reported_by_the_wait @ (GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
+        reported_by_the_wait @ (GpuFailureCause::GaveUpWaitingForTheCallerIsStopping
+        | GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
         | GpuFailureCause::OpeningThreadNotStarted { .. }
         | GpuFailureCause::OpeningPanicked { .. }
         | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
@@ -885,13 +888,14 @@ fn failure_of_waiting_for_the_flush_of_the_pending_writes(
     }
 }
 
-/// 等前一次超时的那次提交又等满了上限：报成它自己的那一种，与这一次交的段自己等超时分得开；别的出错照原样。
+/// 等前一次超时的那次提交又等满了上限：报成它自己的那一种，与这一次交的段自己等超时分得开；别的出错照原样（调用方在停而放弃的那一等照原样报放弃）。
 fn failure_of_waiting_for_the_earlier_submission(cause: GpuFailureCause) -> GpuFailureCause {
     match cause {
         GpuFailureCause::WaitForTheGpuExceededTheLimit { wait_limit } => {
             GpuFailureCause::EarlierTimedOutSubmissionNotCompleteWithinTheWaitLimit { wait_limit }
         }
-        reported_by_the_wait @ (GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
+        reported_by_the_wait @ (GpuFailureCause::GaveUpWaitingForTheCallerIsStopping
+        | GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
         | GpuFailureCause::OpeningThreadNotStarted { .. }
         | GpuFailureCause::OpeningPanicked { .. }
         | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
@@ -1110,6 +1114,78 @@ mod tests {
         assert!(
             account.submission_running_past_its_wait.is_some(),
             "它仍记成还在跑的那次提交"
+        );
+    }
+
+    /// 第 4 条「卸载时不等还在跑的提交」：交活之前等前一次超时的那次提交时调用方在停（标记已置）——醒来就放弃，交回放弃那一种
+    /// （不报成前一次又没等到），它的账照旧记着、仍记成还在跑的那次提交（丢的时候这张卡因此整张泄漏）。
+    #[test]
+    fn the_wait_for_the_timed_out_submission_given_up_for_the_caller_stopping_keeps_it_held_as_still_running(
+    ) {
+        let (mut account, clock) =
+            account_after_a_chunk_whose_wait_timed_out(Duration::from_secs(200));
+        let (caller_is_stopping, handle_setting_the_flag) =
+            crate::waiting_for_the_gpu::caller_stopping_for_tests::caller_stopping_flag_and_the_handle_setting_it();
+        handle_setting_the_flag.tell_the_implementation_the_caller_is_stopping();
+        let waited = account.wait_for_the_submission_running_past_its_wait(
+            &GpuWaitDeadline::starting_now_seeing_the_caller_stopping(
+                WAIT_LIMIT_UNDER_TEST,
+                &clock,
+                crate::waiting_for_the_gpu::CallerStoppingSeenByTheWait::ReadBetweenShortWaits(
+                    caller_is_stopping,
+                ),
+            ),
+            &clock,
+            completion_signal_of(&clock, TIMED_OUT_SUBMISSION, Duration::from_secs(200)),
+        );
+        assert_eq!(
+            waited,
+            Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping),
+            "调用方在停：放弃，不报成前一次又等满了上限"
+        );
+        assert_eq!(
+            clock.now.get(),
+            Duration::from_secs(105)
+                + crate::waiting_for_the_gpu::SHORT_WAIT_BETWEEN_READINGS_OF_THE_CALLER_STOPPING,
+            "只等了一个短等间隔就放弃"
+        );
+        assert_eq!(
+            account.bytes_held(),
+            BYTES_HELD_BY_THE_TIMED_OUT_CHUNK,
+            "它的账照旧记着"
+        );
+        assert!(
+            account.has_a_submission_running_past_its_wait(),
+            "它仍记成还在跑的那次提交"
+        );
+    }
+
+    /// 同一条在建缓冲出错之后：冲掉待写的那一次空提交，等它时调用方在停而放弃——交回放弃那一种（不报成建缓冲的那个错，也不报成冲掉待写等满了上限），
+    /// 这一段的账照旧记着、记成还在跑的那次提交。
+    #[test]
+    fn the_flush_of_the_pending_writes_given_up_for_the_caller_stopping_keeps_the_chunk_held_as_still_running(
+    ) {
+        let mut account = GpuMemoryAccount::with_nothing_held(Some(GpuMemoryInBytes(
+            MEMORY_LIMIT_UNDER_TEST_IN_BYTES,
+        )));
+        account.hold(BYTES_HELD_BY_THE_TIMED_OUT_CHUNK);
+        let reported = account.settle_the_chunk_whose_buffers_were_not_created(
+            BYTES_HELD_BY_THE_TIMED_OUT_CHUNK,
+            GpuFailureCause::OutOfMemoryCreatingTheBuffers {
+                bytes_held_by_the_chunk: BYTES_HELD_BY_THE_TIMED_OUT_CHUNK,
+                reason: "用例造的：建缓冲显存不足".to_string(),
+            },
+            TIMED_OUT_SUBMISSION,
+            Err(GpuFailureCause::GaveUpWaitingForTheCallerIsStopping),
+        );
+        assert_eq!(
+            reported,
+            GpuFailureCause::GaveUpWaitingForTheCallerIsStopping
+        );
+        assert_eq!(account.bytes_held(), BYTES_HELD_BY_THE_TIMED_OUT_CHUNK);
+        assert!(
+            account.has_a_submission_running_past_its_wait(),
+            "冲掉待写的那一次没等到它做完：记成还在跑的那次提交"
         );
     }
 

@@ -1,7 +1,7 @@
 [package]
 name = "singlefs-background-gpu"
 # 构建脚本（build.rs）把这一次编译里 cargo 给本包打开的特性交给直接依赖本包的构建脚本（`DEP_SINGLEFS_BACKGROUND_GPU_ENABLED_FEATURES`，做法同 singlefs-core）：
-# 本包的测试包照它算对拍里参照一侧的判法单元键。
+# 依赖本包、自己算判法单元键的包（实验装置 E202 那个包的构建脚本）照它算。本包的构建脚本只交特性，不算键、不依赖函数单元图。
 links = "singlefs-background-gpu"
 version = "0.1.0"
 edition = "2021"
@@ -22,13 +22,43 @@ ash = { version = "=0.38.0", default-features = false }
 libc = "0.2"
 
 [dev-dependencies]
+# 产品测试的判定库存取（tests/common_pairing_input_through_the_library/mod.rs）只经 prune-server 的容错客户端读写全仓那一份库
+# （.claude/rules/verification.md「判定库只有一份：全仓统一写进 prune-server 的那份 RocksDB」），键在产品测试自己那一族里；
+# 测试判定库存取本身的那几条在这个进程里起一份临时服务（prune_server::server::start_in_this_process）。仓根下的独立工程，经 path 依赖引。
+prune-server = { path = "../../prune-server" }
+# 真卡对拍两侧与产品测试判定库录入那一组的判法单元键：测试支撑包的构建脚本照 tests/pairing_units_entries.tsv 算好，库只交读回的三张键表。
+# 只在编本包的测试时并进来：本包的构建与 [dependencies]、[build-dependencies] 里都没有它，也没有函数单元图（产品构建不编测试代码）。
+singlefs-background-gpu-pairing-keys = { path = "../singlefs-background-gpu-pairing-keys" }
+# 三段对拍的独立参照（tests/common_independent_references）只用格式常量，不调产品与核心层的计算函数；格式常量从格式那一包直接取。
+singlefs-format = { path = "../singlefs-format" }
+# 测试读回键表（parse_entry_group_table）与算录入键、结论键的 SHA-256，与测试支撑包的构建脚本写表用的是同一份函数单元图。
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
 # 同一份 wgpu 在测试里多开 noop 后端（不起 GPU、不碰 Vulkan，建缓冲在主机内存里 try_reserve_exact、建不成报显存不足）：
 # 单测拿它钉「一段自己的缓冲显存不足时交回建缓冲显存不足、不 panic」（src/background_gpu.rs 测试模块，判决 m4-gpugc-code-r3 第三节第 2 条）。
 # 只在编测试时并进来；noop 要的 wgpu-hal 与 smallvec 已在 Cargo.lock 里 wgpu 的依赖之列。
 wgpu = { version = "=30.0.1", default-features = false, features = ["noop"] }
 
 [features]
-# 本包的源码里没有按这个特性编的代码：要真显卡的集成测试目标（对拍与端到端）与实验装置 E202（GPU与CPU两种模式GC对照组）都在测试包
-# crates/singlefs-background-gpu-tests 里，那个包有同名的特性。这里留着它，是因为构建脚本（build.rs）照清单里的特性逐个交给测试包的构建脚本，
-# 单元图那一侧的单测（singlefs-unit-graph 的 build_features）要求这张清单里至少有它；不开时 `cargo test` 整包与整工作区都不碰 GPU。
+# 要真显卡的集成测试目标（对拍与端到端）只在开了这个特性时编：不开时 `cargo test` 整包与整工作区都不碰 GPU。本包 src/ 里没有按它编的代码。
+# 构建脚本（build.rs）照清单里的特性逐个交给依赖本包的构建脚本，单元图那一侧的单测（singlefs-unit-graph 的 build_features）要求这张清单里至少有它。
 tests-on-a-real-gpu = []
+
+[[test]]
+name = "checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
+required-features = ["tests-on-a-real-gpu"]
+
+[[test]]
+name = "region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
+required-features = ["tests-on-a-real-gpu"]
+
+[[test]]
+name = "live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
+required-features = ["tests-on-a-real-gpu"]
+
+[[test]]
+name = "compaction_on_a_real_gpu_through_the_background_gpu_compute_ends_as_on_the_cpu"
+required-features = ["tests-on-a-real-gpu"]
+
+[[test]]
+name = "mount_runtime_on_a_real_gpu_writes_the_same_block_sequence_as_on_the_cpu"
+required-features = ["tests-on-a-real-gpu"]

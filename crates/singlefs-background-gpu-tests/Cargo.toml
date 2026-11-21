@@ -3,51 +3,25 @@ name = "singlefs-background-gpu-tests"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "产品的后台 GPU 包（singlefs-background-gpu）的集成测试：真显卡上的对拍与端到端、CPU 顶替的测试替身那一组，连同它们共用的取卡与造池模块，另有实验装置 E202（GPU与CPU两种模式GC对照组）的二进制（src/bin/e202_gpu_cpu_gc_comparison.rs：按需领卡、内联真卡测试的对拍过判定库都要验证包）。单独成包是因为 GPU 与 CPU 参照的对拍要经判定库两段交接（先在 CPU 上录、写进库，再从库里读回上卡比），存取与算键只有验证包那一份代码，而产品 GPU 包与验证包互不依赖（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条）：这个包同时依赖两边，两边仍互不在对方的依赖里。只引验证包里管存取与算键的模块，不引它的 GPU 判器。"
+description = "实验装置 E202（GPU与CPU两种模式GC对照组）的二进制（src/bin/e202_gpu_cpu_gc_comparison.rs）与它经 #[path] 编进来的两份共用模块（tests/common_discrete_gpus_of_this_host/mod.rs、tests/common_pairing_input_through_the_library/mod.rs：按需领卡、内联真卡测试的对拍过判定库都要验证包）。产品的后台 GPU 包（singlefs-background-gpu）的集成测试在那个包自己的 tests/ 里。这个包同时依赖产品 GPU 包与验证包，两边仍互不在对方的依赖里（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ⑧ 条）。库本身是空的。"
 
 [dependencies]
 # 这三个包各声明了特性：构建脚本照 `singlefs-unit-graph` 的取法读它们这一次编译里开着的特性（各自的构建脚本经 `links` 交出），
 # 那个取法只认直接的普通依赖，所以写在这里、不写在 dev 依赖里。库本身是空的，不用它们；实验装置那份二进制用。
 singlefs-background-gpu = { path = "../singlefs-background-gpu" }
 singlefs-core = { path = "../singlefs-core" }
-# 对拍的两段与判定库：输入与 CPU 参照先入库、再读库（crash_library::pairing_input_and_reference_through_the_pairing_library）；
-# 实验装置 src/bin/e202_gpu_cpu_gc_comparison.rs 另经它按需领卡（gpu_card_configuration::cards_handed_over_or_leased_on_demand）。
+# 实验装置 src/bin/e202_gpu_cpu_gc_comparison.rs 的内联真卡测试对拍过判定库（crash_library::pairing_input_and_reference_through_the_pairing_library），
+# 另经它按需领卡（gpu_card_configuration::cards_handed_over_or_leased_on_demand）。
 singlefs-verification = { path = "../singlefs-verification" }
-# 实验装置 src/bin/e202_gpu_cpu_gc_comparison.rs 枚举适配器要读 wgpu 的适配器信息（bin 用不到 dev 依赖）。版本与特性照产品 GPU 包那一份写死
+# 实验装置 src/bin/e202_gpu_cpu_gc_comparison.rs 枚举适配器要读 wgpu 的适配器信息。版本与特性照产品 GPU 包那一份写死
 # （crates/singlefs-background-gpu/Cargo.toml 的 wgpu 一行）：同一个工作区里解析成同一份。
 wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan", "wgsl", "std"] }
 
 [build-dependencies]
-# 构建脚本经函数单元图算对拍里参照一侧（CPU 上算的那一侧）的判法单元键（src/reference_units_entries.rs 登记入口），做法同验证包的构建脚本。
+# 构建脚本经函数单元图算实验装置 E202 那条内联真卡测试对拍两侧的判法单元键（src/reference_units_entries.rs、src/gpu_side_units_entries.rs 登记入口），
+# 做法同测试支撑包 singlefs-background-gpu-pairing-keys 的构建脚本（产品 GPU 包的构建脚本只交特性、不算键）。
 singlefs-unit-graph = { path = "../singlefs-unit-graph" }
 
-[dev-dependencies]
-singlefs-replay-prefix = { path = "../singlefs-replay-prefix" }
-singlefs-mount-runtime = { path = "../singlefs-mount-runtime" }
-# 版本与特性照产品 GPU 包那一份写死（crates/singlefs-background-gpu/Cargo.toml 的 ash 一行）：同一个工作区里解析成同一份。
-ash = { version = "=0.38.0", default-features = false }
-
 [features]
-# 要真显卡的测试目标与实验装置二进制里要真显卡的内联测试只在开了这个特性时编：不开时 `cargo test` 整包与整工作区都不碰 GPU
-# （.claude/rules/verification.md「凡用 GPU 先清场，跑完不复原」：用 GPU 的跑法经统一任务服务交）。
+# 实验装置二进制里要真显卡的内联测试只在开了这个特性时编：不开时 `cargo test` 整包与整工作区都不碰 GPU。
 tests-on-a-real-gpu = []
-
-[[test]]
-name = "checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
-required-features = ["tests-on-a-real-gpu"]
-
-[[test]]
-name = "region_record_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
-required-features = ["tests-on-a-real-gpu"]
-
-[[test]]
-name = "live_slot_kernels_on_a_real_gpu_agree_with_the_cpu_reference"
-required-features = ["tests-on-a-real-gpu"]
-
-[[test]]
-name = "compaction_on_a_real_gpu_through_the_background_gpu_compute_ends_as_on_the_cpu"
-required-features = ["tests-on-a-real-gpu"]
-
-[[test]]
-name = "mount_runtime_on_a_real_gpu_writes_the_same_block_sequence_as_on_the_cpu"
-required-features = ["tests-on-a-real-gpu"]

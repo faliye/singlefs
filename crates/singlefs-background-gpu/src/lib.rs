@@ -18,7 +18,7 @@
 //!
 //! unsafe 默认拒：只在五处放开，[`background_gpu`] 里四处（读 Vulkan 物理设备的内存堆、读这条线程的 CPU 钟、
 //! 读不受 NTP 调频的单调钟 `CLOCK_MONOTONIC_RAW`（[`background_gpu::monotonic_raw_time_now`]），与它的测试模块里在用例自己起的子进程中
-//! 压本进程的地址空间上限，让 noop 后端真建不成缓冲），加真卡测试 `crates/singlefs-background-gpu-tests/tests/checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs` 读显卡空闲显存那一处；
+//! 压本进程的地址空间上限，让 noop 后端真建不成缓冲），加本包真卡测试 `tests/checksum_kernels_on_a_real_gpu_agree_with_the_cpu_reference.rs` 读显卡空闲显存那一处；
 //! 各有 `// SAFETY:`，逐处登记在 `.claude/gate.d/unsafe-allowances.tsv`。
 #![deny(unsafe_code)]
 

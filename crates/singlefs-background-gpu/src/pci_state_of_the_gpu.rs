@@ -96,14 +96,16 @@ impl PciStateReaderOfTheGpus {
 
 /// 挂着时一批在一张卡上的出错是不是判那张卡用不了、要读 PCI 状态的时刻：等超时用完（[`GpuFailureCause::UnusableAfterResubmissions`]）
 /// 与卡当场报出错（[`GpuFailureCause::UncapturedErrorOrDeviceLost`]）是；一次超时（还要重交）、等提交没等成、回读坏了、核留下认不出的判定字、
-/// 建缓冲显存不足与开卡那几种不是。重开到上限都没开成（[`GpuFailureCause::NotOpenedAfterTheReopenings`]）也是判用不了的时刻，可它的读数在判它开不成
+/// 建缓冲显存不足、调用方在停而放弃的那一等（[`GpuFailureCause::GaveUpWaitingForTheCallerIsStopping`]：这张卡没被判坏）与开卡那几种不是。
+/// 重开到上限都没开成（[`GpuFailureCause::NotOpenedAfterTheReopenings`]）也是判用不了的时刻，可它的读数在判它开不成
 /// 那一刻就读了、随开不成的那一份带着，这里不再读。
 #[must_use]
 pub fn whether_the_cause_judges_the_gpu_unusable_in_a_batch(cause: &GpuFailureCause) -> bool {
     match cause {
         GpuFailureCause::UnusableAfterResubmissions { .. }
         | GpuFailureCause::UncapturedErrorOrDeviceLost { .. } => true,
-        GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
+        GpuFailureCause::GaveUpWaitingForTheCallerIsStopping
+        | GpuFailureCause::DeviceOrPipelineDidNotStart { .. }
         | GpuFailureCause::OpeningThreadNotStarted { .. }
         | GpuFailureCause::OpeningPanicked { .. }
         | GpuFailureCause::EarlierOpeningOfTheDeviceNotReturned
@@ -557,5 +559,22 @@ mod tests {
             .collect::<Vec<bool>>(),
             vec![true, true, false, false, false]
         );
+    }
+
+    /// 调用方在停而放弃的那一等不是判卡用不了的时刻：不读 PCI 状态（第 4 条「卸载时不等还在跑的提交」只放弃那一等，不报这张卡坏了）。
+    #[test]
+    fn giving_up_the_wait_for_the_caller_stopping_does_not_judge_the_gpu_unusable() {
+        assert!(!whether_the_cause_judges_the_gpu_unusable_in_a_batch(
+            &GpuFailureCause::GaveUpWaitingForTheCallerIsStopping
+        ));
+        let pci_state_reader = pci_state_reader_under_a_root_not_present_for_tests();
+        assert_eq!(
+            pci_state_reader.pci_state_if_the_cause_judges_the_gpu_unusable(
+                &card("0000:01:00.0"),
+                &GpuFailureCause::GaveUpWaitingForTheCallerIsStopping,
+            ),
+            PciStateOfTheGpuReadWhenJudgedUnusable::NotReadForThisError
+        );
+        assert_eq!(pci_state_reader.readings_taken(), 0, "一次都没读");
     }
 }

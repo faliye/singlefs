@@ -47,11 +47,12 @@ use crate::memory_limit_and_chunks::{
 use crate::pci_state_of_the_gpu::PciStateReaderOfTheGpus;
 use crate::region_record_kernels::bytes_of_the_smallest_region_record_piece;
 use crate::waiting_for_the_gpu::{
-    gpu_opened_with_the_reopenings, CompletionCheck, GpuWaitDeadline, MonotonicClock,
-    ReopeningsOfAGpuNotOpened,
+    gpu_opened_with_the_reopenings, CallerStoppingSeenByTheWait, CompletionCheck, GpuWaitDeadline,
+    MonotonicClock, ReopeningsOfAGpuNotOpened,
 };
 
-/// 一张卡此刻照的设置管的那几样：显存上限（记在账上）、等 GPU 的上限，连同与设置无关的绑定上限与派发上限、本包在它上面的账。
+/// 一张卡此刻照的设置管的那几样：显存上限（记在账上）、等 GPU 的上限，连同与设置无关的绑定上限与派发上限、本包在它上面的账，
+/// 与这张卡等一批的结果时读不读调用方在停的标记。
 #[derive(Debug)]
 pub struct GpuBudgetUnderTheSettings<Submission> {
     largest_storage_binding_in_bytes: GpuMemoryInBytes,
@@ -60,6 +61,9 @@ pub struct GpuBudgetUnderTheSettings<Submission> {
     wait_limit: Duration,
     /// 开卡那一刻这个进程里更早几次挂载泄漏在这张卡上的字节（账从它起）：丢的时候扣掉它，算这一次挂载自己泄漏的（[`GpuLeakedWhenDropped`]）。
     bytes_leaked_by_earlier_mounts: GpuMemoryInBytes,
+    /// 开卡那一刻不读（开卡那几等一次等满）；卡收进这一次挂载的后台 GPU、核心层的把手交来标记之后读
+    /// （[`Self::read_the_caller_stopping_in_the_waits_of_the_batches`]）。换设置不动它。
+    caller_stopping_seen_by_the_waits_of_the_batches: CallerStoppingSeenByTheWait,
 }
 
 impl<Submission> GpuBudgetUnderTheSettings<Submission> {
@@ -99,7 +103,39 @@ impl<Submission> GpuBudgetUnderTheSettings<Submission> {
             ),
             wait_limit,
             bytes_leaked_by_earlier_mounts,
+            caller_stopping_seen_by_the_waits_of_the_batches:
+                CallerStoppingSeenByTheWait::NotReadByThisWait,
         }
+    }
+
+    /// 从此照 `caller_stopping` 读不读调用方在停的标记（外壳收到核心层交来的标记、收进切换开成的卡时调，
+    /// `crate::background_gpu::BackgroundGpuOverTheCards::give_up_waiting_for_the_cards_once_the_caller_is_stopping`）。
+    pub fn read_the_caller_stopping_in_the_waits_of_the_batches(
+        &mut self,
+        caller_stopping: &CallerStoppingSeenByTheWait,
+    ) {
+        self.caller_stopping_seen_by_the_waits_of_the_batches = caller_stopping.clone();
+    }
+
+    /// 这张卡等一批的结果读不读调用方在停的标记。
+    #[must_use]
+    pub fn caller_stopping_seen_by_the_waits_of_the_batches(&self) -> &CallerStoppingSeenByTheWait {
+        &self.caller_stopping_seen_by_the_waits_of_the_batches
+    }
+
+    /// 这张卡上等一批的结果的一次期限：从钟此刻起、至多等此刻设置给的等的上限，读不读调用方在停的标记照这张卡记着的
+    /// （交一段之后等它、冲掉待写那一等、交活与重交之前等前一次还在跑的那次都从这里取期限）。
+    #[must_use]
+    pub fn deadline_of_a_wait_of_the_batch_starting_now(
+        &self,
+        clock: &impl MonotonicClock,
+    ) -> GpuWaitDeadline {
+        GpuWaitDeadline::starting_now_seeing_the_caller_stopping(
+            self.wait_limit,
+            clock,
+            self.caller_stopping_seen_by_the_waits_of_the_batches
+                .clone(),
+        )
     }
 
     /// 此刻还能切一段的界：显存上限扣掉此刻还占着的（泄漏的、等超过上限还在跑的那一次提交的）。
@@ -160,7 +196,7 @@ impl<Submission> GpuBudgetUnderTheSettings<Submission> {
         clock: &impl MonotonicClock,
         check_once_waiting_at_most: impl FnMut(&Submission, Duration) -> CompletionCheck<()>,
     ) -> Result<ChunkBoundsOfAGpu, GpuFailureCause> {
-        let deadline = GpuWaitDeadline::starting_now(self.wait_limit, clock);
+        let deadline = self.deadline_of_a_wait_of_the_batch_starting_now(clock);
         let bounds = self.chunk_bounds();
         self.memory_account
             .room_once_the_submission_running_past_its_wait_completed(
@@ -180,7 +216,7 @@ impl<Submission> GpuBudgetUnderTheSettings<Submission> {
         clock: &impl MonotonicClock,
         check_once_waiting_at_most: impl FnMut(&Submission, Duration) -> CompletionCheck<()>,
     ) -> Result<(), GpuFailureCause> {
-        let deadline = GpuWaitDeadline::starting_now(self.wait_limit, clock);
+        let deadline = self.deadline_of_a_wait_of_the_batch_starting_now(clock);
         self.memory_account
             .wait_for_the_submission_running_past_its_wait(
                 &deadline,
@@ -201,7 +237,7 @@ impl<Submission> GpuBudgetUnderTheSettings<Submission> {
         entry_input_lengths_in_bytes: &[InputLengthOnTheHostInBytes],
         footprint: ChunkFootprint,
     ) -> Result<Vec<Range<usize>>, ChunksNotCutOnTheGpu> {
-        let deadline = GpuWaitDeadline::starting_now(self.wait_limit, clock);
+        let deadline = self.deadline_of_a_wait_of_the_batch_starting_now(clock);
         let bounds = self.chunk_bounds();
         self.memory_account
             .chunks_cut_once_the_submission_running_past_its_wait_completed(

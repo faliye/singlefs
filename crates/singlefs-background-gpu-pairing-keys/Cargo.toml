@@ -1,0 +1,16 @@
+[package]
+name = "singlefs-background-gpu-pairing-keys"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "测试支撑：产品后台 GPU 包真卡对拍两侧与产品测试判定库录入那一组的判法单元键（D13（验证路线） 已定项 17）。构建脚本照产品 GPU 包的入口登记表（crates/singlefs-background-gpu/tests/pairing_units_entries.tsv，按路径读的数据文件）经函数单元图逐组算键、写进 OUT_DIR，库只交读回的三张键表。复用是测试的事，不是产品的事：产品 GPU 包只在 [dev-dependencies] 里依赖它，产品的构建不编它，也不编函数单元图。"
+
+[dependencies]
+# 构建脚本照 singlefs-unit-graph 的取法读依赖包这一次编译开着的特性（各自的构建脚本经 links 交出）：那个取法只认直接的普通依赖，
+# 所以写在这里、不写在 dev 依赖里。库本身不用它，只交读回的键表。登记的对拍入口闭包里声明了特性的只有核心层；产品 GPU 包自己的
+# tests-on-a-real-gpu 由登记表每一组照开着请求，不经这里取（依赖产品 GPU 包会与它的 dev 依赖绕成一圈）。
+singlefs-core = { path = "../singlefs-core" }
+
+[build-dependencies]
+# 切分、闭包、键、工具链行与表的写法都在函数单元图里（做法同验证包的构建脚本 crates/singlefs-verification/build.rs）。
+singlefs-unit-graph = { path = "../singlefs-unit-graph" }
