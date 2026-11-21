@@ -36,7 +36,17 @@
   用户……定 / 说 / 要求 / 拍板 / 弹窗（「用户」之后十四个字以内）
   定案  攻方腿  辩方腿  正推腿  攻方 ?v<数字>  第<数>轮  判决第  第 ?<数>[a-z]? ?批
   改前  改之前  此前  原先  原为  起初  最初  以前  曾经  修过  改成了  换成了  改为了  旧做法  旧写法
+  「以前」只在作时间词时算，下面两种形态不算：
+    「以」是前一个词的一部分：「以前」前面紧挨「除」「乘」「所」「可」（除以、乘以、所以、可以：除以前者向上取整、所以前面已发的写、可以前置一段命名空间）；
+    「前」开头的是后一个词：「以前」后面紧跟「缀」「者」「置」（前缀、前者、前置：以前缀起头），或紧跟「面」、「面」后面再接「那」「这」「的」「带」（前面那、前面这、前面的、前面带：以前面那一份为准）。
+    别的「以前」照判（「以前这里只认」「这个请求号以前生效过」「半年以前的格式」、「以前面临内存撞上限」「以前面向旧布局的那一支」：「面临」「面向」是词，「以前」是时间词）。
+    「得以」「要以」「用以」「足以」「据以」不算「以」是前一个词的一部分（「取得以前的结果」「据以前的记录」里「以前」是时间词）。
   「不再」「原来」「后来」不判。
+  三方腿的角色名（ROLE_NAME_WORDS：攻方腿、辩方腿、正推腿）写在同一行收尾了的「」里、那一对「」里又有 ASCII 冒号（CELL_NAME_SEPARATOR，格名「<族>:<格>」的分隔）时不算：
+    这种「」括着的是照原文引的自证格名与失败行（「三方腿:正推腿写别的轮的报告，拒」），里面的角色名是现行的名字、不是来历；
+    「」里只放角色名、没有冒号的（「攻方腿」打中的那一处）照判：那是拿「」套住主语，来历写在「」外。
+    「」按层配对（套着的「」里外都算括着，冒号算在哪一层就看那一层括着的整段），没收尾的「与没有「配对的」不算括着；括着的日期与别的词照判。
+    判法 judged_text；弄坏开关 quoted-role-names-judged、nested-quotes-flattened、quoted-spans-unjudged、unclosed-quote-counted、quoted-role-names-colon-unchecked 钉住这几样。
 特殊缘由标记：那一行的注释（文档串、README 同一行同样认）里有 history-kept: <理由>，理由去掉空白后至少 8 个字，那一行放过；
   理由不够长、又有命中的那一行判红并点名（不进滞后表的计数）。
 豁免表 .claude/gate.d/comment-history-exempt.tsv（被判的根下）：一行「<路径><TAB># <理由，至少 8 个字>」，整份文件不判；
@@ -44,6 +54,11 @@
 滞后表 .claude/gate.d/comment-history-lag.tsv（被判的根下）：一行「<路径><TAB><命中行数><TAB># <理由，至少 4 个字>」：
   文件此刻命中数大于登记数判红（列出那份文件的全部命中）；小于登记数也判红（改小到现数，不留余量给新写的）；不在表里的文件命中数要是 0；
   与 gate 基准那一版比只缩不涨：基准里没有的行判红，数比基准大判红（基准那一版经 .claude/gate.d/lib-lag-baseline.py 的 gate_base_of 与 baseline_rows 取）；
+  一份文件拆成多份认拆分族（scripts/gate/lib_lag_split_family.py）：基准里一行点名一份入口文件，族是它本身加按它的拆法命名的部分文件：
+    .rs 入口 <目录>/<名>.rs 加 <目录>/<名>/ 下全部 .rs（含 <名>/main.rs），入口是 <目录>/main.rs 或 <目录>/mod.rs 的加 <目录>/ 下（含再往下各层）全部 .rs；
+    .py、.sh 入口认 Python、钩子、shell 三种拆法（同目录的 <名>_<部分>.py、
+    同目录的 <名>-<部分>.sh 与 .py、.claude/gate.d/lib/ 下的 <名>-<部分>.sh 与 .py；认法、例子与对外的函数写在那一份的文件头）；
+  此刻表里族内各行的数之和不超过基准那一行就不算新加，之和超了判红，落到族外的行（同目录名字对不上拆法的文件在内）照旧判红（基准里没有这一行）；
   基准里整张表还不存在（这一格落地的那一次）时只判写法、不判涨；被判的根不是 git 仓时不比、成功句写明没比；
   列数不对、路径不在、数不是正整数、理由不到 4 个字、重复、路径在豁免表里，都判红。
 成功句报：扫了多少份文件、多少行注释、命中几行、其中按标记放过几行、滞后几行；扫到 0 份文件退 77，不报绿。
@@ -54,7 +69,7 @@
   判一个样本根时根里要有 .gate-cells 或 .gate-break-sample，而且这个根不是这份脚本所在的仓、没设 GATE_STAGED_FROM；
   其余情形设了就拒，退 2 并点名只在自证里认。变量 COMMENT_HISTORY_CHECK_BREAK，值写一个开关名；
   单跑一条：COMMENT_HISTORY_CHECK_BREAK=<开关> python3 scripts/gate/comment-history-check.py --selftest-inner）。
-  前十二条也列在 .claude/gate.d/doc-text.sh 文件头的开关表里，由门禁 doc-text 的样本复跑；后五条只在这一份自证里复跑：
+  前十四条也列在 .claude/gate.d/doc-text.sh 文件头的开关表里，由门禁 doc-text 的样本复跑；后十八条只在这一份自证里复跑：
   COMMENT_HISTORY_CHECK_BREAK=marker-ignored  不认 history-kept 标记：标记行照样按命中算
       comment-history-green
       comment-history-marker-short-red
@@ -68,12 +83,29 @@
   COMMENT_HISTORY_CHECK_BREAK=path-dates-flagged  日期不核前后字符：路径与文件名里的日期也判
       comment-history-green
       「✗ 自证 path-dates：」
+  COMMENT_HISTORY_CHECK_BREAK=prefix-compounds-flagged  「以前」不核前后字：以前缀、除以前者、所以前面、可以前置、以前面那一份里的「以前」也判
+      comment-history-before-face-red
+      comment-history-before-nontime-green
+      comment-history-before-time-red
+      comment-history-past-red
+      comment-history-prefix-green
+      「✗ 自证 prefix-compounds：」
+      「✗ 自证 before-face：」
+      「✗ 自证 before-boundary：」
+  COMMENT_HISTORY_CHECK_BREAK=face-exception-widened  「以前」后面紧跟「面」就放过，不看「面」后面是不是「那」「这」「的」「带」：以前面临、以前面向、以前面对这类真讲过去的句子也放过
+      comment-history-before-face-red
+      comment-history-before-time-red
+      「✗ 自证 before-face：」
+      「✗ 自证 before-boundary：」
   COMMENT_HISTORY_CHECK_BREAK=strings-as-comments  字符串里的注释符也当注释
       comment-history-strings-green
       「✗ 自证 strings-not-comments：」
   COMMENT_HISTORY_CHECK_BREAK=lag-growth-unjudged  滞后表不与 gate 基准那一版比
       comment-history-lag-growth-red
       「✗ 自证 lag-growth：」
+      「✗ 自证 lag-family-sum：」
+      「✗ 自证 lag-family-outside：」
+      「✗ 自证 lag-family-script-outside：」
   COMMENT_HISTORY_CHECK_BREAK=lag-slack-allowed  命中少于登记的不判红
       comment-history-lag-slack-red
       「✗ 自证 lag-slack：」
@@ -99,13 +131,55 @@
       「✗ 自证 wgsl：」
   COMMENT_HISTORY_CHECK_BREAK=python-comments-skipped  不取 .py 与 python shebang 脚本里的 # 注释
       「✗ 自证 python-hash：」
+      「✗ 自证 lag-family-python-split：」
+      「✗ 自证 lag-family-hook-split：」
+      「✗ 自证 lag-family-shell-split：」
   COMMENT_HISTORY_CHECK_BREAK=shell-comments-skipped  不取 shell 里的 # 注释
       「✗ 自证 shell-hash：」
+      「✗ 自证 lag-family-python-split：」
+      「✗ 自证 lag-family-hook-split：」
+      「✗ 自证 lag-family-shell-split：」
   COMMENT_HISTORY_CHECK_BREAK=readme-skipped  不取 README.md
       「✗ 自证 readme：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-unrecognized  滞后表比基准时不认拆分族：拆出来的新文件都当族外
+      「✗ 自证 lag-family-split：」
+      「✗ 自证 lag-family-main：」
+      「✗ 自证 lag-family-directory-entry：」
+      「✗ 自证 lag-family-sum：」
+      「✗ 自证 lag-family-python-split：」
+      「✗ 自证 lag-family-hook-split：」
+      「✗ 自证 lag-family-shell-split：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-main-excluded  拆分族里不含 <名>/main.rs
+      「✗ 自证 lag-family-main：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-wide  拆分族认宽：基准那一行同目录下的别的 .rs 也算族里，脚本入口同样认宽到拆法认的那几个目录里的任何 .py、.sh
+      「✗ 自证 lag-family-outside：」
+      「✗ 自证 lag-growth：」
+      「✗ 自证 lag-family-script-outside：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-sum-unchecked  族内各行的数不比之和：每行各自与基准那一行比
+      「✗ 自证 lag-family-sum：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-python-split-unrecognized  不认 Python 拆法：同目录的 <模块名>_<部分>.py 都当族外
+      「✗ 自证 lag-family-python-split：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-hook-split-unrecognized  不认钩子拆法：同目录的 <名>-<部分>.sh、<名>-<部分>.py 都当族外
+      「✗ 自证 lag-family-hook-split：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-shell-split-unrecognized  不认 shell 拆法：.claude/gate.d/lib/ 下的 <名>-<部分>.sh、<名>-<部分>.py 都当族外
+      「✗ 自证 lag-family-shell-split：」
+  COMMENT_HISTORY_CHECK_BREAK=lag-family-directory-entry-unrecognized  不认 main.rs、mod.rs 入口的同目录兄弟：同目录与下层的子模块 .rs 都当族外
+      「✗ 自证 lag-family-directory-entry：」
+  COMMENT_HISTORY_CHECK_BREAK=quoted-role-names-judged  不认「」：收尾了的「」里的三方腿角色名照历史词判
+      「✗ 自证 quoted-role-names：」「✗ 自证 quoted-role-name-without-colon：」
+  COMMENT_HISTORY_CHECK_BREAK=nested-quotes-flattened  「」不按层配对，只认里面不再有「」的那一层：套着的「」外层里的角色名照判
+      「✗ 自证 quoted-role-names：」
+  COMMENT_HISTORY_CHECK_BREAK=quoted-spans-unjudged  收尾了的「」里整段都不判：括着的日期与别的历史词也放过
+      「✗ 自证 quoted-history-words：」「✗ 自证 quoted-role-name-without-colon：」
+  COMMENT_HISTORY_CHECK_BREAK=unclosed-quote-counted  没收尾的「也算括着：它后面到行尾的角色名放过
+      「✗ 自证 quoted-history-words：」
+  COMMENT_HISTORY_CHECK_BREAK=quoted-role-names-colon-unchecked  「」里不核冒号：只放角色名、没有冒号的「」里的角色名也放过
+      「✗ 自证 quoted-role-name-without-colon：」
 
 样本：.claude/gate.d/fixtures/doc-text.sh/comment-history-*（每份只点名 comment-history 一格，写法与每份判什么在 doc-text.sh 文件头「comment-history」一段）。
 管不到的：字符串里的话（日期、历史词写在字符串、测试输入里的不判）；注释里不在词表里的历史说法（「后来」「不再」「原来」这类，靠 review）；
+  带冒号的「」里写的其实是来历而用的词正是三方腿角色名的（格名里带出处的「正推腿乙 Z8」这类，与故意在「」里加一个冒号的「x:攻方腿」），当格名放过，靠 review；
+  「以前」前面紧挨「除」「乘」「所」「可」而「以」其实是别的词的字的（「删除以前的旧值」「认可以前的写法」，当成除以、可以放过）、后面紧跟「缀」「者」「置」而是时间词的（「以前置零」，当成前置放过）；
   围栏之外的 Markdown 缩进代码块；Python 文档串里续行符之后的行号可能差一两行（只影响打印的行号）；
   shell 的引号状态靠逐行扫（跨 heredoc 的引号、嵌套的 $( ) 里的引号只近似），误判与漏判都落在注释符上，不落在字符串里的话上。
 """
@@ -129,13 +203,27 @@ from preflight import preflight  # noqa: E402
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, "scripts", "hosts"))
 import heavy_threads  # noqa: E402
 
+sys.path.insert(0, SCRIPT_DIRECTORY)
+import lib_lag_split_family as split_family  # noqa: E402
+
 LAG_BASELINE_LIBRARY = os.path.join(REPOSITORY_ROOT, ".claude", "gate.d", "lib-lag-baseline.py")
 BREAK_VARIABLE = "COMMENT_HISTORY_CHECK_BREAK"
-STAGE_BREAKS = ("marker-ignored", "marker-reason-unchecked", "docstrings-skipped", "path-dates-flagged", "strings-as-comments",
+STAGE_BREAKS = ("marker-ignored", "marker-reason-unchecked", "docstrings-skipped", "path-dates-flagged", "prefix-compounds-flagged", "face-exception-widened", "strings-as-comments",
                 "lag-growth-unjudged", "lag-slack-allowed", "lag-table-form-unchecked", "exempt-table-form-unchecked",
                 "exempt-table-ignored", "shebang-unscoped", "readme-fences-judged")
-SELFTEST_BREAKS = ("rust-comments-skipped", "wgsl-skipped", "python-comments-skipped", "shell-comments-skipped", "readme-skipped")
+SELFTEST_BREAKS = ("rust-comments-skipped", "wgsl-skipped", "python-comments-skipped", "shell-comments-skipped", "readme-skipped",
+                   "lag-family-unrecognized", "lag-family-main-excluded", "lag-family-wide", "lag-family-sum-unchecked",
+                   "lag-family-python-split-unrecognized", "lag-family-hook-split-unrecognized", "lag-family-shell-split-unrecognized",
+                   "lag-family-directory-entry-unrecognized", "quoted-role-names-judged", "nested-quotes-flattened", "quoted-spans-unjudged", "unclosed-quote-counted",
+                   "quoted-role-names-colon-unchecked")
 KNOWN_BREAKS = STAGE_BREAKS + SELFTEST_BREAKS
+# 拆分族那几条开关在共用写法（scripts/gate/lib_lag_split_family.py）里的名字
+FAMILY_DEFECTS = {"lag-family-unrecognized": split_family.UNRECOGNIZED, "lag-family-main-excluded": split_family.MAIN_EXCLUDED,
+                  "lag-family-wide": split_family.WIDE, "lag-family-sum-unchecked": split_family.SUM_UNCHECKED,
+                  "lag-family-python-split-unrecognized": split_family.PYTHON_SPLIT_UNRECOGNIZED,
+                  "lag-family-hook-split-unrecognized": split_family.HOOK_SPLIT_UNRECOGNIZED,
+                  "lag-family-shell-split-unrecognized": split_family.SHELL_SPLIT_UNRECOGNIZED,
+                  "lag-family-directory-entry-unrecognized": split_family.DIRECTORY_ENTRY_UNRECOGNIZED}
 
 LAG_TABLE = ".claude/gate.d/comment-history-lag.tsv"
 EXEMPT_TABLE = ".claude/gate.d/comment-history-exempt.tsv"
@@ -148,13 +236,31 @@ SHEBANG = re.compile(r"^#!\s*(?:\S+/)?(?:env\s+(?:-\S+\s+)*)?(sh|bash|python[0-9
 
 DATE_PATTERN = r"(?<![/_A-Za-z0-9-])\d{4}-\d\d-\d\d(?!-[^\d\s]|\.[A-Za-z0-9]|[/_A-Za-z])"
 LOOSE_DATE_PATTERN = r"\d{4}-\d\d-\d\d"
+# 「以前」只在作时间词时算（文件头「不许写的形态」）；不算的两种：
+#   「以」是前一个词的一部分：前面紧挨「除」「乘」「所」「可」（除以、乘以、所以、可以）；
+#   「前」开头的是后一个词：后面紧跟「缀」「者」「置」（前缀、前者、前置），或「面」再接「那」「这」「的」「带」（前面那、前面这、前面的、前面带）。
+# 「以前面临」「以前面向」里「面」是后一个词的头，「以前」是时间词，照判。
+BEFORE_BOUND = r"(?<![除乘所可])"
+BEFORE_PATTERN = BEFORE_BOUND + r"以前(?![缀者置]|面[那这的带])"
+BEFORE_PATTERNS = {"strict": BEFORE_PATTERN, "face-wide": BEFORE_BOUND + r"以前(?![缀者置面])", "loose": "以前"}
+# 三方腿的角色名：写在收尾了的「」里时是照原文引的格名，不算（文件头「不许写的形态」末尾那一条，judged_text）
+ROLE_NAME_WORDS = ("攻方腿", "辩方腿", "正推腿")
+ROLE_NAME_PATTERN = re.compile("|".join(ROLE_NAME_WORDS))
+QUOTE_OPEN, QUOTE_CLOSE = "「", "」"
+CELL_NAME_SEPARATOR = ":"   # 格名「<族>:<格>」的分隔：「」里有它才当照原文引的格名，里面的角色名放过
+FLAT_QUOTED_SPAN = re.compile(r"「[^「」]*」")   # 只给弄坏开关 nested-quotes-flattened：不按层配对
+JUDGED_TEXT_MASK = "〓"   # 换掉括着的角色名用的占位符：词表里哪一个词、日期的前后界都不含它
 WORD_PATTERNS = (
     r"用户.{0,14}?(定|说|要求|拍板|弹窗)",
-    "定案", "攻方腿", "辩方腿", "正推腿", r"攻方 ?v\d", r"第[一二三四五六七八九十百\d]+轮", "判决第", r"第 ?\d+[a-z]? ?批",
-    "改前", "改之前", "此前", "原先", "原为", "起初", "最初", "以前", "曾经", "修过", "改成了", "换成了", "改为了", "旧做法", "旧写法",
+    "定案", *ROLE_NAME_WORDS, r"攻方 ?v\d", r"第[一二三四五六七八九十百\d]+轮", "判决第", r"第 ?\d+[a-z]? ?批",
+    "改前", "改之前", "此前", "原先", "原为", "起初", "最初", BEFORE_PATTERN, "曾经", "修过", "改成了", "换成了", "改为了", "旧做法", "旧写法",
 )
-HISTORY = re.compile("|".join((DATE_PATTERN,) + WORD_PATTERNS))
-HISTORY_LOOSE_DATE = re.compile("|".join((LOOSE_DATE_PATTERN,) + WORD_PATTERNS))
+HISTORY_PATTERNS = {
+    (loose_date, before_mode): re.compile("|".join(
+        (LOOSE_DATE_PATTERN if loose_date else DATE_PATTERN,)
+        + tuple(BEFORE_PATTERNS[before_mode] if word == BEFORE_PATTERN else word for word in WORD_PATTERNS)))
+    for loose_date in (False, True) for before_mode in BEFORE_PATTERNS
+}
 MARKER = re.compile(r"history-kept:\s*(.*)$")
 MINIMUM_MARKER_REASON = 8
 MINIMUM_EXEMPT_REASON = 8
@@ -377,6 +483,40 @@ def readme_text(text, switches):
     return found, (opened if fence is not None else None)
 
 
+def quoted_spans(piece, switches):
+    """一行文字里收尾了的「…」各段（起、止，止不含）：按层配对，套着的里外各算一段；没收尾的「与没有「配对的」不算。"""
+    if "nested-quotes-flattened" in switches:
+        return [match.span() for match in FLAT_QUOTED_SPAN.finditer(piece)]
+    spans, opened = [], []
+    for index, character in enumerate(piece):
+        if character == QUOTE_OPEN:
+            opened.append(index)
+        elif character == QUOTE_CLOSE and opened:
+            spans.append((opened.pop(), index + 1))
+    if "unclosed-quote-counted" in switches:
+        spans.extend((start, len(piece)) for start in opened)
+    return spans
+
+
+def judged_text(piece, switches):
+    """词表判的那一份文字：收尾了的、里面有 CELL_NAME_SEPARATOR 的「」里的三方腿角色名换成占位符（文件头「不许写的形态」末尾那一条），别的照原文、长度不变。"""
+    if "quoted-role-names-judged" in switches:
+        return piece
+    spans = quoted_spans(piece, switches)
+    if not spans:
+        return piece
+    characters = list(piece)
+    for start, end in spans:
+        if "quoted-spans-unjudged" in switches:
+            characters[start:end] = JUDGED_TEXT_MASK * (end - start)
+            continue
+        if CELL_NAME_SEPARATOR not in piece[start:end] and "quoted-role-names-colon-unchecked" not in switches:
+            continue
+        for match in ROLE_NAME_PATTERN.finditer(piece, start, end):
+            characters[match.start():match.end()] = JUDGED_TEXT_MASK * (match.end() - match.start())
+    return "".join(characters)
+
+
 def analyse(text, kind, switches):
     """一份文件：{comment_lines, hits [(行号, 词, 原文)], marked [行号], short [(行号, 理由, 原文)], unparsed, open_fence}。"""
     lines = text.split("\n")
@@ -403,14 +543,15 @@ def analyse(text, kind, switches):
     else:
         if "shell-comments-skipped" not in switches:
             found = shell_comments(text, switches)
-    pattern = HISTORY_LOOSE_DATE if "path-dates-flagged" in switches else HISTORY
+    before_mode = "loose" if "prefix-compounds-flagged" in switches else "face-wide" if "face-exception-widened" in switches else "strict"
+    pattern = HISTORY_PATTERNS["path-dates-flagged" in switches, before_mode]
     comment_lines, hits, marked, short = 0, [], [], []
     for number in sorted(found):
         piece = found[number]
         if not piece.strip():
             continue
         comment_lines += 1
-        match = pattern.search(piece)
+        match = pattern.search(judged_text(piece, switches))
         if match is None:
             continue
         source = lines[number - 1].strip() if 0 < number <= len(lines) else piece.strip()
@@ -594,7 +735,7 @@ def read_lag_table(root, scope, exempt, switches):
 
 
 def lag_growth(root, accepted, switches, current_rows):
-    """(涨了的 [(表的行号, 路径, 一句)], 基准那一句说明, 取不到基准的问题或 None, 基准的名字或 "")。"""
+    """(涨了的 [(表的行号, 路径, 一句)], 基准那一句说明, 取不到基准的问题或 None, 基准的名字或 "")。路径照拆分族认、族内各行比之和（lib_lag_split_family.py）。"""
     if "lag-growth-unjudged" in switches:
         return [], "弄坏开关 lag-growth-unjudged：没与 gate 基准比", None, ""
     library = load_lag_baseline()
@@ -612,12 +753,16 @@ def lag_growth(root, accepted, switches, current_rows):
     for _number, columns in base_rows:
         if len(columns) >= 2 and columns[1].strip().isdigit():
             base_counts.setdefault(columns[0].strip(), int(columns[1].strip()))
+    current = {path: count for path, (count, _number) in sorted(accepted.items(), key=lambda item: item[1][1])}
     grown = []
-    for path, (count, number) in sorted(accepted.items(), key=lambda item: item[1][1]):
-        if path not in base_counts:
-            grown.append((number, path, "基准里没有这一行"))
-        elif count > base_counts[path]:
-            grown.append((number, path, f"登记 {count} 行，基准里是 {base_counts[path]} 行"))
+    for item in split_family.family_growth(base_counts, current, frozenset(FAMILY_DEFECTS[name] for name in switches if name in FAMILY_DEFECTS)):
+        if item.owner is None:
+            sentence = "基准里没有这一行"
+        elif item.owner == item.path and item.members == 1:
+            sentence = f"登记 {item.own} 行，基准里是 {item.allowed} 行"
+        else:
+            sentence = f"拆分族 {item.owner} 里 {item.members} 行登记之和是 {item.total} 行，基准里那一行是 {item.allowed} 行"
+        grown.append((accepted[item.path][1], item.path, sentence))
     return grown, f"与 gate 基准 {base} 那一版比没涨（基准 {len(base_rows)} 行，此刻 {current_rows} 行）", None, base
 
 
@@ -760,7 +905,8 @@ def judge(root, switches, jobs):
         lines.append(f"  ✗ 滞后表比 gate 基准 {base} 那一版涨了 {len(grown)} 处（只缩不涨；路径改了也算新加）：")
         for number, path, sentence in grown:
             lines.append(f"      第 {number} 行：{path}  {sentence}")
-        remedy(lines, ("新写的历史写法当场改成现状，不往滞后表里加；改过名的文件，在同一次改动里把那一份改净、删它那一行。",))
+        remedy(lines, ("新写的历史写法当场改成现状，不往滞后表里加；改过名的文件，在同一次改动里把那一份改净、删它那一行；",
+                       "一份文件拆成多份的，族内（入口本身与它按拆法命名的部分文件，认法写在 scripts/gate/lib_lag_split_family.py 文件头）各行的数之和不超过基准那一行；拆到族外的文件不放过。"))
     if scan["open_fences"]:
         lines.append(f"  ✗ {len(scan['open_fences'])} 份 README 的围栏代码块没收尾，围栏之后的内容没判：")
         for path, number in scan["open_fences"]:
@@ -903,6 +1049,37 @@ def selftest_cells(switches):
          hit_lines_of("// 见 records/2026-10-29-sample.md\n// 见 data-2026-10-26.json 与 notes_2026-10-26.txt\n// 见 2026-10-26.md\n// 这一天 2026-10-26。\n",
                       "rust", switches) == [4],
          "路径与文件名里的日期不算，句子里的日期算：只命中第 4 行")
+    cell("prefix-compounds",
+         hit_lines_of("// 续扫起点要以前缀起头\n// 后者除以前者向上取整\n// 所以前面已发的写都看得见\n// 除以前一项的值\n// 以前这里只认 --bin\n// 这个请求号以前生效过\n",
+                      "rust", switches) == [5, 6],
+         "「以」「除以」「所以」接前缀、前者、前面的构词与「除以前」不算，真讲过去的「以前」算：只命中第 5、6 行")
+    cell("before-face",
+         hit_lines_of("// 所以前面已发的写都看得见\n// 这一段以前面临内存撞上限，所以按块读\n// 以前面向旧布局的那一支已删掉\n// 除以前面一项的值再取整\n// 除以前一项的值\n", "rust", switches) == [2, 3],
+         "「面」跟在「以前」后面且后面不是「那」「这」「的」「带」时，「以前」是时间词要算（以前面临、以前面向）；「所以前面」「除以前面」照「所」「除」放过：只命中第 2、3 行")
+    cell("before-boundary",
+         hit_lines_of("// 两份结果不同时以前面那一份为准\n// 路径可以前面带 ./，归一之后再比\n// 键可以前置一段命名空间\n// 系数要乘以前一项再取整\n"
+                      "// 条件以前置条件为准\n// 取值以前面的那一份为准\n// 这一路以前面对的是旧布局，现在只认新布局\n// 以前一次读两遍，现在只读一遍\n// 半年以前的格式现在不认\n",
+                      "rust", switches) == [7, 8, 9],
+         "不算的六句（以前面那、可以前面带、可以前置、乘以前一项、以前置条件、以前面的）：「以」是可以、乘以的一部分，或「前面那」「前面带」「前置」「前面的」是后一个词；"
+         "要算的三句（以前面对、以前一次、半年以前）：时间词；只命中第 7、8、9 行")
+    # 「」里的三方腿角色名（照原文引的格名）
+    cell("quoted-role-names",
+         hit_lines_of("# 「Bash写范围:三方腿:正推腿写别的轮的报告，拒」「三方报告:辩方腿没写报告行拒」（共 2 格）\n"
+                      "# 「三方报告:跨行的「」引文里攻方腿的报告，拒」\n"
+                      "# 正推腿报的那一条\n"
+                      "# 「格名」之外的攻方腿照判\n", "shell", switches) == [3, 4],
+         "收尾了的带冒号的「」里的角色名不算（套着的「」按层配对，外层里的同样不算），「」外的照判：只命中第 3、4 行")
+    cell("quoted-role-name-without-colon",
+         hit_lines_of("# 这一段是「攻方腿」打中的那一处的修补\n"
+                      "# 「辩方腿」指出这里漏判\n"
+                      "# 「Bash写范围:三方腿:正推腿写别的轮的报告，拒」\n", "shell", switches) == [1, 2],
+         "「」里只放角色名、没有冒号的照判（来历写在「」外），带冒号的格名里的角色名放过：只命中第 1、2 行")
+    cell("quoted-history-words",
+         hit_lines_of("# 「此前只认 --bin」\n"
+                      "# 「样本 2026-10-26 的格」\n"
+                      "# 「三方报告:没收尾的引文里正推腿照判\n"
+                      "# 收尾在前」正推腿照判\n", "shell", switches) == [1, 2, 3, 4],
+         "「」只放过角色名：括着的别的历史词与日期照判，没收尾的「后面、没有「配对的」前后照判：命中第 1 到 4 行")
 
     # 标记
     long_reason = "history-kept: 日期本身就是被测的数据"
@@ -965,6 +1142,65 @@ def selftest_cells(switches):
     code, text = judge_repository({"crates/c/a.rs": "// 此前\n"}, {LAG_TABLE: stock_table_header + lag_row.format("crates/c/a.rs", 1)}, switches)
     cell("lag-first-registration", code == 0 and "里还没有滞后表（初次登记），只判写法、不判涨" in text, f"基准里没有滞后表只判写法，实判 {code}：{text}")
 
+    # 拆分族（lib_lag_split_family.py）：基准里点名一份入口的一行，族是它本身加按它的拆法命名的部分文件（.rs 入口加 <名>/ 下的 .rs，.py、.sh 入口的三种拆法在下面逐种造）
+    family_base = {"crates/c/a.rs": three, LAG_TABLE: stock_table_header + lag_row.format("crates/c/a.rs", 3)}
+    code, text = judge_repository(family_base, {"crates/c/a.rs": "// 此前\n// 原先\n", "crates/c/a/part.rs": "// 起初\n",
+                                                LAG_TABLE: stock_table_header + lag_row.format("crates/c/a.rs", 2) + lag_row.format("crates/c/a/part.rs", 1)}, switches)
+    cell("lag-family-split", code == 0 and "那一版比没涨（基准 1 行，此刻 2 行）" in text, f"一份拆成两份、两行之和等于基准那一行判绿，实判 {code}：{text}")
+    code, text = judge_repository(family_base, {"crates/c/a.rs": "// 此前\n// 原先\n", "crates/c/a/part.rs": "// 起初\n// 最初\n",
+                                                LAG_TABLE: stock_table_header + lag_row.format("crates/c/a.rs", 2) + lag_row.format("crates/c/a/part.rs", 2)}, switches)
+    cell("lag-family-sum", code == 1 and "涨了 2 处" in text and "第 2 行：crates/c/a.rs  拆分族 crates/c/a.rs 里 2 行登记之和是 4 行，基准里那一行是 3 行" in text
+         and "第 3 行：crates/c/a/part.rs  拆分族 crates/c/a.rs 里 2 行登记之和是 4 行，基准里那一行是 3 行" in text, f"族内两行之和超过基准那一行判红、两行都点名，实判 {code}：{text}")
+    code, text = judge_repository(family_base, {"crates/c/a.rs": "// 此前\n// 原先\n", "crates/c/b.rs": "// 起初\n",
+                                                LAG_TABLE: stock_table_header + lag_row.format("crates/c/a.rs", 2) + lag_row.format("crates/c/b.rs", 1)}, switches)
+    cell("lag-family-outside", code == 1 and "涨了 1 处" in text and "第 3 行：crates/c/b.rs  基准里没有这一行" in text,
+         f"落到族外（同目录的兄弟文件）的行判红，之和没超也一样，实判 {code}：{text}")
+    code, text = judge_repository({"crates/c/tests/x.rs": "// 此前\n// 原先\n", LAG_TABLE: stock_table_header + lag_row.format("crates/c/tests/x.rs", 2)},
+                                  {"crates/c/tests/x.rs": None, "crates/c/tests/x/main.rs": "// 此前\n// 原先\n",
+                                   LAG_TABLE: stock_table_header + lag_row.format("crates/c/tests/x/main.rs", 2)}, switches)
+    cell("lag-family-main", code == 0 and "那一版比没涨（基准 1 行，此刻 1 行）" in text, f"tests/x.rs 挪成 tests/x/main.rs（族里的 main.rs）判绿，实判 {code}：{text}")
+    # 入口自己就是目录的入口文件（main.rs、mod.rs）：同目录与再往下各层的 .rs 都是族里的部分文件
+    directory_base = {"crates/c/src/bin/tool/main.rs": three, "crates/c/src/net/mod.rs": three,
+                      LAG_TABLE: stock_table_header + lag_row.format("crates/c/src/bin/tool/main.rs", 3) + lag_row.format("crates/c/src/net/mod.rs", 3)}
+    directory_later = {"crates/c/src/bin/tool/main.rs": "// 此前\n", "crates/c/src/bin/tool/part.rs": "// 原先\n", "crates/c/src/bin/tool/sub/deep.rs": "// 起初\n",
+                       "crates/c/src/net/mod.rs": "// 此前\n", "crates/c/src/net/client.rs": "// 原先\n", "crates/c/src/net/wire/frame.rs": "// 起初\n"}
+    code, text = judge_repository(directory_base, {**directory_later, LAG_TABLE: stock_table_header + "".join(lag_row.format(path, 1) for path in directory_later)}, switches)
+    cell("lag-family-directory-entry", code == 0 and "那一版比没涨（基准 2 行，此刻 6 行）" in text,
+         f"基准里点名 bin/tool/main.rs 与 net/mod.rs，此刻各拆成入口加同目录与下层的子模块 .rs（三份各一行、之和等于基准那一行），判绿，实判 {code}：{text}")
+    # .py、.sh 入口的三种拆法：Python 拆法（同目录的 <模块名>_<部分>.py，入口的「-」在模块名里是「_」）、钩子拆法（同目录的 <名>-<部分>.sh、.py）、
+    # shell 拆法（.claude/gate.d/ 下的入口加 .claude/gate.d/lib/ 下的 <名>-<部分>.sh、.py）：入口那一行拆成几份、几行之和等于基准那一行都判绿
+    hash_three, hash_two, hash_one = "# 此前\n# 原先\n# 起初\n", "# 此前\n# 原先\n", "# 起初\n"
+    code, text = judge_repository({"scripts/c/data-tool.py": hash_three, "scripts/d/prove-red.sh": hash_three,
+                                   LAG_TABLE: stock_table_header + lag_row.format("scripts/c/data-tool.py", 3) + lag_row.format("scripts/d/prove-red.sh", 3)},
+                                  {"scripts/c/data-tool.py": hash_two, "scripts/c/data_tool_base.py": hash_one, "scripts/d/prove-red.sh": hash_two, "scripts/d/prove_red_core.py": hash_one,
+                                   LAG_TABLE: stock_table_header + lag_row.format("scripts/c/data-tool.py", 2) + lag_row.format("scripts/c/data_tool_base.py", 1)
+                                   + lag_row.format("scripts/d/prove-red.sh", 2) + lag_row.format("scripts/d/prove_red_core.py", 1)}, switches)
+    cell("lag-family-python-split", code == 0 and "那一版比没涨（基准 2 行，此刻 4 行）" in text,
+         f"data-tool.py 拆出同目录的 data_tool_base.py、另一个目录里的 prove-red.sh 拆出 prove_red_core.py（Python 拆法），两族各自的之和等于基准那一行，判绿，实判 {code}：{text}")
+    code, text = judge_repository({".claude/hooks/guard.sh": hash_three, LAG_TABLE: stock_table_header + lag_row.format(".claude/hooks/guard.sh", 3)},
+                                  {".claude/hooks/guard.sh": hash_one, ".claude/hooks/guard-decisions.py": hash_one, ".claude/hooks/guard-cells.sh": hash_one,
+                                   LAG_TABLE: stock_table_header + lag_row.format(".claude/hooks/guard.sh", 1) + lag_row.format(".claude/hooks/guard-decisions.py", 1)
+                                   + lag_row.format(".claude/hooks/guard-cells.sh", 1)}, switches)
+    cell("lag-family-hook-split", code == 0 and "那一版比没涨（基准 1 行，此刻 3 行）" in text,
+         f"guard.sh 拆出同目录的 guard-decisions.py 与 guard-cells.sh（钩子拆法），三行之和等于基准那一行，判绿，实判 {code}：{text}")
+    code, text = judge_repository({".claude/gate.d/stage.sh": hash_three, LAG_TABLE: stock_table_header + lag_row.format(".claude/gate.d/stage.sh", 3)},
+                                  {".claude/gate.d/stage.sh": hash_one, ".claude/gate.d/lib/stage-cells.sh": hash_one, ".claude/gate.d/lib/stage-samples.py": hash_one,
+                                   LAG_TABLE: stock_table_header + lag_row.format(".claude/gate.d/stage.sh", 1) + lag_row.format(".claude/gate.d/lib/stage-cells.sh", 1)
+                                   + lag_row.format(".claude/gate.d/lib/stage-samples.py", 1)}, switches)
+    cell("lag-family-shell-split", code == 0 and "那一版比没涨（基准 1 行，此刻 3 行）" in text,
+         f"门禁阶段 stage.sh 拆出 .claude/gate.d/lib/ 下的 stage-cells.sh 与 stage-samples.py（shell 拆法），三行之和等于基准那一行，判绿，实判 {code}：{text}")
+    outside_files = {"scripts/c/data-tool.py": hash_one, "scripts/c/data-tool-extra.py": hash_one, "scripts/c/other_tool.py": hash_one,
+                     ".claude/gate.d/stage.sh": hash_two, ".claude/gate.d/lib/other-cells.sh": hash_one,
+                     ".claude/hooks/guard.sh": hash_two, ".claude/hooks/other-decisions.py": hash_one}
+    code, text = judge_repository({"scripts/c/data-tool.py": hash_three, ".claude/gate.d/stage.sh": hash_three, ".claude/hooks/guard.sh": hash_three,
+                                   LAG_TABLE: stock_table_header + lag_row.format("scripts/c/data-tool.py", 3) + lag_row.format(".claude/gate.d/stage.sh", 3)
+                                   + lag_row.format(".claude/hooks/guard.sh", 3)},
+                                  {**outside_files, LAG_TABLE: stock_table_header + "".join(lag_row.format(path, len(source.splitlines())) for path, source in outside_files.items())}, switches)
+    cell("lag-family-script-outside", code == 1 and "涨了 4 处" in text and "第 3 行：scripts/c/data-tool-extra.py  基准里没有这一行" in text
+         and "第 4 行：scripts/c/other_tool.py  基准里没有这一行" in text and "第 6 行：.claude/gate.d/lib/other-cells.sh  基准里没有这一行" in text
+         and "第 8 行：.claude/hooks/other-decisions.py  基准里没有这一行" in text,
+         f"同目录名字对不上拆法的脚本（.py 入口的 data-tool-extra.py 与 other_tool.py、门禁阶段 lib/ 下的 other-cells.sh、钩子旁的 other-decisions.py）落到族外判红，之和没超也一样，实判 {code}：{text}")
+
     # 现算滞后表、列表、数
     with tempfile.TemporaryDirectory() as root:
         build_tree(root, {"crates/c/a.rs": three, "scripts/c/b.sh": "# 曾经\n", "scripts/c/clean.py": "# 只写现状\n", LAG_TABLE: stock_table_header})
@@ -1011,11 +1247,18 @@ def classify_tree(files, switches):
 
 WHEEL = {
     "marker-ignored": "marker-long", "marker-reason-unchecked": "marker-short", "docstrings-skipped": "python-docstring",
-    "path-dates-flagged": "path-dates", "strings-as-comments": "strings-not-comments", "lag-growth-unjudged": "lag-growth",
+    "path-dates-flagged": "path-dates", "prefix-compounds-flagged": "prefix-compounds", "face-exception-widened": "before-face", "strings-as-comments": "strings-not-comments", "lag-growth-unjudged": "lag-growth",
     "lag-slack-allowed": "lag-slack", "lag-table-form-unchecked": "lag-table-form", "exempt-table-form-unchecked": "exempt-table-form",
     "exempt-table-ignored": "exempt-table", "shebang-unscoped": "shebang-script", "readme-fences-judged": "readme-fence",
     "rust-comments-skipped": "rust-line-date", "wgsl-skipped": "wgsl", "python-comments-skipped": "python-hash",
     "shell-comments-skipped": "shell-hash", "readme-skipped": "readme",
+    "lag-family-unrecognized": "lag-family-split", "lag-family-main-excluded": "lag-family-main", "lag-family-wide": "lag-family-outside",
+    "lag-family-sum-unchecked": "lag-family-sum", "lag-family-python-split-unrecognized": "lag-family-python-split",
+    "lag-family-hook-split-unrecognized": "lag-family-hook-split", "lag-family-shell-split-unrecognized": "lag-family-shell-split",
+    "lag-family-directory-entry-unrecognized": "lag-family-directory-entry",
+    "quoted-role-names-judged": "quoted-role-names", "nested-quotes-flattened": "quoted-role-names",
+    "quoted-spans-unjudged": "quoted-history-words", "unclosed-quote-counted": "quoted-history-words",
+    "quoted-role-names-colon-unchecked": "quoted-role-name-without-colon",
 }
 
 
@@ -1029,7 +1272,7 @@ def run_selftest(switches):
         print(f"  ✗ --selftest：{len(cells)} 格里 {len(failed)} 格不对")
         print("     → 怎么办：照上面点名的格查判法；弄坏开关打开时红在点名的格是对的")
         return 1
-    print(f"  ✓ --selftest：{len(cells)} 格都对（射程、各形态取文本、字符串不误判、路径日期、标记、豁免表、滞后表写法与数、与基准比、现算滞后表、列表、数、开关只在样本根上认）")
+    print(f"  ✓ --selftest：{len(cells)} 格都对（射程、各形态取文本、字符串不误判、路径日期、「以前」的构词、「」里的角色名、标记、豁免表、滞后表写法与数、与基准比、拆分族、现算滞后表、列表、数、开关只在样本根上认）")
     return 0
 
 

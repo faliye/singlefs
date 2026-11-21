@@ -10,6 +10,7 @@ scripts/mutation/mutate.sh（经下面的命令行 failed-names）、scripts/mut
 judge:scripts/gate/lib_libtest_result_lines.py::recordable_results）与 research-build-and-replay 的 research-unit-tests 格（binary_runs；判定请求点名
 judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个函数的闭包改了，按条记的判定一起作废。
 各自按文件路径用 importlib 导入（调用方的 sys.path 不一定有本目录）。
+task-server/task_server_selftest.py 的 gpu-not-run-line-forms 格也按文件路径导入，取 NOT_RUN_MARKER_SAMPLE_LOG 与 NOT_RUN_MARKER_SAMPLE_TESTS：服务的 gpu_not_run_test 与本库对同一份样本日志认同样的行。
 
 认的行（行尾多出的空白不算）：
   结果行  `test <全名> ... <结局>`。全名是带模块路径的用例名；rustdoc 的是 `<源文件> - <条目> (line <N>)`，中间有空格，照样整段算全名。
@@ -38,7 +39,12 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
       接成一条照认；结局粘在别的字后面、或下一条「test <名> ... 」先来了的，那一条认不出结局、不记。这一段另有对不上号的单独一行结局时，接出来的都不认。
   完整性闸：没有汇总行的一段一条不记；认出的结果行（总数，或 ok、FAILED、ignored 任一种）比汇总行报的多，整段不记；同一段里同名的结果行不止一行，那个名字不记。
       汇总行报的比认出的多（有几条连起头都没认出），认出的照记，认不出的本来就不在名单里。
-  记号：一行里的 NOT_RUN_<原因>（后面接空白或行尾；kind 是 not-run，text 从它起到同一行下一处 NOT_RUN_ 之前），与判段判在 CPU 的行
+  记号：一行里任一处的 NOT_RUN_<原因> 整词（kind 是 not-run，text 从它起到同一行下一处 NOT_RUN_ 之前），与判段判在 CPU 的行
+      not-run 记号的边界：前面是行首、空白或别的非标识符字符（标识符字符只算 ASCII 字母、数字、下划线），后面是空白（含制表符）或行尾；ANSI 颜色码（CSI 序列）先去掉再看，
+      两侧照终端上看到的字算；更长的词（`CANNOT_RUN_…`、`NOT_RUN_…:`）不认。
+      认的名字是 NOT_RUN_ 加大写字母、数字、下划线的整词一族（crates 的约定写 NOT_RUN_<原因>，不列死：新原因打了记号被当成没打而记绿比多扣更糟）：crates 实际打的是 NOT_RUN_NO_GPU_ADAPTER
+      （gpu_memory_ledger 的 GPU_NOT_RUN_MARKER），门禁样本与本库自证另用 NOT_RUN_GPU_FEATURE_NOT_COMPILED_IN、NOT_RUN_SAMPLE_REASON、NOT_RUN_SAMPLE_MARKER。
+      task-server 的 gpu_not_run_test 只认 NOT_RUN_NO_GPU_ADAPTER 一个名字，边界与颜色码的算法同本库。
       （CRASH_POINT_REPLAY_JUDGE route=cpu、CRASH_POINT_REPLAY_PARALLEL_START / _FINISHED 带 judge=cpu；kind 是 cpu-judging）。记号认作谁打的，那几条不记；
       cpu_judging_recordable（门禁在多机配置没开 GPU 时给，D13 已定项 17「复用与剪枝不看设备」）下 cpu-judging 照样交出记号、不让谁不记，not-run 照旧不记：
       serial（日志是只开一个测试线程跑的，libtest 在测试开跑时就打「test <名> ... 」；门禁与入口脚本的每一趟都不给它）：记号之前最近的那一条「test <名> ... 」；之前一条都没有的认作这一段全部。
@@ -71,6 +77,10 @@ judge:scripts/gate/lib_libtest_result_lines.py::result_line）：点名的那个
     「按条记库：这一段另有对不上号的单独一行结局，接出来的结局不认…」「recordable 逐条打 green、withheld、marker…」；连带同上那个门禁开关
   LIBTEST_RESULT_LINES_BREAK=cpu-judging-always-withheld  给了 cpu_judging_recordable（--cpu-judging-recordable）也把判段判在 CPU 的那一条不记
     本库「按条记库：没开 GPU 时判段判在 CPU 的照记…」「recordable --cpu-judging-recordable…」
+  LIBTEST_RESULT_LINES_BREAK=marker-word-edges-unchecked  not-run 记号不判两侧词界：更长的词里含着的 NOT_RUN_…（CANNOT_RUN_…、NOT_RUN_…:）也当记号
+    本库「记号认法：样本日志里七种形态的整词都认…」「记号认法：recordable 喂样本日志末行报七处记号…」「记号认法：更长的词与前后紧贴非空白的不认…」
+  LIBTEST_RESULT_LINES_BREAK=marker-color-codes-kept  不先去 ANSI 颜色码：颜色码结尾的 m 紧贴在记号前面，前面有颜色码的那一行认不出
+    本库「记号认法：样本日志里七种形态的整词都认…」「记号认法：recordable 喂样本日志末行报七处记号…」「记号认法：更长的词与前后紧贴非空白的不认…」
 """
 import collections
 import os
@@ -101,7 +111,24 @@ SUMMARY_LINE_FORM = re.compile(r"^test result: (?P<outcome>\w+)\. (?P<passed>\d+
 # 按条记库（文件头「按条记库」）：被打散的结果行的起头与单独一行的结局、两种记号
 SCATTERED_START_FORM = re.compile(r"^test (?P<name>.+?)(?: - should panic)? \.\.\. (?P<rest>.*)$")
 STANDALONE_OUTCOME_FORM = re.compile(r"^(?P<outcome>ok|FAILED|ignored)(?:, .*| <[^>]*>)?\s*$")
-NOT_RUN_MARKER_FORM = re.compile(r"NOT_RUN_[A-Z][A-Z0-9_]*(?=\s|$)")
+# 记号是整词：前面是行首、空白或别的非标识符字符（标识符字符只算 ASCII 字母、数字、下划线），后面是空白或行尾；re.ASCII 让 \S 与 task-server 的 bytes 正则同义
+NOT_RUN_MARKER_FORM = re.compile(r"(?<![A-Za-z0-9_])NOT_RUN_[A-Z][A-Z0-9_]*(?!\S)", re.ASCII)
+NOT_RUN_MARKER_FORM_WITHOUT_EDGES = re.compile(r"NOT_RUN_[A-Z][A-Z0-9_]*")   # 只给弄坏开关 marker-word-edges-unchecked：两侧都不判词界
+ANSI_ESCAPE_FORM = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")   # CSI 序列（颜色码 ESC[33m、ESC[0m 是其中的一种）：认记号之前先去掉，两侧照终端上看到的字判
+# 记号认法的样本日志（文件头「记号」）：task-server 的自证（gpu-not-run-line-forms 格）按这个路径导入同一份，两边对它认出同样的七行、都不认「CANNOT_RUN_ANYTHING_HERE」那一行
+NOT_RUN_MARKER_SAMPLE_LOG = "\n".join([
+    "     Running tests/marker_forms.rs (target/debug/deps/marker_forms-0000000000000000)", "", "running 7 tests",
+    "NOT_RUN_NO_GPU_ADAPTER test=form_line_start reason=样本：行首",
+    "    NOT_RUN_NO_GPU_ADAPTER test=form_indented reason=样本：行首带空白",
+    "test form_after_result_start ... NOT_RUN_NO_GPU_ADAPTER test=form_after_result_start reason=样本：接在结果行起头之后", "ok",
+    "进度 42% NOT_RUN_NO_GPU_ADAPTER test=form_after_other_output reason=样本：接在别的测试没换行的输出后面",
+    "\x1b[33mNOT_RUN_NO_GPU_ADAPTER test=form_colored reason=样本：前面有颜色码\x1b[0m",
+    "test form_words_between ... 卡探测：NOT_RUN_NO_GPU_ADAPTER test=form_words_between reason=样本：结果行起头与记号之间隔着字", "ok",
+    "NOT_RUN_NO_GPU_ADAPTER\ttest=form_tab_after reason=样本：记号后面接制表符",
+    "样本日志摘录：CANNOT_RUN_ANYTHING_HERE 不是记号",
+    "test form_line_start ... ok", "test form_indented ... ok", "test form_after_other_output ... ok", "test form_colored ... ok", "test form_tab_after ... ok", "",
+    "test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s", ""])
+NOT_RUN_MARKER_SAMPLE_TESTS = ("form_line_start", "form_indented", "form_after_result_start", "form_after_other_output", "form_colored", "form_words_between", "form_tab_after")   # 记号行自己 test= 点名的七条，按出现次序
 CPU_JUDGING_FORMS = (re.compile(r"CRASH_POINT_REPLAY_JUDGE route=cpu(?=\s|$)"),
                      re.compile(r"CRASH_POINT_REPLAY_PARALLEL_(?:START|FINISHED) (?:.*\s)?judge=cpu(?=\s|$)"))
 AccountEntry = collections.namedtuple("AccountEntry", "name outcome start end scattered")
@@ -198,12 +225,15 @@ def binary_runs(text):
 
 def marker_pieces(line):
     """一行里的记号（文件头「按条记库」）：[(种类, 那一截)]。not-run 一处一截：从 NOT_RUN_ 起到同一行下一处 NOT_RUN_ 之前（去掉行尾空白）；
-    cpu-judging 一行至多一截：去掉行首空白的整行。"""
+    cpu-judging 一行至多一截：去掉行首空白的整行。
+    not-run 的记号是整词（文件头「记号」）：先去掉颜色码（弄坏开关 marker-color-codes-kept 下不去），再按两侧词界找（弄坏开关 marker-word-edges-unchecked 下不判词界）。"""
     pieces = []
-    starts = [found.start() for found in NOT_RUN_MARKER_FORM.finditer(line)]
+    visible = line if break_is("marker-color-codes-kept") else ANSI_ESCAPE_FORM.sub("", line)
+    marker_form = NOT_RUN_MARKER_FORM_WITHOUT_EDGES if break_is("marker-word-edges-unchecked") else NOT_RUN_MARKER_FORM
+    starts = [found.start() for found in marker_form.finditer(visible)]
     for position, start in enumerate(starts):
-        end = starts[position + 1] if position + 1 < len(starts) else len(line)
-        pieces.append(("not-run", line[start:end].rstrip()))
+        end = starts[position + 1] if position + 1 < len(starts) else len(visible)
+        pieces.append(("not-run", visible[start:end].rstrip()))
     if any(form.search(line) for form in CPU_JUDGING_FORMS):
         pieces.append(("cpu-judging", line.strip()))
     return pieces
@@ -565,6 +595,25 @@ def selftest():
           code == 0 and "green\ttests/setting.rs\ttest_a" in output.getvalue() and "withheld\ttests/noisy.rs\tnoisy_glued\t结果行被打散、认不出结局" in output.getvalue()
           and "marker\ttests/setting.rs\tnot-run\t1\tNOT_RUN_SAMPLE_REASON" in output.getvalue()
           and "RECORDABLE binaries=2 green=4 withheld=2 markers=1" in output.getvalue(), f"退 {code}，输出 {output.getvalue()!r}")
+    # 记号认法（文件头「记号」）：样本日志里任一处的整词都认（行首、行首带空白、接在结果行起头后面、接在别的输出后面、前面有颜色码、结果行起头与记号之间隔着字、后面接制表符共七行），
+    # 更长的词不认；task-server 的自证导入同一份样本日志（NOT_RUN_MARKER_SAMPLE_LOG）
+    sample_pieces = [piece for line in NOT_RUN_MARKER_SAMPLE_LOG.split("\n") for kind, piece in marker_pieces(line) if kind == "not-run"]
+    sample_tests = [found.group(1) for found in (re.search(r"(?<!\S)test=(\S+)", piece) for piece in sample_pieces) if found]
+    check("记号认法：样本日志里七种形态的整词都认、各行 test= 点名的七条、颜色码不进记号那一截，更长的词（CANNOT_RUN_…）那一行不认",
+          sample_tests == list(NOT_RUN_MARKER_SAMPLE_TESTS) and len(sample_pieces) == len(NOT_RUN_MARKER_SAMPLE_TESTS)
+          and all(piece.startswith("NOT_RUN_NO_GPU_ADAPTER") and "\x1b" not in piece for piece in sample_pieces)
+          and marker_pieces("样本日志摘录：CANNOT_RUN_ANYTHING_HERE 不是记号") == [], repr((sample_tests, sample_pieces)))
+    output = io.StringIO()
+    code = command_recordable(["-"], standard_input=io.StringIO(NOT_RUN_MARKER_SAMPLE_LOG), standard_output=output, standard_error=errors)
+    check("记号认法：recordable 喂样本日志末行报七处记号（不是把更长的词也数进去的八处）",
+          code == 0 and "RECORDABLE binaries=1 green=0 withheld=7 markers=7" in output.getvalue(), f"退 {code}，输出 {output.getvalue()!r}")
+    longer_words = ("PRENOT_RUN_NO_GPU_ADAPTER test=left-longer", "x_NOT_RUN_NO_GPU_ADAPTER test=left-underscore", "9NOT_RUN_NO_GPU_ADAPTER test=left-digit",
+                    "NOT_RUN_NO_GPU_ADAPTER:test=right-colon", "NOT_RUN_NO_GPU_ADAPTER-x test=right-longer", "（NOT_RUN_NO_GPU_ADAPTER） test=right-bracket")
+    neighbours = ("[NOT_RUN_NO_GPU_ADAPTER test=left-bracket", "卡NOT_RUN_NO_GPU_ADAPTER test=left-non-ascii", "NOT_RUN_SAMPLE_REASON test=other-name",
+                  "NOT_RUN_NO_GPU_ADAPTER_X test=other-longer-name", "NOT_RUN_NO_GPU_ADAPTER", "NOT_RUN_NO_GPU_ADAPTER\x1b[0m test=color-after")
+    check("记号认法：更长的词与前后紧贴非空白的不认（前面是字母、数字、下划线，后面不是空白或行尾）；前面是非 ASCII 字、标点，别的 NOT_RUN_ 名字（含更长的名字，一族都认）、行尾、后面紧贴颜色码的照认",
+          all(marker_pieces(line) == [] for line in longer_words) and all(len(marker_pieces(line)) == 1 for line in neighbours),
+          repr(([line for line in longer_words if marker_pieces(line)], [line for line in neighbours if len(marker_pieces(line)) != 1])))
     if failures:
         for failure in failures:
             print(f"  ✗ lib_libtest_result_lines 自检：{failure}")  # gate-lint:detail
@@ -574,7 +623,8 @@ def selftest():
           "不是结果行的四种、汇总行、点名省掉模块路径、FAILED 全名按次序、failed-names 的标准输入、名字取不到退 3、读文件、读不了退 2、"
           "逐条认出测试名与结局（按测试二进制切段、条数与汇总行对不上的段整段不认、binary-results）、"
           "按条记库（打了记号的那一条不记、打散的结果行接得上结局的照记、带 --test-threads 1 的段记号归正在跑的那一条、几条同时跑时接在结果行起头后面的记号打这一行时还没出结果的都算、"
-          "没开 GPU 时判段判在 CPU 的照记、对不上号的单独结局、认多了与没有汇总行、recordable 与 --cpu-judging-recordable））")
+          "没开 GPU 时判段判在 CPU 的照记、对不上号的单独结局、认多了与没有汇总行、recordable 与 --cpu-judging-recordable、"
+          "记号认法（样本日志七种形态的整词都认、更长的词不认、颜色码先去掉））")
     return 0
 
 

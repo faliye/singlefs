@@ -11,7 +11,9 @@
 输入：一份或几份实现员补丁目录（格式由 .claude/agents/implementation-writer.md「产出」一节定），照打的次序给：
   crates.patch                 补丁点到的每份文件都要有对应的基线：baseline/<路径>，补丁新建的文件除外
   baseline/<相对仓根的路径>     补丁前原样
-  mutations-append.tsv、mutations-replacements.tsv   变异行；mutations-delete.txt 不带（merge-and-verify.sh 不读它）
+  mutations-append.tsv、mutations-replacements.tsv   变异行（格式照 scripts/gate/apply-writer-patch.py 文件头「补丁目录里的文件」：追加一行六段，
+                               替换一行十二段——新行六段接写补丁时表里那一行的六段即前像；替换表里有一行不是十二段就拒、退 2、不留产物）；
+                               mutations-delete.txt 不带（merge-and-verify.sh 不读它）
 --tree 是此刻的树，缺省是这份脚本所在的仓根。
 
 做什么：
@@ -19,7 +21,7 @@
      算「基线 → 此刻树里那一份」的 diff：在临时 git 仓里放基线、再放树里的现状，git diff --binary --full-index --no-renames，
      合成新 crates.patch（diff --git a/<路径> b/<路径>，路径不带目录前缀）。基线与树里一样的文件不进补丁；树里没有的文件写成删除。
      新补丁目录里的 baseline/ 放新补丁点到的那些文件取用的基线。
-  2. 变异行：mutations-append.tsv 与 mutations-replacements.tsv 的每一行，整行（含制表符，逐字、不用正则）还在此刻树里 crates/mutations.tsv 的才留，
+  2. 变异行：mutations-append.tsv 的每一行、mutations-replacements.tsv 每一行的新行（前六段），整行（含制表符，逐字、不用正则）还在此刻树里 crates/mutations.tsv 的才留（替换行连前像原样留），
      几份补丁目录的行按出现次序合并、重复的留一行。一行不剩的文件不写。
   3. 在 --tree 上 git apply --check --reverse 新 crates.patch 核过才算成：核不过退 1、不留任何产物。
   4. 新补丁目录（--out）必须是不存在的、父目录在的；先在父目录里的临时目录里写全、核完再改名换上，失败时临时目录删净。
@@ -29,16 +31,19 @@
 补丁没点到的文件不在里面。拿它 --skip-apply 验，验的是此刻树上这些文件的现状。
 
 退出码：0 成；1 新补丁在 --tree 上反着核不过（算完之后树又变了，或 diff 本身有误），没留产物；
-  2 用法错、补丁目录读不了、补丁点到树外的路径、点到的已有文件在基线里没有、输出目录已在、临时目录建不成；
+  2 用法错、补丁目录读不了、补丁点到树外的路径、点到的已有文件在基线里没有、替换表里有一行不是十二段、输出目录已在、临时目录建不成；
   3 补丁全撤回了：没有改动、没有变异行可留，没留产物；78 准入或运行条件不满足。
 
-自证（--selftest）：在临时目录里造假仓（git init 的假树）与假补丁目录，十格，其中六格各配一条弄坏开关（文末）：
-  补丁全打着、撤回一半、三方合并打进去、变异行被改过、输出目录已在、两份补丁点到同一份文件、基线缺失、算完之后树又被改、补丁全撤回、补丁点到树外。
+自证（--selftest）：在临时目录里造假仓（git init 的假树）与假补丁目录，十一格，其中七格各配一条弄坏开关（文末）：
+  补丁全打着、撤回一半、三方合并打进去、变异行被改过、替换行没带前像、输出目录已在、两份补丁点到同一份文件、基线缺失、算完之后树又被改、补丁全撤回、补丁点到树外。
   只起 git，不起 cargo；平常跑设了弄坏开关会退 2。
 
 弄坏开关 PATCH_OF_THE_CURRENT_TREE_BREAK=<项>（只给 --selftest 证红用，打开后 --selftest 退 1；项名、弄坏哪一处、红在哪一格，「」里是失败行的开头）：
   PATCH_OF_THE_CURRENT_TREE_BREAK=keep-all-mutation-lines   变异行照抄，不筛此刻表里还在不在
       红在「✗ 自检：变异行被改过：只留此刻表里逐字还在的」
+  PATCH_OF_THE_CURRENT_TREE_BREAK=replacement-width-unchecked   替换表的行不核段数、整行拿去比此刻的表
+      红在「✗ 自检：替换行没带前像（只有六段）：拒、不留产物」
+      连带红在「✗ 自检：变异行被改过：只留此刻表里逐字还在的」（带前像的十二段整行不在表里，一行替换都不留）
   PATCH_OF_THE_CURRENT_TREE_BREAK=skip-reverse-check   不在 --tree 上做 git apply --check --reverse
       红在「✗ 自检：算完补丁之后树又被改：反向核不过时退 1、不留产物」
   PATCH_OF_THE_CURRENT_TREE_BREAK=baseline-latest   几份补丁点到同一份文件时取最晚那份的基线
@@ -75,6 +80,8 @@ BASELINE_DIRECTORY_NAME = 'baseline'
 MUTATION_APPEND_NAME = 'mutations-append.tsv'
 MUTATION_REPLACEMENTS_NAME = 'mutations-replacements.tsv'
 MUTATION_TABLE_PATH = 'crates/mutations.tsv'
+MUTATION_ROW_FIELDS = 6   # 变异表一行几段
+REPLACEMENT_FIELDS = 2 * MUTATION_ROW_FIELDS   # 替换一行：新行六段接写补丁时表里那一行的六段（前像，scripts/gate/apply-writer-patch.py 文件头「补丁目录里的文件」）
 WORK_DIRECTORY_PREFIX = '.patch-of-the-current-tree-'
 HERE = os.path.dirname(os.path.realpath(__file__))
 DEFAULT_TREE = os.path.normpath(os.path.join(HERE, '..', '..'))
@@ -238,19 +245,31 @@ def diff_from_baselines(tree, chosen, repo):
 
 
 def surviving_rows(sources_directories, file_name, table):
-    """→ (读到的行数, 留下的行)：整行逐字还在 table（此刻表的行集合）里的才留；重复的留第一次。"""
-    kept, seen, read = [], set(), 0
+    """→ (读到的行数, 留下的行)：追加的整行、替换的新行（前六段）逐字还在 table（此刻表的行集合）里的才留，留下的照原样（替换带着前像）；重复的留第一次。
+    替换表里有不是 REPLACEMENT_FIELDS 段的行就抛 Refusal、逐行点名（文件头「输入」；弄坏开关 replacement-width-unchecked 下不拒、照整行比）。"""
+    kept, seen, read, wrong = [], set(), 0, []
     for directory in sources_directories:
         path = os.path.join(directory, file_name)
         if not os.path.isfile(path):
             continue
-        for line in table_lines(read_text(path)):
+        for number, line in enumerate(table_lines(read_text(path)), 1):
             if not line:
                 continue
             read += 1
-            if (broken('keep-all-mutation-lines') or line in table) and line not in seen:
+            compared = line
+            if file_name == MUTATION_REPLACEMENTS_NAME and not broken('replacement-width-unchecked'):
+                fields = line.split('\t')
+                if len(fields) != REPLACEMENT_FIELDS:
+                    wrong.append(f'{path}:{number}（「{fields[0]}」{len(fields)} 段）')
+                    continue
+                compared = '\t'.join(fields[:MUTATION_ROW_FIELDS])
+            if (broken('keep-all-mutation-lines') or compared in table) and line not in seen:
                 seen.add(line)
                 kept.append(line)
+    if wrong:
+        raise Refusal(f'{file_name} 有 {len(wrong)} 行不是 {REPLACEMENT_FIELDS} 段：{"、".join(wrong[:10])}{"…" if len(wrong) > 10 else ""}'
+                      '（替换一行是新行六段接写补丁时表里那一行的六段，即前像）',
+                      '以被打那棵树此刻的行为基线重出这几行（格式照 scripts/gate/apply-writer-patch.py 文件头「补丁目录里的文件」），再来')
     return read, kept
 
 
@@ -393,6 +412,12 @@ def mutation_row(name, path='crates/alpha/src/a.rs'):
     return f'{name}\t{path}\t1\t2\t-p alpha --lib\t{name}'
 
 
+def replacement_line(row):
+    """替换表的一行：新行 row 接前像（同名、第四段是 0 的那一行，当写补丁时表里的样子）。"""
+    fields = row.split('\t')
+    return row + '\t' + '\t'.join(fields[:3] + ['0'] + fields[4:])
+
+
 class World:
     """假仓：tree 是 git 仓，提交里是补丁前的原样；writer_patch 像实现员那样出一份补丁目录并提交，让下一份补丁以它为基线。"""
 
@@ -442,7 +467,7 @@ class World:
                 os.makedirs(os.path.dirname(destination), exist_ok=True)
                 with open(destination, 'wb') as handle:
                     handle.write(shown.stdout)
-        for file_name, rows in ((MUTATION_APPEND_NAME, append_rows), (MUTATION_REPLACEMENTS_NAME, replacement_rows)):
+        for file_name, rows in ((MUTATION_APPEND_NAME, append_rows), (MUTATION_REPLACEMENTS_NAME, [replacement_line(row) for row in replacement_rows])):
             if rows:
                 write_rows(os.path.join(patch_directory, file_name), list(rows))
         appended = self.read(MUTATION_TABLE_PATH) or ''
@@ -572,8 +597,23 @@ def cell_mutation_rows_edited(directory):
         return f'应当退 0，实际退 {code}：{text.strip()[:300]}'
     got_append = read_text(os.path.join(out, MUTATION_APPEND_NAME))
     got_replacements = read_text(os.path.join(out, MUTATION_REPLACEMENTS_NAME))
-    if got_append != appended[0] + '\n' + appended[2] + '\n' or got_replacements != replaced[0] + '\n':
-        return f'只该留逐字还在表里的行：追加应当是 kept-row-alpha、kept-row-beta，替换应当是 kept-replacement，实际追加 {got_append!r}、替换 {got_replacements!r}'
+    if got_append != appended[0] + '\n' + appended[2] + '\n' or got_replacements != replacement_line(replaced[0]) + '\n':
+        return f'只该留逐字还在表里的行：追加应当是 kept-row-alpha、kept-row-beta，替换应当是 kept-replacement（连前像），实际追加 {got_append!r}、替换 {got_replacements!r}'
+    return None
+
+
+def cell_replacement_without_preimage(directory):
+    world, _ = fresh_world(directory, BASIC_FILES)
+    patch = world.writer_patch('patch', {'crates/alpha/src/a.rs': numbered({2: 'edited 2'})}, replacement_rows=[mutation_row('kept-replacement')])
+    with open(os.path.join(patch, MUTATION_REPLACEMENTS_NAME), 'a', encoding='utf-8') as handle:
+        handle.write(mutation_row('bare-replacement') + '\n')
+    world.write(MUTATION_TABLE_PATH, world.read(MUTATION_TABLE_PATH) + mutation_row('bare-replacement') + '\n')
+    out = os.path.join(directory, 'out')
+    code, text = run_tool(['--out', out, '--tree', world.tree, patch])
+    if code != 2 or f'{MUTATION_REPLACEMENTS_NAME} 有 1 行不是 12 段' not in text or '「bare-replacement」6 段' not in text:
+        return f'应当退 2、点名没带前像的那一行（bare-replacement，6 段），实际退 {code}：{text.strip()[:300]}'
+    if os.path.lexists(out) or leftovers(directory):
+        return '不该留产物与临时目录'
     return None
 
 
@@ -668,6 +708,7 @@ CELLS = (
     ('撤回一半：现算的补丁只含还在的那一半、反向核过', cell_half_withdrawn),
     ('三方合并打进去、主工作区另有别人的改动：现算的补丁含那些改动、反向核过', cell_merged_by_three_way),
     ('变异行被改过：只留此刻表里逐字还在的', cell_mutation_rows_edited),
+    ('替换行没带前像（只有六段）：拒、不留产物', cell_replacement_without_preimage),
     ('输出目录已在：拒、原目录一个字节不动', cell_output_directory_exists),
     ('两份补丁点到同一份文件：取最早那份的基线', cell_two_patches_share_a_file),
     ('点到的已有文件在基线里没有：拒、不留产物', cell_baseline_missing),

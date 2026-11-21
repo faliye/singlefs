@@ -13,7 +13,7 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
     data-name-lint.py --selftest  # DATA_NAME_LINT_BREAK=<开关> 时必须红在点名的格
 
 扫哪些（只认整串匹配 [a-z][a-z0-9_]*）：
-  ① scripts/experiment-apparatus/*.rs 与 crates/*/src/**/*.rs 里的字符串字面量，三种形态：
+  ① scripts/experiment-apparatus/**/*.rs（顶层的装置，与拆成子模块的装置目录 <装置>/ 底下逐层往下的，名叫 target 的目录不进）与 crates/*/src/**/*.rs 里的字符串字面量，三种形态：
      元组首列 ("名字", …)（左括号前面是标识符或 ! 的是函数或宏调用，不算元组）；
      => "名字" 右侧（cargo fmt 把放不下一行的分支折成 => { 换行 "名字" 换行 }，块里只有这一个串的，同算 => 右侧）；
      任一字符串字面量里的 键= （键前面是串首、空白或 , ; ( [ { |，后面不是 = 或 >）。
@@ -61,6 +61,8 @@ naming-lint 只查我们声明的名字；实验装置的字段表标签 ("syste
       「✗ 自证 exclusion-stale-red：」「✗ 自证 exclusion-missing-path-red：」「✗ 自证 exclusion-no-reason-red：」
   DATA_NAME_LINT_BREAK=external-marker-ignored  .rs 里那一行的 `// naming-lint:external <理由>` 不认
       「✗ 自证 external-marker-green：」
+  DATA_NAME_LINT_BREAK=apparatus-subdirectories-unscanned  scripts/experiment-apparatus 只扫顶层的 *.rs，装置目录里的 .rs 不扫（排除表指到子目录文件的行判「不在扫描范围」）
+      「✗ 自证 apparatus-subdirectory-red：」「✗ 自证 apparatus-subdirectory-exclusion-green：」
 """
 import os
 import re
@@ -90,7 +92,7 @@ EXTRA_ABBREVIATIONS = {
 }
 BREAKS = ("string-literals-skipped", "arrow-right-skipped", "folded-arm-skipped", "key-names-skipped", "call-arguments-judged", "comments-scanned", "kb-tables-skipped",
           "single-letters-passed", "registered-ignored", "numbered-ignored", "exclusions-ignored", "stale-exclusions-passed",
-          "external-marker-ignored")
+          "external-marker-ignored", "apparatus-subdirectories-unscanned")
 broken = set(item for item in os.environ.get("DATA_NAME_LINT_BREAK", "").split(",") if item in BREAKS)
 
 
@@ -320,7 +322,9 @@ def walk_files(root, relative_directory, suffix, depth_rule):
 
 
 def is_scanned_rust(relative):
-    if re.fullmatch(r"scripts/experiment-apparatus/[^/]+\.rs", relative):
+    # 装置拆成子模块之后住在 scripts/experiment-apparatus/<装置>/ 底下逐层往下（名叫 target 的目录 walk_files 不进）
+    apparatus = r"scripts/experiment-apparatus/[^/]+\.rs" if "apparatus-subdirectories-unscanned" in broken else r"scripts/experiment-apparatus/.+\.rs"
+    if re.fullmatch(apparatus, relative):
         return True
     return re.fullmatch(r"crates/[^/]+/src/.+\.rs", relative) is not None
 
@@ -369,7 +373,7 @@ def load_exclusions(root, scanned):
             if not os.path.isfile(os.path.join(root, path)):
                 faults.append((number, f"{body} 指向不存在的路径 {path}")); continue
             if path not in scanned:
-                faults.append((number, f"{body} 的 {path} 不在扫描范围里（scripts/experiment-apparatus/*.rs、crates/*/src/**/*.rs、.claude/kb/**/*.md）")); continue
+                faults.append((number, f"{body} 的 {path} 不在扫描范围里（scripts/experiment-apparatus/**/*.rs、crates/*/src/**/*.rs、.claude/kb/**/*.md）")); continue
             if key in table:
                 faults.append((number, f"{body} 与第 {table[key]} 行是同一条")); continue
         table[key] = number
@@ -388,7 +392,7 @@ def judge(root, quiet=False):
     registered, letters = read_registered(root)
     files, candidates = collect(root)
     if not files:
-        say(f"  ! 本次无对象可判：{root} 下没有 scripts/experiment-apparatus/*.rs、crates/*/src/**/*.rs 与 .claude/kb/**/*.md")
+        say(f"  ! 本次无对象可判：{root} 下没有 scripts/experiment-apparatus/**/*.rs、crates/*/src/**/*.rs 与 .claude/kb/**/*.md")
         return 77, out
     exclusions, faults = load_exclusions(root, set(files))
     used = {key: 0 for key in exclusions}
@@ -476,6 +480,10 @@ def run_selftest():
     case("exclusion-no-reason-red", {**excluded, EXCLUDE_FILE: "scripts/experiment-apparatus/e1_demo.rs:system_configuration_mac\n"}, 1, "没写理由")
     case("external-marker-green", {"crates/demo/src/lib.rs": 'fn kind() -> &\x27static str {\n    match 0 {\n        _ => "lib", // naming-lint:external cargo 定的目标种类名\n    }\n}\n'}, 0, "合命名纪律")
     case("external-marker-no-reason-red", {"crates/demo/src/lib.rs": 'fn kind() -> &\x27static str {\n    match 0 {\n        _ => "lib", // naming-lint:external\n    }\n}\n'}, 1, "「lib」是缩写")
+    split_apparatus = {"scripts/experiment-apparatus/e1_split/main.rs": "mod parts;\n", "scripts/experiment-apparatus/e1_split/parts/tests.rs": fields}
+    case("apparatus-subdirectory-red", split_apparatus, 1, "scripts/experiment-apparatus/e1_split/parts/tests.rs:1  元组首列「system_configuration_mac」里 「mac」")
+    case("apparatus-subdirectory-exclusion-green", {**split_apparatus, EXCLUDE_FILE: "scripts/experiment-apparatus/e1_split/parts/tests.rs:system_configuration_mac  # 2026-10-13 立 C430 之前的名字，改名要连产物一起重跑\n"}, 0,
+         "扫了 2 份文件、1 个串（排除表 1 条放行 1 个串）")
     case("nothing-to-judge", {"README.md": "no sources\n"}, 77, "本次无对象可判")
     table = upstream_table() or {}
     overlap = sorted(word for word in EXTRA_ABBREVIATIONS if word in table)
@@ -506,6 +514,7 @@ WHEEL = {
     "exclusions-ignored": ("exclusion-green",),
     "stale-exclusions-passed": ("exclusion-stale-red",),
     "external-marker-ignored": ("external-marker-green",),
+    "apparatus-subdirectories-unscanned": ("apparatus-subdirectory-red", "apparatus-subdirectory-exclusion-green"),
 }
 
 

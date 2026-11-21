@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# git 的 pre-push 钩子：判法都在 scripts/gate/large-file-git-hook.py（标准输入是 git 给的 `<本地引用> <本地 sha> <远端引用> <远端 sha>` 行，照这几行判每个要推的引用）。
+# 经 core.hooksPath（主工作树钩子目录的绝对路径）生效，装与核对见 scripts/gate/git-hooks-install.py。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if ! command -v python3 > /dev/null 2>&1; then
+  echo "  ✗ pre-push：PATH 上没有 python3，大文件判不了，这一次推送不放行" >&2
+  echo "     → 怎么办：装好 python3 再推；确要不经钩子推送的是用户的决定，由用户自己 git push --no-verify" >&2
+  exit 1
+fi
+exec python3 -B "$here/../large-file-git-hook.py" pre-push "$@"

@@ -767,15 +767,17 @@ def watch_judgement(command, directory, registry_root, environment, broken):
         if problem:
             return False, f"stage-selftest.sh 喂的样本档不盯：{problem}"
         return True, f"{script} 喂的样本档都登记在表里，样本与 HEAD 加暂存区相同"
-    saved = (library.SELFTEST_REGISTRY_PATH, library.SELFTEST_REGISTRY_ROOT)
+    # 登记表的位置与登记表所在的仓根是 lib_project_code_runs_base 这一份部分模块的模块变量（读它们的函数在那里，换在库入口的再导出名上读它们的函数看不到）
+    registry_state = library.lib_project_code_runs_base
+    saved = (registry_state.SELFTEST_REGISTRY_PATH, registry_state.SELFTEST_REGISTRY_ROOT)
     if registry_root:
-        library.SELFTEST_REGISTRY_ROOT = os.path.realpath(registry_root)
-        library.SELFTEST_REGISTRY_PATH = os.path.join(library.SELFTEST_REGISTRY_ROOT, REGISTRY_RELATIVE_PATH)
+        registry_state.SELFTEST_REGISTRY_ROOT = os.path.realpath(registry_root)
+        registry_state.SELFTEST_REGISTRY_PATH = os.path.join(registry_state.SELFTEST_REGISTRY_ROOT, REGISTRY_RELATIVE_PATH)
     try:
         row = library.registered_selftest(script, rest, directory)
-        registry = library.SELFTEST_REGISTRY_PATH
+        registry = registry_state.SELFTEST_REGISTRY_PATH
     finally:
-        library.SELFTEST_REGISTRY_PATH, library.SELFTEST_REGISTRY_ROOT = saved
+        registry_state.SELFTEST_REGISTRY_PATH, registry_state.SELFTEST_REGISTRY_ROOT = saved
     if row is None:
         return False, f"{script} 不是登记表管的自证（不在登记目录下、没登记、没带 --selftest，或带了 --selftest 之外的参数）"
     return True, f"{script} 在 {registry} 里登记过（第 {row.line} 行）"

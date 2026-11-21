@@ -17,6 +17,10 @@
 #     一行一条、排序去重：基准到工作区的 diff、HEAD 到暂存区的 diff；第二个参数是 untracked 时再加未跟踪文件。
 #     给了 diff-filter（例 A）只在两个 diff 上加；未跟踪文件只在 diff-filter 为空或含 A 时加（它们本来就是新增）。
 #     git 调用一律带 -c core.quotepath=false。路径里带制表符、换行或引号的，git 照样转义，这一条管不到。
+#     任一条 git 退非 0 就退 1，并把哪一条 git、退几、git 的报错原文（它的标准错误，逐行缩进）写到标准错误（gate_added_lines 的 git 失败时同样经 _lib_changed_paths_run_git 写）；调用方在命令替换里取标准输出，这几行照样落进它自己的输出。
+#     git 成了而往标准错误写了东西（例：重命名探测超上限的警告）的，原样交到标准错误，与直接起 git 时一样（gate_added_lines 同样）。
+#     在父进程里预取、各格的子 shell 里才用的调用方，要自己把标准错误接住、格里取不到时再打出来（doc-text 的 text_prefetched_error、
+#     doc-process-records 的 load_change_range、doc-experiments 的 CHANGE_RANGE_ERROR_FILE 就是这样），不然报错落在父进程的标准错误里、各格的日志里没有。
 #     与基准相比内容只差此刻生效的登记搬迁（.claude/gate.d/path-moves.tsv，被判的根里那一份；一行只在不在 gate 基准那一版的登记表里、gate 基准那一版里旧前缀下有文件、
 #     新前缀下没有文件时生效；只差仓根起的前缀，别的目录下同名的一段不算）的路径剔掉，不算这一次碰了的：经 gate_drop_moved_only。
 #   gate_drop_moved_only <基准>
@@ -32,7 +36,7 @@
 #     登记了搬迁的，剔掉只因此刻生效的登记搬迁才变了的行（lib-lag-baseline.py 的 drop_moved_lines：与基准那一版按 diff 的位置配对，同一块里被删的第 k 行
 #     照登记换算之后等于新增的第 k 行才剔，删加条数不等的块不剔；整份恰好换前缀搬了家、没搬进别的按路径管的类的，另剔 diff 里没动的行；别的一行不剔）。
 #     路径可以是目录。git 失败、或路径被 git 加了引号（带制表符、引号、反斜杠）时退出码非 0、不输出半截结果，
-#     调用方按「拿不到改动范围」处理（通常退回全量判）。
+#     调用方按「拿不到改动范围」处理（通常退回全量判）；git 失败时与 gate_changed_paths 一样把哪一条 git、退几、git 的报错原文写到标准错误。
 #
 # 阶段里的用法：
 #   LIB_CHANGED_PATHS="$(cd "$(dirname "$0")/../.." && pwd)/scripts/gate/changed-paths.sh"
@@ -76,6 +80,13 @@
 #       「✗ 新增行：路径带制表符时退非 0：」（实测『0』：带制表符的那份未跟踪文件根本没读）
 #   LIB_CHANGED_PATHS_BREAK=swallow  gate_changed_paths 第一条 git diff 失败时吞掉退出码
 #       「✗ 基准解析不到：两个取法都退非 0，不交半截结果：」（实测『0 1 空』）
+#   LIB_CHANGED_PATHS_BREAK=git-error-dropped  gate_changed_paths 与 gate_added_lines 的 git 失败时不把哪一条、退几、git 的报错原文写到标准错误
+#       「✗ 基准解析不到：标准错误里写明哪一条 git、退几、git 的报错原文：」（实测『  』）
+#       「✗ 基准解析不到：gate_added_lines 的标准错误里也写明哪一条 git、退几、git 的报错原文：」（实测『  』）
+#   LIB_CHANGED_PATHS_BREAK=added-lines-git-bare  gate_added_lines 的 git 失败时不写哪一条 git、退几（只剩 git 自己的原文）
+#       「✗ 基准解析不到：gate_added_lines 的标准错误里也写明哪一条 git、退几、git 的报错原文：」（实测『  原文』）
+#   LIB_CHANGED_PATHS_BREAK=success-stderr-dropped  git 成了而往标准错误写的警告不交出（只在失败时才打标准错误）
+#       「✗ 成功时 git 写到标准错误的警告原样交出：」（实测『没有』）
 #   LIB_CHANGED_PATHS_BREAK=header-anywhere  「+++ 」在正文里也当文件头认
 #       「✗ 新增行：路径带空格、正文里以「++ 」开头的一行照样归到那份文件：」（实测『以两个加号开头的新增行<制表符>紧跟的一行』）
 #   LIB_CHANGED_PATHS_BREAK=binary  未跟踪的二进制文件也整份读
@@ -145,6 +156,34 @@ gate_diff_base() {
   esac
 }
 
+# 跑一条 git（第一个参数是调用它的函数名，第二个参数是存它标准错误的文件）：成了照交它的标准输出，它往标准错误写的警告（例：重命名探测超上限）原样打到标准错误；
+# 失败把哪一条 git、退几、git 的报错原文打到标准错误，退它的退出码。
+# 弄坏开关 git-error-dropped：失败时不打这几行；added-lines-git-bare：调用者是 gate_added_lines 时只打 git 自己的报错原文、不写哪一条 git 与退几；
+# success-stderr-dropped：成了就不打它的标准错误。
+_lib_changed_paths_run_git() {
+  local caller="$1" error_file="$2" status=0
+  shift 2
+  git "$@" 2> "$error_file" || status=$?
+  if ((status == 0)); then
+    [[ "${_lib_changed_paths_break:-}" == success-stderr-dropped ]] || cat -- "$error_file" >&2
+    return 0
+  fi
+  if [[ "${_lib_changed_paths_break:-}" == added-lines-git-bare && "$caller" == gate_added_lines ]]; then
+    cat -- "$error_file" >&2
+  elif [[ "${_lib_changed_paths_break:-}" != git-error-dropped ]]; then
+    {
+      echo "  ! $caller 取不到改动路径：git $* 退出 $status"
+      if [[ -s "$error_file" ]]; then
+        echo "     git 的报错原文："
+        sed 's/^/       /' "$error_file"
+      else
+        echo "     git 没有写报错（标准错误是空的）"
+      fi
+    } >&2
+  fi
+  return "$status"
+}
+
 gate_changed_paths() {
   local base="$1" untracked_mode="$2" diff_filter="${3:-}"
   local quote_option=(-c core.quotepath=false) filter_option=()
@@ -164,12 +203,15 @@ gate_changed_paths() {
   fi
   # 三次调用逐条判退出码、先落到变量再排序：写成 `{ …; …; …; } | sort -u` 时花括号组只交最后一条的退出码，
   # 基准写错、第一条 git diff 失败，集合就静默少了一截。
-  local listed
+  local listed error_file status=0
+  error_file="$(mktemp)" || return 1
   listed="$(
-    git "${quote_option[@]}" diff --name-only "${filter_option[@]}" "$base" -- || [[ "${_lib_changed_paths_break:-}" == swallow ]] || exit 1
-    git "${quote_option[@]}" diff --name-only --cached "${filter_option[@]}" -- || exit 1
-    if ((include_untracked)); then git "${quote_option[@]}" ls-files --others --exclude-standard -- || exit 1; fi
-  )" || return 1
+    _lib_changed_paths_run_git gate_changed_paths "$error_file" "${quote_option[@]}" diff --name-only "${filter_option[@]}" "$base" -- || [[ "${_lib_changed_paths_break:-}" == swallow ]] || exit 1
+    _lib_changed_paths_run_git gate_changed_paths "$error_file" "${quote_option[@]}" diff --name-only --cached "${filter_option[@]}" -- || exit 1
+    if ((include_untracked)); then _lib_changed_paths_run_git gate_changed_paths "$error_file" "${quote_option[@]}" ls-files --others --exclude-standard -- || exit 1; fi
+  )" || status=1
+  rm -f -- "${error_file:?}"
+  ((status == 0)) || return 1
   [[ -n "$listed" ]] || return 0
   listed="$(sort -u <<<"$listed")"
   gate_drop_moved_only "$base" <<<"$listed"
@@ -196,12 +238,14 @@ _lib_changed_paths_added_lines_raw() {
   scratch="$(mktemp -d)" || return 1
   # --no-renames 写死：同一次搬家，暂存前（未跟踪的新名）与暂存后（一次改名）判得要一样；
   # 前缀写死：diff.noprefix 之类的配置会让 +++ 行不带 b/，路径就解析错了。
-  if ! git "${quote_option[@]}" diff --no-renames --unified=0 --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$base" -- "$@" > "$scratch/diff"; then
+  # 两条 git 都经 _lib_changed_paths_run_git：失败时写哪一条 git、退几、git 的报错原文（与 gate_changed_paths 同一处写）；ls-files 的输出先落文件再转换行，管道里看不到它的退出码。
+  if ! _lib_changed_paths_run_git gate_added_lines "$scratch/git-error" "${quote_option[@]}" diff --no-renames --unified=0 --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$base" -- "$@" > "$scratch/diff"; then
     rm -rf "${scratch:?}"; return 1
   fi
-  if ! untracked_list="$(git "${quote_option[@]}" ls-files -z --others --exclude-standard -- "$@" | tr '\0' '\n')"; then
+  if ! _lib_changed_paths_run_git gate_added_lines "$scratch/git-error" "${quote_option[@]}" ls-files -z --others --exclude-standard -- "$@" > "$scratch/untracked"; then
     rm -rf "${scratch:?}"; return 1
   fi
+  untracked_list="$(tr '\0' '\n' < "$scratch/untracked")"
   # 「+++ 」只在文件头里认（diff --git 与第一个 @@ 之间）：正文里以「++ 」开头的一行新增，在 diff 里也长成「+++ 」。
   # git 给带空格的路径在文件头末尾补一个制表符，剥掉；路径被 git 加了引号（带制表符、引号、反斜杠），这里还原不了，退非 0。
   if ! tr -d '\0' < "$scratch/diff" | awk -v header_anywhere="$([[ "${_lib_changed_paths_break:-}" == header-anywhere ]] && echo 1)" '
@@ -304,6 +348,29 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     check "基准解析不到：两个取法都退非 0，不交半截结果" "1 1 空" \
           "$(gate_changed_paths 没有这个提交 untracked >/dev/null 2>&1; a=$?; gate_added_lines 没有这个提交 . >/dev/null 2>&1; b=$?; \
              out="$(gate_changed_paths 没有这个提交 untracked 2>/dev/null)"; echo "$((a != 0)) $((b != 0)) ${out:-空}")"
+    # git 失败时标准错误里有哪一条 git、退几、git 自己的报错原文（原文取 git 直接跑同一条的标准错误的头一行，不写死某种语言的句子）
+    git_original="$(git -c core.quotepath=false diff --name-only 没有这个提交 -- 2>&1 >/dev/null)" && git_original_status=0 || git_original_status=$?
+    git_original_head="${git_original%%$'\n'*}"
+    git_reported="$(gate_changed_paths 没有这个提交 untracked 2>&1 >/dev/null)"
+    check "基准解析不到：标准错误里写明哪一条 git、退几、git 的报错原文" "命令 退出码 原文" \
+          "$([[ "$git_reported" == *'diff --name-only 没有这个提交'* ]] && echo 命令) $([[ "$git_reported" == *"退出 $git_original_status"* ]] && echo 退出码) $([[ -n "$git_original_head" && "$git_reported" == *"$git_original_head"* ]] && echo 原文)"
+    # gate_added_lines 的 git 失败时同样写哪一条 git、退几、git 的报错原文（原文取 git 直接跑同一条的标准错误的头一行）
+    added_original="$(git -c core.quotepath=false diff --no-renames --unified=0 --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ 没有这个提交 -- . 2>&1 >/dev/null)" && added_original_status=0 || added_original_status=$?
+    added_original_head="${added_original%%$'\n'*}"
+    added_reported="$(gate_added_lines 没有这个提交 . 2>&1 >/dev/null)"
+    check "基准解析不到：gate_added_lines 的标准错误里也写明哪一条 git、退几、git 的报错原文" "命令 退出码 原文" \
+          "$([[ "$added_reported" == *'diff --no-renames --unified=0'*'没有这个提交'* ]] && echo 命令) $([[ "$added_reported" == *"退出 $added_original_status"* ]] && echo 退出码) $([[ -n "$added_original_head" && "$added_reported" == *"$added_original_head"* ]] && echo 原文)"
+    # git 成了而往标准错误写了警告：删两个、加两个内容不同的文件、diff.renameLimit 写成 1，git diff --name-only 成功、标准错误里写「diff.renameLimit」（配置项名字不随界面语言变）
+    warning_result="$(
+      mkdir 警告仓 && cd 警告仓 && git init -q -b master . && mkdir 目录 || exit 2
+      printf '甲\n' > 目录/甲.md && printf '乙\n' > 目录/乙.md
+      git add -A && git commit -qm 基准 && git rm -q 目录/甲.md 目录/乙.md && mkdir -p 目录 || exit 2
+      printf '丙一\n丙二\n' > 目录/丙.md && printf '丁一\n丁二\n' > 目录/丁.md
+      git add -A && git config diff.renameLimit 1 || exit 2
+      gate_changed_paths HEAD tracked-only 2>&1 >/dev/null
+    )"
+    check "成功时 git 写到标准错误的警告原样交出" "有" "$([[ "$warning_result" == *diff.renameLimit* ]] && echo 有 || echo 没有)"
+    rm -rf 警告仓
     # HEAD 还没出生的仓（刚 git init）：基准取空树，取路径照常交出未跟踪文件，不报取不到
     unborn_result="$(mkdir 未出生 && cd 未出生 && git init -q -b master . && printf 'x\n' > 新.md \
       && base="$(gate_diff_base gate)" && paths="$(gate_changed_paths "$base" untracked)" && echo "$base $paths")"
@@ -366,14 +433,14 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   )"
   check_count="$(grep -c '^PASS \|^FAIL ' <<<"$selftest_output")"
   failures="$(grep '^FAIL ' <<<"$selftest_output")"
-  if [[ -n "$failures" || "$check_count" -ne 22 ]]; then
-    echo "  ✗ 共用库 scripts/gate/changed-paths.sh 的自证没过（查了 $check_count 项，应当 22 项）："   # gate-lint:summary
+  if [[ -n "$failures" || "$check_count" -ne 25 ]]; then
+    echo "  ✗ 共用库 scripts/gate/changed-paths.sh 的自证没过（查了 $check_count 项，应当 25 项）："   # gate-lint:summary
     printf '%s\n' "$failures" | sed 's/^FAIL /  ✗ /'   # gate-lint:detail
     printf '%s\n' "$selftest_output" | grep -v '^PASS \|^FAIL ' | sed 's/^/      /'   # gate-lint:detail
     echo "     → 怎么办：看 gate_changed_paths / gate_added_lines 的 git 调用有没有带 -c core.quotepath=false、未跟踪文件那一支有没有加 ls-files --others，"
     echo "               gate_diff_base 的回退次序是不是 GATE_BASE → @{upstream} 的 merge-base → HEAD；门禁 doc-process-records、doc-experiments 与 doc-registries 的 invariant-anchors 那一格都靠它取改动范围。"
     exit 1
   fi
-  echo "  ✓ 共用库 scripts/gate/changed-paths.sh 自证通过（$check_count 项：三种来源的中文路径逐字不转义、未跟踪可开关、diff-filter=A、新增行含未跟踪整份且只看给的路径、带空格路径与「++ 」开头的行、不读二进制、路径带制表符退非 0、基准解析不到退非 0、HEAD 没出生取空树、基准回退四档、source 时不认环境里的弄坏开关、与基准只差登记搬迁的文件与行不算改动、登记表没有内容行时照旧算、搬迁登记只认仓根起的前缀、生效窗口跟着 gate 基准走）"
+  echo "  ✓ 共用库 scripts/gate/changed-paths.sh 自证通过（$check_count 项：三种来源的中文路径逐字不转义、未跟踪可开关、diff-filter=A、新增行含未跟踪整份且只看给的路径、带空格路径与「++ 」开头的行、不读二进制、路径带制表符退非 0、基准解析不到退非 0、git 失败时两个函数的标准错误里各有哪一条 git、退几与 git 的报错原文、HEAD 没出生取空树、基准回退四档、source 时不认环境里的弄坏开关、与基准只差登记搬迁的文件与行不算改动、登记表没有内容行时照旧算、搬迁登记只认仓根起的前缀、生效窗口跟着 gate 基准走）"
   exit 0
 fi

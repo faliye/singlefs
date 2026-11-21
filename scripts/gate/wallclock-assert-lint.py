@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-# admission: always 判的是此刻 scripts/experiment-apparatus/*.rs 里的 #[test]，几秒跑完；改了测试或登记位就要现判
+# admission: always 判的是此刻 scripts/experiment-apparatus/ 下顶层的 *.rs 与装置目录里的 .rs 里的 #[test]，几秒跑完；改了测试或登记位就要现判
 # run-condition: none 只读 .rs 源码，纯 python3 标准库，不起 cargo
 """按挂钟判的断言要有登记位（checks-owed C465）。登记位只是一行注释，装置源码里不加任何代码。
 
 用法：
-    wallclock-assert-lint.py [仓根]          # 不给就判本仓；扫 <仓根>/scripts/experiment-apparatus/*.rs 里每个 #[test] 函数
+    wallclock-assert-lint.py [仓根]          # 不给就判本仓；扫 <仓根>/scripts/experiment-apparatus/ 下顶层的 *.rs 与带根 main.rs 的装置目录 <装置>/ 底下逐层往下的 .rs（名叫 target 的目录不进）里每个 #[test] 函数
     wallclock-assert-lint.py --list [仓根]   # 打登记了的测试，一行「<文件>TAB<函数名>」；门禁的单测格靠它按名给 cargo test 传 --skip
     wallclock-assert-lint.py --selftest      # WALLCLOCK_ASSERT_LINT_BREAK=<开关> 时必须红在点名的格
 
 什么算按挂钟判的断言：#[test] 函数里的 assert! / assert_eq! / assert_ne!（含 debug_ 前缀），它的参数（连同格式串里 {名字} 的内联捕获）
-  先过读钟这一关：测试函数里、或它（传递地）调到的同一份文件里的函数里，有 CLOCK_READ_PATTERNS 的写法（Instant::now、SystemTime::now、.elapsed(、.duration_since(），
+  先过读钟这一关：测试函数里、或它（传递地）调到的同一份装置里的函数里（装置目录的各份子模块算一份装置，顶层的 .rs 单独算一份），有 CLOCK_READ_PATTERNS 的写法（Instant::now、SystemTime::now、.elapsed(、.duration_since(），
   否则它量不到挂钟，断言不算。过了这一关，断言的参数（连同格式串里 {名字} 的内联捕获）
   ① 直接含挂钟量：MEASUREMENT_PATTERNS 的写法（.elapsed(、.duration_since(），或词表 WALLCLOCK_VOCABULARY 里的词（elapsed、Instant、Duration、per_second、throughput、nanoseconds，可扩）
      出现在一个值标识符的词序列里（four_thread_nanoseconds 算；函数名、Duration::from_secs 这类路径头、全大写的常量、`let 名字 = <只有字面量与运算>;` 绑的名字都不算，它们不是量到的）；
@@ -22,7 +22,8 @@
   // wallclock-assert-load-safe: <为什么负载再高也不会红>   断言里有挂钟词，但判的方向不怕负载（量到的只会更大才过的下界，或比的是配置值、字面量算出来的数）。门禁里照跑，不跳过。
 
 --skip 是子串匹配：登记的函数名是别的 #[test] 函数名的子串（含同名）时，--skip 会把那一条一起跳过。判法把扫到的全部 #[test] 函数名当全集，
-  登记名撞上别的、没登记的测试名就判红，点名撞上的那一条；出路是改名，或者把撞上的那一条也登记（它也得是有挂钟断言的测试）。全集只含 scripts/experiment-apparatus/ 顶层的 .rs，子目录里的不扫。
+  登记名撞上别的、没登记的测试名就判红，点名撞上的那一条；出路是改名，或者把撞上的那一条也登记（它也得是有挂钟断言的测试）。全集是上面扫到的全部 .rs 里的 #[test]（顶层的 .rs 与装置目录里的）。断言按文件判；读钟的传递在同一份装置的全部文件里走，
+  污染的传递只在同一个函数里走（跨装置的计时辅助函数，登记位是人的判断，这条判法兜不住，见上面「判的是字面与传递」）。
 
 判红：
   ① 有挂钟断言而两种登记位都没有（点名文件:行号）；两种都有
@@ -31,10 +32,10 @@
   ④ 登记名是别的未登记 #[test] 函数名的子串
 
 滞后表 .claude/gate.d/wallclock-assert-lag.tsv（本判法立之前就在仓里、还没人复核的挂钟断言；只缩不涨，门禁不判涨，靠 review）：
-  一行一个测试，`scripts/experiment-apparatus/<文件>.rs::<函数名>  # 理由`（理由至少 8 个字，写它量的是什么、为什么还没登记）。落在表里的没登记的挂钟断言不判红，
+  一行一个测试，`scripts/experiment-apparatus/<文件>.rs::<函数名>  # 理由`（文件写相对仓根的路径，装置目录里的带子目录；理由至少 8 个字，写它量的是什么、为什么还没登记）。落在表里的没登记的挂钟断言不判红，
   成功行另报「另有 N 条在滞后表里」；表里的行对应的测试已经登记、不再有挂钟断言或函数不在了，判红（陈旧行，删掉）。新写的挂钟断言一律直接写登记位，不往表里加。
 
-退出码：0 全对；1 有红（逐条点名文件:行号）；2 用法错；77 scripts/experiment-apparatus/ 下一份 .rs 都没有、或一个 #[test] 都没扫到。
+退出码：0 全对；1 有红（逐条点名文件:行号）；2 用法错；77 scripts/experiment-apparatus/ 下（顶层与装置目录里）一份 .rs 都没有、或一个 #[test] 都没扫到（扫到 0 份不算绿）。
 
 弄坏开关（逗号连几个；只给自证用：--selftest 本身与它起的子进程认，平常跑设了退 2、点名只在自证里认；
 自证自带开关轮，逐个设上起 --selftest-inner，红的格逐条以「✗ 自证 <格名>：」起头；单跑一条：WALLCLOCK_ASSERT_LINT_BREAK=<项> python3 scripts/gate/wallclock-assert-lint.py --selftest）：
@@ -52,6 +53,8 @@
       「✗ 自证 propagated-unregistered：」
   WALLCLOCK_ASSERT_LINT_BREAK=lag-unchecked  滞后表里已经登记了或不再是挂钟断言的陈旧行不报
       「✗ 自证 lag-stale：」
+  WALLCLOCK_ASSERT_LINT_BREAK=apparatus-subdirectories-unscanned  只扫 scripts/experiment-apparatus 顶层的 *.rs，装置目录里的 .rs 不扫
+      「✗ 自证 apparatus-directory-unregistered：」「✗ 自证 apparatus-directory-green：」
 
 查过的已有判据：code-source-discipline.sh 的实验源码纪律只判有没有钉绝对值的断言、种子与读数，不看断言量的是不是挂钟；
   research-build-and-replay.sh 的 research-unit-tests 格是用它的 --list 按名传 --skip 的一方，两边读同一份登记。
@@ -88,7 +91,8 @@ IDENTIFIER = re.compile(r"(?<![\w.])[A-Za-z_]\w*|(?<=\.)[A-Za-z_]\w*")
 INLINE_CAPTURE = re.compile(r"\{([A-Za-z_]\w*)(?::[^}]*)?\}")
 NOT_VALUES = frozenset("""as let mut ref if else for while loop match in return break continue move fn pub use mod struct enum impl where
     self Self super crate true false u8 u16 u32 u64 u128 usize i8 i16 i32 i64 i128 isize f32 f64 bool char str String Vec Option Some None Ok Err""".split())
-BREAKS = ("registration-unchecked", "misplaced-unchecked", "placement-unchecked", "reason-unchecked", "collision-unchecked", "propagation-off", "lag-unchecked")
+BREAKS = ("registration-unchecked", "misplaced-unchecked", "placement-unchecked", "reason-unchecked", "collision-unchecked", "propagation-off", "lag-unchecked",
+          "apparatus-subdirectories-unscanned")
 broken = set()
 
 def sanitize(text):
@@ -370,12 +374,14 @@ def clock_reaching_names(functions):
     return reaching
 
 
-def judge_file(path, text, shown, lag, lag_hits):
-    """交回 (红的行, 登记了的 [(函数名, 行号)], load-safe 的条数, 扫到的 [(函数名, 行号)])；落在滞后表里的没登记的测试往 lag_hits 记键。"""
+def judge_file(path, text, shown, lag, lag_hits, clock_reaching=None):
+    """交回 (红的行, 登记了的 [(函数名, 行号)], load-safe 的条数, 扫到的 [(函数名, 行号)])；落在滞后表里的没登记的测试往 lag_hits 记键。
+    clock_reaching 是这份文件所在那份装置里读钟的函数名集合（scan 按装置算好交进来）；不给就只按这一份文件算。"""
     problems, registered, safe_count, tests = [], [], 0, []
     attached_marker_lines = set()
     functions = functions_of(path, text)
-    clock_reaching = clock_reaching_names(functions)
+    if clock_reaching is None:
+        clock_reaching = clock_reaching_names(functions)
     for function in functions:
         if function["is_test"]:
             tests.append((function["name"], function["line"]))
@@ -430,7 +436,7 @@ def read_lag(root):
         for number, line in enumerate(handle.read().split("\n"), 1):
             if not line.strip() or line.lstrip().startswith("#"):
                 continue
-            match = re.match(r"^(scripts/experiment-apparatus/[\w.-]+\.rs::\w+)\s+#\s*(.*\S)\s*$", line)
+            match = re.match(r"^(scripts/experiment-apparatus/[\w./-]+\.rs::\w+)\s+#\s*(.*\S)\s*$", line)
             if not match or len(match.group(2)) < LAG_REASON_CHARACTERS:
                 problems.append(f"{LAG_TABLE}:{number}：这一行不是「<相对仓根的 .rs>::<函数名>  # <理由，至少 {LAG_REASON_CHARACTERS} 个字>」")
             elif match.group(1) in rows:
@@ -454,15 +460,41 @@ def collision_problems(registered, all_tests):
     return problems
 
 
+def apparatus_sources(directory):
+    """装置的源文件，相对 <根>/scripts/experiment-apparatus 的路径：顶层的 *.rs，加上带根 main.rs 的装置目录底下逐层往下的 .rs（名叫 target 的目录不进）。"""
+    if not os.path.isdir(directory):
+        return []
+    names = sorted(name for name in os.listdir(directory) if name.endswith(".rs"))
+    if "apparatus-subdirectories-unscanned" in broken:
+        return names
+    for entry in sorted(os.listdir(directory)):
+        apparatus = os.path.join(directory, entry)
+        if entry == "target" or not os.path.isfile(os.path.join(apparatus, "main.rs")):
+            continue
+        for current, subdirectories, files in os.walk(apparatus):
+            subdirectories[:] = sorted(name for name in subdirectories if name != "target")
+            names.extend(os.path.relpath(os.path.join(current, name), directory) for name in sorted(files) if name.endswith(".rs"))
+    return names
+
+
 def scan(root):
     directory = os.path.join(root, EXPERIMENT_DIRECTORY)
-    names = sorted(name for name in os.listdir(directory) if name.endswith(".rs")) if os.path.isdir(directory) else []
+    names = apparatus_sources(directory)
     lag, problems = read_lag(root)
     registered, lag_hits, safe_total, all_tests = [], [], 0, []
+    texts = {}
+    for name in names:
+        with open(os.path.join(directory, name), encoding="utf-8") as handle:
+            texts[name] = handle.read()
+    # 读钟的传递按装置算：装置目录里的各份文件（路径的第一段相同）算一份装置，顶层的 .rs 各自一份
+    unit_of = {name: (name.split(os.sep)[0] if os.sep in name else name) for name in names}
+    unit_functions = {}
+    for name in names:
+        unit_functions.setdefault(unit_of[name], []).extend(functions_of(os.path.join(directory, name), texts[name]))
+    reaching_of_unit = {unit: clock_reaching_names(functions) for unit, functions in unit_functions.items()}
     for name in names:
         shown = os.path.join(EXPERIMENT_DIRECTORY, name)
-        with open(os.path.join(directory, name), encoding="utf-8") as handle:
-            file_problems, file_registered, file_safe, file_tests = judge_file(os.path.join(directory, name), handle.read(), shown, lag, lag_hits)
+        file_problems, file_registered, file_safe, file_tests = judge_file(os.path.join(directory, name), texts[name], shown, lag, lag_hits, reaching_of_unit[unit_of[name]])
         problems += file_problems
         registered += [(shown, function_name, line) for function_name, line in file_registered]
         safe_total += file_safe
@@ -686,6 +718,24 @@ def run_selftest():
         with contextlib.redirect_stdout(io.StringIO()):
             status = judge(empty, False)
         cells.append(("empty", status == 77, f"没有 .rs 该退 77，实得 {status}"))
+        # 装置目录（根是 main.rs，测试在子模块里）：没登记的挂钟断言判红、点名子模块的路径；登记了的绿，--list 列子模块的路径
+        for cell, content, expected in (("apparatus-directory-unregistered", sample_files()["unregistered"][0], "scripts/experiment-apparatus/split_sample/parts/tests.rs:"),
+                                        ("apparatus-directory-green", sample_files()["green"][0], None)):
+            root = os.path.join(scratch, cell)
+            tests_directory = os.path.join(root, EXPERIMENT_DIRECTORY, "split_sample", "parts")
+            os.makedirs(tests_directory)
+            with open(os.path.join(root, EXPERIMENT_DIRECTORY, "split_sample", "main.rs"), "w", encoding="utf-8") as handle:
+                handle.write("fn main() {}\n")
+            with open(os.path.join(tests_directory, "tests.rs"), "w", encoding="utf-8") as handle:
+                handle.write("#[cfg(test)]\nmod tests {\n" + SAMPLE_CLOCK_HELPERS + content + "}\n")
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                status = judge(root, expected is None)
+            if expected is None:
+                cells.append((cell, status == 0 and output.getvalue() == "scripts/experiment-apparatus/split_sample/parts/tests.rs\tfaster_with_threads\n",
+                              f"--list 该只列一行「scripts/experiment-apparatus/split_sample/parts/tests.rs<TAB>faster_with_threads」，实得退 {status}：{output.getvalue()!r}"))
+            else:
+                cells.append((cell, status == 1 and expected in output.getvalue(), f"该红并点名「{expected}」，实得退 {status}：{output.getvalue().strip()[:200]}"))
     failed = [cell for cell in cells if not cell[1]]
     for name, passed, message in cells:
         if not passed:
@@ -699,9 +749,10 @@ def run_selftest():
 
 
 def switch_wheel():
-    expected = {"registration-unchecked": ("unregistered", "propagated-unregistered"), "misplaced-unchecked": ("misplaced", "orphan", "load-safe-misplaced"),
+    expected = {"registration-unchecked": ("unregistered", "propagated-unregistered", "apparatus-directory-unregistered"), "misplaced-unchecked": ("misplaced", "orphan", "load-safe-misplaced"),
                 "placement-unchecked": ("marker-too-far",), "reason-unchecked": ("reason-short",), "collision-unchecked": ("name-collision",),
-                "propagation-off": ("propagated-unregistered",), "lag-unchecked": ("lag-stale",)}
+                "propagation-off": ("propagated-unregistered",), "lag-unchecked": ("lag-stale",),
+                "apparatus-subdirectories-unscanned": ("apparatus-directory-unregistered", "apparatus-directory-green")}
     failures = 0
     for switch, wanted in expected.items():
         completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest-inner"], capture_output=True, text=True,

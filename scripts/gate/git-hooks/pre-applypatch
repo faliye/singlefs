@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# git 的 pre-applypatch 钩子：git am 打完补丁、生成提交之前起它；退非 0 时那一笔补丁不提交，git am 停下。判法都在 scripts/gate/large-file-git-hook.py（判 git am 放进索引的内容）。
+# 经 core.hooksPath（主工作树钩子目录的绝对路径）生效，装与核对见 scripts/gate/git-hooks-install.py。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if ! command -v python3 > /dev/null 2>&1; then
+  echo "  ✗ pre-applypatch：PATH 上没有 python3，大文件判不了，这一笔补丁不放行" >&2
+  echo "     → 怎么办：装好 python3 再 git am；确要不经钩子打补丁是用户的决定" >&2
+  exit 1
+fi
+exec python3 -B "$here/../large-file-git-hook.py" pre-applypatch "$@"

@@ -13,17 +13,22 @@
   <包名>:<目标根文件>   目标根文件从包目录起，就是 cargo 段头 `Running …` 里的那个源文件：src/lib.rs、tests/<名>.rs、src/bin/<名>.rs 这一类；
   <包名>:doc            那个包的文档测试（段头 `Doc-tests <库名>`）。
   一个包有哪几项（test_targets_of_package）：照它的 Cargo.toml 与目录认 cargo test 不带特性时会跑的测试目标——库（[lib] test = false 的不算）、
-    [[bin]] / [[test]] 写出的与 src/main.rs、src/bin/、tests/ 下自动认的（autobins / autotests = false 的不自动认；写了 required-features 的不带特性编不进，不算；
-    test = false 的不算），[[example]] / [[bench]] 只算写了 test = true 的；库要跑文档测试（[lib] doctest 不是 false）再加一项 doc。
+    [[bin]] / [[test]] 写出的与 src/main.rs、src/bin/、tests/ 下自动认的（写了 required-features 的不带特性编不进，不算；test = false 的不算），
+    [[example]] / [[bench]] 只算写了 test = true 的；库要跑文档测试（[lib] doctest 不是 false）再加一项 doc。推目标照 cargo 的办法（section_targets）：
+    段里写的 path 先归一（manifest_root：相对包目录解析、去掉开头与中间的 ./、合并多余的分隔符）；没写 path 的找 <目录>/<名>.rs 与目录形的 <目录>/<名>/main.rs
+    （[[bin]] 名字与包名相同的先找 src/main.rs；default_root_paths）；自动认的照 automatic_targets_on：autobins / autotests 写了 true、false 的照写，
+    没写的看 edition——包没写 edition（cargo 按 2015 算）或写了 2015、而 Cargo.toml 里写了同一种段的，cargo 不再自动认同一种目标
+    （edition 写成 { workspace = true } 继承工作区根的，这里不往上读工作区根，同样照 2015 算：只会少认、多判不出，不漏挑）。
+    合入后验证挑目标与这里共用这一份（section_targets、entry_root_paths、test_targets_of_package）。
   挑目标的参数取清单写的名字：[[bin]] name = "unit-graph" path = "src/bin/unit_graph.rs" 那一项是 --bin unit-graph，不是照文件名猜的 unit_graph。
   日志里一段属于哪一项（section_item）：段头的源文件是那个包的一项、而且段头括号里编出来的文件名的 crate 名等于那一项的 crate 名
     （库是库名，别的是目标名把 - 换成 _）；文档测试那一段按库名认。一个包都对不上交 None（认不出），几个包都对得上交空串（拿不准），两种都不归到哪一项。
   --item 的项写错（包不在、那个包没有这一项）退 2，列出那个包可点的项（包不在列工作区里的包）。点名之外的段在 stderr 逐段点名「不在点名的项里，没打」。
 按包筛目标：段头 `Running tests/<目标>.rs (…/deps/<目标>-…)` 不带包名，要读工作区：先照 <根>/Cargo.toml 的 [package] 与 [workspace] members
 （展开通配、去掉 exclude）找到 name 等于 <包名> 的那个包（找不到退 2），再逐段判：
-  --test <目标>  <包目录>/tests/<目标>.rs 在，或那个包 Cargo.toml 的 [[test]] name 等于 <目标>；
+  --test <目标>  <包目录>/tests/<目标>.rs 或 <包目录>/tests/<目标>/main.rs 在，或那个包 Cargo.toml 的 [[test]] name 等于 <目标>；
   --lib          段头括号里 deps 文件名的 crate 名（<名>-<哈希> 的 <名>）等于这个包的 lib 名（[lib] name，没写是包名把 - 换成 _）；
-  --bin <名>     <包目录>/src/bin/<名>.rs 在，或 [[bin]] name 等于 <名>。
+  --bin <名>     <包目录>/src/bin/<名>.rs 或 <包目录>/src/bin/<名>/main.rs 在，或 [[bin]] name 等于 <名>。
 不属于这个包的段不打命令，在 stderr 逐段点名「属于别的包，没打」；属于的段照打。
 打印出来的命令交给调用方原样经 Bash 起：每条都是 `SINGLEFS_RUN_SCOPE='…' task-server/task submit -- cargo test …`，经 task-server 跑
 （不加内存包装、不写线程：上限、线程与机器都由服务定；records/2026-10-30-编译绕过内存总上限.md「收尾批」），钩子看得见它；脚本里起就绕过了闸。
@@ -31,8 +36,8 @@
 每条命令开头带范围声明（.claude/hooks/run-scope-guard.sh 文件头的写法），写在提交客户端前面，客户端照白名单带进任务：
   SINGLEFS_RUN_SCOPE='种类=target; 跑什么=<包> <挑目标的参数> 里上一趟红的用例; 范围=<N> 个测试; 为什么=只重跑 <日志文件名> 里红的这 <N> 条用例，修完看它们转绿，不整份重跑'
   N 是那一条 `--exact` 后面点名的用例数；日志文件名里的 ; 与 = 换成 _（声明按 ; 与 = 切段）。
-认的段头：`Running tests/<目标>.rs (…)` → `--test <目标>`；`Running unittests src/lib.rs (…)` → `--lib`；
-`Running unittests src/bin/<名>.rs (…)` → `--bin <名>`；`Doc-tests` 段不认（文档测试按名字重跑不了），有失败就判红要人看。
+认的段头：`Running tests/<目标>.rs (…)` 与 `Running tests/<目标>/main.rs (…)` → `--test <目标>`；`Running unittests src/lib.rs (…)` → `--lib`；
+`Running unittests src/bin/<名>.rs (…)` 与 `Running unittests src/bin/<名>/main.rs (…)` → `--bin <名>`；`Doc-tests` 段不认（文档测试按名字重跑不了），有失败就判红要人看。
 完整性闸：每一段收到的 `test <名> ... FAILED` 条数要等于那一段 `test result:` 行报的 failed 数，对不上判红、stdout 不出命令。
 没有段头的测试结果、认不出目标的新 Running 段都不并入前一个目标；无法定位的失败判红，不生成可能跑错目标的命令。
 结果行与汇总行的解析在 scripts/gate/lib_libtest_result_lines.py（全仓一份）：#[should_panic] 的用例那一段「 - should panic」不进名字。
@@ -53,12 +58,15 @@
   RERUN_FAILED_TESTS_BREAK=test-arguments-added  打出的 cargo test 在 -- 之后，--exact 前面多带一个参数（--show-output）
       「按段取失败用例」「should panic 的失败用例按全名重跑」「按包筛目标：两个包各有失败的段，-p 那个包只打它自己的两条、stderr 点名别的包那两段」
       「按项筛目标：点名 rerun-target 的 tests/alpha.rs，只打它那一条、stderr 点名别的三段」「[[bin]] 写了 path 的项按清单里的名字挑」
+      「段没写 path 的目录形目标按项重跑…」
   RERUN_FAILED_TESTS_BREAK=item-filter-dropped  --item 只认它的包，那个包里有失败的段全打（点名的目标不筛）
       「按项筛目标：点名 rerun-target 的 tests/alpha.rs，只打它那一条、stderr 点名别的三段」
   RERUN_FAILED_TESTS_BREAK=item-unknown-accepted  --item 点了包里没有的目标也照收（当没点那一项，不退 2）
       「项写错退 2：rerun-target 没有 tests/missing.rs，列出它可点的项」
   RERUN_FAILED_TESTS_BREAK=bin-selector-from-file-name  挑目标的参数照段头的文件名猜（src/bin/tool_x.rs → --bin tool_x），不读清单里写的名字
       「[[bin]] 写了 path 的项按清单里的名字挑」
+  RERUN_FAILED_TESTS_BREAK=directory-form-default-root-ignored  [[test]] / [[bin]] 段没写 path 时只找 <目录>/<名>.rs，不找目录形的 <目录>/<名>/main.rs（default_root_paths）
+      「段没写 path 的目录形目标按项重跑…」（dir-crate 的 tests/d/main.rs、src/bin/probe/main.rs 不在项里，--item 写错退 2）
 """
 import glob
 import os
@@ -105,10 +113,14 @@ def target_selector_of(source_path):
     """段头里的源文件 → cargo test 挑目标的参数；认不出交 None。"""
     if re.fullmatch(r"tests/[^/]+\.rs", source_path):
         return ["--test", os.path.basename(source_path)[:-len(".rs")]]
+    if re.fullmatch(r"tests/[^/]+/main\.rs", source_path):
+        return ["--test", source_path.split("/")[1]]
     if source_path == "src/lib.rs":
         return ["--lib"]
     if re.fullmatch(r"src/bin/[^/]+\.rs", source_path):
         return ["--bin", os.path.basename(source_path)[:-len(".rs")]]
+    if re.fullmatch(r"src/bin/[^/]+/main\.rs", source_path):
+        return ["--bin", source_path.split("/")[2]]
     return None
 
 
@@ -220,11 +232,96 @@ def split_item(text):
     return (package, target) if separator and package and target else None
 
 
-def test_targets_of_package(package_directory, manifest, package):
+TARGET_FOLDERS = {"bin": "src/bin", "test": "tests", "example": "examples", "bench": "benches"}   # 每种段没写 path 时 cargo 找根文件的目录
+AUTOMATIC_KEYS = {"bin": "autobins", "test": "autotests"}   # 推自动认的目标的两种段与 [package] 里管它的键（[[example]] / [[bench]] 只算写了 test = true 的，不推）
+EDITION_WITHOUT_AUTOMATIC_NEXT_TO_DECLARED = "2015"   # 这一版 edition 下写了同一种段、autobins / autotests 又没写的，cargo 不推自动认的目标
+
+
+def manifest_root(package_directory, written, normalized=True):
+    """段里写的 path → 包内相对路径：相对包目录解析、去掉开头与中间的 ./、合并多余的分隔符（cargo 认的是归一之后的那份文件）。
+    normalized 为假时原样交（合入后验证的弄坏开关 manifest-paths-unnormalized）。"""
+    if not normalized:
+        return written
+    base = os.path.normpath(os.path.abspath(package_directory))
+    return os.path.relpath(os.path.normpath(os.path.join(base, written)), base)
+
+
+def default_root_paths(package_directory, package, section, name, directory_form=True):
+    """段没写 path 时 cargo 找的根文件（包内相对路径）：<目录>/<名>.rs、目录形的 <目录>/<名>/main.rs（目录照 TARGET_FOLDERS），[[bin]] 名字与包名相同的先找 src/main.rs。
+    树里在的交出来，一个都不在交第一个。directory_form 为假（合入后验证的弄坏开关）或本脚本的弄坏开关 directory-form-default-root-ignored 下不找目录形的。"""
+    folder = TARGET_FOLDERS[section]
+    candidates = (["src/main.rs"] if section == "bin" and name == package else []) + [f"{folder}/{name}.rs"]
+    if directory_form and os.environ.get(BREAK_VARIABLE) != "directory-form-default-root-ignored":
+        candidates.append(f"{folder}/{name}/main.rs")
+    return [path for path in candidates if os.path.isfile(os.path.join(package_directory, path))] or candidates[:1]
+
+
+def entry_root_paths(package_directory, package, section, entry, normalized=True, directory_form=True):
+    """一段（name 是字符串）的根文件：写了 path 的照 manifest_root，没写的照 default_root_paths。"""
+    written = entry.get("path")
+    if isinstance(written, str):
+        return [manifest_root(package_directory, written, normalized)]
+    return default_root_paths(package_directory, package, section, entry["name"], directory_form)
+
+
+def package_edition(manifest):
+    """包的 edition：[package] 写了字符串的照写；没写的是 cargo 的缺省 2015；别的（写成 { workspace = true } 继承工作区根的这一类）交 None：
+    这里只读包自己这一份清单，不往上找工作区根。"""
+    package_section = manifest.get("package") if isinstance(manifest.get("package"), dict) else {}
+    edition = package_section.get("edition")
+    if edition is None:
+        return EDITION_WITHOUT_AUTOMATIC_NEXT_TO_DECLARED
+    return edition if isinstance(edition, str) else None
+
+
+def automatic_targets_on(manifest, section, edition_ignored=False):
+    """cargo 推不推这一种段（bin、test）的自动认的目标：[package] 的 autobins / autotests 写了 true、false 的照写；没写的，包的 edition 是 2015
+    而 Cargo.toml 里写了这一种段的（[[bin]] / [[test]] 那张数组在）不推，别的推。package_edition 交 None 的（继承工作区根的 edition）同样照 2015 算：
+    少推自动认的目标只会让合入后验证多判不出（退 3）、让 --item 多一句写错，不会漏挑。
+    edition_ignored 为真时不看 edition（合入后验证的弄坏开关 edition-2015-automatic-targets-kept）。"""
+    package_section = manifest.get("package") if isinstance(manifest.get("package"), dict) else {}
+    written = package_section.get(AUTOMATIC_KEYS[section])
+    if written is False:
+        return False
+    if written is True or edition_ignored:
+        return True
+    edition = package_edition(manifest)
+    return not (edition in (None, EDITION_WITHOUT_AUTOMATIC_NEXT_TO_DECLARED) and isinstance(manifest.get(section), list))
+
+
+def section_targets(package_directory, manifest, package, section, normalized=True, directory_form=True, edition_ignored=False):
+    """这个包里一种段（bin、test、example、bench）的目标 → {目标名: (根文件, 是不是自动认的, 写的那一段；自动认的是 None)}，照 cargo 推目标的办法：
+    写了的段（name 是字符串、同名的取头一段）照 entry_root_paths 在前；bin、test 两种在 automatic_targets_on 推的时候再加自动认的：
+    src/main.rs（名字是包名，只 bin）、<目录>/<名>.rs、<目录>/<名>/main.rs 里名字与根文件都没被同一种段点到的。
+    写了的段不管根文件在不在、写没写 test = false 与 required-features，都占住名字与根文件。"""
+    found, declared_roots = {}, set()
+    entries = manifest.get(section, [])
+    for entry in entries if isinstance(entries, list) else []:
+        if isinstance(entry, dict) and isinstance(entry.get("name"), str) and entry["name"] not in found:
+            root = entry_root_paths(package_directory, package, section, entry, normalized, directory_form)[0]
+            found[entry["name"]] = (root, False, entry)
+            declared_roots.add(root)
+    if section not in AUTOMATIC_KEYS or not automatic_targets_on(manifest, section, edition_ignored):
+        return found
+    folder = TARGET_FOLDERS[section]
+    candidates = [("src/main.rs", package)] if section == "bin" else []
+    absolute = os.path.join(package_directory, folder)
+    for name in sorted(os.listdir(absolute)) if os.path.isdir(absolute) else []:
+        if name.endswith(".rs") and os.path.isfile(os.path.join(absolute, name)):
+            candidates.append((f"{folder}/{name}", name[:-len(".rs")]))
+        elif os.path.isfile(os.path.join(absolute, name, "main.rs")):
+            candidates.append((f"{folder}/{name}/main.rs", name))
+    for root, name in candidates:
+        if os.path.isfile(os.path.join(package_directory, root)) and name not in found and root not in declared_roots:
+            found[name] = (root, True, None)
+    return found
+
+
+def test_targets_of_package(package_directory, manifest, package, normalized=True, directory_form=True, edition_ignored=False):
     """cargo test 不带特性时这个包会跑的测试目标（文件头「项的写法」）：{目标根文件或 doc: TestTarget}，库在前、文档测试在最后。
+    [[bin]] / [[test]] / [[example]] / [[bench]] 照 section_targets 推；三个关键字参数是合入后验证的弄坏开关交下来的（缺省就是 cargo 的办法）。
     弄坏开关 bin-selector-from-file-name 下 [[bin]] / [[test]] 写了 path 的照文件名猜名字。"""
     found = {}
-    package_section = manifest.get("package", {})
 
     def exists(relative):
         return os.path.isfile(os.path.join(package_directory, relative))
@@ -239,33 +336,12 @@ def test_targets_of_package(package_directory, manifest, package):
     if exists(library_root) and library.get("test", True):
         add(library_root, ["--lib"], library_name)
     guessed = os.environ.get(BREAK_VARIABLE) == "bin-selector-from-file-name"
-    sections = (("bin", "--bin", "src/bin", package_section.get("autobins", True)), ("test", "--test", "tests", package_section.get("autotests", True)),
-                ("example", "--example", "examples", False), ("bench", "--bench", "benches", False))
-    for section, option, directory, automatic in sections:
-        declared = set()
-        for entry in manifest.get(section, []):
-            name = entry.get("name")
-            if not isinstance(name, str):
+    for section, option in (("bin", "--bin"), ("test", "--test"), ("example", "--example"), ("bench", "--bench")):
+        for name, (relative, automatic, entry) in section_targets(package_directory, manifest, package, section, normalized, directory_form, edition_ignored).items():
+            if not automatic and (not entry.get("test", section in ("bin", "test")) or entry.get("required-features")):
                 continue
-            default_root = "src/main.rs" if section == "bin" and name == package else f"{directory}/{name}.rs"
-            relative = entry.get("path", default_root)
-            declared.update((name, relative))
-            wanted = entry.get("test", section in ("bin", "test")) and not entry.get("required-features")
-            if wanted:
-                chosen = os.path.splitext(os.path.basename(relative))[0] if guessed and relative != default_root else name
-                add(relative, [option, chosen], chosen.replace("-", "_"))
-        if not automatic:
-            continue
-        candidates = [("src/main.rs", package)] if section == "bin" else []
-        absolute = os.path.join(package_directory, directory)
-        for entry in sorted(os.listdir(absolute)) if os.path.isdir(absolute) else []:
-            if entry.endswith(".rs") and os.path.isfile(os.path.join(absolute, entry)):
-                candidates.append((f"{directory}/{entry}", entry[:-len(".rs")]))
-            elif os.path.isfile(os.path.join(absolute, entry, "main.rs")):
-                candidates.append((f"{directory}/{entry}/main.rs", entry))
-        for relative, name in candidates:
-            if relative not in declared and name not in declared:
-                add(relative, [option, name], name.replace("-", "_"))
+            chosen = os.path.splitext(os.path.basename(relative))[0] if guessed and not automatic and isinstance(entry.get("path"), str) else name
+            add(relative, [option, chosen], chosen.replace("-", "_"))
     if exists(library_root) and library.get("doctest", True):
         found[DOC_TARGET] = TestTarget(["--doc"], library_name)
     return found
@@ -293,10 +369,12 @@ def target_belongs_to_package(failed_target, package, package_directory, manifes
     if kind == "--test":
         name = failed_target.selector[1]
         return (os.path.isfile(os.path.join(package_directory, "tests", name + ".rs"))
+                or os.path.isfile(os.path.join(package_directory, "tests", name, "main.rs"))
                 or any(entry.get("name") == name for entry in manifest.get("test", [])))
     if kind == "--bin":
         name = failed_target.selector[1]
         return (os.path.isfile(os.path.join(package_directory, "src", "bin", name + ".rs"))
+                or os.path.isfile(os.path.join(package_directory, "src", "bin", name, "main.rs"))
                 or any(entry.get("name") == name for entry in manifest.get("bin", [])))
     built = BUILT_CRATE_NAME.search(failed_target.artifact)
     library_name = manifest.get("lib", {}).get("name") or package.replace("-", "_")
@@ -523,19 +601,22 @@ def selftest():
             failures.append("没有失败的用例应当退 0")
         failures.extend(package_filter_failures(directory, workspace_root))
         failures.extend(item_filter_failures(directory, workspace_root))
+        failures.extend(directory_form_failures(directory, workspace_root))
     if failures:
         for failure in failures:
             print(f"  ✗ rerun-failed-tests 自检：{failure}")  # gate-lint:detail
         print(f"     → 看 failed_tests_by_target() 的分段与条数核对、targets_of_package() 的按包筛；{BREAK_VARIABLE} 设着的话这里本来就该红")
         return 1
-    print("  ✓ rerun-failed-tests 自检通过（13 格：按段分目标、打出的命令经 task-server/task submit 起、打出的命令带范围声明且闸放行、不带声明闸拒、缺 test result、条数对不上、"
-          "should panic 的按全名重跑、没有失败、按包筛目标、找不到包退 2、按项筛目标、项写错退 2、[[bin]] 写了 path 的项按清单里的名字挑）")
+    print("  ✓ rerun-failed-tests 自检通过（14 格：按段分目标、打出的命令经 task-server/task submit 起、打出的命令带范围声明且闸放行、不带声明闸拒、缺 test result、条数对不上、"
+          "should panic 的按全名重跑、没有失败、按包筛目标、找不到包退 2、按项筛目标、项写错退 2、[[bin]] 写了 path 的项按清单里的名字挑、"
+          "段没写 path 的目录形目标 tests/<名>/main.rs 与 src/bin/<名>/main.rs 按项重跑）")
     return 0
 
 
 def build_two_package_workspace(directory):
     """自证用的假 cargo 工作区：rerun-target 有 tests/alpha.rs、src/lib.rs 与 src/bin/tool.rs，neighbour-crate 有 tests/beta.rs 与 src/lib.rs，
-    bin-crate 只有 [[bin]] name = "tool-x" path = "src/bin/tool_x.rs" 那一个目标。交工作区根。"""
+    bin-crate 只有 [[bin]] name = "tool-x" path = "src/bin/tool_x.rs" 那一个目标，dir-crate 只有没写 path 的 [[test]] d 与 [[bin]] probe，
+    根文件是目录形的 tests/d/main.rs 与 src/bin/probe/main.rs。交工作区根。"""
     workspace_root = os.path.join(directory, "workspace")
     files = {
         "Cargo.toml": '[workspace]\nmembers = ["crates/*"]\nexclude = ["crates/excluded"]\n',
@@ -549,6 +630,9 @@ def build_two_package_workspace(directory):
         "crates/excluded/Cargo.toml": '[package]\nname = "excluded-crate"\nversion = "0.1.0"\n',
         "crates/bin-crate/Cargo.toml": '[package]\nname = "bin-crate"\nversion = "0.1.0"\n\n[[bin]]\nname = "tool-x"\npath = "src/bin/tool_x.rs"\n',
         "crates/bin-crate/src/bin/tool_x.rs": "",
+        "crates/dir-crate/Cargo.toml": '[package]\nname = "dir-crate"\nversion = "0.1.0"\nedition = "2021"\n\n[[test]]\nname = "d"\nharness = true\n\n[[bin]]\nname = "probe"\n',
+        "crates/dir-crate/tests/d/main.rs": "",
+        "crates/dir-crate/src/bin/probe/main.rs": "",
     }
     for relative, text in files.items():
         path = os.path.join(workspace_root, relative)
@@ -631,6 +715,29 @@ def item_filter_failures(directory, workspace_root):
     if finished.returncode != 0 or printed != expected:
         failures.append(f"[[bin]] 写了 path 的项按清单里的名字挑：退 {finished.returncode}，期望 {expected}，实际 {printed}，stderr「{finished.stderr.strip()[-600:]}」")
     return failures
+
+
+def directory_form_failures(directory, workspace_root):
+    """目录形那一格（文件头「项的写法」）：dir-crate 的 [[test]] d、[[bin]] probe 没写 path，根文件是 tests/d/main.rs、src/bin/probe/main.rs；
+    两份日志各只有一段（各有一条失败），--item dir-crate:tests/d/main.rs 打 --test d，--item dir-crate:src/bin/probe/main.rs 打 --bin probe。"""
+    import subprocess
+    script = os.path.realpath(__file__)
+    cases = (("dir-test.log", "     Running tests/d/main.rs (target/debug/deps/d-0123456789abcdef)", "d_case", "dir-crate:tests/d/main.rs",
+              "cargo test -p dir-crate --test d -- --exact d_case"),
+             ("dir-bin.log", "     Running unittests src/bin/probe/main.rs (target/debug/deps/probe-0123456789abcdef)", "checks::probe_case", "dir-crate:src/bin/probe/main.rs",
+              "cargo test -p dir-crate --bin probe -- --exact checks::probe_case"))
+    wrong = []
+    for file_name, header, failed, item, expected in cases:
+        log = os.path.join(directory, file_name)
+        with open(log, "w", encoding="utf-8") as handle:
+            handle.write("\n".join([header, f"test {failed} ... FAILED", "test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out", ""]))
+        finished = subprocess.run([sys.executable, script, log, "--item", item, "--root", workspace_root], capture_output=True, text=True, timeout=120)
+        printed = [without_declaration(line) for line in finished.stdout.splitlines() if line.strip()]
+        if finished.returncode != 0 or printed != [expected]:
+            wrong.append(f"--item {item}：退 {finished.returncode}，期望 {[expected]}，实际 {printed}，stderr「{finished.stderr.strip()[-400:]}」")
+    if wrong:
+        return [f"段没写 path 的目录形目标按项重跑：{'；'.join(wrong)}"]
+    return []
 
 
 def main():

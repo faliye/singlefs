@@ -1,0 +1,31 @@
+# 测试服务代码的登记表：这里登的代码不进任何判定与复用的键（.claude/kb/decisions/13-验证路线.md 已定项 17「三类代码」表测试服务代码那一行，用户定）。
+# 读它的：scripts/gate/lib_function_units_registry.py 的 is_test_service_code（算键库的 closure_key 照它排掉闭包里这些代码的单元；文件头「测试服务代码不进键」）。
+# 一行「<仓内路径><制表符><理由>」：路径以 / 收尾的是前缀（底下的每一份都算），别的是单个文件；登的 .py、.sh、.rs 连同它的拆分族
+# （scripts/gate/lib_lag_split_family.py 的 in_family：<名>.rs 加 <名>/ 下的子模块这一类）一起算，.wgsl 只认登的那一份，GPU 判器的内核逐份登。
+# 表的内容与 D13 那一行逐项对上，由算键库自证「真仓：测试服务代码登记表…」那一格判；改那一行就同一次改这张表。
+# 那一行的「录制」没点名文件，这里不登。
+task-server/	统一任务服务
+gpu-verification-server/	GPU 批处理验证服务，连同它跑的 GPU 判器与核对内核
+prune-server/	判定库服务
+crates/singlefs-unit-graph/	算键的函数单元图
+crates/singlefs-device-library/	算键与存取判定的设备库
+crates/singlefs-background-gpu-pairing-keys/	产品 GPU 包对拍的键
+crates/singlefs-verification/src/crash_facts.rs	崩溃三段管线的核对：CPU 参照
+crates/singlefs-verification/src/crash_verify_gpu.rs	崩溃三段管线的核对：GPU 内核
+crates/singlefs-verification/src/crash_judge_gpu.rs	GPU 判器
+crates/singlefs-verification/src/crash_judge_dispatch.rs	GPU 判器的派活
+crates/singlefs-verification/src/crash_judge_checker.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_common.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_scan.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_scan_merge_order_first_data_units_and_deletion_state.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_scan_rebuild.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_scan_references_snapshots_and_compaction.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_scan_rollback_floors_and_accounting.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_scan_tombstones_lineage_and_retirement.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_walk_driver_pool_judgements_and_entry.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_walk_of_code_two_inode_and_container_trees.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_checker_walk_of_units_allocation_and_extent_trees.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_common.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_common_extent_tree_instance_table_and_first_file_walk.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_common_unit_parsing_mapping_and_index_trees.wgsl	GPU 判器的 WGSL 内核
+crates/singlefs-verification/src/crash_judge_recovery.wgsl	GPU 判器的 WGSL 内核

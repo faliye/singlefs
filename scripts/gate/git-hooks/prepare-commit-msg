@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# git 的 prepare-commit-msg 钩子：git 在写好默认说明之后、起编辑器之前起它；git commit --no-verify 与 git merge --no-verify 挡不住它，cherry-pick、revert、rebase 逐笔重放与 --continue 也起它。
+# 判法都在 scripts/gate/large-file-git-hook.py（判这一笔提交真要进的暂存区；pre-commit 或 pre-merge-commit 刚判过同一份的不重复判）。
+# 经 core.hooksPath（主工作树钩子目录的绝对路径）生效，装与核对见 scripts/gate/git-hooks-install.py。
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+if ! command -v python3 > /dev/null 2>&1; then
+  echo "  ✗ prepare-commit-msg：PATH 上没有 python3，大文件判不了，这一笔提交不放行" >&2
+  echo "     → 怎么办：装好 python3 再提交；确要不经钩子提交是用户的决定" >&2
+  exit 1
+fi
+exec python3 -B "$here/../large-file-git-hook.py" prepare-commit-msg "$@"
