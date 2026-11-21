@@ -37,10 +37,20 @@
 #    长得像钟点的冒号对靠库里的上下文规则放过，.sh、.py、.rs 里带「clock-times:allow <理由>」的那一行放过（目标路径交给库判后缀）；
 #    逐个形态的判据与放行写在那份库的文档串里。
 # 七、会话号与批次代号（Write、Edit、MultiEdit）：ListAgents 列的会话名全名（目录名后面跟「-」与十六进制）写进仓里就拒绝，排除前缀、放行标记与仓外不判同五；
-#    判据是同一份库里的 session-names 那一形态，与门禁 doc-text 的 session-names 格同一份。改过标题的会话认不出。只写两位短号（「87」）不算。
+#    判据是同一份库里的 session-names 那一形态，与门禁 doc-text 的 session-names 格同一份。改过标题的会话认不出。不带括号的两位短号（「87」）不算会话号。
 #    同一道另判批次代号（拒绝时另列一道「写了批次代号」）：拿来当名字用的批次与运行代号（「24c-1」「22a」「批次 24c」「第十五批乙二」「批 10 甲」），
 #    判据是同一份库里的 batch-codes 那一形态（四条判据行、上下文规则、排除前缀都写在库的文档串里），库按后缀只判 .md、.tsv、.txt，不认放行标记，仓外不判；
 #    出路用那一形态登记的 remedy（写成那一批做了什么事）。Bash 里往仓里写的字面内容归 bash-command-detector.sh 的 ⑰，读同一份库。
+#    同一道再判任务号、会话短号与批号（拒绝时另列一道「写了任务号、会话短号或批号」）：任务服务的任务号（「任务 <号>」「同 <号>、<号>」「task=<号>」，反引号与围栏里的照判）、
+#    括号里当会话名用的两位短号（挨着会话词的、括号里跟会话词的；不挨会话词的数字字母短号只在 records/ 下判）、批号（「批 <数字>」「第 <数字> 批」，自己会话的也算）、
+#    拿「<做什么>那一路」的描述指别的会话或子 agent（「那一路会话」「那一路的 agent」；按出场次序的 mainagent(A)、subagent(A) 不判），
+#    判据是同一份库里的 task-and-session-numbers 那一形态（四条判据行、按路径的上下文规则、围栏代码块的放过都写在库的文档串里）：只判 .md、.tsv、.txt，不认放行标记，仓外不判；
+#    判决（research/prompts/*-main-verification.md）里行首的「A/B 读数：任务 <号>」一行（值里至多两个、引用块不算）、records/ 下以「长跑拆分：」起头的行照写任务号，
+#    records/ 下表格里表头是「批次」的那一列照写批号。
+#    这一判不只看新写的字：写前（现文件，不在是空串）、写后（Write 的 content，Edit 与 MultiEdit 施加到现文件之后的整份，edited_content）两份整文交库的 new_violation_hits
+#    （library_hits_before_and_after），写后多出来的违例才拒（按判据行与命中的串整份计数相抵）：文件里已有的旧号不挡这一次写，只改了那一行别处的也不挡，同一行新加的号照拒；这一次写删了、加了或改坏一行围栏，让后面已有的批号出了围栏的，
+#    改了表头让批号离开「批次」那一列的，Edit replace_all 一处在围栏里一处在外的，都照拒。拒绝说明里的行号是写后文件的行号。
+#    出路用那一形态登记的 remedy（改写成交给服务的那条命令、结局行的 type= 与 exit= 那一段、日志里那一行的内容而不是日志路径、谁在改哪个文件、那一批做了什么）。
 # 八、old_string 以空白收尾（Edit、MultiEdit）：目标不是 .md / .mdx（后缀不分大小写）时，Edit 的 old_string、MultiEdit 每一处的 old_string
 #    以空格或制表符收尾就拒绝；主 agent 与所有子 agent 一样判，目标在不在仓里都判。.md / .mdx 目标与 Write 不判。
 #    为什么：Edit 在 .md / .mdx 以外的目标上先去掉 new_string 每一行行尾的空格与制表符，钩子拿到的已是去过的 new_string，old_string 原样。
@@ -76,13 +86,38 @@
 #    出路：scripts/kb/ledger-append-section.py，现取最大节号加一，一次写入索引表末行与末尾新节，写前复核 sha256，撞了拒。Bash 里的写归 bash-command-detector.sh 的 ⑯。
 # 十一、工具员就地改主工作区里已存在的脚本（Write、Edit、MultiEdit）：agent_type 在 SWAP_ONLY_AGENTS（tooling-writer）里，目标解开符号链接之后落在主工作区
 #    （CLAUDE_PROJECT_DIR）的 SWAP_ONLY_DIRECTORIES（scripts/、.claude/gate.d/、.claude/scripts/、task-server/、prune-server/、gpu-verification-server/）下、
-#    不在 SWAP_ONLY_EXCLUDED（.claude/gate.d/fixtures/ 与两个服务的 target/、src/）下，是已存在的普通文件，且是 .sh、.py 或带执行位的，就拒。
-#    目录与 scripts/gate/hook-swap.py 脚本规格收的那一组相同（它的 SCRIPT_SPEC_DIRECTORIES、SCRIPT_SPEC_EXCLUDED），两边各写一份、改的时候一起改。
-#    放行：新建文件；不带执行位的数据与文档（.tsv、.md、.json、.txt 这类）；fixtures 下的样本；草稿目录与仓副本里的文件（落在主工作区之外）；别的 agent 类型与主 agent。
+#    不在 SWAP_ONLY_EXCLUDED（.claude/gate.d/fixtures/ 与两个服务的 target/）下，是已存在的普通文件，且是 .sh、.py 或带执行位的，就拒。
+#    两个服务的 Rust 源码目录 SWAP_ONLY_SOURCE_DIRECTORIES（prune-server/src/、gpu-verification-server/src/）下已存在的普通文件，
+#    与两个服务的构建清单 SWAP_ONLY_SOURCE_FILES（prune-server、gpu-verification-server 各自的 Cargo.toml、Cargo.lock）里已存在的那几份，不看后缀与执行位，一律拒，
+#    出路另是一句：在仓副本里改、把改动存成补丁写进草稿目录，打补丁的命令交主 agent 一次打上（源码或依赖清单改到一半，主工作区里的服务编不过，带临时判定库服务的自证都取不到二进制）。
+#    Bash 里往这几处已存在的文件写（追加、cp、定点替换工具这些）归 bash-command-detector.sh 的 ⑭，判的是同一组落点；弄坏开关 WRITE_GUARD_BREAK=swap-manifests-unseen 下构建清单那一半不拦。
+#    脚本的出路分两种，判是哪一种读项目根下的 .claude/hooks/selftest-temporary-service.tsv（TEMPORARY_SERVICE_TABLE，不写死名单）：
+#    脚本在表里登记成 required 的，换上不加 --verify（--verify 的命令在换上工具里起、拿不到任务服务给的编译目录与临时服务，退 2、回滚），自证换上之后另交一条，
+#    这样换没有自动回滚，自证验不过要再出一份退回的规格；不在表里、或登记成 own-server 的，照旧加 --verify 给被换脚本的 --selftest。
+#    表读不到时两种出路都写、记一处没判全。弄坏开关 WRITE_GUARD_BREAK=swap-remedy-always-verify 下一律只写加 --verify 的那一种。
+#    门禁阶段（GATE_STAGE_DIRECTORY 这一层的 .sh，不含 lib/ 与 fixtures/ 下的、也不含这一层 lib- 起头的 .py 共用库）单走一支，不读登记表（表里只登记脚本与钩子的 --selftest，不收门禁阶段）：
+#    不带 --verify 换上（--verify 只起一条命令、在换上工具里起，拿不到任务服务给的编译目录与临时服务，起不了样本档）；验证是这一道的样本档，由主 agent 在换上之后另交一条
+#    （STAGE_SELFTEST_SCRIPT 的 --item <阶段文件名>，.claude/hooks/selftest-registry.tsv 里这一道那一行写了要包在临时 prune-server 底下起的，包上 --with-temporary-service）；
+#    这样换没有自动回滚，样本档验不过要再出一份退回的规格。一份规格里门禁阶段与别的脚本都有，整份都不带 --verify，所以说明写成门禁阶段单放一份规格、别的脚本另放一份照它们各自的出路。
+#    弄坏开关 WRITE_GUARD_BREAK=gate-stage-remedy-as-script 下门禁阶段与别的脚本走同一支。
+#    目录与 scripts/gate/hook-swap.py 脚本规格收的那一组相同（它的 SCRIPT_SPEC_DIRECTORIES；它不收的 target/、src/ 在这里是 SWAP_ONLY_EXCLUDED 与 SWAP_ONLY_SOURCE_DIRECTORIES），
+#    两边各写一份、改的时候一起改。
+#    已有门禁的样本档目录：目标落在主工作区 SWAP_ONLY_FIXTURE_DIRECTORY（.claude/gate.d/fixtures/）下第一层目录 <门禁>/ 里，且 .claude/gate.d/<门禁> 是已存在的普通文件（那一道门禁已在），
+#    不看是新建还是改已有、不看后缀与执行位，一律拒：样本先于门禁新版进主工作区，门禁新版还在草稿里，别的会话这段时间跑这一道的样本档会判错。
+#    出路另是一句：样本的新版写在草稿目录，照仓里的相对路径，被改那几份样本此刻的样子拷进 <草稿目录>/fixtures-base/（只新建样本的建成空目录）、改后的与新建的放进 <草稿目录>/fixtures-new/，
+#    在草稿目录里 `git diff --no-index --binary fixtures-base fixtures-new > fixtures.patch` 生成补丁，打补丁的两条命令（`git apply -p2 --check`、`git apply -p2`，在仓根起）
+#    写进报告「要主 agent 跑的命令」一节，排在门禁新版经 hook-swap.py 换上那一条之后、样本档之前，由主 agent 打上（hook-swap.py 的脚本规格只收已存在的文件、不收 fixtures/）。
+#    还没有门禁阶段的样本目录（新门禁的样本，与新门禁一起写）不拦。认样本档目录的判法在 lib_write_scope.py 的 existing_gate_of_fixture，
+#    Bash 里往样本档目录写（cp、mv、重定向、tee、git apply）这道闸看不见，由 bash-command-detector.sh ⑭ 调同一份判法拒。
+#    弄坏开关 WRITE_GUARD_BREAK=gate-fixtures-in-place-allowed 下这一半不判。
+#    放行：新建文件（已有门禁的样本档目录里的除外）；不带执行位的数据与文档（.tsv、.md、.json、.txt 这类，两个服务的 src/ 下的与上面那四份构建清单除外）；
+#    还没有门禁阶段的样本目录里的样本；两个服务的 target/ 下的文件；
+#    草稿目录与仓副本里的文件（落在主工作区之外）；别的 agent 类型与主 agent（输入里没有 agent_type 也没有 agent_id 的调用）。
 #    钩子（.claude/hooks/）不在这一道的目录里：钩子照旧只经 hook-swap.py 的钩子规格换上。
 #    判不了的照「放行但必记检出」：子 agent 的调用认不出 agent 类型（带 agent_id 而 agent_type 缺、空或不是字符串）、目标 stat 失败（不是「不存在」）。
-#    为什么：分几次 Edit 改一份脚本，中间态对别的会话可见，被拷进快照的任务跑到半截的版本（records/2026-10-29-subagent拆分提案.md 第二百三十一节）。
-#    出路：新版整份写在草稿目录，把 hook-swap.py 的脚本规格（一件活改几份的写进同一份规格）与那条换上命令写进报告「要主 agent 跑的命令」一节，由主 agent 一次换上。
+#    为什么：分几次 Edit 改一份脚本，中间态对别的会话可见，被拷进快照的任务跑到半截的版本（records/2026-11-17-subagent账本自上而下清欠.md 第二百三十一节）。
+#    出路：新版整份写在草稿目录，把 hook-swap.py 的脚本规格（一件活改几份的写进同一份规格，用 scripts/gate/make-swap-spec.py 生成）与那条换上命令写进报告「要主 agent 跑的命令」一节，
+#    由主 agent 一次换上；两个服务的 src/ 走仓副本与补丁。
 #    Bash 里用定点替换工具分几次改同一份脚本，这道闸看不见。
 # gate-similar: bash-command-detector.sh 它的 ⑦ 只看 Bash 里在同一个 inode 上改已存在的脚本（出路改名换上或定点替换），看不见 Write / Edit 工具的调用，也不分 agent 类型；这一道挂在 Write / Edit / MultiEdit 上，按 agent 类型与目录判，与写闸别的几道共用落点与检出记录
 # 十一道判定合在这一个 hook 里：一至五、七至十一各占文件头一段，六写在 --selftest 那一行的说明里。
@@ -111,6 +146,75 @@
 #                              #   「批次代号:.py 不判」「批次代号:.sh 不判」两格红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=batch-code-labeled-three-digits（库里挨着批次词的三位数字加字母也判）时「批次代号:批次词后面的三位数字加字母放行」「批次代号:三位数字加字母挨着批字放行」两格红；
 #                              # LIB_FORBIDDEN_NOTATIONS_BREAK=code-span-backtick-parity（库里反引号只数前面的奇偶、不按代码段配对）时「批次代号上下文:双反引号代码段里的放行」「批次代号:配不上对的反引号不开代码段」两格红；
+#                              # 任务号、会话短号与批号（七里的第三判）：WRITE_GUARD_BREAK=task-and-session-numbers-unjudged（这一判不判）与 LIB_FORBIDDEN_NOTATIONS_BREAK=task-and-session-numbers
+#                              #   （库里整形态不判）时「任务号与批号:」起头的拒绝几格与「任务号与批号:派发闸收而值里另带别的写法的号的四条在判决里照拒、两臂与单臂放行」红；库的判据行键一次关一条时点名那一条的格红：
+#                              #   task-numbers「任务号与批号:括号里的任务号」「任务号与批号:同字后面并列的裸号」「任务号与批号:任务号冒号加号」「任务号与批号:.tsv 也判」「任务号与批号:Edit 写进的任务号」
+#                              #     「任务号与批号:任务与号之间夹全角括号、冒号与井号」「任务号与批号:斜杠与短横连着的并列号」「任务号与批号:同字与与字后面并列的号」
+#                              #     「任务号与批号:单个同字后面的号」「任务号与批号:任务号后接英文冒号」「任务号与批号:任务号后面跟条件与个别」「任务号与批号:日志文件名与运行目录名里的号」
+#                              #     「任务号与批号:英文 task 的几种写法」「任务号与批号:结局行原文里的 task=」「任务号与批号:反引号里 task 子命令加号」「任务号与批号:反引号里的任务号」「任务号与批号:围栏代码块里的任务号」
+#                              #     「任务号与批号:A/B 读数不在行首」「任务号与批号:A/B 读数一行在记录里」「任务号与批号:A/B 读数一行里同字并列的号」「任务号与批号:A/B 读数一行装三个号」
+#                              #     「任务号与批号:引用块里的 A/B 读数」「任务号与批号:长跑拆分一行在 kb 里」「任务号与批号:旧号那一行新加第二个号照判」
+#                              #     「任务号与批号:派发闸收而值里另带别的写法的号的四条在判决里照拒、两臂与单臂放行」
+#                              #     「任务号与批号:任务编号与号任务」「任务号与批号:列表里的引用块里的 A/B 读数」、
+#                              #   session-short-codes「任务号与批号:括号里数字加字母的会话短号」「任务号与批号:挨着会话词的纯数字短号」「任务号与批号:并列的会话短号」「任务号与批号:括号里短号后面跟会话词」
+#                              #     「任务号与批号:括号里短号后面跟范围与判过」「任务号与批号:判决里括号里的会话短号」
+#                              #     「任务号与批号:Edit 以收尾围栏起头、插入点前围栏开着」「任务号与批号:MultiEdit 前一处开了围栏、后一处以收尾围栏起头」
+#                              #     「任务号与批号:mainagent 与 subagent 括号里的短号」「任务号与批号:agent 括号里的短号」「任务号与批号:会话后面不带括号跟短号」、
+#                              #   batch-numbers「任务号与批号:正文里的批号」「任务号与批号:别的会话的批号」「任务号与批号:第几批」「任务号与批号:批号冒号起头的一行」
+#                              #     「任务号与批号:批井号、区间与并列的第几批」「任务号与批号:批号后面跟副词只」「任务号与批号:批号后面跟处理、行为、项目」「任务号与批号:锚点里的第几批」
+#                              #     「任务号与批号:记录里中文数字的第几批」「任务号与批号:记录里追加第几批」「任务号与批号:kb 里同一分句后面的批号」「任务号与批号:表格行里的批号在 kb 里」
+#                              #     「任务号与批号:记录里表格别的列的批号」「任务号与批号:没有表头分隔行的竖线行」「任务号与批号:Edit 删开头围栏行让批号出了围栏」
+#                              #     「任务号与批号:Edit 在开头围栏前补一行围栏」「任务号与批号:Edit 把开头围栏的信息串改成带反引号」「任务号与批号:MultiEdit 先写进围栏再删开头围栏行」
+#                              #     「任务号与批号:Edit replace_all 一处在围栏里一处在外」「任务号与批号:记录里批后面跟中文数字」「任务号与批号:表格里转义的反斜杠加竖线」；
+#                              #   LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=task-and-session-numbers 时「任务号与批号上下文:」起头的几格里靠上下文规则放行的十三格红
+#                              #   （反引号里的会话短号与批号、反引号里拿描述指别的会话、A/B 读数一行、派发闸认的 A/B 读数写法、A/B 读数一行两臂两个号、长跑拆分一行、列表里的长跑拆分一行、表格行里的批号、
+#                              #   Edit 单改表格里一行、表头在文件里、kb 里括号里的步号、kb 里中文数字的第几批、kb 里批后面跟中文数字、fsync 攒批的大小），
+#                              #   与「任务号与批号:派发闸收而值里另带别的写法的号的四条在判决里照拒、两臂与单臂放行」（两臂、单臂那两条靠上下文规则放行）；
+#                              #   WRITE_GUARD_BREAK=numbers-new-text-only（这一判只把新写进的每一段当写后、写前当空串，看不到写完之后整份的样子）时
+#                              #     「任务号与批号:Edit 以收尾围栏起头、插入点前围栏开着」「任务号与批号:MultiEdit 前一处开了围栏、后一处以收尾围栏起头」
+#                              #     「任务号与批号:Edit 删开头围栏行让批号出了围栏」「任务号与批号:Edit 在开头围栏前补一行围栏」「任务号与批号:Edit 把开头围栏的信息串改成带反引号」
+#                              #     「任务号与批号:MultiEdit 先写进围栏再删开头围栏行」「任务号与批号上下文:Edit 单改表格里一行、表头在文件里放行」红；
+#                              #   库里放宽或改掉一处判法的几项（LIB_FORBIDDEN_NOTATIONS_BREAK=<项>，写法在库的文件头）：
+#                              #     fenced-blocks-judged「任务号与批号上下文:围栏代码块里的会话短号与批号放行」「任务号与批号上下文:Edit 以围栏起头、插入点前没有开着的围栏放行」
+#                              #       「任务号与批号上下文:Edit 把批号写进围栏放行」「任务号与批号:Edit 删开头围栏行让批号出了围栏」「任务号与批号:Edit 在开头围栏前补一行围栏」
+#                              #       「任务号与批号:Edit 把开头围栏的信息串改成带反引号」「任务号与批号上下文:围栏代码块里拿描述指别的会话放行」；
+#                              #     fenced-blocks-all-rows「任务号与批号:围栏代码块里的任务号」；
+#                              #     after-lines-judged-alone「任务号与批号:Edit 删开头围栏行让批号出了围栏」「任务号与批号:Edit 在开头围栏前补一行围栏」「任务号与批号:Edit 把开头围栏的信息串改成带反引号」
+#                              #       「任务号与批号上下文:表格行里的批号放行」「任务号与批号上下文:Edit 单改表格里一行、表头在文件里放行」「任务号与批号上下文:围栏代码块里的会话短号与批号放行」
+#                              #       「任务号与批号上下文:Edit 以围栏起头、插入点前没有开着的围栏放行」「任务号与批号上下文:Edit 把批号写进围栏放行」
+#                              #       「任务号与批号上下文:围栏代码块里拿描述指别的会话放行」；
+#                              #     violations-not-netted「任务号与批号:写前文件里已有的旧号不挡这一次写」「任务号与批号:改了旧号那一行、号没动放行」；
+#                              #     violations-netted-by-line-text（按行文相抵，行里别处一改、原有的号就算新写的）「任务号与批号:改了旧号那一行、号没动放行」；
+#                              #     violations-netted-by-line-number（写前哪一行号上有违例，写后同一行号上的违例全抵掉）「任务号与批号:旧号那一行新加第二个号照判」；
+#                              #     task-numbers-in-code-span-kept「任务号与批号:反引号里 task 子命令加号」「任务号与批号:反引号里的任务号」
+#                              #       「任务号与批号:派发闸收而值里另带别的写法的号的四条在判决里照拒、两臂与单臂放行」（那四条里有一条的号写在反引号里，开关放过它）；
+#                              #     zero-round-reading-anywhere「任务号与批号:A/B 读数不在行首」「任务号与批号:A/B 读数一行在记录里」「任务号与批号:A/B 读数一行里同字并列的号」
+#                              #       「任务号与批号:A/B 读数一行装三个号」「任务号与批号:引用块里的 A/B 读数」「任务号与批号:派发闸收而值里另带别的写法的号的四条在判决里照拒、两臂与单臂放行」
+#                              #       「任务号与批号上下文:派发闸认的 A/B 读数写法放行」「任务号与批号:列表里的引用块里的 A/B 读数」（开关下只认「A/B 读数」中间一个空格、后面紧跟冒号）；
+#                              #     zero-round-reading-count-unchecked「任务号与批号:A/B 读数一行装三个号」；zero-round-reading-quote-kept「任务号与批号:引用块里的 A/B 读数」
+#                              #       「任务号与批号:列表里的引用块里的 A/B 读数」；
+#                              #     zero-round-reading-list-quote-kept（引用块只认顶格的 >，列表里的「- >」不算）「任务号与批号:列表里的引用块里的 A/B 读数」；
+#                              #     reserved-lines-any-file「任务号与批号:长跑拆分一行在 kb 里」「任务号与批号:表格行里的批号在 kb 里」「任务号与批号:记录里表格别的列的批号」
+#                              #       「任务号与批号:没有表头分隔行的竖线行」「任务号与批号:表格里转义的反斜杠加竖线」；
+#                              #     table-batch-any-column「任务号与批号:记录里表格别的列的批号」「任务号与批号:没有表头分隔行的竖线行」「任务号与批号:表格里转义的反斜杠加竖线」；
+#                              #     table-escaped-pipe-parity-ignored（竖线前面挨着反斜杠的一律当转义，不数奇偶）「任务号与批号:表格里转义的反斜杠加竖线」；
+#                              #     batch-size-loosened「任务号与批号:记录里追加第几批」「任务号与批号:kb 里同一分句后面的批号」；
+#                              #     measure-compounds-counted「任务号与批号:批号后面跟处理、行为、项目」；
+#                              #     bare-short-codes-everywhere「任务号与批号上下文:kb 里括号里的步号放行」；
+#                              #     agent-parentheses-unjudged（mainagent( / subagent( / agent( 括号里的短号与别的写法不判）「任务号与批号:mainagent 与 subagent 括号里的短号」「任务号与批号:agent 括号里的短号」；
+#                              #     session-word-code-unjudged（「会话」后面不带括号跟的短号不判）「任务号与批号:会话后面不带括号跟短号」；
+#                              #     chinese-numeral-batch-unjudged（「批」后面跟的中文数字不判）「任务号与批号:记录里批后面跟中文数字」；
+#                              #     task-number-variants-unjudged（「任务编号 <号>」「<号> 号任务」不判）「任务号与批号:任务编号与号任务」；
+#                              #     session-description-actions-unjudged（「那一路」后面紧跟动作词的不判）「任务号与批号:那一路后面跟回信、认领、转达这类动作词」；
+#                              #     session-descriptions-loose（拿描述指别的会话那一条退成带「一路」的与 mainagent(、subagent( 一律算）「任务号与批号:这一路放行」「任务号与批号:那一路径放行」
+#                              #       「任务号与批号:一路绿放行」「任务号与批号:那一路后面不跟会话词放行」「任务号与批号:mainagent 按出场次序的叫法放行」「任务号与批号:subagent 按出场次序的叫法放行」
+#                              #       「任务号与批号:那一路后面跟问、报红与说法放行」；
+#                              #   库的判据行键 session-descriptions（拿描述指别的会话那一条不判）时「任务号与批号:那一路会话（调度记录原句：发给两路会话那一句）」
+#                              #     「任务号与批号:那一路会话（调度记录原句：腿跑着时换上那一句）」「任务号与批号:那一路会话（调度记录原句：问过改检出钩子那一句）」
+#                              #     「任务号与批号:那一路的会话与那一路的 agent」「任务号与批号:那一路后面跟回信、认领、转达这类动作词」红；
+#                              #   LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=session-descriptions 时「任务号与批号上下文:反引号里拿描述指别的会话放行」红；
+#                              #   LIB_FORBIDDEN_NOTATIONS_BREAK=judged-suffixes-ignored 时「任务号与批号:.py 不判」一格也红；
+#                              #   LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=task-and-session-numbers 时「任务号与批号:门禁样本放行」红；
 #                              # 第二道里工作根那一条模式的三样各一个弄坏开关，打开时点名的几项红：
 #                              #   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（工作根退回会话临时目录根，lib_work_root.py）：「范围:工作根下的报告目录」「先编后换:experiment-runner 改草稿目录里的副本放行」
 #                              #     「stdin:实现员写工作根下的报告」「stdin:七次拒绝都落进检出记录」（多出一次拒绝）「范围:内置 agent 写工作根放行」
@@ -204,9 +308,47 @@
 #       「整份换上:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒」「整份换上:工具员 Edit 主工作区已存在、带执行位无后缀的 gpu-verification-server/control 拒」
 #       「整份换上:工具员 Write 整份重写已存在的 .claude/gate.d/ 下的 .sh 拒」「整份换上:工具员 MultiEdit 已存在的 .claude/scripts/ 下的 .py 拒」
 #       「整份换上:工具员 Edit 已存在的 task-server/ 下的 .py 拒」「整份换上:工具员 Edit 已存在、带执行位无后缀的 prune-server/control 拒」
+#       「整份换上:工具员 Write 已有门禁的一份样本拒」「整份换上:工具员在已有门禁的样本档目录里新建样本拒」
+#       「整份换上:已有门禁的样本的拒绝给草稿目录、补丁与打补丁的出路」「整份换上:认不出 agent 类型的子 agent 写已有门禁的样本照常放行、记一处没判全」
+#       「stdin:工具员 Write 已有门禁的样本档目录里的新样本拒、点名补丁出路」
 #       「stdin:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒并点名 hook-swap.py 与出路」
 #       「stdin:工具员 Edit 主工作区已存在的 gpu-verification-server/control 拒并点名 hook-swap.py 与出路」
 #       「整份换上:认不出 agent 类型的子 agent 调用照常放行、记一处没判全」「整份换上:目标 stat 失败照常放行、记一处没判全」
+#       「整份换上:工具员 Edit 主工作区已存在的 prune-server/src/protocol.rs 拒」「整份换上:工具员 Edit 主工作区已存在的 gpu-verification-server/src/ 下的文件拒」
+#       「整份换上:两个服务 src/ 的拒绝给仓副本与补丁的出路」
+#       「整份换上:工具员 Edit 主工作区已存在的 prune-server/Cargo.toml 拒」「整份换上:工具员 Edit 主工作区已存在的 prune-server/Cargo.lock 拒」
+#       「整份换上:工具员 Write 整份重写已存在的 gpu-verification-server/Cargo.toml 拒」「整份换上:两个服务构建清单的拒绝给仓副本与补丁的出路」
+#       「整份换上:登记成 required 的脚本，拒绝说明写不加 --verify、自证换上之后另交一条、没有自动回滚」「整份换上:不在登记表里的脚本，拒绝说明照旧写加 --verify 换上」
+#       「整份换上:登记成 own-server 的脚本照不在表里办，写加 --verify 换上」「整份换上:登记表读不到时两种出路都写、记一处没判全」
+#       「整份换上:门禁共用库（.claude/gate.d/lib/ 下）不是门禁阶段，照不在登记表里的脚本写加 --verify 换上」
+#       「整份换上:门禁阶段（.claude/gate.d/ 顶层的 .sh）单走一支：不带 --verify、样本档换上之后另交一条、没有自动回滚、阶段单放一份规格」
+#       「整份换上:登记表读不到时门禁阶段照写不带 --verify、不记没判全（不读登记表）」
+#       「整份换上:.claude/gate.d/ 顶层 lib- 起头的 .py 是门禁共用库、不是门禁阶段，照不在登记表里的脚本写加 --verify 换上」
+#       「stdin:工具员 Edit 主工作区已存在的 .claude/gate.d/stage.sh 拒、点名不带 --verify 与样本档换上之后另交一条」
+#   WRITE_GUARD_BREAK=gate-fixtures-in-place-allowed  第十一道不判已有门禁的样本档目录：工具员改已有的样本、在那个目录里新建样本照放
+#       「整份换上:工具员 Write 已有门禁的一份样本拒」「整份换上:工具员在已有门禁的样本档目录里新建样本拒」
+#       「整份换上:已有门禁的样本的拒绝给草稿目录、补丁与打补丁的出路」「整份换上:认不出 agent 类型的子 agent 写已有门禁的样本照常放行、记一处没判全」
+#       「stdin:工具员 Write 已有门禁的样本档目录里的新样本拒、点名补丁出路」
+#   WRITE_GUARD_BREAK=swap-manifests-unseen  第十一道不把两个服务的构建清单（Cargo.toml、Cargo.lock）当源码一类：该拒的放行
+#       「整份换上:工具员 Edit 主工作区已存在的 prune-server/Cargo.toml 拒」「整份换上:工具员 Edit 主工作区已存在的 prune-server/Cargo.lock 拒」
+#       「整份换上:工具员 Write 整份重写已存在的 gpu-verification-server/Cargo.toml 拒」「整份换上:两个服务构建清单的拒绝给仓副本与补丁的出路」
+#   WRITE_GUARD_BREAK=swap-remedy-always-verify  第十一道脚本一支的出路一律写加 --verify，不读要临时服务的自证登记表
+#       「整份换上:登记成 required 的脚本，拒绝说明写不加 --verify、自证换上之后另交一条、没有自动回滚」「整份换上:登记表读不到时两种出路都写、记一处没判全」
+#   WRITE_GUARD_BREAK=gate-stage-remedy-as-script  门禁阶段与别的脚本走同一支出路（读登记表：不在表里写加 --verify，表读不到两种都写）
+#       「整份换上:门禁阶段（.claude/gate.d/ 顶层的 .sh）单走一支：不带 --verify、样本档换上之后另交一条、没有自动回滚、阶段单放一份规格」
+#       「整份换上:登记表读不到时门禁阶段照写不带 --verify、不记没判全（不读登记表）」
+#       「stdin:工具员 Edit 主工作区已存在的 .claude/gate.d/stage.sh 拒、点名不带 --verify 与样本档换上之后另交一条」
+# 引导（下面读部分文件的那一段）的弄坏开关：
+#   WRITE_GUARD_BREAK=part-unreadable-passes  引导载不全部分文件（读不到、编不过、编得过而 import 抛错或入口要的名字缺）时不按拒判：照原样抛错、进程退 1（Claude Code 照常放行、检出记录一行不写）；只在自证起的子进程里认（引导读它，不经 python 部分文件）
+#       「引导:读不到部分文件 write_guard_decisions.py 按拒判（退 2、点名那一份）」「引导:编不过部分文件 write_guard_decisions.py 按拒判（退 2、点名那一份）」「引导:截空部分文件 write_guard_decisions.py 按拒判（退 2、点名那一份）」
+#       「引导:读不到部分文件 write_guard_selftest.py 按拒判（退 2、点名那一份）」「引导:编不过部分文件 write_guard_selftest.py 按拒判（退 2、点名那一份）」「引导:截空部分文件 write_guard_selftest.py 按拒判（退 2、点名那一份）」
+#       「引导:读不到部分文件时对写回那一份本身的 Write 放行（退 0、记一条检出）」「引导:读不到部分文件时对那一份本身的 Edit 照拒（退 2、点名那一份）」
+# python 代码分在同目录的这几份（本文件是入口：bash 这一层与下面的引导；引导先把每一份读进来、核顶层名字、语法解析过（只读语法树、不执行），再按次序 import 它们（每一份是普通 python 模块，用到别份的名字写显式 import、不留环），不单独执行）：
+# write_guard_decisions.py：各道判定（覆盖、写范围、写者锁、先编后换、撇号类角标、行尾空白、钟点、会话号、批次代号、任务号、账本、整份换上、语法）与检出记录
+# write_guard_selftest.py：自证 selftest、弄坏开关只在自证里认的拒绝与读 hook 输入的入口流程
+# 载不全任何一份（读不到、编不过、编得过而不完整：顶层没有入口要的名字——WRITE_GUARD_PART_REQUIRED_NAMES 一份一组，import 之前用 ast 静态核、点名缺哪个——或 import 抛错）：照缺依赖（lib_write_scope.py 之类）的处置按拒判，退 2、stderr 点名是哪一份，不抛错退 1；
+# 只有一次写放行：Write 写回点名的那一份本身（出路只剩这一条，放行同时记一条检出）；Edit、MultiEdit 与别的目标照拒。主函数 main 在引导核完之后由引导调用，部分文件末尾不自己退出。
+# 弄坏开关的名单、读开关的代码在这几份 python 里（引导里那一条在引导里），开关表与红的格写在这个文件头。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -214,1743 +356,86 @@ HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # python 程序从文件描述符 3 读，标准输入留给 hook 的 JSON。
 # 写成 `python3 - <<PY` 时程序占了标准输入，JSON 读不到，判定一律放行。
 python3 /dev/fd/3 "$HOOK_DIR" "$@" 3<<'PY'
-import importlib.util, json, os, re, shutil, subprocess, sys, tempfile, time
-from datetime import datetime, timezone
-
-try:   # 工作根与会话临时目录根的唯一定义：同目录的 lib_work_root.py
-    sys.dont_write_bytecode = True
-    sys.path.insert(0, sys.argv[1]); import lib_work_root as work_roots
-    DEFAULT_DETECTIONS, work_roots_error = work_roots.default_detections_path(), None
-except Exception as error:  # 文件不在、语法错、弄坏开关写错都算读不到
-    work_roots, DEFAULT_DETECTIONS, work_roots_error = None, None, error
-
-try:   # 草稿目录写者锁的判法与锁的格式：同目录的 lib_writer_lock.py（读不到时第九道不判，stderr 写一句并记检出）
-    sys.path.insert(0, sys.argv[1]); import lib_writer_lock as writer_lock
-    writer_lock_error = None
-except Exception as error:  # 文件不在、语法错都算读不到
-    writer_lock, writer_lock_error = None, error
-
-# 写范围表的读法与判法（读表、展开工作根、glob 转正则、路径落没落进范围）在同目录的 lib_write_scope.py，bash-command-detector.sh 判 Bash 里的写用同一份；
-# 读不到它时子 agent 的写按拒判（decide_scope），拒绝信息点名那份库
-try:
-    sys.path.insert(0, sys.argv[1]); import lib_write_scope as write_scope
-    write_scope_error = None
-except Exception as error:  # 文件不在、语法错都算读不到
-    write_scope, write_scope_error = None, error
-
-def expanded_scope_patterns(patterns):
-    """写范围表里的模式：$SINGLEFS_WORK_ROOT/ 起头的展开成工作根那一条（弄坏开关 WRITE_GUARD_BREAK=scope-root-unanchored 时根后面不带 /）。"""
-    return write_scope.expanded_scope_patterns(patterns, work_roots, os.environ.get("WRITE_GUARD_BREAK") != "scope-root-unanchored")
-
-def glob_to_regex(pattern):
-    return write_scope.glob_to_regex(pattern)
-
-def load_scopes(table_path):
-    return write_scope.load_scopes(table_path)
-
-def absolute_target(hook_input, project_root):
-    file_path = (hook_input.get("tool_input") or {}).get("file_path") or ""
-    if not file_path:
-        return ""
-    return os.path.normpath(file_path if os.path.isabs(file_path) else os.path.join(project_root, file_path))
-
-UNJUDGED = []   # 这一次调用里判不了、照常放行的几处：入口逐条已打过 stderr，收尾记一条检出（结局只记）
-
-def note_unjudged(text):
-    """判不了、照常放行的一处：stderr 写一行，记进 UNJUDGED 等入口记检出。弄坏开关 WRITE_GUARD_BREAK=unjudged-not-recorded 下只打 stderr。"""
-    print(f"! write-guard.sh：{text}", file=sys.stderr)
-    if os.environ.get("WRITE_GUARD_BREAK") != "unjudged-not-recorded":
-        UNJUDGED.append(text)
-
-def landing_lexical_only():
-    return os.environ.get("WRITE_GUARD_BREAK") == "landing-lexical-only"
-
-def landing_target(hook_input, project_root):
-    """这一次写最终落在哪：absolute_target 规整 .. 之后逐段解开符号链接（目标不存在时解到最深的已存在那一层，lib_write_scope.landing_forms）。
-    取的是 landing_forms 里「先规整 .. 再解开」那一种（工具先规整路径再打开）；解不开时交字面那一份并记一处没判全；弄坏开关 WRITE_GUARD_BREAK=landing-lexical-only 下交字面那一份。"""
-    absolute = absolute_target(hook_input, project_root)
-    if not absolute or landing_lexical_only():
-        return absolute
-    try:
-        return os.path.realpath(absolute)
-    except (OSError, ValueError) as error:
-        note_unjudged(f"{absolute} 的符号链接解不开（{type(error).__name__}: {error}），覆盖、先编后换、语法、钟点与写者锁几道按字面路径判")
-        return absolute
-
-def landing_root(project_root):
-    """和 landing_target 配对的仓根：也解开符号链接（仓根自己在链接底下时，落点照样算得出相对仓根的路径）。"""
-    return os.path.normpath(project_root) if landing_lexical_only() else os.path.realpath(project_root)
-
-def decide_overwrite(hook_input, project_root):
-    """一、Write 整份覆盖未跟踪的已有文件。"""
-    if hook_input.get("tool_name") != "Write" or os.environ.get("WRITE_GUARD_DISABLE_OVERWRITE") == "1":
-        return 0, None
-    target = landing_target(hook_input, project_root)
-    if not target or not os.path.exists(target):
-        return 0, None
-    top = subprocess.run(["git", "-C", os.path.dirname(target), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-    if top.returncode != 0:
-        return 0, None
-    tracked = subprocess.run(["git", "-C", top.stdout.strip(), "ls-files", "--error-unmatch", "--", target], capture_output=True, text=True)
-    if tracked.returncode == 0:
-        return 0, None
-    return 2, (f"✗ 拒绝用 Write 整份覆盖 {target}：它已存在而且没进 git，可能是别的会话还没提交的文件，盖掉就找不回来。\n"
-               "→ 新建文件：换一个没被占的名字，用排他方式写（set -o noclobber; cat > 路径 <<'EOF'，或 python open(路径, 'x')）。\n"
-               "→ 确认是这一轮自己的文件：先 Read 看一眼，再用 Edit 改；整份重写就先 git add 它。")
-
-# 没有项目定义的 agent（内置类型、插件带来的、定义已删的旧实例）的写范围：只有工作根（文件头第二道；bash-command-detector.sh 的 ⑫ 用同一句模式）
-BUILTIN_AGENT_SCOPE = ("$SINGLEFS_WORK_ROOT/**",)
-
-def decide_builtin_scope(agent_type, absolute, project_root):
-    """二之一：没有项目定义的 agent 只许写工作根（BUILTIN_AGENT_SCOPE 展开成工作根那一条），仓里与别处一律拒；落点照 lib_write_scope.landings_out_of_scope 解开符号链接。"""
-    if work_roots is None:
-        return 2, (f"✗ 读不到工作根的定义 .claude/hooks/lib_work_root.py（{work_roots_error!r}），没有项目定义的 {agent_type} 只许写工作根，这一次按拒判：{absolute}\n"
-                   "→ 怎么办：先 git status 看那份库是被删了还是改坏了，用 Bash 恢复它；这件活交回主 agent。")
-    try:
-        outside = write_scope.landings_out_of_scope(expanded_scope_patterns(list(BUILTIN_AGENT_SCOPE)), absolute, project_root, landing_lexical_only())
-    except (OSError, ValueError) as error:
-        return 2, (f"✗ {absolute} 的符号链接解不开（{type(error).__name__}: {error}），算不出这次写落在哪，没有项目定义的 {agent_type} 的写按拒判\n"
-                   "→ 怎么办：直接写链接指向的那个路径（ls -l 看它指到哪）；落在工作根之外的写进报告交回主 agent。")
-    if not outside:
-        return 0, None
-    landed = (f"（解开符号链接之后落在 {'、'.join(outside)}）" if outside != [absolute] else "")
-    return 2, (f"✗ {agent_type} 没有项目定义（.claude/agents/{agent_type}.md 不在：内置类型、插件带来的或定义已删的旧实例），只许写工作根，不含 {absolute}{landed}\n"
-               f"→ 它能写的：{work_roots.work_root()}/ 下；仓里与别处（会话临时目录根 {work_roots.claude_session_temporary_root()}/ 在内）一律不写（用户 2026-10-26 定「只许写草稿目录」）。\n"
-               "→ 怎么办：草稿、报告写进派发提示给的草稿目录；要改仓里的文件，写进报告交回主 agent，由主 agent 改或派有写范围的项目 agent（一次性的活派 clerk）。")
-
-def decide_scope(hook_input, project_root, table_path):
-    """二、项目 subagent 的写范围；没有项目定义的 agent 只许写工作根（decide_builtin_scope）。"""
-    agent_type = hook_input.get("agent_type")
-    if not agent_type:
-        return 0, None
-    defined = os.path.isfile(os.path.join(project_root, ".claude", "agents", f"{agent_type}.md"))
-    if not defined and os.environ.get("WRITE_GUARD_BREAK") == "builtin-agents-unscoped":   # 弄坏开关：没有项目定义的一概放行
-        return 0, None
-    if os.environ.get("WRITE_GUARD_DISABLE_SCOPE") == "1":
-        return 0, None
-    file_path = (hook_input.get("tool_input") or {}).get("file_path") or ""
-    if write_scope is None:
-        return 2, (f"✗ 读不到写范围的判法 .claude/hooks/lib_write_scope.py（{write_scope_error!r}），{agent_type} 的写按拒判：{file_path}\n"
-                   "→ 怎么办：先 git status 看那份库是被删了还是改坏了，用 Bash 恢复它（Edit / Write 这一刻都被这道闸拦着）；这件活交回主 agent。")
-    if not defined:
-        return decide_builtin_scope(agent_type, absolute_target(hook_input, project_root), project_root)
-    patterns = load_scopes(table_path).get(agent_type, [])
-    if not patterns:
-        return 2, (f"✗ {agent_type} 在写范围表里没有登记，按拒绝处理：{file_path}\n"
-                   f"→ 怎么办：在 .claude/hooks/agent-write-scope.tsv 按它定义的「写范围」一节补上路径模式；补之前这件活交回主 agent。")
-    absolute = absolute_target(hook_input, project_root)
-    try:   # 落点：规整 .. 并逐段解开符号链接，每一种认法都要在范围里（lib_write_scope.py 的 landings_out_of_scope）
-        outside = write_scope.landings_out_of_scope(expanded_scope_patterns(patterns), absolute, project_root, landing_lexical_only())
-    except (OSError, ValueError) as error:
-        return 2, (f"✗ {absolute} 的符号链接解不开（{type(error).__name__}: {error}），算不出这次写落在哪，{agent_type} 的写按拒判\n"
-                   "→ 怎么办：直接写链接指向的那个路径（ls -l 看它指到哪）；落在写范围之外的写进报告交回主 agent。")
-    if not outside:
-        return 0, None
-    landed = (f"（解开符号链接之后落在 {'、'.join(outside)}）" if outside != [absolute] else "")
-    unexpanded = (f"\n→ 读不到工作根的定义 .claude/hooks/lib_work_root.py（{work_roots_error!r}），表里 $SINGLEFS_WORK_ROOT/ 起头的模式按拒判："
-                  "先 git status 看那份库是被删了还是改坏了，用 Bash 恢复它") if work_roots is None and any(p.startswith("$") for p in patterns) else ""
-    return 2, (f"✗ {agent_type} 的写范围不含 {absolute}{landed}\n"
-               f"→ 它的写范围：{'、'.join(patterns)}（.claude/hooks/agent-write-scope.tsv；$SINGLEFS_WORK_ROOT 是工作根 ~/.local/share/singlefs/work；会话临时目录根 /tmp/claude-<uid> 不在里面）。\n"
-               f"→ 怎么办：范围外的改动不自己做，写进报告交回主 agent，由主 agent 改或派该写的 agent。{unexpanded}")
-
-def decide_writer_lock(hook_input, project_root):
-    """九、子 agent 写草稿根底下的文件，那个目录（或往上的某一层）有写者锁、而它不是持锁的那一个。判法与锁的格式在 lib_writer_lock.py。"""
-    agent_id = hook_input.get("agent_id")
-    if not agent_id or os.environ.get("WRITE_GUARD_DISABLE_WRITER_LOCK") == "1":
-        return 0, None
-    if writer_lock is None or work_roots is None:
-        note_unjudged(f"写者锁这一道读不到 lib_writer_lock.py 或 lib_work_root.py（{(writer_lock_error or work_roots_error)!r}），这一次没判、照常放行")
-        return 0, None
-    target = landing_target(hook_input, project_root)
-    if not target:
-        return 0, None
-    transcript_path = hook_input.get("transcript_path") or ""
-    try:
-        scratch = writer_lock.find_lock_directory(target, work_roots.scratch_roots(), any_entry=True)   # 嵌套的草稿目录只认最近一层的锁（lib_writer_lock.py 文件头「嵌套的草稿目录」）
-        if not scratch:
-            return 0, None
-        state, lock = writer_lock.lock_state(scratch)
-        if state == "absent":
-            return 0, None
-        if state == "unreadable":
-            lock_file = writer_lock.lock_path(scratch)
-            return 2, (f"✗ {target} 在草稿目录 {scratch} 里，这个目录的写者锁 {lock_file} 在、却判不了谁持锁（{lock}）：锁判不了的目录，子 agent 一律不写。\n"
-                       "→ 怎么办：停下对这个目录的写，已经写的与没写完的在报告里交回主 agent，交回里点名这把锁的路径。\n"
-                       f"→ 主 agent：核过这个目录现在归谁（.owner、在跑的子 agent）之后，删掉这把锁（rm {lock_file}；锁的位置是目录的 rm -r）再重派，"
-                       "派发闸重建（提示里「草稿目录：」点名它）；锁判不了时派发闸不认「写者锁已判」接手，不删就派会被它拒。")
-        verdict, holder = writer_lock.writer_verdict(scratch, lock, agent_id, transcript_path)
-        if verdict == "holder":
-            return 0, None
-        if verdict == "unclaimed":   # 回执还没落盘：照「放行但必记检出」放行、不认领（lib_writer_lock.py 文件头「谁是持锁者」2）
-            note_unjudged(f"写者锁这一道：{agent_id} 写 {target}，派发回执还没落盘，没认领 {scratch} 的写者锁"
-                          f"（主会话记录 {transcript_path or '（输入里没有）'} 里还找不到它的回执，或记录读不了），这一次照常放行；回执落盘之后照旧核回执再认领")
-            return 0, None
-        if verdict == "broken-claim":
-            claim_file = writer_lock.claim_path(scratch, lock)
-            return 2, (f"✗ {target} 在草稿目录 {scratch} 里，这个目录的写者锁的认领文件 {claim_file} 在、却判不了谁持锁（{holder}）：认领判不了的目录，子 agent 一律不写。\n"
-                       "→ 怎么办：停下对这个目录的写，已经写的与没写完的在报告里交回主 agent，交回里点名这份认领文件的路径。\n"
-                       f"→ 主 agent：核过这个目录现在归谁（.owner、在跑的子 agent）之后，删掉这份认领文件（rm {claim_file}；是目录的 rm -r），"
-                       "持锁者下一次写照派发回执重新认领；归属核不清的，换一个草稿目录重派。")
-        unknown = None if holder else writer_lock.describe_unknown_holder(lock, agent_id, transcript_path)
-    except Exception as error:   # 挂在每一次写上的闸，坏了不能把所有写都挡住
-        note_unjudged(f"写者锁这一道自己出错，这一次放行：{type(error).__name__}: {error}")
-        return 0, None
-    owner = f"子 agent {holder}" if holder else f"{unknown}（你的派发回执不是这把锁登记的那一份提示，或早于这把锁）"
-    return 2, (f"✗ {target} 在草稿目录 {scratch} 里，这个目录的写者锁（派发 {lock.get('subagent_type') or '?'}，派发于 {str(lock.get('dispatched_date'))[:10]}）由{owner}持有，"
-               f"你（{agent_id}）不是：同一个草稿目录同一时刻只许持锁的那一个子 agent 写。\n"
-               "→ 怎么办：停下对这个目录的写，已经写的与没写完的在报告里交回主 agent；主 agent 给你换一个没人持锁的草稿目录重派，"
-               "或在派发提示里单起一行「写者锁已判：<理由>」接手这个目录（接手之后原持锁者写这个目录会被拒）。\n"
-               "→ 规矩：锁的格式与谁算持锁者见 .claude/hooks/lib_writer_lock.py 文件头；Bash 里的写这道闸看不见，同样不许写进别人持锁的目录。")
-
-# 四、先编后换：这几个项目 subagent 不直接写主工作区 crates/ 下的 .rs，出路是 scripts/hosts/compile-then-swap.py。
-# Bash 里的同一类写法由 bash-command-detector.sh 的 ⑨ 判，agent 名单与路径判据两边各写一份、改的时候一起改。
-COMPILE_FIRST_AGENTS = ("experiment-runner",)
-COMPILE_THEN_SWAP_SCRIPT = "scripts/hosts/compile-then-swap.py"
-
-def decide_compile_first(hook_input, project_root):
-    """四、登记在 COMPILE_FIRST_AGENTS 里的 agent 写主工作区 crates/ 下的 .rs。"""
-    agent_type = hook_input.get("agent_type")
-    if agent_type not in COMPILE_FIRST_AGENTS or os.environ.get("WRITE_GUARD_DISABLE_COMPILE_FIRST") == "1":
-        return 0, None
-    absolute = landing_target(hook_input, project_root)
-    root = landing_root(project_root)
-    if not absolute or not absolute.endswith(".rs") or not absolute.startswith(os.path.join(root, "crates") + os.sep):
-        return 0, None
-    relative = os.path.relpath(absolute, root)
-    return 2, (f"✗ {agent_type} 不直接写主工作区的 {relative}：入库装置先在草稿目录的副本里改，编过再整份换进主工作区，"
-               "主工作区里任何时候都只放编得过的版本。\n"
-               f"→ 怎么办：cp {relative} <草稿目录>/ 拷一份（新建的装置直接在草稿目录里建），在草稿目录那一份上用 Edit / Write 改；"
-               + (f"改完跑 bash scripts/hosts/capped.sh <线程上限> python3 {COMPILE_THEN_SWAP_SCRIPT} <草稿目录>/{os.path.basename(relative)} "
-                  f"{relative} --scratch <草稿目录>，" if os.environ.get("WRITE_GUARD_BREAK") == "compile-first-capped-hint" else
-                  f"改完把 `task-server/task submit -- python3 {COMPILE_THEN_SWAP_SCRIPT} <草稿目录>/{os.path.basename(relative)} "
-                  f"{relative} --scratch <草稿目录>` 写进报告「要主 agent 跑的命令」一节交回、由主 agent 交服务（子 agent 不往统一任务服务交任务），")
-               + "它编过才整份换进来，编不过一个字节不写。\n"
-               "→ 目标不是 crates/<crate>/src/bin/ 下的装置（crate 的库、测试）的，不归你改，写进报告交回主 agent。")
-
-def notations_library_path(hook_dir):
-    return os.path.join(os.path.dirname(hook_dir), "gate.d", "lib-forbidden-notations.py")
-
-NOTATIONS_LIBRARIES = {}      # 库路径 → 装好的模块：一个进程里同一份库只装一次（一次写入判撇号、钟点、会话号三道，都从这里取）
-NOTATIONS_LIBRARY_LOADS = [0]  # 真装了几次，自证数它
-
-def load_notations_library(library_path):
-    """门禁 doc-text 与本钩子共用的判据库 lib-forbidden-notations.py：装过的直接交回，没装过的装一次并记下；读不到、语法错抛异常（失败不记，下一回再试）。
-    弄坏开关 WRITE_GUARD_BREAK=library-reloaded-each-time 每回重装。"""
-    library = NOTATIONS_LIBRARIES.get(library_path)
-    if library is not None and os.environ.get("WRITE_GUARD_BREAK") != "library-reloaded-each-time":
-        return library
-    spec = importlib.util.spec_from_file_location("lib_forbidden_notations", library_path)
-    library = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(library)
-    NOTATIONS_LIBRARY_LOADS[0] += 1
-    NOTATIONS_LIBRARIES[library_path] = library
-    return library
-
-def load_prime_marks(library_path):
-    """撇号类字符集，与门禁 doc-text 同一份；读不到或读出来是空的就抛异常，由调用方按拒绝处理。"""
-    library = load_notations_library(library_path)
-    prime_marks = library.PRIME_MARKS
-    if not isinstance(prime_marks, str) or not prime_marks:
-        raise ValueError(f"PRIME_MARKS 是 {prime_marks!r}，不是非空字符串")
-    return prime_marks
-
-def written_texts(hook_input):
-    """这一次写要落进文件的文字：Write 的 content、Edit 的 new_string、MultiEdit 每一处的 new_string。old_string 不算。"""
-    tool_name = hook_input.get("tool_name")
-    tool_input = hook_input.get("tool_input") or {}
-    if tool_name == "Write":
-        return [str(tool_input.get("content") or "")]
-    if tool_name == "Edit":
-        return [str(tool_input.get("new_string") or "")]
-    if tool_name == "MultiEdit":
-        return [str((edit or {}).get("new_string") or "") for edit in tool_input.get("edits") or []]
-    return []
-
-def decide_prime_marks(hook_input, library_path):
-    """三、写进去的内容里有撇号类角标。"""
-    texts = [text for text in written_texts(hook_input) if text]
-    if not texts:
-        return 0, None
-    try:
-        prime_marks = load_prime_marks(library_path)
-    except Exception as error:
-        return 2, (f"✗ 读不到撇号类字符集 {library_path}（{type(error).__name__}：{error}），这次写没法判，按拒绝处理。\n"
-                   "→ 怎么办：那一份是门禁 doc-text 与这道 hook 共用的唯一定义，先 git status 看它是被删了还是被改坏了，"
-                   "用 Bash 恢复它（不在 hook 里另抄一份）；恢复之前 Write / Edit 都会被拒。")
-    occurrences = sum(text.count(mark) for text in texts for mark in prime_marks)
-    if not occurrences:
-        return 0, None
-    offending_text = next(text for text in texts if any(mark in text for mark in prime_marks))
-    position, mark = min((offending_text.find(mark), mark) for mark in prime_marks if mark in offending_text)
-    line_start = offending_text.rfind("\n", 0, position) + 1
-    line_end = offending_text.find("\n", position)
-    line = offending_text[line_start:line_end if line_end != -1 else len(offending_text)]
-    column = position - line_start
-    snippet = line[max(0, column - 20):column + 10].strip()
-    file_path = (hook_input.get("tool_input") or {}).get("file_path") or ""
-    return 2, (f"✗ 写进去的内容里有撇号类角标 {mark}（U+{ord(mark):04X}）在「…{snippet}…」"
-               f"（{file_path}，这次写的内容里共 {occurrences} 处）\n"
-               "→ 怎么办：给这个变体起一个新名字——在它那一族里取下一个没用过的号，或起一个短的描述性名字；"
-               "做法见 .claude/rules/path-moves.md「变体起新名字，不用角标」\n"
-               "→ 引用户原话或原文时也不例外：把那个字符改写成文字（写成「B2（加撇号）」这类）")
-
-TRAILING_BLANKS = (" ", "\t")
-TRAILING_BLANK_EXEMPT_SUFFIXES = (".md", ".mdx")
-
-def decide_trailing_blank(hook_input):
-    """八、目标不是 .md / .mdx 时，Edit 的 old_string、MultiEdit 每一处的 old_string 以空格或制表符收尾。"""
-    if os.environ.get("WRITE_GUARD_BREAK") == "trailing-blank-ignored":
-        return 0, None
-    tool_name = hook_input.get("tool_name")
-    if tool_name not in ("Edit", "MultiEdit"):
-        return 0, None
-    tool_input = hook_input.get("tool_input") or {}
-    if str(tool_input.get("file_path") or "").lower().endswith(TRAILING_BLANK_EXEMPT_SUFFIXES):
-        return 0, None
-    edits = (tool_input.get("edits") or []) if tool_name == "MultiEdit" else [tool_input]
-    texts = [str((edit or {}).get("old_string") or "") for edit in edits]
-    offending = [index for index, text in enumerate(texts) if text.endswith(TRAILING_BLANKS)]
-    if not offending:
-        return 0, None
-    text = texts[offending[0]]
-    last_line = text[text.rfind("\n") + 1:]
-    blank = last_line[len(last_line.rstrip(" \t")):]
-    shown = last_line.rstrip(" \t")[-30:] + blank.replace(" ", "␠").replace("\t", "⇥")
-    where = f"第 {offending[0] + 1} 处（共 {len(offending)} 处以空白收尾）的 " if tool_name == "MultiEdit" else ""
-    file_path = tool_input.get("file_path") or ""
-    return 2, (f"✗ {tool_name} {where}old_string 以空白收尾：「…{shown}」（{file_path}；␠ 是空格，⇥ 是制表符）\n"
-               "  .md / .mdx 以外的目标，Edit 先去掉 new_string 每一行行尾的空格与制表符再施加：old_string 收尾的空白照样被换掉，"
-               "new_string 里对应的那一个却没了，文件里紧跟着的字就粘上来（`python3 - \"$DEC\"` 落成 `python3 -\"$DEC\"`）。\n"
-               "→ 怎么办：把 old_string 与 new_string 的框选范围收到不以空白结尾：两边一起往后多框到下一个非空白字符，或止于行尾（框到换行之前）。\n"
-               "→ 确实要删行尾空白的：用 Bash 跑 python3 scripts/kb/replace-once.py <文件> <旧串> <新串>（旧串恰好命中一次才写）。")
-
-LIBRARY_UNREADABLE_PREFIX = "✗ 读不到"
-LISTED_HITS_LIMIT = 20
-
-def written_text_places(hook_input, project_root):
-    """written_texts 的每一段，连同「它的第 n 行在哪」的说法：[(文字, 行号 → 说法)]。Write 的行号就是文件的行号；
-    Edit 的 old_string 在现文件里找得到时折算成施加之后文件里的行号，找不到写 new_string 的第几行；MultiEdit 写第几处的第几行。"""
-    tool_name = hook_input.get("tool_name")
-    tool_input = hook_input.get("tool_input") or {}
-    texts = written_texts(hook_input)
-    if tool_name == "Edit":
-        base, old_string = None, str(tool_input.get("old_string") or "")
-        try:
-            current = open(absolute_target(hook_input, project_root), encoding="utf-8", errors="replace").read()
-            index = current.find(old_string) if old_string and not tool_input.get("replace_all") else -1
-            base = current[:index].count("\n") if index >= 0 else None
-        except (OSError, ValueError):
-            pass
-        return [(texts[0], (lambda number: f"第 {base + number} 行") if base is not None else (lambda number: f"new_string 第 {number} 行"))]
-    if tool_name == "MultiEdit":
-        return [(text, lambda number, place=place: f"第 {place} 处 new_string 第 {number} 行") for place, text in enumerate(texts, 1)]
-    return [(text, lambda number: f"第 {number} 行") for text in texts]
-
-def library_hits_in_written_texts(hook_input, project_root, library_path, form_key, form_name):
-    """写进仓里的内容在共用库那一形态下的每一处：(拒绝信息, None, []) 读不到库；(None, None, []) 没命中或不判；
-    (None, 相对路径, [(在哪, 判据行名字, 命中的串)]) 命中（库的 all_hits，按出现的次序）。"""
-    places = [(text, where) for text, where in written_text_places(hook_input, project_root) if text]
-    absolute = landing_target(hook_input, project_root)
-    root = landing_root(project_root)
-    if not places or not absolute or os.path.commonpath([absolute, root]) != root:
-        return None, None, []
-    try:
-        library = load_notations_library(library_path)
-        relative = os.path.relpath(absolute, root)
-        if library.is_excluded(form_key, relative):
-            return None, None, []
-        found = [(where(number), name, matched) for text, where in places for number, _, name, matched in library.all_hits(form_key, text, relative)]
-    except Exception as error:
-        return (f"{LIBRARY_UNREADABLE_PREFIX}{form_name}判据 {library_path}（{type(error).__name__}：{error}），这次写没法判，按拒绝处理。\n"
-                "→ 怎么办：那一份是门禁 doc-text 与这道 hook 共用的唯一定义，先 git status 看它是被删了还是被改坏了，"
-                "用 Bash 恢复它（不在 hook 里另抄一份）；恢复之前往仓里的 Write / Edit 都会被拒。"), None, []
-    return None, relative, found
-
-def listed_hits(found, with_shape):
-    """逐处一行：「  第 n 行（判据行名字）：「命中的串」」；超过 LISTED_HITS_LIMIT 处的只报另有几处。"""
-    shown = [f"  {where}（{shape}）：「{matched}」" if with_shape else f"  {where}：「{matched}」" for where, shape, matched in found[:LISTED_HITS_LIMIT]]
-    if len(found) > LISTED_HITS_LIMIT:
-        shown.append(f"  （另有 {len(found) - LISTED_HITS_LIMIT} 处没列，改完上面这些再写一次会列出来）")
-    return "\n".join(shown) + "\n"
-
-COMPACT_TIMESTAMP_SHAPE = "ISO 紧凑时间戳"   # 库里 iso-compact-timestamp 那一条判据行的名字；只给弄坏开关 compact-timestamp-skipped 认形态用，判法在库里
-
-def decide_clock_times(hook_input, project_root, library_path):
-    """五、写进仓里的内容带描述性的钟点。"""
-    if os.environ.get("WRITE_GUARD_DISABLE_CLOCK_TIMES") == "1":
-        return 0, None
-    unreadable, relative, found = library_hits_in_written_texts(hook_input, project_root, library_path, "clock-times", "钟点")
-    if unreadable:
-        return 2, unreadable
-    if os.environ.get("WRITE_GUARD_BREAK") == "compact-timestamp-skipped":   # 弄坏开关：把紧凑时间戳那一形态的命中丢掉
-        found = [hit for hit in found if hit[1] != COMPACT_TIMESTAMP_SHAPE]
-    if not found:
-        return 0, None
-    return 2, (f"✗ 写进 {relative} 的内容在描述里写了钟点，共 {len(found)} 处：\n" + listed_hits(found, True) +
-               "→ 怎么办：时间只写到日期，把钟点（时:分、「N 点 / N 时」、上午下午这类时段词）连同挨着它的时区词、「前后」一起删掉；"
-               "光秃的时区词、ISO 时间戳（含运行目录名、日志文件名里连写的紧凑写法，路径里的也判：目录名里的时间戳段删掉）与 date 的原样输出也删，只写日期。\n"
-               "→ .sh、.py、.rs 里代码真要用这些字面（TZ 环境变量、解析外部文本的正则、造时间戳的自检输入），在那一行写「# clock-times:allow <理由>」（Rust 写「//」）；"
-               "命中的其实不是钟点（产物字段、切片、编号对），改 .claude/gate.d/lib-forbidden-notations.py 的上下文规则\n"
-               "→ 钟点确实是被测输入的整份文件（hook 自检、门禁样本），登记进 .claude/gate.d/lib-forbidden-notations.py 里钟点那一形态的 excluded_prefixes 并写明理由")
-
-def decide_session_names(hook_input, project_root, library_path):
-    """七、写进仓里的内容带会话号（ListAgents 列的会话名）。"""
-    if os.environ.get("WRITE_GUARD_DISABLE_SESSION_NAMES") == "1":
-        return 0, None
-    unreadable, relative, found = library_hits_in_written_texts(hook_input, project_root, library_path, "session-names", "会话号")
-    if unreadable:
-        return 2, unreadable
-    if not found:
-        return 0, None
-    return 2, (f"✗ 写进 {relative} 的内容写了会话号，共 {len(found)} 处：\n" + listed_hits(found, False) +
-               "→ 怎么办：会话号全名不写进仓：非写不可就只写后面的两位短号（例「87」），或写成「别的会话」「SOP 会话」这类不带号的说法；"
-               "标签式的「（会话 <号>，<日期>）」只留日期，事情与日期照留；改过标题的会话（「会话「<标题>」」）同样不写标题。\n"
-               "→ .sh、.py、.rs 里代码真要用这些字面（解析 ListAgents 输出的正则、造会话号的自检输入），在那一行写「# session-names:allow <理由>」（Rust 写「//」）")
-
-def decide_batch_codes(hook_input, project_root, library_path):
-    """七之另一判：写进仓里的内容带批次代号（库里 batch-codes 那一形态，库按后缀只判 .md、.tsv、.txt）。弄坏开关 WRITE_GUARD_BREAK=batch-codes-unjudged 下不判。"""
-    if os.environ.get("WRITE_GUARD_BREAK") == "batch-codes-unjudged":
-        return 0, None
-    unreadable, relative, found = library_hits_in_written_texts(hook_input, project_root, library_path, "batch-codes", "批次代号")
-    if unreadable:
-        return 2, unreadable
-    if not found:
-        return 0, None
-    remedy = load_notations_library(library_path).FORMS_BY_KEY["batch-codes"]["remedy"]
-    return 2, (f"✗ 写进 {relative} 的内容写了批次代号，共 {len(found)} 处：\n" + listed_hits(found, True) +
-               "\n".join(f"→ {'怎么办：' if index == 0 else ''}{line}" for index, line in enumerate(remedy)))
-
-LEDGER_REGISTRY = os.path.join(".claude", "gate.d", "split-proposal-ledgers.tsv")   # 拆分提案账本登记表（门禁 doc-process-records 的 deferred-items-registered、ledger-section-numbers、sealed-ledgers-unchanged 三格读同一张）
-LEDGER_HEADING = re.compile(r"^##[ \t]+[零〇一二两三四五六七八九十百千]+、", re.M)   # 节标题的写法，同门禁 ledger-section-numbers 格认节的 HEADING
-
-def current_ledger(project_root):
-    """登记表里 current 那一行点名的账本 → (相对仓根的路径, None)；表读不到或 current 不是恰好一行 → (None, 原因)。"""
-    registry = os.path.join(project_root, LEDGER_REGISTRY)
-    try:
-        with open(registry, encoding="utf-8") as handle:
-            rows = [line.rstrip("\n").split("\t") for line in handle if line.strip() and not line.startswith("#")]
-    except OSError as error:
-        return None, f"读不到 {registry}（{type(error).__name__}: {error}）"
-    current = [parts[1] for parts in rows if len(parts) == 4 and parts[0] == "current"]
-    if len(current) != 1:
-        return None, f"{registry} 里 current 的行有 {len(current)} 行，要恰好一行"
-    return current[0], None
-
-def ledger_heading_gain(hook_input, target):
-    """这一次写让账本的「## <节号>、」标题净增几个：Write 是新内容比现有文件多出的；Edit 与 MultiEdit 是每一处新串比旧串多出的（改节号、改标题文字，个数不变，不算）。"""
-    tool_name = hook_input.get("tool_name")
-    tool_input = hook_input.get("tool_input") or {}
-    if tool_name == "Write":
-        try:
-            with open(target, encoding="utf-8", errors="replace") as handle:
-                existing = handle.read()
-        except OSError:
-            existing = ""
-        pairs = [(existing, str(tool_input.get("content") or ""))]
-    elif tool_name == "Edit":
-        pairs = [(str(tool_input.get("old_string") or ""), str(tool_input.get("new_string") or ""))]
-    elif tool_name == "MultiEdit":
-        pairs = [(str((edit or {}).get("old_string") or ""), str((edit or {}).get("new_string") or "")) for edit in tool_input.get("edits") or []]
-    else:
-        return 0
-    return sum(max(0, len(LEDGER_HEADING.findall(new)) - len(LEDGER_HEADING.findall(old))) for old, new in pairs)
-
-def decide_ledger_append(hook_input, project_root):
-    """十、往现行账本追加节标题。写进去的文字里没有节标题的不读登记表；登记表读不到照常放行并记一处没判全。弄坏开关 WRITE_GUARD_BREAK=ledger-append-ignored 下该拒的也放行。"""
-    if not any(LEDGER_HEADING.search(text) for text in written_texts(hook_input)):
-        return 0, None
-    target = landing_target(hook_input, project_root)
-    if not target:
-        return 0, None
-    relative, problem = current_ledger(project_root)
-    if relative is None:
-        note_unjudged(f"账本追加这一道没判：{problem}，这一次照常放行")
-        return 0, None
-    if os.path.realpath(os.path.join(project_root, relative)) != os.path.realpath(target):
-        return 0, None
-    gained = ledger_heading_gain(hook_input, target)
-    if not gained or os.environ.get("WRITE_GUARD_BREAK") == "ledger-append-ignored":
-        return 0, None
-    return 2, (f"✗ 往现行账本 {relative} 追加「## <节号>、」标题（这一次写比原来多 {gained} 个节标题）：几个会话同时追加，各自读文件、各自取号，节号会撞，"
-               "到提交时门禁 doc-process-records 的 ledger-section-numbers 格才判出重号。\n"
-               "→ 怎么办：新节经 `python3 scripts/kb/ledger-append-section.py --title '<标题（含日期）>' --body-file <草稿目录里写好的正文文件>`：现取最大节号加一，"
-               "一次写入索引表末行与末尾新节，写前复核 sha256，撞了拒（重跑取下一个号）；索引行的判定、历史行、当日还开着的几行用 --judgement、--history-rows、--open-rows 给。\n"
-               "→ 改已有节的节号或标题文字（撞了号改成下一个空号）：新旧串里节标题个数相同的 Edit 放行，索引表里同步改。")
-
-# 十一、这几个项目 subagent 不在主工作区里就地改已存在的脚本，出路是草稿目录里写完整份、经 scripts/gate/hook-swap.py 一次换上。
-# 目录与 hook-swap.py 的 SCRIPT_SPEC_DIRECTORIES、SCRIPT_SPEC_EXCLUDED 相同，两边各写一份、改的时候一起改。
-SWAP_ONLY_AGENTS = ("tooling-writer",)
-SWAP_ONLY_DIRECTORIES = ("scripts", ".claude/gate.d", ".claude/scripts", "task-server", "prune-server", "gpu-verification-server")
-SWAP_ONLY_EXCLUDED = (".claude/gate.d/fixtures", "prune-server/target", "prune-server/src", "gpu-verification-server/target", "gpu-verification-server/src")
-SWAP_ONLY_SCRIPT_SUFFIXES = (".sh", ".py")
-HOOK_SWAP_SCRIPT = "scripts/gate/hook-swap.py"
-
-def swap_only_directory(relative):
-    """相对仓根的路径落在 SWAP_ONLY_DIRECTORIES 里哪一处（SWAP_ONLY_EXCLUDED 下的不算）：交那一处，不在交 None。"""
-    def under(directory):
-        return relative.startswith(directory + "/")
-    if any(under(directory) for directory in SWAP_ONLY_EXCLUDED):
-        return None
-    return next((directory for directory in SWAP_ONLY_DIRECTORIES if under(directory)), None)
-
-def decide_script_swap_only(hook_input, project_root):
-    """十一、SWAP_ONLY_AGENTS 里的 agent 用 Write / Edit / MultiEdit 改主工作区 SWAP_ONLY_DIRECTORIES 下已存在的脚本（.sh、.py 或带执行位的普通文件）。
-    认不出 agent 类型的子 agent 调用、目标 stat 失败的照常放行并记一处没判全。弄坏开关 WRITE_GUARD_BREAK=script-in-place-allowed 下该拒的也放行。"""
-    import stat
-    if hook_input.get("tool_name") not in ("Write", "Edit", "MultiEdit") or os.environ.get("WRITE_GUARD_BREAK") == "script-in-place-allowed":
-        return 0, None
-    agent_type = hook_input.get("agent_type")
-    recognized = isinstance(agent_type, str) and bool(agent_type)
-    if recognized and agent_type not in SWAP_ONLY_AGENTS:
-        return 0, None
-    if agent_type is None and not hook_input.get("agent_id"):   # 主 agent：输入里没有 agent_type 也没有 agent_id
-        return 0, None
-    target = landing_target(hook_input, project_root)
-    if not target:
-        return 0, None
-    relative = os.path.relpath(target, landing_root(project_root))
-    if relative == ".." or relative.startswith("../") or os.path.isabs(relative):   # 落在主工作区之外：草稿目录、仓副本
-        return 0, None
-    if swap_only_directory(relative) is None:
-        return 0, None
-    try:
-        status = os.stat(target)
-    except (FileNotFoundError, NotADirectoryError):   # 新建文件
-        return 0, None
-    except OSError as error:
-        note_unjudged(f"第十一道（就地改已存在的脚本）：{relative} stat 失败（{type(error).__name__}: {error.strerror or error}），认不出它在不在、是不是脚本，这一次没判、照常放行")
-        return 0, None
-    if not stat.S_ISREG(status.st_mode):
-        return 0, None
-    executable = bool(status.st_mode & 0o111)
-    if not relative.endswith(SWAP_ONLY_SCRIPT_SUFFIXES) and not executable:   # 不带执行位的数据与文档
-        return 0, None
-    if not recognized:
-        note_unjudged(f"第十一道（就地改已存在的脚本）：子 agent 的调用认不出 agent 类型（agent_type={agent_type!r}），{relative} 是主工作区里已存在的脚本，这一次没判、照常放行")
-        return 0, None
-    suffix = os.path.splitext(relative)[1]
-    kind = f"{suffix} 脚本" if relative.endswith(SWAP_ONLY_SCRIPT_SUFFIXES) else f"带执行位的{suffix or '无后缀'}文件"
-    return 2, (f"✗ {agent_type} 不在主工作区里就地改已存在的脚本 {relative}（{kind}）：分几次改的中间态对别的会话可见，被拷进快照的任务、直接起它的服务会跑到改到一半的版本。\n"
-               f"→ 怎么办：新版整份写在草稿目录（照主工作区此刻那一份拷过去再改），把 {HOOK_SWAP_SCRIPT} 的脚本规格（JSON 数组，每项 file / old / new，"
-               "旧串在主工作区那一份里恰好命中 count 次；一件活改几份文件的写进同一份规格）与那条换上命令写进报告「要主 agent 跑的命令」一节，由主 agent 一次换上："
-               f"`task-server/task submit -- python3 {HOOK_SWAP_SCRIPT} <草稿目录>/<规格.json> --scratch <草稿目录> --root <仓根> --dry-run` 先验，"
-               f"再去掉 --dry-run、加 --verify '<被换脚本的 --selftest 命令>' 换上。\n"
-               "→ 不拦的：新建文件，.tsv / .md / .json / .txt 这类不带执行位的数据与文档，.claude/gate.d/fixtures/ 下的样本，草稿目录与仓副本里的文件；"
-               "钩子（.claude/hooks/）照旧经 hook-swap.py 的钩子规格换上。")
-
-SYNTAX_CHECKED_DIRECTORIES = (".claude/hooks", ".claude/gate.d", ".claude/scripts", "scripts")
-PYTHON_SYNTAX_CHECK = "import ast, sys; ast.parse(open(sys.argv[1], encoding='utf-8').read(), sys.argv[1])"   # 只给弄坏开关 python-syntax-subprocess 用
-
-def python_syntax_error(content, relative):
-    """.py 的内容在本进程里 ast 解析（不写临时文件、不起子进程）：过得去交 None，过不去交错误说明（文件名写相对仓根的路径）。"""
-    import ast, traceback
-    try:
-        ast.parse(content, filename=relative)
-    except (SyntaxError, ValueError, RecursionError) as error:
-        return "".join(traceback.format_exception_only(type(error), error)).strip()[-600:]
-    return None
-
-def syntax_error_by_checker(checker, content, suffix, relative):
-    """内容写进临时文件、起 checker（bash -n）判：过得去交 None，过不去交错误说明；起不了、超时按放行交 None。"""
-    handle = tempfile.NamedTemporaryFile("w", suffix=suffix, delete=False, encoding="utf-8")
-    try:
-        handle.write(content)
-        handle.close()
-        result = subprocess.run(checker + [handle.name], capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        note_unjudged(f"{' '.join(checker[:2])} 起不了或超时（{type(error).__name__}: {error}），{relative} 的语法这一次没判、照常放行")
-        return None
-    finally:
-        handle.close()
-        os.unlink(handle.name)
-    if result.returncode == 0:
-        return None
-    return (result.stderr or result.stdout).strip().replace(handle.name, relative)[-600:]
-
-def edited_content(hook_input, target):
-    """Write 给的整份内容，或 Edit / MultiEdit 施加到现文件之后的内容；施加不了（文件不在、旧串找不到）返回 None，那一步 Edit 自己会拒。"""
-    tool_name = hook_input.get("tool_name")
-    tool_input = hook_input.get("tool_input") or {}
-    if tool_name == "Write":
-        return tool_input.get("content")
-    if not os.path.isfile(target):
-        return None
-    try:
-        text = open(target, encoding="utf-8", errors="replace").read()
-    except OSError as error:   # 在而读不了：改完之后的内容算不出，语法这一道判不了，记一处没判全（弄坏开关 syntax-unreadable-unrecorded 下静默放行）
-        if os.environ.get("WRITE_GUARD_BREAK") != "syntax-unreadable-unrecorded":
-            note_unjudged(f"{target} 读不了（{type(error).__name__}: {error.strerror or error}），改完之后的内容算不出，语法这一次没判、照常放行")
-        return None
-    edits = tool_input.get("edits") if tool_name == "MultiEdit" else [tool_input]
-    for edit in edits or []:
-        old_string = edit.get("old_string") or ""
-        if not old_string or old_string not in text:
-            return None
-        new_string = edit.get("new_string") or ""
-        text = text.replace(old_string, new_string) if edit.get("replace_all") else text.replace(old_string, new_string, 1)
-    return text
-
-def decide_shell_syntax(hook_input, project_root):
-    """六、钩子、门禁、项目脚本与研究脚本目录下的 .sh 与 .py：写进去的内容先过语法，过不了就拒。"""
-    if os.environ.get("WRITE_GUARD_DISABLE_SYNTAX") == "1" or hook_input.get("tool_name") not in ("Write", "Edit", "MultiEdit"):
-        return 0, None
-    target = landing_target(hook_input, project_root)
-    if not target:
-        return 0, None
-    relative = os.path.relpath(target, landing_root(project_root))
-    if relative.startswith("..") or not any(relative.startswith(directory + "/") for directory in SYNTAX_CHECKED_DIRECTORIES):
-        return 0, None
-    if target.endswith(".sh"):
-        checker, checker_name = ["bash", "-n"], "bash -n"
-    elif target.endswith(".py"):
-        checker, checker_name = None, "python3 的 ast 解析"
-    else:
-        return 0, None
-    content = edited_content(hook_input, target)
-    if content is None:
-        return 0, None
-    if checker is None and os.environ.get("WRITE_GUARD_BREAK") == "python-syntax-subprocess":   # 弄坏开关：.py 也另起 python3
-        checker = [sys.executable, "-c", PYTHON_SYNTAX_CHECK]
-    detail = python_syntax_error(content, relative) if checker is None else syntax_error_by_checker(checker, content, os.path.splitext(target)[1], relative)
-    if detail is None:
-        return 0, None
-    return 2, (f"✗ 写进 {relative} 的内容过不了 {checker_name}：\n  {detail}\n"
-               f"→ 怎么办：先在草稿目录里改到 `{checker_name}` 过，再写进来；钩子、门禁与脚本带着语法错误上线，之后每一次调用都会收到它的报错。")
-
-def decide(hook_input, project_root, table_path, prime_marks_library, clock_times_library=None):
-    """返回 (0, None, None) 放行；(2, 说明, 哪几道（「、」连）) 拒绝。十一道都判完，不成立的按下面的次序一次列全；
-    先编后换拒了不再判写范围，钟点那一道读不到判据时会话号与批次代号不再报同一句。弄坏开关 WRITE_GUARD_BREAK=stop-at-first 判到第一道不成立就交回。"""
-    if clock_times_library is None:
-        clock_times_library = prime_marks_library
-    judges = (("整份覆盖未跟踪文件", lambda: decide_overwrite(hook_input, project_root)),
-              ("绕过先编后换", lambda: decide_compile_first(hook_input, project_root)),
-              ("old_string 以空白收尾", lambda: decide_trailing_blank(hook_input)),
-              ("写进语法错误", lambda: decide_shell_syntax(hook_input, project_root)),
-              ("越出写范围", lambda: decide_scope(hook_input, project_root, table_path)),
-              ("写进撇号类角标", lambda: decide_prime_marks(hook_input, prime_marks_library)),
-              ("描述里写了钟点", lambda: decide_clock_times(hook_input, project_root, clock_times_library)),
-              ("写了会话号", lambda: decide_session_names(hook_input, project_root, clock_times_library)),
-              ("写了批次代号", lambda: decide_batch_codes(hook_input, project_root, clock_times_library)),
-              ("写别的子 agent 持锁的草稿目录", lambda: decide_writer_lock(hook_input, project_root)),
-              ("往现行账本追加节标题", lambda: decide_ledger_append(hook_input, project_root)),
-              ("就地改已存在的脚本", lambda: decide_script_swap_only(hook_input, project_root)))
-    refused = []   # [(哪一道, 说明)]
-    for label, judge in judges:
-        already = {name for name, _ in refused}
-        if label == "越出写范围" and "绕过先编后换" in already:
-            continue
-        if (label in ("写了会话号", "写了批次代号") and "描述里写了钟点" in already
-                and dict(refused)["描述里写了钟点"].startswith(LIBRARY_UNREADABLE_PREFIX)):
-            continue
-        code, message = judge()
-        if code:
-            refused.append((label, message))
-            if os.environ.get("WRITE_GUARD_BREAK") == "stop-at-first":
-                break
-    if not refused:
-        return 0, None, None
-    labels = "、".join(label for label, _ in refused)
-    if len(refused) == 1:
-        return 2, refused[0][1], labels
-    blocks = [f"── 第 {number} 道：{label} ──\n{message}" for number, (label, message) in enumerate(refused, 1)]
-    return 2, (f"✗ 这一次写有 {len(refused)} 道判定不成立（{labels}）：十一道都判完了，下面一次列全，逐道照各自的「→」改完再写。\n"
-               + "\n".join(blocks)), labels
-
-def record_detection(hook_input, finding, detections_path, outcome="被拒"):
-    """检出记录追加一行：outcome「被拒」时 findings 是「写被拒：<哪几道>」，「只记」（判不了、照常放行）时 finding 是一串说明、各以「写闸没判全：」起头。
-    写不进（没有路径、OSError）时 stderr 写一句。"""
-    tool_input = hook_input.get("tool_input") if isinstance(hook_input.get("tool_input"), dict) else {}
-    entry = {
-        "time": datetime.now(timezone.utc).isoformat(),
-        "session_id": hook_input.get("session_id"),
-        "agent_id": hook_input.get("agent_id"),
-        "agent_type": hook_input.get("agent_type") or "主 agent",
-        "transcript_path": hook_input.get("transcript_path"),
-        "command": f"{hook_input.get('tool_name')} {tool_input.get('file_path', '')}"[:500],
-        "findings": [f"写被拒：{finding}"] if outcome == "被拒" else [f"写闸没判全：{text}" for text in finding],
-        "outcome": outcome,
-    }
-    if not detections_path:
-        print("! write-guard.sh：读不到工作根的定义、又没设 AGENT_HOOK_DETECTIONS，这一条检出没地方记", file=sys.stderr)
-        return
-    try:
-        os.makedirs(os.path.dirname(detections_path), exist_ok=True)
-        with open(detections_path, "a", encoding="utf-8") as handle:
-            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except OSError as error:
-        print(f"! write-guard.sh：检出记录 {detections_path} 写不进（{error}）", file=sys.stderr)
-
-INPUT_PREFIX_BYTES = 200
-INPUT_FIELD = r'"{}"\s*:\s*"((?:[^"\\]|\\.)*)"'
-
-def unparsable_input_entry(raw, problem):
-    """输入不是合法的 JSON 对象：从原文里按字面找得到的会话号、agent 号与类型、记录路径照抄，找不到的会话号与类型写「读不到」。"""
-    text = raw.decode("utf-8", "replace")
-    def field(name):
-        found = re.search(INPUT_FIELD.format(name), text)
-        return found.group(1) if found else None
-    prefix = raw[:INPUT_PREFIX_BYTES].decode("utf-8", "replace")
-    return ({"session_id": field("session_id") or "读不到", "agent_id": field("agent_id"), "agent_type": field("agent_type") or "读不到",
-             "transcript_path": field("transcript_path"), "tool_name": field("tool_name"), "tool_input": {"file_path": field("file_path") or ""}},
-            f"输入不是合法的 JSON 对象（{problem}），这一次没判、照常放行；读到 {len(raw)} 字节，前 {INPUT_PREFIX_BYTES} 字节：{prefix!r}")
-
-def selftest_base_directory(table_path):
-    """自检的现场放在哪。不能落进写范围表里任何一条仓外绝对路径模式（落进去，「越界」那几例会被那条模式放行），
-    也不能落在某个 git 仓里（「仓外文件」那一例要真在仓外）。TMPDIR 指到哪都不影响判定：依次试几处，取第一处两条都满足的。"""
-    absolute_patterns = [glob_to_regex(pattern) for patterns in load_scopes(table_path).values()
-                         for pattern in expanded_scope_patterns(patterns) if pattern.startswith("/")]
-    for candidate in (tempfile.gettempdir(), "/tmp", "/var/tmp", "/dev/shm"):
-        if not os.path.isdir(candidate) or not os.access(candidate, os.W_OK):
-            continue
-        probe = os.path.join(candidate, "write-guard-selftest-probe", "crates", "a.rs")
-        if any(pattern.match(os.path.normpath(probe)) for pattern in absolute_patterns):
-            continue
-        if subprocess.run(["git", "-C", candidate, "rev-parse", "--show-toplevel"], capture_output=True, text=True).returncode == 0:
-            continue
-        return candidate
-    return None
-
-def selftest(hook_dir):
-    os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 自证起的钩子子进程（环境原样继承）靠它认：弄坏开关与关闭开关只在自证里认
-    if work_roots is None:
-        print(f"  ✗ 自检读不到工作根的定义 {os.path.join(hook_dir, 'lib_work_root.py')}：{work_roots_error!r}")
-        print("    → 怎么办：恢复那份库（工作根与会话临时目录根只在那里定义），SINGLEFS_WORK_ROOT_BREAK 只写它认的值，再跑 --selftest")
-        return 1
-    # 工作根下的样本路径不看弄坏开关（configured_work_root）；会话临时目录根照库里的写法
-    new_root, session_temporary_root = work_roots.configured_work_root(), work_roots.claude_session_temporary_root()
-    base = selftest_base_directory(os.path.join(hook_dir, "agent-write-scope.tsv"))
-    if base is None:
-        print("  ✗ 自检找不到一处能放现场的临时目录：TMPDIR、/tmp、/var/tmp、/dev/shm 要么落进写范围表的仓外模式、要么在 git 仓里、要么写不进去")
-        print("    → 怎么办：给一个不在 git 仓里、也不在 agent-write-scope.tsv 任何一条绝对路径模式底下的可写目录当 TMPDIR 再跑")
-        return 1
-    work = tempfile.mkdtemp(dir=base)
-    outside_directory = work + "-outside"   # 符号链接那几格仓外的一头：work 旁边、同样不在 git 仓与写范围的绝对模式里
-    cases = []
-    library = notations_library_path(hook_dir)
-    try:
-        subprocess.run(["git", "init", "-q", work], check=True)
-        subprocess.run(["git", "-C", work, "config", "user.email", "t@t"], check=True)
-        subprocess.run(["git", "-C", work, "config", "user.name", "t"], check=True)
-        os.makedirs(os.path.join(work, ".claude", "agents"))
-        os.makedirs(os.path.join(work, ".claude", "kb"))
-        for name in ("kb-scribe", "implementation-writer", "experiment-runner", "unscoped-writer"):
-            open(os.path.join(work, ".claude", "agents", f"{name}.md"), "w").write("---\n")
-        open(os.path.join(work, "tracked.md"), "w").write("a\n")
-        subprocess.run(["git", "-C", work, "add", "tracked.md"], check=True)
-        subprocess.run(["git", "-C", work, "commit", "-qm", "t"], check=True)
-        open(os.path.join(work, "untracked.md"), "w").write("b\n")
-        open(os.path.join(work, ".claude", "kb", "untracked-kb.md"), "w").write("c\n")
-        outside = tempfile.NamedTemporaryFile(delete=False, dir=base)
-        outside.close()
-        table = os.path.join(work, "scope.tsv")
-        shutil.copyfile(os.path.join(hook_dir, "agent-write-scope.tsv"), table)
-        if os.environ.get("WRITE_GUARD_BREAK") == "scope-new-rows-dropped":   # 弄坏开关：表副本退回没有这两行的样子
-            with open(table, encoding="utf-8") as table_source:
-                kept_rows = [row for row in table_source if not row.startswith(("kb-scribe\tcrates/singlefs-checker/invariants/", "experiment-runner\t.claude/gate.d/replay-comparison-units.tsv\t"))]
-            # 跑前登记那一行退回只认原登记的写法（放宽到带轮号之前的样子）
-            kept_rows = [row.replace("experiment-runner\tresearch/prompts/e*-preregistration*.md\t", "experiment-runner\tresearch/prompts/e*-preregistration.md\t", 1)
-                         for row in kept_rows]
-            with open(table, "w", encoding="utf-8") as table_target:
-                table_target.writelines(kept_rows)
-        if os.environ.get("WRITE_GUARD_BREAK") == "scope-runner-language-rows-dropped":   # 弄坏开关：表副本去掉执行员的英语、日语实验索引与历史条目四行
-            with open(table, encoding="utf-8") as table_source:
-                kept_rows = [row for row in table_source if not row.startswith(tuple(f"experiment-runner\t.claude/kb/{name}\t" for name in (
-                    "experiments.en.md", "experiments.ja.md", "experiments-history.en.md", "experiments-history.ja.md")))]
-            with open(table, "w", encoding="utf-8") as table_target:
-                table_target.writelines(kept_rows)
-        def case(label, tool_name, agent, path, want):
-            hook_input = {"tool_name": tool_name, "tool_input": {"file_path": path}}
-            if agent:
-                hook_input["agent_type"] = agent
-            return (label, want, decide(hook_input, work, table, library)[0])
-        def finding_case(label, tool_name, agent, path, want):
-            hook_input = {"tool_name": tool_name, "tool_input": {"file_path": path}}
-            if agent:
-                hook_input["agent_type"] = agent
-            return (label, want, decide(hook_input, work, table, library)[2])
-        os.makedirs(os.path.join(work, "scripts"))
-        open(os.path.join(work, "scripts", "y.sh"), "w").write("#!/usr/bin/env bash\necho ok\n")
-        # 落点：符号链接（弄坏开关 WRITE_GUARD_BREAK=landing-lexical-only 下解不开，「链接指到范围外」那几格红）；仓外的那一头放在 work 旁边的 outside_directory
-        os.makedirs(outside_directory)
-        os.makedirs(os.path.join(work, "crates", "singlefs-core"))
-        os.makedirs(os.path.join(work, "crates", "singlefs-verification", "src", "bin"))
-        open(os.path.join(work, "crates", "singlefs-verification", "src", "bin", "e161_x.rs"), "w").write("fn main() {}\n")
-        os.symlink(outside_directory, os.path.join(work, "crates", "escape"))                              # 范围内的链接指到仓外
-        os.symlink(os.path.join(outside_directory, "not-yet"), os.path.join(work, "crates", "dangling"))   # 范围内的悬空链接指到仓外
-        os.symlink(os.path.join(work, ".claude", "kb"), os.path.join(work, "crates", "kb-link"))           # 范围内的链接指到仓里范围外
-        os.symlink(os.path.join(work, "crates", "singlefs-core"), os.path.join(work, "crates", "inner"))   # 范围内的链接指到范围内
-        os.symlink(os.path.join(work, "crates"), os.path.join(outside_directory, "back"))                  # 仓外的链接指回范围内
-        os.symlink(os.path.join(work, "untracked.md"), os.path.join(outside_directory, "untracked-link"))   # 仓外的链接指到仓里未跟踪的文件
-        os.symlink(os.path.join(work, "crates", "singlefs-verification", "src", "bin", "e161_x.rs"), os.path.join(outside_directory, "e161-link.rs"))
-        def content_case(label, tool_name, path, tool_input, want):
-            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=path)}
-            return (label, want, decide(hook_input, work, table, library)[0])
-        def prime_case(label, tool_name, agent, tool_input, want, library_path=library):
-            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=f"{work}/crates/a.rs")}
-            if agent:
-                hook_input["agent_type"] = agent
-            return (label, want, decide(hook_input, work, table, library_path)[0])
-        cases += [
-            # 六、语法：钩子、门禁、项目脚本、研究脚本目录下的 .sh / .py
-            content_case("语法:hooks 下写进语法错误的 .sh", "Write", f"{work}/.claude/hooks/x.sh", {"content": "if [ ; then\n  echo\n"}, 2),
-            content_case("语法:hooks 下语法对的 .sh", "Write", f"{work}/.claude/hooks/x.sh", {"content": "#!/usr/bin/env bash\necho ok\n"}, 0),
-            content_case("语法:Edit 把研究脚本改出语法错误", "Edit", f"{work}/scripts/y.sh", {"old_string": "echo ok", "new_string": "if [ ; then"}, 2),
-            content_case("语法:Edit 研究脚本合法改动", "Edit", f"{work}/scripts/y.sh", {"old_string": "echo ok", "new_string": "echo fine"}, 0),
-            content_case("语法:门禁目录下语法错误的 .py", "Write", f"{work}/.claude/gate.d/z.py", {"content": "def (:\n"}, 2),
-            content_case("语法:门禁目录下语法对的 .py", "Write", f"{work}/.claude/gate.d/z.py", {"content": "print(1)\n"}, 0),
-            content_case("语法:别处的 .sh 不判", "Write", f"{work}/crates/run.sh", {"content": "if [ ; then\n"}, 0),
-            # 一、整份覆盖未跟踪文件
-            case("覆盖:未跟踪的已有文件用 Write", "Write", None, f"{work}/untracked.md", 2),
-            case("覆盖:未跟踪的已有文件用 Edit", "Edit", None, f"{work}/untracked.md", 0),
-            case("覆盖:已跟踪文件", "Write", None, f"{work}/tracked.md", 0),
-            case("覆盖:不存在的文件", "Write", None, f"{work}/missing.md", 0),
-            case("覆盖:仓外文件", "Write", None, outside.name, 0),
-            # 二、写范围
-            case("范围:主 agent", "Edit", None, f"{work}/crates/a.rs", 0),
-            # 没有项目定义的 agent 只许写工作根（弄坏开关 builtin-agents-unscoped 下「拒」的三格红）
-            case("范围:内置 agent 写仓里拒", "Edit", "general-purpose", f"{work}/crates/a.rs", 2),
-            case("范围:内置 agent 写仓外别处拒", "Write", "general-purpose", outside.name, 2),
-            case("范围:定义已删的旧实例写仓里拒", "Write", "gate-triage", f"{work}/records/x.md", 2),
-            case("范围:内置 agent 写工作根放行", "Write", "general-purpose", f"{new_root}/builtin-x/result.md", 0),
-            case("范围:kb-scribe 范围内", "Edit", "kb-scribe", f"{work}/.claude/kb/decisions/01-x.md", 0),
-            case("范围:kb-scribe 越界 crates", "Edit", "kb-scribe", f"{work}/crates/a.rs", 2),
-            case("范围:kb-scribe 越界 records", "Edit", "kb-scribe", f"{work}/records/x.md", 2),
-            case("范围:kb-scribe 写不变量清单的 .md", "Edit", "kb-scribe", f"{work}/crates/singlefs-checker/invariants/cp-01.md", 0),
-            case("范围:kb-scribe 不变量清单目录里的 .rs 越界", "Edit", "kb-scribe", f"{work}/crates/singlefs-checker/invariants/x.rs", 2),
-            case("范围:kb-scribe 写不变量清单子目录里的 .md", "Edit", "kb-scribe", f"{work}/crates/singlefs-checker/invariants/sub/x.md", 0),
-            case("范围:kb-scribe 不变量清单子目录里的 .rs 越界", "Edit", "kb-scribe", f"{work}/crates/singlefs-checker/invariants/sub/x.rs", 2),
-            case("范围:kb-scribe checker 源码越界", "Edit", "kb-scribe", f"{work}/crates/singlefs-checker/src/lib.rs", 2),
-            case("范围:implementation-writer 范围内", "Edit", "implementation-writer", f"{work}/crates/singlefs-core/src/a.rs", 0),
-            case("范围:.. 绕路", "Edit", "implementation-writer", f"{work}/crates/../.claude/kb/x.md", 2),
-            case("范围:implementation-writer 越界 research", "Edit", "implementation-writer", f"{work}/research/x.md", 2),
-            case("范围:工作根下的报告目录", "Write", "implementation-writer", f"{new_root}/agents/implementation-writer/result.md", 0),
-            case("范围:会话临时目录根下写拒（scratchpad 之外）", "Write", "implementation-writer", f"{session_temporary_root}/agents/implementation-writer/result.md", 2),
-            case("范围:会话临时目录根下的 scratchpad 里写拒", "Write", "implementation-writer",
-                 f"{session_temporary_root}/-home-selftest-project/selftest-session/scratchpad/result.md", 2),
-            case("范围:工作根同名前缀的兄弟目录", "Write", "implementation-writer", f"{new_root}-other/result.md", 2),
-            case("范围:仓外别处", "Edit", "implementation-writer", "/etc/passwd", 2),
-            case("范围:范围内的链接指到范围外，经它写拒", "Edit", "implementation-writer", f"{work}/crates/escape/hosts", 2),
-            case("范围:范围内的链接指到范围外，经它写不存在的子目录拒", "Write", "implementation-writer", f"{work}/crates/escape/no-such/x.rs", 2),
-            case("范围:范围内的悬空链接指到范围外拒", "Write", "implementation-writer", f"{work}/crates/dangling", 2),
-            case("范围:范围内的链接指到仓里范围外拒", "Write", "implementation-writer", f"{work}/crates/kb-link/x.md", 2),
-            case("范围:范围内的链接指到范围内放行", "Edit", "implementation-writer", f"{work}/crates/inner/a.rs", 0),
-            case("范围:范围外的链接指回范围内放行", "Edit", "implementation-writer", f"{outside_directory}/back/a.rs", 0),
-            case("覆盖:仓外的链接指到仓里未跟踪的文件，Write 拒", "Write", None, f"{outside_directory}/untracked-link", 2),
-            case("范围:experiment-runner 登记", "Edit", "experiment-runner", f"{work}/research/prompts/e12-preregistration.md", 0),
-            # 带轮号的跑前登记（e<号>-preregistration-r<N>.md）同样放行；同一目录里别的文件照拒（WRITE_GUARD_BREAK=scope-new-rows-dropped 下放行那一格红）
-            case("范围:experiment-runner 带轮号的跑前登记", "Edit", "experiment-runner", f"{work}/research/prompts/e12-preregistration-r4.md", 0),
-            case("范围:experiment-runner research/prompts 下不是跑前登记的文件", "Edit", "experiment-runner", f"{work}/research/prompts/e12-verdict.md", 2),
-            case("范围:experiment-runner 三方正文", "Edit", "experiment-runner", f"{work}/research/prompts/_e12-body.md", 2),
-            case("范围:experiment-runner replay.sh", "Edit", "experiment-runner", f"{work}/scripts/experiment-apparatus/replay.sh", 0),
-            case("范围:experiment-runner mutate.sh", "Edit", "experiment-runner", f"{work}/scripts/mutation/mutate.sh", 2),
-            case("范围:experiment-runner 写重跑比对对象登记", "Edit", "experiment-runner", f"{work}/.claude/gate.d/replay-comparison-units.tsv", 0),
-            case("范围:experiment-runner 写别的门禁文件越界", "Edit", "experiment-runner", f"{work}/.claude/gate.d/doc-experiments.sh", 2),
-            # 实验索引与历史条目的英语、日语版（WRITE_GUARD_BREAK=scope-runner-language-rows-dropped 下前四格红）；别的语言与译名对照表不在范围里
-            case("范围:experiment-runner 写英语实验索引", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments.en.md", 0),
-            case("范围:experiment-runner 写日语实验索引", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments.ja.md", 0),
-            case("范围:experiment-runner 写英语历史条目", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments-history.en.md", 0),
-            case("范围:experiment-runner 写日语历史条目", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments-history.ja.md", 0),
-            case("范围:experiment-runner 写别的语言的实验索引越界", "Edit", "experiment-runner", f"{work}/.claude/kb/experiments.fr.md", 2),
-            case("范围:experiment-runner 写译名对照表越界", "Edit", "experiment-runner", f"{work}/.claude/kb/translation-glossary.en.md", 2),
-            case("范围:未登记的项目 agent", "Edit", "unscoped-writer", f"{work}/anything.md", 2),
-            case("两道都中时先报覆盖", "Write", "kb-scribe", f"{work}/untracked.md", 2),
-            # 四、实验执行员对主工作区 crates/ 下 .rs 的写：拒的那一道要是「绕过先编后换」，不是写范围那一道（出路不同）
-            finding_case("先编后换:experiment-runner Edit 主工作区的入库装置", "Edit", "experiment-runner",
-                         f"{work}/crates/singlefs-verification/src/bin/e161_x.rs", "绕过先编后换"),
-            finding_case("先编后换:experiment-runner Write 新建入库装置", "Write", "experiment-runner",
-                         f"{work}/crates/singlefs-verification/src/bin/e999_new.rs", "绕过先编后换"),
-            finding_case("先编后换:experiment-runner 改 crates 里 bin 以外的 .rs", "Edit", "experiment-runner",
-                         f"{work}/crates/singlefs-core/src/lib.rs", "绕过先编后换"),
-            finding_case("先编后换:.. 绕路进 crates 也算", "Edit", "experiment-runner",
-                         f"{work}/research/../crates/singlefs-verification/src/bin/e161_x.rs", "绕过先编后换"),
-            finding_case("先编后换:仓外的链接指到主工作区的入库装置拒", "Edit", "experiment-runner", f"{outside_directory}/e161-link.rs", "绕过先编后换"),
-            finding_case("先编后换:implementation-writer 同一处放行", "Edit", "implementation-writer",
-                         f"{work}/crates/singlefs-verification/src/bin/e161_x.rs", None),
-            finding_case("先编后换:主 agent 同一处放行", "Edit", None, f"{work}/crates/singlefs-verification/src/bin/e161_x.rs", None),
-            finding_case("先编后换:experiment-runner 改草稿目录里的副本放行", "Edit", "experiment-runner",
-                         f"{new_root}/runner-x/e161_x.rs", None),
-            finding_case("先编后换:experiment-runner 追加 crates/mutations.tsv 放行", "Edit", "experiment-runner",
-                         f"{work}/crates/mutations.tsv", None),
-            # 三、撇号类角标：五个字符各写死一例（共用字符集少了哪一个，这里就红）
-            prime_case("角标:Write 内容含 B2 加一撇（U+2032）", "Write", None, {"content": "取 B2\u2032 的读法\n"}, 2),
-            prime_case("角标:Edit new_string 含 P1 加两撇（U+2033）", "Edit", None, {"old_string": "P1", "new_string": "P1\u2033"}, 2),
-            prime_case("角标:Write 内容含三撇（U+2034）", "Write", None, {"content": "臂 A\u2034\n"}, 2),
-            prime_case("角标:Edit new_string 含 U+02B9", "Edit", None, {"old_string": "丙", "new_string": "丙\u02b9"}, 2),
-            prime_case("角标:Write 内容含 U+02BA", "Write", None, {"content": "候选 K9\u02ba\n"}, 2),
-            prime_case("角标:MultiEdit 第二处 new_string 含", "MultiEdit", None,
-                       {"edits": [{"old_string": "a", "new_string": "b"}, {"old_string": "c", "new_string": "K9\u2032"}]}, 2),
-            prime_case("角标:子 agent 在写范围内也判", "Edit", "implementation-writer", {"old_string": "x", "new_string": "G5\u2032"}, 2),
-            prime_case("角标:子 agent 同一处不带角标放行（上一例的 2 出自角标这一道）", "Edit", "implementation-writer", {"old_string": "x", "new_string": "G6"}, 0),
-            prime_case("角标:ASCII 单引号放行", "Write", None, {"content": "S1' 与 it's\n"}, 0),
-            prime_case("角标:只在 old_string 里有（删掉它的改动）放行", "Edit", None, {"old_string": "B2\u2032", "new_string": "B3"}, 0),
-            prime_case("角标:MultiEdit 只在 old_string 里有放行", "MultiEdit", None,
-                       {"edits": [{"old_string": "B2\u2032", "new_string": "B3"}]}, 0),
-            prime_case("角标:读不到共用字符集就拒绝", "Write", None, {"content": "普通内容\n"}, 2,
-                       library_path=os.path.join(work, "no-such-lib-forbidden-notations.py")),
-        ]
-        # 六、语法（续）：.py 在本进程里 ast 解析、不起子进程，.sh 起一个 bash -n；WRITE_GUARD_BREAK=python-syntax-subprocess 下「.py 在本进程里判」一格红
-        real_run, started = subprocess.run, []
-        def counting_run(command, *run_arguments, **run_keywords):
-            started.append(command)
-            return real_run(command, *run_arguments, **run_keywords)
-        def checker_starts_of(path, content):
-            del started[:]
-            decided = decide({"tool_name": "Write", "tool_input": {"file_path": path, "content": content}}, work, table, library)
-            return [command for command in started if command[0] in ("bash", sys.executable)], decided[1] or ""
-        subprocess.run = counting_run
-        try:
-            python_starts, python_message = checker_starts_of(f"{work}/.claude/gate.d/z.py", "def (:\n")
-            shell_starts, _ = checker_starts_of(f"{work}/.claude/hooks/x.sh", "if [ ; then\n  echo\n")
-        finally:
-            subprocess.run = real_run
-        cases += [
-            ("语法:写坏的 .py 在本进程里判，不起 python 子进程", 0, len(python_starts)),
-            ("语法:写坏的 .py 的拒绝说明点名文件与 SyntaxError", True, ".claude/gate.d/z.py" in python_message and "SyntaxError" in python_message and "python3 的 ast 解析" in python_message),
-            ("语法:写坏的 .sh 仍起一个 bash -n", ["bash"], [command[0] for command in shell_starts]),
-        ]
-        # 共用判据库一次写入只装一次：撇号、钟点、会话号三道都读它；WRITE_GUARD_BREAK=library-reloaded-each-time 下这一格红（装三回）
-        NOTATIONS_LIBRARIES.clear()
-        NOTATIONS_LIBRARY_LOADS[0] = 0
-        decide({"tool_name": "Write", "tool_input": {"file_path": f"{work}/records/library-once.md", "content": "普通内容\n"}}, work, table, library, library)
-        cases.append(("库:一次写入判撇号、钟点、会话号三道，共用判据库只装一次", 1, NOTATIONS_LIBRARY_LOADS[0]))
-        # 八、old_string 以空白收尾：判的是拒绝那一道的名字；WRITE_GUARD_BREAK=trailing-blank-ignored 时拒绝的几例就红。
-        # 不是 .md / .mdx 的目标，钩子收到的 new_string 已去过行尾空白，例子里照那样写
-        trailing_finding = "old_string 以空白收尾"
-        def trailing_case(label, tool_name, tool_input, want, agent=None, target=None):
-            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=target or f"{work}/records/x.sh")}
-            if agent:
-                hook_input["agent_type"] = agent
-            return (label, want, decide(hook_input, work, table, library)[2])
-        cases += [
-            trailing_case("行尾空白:.sh 目标 old_string 以空格收尾", "Edit", {"old_string": "x = 1\ndeclared = ", "new_string": "x = 2\ndeclared ="}, trailing_finding),
-            trailing_case("行尾空白:.sh 目标 old_string 以制表符收尾", "Edit", {"old_string": "key\t", "new_string": "key"}, trailing_finding),
-            trailing_case("行尾空白:MultiEdit 第二处 old_string 以空格收尾", "MultiEdit",
-                          {"edits": [{"old_string": "a", "new_string": "b"}, {"old_string": "python3 - ", "new_string": "python3 -"}]}, trailing_finding),
-            trailing_case("行尾空白:.txt 目标也判", "Edit", {"old_string": "declared = ", "new_string": "declared ="}, trailing_finding, target=f"{work}/records/x.txt"),
-            trailing_case("行尾空白:.markdown 目标也判（Edit 只在 .md / .mdx 上留行尾空白）", "Edit", {"old_string": "declared = ", "new_string": "declared ="},
-                          trailing_finding, target=f"{work}/records/x.markdown"),
-            trailing_case("行尾空白:子 agent 写仓外文件也判", "Edit", {"old_string": "a ", "new_string": "b"}, trailing_finding,
-                          agent="implementation-writer", target=f"{new_root}/agents/implementation-writer/notes.txt"),
-            trailing_case("行尾空白:.md 目标 old_string 以空格收尾放行", "Edit", {"old_string": "x = 1\ndeclared = ", "new_string": "x = 2\ndeclared = "}, None,
-                          target=f"{work}/records/x.md"),
-            trailing_case("行尾空白:.mdx 目标放行", "Edit", {"old_string": "a ", "new_string": "b "}, None, target=f"{work}/records/x.mdx"),
-            trailing_case("行尾空白:大写 .MD 目标放行", "Edit", {"old_string": "a\t", "new_string": "b\t"}, None, target=f"{work}/records/X.MD"),
-            trailing_case("行尾空白:.sh 目标 old_string 不以空白收尾放行", "Edit", {"old_string": "x = 1\ndeclared = foo", "new_string": "x = 2\ndeclared = foo"}, None),
-            trailing_case("行尾空白:.sh 目标只在中间行有行尾空白放行", "Edit", {"old_string": "x = 1  \ny", "new_string": "x = 3\ny"}, None),
-            trailing_case("行尾空白:old_string 以换行收尾、换行前有空白放行", "Edit", {"old_string": "a \n", "new_string": "b\n"}, None),
-            trailing_case("行尾空白:只有 new_string 以空白收尾放行（旧判据已撤）", "Edit", {"old_string": "a", "new_string": "b "}, None),
-            trailing_case("行尾空白:Write 不判", "Write", {"content": "x = 1 "}, None, target=f"{work}/records/new.sh"),
-        ]
-        # 五、钟点：样本串用 colon 拼、时区词用 jst / utc 两个变量拼，这份源码里不出现字面钟点与时区词（门禁 doc-text 也扫它）
-        colon = ":"
-        jst, utc = "J" + "ST", "U" + "TC"
-        clock_library = notations_library_path(hook_dir)
-        def clock_case(label, target, tool_input, want, agent=None, library_path=clock_library):
-            hook_input = {"tool_name": "Edit" if "new_string" in tool_input else "Write",
-                          "tool_input": dict(tool_input, file_path=target if os.path.isabs(target) else f"{work}/{target}")}
-            if agent:
-                hook_input["agent_type"] = agent
-            return (label, want, decide(hook_input, work, table, library, library_path)[2])
-        cases += [
-            clock_case("钟点:日期 时区词 时分x", "records/x.md", {"content": f"用户 2026-09-26 {jst} 15{colon}3x 定\n"}, "描述里写了钟点"),
-            clock_case("钟点:日期 时分 时区词 前后", "records/x.md", {"content": f"实十九（2026-09-24 16{colon}50 {utc} 前后落地）\n"}, "描述里写了钟点"),
-            clock_case("钟点:时区词 时分，不带日期", ".claude/kb/x.md", {"old_string": "a", "new_string": f"同日 {utc} 14{colon}00 前后：\n"}, "描述里写了钟点"),
-            clock_case("钟点:时分 时区词，不带日期", "crates/a.rs", {"content": f"// 跑于 03{colon}44 {jst}\n"}, "描述里写了钟点"),
-            clock_case("钟点:带 x 通配的裸时分", "records/x.md", {"content": f"主 agent 22{colon}5x 跑前修订\n"}, "描述里写了钟点"),
-            clock_case("钟点:子 agent 也判", "research/prompts/e12-preregistration.md", {"content": f"交回 {jst} 22{colon}0x\n"}, "描述里写了钟点", agent="experiment-runner"),
-            clock_case("钟点:只写日期放行", "records/x.md", {"content": "用户 2026-09-26 定\n"}, None),
-            clock_case("钟点:仓外草稿目录放行", f"{new_root}/x/progress.md", {"content": f"2026-09-27 22{colon}41 {jst} 编过\n"}, None),
-            clock_case("钟点:排除的门禁样本放行", ".claude/gate.d/fixtures/x/red/expect", {"content": f"改于 2026-09-05 00{colon}00\n"}, None),
-            clock_case("钟点:排除的检查项自检放行", ".claude/session-checks/kernel-memory-kills", {"content": f"2026-09-25 07{colon}58{colon}02 {utc}\n"}, None),
-            clock_case("钟点:排除的 c510 提示放行", "research/prompts/_c510-date-gate-r1-body.md", {"content": f"本机时钟是 {utc}\n"}, None),
-            clock_case("钟点:只在 old_string 里有放行", "records/x.md", {"old_string": f"{jst} 15{colon}3x", "new_string": ""}, None),
-            clock_case("钟点:读不到判据就拒绝", "records/x.md", {"content": "普通内容\n"}, "描述里写了钟点",
-                       library_path=os.path.join(work, "no-such-lib-forbidden-notations.py")),
-        ]
-        # 五、钟点里的各个判据行：样本串用 glued 把数字与「点」、日期与时段词拆开拼，这份源码里不出现字面写法；
-        # 判的是拒绝信息点名的判据行名字，LIB_FORBIDDEN_NOTATIONS_BREAK 关掉哪一条判据行，点名它的那几例就红；
-        # 放行的几组分别靠上下文规则、放行标记，LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT / _ALLOW 点名钟点那一形态时它们就红
-        def glued(*parts):
-            return "".join(parts)
-        def clock_shape_case(label, content, want_shape, target="records/x.md"):
-            code, message, finding = decide({"tool_name": "Write", "tool_input": {"file_path": f"{work}/{target}", "content": content + "\n"}},
-                                            work, table, library, clock_library)
-            shape = re.search(r"描述里写了钟点，共 \d+ 处：\n  [^（\n]*（(.+?)）：「", message) if finding == "描述里写了钟点" else None
-            return (label, want_shape, shape.group(1) if shape else finding)
-        hour_shape, period_shape, period_hour_shape, suffix_shape = "日期或时区后面跟「N 点 / N 时」", "日期或时区后面跟时段词", "时段词后面跟钟点", "「N 点前后」这类钟点"
-        date_shape, bare_shape, iso_shape, zone_shape = "日期后面跟钟点", "不挨日期时区的钟点", "ISO 时间戳", "时区词"
-        twelve_hour_shape = "十二小时制钟点"
-        cases += [
-            clock_shape_case("钟点:英文月日后面接十二小时制", glued("交付写 Oct 4 4", f"pm {utc}"), twelve_hour_shape),
-            clock_shape_case("钟点:十二小时制隔空格大写", glued("11 ", "AM 截止"), twelve_hour_shape),
-            clock_shape_case("钟点:十二小时制带点", glued("交回于 3", "p.m."), twelve_hour_shape),
-            clock_shape_case("钟点:以 am / pm 起头的英文词放行", glued("2 AMD 显卡、3 ", "amps、5 ppm、pm2 进程、v1.2", "am"), None),
-        ]
-        # 七、会话号：样本串用 glued 把目录名与十六进制拆开拼，这份源码里不出现会话号；
-        # WRITE_GUARD_DISABLE_SESSION_NAMES=1 或 LIB_FORBIDDEN_NOTATIONS_BREAK=session-names 时拒绝的几例就红，
-        # LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 时带放行标记的那一例就红
-        session_shape = "写了会话号"
-        cases += [
-            clock_shape_case("会话号:标签式（会话 号，日期）", glued("### 第 4 批开工（会话 singlefs-", "21，2026-10-01）"), session_shape),
-            clock_shape_case("会话号:当主语用的", glued("已发消息，singlefs-", "e1 回话"), session_shape),
-            clock_shape_case("会话号:上游三语仓的", glued("SOP 会话 singlefs-ai-sop-zh-", "86 同步来"), session_shape),
-            clock_shape_case("会话号:四位十六进制", glued("会话 singlefs-", "e152 在跑"), session_shape),
-            clock_shape_case("会话号:crate 名、上游仓目录名、临时目录名放行",
-                             glued("改 singlefs-core 与 singlefs-ai-sop-zh；mktemp -d /tmp/singlefs-", "e152.XXXXXX；/tmp/singlefs-", "e152-packages"), None),
-            clock_shape_case("会话号放行标记:sh 里的自检输入放行",
-                             glued("echo singlefs-", "6a  # session-names:allow 解析 ListAgents 输出的自检输入"), None, target=".claude/scripts/parse.sh"),
-            clock_shape_case("钟点:日期 时区词 N 点前后", glued(f"用户 2026-09-28 {jst} 08 ", "点前后要开"), hour_shape),
-            clock_shape_case("钟点:时区词 日期 N 点后（时区词那一处先中）", glued(f"本机 {utc} 2026-09-26 23 ", "点后"), zone_shape),
-            clock_shape_case("钟点:日期 时区词 N 时许", glued(f"2026-09-16 {utc} 17 ", "时许的快照"), hour_shape),
-            clock_shape_case("钟点:不带年份的日期 时区词 N 点前后", glued(f"09-24 {jst} 19 ", "点前后问了四件"), hour_shape),
-            clock_shape_case("钟点:日期 时区词 N 点后", glued(f"2026-09-25 {jst} 01 ", "点后弹窗"), hour_shape),
-            clock_shape_case("钟点:日期 时区词 时段词", glued(f"交回于 2026-09-27 {jst} ", "上午"), period_shape),
-            clock_shape_case("钟点:括号里日期后跟时段词", glued("降为待证（2026-09-13 ", "上午）"), period_shape),
-            clock_shape_case("钟点:日期时段词再括号时区词", glued("2026-09-12 ", f"凌晨（{jst}）"), period_shape),
-            clock_shape_case("钟点:括号里时区词日期时段词（时区词那一处先中）", glued(f"（{jst} 2026-09-27 ", "早上）"), zone_shape),
-            clock_shape_case("钟点:日期时段词前后", glued("满载到 2026-09-28 ", "中午前后"), period_shape),
-            clock_shape_case("钟点:标题里日期后括号时段词", glued("### 2026-09-27（", "下午）：E162"), period_shape),
-            clock_shape_case("钟点:日期时段词再时分（日期那一处先中）", glued("2026-09-27 ", f"上午 08{colon}32 现跑"), period_shape),
-            clock_shape_case("钟点:时段词后跟时分", f"上午 08{colon}32 现跑", period_hour_shape),
-            clock_shape_case("钟点:时段词后跟 N 点", glued("晚上 ", "8 点"), period_hour_shape),
-            clock_shape_case("钟点:光秃的 N 点前后", glued("19 ", "点前后问了"), suffix_shape),
-            clock_shape_case("钟点:裸时分", f"用户 23{colon}10 定", bare_shape),
-            clock_shape_case("钟点:裸时分秒", f"交回 14{colon}00{colon}10、续做", bare_shape),
-            clock_shape_case("钟点:裸时分秒带毫秒", f"07{colon}58{colon}02.123 起跑", bare_shape),
-            clock_shape_case("钟点:时分区间", f"14{colon}00–15{colon}30 之间跑完", bare_shape),
-            clock_shape_case("钟点:月-日 时分", f"核查员缺快照（09-24 23{colon}44 那一次）", bare_shape),
-            clock_shape_case("钟点:反引号里两位小时的时分", f"跑于 `09{colon}55` 的那一轮", bare_shape),
-            clock_shape_case("钟点:日期后面跟带秒带偏移的 diff 头", f"--- a/x.rs\t2026-09-24 16{colon}27{colon}05.398761624 +0000", date_shape),
-            clock_shape_case("钟点:stat 的修改时间", f"Modify: 2026-09-24 18{colon}48{colon}58.254848952 +0000", date_shape),
-            clock_shape_case("钟点:ISO 时间戳", f"派腿 2026-09-27T09{colon}55{colon}07+00{colon}00", iso_shape),
-            clock_shape_case("钟点:不带日期的 T 钟点", f"交回于 …T23{colon}15Z", iso_shape),
-            clock_shape_case("钟点:光秃的时区词", f"本机时钟是 {utc}、直接 date 会差一天", zone_shape),
-            clock_shape_case("钟点:日期后括号时区词", f"跑于 2026-09-27（{jst}），本机", zone_shape),
-            clock_shape_case("钟点:两个时区的名字", f"{jst} 与 {utc} 两个时区", zone_shape),
-            clock_shape_case("钟点:时区词 时间", f"{utc} 时间", zone_shape),
-            clock_shape_case("钟点:放行标记写在 md 里不认", f"用户 23{colon}10 定  # clock-times:allow 写在 md 里不认", bare_shape),
-            clock_shape_case("钟点:放行标记没写理由不认", f"// 跑于 23{colon}10  // clock-times:allow", bare_shape, target="crates/a.rs"),
-            clock_shape_case("钟点:第 N 点前后是序号放行", "第 3 点前后两句", None),
-            clock_shape_case("钟点:N 点意见放行", "3 点意见", None),
-            clock_shape_case("钟点:个数后的点放行", "1000 个崩溃点", None),
-            clock_shape_case("钟点:夜间放行", "全量由用户要求或夜间跑", None),
-            clock_shape_case("钟点:只写日期放行（Write 整份）", "用户 2026-09-28 定", None),
-            clock_shape_case("钟点:不挨日期时区的光秃时段词放行", "同一天下午续跑", None),
-            clock_shape_case("钟点:标识符里的时区词放行", f"`{jst}_OFFSET`、`started_{utc}`", None),
-        ]
-        context_cases = [
-            clock_shape_case("钟点上下文:产物行的名字=值放行", f"remount_chosen=2{colon}12 device_chosen=1{colon}16 values=1{colon}16.000,3{colon}12.000", None),
-            clock_shape_case("钟点上下文:差分与计数的冒号对放行", f"adjacent_differences=0->1{colon}10,1->2{colon}8 steps_by_changed_leaf_count=1{colon}108,2{colon}36", None),
-            clock_shape_case("钟点上下文:字典放行", f"分布 {{0{colon}14, 1{colon}14, 2{colon}16}}", None),
-            clock_shape_case("钟点上下文:Python 切片放行", f"r[8{colon}12]=i.to_bytes(4); fields[11{colon}15]; arguments[5{colon}13]", None),
-            clock_shape_case("钟点上下文:代码里的时区偏移放行", f'stamp.replace("Z", "+00{colon}00")', None),
-            clock_shape_case("钟点上下文:双引号里的代码字面放行", f'            Some("2{colon}11"),', None),
-            clock_shape_case("钟点上下文:单引号里的代码字面放行", f"                      printf '2{colon}11' ;;", None),
-            clock_shape_case("钟点上下文:百分比放行", f"B Lost Writes **13{colon}54%**", None),
-            clock_shape_case("钟点上下文:time -v 的格式说明放行", f"Elapsed (wall clock) time (h:mm:ss or m:ss): 0{colon}03.21", None),
-            clock_shape_case("钟点上下文:门禁号行号表格放行", f"| 共用脚本不在 | 21{colon}38 | 31{colon}68 |", None),
-            clock_shape_case("钟点上下文:门禁号行号列表放行", f"| kb 目录不在 | —— | 21{colon}39、24{colon}27、27{colon}39 |", None),
-            clock_shape_case("钟点上下文:门禁文件名放行", f"门禁 20{colon}09-sample-stage.sh 那一行", None),
-            clock_shape_case("钟点上下文:同一行带文件行号的编号对放行", f"触发的那一处（decisions/06-快照实现模型.md{colon}42），06{colon}42 正是没抽到的那一行", None),
-            clock_shape_case("钟点上下文:反引号里一位小时的键放行", f"撞键 `3{colon}10`：冷重开是 `2{colon}11`", None),
-            clock_shape_case("钟点上下文:产物字段里的 ISO 时间戳放行", f"taken_jst=2026-09-27T01{colon}20{colon}12+09{colon}00", None),
-        ]
-        allow_cases = [
-            clock_shape_case("钟点放行标记:sh 里的 TZ 环境变量放行", f"TZ={utc}-14 date +%F  # clock-times:allow 环境变量写法，符号与东京时间相反", None, target=".claude/scripts/tz.sh"),
-            clock_shape_case("钟点放行标记:py 里解析外部通知的正则放行", f'RESETS = re.compile(r"resets (\\d+)(am|pm) \\({utc}\\)")  # clock-times:allow 解析外部通知文本', None,
-                             target=".claude/hooks/parse.py"),
-            clock_shape_case("钟点放行标记:rs 里造时间戳的自检输入放行", f'let stamp = "2026-09-27T09{colon}55{colon}07Z"; // clock-times:allow 造时间戳格式的自检输入', None,
-                             target="crates/a.rs"),
-        ]
-        cases += context_cases + allow_cases
-        # 五、ISO 基本格式的紧凑时间戳（运行目录名、日志文件名里连写的那种）：样本串用 glued 把日期与「T 加钟点」拆开拼，这份源码里不出现字面写法；
-        # 拒绝的几例判的是拒绝信息点名的形态；WRITE_GUARD_BREAK=compact-timestamp-skipped 或 LIB_FORBIDDEN_NOTATIONS_BREAK=iso-compact-timestamp 时它们红，
-        # 放行的「8 位数字后跟 T 但不是时间戳」几例在 LIB_FORBIDDEN_NOTATIONS_BREAK=compact-timestamp-loose 时红
-        compact_shape = "ISO 紧凑时间戳"
-        compact_sample = glued("运行目录 20261014", "T153000Z")
-        compact_cases = [
-            clock_shape_case("紧凑时间戳:8 位日期、T、6 位钟点、Z", compact_sample, compact_shape),
-            clock_shape_case("紧凑时间戳:8 位日期、T、4 位钟点", glued("日志 20261014", "T1530"), compact_shape),
-            clock_shape_case("紧凑时间戳:8 位日期、T、带冒号的时分", glued("跑于 20261014", "T15", colon, "30"), compact_shape),
-            clock_shape_case("紧凑时间戳:带连字符的日期加连写钟点", glued("run 2026-10-14", "T153000"), compact_shape),
-            clock_shape_case("紧凑时间戳:带小数秒与偏移", glued("20261014", "T153000.5+0900"), compact_shape),
-            clock_shape_case("紧凑时间戳:路径里的运行目录名也判", glued("见 logs/run-20261014", "T153000Z/out.log"), compact_shape),
-        ]
-        compact_lookalike_cases = [
-            clock_shape_case("紧凑时间戳:月份越界放行", glued("编号 20261314", "T1530"), None),
-            clock_shape_case("紧凑时间戳:钟点越界放行", glued("编号 20261014", "T2560"), None),
-            clock_shape_case("紧凑时间戳:年不是 20 开头放行", glued("编号 12345678", "T0000"), None),
-            clock_shape_case("紧凑时间戳:钟点只有三位放行", glued("编号 20261014", "T123"), None),
-            clock_shape_case("紧凑时间戳:8 位数字全是 9 放行", glued("编号 99999999", "T123456"), None),
-            clock_shape_case("紧凑时间戳:前面挨着字母放行", glued("哈希 ab20261014", "T1530"), None),
-            clock_shape_case("紧凑时间戳:小写 t 放行", glued("哈希 20261014", "t1530"), None),
-        ]
-        compact_pass_cases = [
-            clock_shape_case("紧凑时间戳:只写日期放行", "运行目录 20261014", None),
-            clock_shape_case("紧凑时间戳:.py 里带理由的放行标记放行", glued('stamp = "20261014', 'T153000Z"  # clock-times:allow 造紧凑时间戳的自检输入'), None,
-                             target=".claude/hooks/parse.py"),
-            clock_case("紧凑时间戳:仓外草稿目录放行", f"{new_root}/x/progress.md", {"content": compact_sample + "\n"}, None),
-        ]
-        compact_hyphenated_lookalike_cases = [   # LIB_FORBIDDEN_NOTATIONS_BREAK=compact-hyphenated-date-loose 时这两格红（compact-timestamp-loose 下照放行）
-            clock_shape_case("紧凑时间戳:带连字符的日期月份越界放行", glued("编号 2026-13-01", "T1234"), None),
-            clock_shape_case("紧凑时间戳:带连字符的日期日越界放行", glued("编号 2026-10-32", "T1234"), None),
-        ]
-        cases += compact_cases + compact_lookalike_cases + compact_pass_cases + compact_hyphenated_lookalike_cases
-        # 七里的另一判，批次代号：拒绝的几格判的是拒绝的那一道（「写了批次代号」）；WRITE_GUARD_BREAK=batch-codes-unjudged 或 LIB_FORBIDDEN_NOTATIONS_BREAK=batch-codes 时
-        # 拒绝的几格红，库的判据行键一次关一条时点名那一条的格红（文件头）；放行的几格分别靠判据行的边界、上下文规则、排除前缀与只判 .md、.tsv、.txt
-        batch_shape = "写了批次代号"
-        batch_cases = [
-            clock_shape_case("批次代号:数字加字母加短横序号", "24c-1 交回", batch_shape),
-            clock_shape_case("批次代号:.tsv 也判", "22c-2\t已合", batch_shape, target="records/x.tsv"),
-            clock_shape_case("批次代号:两位数字加字母当名字用", "22a 的接口改了", batch_shape),
-            clock_shape_case("批次代号:批次词后面跟一位数字加字母", "截止批次 3c 交回", batch_shape),
-            clock_shape_case("批次代号:单位字母的批号挨着批字", "第 10h 批交回", batch_shape),
-            clock_shape_case("批次代号:第几批加天干", "第十五批乙二交回", batch_shape),
-            clock_shape_case("批次代号:批加数字加天干", "批 10 甲交回", batch_shape),
-            clock_shape_case("批次代号:批次词后面的两位代号", "批次 24c 的补丁", batch_shape),
-            clock_shape_case("批次代号:配不上对的反引号不开代码段", "孤零零一个 ` 号后面的 22c 交回", batch_shape),
-            clock_shape_case("批次代号:批次词后面的三位数字加字母放行", "截止批 123c 交回", None),
-            clock_shape_case("批次代号:三位数字加字母挨着批字放行", "123c 批交回", None),
-            clock_shape_case("批次代号:两位会话短号放行", "已告诉 87、7a、e2、ed", None),
-            clock_shape_case("批次代号:单位、倍数与指数放行", "16k 块、64x 加速、30d 清空、60s 超时、1e-6 的期望", None),
-            clock_shape_case("批次代号:路径、标识符与文件行号放行", "path-move-6b/result.md、m3-batch10z-c、a.md:12a、e165", None),
-            clock_shape_case("批次代号:不带批次词的候选名放行", "出口 4 甲一、已定项 1 甲、C554 乙、第 1b 步", None),
-            clock_shape_case("批次代号:.py 不判", "# 24c-1 交回", None, target=".claude/hooks/parse.py"),
-            clock_shape_case("批次代号:.sh 不判", "# 22a 的接口", None, target=".claude/scripts/parse.sh"),
-            clock_shape_case("批次代号:变异表放行", "22a\t名字", None, target="crates/mutations.tsv"),
-            clock_case("批次代号:仓外草稿目录放行", f"{new_root}/x/progress.md", {"content": "24c-1 交回\n"}, None),
-        ]
-        batch_context_cases = [   # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=batch-codes 时这几格红
-            clock_shape_case("批次代号上下文:反引号里的放行", "格里写 `10q` 的样子", None),
-            clock_shape_case("批次代号上下文:双反引号代码段里的放行", "格里写 ``10q`` 的样子", None),
-            clock_shape_case("批次代号上下文:字段值放行", "活槽 = 64f 时", None),
-            clock_shape_case("批次代号上下文:算式放行", "13 + 22n 个槽，(w + 31u) / 32u", None),
-            clock_shape_case("批次代号上下文:引号与逗号后面的代码字面放行", 'key "22c" 与名单 a,22e', None),
-        ]
-        cases += batch_cases + batch_context_cases
-        # 钟点、会话号逐处全报（行号与总数；LIB_FORBIDDEN_NOTATIONS_BREAK=first-hit-only 下前两格红）；Edit 的行号折算成文件里的行号；
-        # 九道判完再报：覆盖、越界与钟点三道一次列全（WRITE_GUARD_BREAK=stop-at-first 下末格红）
-        def refusal_of(tool_name, target, tool_input, agent=None):
-            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=f"{work}/{target}")}
-            if agent:
-                hook_input["agent_type"] = agent
-            code, message, finding = decide(hook_input, work, table, library, clock_library)
-            return message or "", finding
-        two_clocks, _ = refusal_of("Write", "records/x.md", {"content": f"用户 23{colon}10 定\n中间一行\n交回 14{colon}00{colon}10、续做\n"})
-        cases.append(("钟点:两处都报（行号与总数）", True, all(fragment in two_clocks for fragment in ("共 2 处", "  第 1 行（", "  第 3 行（"))))
-        two_sessions, _ = refusal_of("Write", "records/x.md", {"content": glued("会话 singlefs-", "e152 在跑\n已发消息，singlefs-", "e1 回话\n")})
-        cases.append(("会话号:两处都报（行号与总数）", True, all(fragment in two_sessions for fragment in ("共 2 处", "  第 1 行：", "  第 2 行："))))
-        edit_lines, _ = refusal_of("Edit", "tracked.md", {"old_string": "a", "new_string": f"x\n用户 23{colon}10 定"})
-        cases.append(("钟点:Edit 的行号折算成文件里的行号", True, "  第 2 行（" in edit_lines))
-        # 紧凑时间戳：Write、Edit、MultiEdit 三个工具各写一次，拒绝点名形态与命中的那一串（开关见上面紧凑时间戳那一段）
-        compact_stamp = compact_sample[len("运行目录 "):]
-        for tool_name, tool_input in (("Write", {"content": compact_sample + "\n"}),
-                                      ("Edit", {"old_string": "a", "new_string": compact_sample}),
-                                      ("MultiEdit", {"edits": [{"old_string": "a", "new_string": "b"}, {"old_string": "c", "new_string": compact_sample}]})):
-            compact_message, compact_finding = refusal_of(tool_name, "records/x.md", tool_input)
-            cases.append((f"紧凑时间戳:{tool_name} 写进仓里拒绝并点名形态与那一处", True,
-                          compact_finding == "描述里写了钟点" and f"（{compact_shape}）：「{compact_stamp}」" in compact_message))
-        _, three_labels = refusal_of("Write", "untracked.md", {"content": f"用户 23{colon}10 定\n"}, agent="kb-scribe")
-        cases.append(("九道判完再报:覆盖、越界与钟点一次列全", "整份覆盖未跟踪文件、越出写范围、描述里写了钟点", three_labels))
-        # 十、往现行账本追加节标题：登记表与账本放进自检现场（WRITE_GUARD_BREAK=ledger-append-ignored 下拒绝的几格红，放行的几格照样绿）
-        import contextlib, io
-        ledger_text = "# 账本\n\n## 索引\n\n| 节号 | 判定 |\n|---|---|\n| 一 | 做完 |\n\n## 一、甲\n\n正文\n"
-        added_heading = "\n## 二、乙\n\n正文"
-        os.makedirs(os.path.join(work, ".claude", "gate.d"), exist_ok=True)
-        with open(os.path.join(work, LEDGER_REGISTRY), "w", encoding="utf-8") as handle:
-            handle.write("current\trecords/ledger.md\t-\t样本里的现行账本，自证用\nsealed\trecords/old.md\t" + "0" * 64 + "\t样本里的封存账本，自证用\n")
-        os.makedirs(os.path.join(work, "records"), exist_ok=True)
-        for ledger_name in ("ledger.md", "old.md"):
-            with open(os.path.join(work, "records", ledger_name), "w", encoding="utf-8") as handle:
-                handle.write(ledger_text)
-        subprocess.run(["git", "-C", work, "add", "records/ledger.md", "records/old.md"], check=True)
-        subprocess.run(["git", "-C", work, "commit", "-qm", "ledgers"], check=True)
-        ledger_edit_message, ledger_edit_finding = refusal_of("Edit", "records/ledger.md", {"old_string": "正文", "new_string": "正文" + added_heading})
-        cases.append(("账本追加:Edit 往现行账本追加节标题拒", "往现行账本追加节标题", ledger_edit_finding))
-        cases.append(("账本追加:MultiEdit 往现行账本追加节标题拒", "往现行账本追加节标题",
-                      refusal_of("MultiEdit", "records/ledger.md", {"edits": [{"old_string": "甲", "new_string": "丙"}, {"old_string": "正文", "new_string": "正文" + added_heading}]})[1]))
-        cases.append(("账本追加:Write 往现行账本追加节标题拒", "往现行账本追加节标题",
-                      refusal_of("Write", "records/ledger.md", {"content": ledger_text + added_heading + "\n"})[1]))
-        cases.append(("账本追加:拒绝点名新脚本、账本与出路", True,
-                      all(fragment in ledger_edit_message for fragment in ("scripts/kb/ledger-append-section.py", "records/ledger.md", "→ 怎么办", "--body-file"))))
-        cases.append(("账本追加:改节号放行", None, refusal_of("Edit", "records/ledger.md", {"old_string": "## 一、甲", "new_string": "## 二、甲"})[1]))
-        cases.append(("账本追加:改正文放行", None, refusal_of("Edit", "records/ledger.md", {"old_string": "正文", "new_string": "改过的正文"})[1]))
-        cases.append(("账本追加:Write 整份改正文放行", None, refusal_of("Write", "records/ledger.md", {"content": ledger_text.replace("正文", "改过的正文")})[1]))
-        cases.append(("账本追加:别的文件里追加节标题放行", None, refusal_of("Write", "records/notes.md", {"content": ledger_text + added_heading + "\n"})[1]))
-        cases.append(("账本追加:封存的账本放行", None, refusal_of("Edit", "records/old.md", {"old_string": "正文", "new_string": "正文" + added_heading})[1]))
-        bare_root = tempfile.mkdtemp(dir=base)
-        del UNJUDGED[:]
-        try:
-            with contextlib.redirect_stderr(io.StringIO()):
-                bare_code = decide_ledger_append({"tool_name": "Edit", "tool_input": {"file_path": f"{bare_root}/records/x.md", "old_string": "a", "new_string": "a" + added_heading}}, bare_root)[0]
-        finally:
-            shutil.rmtree(bare_root, ignore_errors=True)
-        bare_notes = list(UNJUDGED)
-        del UNJUDGED[:]
-        cases.append(("账本追加:登记表读不到时放行、记一处没判全", (0, True), (bare_code, any("账本追加这一道没判" in note for note in bare_notes))))
-        # 走真实入口：把脚本当子进程、从标准输入喂 JSON，防「判定函数对、入口读不到输入」；拒绝要落进检出记录
-        script = os.path.join(hook_dir, "write-guard.sh")
-        detections = os.path.join(work, "detections.jsonl")
-        environment = dict(os.environ, CLAUDE_PROJECT_DIR=work, AGENT_HOOK_DETECTIONS=detections)
-        def run_entry(hook_input):
-            return subprocess.run(["bash", script], input=json.dumps(hook_input), capture_output=True, text=True, env=environment)
-        def stdin_case(label, hook_input, want):
-            return (label, want, run_entry(hook_input).returncode)
-        cases += [
-            stdin_case("stdin:主 agent 写新文件", {"tool_name": "Write", "tool_input": {"file_path": f"{work}/crates/a.rs", "content": "x"}}, 0),
-            stdin_case("stdin:覆盖未跟踪文件", {"tool_name": "Write", "tool_input": {"file_path": f"{work}/untracked.md", "content": "x"}}, 2),
-            stdin_case("stdin:kb-scribe 越界", {"tool_name": "Edit", "agent_type": "kb-scribe", "tool_input": {"file_path": f"{work}/crates/a.rs"}}, 2),
-            stdin_case("stdin:kb-scribe 范围内", {"tool_name": "Edit", "agent_type": "kb-scribe", "tool_input": {"file_path": f"{work}/.claude/kb/x.md"}}, 0),
-            stdin_case("stdin:kb-scribe 用 MultiEdit 越界", {"tool_name": "MultiEdit", "agent_type": "kb-scribe",
-                                                            "tool_input": {"file_path": f"{work}/crates/a.rs", "edits": [{"old_string": "a", "new_string": "b"}]}}, 2),
-            stdin_case("stdin:kb-scribe 用 MultiEdit 范围内", {"tool_name": "MultiEdit", "agent_type": "kb-scribe",
-                                                              "tool_input": {"file_path": f"{work}/.claude/kb/x.md", "edits": [{"old_string": "a", "new_string": "b"}]}}, 0),
-            stdin_case("stdin:大内容越界", {"tool_name": "Write", "agent_type": "implementation-writer", "tool_input": {"file_path": f"{work}/research/big.md", "content": "y" * 300000}}, 2),
-            stdin_case("stdin:实现员写工作根下的报告", {"tool_name": "Write", "agent_type": "implementation-writer",
-                                                       "tool_input": {"file_path": f"{new_root}/x/result.md", "content": "x"}}, 0),
-        ]
-        runner_entry = run_entry({"tool_name": "Edit", "agent_type": "experiment-runner",
-                                  "tool_input": {"file_path": f"{work}/crates/singlefs-verification/src/bin/e161_x.rs", "old_string": "a", "new_string": "b"}})
-        cases.append(("stdin:experiment-runner 改主工作区的入库装置拒绝", 2, runner_entry.returncode))
-        cases.append(("stdin:先编后换的拒绝点名那条脚本与草稿目录", True,
-                      all(fragment in runner_entry.stderr for fragment in ("scripts/hosts/compile-then-swap.py", "草稿目录", "→ 怎么办"))))
-        # 出路经 task-server 提交、不再教直接起（WRITE_GUARD_BREAK=compile-first-capped-hint 下这一格红）
-        cases.append(("stdin:先编后换的出路经 task-server 提交、不写 capped.sh 直接起", True,
-                      "task-server/task submit -- python3 scripts/hosts/compile-then-swap.py" in runner_entry.stderr and "capped.sh" not in runner_entry.stderr))
-        prime_entry = run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/crates/a.rs", "old_string": "B2", "new_string": "取 B2\u2032 的读法"}})
-        cases.append(("stdin:Edit 写进角标", 2, prime_entry.returncode))
-        cases.append(("stdin:角标的拒绝带字符、前后几个字与出路", True,
-                      all(fragment in prime_entry.stderr for fragment in ("撇号类角标 \u2032", "取 B2\u2032 的读法", "→ 怎么办", "path-moves.md"))))
-        trailing_entry = run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/records/x.sh", "old_string": "python3 - ", "new_string": "python3 -"}})
-        cases.append(("stdin:.sh 目标 Edit old_string 以空白收尾", 2, trailing_entry.returncode))
-        cases.append(("stdin:行尾空白的拒绝带收尾那几个字、两条出路", True,
-                      all(fragment in trailing_entry.stderr for fragment in ("「…python3 -␠」", "→ 怎么办", "多框到下一个非空白字符", "replace-once.py"))))
-        cases.append(("stdin:.md 目标 Edit old_string 以空白收尾放行", 0,
-                      run_entry({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/records/x.md", "old_string": "python3 - ", "new_string": "python3 - "}}).returncode))
-        recorded = sum(1 for _ in open(detections, encoding="utf-8")) if os.path.exists(detections) else 0
-        cases.append(("stdin:七次拒绝都落进检出记录", 7, recorded))
-        compact_entry = run_entry({"tool_name": "Write", "tool_input": {"file_path": f"{work}/records/compact.md", "content": compact_sample + "\n"}})
-        cases.append(("stdin:Write 写进紧凑时间戳拒绝（退出码 2）", 2, compact_entry.returncode))
-        cases.append(("stdin:紧凑时间戳的拒绝点名形态与那一处", True,
-                      all(fragment in compact_entry.stderr for fragment in (f"（{compact_shape}）：「{compact_stamp}」", "→ 怎么办", "紧凑写法"))))
-        # 没有项目定义的 agent 写仓里：入口拒，拒绝说明点名只许写工作根与交回主 agent 的出路（弄坏开关 builtin-agents-unscoped 下红）
-        builtin_entry = run_entry({"tool_name": "Write", "agent_type": "general-purpose", "tool_input": {"file_path": f"{work}/crates/builtin.rs", "content": "x"}})
-        cases.append(("stdin:内置 agent 写仓里拒", (2, True),
-                      (builtin_entry.returncode, all(fragment in builtin_entry.stderr for fragment in ("只许写工作根", "交回主 agent", "→ 怎么办")))))
-        link_entry = run_entry({"tool_name": "Edit", "agent_type": "implementation-writer",
-                                "tool_input": {"file_path": f"{work}/crates/escape/hosts", "old_string": "a", "new_string": "b"}})
-        cases.append(("stdin:范围内的链接指到范围外拒（退出码 2）", 2, link_entry.returncode))
-        ledger_detections = os.path.join(work, "ledger-detections.jsonl")
-        ledger_entry = subprocess.run(["bash", script], capture_output=True, text=True, env=dict(environment, AGENT_HOOK_DETECTIONS=ledger_detections),
-                                      input=json.dumps({"tool_name": "Edit", "tool_input": {"file_path": f"{work}/records/ledger.md", "old_string": "正文", "new_string": "正文" + added_heading}}))
-        cases.append(("stdin:往现行账本追加节标题拒（退出码 2）", 2, ledger_entry.returncode))
-        cases.append(("stdin:往现行账本追加节标题的拒绝点名新脚本与出路", True,
-                      all(fragment in ledger_entry.stderr for fragment in ("scripts/kb/ledger-append-section.py", "records/ledger.md", "→ 怎么办"))))
-        # 十一、工具员就地改主工作区里已存在的脚本：拒的几格判的是拒绝的那一道（只这一道），弄坏开关 WRITE_GUARD_BREAK=script-in-place-allowed 下「整份换上:… 拒」
-        # 与「stdin:工具员 Edit 主工作区已存在的 … 拒并点名 hook-swap.py 与出路」几格红，放行与判不了的几格照样绿
-        open(os.path.join(work, ".claude", "agents", "tooling-writer.md"), "w").write("---\n")
-        swap_only_files = {   # 相对仓根 → (内容, 文件权限)；都 git add 过，Write 整份覆盖那一道不判
-            "scripts/mutation/crates-mutation-rows.py": ("def main():\n    return 0\n", 0o644),
-            "gpu-verification-server/control": ("#!/usr/bin/env bash\necho stop\n", 0o755),
-            ".claude/gate.d/stage.sh": ("#!/usr/bin/env bash\necho stage\n", 0o755),
-            ".claude/scripts/tool.py": ("def main():\n    return 0\n", 0o644),
-            "task-server/task_lib.py": ("def main():\n    return 0\n", 0o644),
-            "prune-server/control": ("#!/usr/bin/env bash\necho stop\n", 0o755),
-            "scripts/table.tsv": ("a\tb\n", 0o644),
-            "scripts/notes.md": ("说明\n", 0o644),
-            "scripts/settings.json": ("{}\n", 0o644),
-            "task-server/notes.txt": ("说明\n", 0o644),
-            ".claude/gate.d/fixtures/sample-red/stage.sh": ("#!/usr/bin/env bash\necho sample\n", 0o755),
-        }
-        for relative, (content, file_mode) in swap_only_files.items():
-            os.makedirs(os.path.dirname(os.path.join(work, relative)), exist_ok=True)
-            with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
-                handle.write(content)
-            os.chmod(os.path.join(work, relative), file_mode)
-        subprocess.run(["git", "-C", work, "add", *swap_only_files], check=True)
-        subprocess.run(["git", "-C", work, "commit", "-qm", "swap-only samples"], check=True)
-        copied_script = os.path.join(outside_directory, "copy", "scripts", "mutation", "crates-mutation-rows.py")   # 草稿目录与仓副本：主工作区之外的同名脚本
-        os.makedirs(os.path.dirname(copied_script))
-        with open(copied_script, "w", encoding="utf-8") as handle:
-            handle.write("def main():\n    return 0\n")
-        def swap_only_finding(tool_name, relative, tool_input, agent="tooling-writer"):
-            hook_input = {"tool_name": tool_name, "tool_input": dict(tool_input, file_path=f"{work}/{relative}")}
-            if agent:
-                hook_input["agent_type"] = agent
-            return decide(hook_input, work, table, library)[2]
-        def swap_only_code(hook_input):
-            with contextlib.redirect_stderr(io.StringIO()):
-                return decide_script_swap_only(hook_input, work)[0]
-        swap_label = "就地改已存在的脚本"
-        cases += [
-            ("整份换上:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒", swap_label,
-             swap_only_finding("Edit", "scripts/mutation/crates-mutation-rows.py", {"old_string": "return 0", "new_string": "return 1"})),
-            ("整份换上:工具员 Edit 主工作区已存在、带执行位无后缀的 gpu-verification-server/control 拒", swap_label,
-             swap_only_finding("Edit", "gpu-verification-server/control", {"old_string": "echo stop", "new_string": "echo stop all"})),
-            ("整份换上:工具员 Write 整份重写已存在的 .claude/gate.d/ 下的 .sh 拒", swap_label,
-             swap_only_finding("Write", ".claude/gate.d/stage.sh", {"content": "#!/usr/bin/env bash\necho stage two\n"})),
-            ("整份换上:工具员 MultiEdit 已存在的 .claude/scripts/ 下的 .py 拒", swap_label,
-             swap_only_finding("MultiEdit", ".claude/scripts/tool.py", {"edits": [{"old_string": "return 0", "new_string": "return 2"}]})),
-            ("整份换上:工具员 Edit 已存在的 task-server/ 下的 .py 拒", swap_label,
-             swap_only_finding("Edit", "task-server/task_lib.py", {"old_string": "return 0", "new_string": "return 3"})),
-            ("整份换上:工具员 Edit 已存在、带执行位无后缀的 prune-server/control 拒", swap_label,
-             swap_only_finding("Edit", "prune-server/control", {"old_string": "echo stop", "new_string": "echo stop all"})),
-            # 不拦的几种：新建、不带执行位的数据与文档、fixtures 下的样本、草稿目录与仓副本、别的 agent 类型与主 agent
-            ("整份换上:工具员新建 scripts/ 下的 .py 放行", None,
-             swap_only_finding("Write", "scripts/mutation/new_tool.py", {"content": "def main():\n    return 0\n"})),
-            ("整份换上:工具员改不带执行位的 .tsv、.md、.json、.txt 放行", (None, None, None, None),
-             tuple(swap_only_finding("Edit", relative, {"old_string": old, "new_string": old + "x"})
-                   for relative, old in (("scripts/table.tsv", "a"), ("scripts/notes.md", "说明"), ("scripts/settings.json", "{}"), ("task-server/notes.txt", "说明")))),
-            ("整份换上:工具员改 .claude/gate.d/fixtures/ 下带执行位的样本放行", None,
-             swap_only_finding("Edit", ".claude/gate.d/fixtures/sample-red/stage.sh", {"old_string": "echo sample", "new_string": "echo sample two"})),
-            ("整份换上:工具员改主工作区之外（草稿目录与仓副本）的同名脚本放行", 0,
-             swap_only_code({"tool_name": "Edit", "agent_type": "tooling-writer",
-                             "tool_input": {"file_path": copied_script, "old_string": "return 0", "new_string": "return 1"}})),
-            ("整份换上:实现员改同一份脚本不归这一道", 0,
-             swap_only_code({"tool_name": "Edit", "agent_type": "implementation-writer",
-                             "tool_input": {"file_path": f"{work}/scripts/mutation/crates-mutation-rows.py", "old_string": "return 0", "new_string": "return 1"}})),
-            ("整份换上:主 agent 改同一份脚本放行", None,
-             swap_only_finding("Edit", "scripts/mutation/crates-mutation-rows.py", {"old_string": "return 0", "new_string": "return 1"}, agent=None)),
-        ]
-        # 判不了照常放行而记一处没判全：带 agent_id 而没有 agent_type 的子 agent 调用；目标所在目录不许进（chmod 000）、stat 失败
-        del UNJUDGED[:]
-        untyped_code = swap_only_code({"tool_name": "Edit", "agent_id": "a0000000000000ff6",
-                                       "tool_input": {"file_path": f"{work}/scripts/mutation/crates-mutation-rows.py", "old_string": "return 0", "new_string": "return 1"}})
-        untyped_notes = list(UNJUDGED)
-        del UNJUDGED[:]
-        cases.append(("整份换上:认不出 agent 类型的子 agent 调用照常放行、记一处没判全", (0, True),
-                      (untyped_code, any("认不出 agent 类型" in note for note in untyped_notes))))
-        sealed_directory = os.path.join(work, "scripts", "sealed")
-        os.makedirs(sealed_directory)
-        with open(os.path.join(sealed_directory, "tool.py"), "w", encoding="utf-8") as handle:
-            handle.write("def main():\n    return 0\n")
-        os.chmod(sealed_directory, 0)
-        try:
-            sealed_code = swap_only_code({"tool_name": "Edit", "agent_type": "tooling-writer",
-                                          "tool_input": {"file_path": os.path.join(sealed_directory, "tool.py"), "old_string": "return 0", "new_string": "return 1"}})
-        finally:
-            os.chmod(sealed_directory, 0o700)
-        sealed_notes = list(UNJUDGED)
-        del UNJUDGED[:]
-        cases.append(("整份换上:目标 stat 失败照常放行、记一处没判全", (0, True), (sealed_code, any("stat 失败" in note for note in sealed_notes))))
-        # 走真实入口：上面两回事故的两条写法，拒绝点名 hook-swap.py、「要主 agent 跑的命令」与草稿目录，只这一道（检出记录单用一份）
-        swap_only_environment = dict(environment, AGENT_HOOK_DETECTIONS=os.path.join(work, "swap-only-detections.jsonl"))
-        for label, relative, old, new in (
-                ("stdin:工具员 Edit 主工作区已存在的 scripts/mutation/ 下的 .py 拒并点名 hook-swap.py 与出路", "scripts/mutation/crates-mutation-rows.py", "return 0", "return 1"),
-                ("stdin:工具员 Edit 主工作区已存在的 gpu-verification-server/control 拒并点名 hook-swap.py 与出路", "gpu-verification-server/control", "echo stop", "echo stop all")):
-            swap_only_entry = subprocess.run(["bash", script], capture_output=True, text=True, env=swap_only_environment,
-                                             input=json.dumps({"tool_name": "Edit", "agent_type": "tooling-writer",
-                                                               "tool_input": {"file_path": f"{work}/{relative}", "old_string": old, "new_string": new}}))
-            cases.append((label, (2, True), (swap_only_entry.returncode,
-                                             all(fragment in swap_only_entry.stderr for fragment in (relative, HOOK_SWAP_SCRIPT, "要主 agent 跑的命令", "草稿目录", "→ 怎么办"))
-                                             and "道判定不成立" not in swap_only_entry.stderr)))
-        # 判不了照常放行而记检出：坏 JSON、JSON 数组各喂一次，检出记录单用一份（开关 unparsable-input-silent 下诊断与检出那几格红）
-        unjudged_detections = os.path.join(work, "unjudged-detections.jsonl")
-        def run_raw(raw_text, extra_environment=None):
-            return subprocess.run(["bash", script], input=raw_text, capture_output=True, text=True,
-                                  env=dict(environment, AGENT_HOOK_DETECTIONS=unjudged_detections, **(extra_environment or {})))
-        def unjudged_records():
-            return [json.loads(line) for line in open(unjudged_detections, encoding="utf-8")] if os.path.exists(unjudged_detections) else []
-        broken_entry = run_raw('{"tool_name": "Write", "tool_input": {"file_path": "x.md"')
-        broken_records = unjudged_records()
-        cases.append(("stdin:坏 JSON 放行（退出码 0）", 0, broken_entry.returncode))
-        cases.append(("stdin:坏 JSON 的 stderr 有诊断", True,
-                      all(fragment in broken_entry.stderr for fragment in ("write-guard.sh", "不是合法的 JSON 对象", '{"tool_name": "Write"'))))
-        cases.append(("stdin:坏 JSON 记一条检出（结局只记、会话号读不到）", (1, "只记", "读不到", True),
-                      (len(broken_records), broken_records[-1].get("outcome") if broken_records else None, broken_records[-1].get("session_id") if broken_records else None,
-                       bool(broken_records) and all(str(finding).startswith("写闸没判全：") for finding in broken_records[-1].get("findings") or [None]))))
-        run_raw('{"session_id": "selftest-session", "agent_type": "implementation-writer", "tool_name": "Edit"')
-        cases.append(("stdin:坏 JSON 里按字面找得到的会话号与类型照抄", ("selftest-session", "implementation-writer"),
-                      tuple(unjudged_records()[-1].get(key) for key in ("session_id", "agent_type")) if len(unjudged_records()) == 2 else None))
-        array_entry = run_raw("[1, 2]")
-        cases.append(("stdin:JSON 数组记一条检出", (0, 3), (array_entry.returncode, len(unjudged_records()))))
-        # ── 九、草稿目录写者锁：SINGLEFS_WORK_ROOT 指到自检自己的工作根，锁与主会话记录都在里面 ──
-        # 开关见文件头 --selftest 一段；下面「写者锁:」「stdin:第二个写者」「stdin:持锁者」开头的格各自点名在开关下红
-        lock_root = tempfile.mkdtemp(dir=base)
-        work_root_before = os.environ.get("SINGLEFS_WORK_ROOT")
-        os.environ["SINGLEFS_WORK_ROOT"] = lock_root
-        try:
-            if writer_lock is None:
-                cases.append(("写者锁:库读得到", True, False))
-            else:
-                prompt_one, prompt_other, prompt_three = "写者锁自检的派发提示甲", "写者锁自检的派发提示乙", "写者锁自检的派发提示丙"
-                prompt_four = "写者锁自检的派发提示丁"   # 没有任何回执对得上它
-                lock_transcript = os.path.join(lock_root, "main-session.jsonl")
-                def make_lock(name, prompt_text):
-                    scratch = os.path.join(lock_root, name)
-                    writer_lock.create_lock(scratch, writer_lock.new_lock("self-test", prompt_text, "implementation-writer", lock_transcript))
-                    return scratch
-                def receipt(agent_id, prompt_text, seconds_ago=0):
-                    stamped = datetime.fromtimestamp(time.time() - seconds_ago, timezone.utc).isoformat().replace("+00:00", "Z")
-                    return json.dumps({"timestamp": stamped, "toolUseResult": {"status": "async_launched", "agentId": agent_id, "prompt": prompt_text}}, ensure_ascii=False)
-                for name in ("w1", "w2", "w4", "w5", "w6", "w7/sub", "w9"):
-                    os.makedirs(os.path.join(lock_root, name), exist_ok=True)
-                make_lock("w1", prompt_one)
-                make_lock("w4", prompt_three)
-                make_lock("w6", prompt_one)       # 回执对不上的拒绝点名持锁者：持锁者（提示甲）还没写过
-                make_lock("w7", prompt_one)       # 嵌套：父目录锁是持锁者甲的
-                make_lock("w7/sub", prompt_other)  # 嵌套：子目录锁是对手乙的
-                make_lock("w9", prompt_four)      # 没有回执对得上这把锁
-                open(os.path.join(lock_root, "w5", writer_lock.LOCK_NAME), "w", encoding="utf-8").write("{不是 JSON")
-                for name, dropped in (("w13", "nonce"), ("w14", "dispatched_at"), ("w15", "prompt_sha256")):   # 锁文件在、字段缺一项（开关 unreadable-lock-absent 下这几格红）
-                    os.makedirs(os.path.join(lock_root, name))
-                    partial = writer_lock.new_lock("self-test", prompt_one, "implementation-writer", lock_transcript)
-                    partial.pop(dropped)
-                    with open(os.path.join(lock_root, name, writer_lock.LOCK_NAME), "w", encoding="utf-8") as partial_file:
-                        json.dump(partial, partial_file)
-                os.makedirs(os.path.join(lock_root, "w16", writer_lock.LOCK_NAME))   # 锁的位置是个目录
-                for name, broken_claim in (("w22", "{不是 JSON"), ("w23", json.dumps({"claimed_at": 1}))):   # 认领文件在而判不了（开关 broken-claim-absent 下点名那份认领文件的几格红）
-                    broken_scratch = make_lock(name, prompt_one)
-                    with open(writer_lock.claim_path(broken_scratch, writer_lock.lock_state(broken_scratch)[1]), "w", encoding="utf-8") as claim_file:
-                        claim_file.write(broken_claim)
-                holder_id, rival_id, zombie_id, first_id, second_id = ("a0000000000000aa1", "a0000000000000bb2", "a0000000000000cc3", "a0000000000000dd4", "a0000000000000ee5")
-                with open(lock_transcript, "w", encoding="utf-8") as transcript_file:   # 回执：持锁者（提示甲、锁之后）、对手（提示乙）、旧进程（提示甲、一小时前）；w4 的两个写者没有回执
-                    transcript_file.write("\n".join([receipt(rival_id, prompt_other), receipt(zombie_id, prompt_one, seconds_ago=3600), receipt(holder_id, prompt_one)]) + "\n")
-                def lock_hook_input(agent_id, relative):
-                    return {"tool_name": "Write", "agent_id": agent_id, "agent_type": "implementation-writer", "transcript_path": lock_transcript,
-                            "tool_input": {"file_path": os.path.join(lock_root, relative), "content": "x"}}
-                def lock_case(label, agent_id, relative, want):
-                    return (label, want, decide(lock_hook_input(agent_id, relative), work, table, library)[0])
-                def refusal_names_holder():   # 持锁者认领之后才有「持锁者是谁」可写：在 cases 列表里按次序求值
-                    message = decide(lock_hook_input(rival_id, "w1/d.md"), work, table, library)[1] or ""
-                    return all(fragment in message for fragment in (holder_id, rival_id, "→ 怎么办", "写者锁已判："))
-                def bad_lock_refusal_names_lock():
-                    message = decide(lock_hook_input(rival_id, "w5/z.md"), work, table, library)[1] or ""
-                    return all(fragment in message for fragment in (os.path.join(lock_root, "w5", writer_lock.LOCK_NAME), "判不了谁持锁", "→ 怎么办", "→ 主 agent", "rm "))
-                def foreign_message(agent_id, relative):   # 持锁者还没认领的目录里被拒的说明（在 cases 列表里按次序求值，w6、w9 没人认领过）
-                    return decide(lock_hook_input(agent_id, relative), work, table, library)[1] or ""
-                def foreign_names_expected_holder():
-                    rival_message, zombie_message = foreign_message(rival_id, "w6/a.md"), foreign_message(zombie_id, "w6/b.md")
-                    return (f"子 agent {holder_id}" in rival_message and "还没有认领文件" in rival_message and rival_id in rival_message and "→ 怎么办" in rival_message
-                            and f"子 agent {holder_id}" in zombie_message and zombie_message.count(zombie_id) == 1)
-                def foreign_unfound_names_registration():
-                    message = foreign_message(rival_id, "w9/a.md")
-                    return "主会话记录里没找到它的回执" in message and writer_lock.prompt_digest(prompt_four)[:writer_lock.PROMPT_DIGEST_SHOWN] in message and "→ 怎么办" in message
-                def broken_claim_refusal_names_claim():
-                    shown = []
-                    for name in ("w22", "w23"):
-                        broken_scratch = os.path.join(lock_root, name)
-                        message = decide(lock_hook_input(holder_id, f"{name}/m.md"), work, table, library)[1] or ""
-                        claim_file = writer_lock.claim_path(broken_scratch, writer_lock.lock_state(broken_scratch)[1])
-                        shown.append(all(fragment in message for fragment in (claim_file, "判不了谁持锁", "→ 怎么办", "→ 主 agent", "rm ")))
-                    return all(shown)
-                def claim_owner(name):   # 这个目录的锁此刻的认领：认领者的 agent_id，没有认领交 "absent"，判不了交 "unreadable"
-                    scratch = os.path.join(lock_root, name)
-                    state, claim = writer_lock.claim_state(scratch, writer_lock.lock_state(scratch)[1])
-                    return claim["agent_id"] if state == "ok" else state
-                def append_receipt(agent_id, prompt_text):
-                    with open(lock_transcript, "a", encoding="utf-8") as transcript_file:
-                        transcript_file.write(receipt(agent_id, prompt_text) + "\n")
-                def receipt_pending_cases():
-                    """w4 的锁登记提示丙：乙（first_id）一直没有回执，甲（second_id）的回执晚落盘，same_prompt_id 是同一份提示的另一次派发。
-                    回执读不到的写放行、不认领、记一处没判全（开关 missing-receipt-claims 下退回先到先得，前四格红）；按次序求值。"""
-                    import contextlib, io
-                    def pending_case(label, agent_id, relative):
-                        del UNJUDGED[:]
-                        with contextlib.redirect_stderr(io.StringIO()):
-                            code = decide(lock_hook_input(agent_id, relative), work, table, library)[0]
-                        notes = list(UNJUDGED)
-                        del UNJUDGED[:]
-                        return (label, (0, "absent", True), (code, claim_owner("w4"), any("回执还没落盘，没认领" in note for note in notes)))
-                    same_prompt_id = "a0000000000000ff6"
-                    found = [pending_case("写者锁:回执还没落盘的乙先写放行、不认领、记一处没判全", first_id, "w4/x.md"),
-                             pending_case("写者锁:真持锁者回执还没落盘时第一次写也放行、不认领", second_id, "w4/y.md")]
-                    append_receipt(second_id, prompt_three)
-                    found.append(("写者锁:回执落盘之后持锁者写拿到锁", (0, second_id), (decide(lock_hook_input(second_id, "w4/z.md"), work, table, library)[0], claim_owner("w4"))))
-                    found.append(lock_case("写者锁:持锁者认领之后，回执一直没落盘的乙写被拒", first_id, "w4/u.md", 2))
-                    append_receipt(same_prompt_id, prompt_three)
-                    found.append(lock_case("写者锁:认领之后同一份提示的另一次派发写被拒", same_prompt_id, "w4/v.md", 2))
-                    found.append(lock_case("写者锁:认领之后持锁者续写放行", second_id, "w4/w.md", 0))
-                    return found
-                cases += [
-                    lock_case("写者锁:提示对不上的子 agent 不能认领", rival_id, "w1/a.md", 2),
-                    lock_case("写者锁:同一份提示但派发早于这把锁的旧进程不能认领", zombie_id, "w1/a.md", 2),
-                    lock_case("写者锁:持锁者第一次写放行", holder_id, "w1/a.md", 0),
-                    lock_case("写者锁:持锁者续写放行", holder_id, "w1/b.md", 0),
-                    lock_case("写者锁:持锁者写子目录放行", holder_id, "w1/sub/c.md", 0),
-                    lock_case("写者锁:第二个写者被拒", rival_id, "w1/c.md", 2),
-                    lock_case("写者锁:第二个写者写子目录也被拒", rival_id, "w1/sub/deeper/e.md", 2),
-                    ("写者锁:拒绝说明点名持锁者与出路", True, refusal_names_holder()),
-                    *receipt_pending_cases(),
-                    lock_case("写者锁:主 agent 不判", None, "w1/f.md", 0),
-                    lock_case("写者锁:没有锁的目录不判", rival_id, "w2/x.md", 0),
-                    lock_case("写者锁:锁文件不是 JSON 拒", rival_id, "w5/x.md", 2),
-                    lock_case("写者锁:锁缺 nonce 拒", holder_id, "w13/x.md", 2),
-                    lock_case("写者锁:锁缺 dispatched_at 拒", holder_id, "w14/x.md", 2),
-                    lock_case("写者锁:锁缺 prompt_sha256 拒", holder_id, "w15/x.md", 2),
-                    lock_case("写者锁:锁的位置是目录拒", holder_id, "w16/x.md", 2),
-                    lock_case("写者锁:主 agent 写坏锁的目录不判", None, "w5/y.md", 0),
-                    ("写者锁:判不了的锁的拒绝点名那份锁与出路", True, bad_lock_refusal_names_lock()),
-                    lock_case("写者锁:认领文件不是 JSON，真持锁者写也拒", holder_id, "w22/x.md", 2),
-                    lock_case("写者锁:认领文件缺 agent_id，真持锁者写也拒", holder_id, "w23/x.md", 2),
-                    ("写者锁:认领文件判不了的拒绝点名那份认领文件与出路", True, broken_claim_refusal_names_claim()),
-                    ("写者锁:认领文件判不了的不另建一份、不改它", ("unreadable", "unreadable"), (claim_owner("w22"), claim_owner("w23"))),
-                    lock_case("写者锁:草稿根自己下面直接写不判", rival_id, "result.md", 0),
-                    ("写者锁:回执对不上的拒绝点名还没认领的持锁者的 agent_id", True, foreign_names_expected_holder()),
-                    ("写者锁:回执对不上又找不到持锁者的回执时，拒绝写锁登记的提示 sha256 前几位", True, foreign_unfound_names_registration()),
-                    # 嵌套的草稿目录：w7 的锁是甲的、w7/sub 的锁是乙的，只认最近一层（writer_lock 文件头「嵌套的草稿目录」；开关 holder-ignored、launch-ignored 下第一格红）
-                    lock_case("写者锁:父目录锁的持有者写子目录另派给别人持锁的部分被拒", holder_id, "w7/sub/x.md", 2),
-                    lock_case("写者锁:子目录锁的持有者写自己的子目录放行", rival_id, "w7/sub/z.md", 0),
-                    lock_case("写者锁:子目录锁的持有者写父目录仍被父目录锁拦", rival_id, "w7/y.md", 2),
-                    lock_case("写者锁:不持有任何一层锁的第三者写嵌套的子目录被拦", first_id, "w7/sub/q.md", 2),
-                    lock_case("写者锁:父目录锁的持有者写父目录放行（认领父目录）", holder_id, "w7/h.md", 0),
-                    lock_case("写者锁:父目录认领之后，认领者写别人持锁的子目录仍被拒", holder_id, "w7/sub/x2.md", 2),
-                    lock_case("写者锁:父目录认领之后，子目录锁的持有者写自己的子目录仍放行", rival_id, "w7/sub/z2.md", 0),
-                    ("写者锁:草稿根之外不判", 0, decide({"tool_name": "Write", "agent_id": rival_id, "agent_type": "implementation-writer", "transcript_path": lock_transcript,
-                                                   "tool_input": {"file_path": f"{work}/crates/b.rs", "content": "x"}}, work, table, library)[0]),
-                ]
-                # 接手换锁（派发闸用 replace_lock）失败不留临时文件：锁内容写不进 JSON（json.dump 写到一半抛 TypeError）、锁的位置是个非空目录（os.replace 抛 OSError）
-                # 两种失败各一格，另有一格成功的对照；LIB_WRITER_LOCK_BREAK=replace-temp-kept 下前两格红
-                def replace_lock_outcome(name, obstacle):
-                    scratch = os.path.join(lock_root, name)
-                    os.makedirs(scratch)
-                    if obstacle == "directory-in-the-way":
-                        os.makedirs(os.path.join(scratch, writer_lock.LOCK_NAME, "keep"))
-                    new = writer_lock.new_lock("self-test", prompt_one, "implementation-writer", lock_transcript)
-                    if obstacle == "unserializable":
-                        new["unserializable"] = object()
-                    try:
-                        writer_lock.replace_lock(scratch, new)
-                        raised = False
-                    except (TypeError, OSError):
-                        raised = True
-                    return raised, sorted(item for item in os.listdir(scratch) if item.endswith(".tmp"))
-                cases += [
-                    ("写者锁:换锁时锁内容写不进 JSON，抛异常且不留临时文件", (True, []), replace_lock_outcome("w10", "unserializable")),
-                    ("写者锁:换锁时锁的位置被目录占着，抛异常且不留临时文件", (True, []), replace_lock_outcome("w11", "directory-in-the-way")),
-                    ("写者锁:换锁成功不抛异常也不留临时文件", (False, []), replace_lock_outcome("w12", "none")),
-                ]
-                # 排他建锁（派发闸用 create_lock）、建认领（try_claim）共用 write_exclusively：内容写不进 JSON（json.dump 写到一半抛 TypeError）时抛异常、
-                # 不留临时文件，锁与认领也不落下；LIB_WRITER_LOCK_BREAK=exclusive-temp-kept 下这两格红
-                def exclusive_write_outcome(name, which):
-                    scratch = os.path.join(lock_root, name)
-                    os.makedirs(scratch)
-                    new = writer_lock.new_lock("self-test", prompt_one, "implementation-writer", lock_transcript)
-                    try:
-                        if which == "lock":
-                            new["unserializable"] = object()
-                            writer_lock.create_lock(scratch, new)
-                        else:
-                            writer_lock.create_lock(scratch, new)
-                            writer_lock.try_claim(scratch, new, object())
-                        raised = False
-                    except TypeError:
-                        raised = True
-                    landed = writer_lock.lock_path(scratch) if which == "lock" else writer_lock.claim_path(scratch, new)
-                    return raised, sorted(item for item in os.listdir(scratch) if item.endswith(writer_lock.TEMPORARY_SUFFIX)), os.path.lexists(landed)
-                cases += [
-                    ("写者锁:排他建锁时锁内容写不进 JSON，抛异常、不留临时文件也不留锁", (True, [], False), exclusive_write_outcome("w19", "lock")),
-                    ("写者锁:认领时认领内容写不进 JSON，抛异常、不留临时文件也不留认领", (True, [], False), exclusive_write_outcome("w20", "claim")),
-                ]
-                # 两次接手交错：A 换上锁之后、清理旧认领之前，B 换上自己的锁、B 的子 agent 认领（replace_lock 的 after_replace 造这一刻），A 再清理。
-                # 改后 A 只删换锁之前列过的认领：B 的认领还在、第三个子 agent 认领不成，别的进程正在写的认领临时文件也还在；
-                # LIB_WRITER_LOCK_BREAK=takeover-sweeps-new-claims（换上之后删掉所有 nonce 不同的认领）下这两格红：
-                #     「✗ 自检：写者锁:两次接手交错（A 换锁、B 换锁并认领、A 清理）之后 B 的认领还在，第三个认领不成，旧认领删掉」
-                #     「✗ 自检：写者锁:接手不删别的进程正在写的认领临时文件」
-
-                def interleaved_takeover_outcome(name):
-                    scratch = os.path.join(lock_root, name)
-                    old = writer_lock.new_lock("self-test", prompt_one, "implementation-writer", lock_transcript)
-                    writer_lock.create_lock(scratch, old)
-                    writer_lock.try_claim(scratch, old, holder_id)   # 换锁之前就在的旧认领
-                    in_flight = os.path.join(scratch, f"{writer_lock.CLAIM_PREFIX}0123456789abcdef.4242.abcd{writer_lock.TEMPORARY_SUFFIX}")
-                    open(in_flight, "w", encoding="utf-8").close()   # 别的进程正在写、还没链上的认领临时文件
-                    lock_a = writer_lock.new_lock("self-test", prompt_other, "implementation-writer", lock_transcript)
-                    lock_b = writer_lock.new_lock("self-test", prompt_three, "implementation-writer", lock_transcript)
-                    def b_takes_over_and_claims():
-                        writer_lock.replace_lock(scratch, lock_b)
-                        writer_lock.try_claim(scratch, lock_b, rival_id)
-                    writer_lock.replace_lock(scratch, lock_a, after_replace=b_takes_over_and_claims)
-                    state, current = writer_lock.lock_state(scratch)
-                    survived = claim_owner(name)
-                    third = writer_lock.try_claim(scratch, lock_b, zombie_id)
-                    return ((state == "ok" and current["nonce"] == lock_b["nonce"], survived, third, os.path.exists(writer_lock.claim_path(scratch, old))),
-                            os.path.exists(in_flight))
-                takeover_claims, in_flight_kept = interleaved_takeover_outcome("w21")
-                cases += [
-                    ("写者锁:两次接手交错（A 换锁、B 换锁并认领、A 清理）之后 B 的认领还在，第三个认领不成，旧认领删掉", (True, rival_id, rival_id, False), takeover_claims),
-                    ("写者锁:接手不删别的进程正在写的认领临时文件", True, in_flight_kept),
-                ]
-                # 判不了照常放行而记一处没判全：读不到库、判法自己出错（LIB_WRITER_LOCK_BREAK 设成认不出的值，find_lock_directory 抛 ValueError）；
-                # 开关 WRITE_GUARD_BREAK=unjudged-not-recorded 下这两格与下面 stdin 那一格红
-                def unjudged_after(prepare, restore, relative):
-                    import contextlib, io
-                    del UNJUDGED[:]
-                    prepare()
-                    try:
-                        with contextlib.redirect_stderr(io.StringIO()):
-                            code = decide(lock_hook_input(rival_id, relative), work, table, library)[0]
-                    finally:
-                        restore()
-                    notes = list(UNJUDGED)
-                    del UNJUDGED[:]
-                    return code, notes
-                saved_library, saved_lock_break = writer_lock, os.environ.get("LIB_WRITER_LOCK_BREAK")
-                def restore_lock_break():
-                    if saved_lock_break is None:
-                        os.environ.pop("LIB_WRITER_LOCK_BREAK", None)
-                    else:
-                        os.environ["LIB_WRITER_LOCK_BREAK"] = saved_lock_break
-                def drop_writer_lock_library():
-                    global writer_lock   # 照名字换掉模块里的那一份（不按名字现取 globals()）
-                    writer_lock = None
-                def restore_writer_lock_library():
-                    global writer_lock
-                    writer_lock = saved_library
-                code, notes = unjudged_after(drop_writer_lock_library, restore_writer_lock_library, "w1/u.md")
-                cases.append(("写者锁:读不到库时记一处没判全", (0, True), (code, any("读不到 lib_writer_lock.py" in note for note in notes))))
-                code, notes = unjudged_after(lambda: os.environ.__setitem__("LIB_WRITER_LOCK_BREAK", "selftest-unknown-mode"), restore_lock_break, "w2/u.md")
-                cases.append(("写者锁:自己出错时记一处没判全", (0, True), (code, any("写者锁这一道自己出错" in note for note in notes))))
-                lock_environment = dict(environment, SINGLEFS_WORK_ROOT=lock_root)
-                def run_lock_entry(agent_id, relative):
-                    return subprocess.run(["bash", script], input=json.dumps(lock_hook_input(agent_id, relative)), capture_output=True, text=True, env=lock_environment)
-                second_entry = run_lock_entry(rival_id, "w1/g.md")
-                cases.append(("stdin:第二个写者被拒（退出码 2）", 2, second_entry.returncode))
-                cases.append(("stdin:第二个写者的拒绝点名持锁者、锁的目录与出路", True,
-                              all(fragment in second_entry.stderr for fragment in (holder_id, os.path.join(lock_root, "w1"), "→ 怎么办"))))
-                cases.append(("stdin:持锁者放行", 0, run_lock_entry(holder_id, "w1/h.md").returncode))
-                foreign_entry = run_lock_entry(rival_id, "w6/h.md")
-                cases.append(("stdin:回执对不上的拒绝（退出码 2）", 2, foreign_entry.returncode))
-                cases.append(("stdin:回执对不上的拒绝点名持锁者的 agent_id 与出路", True,
-                              all(fragment in foreign_entry.stderr for fragment in (holder_id, os.path.join(lock_root, "w6"), "→ 怎么办"))))
-                cases.append(("stdin:父目录锁的持有者写别人持锁的子目录被拒（退出码 2）", 2, run_lock_entry(holder_id, "w7/sub/h2.md").returncode))
-                bad_lock_entry = run_lock_entry(rival_id, "w5/h.md")
-                cases.append(("stdin:坏锁拒绝（退出码 2）", 2, bad_lock_entry.returncode))
-                cases.append(("stdin:坏锁的拒绝点名那份锁与出路", True,
-                              all(fragment in bad_lock_entry.stderr for fragment in (os.path.join(lock_root, "w5", writer_lock.LOCK_NAME), "→ 怎么办", "→ 主 agent"))))
-                broken_claim_entry = run_lock_entry(holder_id, "w22/h.md")
-                broken_claim_file = writer_lock.claim_path(os.path.join(lock_root, "w22"), writer_lock.lock_state(os.path.join(lock_root, "w22"))[1])
-                cases.append(("stdin:坏认领文件拒绝并点名那份认领文件（退出码 2）", (2, True),
-                              (broken_claim_entry.returncode, all(fragment in broken_claim_entry.stderr for fragment in (broken_claim_file, "→ 怎么办", "→ 主 agent")))))
-                # 回执还没落盘：经钩子入口写，放行、不认领、stderr 一行、检出一条（结局只记）；开关 missing-receipt-claims 下红
-                make_lock("w18", prompt_three)
-                pending_detections = os.path.join(lock_root, "pending-detections.jsonl")
-                pending_entry = subprocess.run(["bash", script], input=json.dumps(lock_hook_input("a0000000000000ab9", "w18/h.md")), capture_output=True, text=True,
-                                               env=dict(lock_environment, AGENT_HOOK_DETECTIONS=pending_detections))
-                pending_records = [json.loads(line) for line in open(pending_detections, encoding="utf-8")] if os.path.exists(pending_detections) else []
-                cases.append(("stdin:回执还没落盘的写放行、不认领，stderr 一行并记一条检出（结局只记）", (0, "absent", True, 1, "只记", True),
-                              (pending_entry.returncode, claim_owner("w18"), "回执还没落盘，没认领" in pending_entry.stderr, len(pending_records),
-                               pending_records[-1].get("outcome") if pending_records else None,
-                               bool(pending_records) and any(str(finding).startswith("写闸没判全：写者锁这一道") and "回执还没落盘，没认领" in str(finding)
-                                                             for finding in pending_records[-1].get("findings") or []))))
-                lock_error_detections = os.path.join(lock_root, "lock-error-detections.jsonl")
-                lock_error_entry = subprocess.run(["bash", script], input=json.dumps(lock_hook_input(rival_id, "w2/h.md")), capture_output=True, text=True,
-                                                  env=dict(lock_environment, LIB_WRITER_LOCK_BREAK="selftest-unknown-mode", AGENT_HOOK_DETECTIONS=lock_error_detections))
-                lock_error_records = [json.loads(line) for line in open(lock_error_detections, encoding="utf-8")] if os.path.exists(lock_error_detections) else []
-                cases.append(("stdin:写者锁自己出错放行并记一条检出（结局只记）", (0, 1, "只记", True),
-                              (lock_error_entry.returncode, len(lock_error_records), lock_error_records[-1].get("outcome") if lock_error_records else None,
-                               bool(lock_error_records) and any(str(finding).startswith("写闸没判全：写者锁这一道自己出错") for finding in lock_error_records[-1].get("findings") or []))))
-        finally:
-            if work_root_before is None:
-                os.environ.pop("SINGLEFS_WORK_ROOT", None)
-            else:
-                os.environ["SINGLEFS_WORK_ROOT"] = work_root_before
-            shutil.rmtree(lock_root, ignore_errors=True)
-        os.unlink(outside.name)
-    finally:
-        shutil.rmtree(work)
-        shutil.rmtree(outside_directory, ignore_errors=True)
-    # 第六道判不了照常放行而记一处没判全：Edit 一份在而读不了（chmod 成 000）的脚本，改完之后的内容算不出；开关 WRITE_GUARD_BREAK=syntax-unreadable-unrecorded 下这一格红
-    import contextlib, io
-    locked_root = tempfile.mkdtemp(prefix="write-guard-locked-")
-    try:
-        os.makedirs(os.path.join(locked_root, "scripts"))
-        locked_script = os.path.join(locked_root, "scripts", "locked.sh")
-        with open(locked_script, "w", encoding="utf-8") as handle:
-            handle.write("echo a\n")
-        os.chmod(locked_script, 0)
-        del UNJUDGED[:]
-        with contextlib.redirect_stderr(io.StringIO()):
-            code = decide_shell_syntax({"tool_name": "Edit", "tool_input": {"file_path": locked_script, "old_string": "echo a", "new_string": "echo b"}}, locked_root)[0]
-        notes = list(UNJUDGED)
-        del UNJUDGED[:]
-        cases.append(("语法:改一份读不了的脚本照常放行、记一处没判全", (0, True), (code, any("读不了" in note and "语法这一次没判" in note for note in notes))))
-    finally:
-        for directory, _, names in os.walk(locked_root):
-            for name in names:
-                os.chmod(os.path.join(directory, name), 0o600)
-        shutil.rmtree(locked_root, ignore_errors=True)
-    failures = [item for item in cases if item[1] != item[2]]
-    for label, want, got in failures:
-        print(f"  ✗ 自检：{label} 应当是 {want}，实际 {got}")  # gate-lint:detail
-    if failures:
-        print("    → 看 decide_overwrite() / decide_compile_first() / decide_trailing_blank() / decide_shell_syntax() / decide_scope() / decide_prime_marks() / decide_clock_times() / decide_session_names() / decide_batch_codes() / decide_writer_lock() / decide_ledger_append() / decide_script_swap_only() 与入口；"
-              "WRITE_GUARD_DISABLE_WRITER_LOCK / LIB_WRITER_LOCK_BREAK / WRITE_GUARD_DISABLE_OVERWRITE / WRITE_GUARD_DISABLE_COMPILE_FIRST / WRITE_GUARD_DISABLE_SYNTAX / WRITE_GUARD_DISABLE_SCOPE / WRITE_GUARD_DISABLE_CLOCK_TIMES / WRITE_GUARD_DISABLE_SESSION_NAMES、"
-              "WRITE_GUARD_BREAK=trailing-blank-ignored / scope-root-unanchored / builtin-agents-unscoped / python-syntax-subprocess / library-reloaded-each-time / landing-lexical-only / unparsable-input-silent / unjudged-not-recorded / ledger-append-ignored / script-in-place-allowed 或 SINGLEFS_WORK_ROOT_BREAK 设着的话这里本来就该红")
-        return 1
-    print(f"  ✓ 自检通过（查了 {len(cases)} 种情形）：钩子、门禁、项目脚本、研究脚本目录下写进语法错误的 .sh（Write 与 Edit）与 .py 拒绝、语法对的与别处的放行；"
-          "未跟踪的已有文件整份覆盖拒绝，已跟踪 / 不存在 / 仓外 / Edit 放行；主 agent 放行、没有项目定义的 agent（内置类型、定义已删的旧实例）只许写工作根（仓里与仓外别处拒）、范围内放行、"
-          "工作根下的报告目录放行、会话临时目录根下（scratchpad 内外）与工作根同名前缀的兄弟目录拒绝，范围外（Edit、Write、MultiEdit）与 .. 绕路与未登记的项目 agent 拒绝，按解开符号链接之后的落点判（范围内的链接指到范围外、经它写不存在的子目录、悬空链接、指到仓里范围外的拒，指到范围内与范围外指回范围内的放行；覆盖与先编后换经链接同样认得出）；experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，"
-          "implementation-writer 与主 agent 写同一处、执行员写草稿目录与 crates/mutations.tsv 放行；Write 内容、Edit 与 MultiEdit 的 new_string 里有撇号类角标（五个字符各一例，主 agent 与子 agent 一样）拒绝，"
-          "只在 old_string 里有、ASCII 单引号放行，共用字符集读不到拒绝；写进仓里的内容带钟点（日期后、时区词旁、x 通配、日期或时区词后的「N 点 / N 时」与时段词、时段词后的钟点、光秃的「N 点前后」、"
-          "不挨日期时区的时分与区间、ISO 与 diff 头 stat 的机器时间、ISO 紧凑时间戳（日期连写或带连字符加连写的钟点，含路径里的运行目录名，Write、Edit、MultiEdit 各一例）、光秃的时区词、英文十二小时制，"
-          f"md 里与没写理由的放行标记不认，主 agent 与子 agent 一样）拒绝并点名形态，8 位数字后跟 T 但不是时间戳的 {len(compact_lookalike_cases)} 例（月份与钟点越界、年不是 20 开头、钟点只有三位、前面挨着字母、小写 t）与只写日期、仓外、.py 里带理由的放行标记放行，"
-          f"只写日期、序号与个数后的「点」、不挨日期时区的时段词、标识符里的时区词、以 am / pm 起头的英文词、{len(context_cases)} 类长得像钟点的冒号对、"
-          f".sh / .py / .rs 里带理由的放行标记 {len(allow_cases)} 例、仓外、排除的样本、hook 自检与 c510 提示、只在 old_string 里有放行，判据读不到拒绝；写进仓里的会话号（标签式、当主语、上游三语仓、长十六进制）拒绝，crate 名、上游仓目录名、临时目录名与 .sh 里带理由的放行标记放行；"
-          "目标不是 .md / .mdx 时 Edit 与 MultiEdit 的 old_string 以空格或制表符收尾（.sh、.txt、.markdown，仓里仓外、主 agent 与子 agent 一样）拒绝并给出收窄框选与 replace-once.py 两条出路，"
-          ".md / .mdx / .MD 目标、不以空白收尾、只在中间行或换行前有行尾空白、只有 new_string 以空白收尾与 Write 放行；"
-          "钟点与会话号逐处列出（行号与总数，Edit 折算成文件里的行号），几道都不成立的一次列全；拒绝都记进检出记录；输入不是合法的 JSON 对象照常放行、stderr 写诊断并记一条只记的检出（会话号读不到写「读不到」，按字面找得到的照抄）；"
-          "草稿目录写者锁：提示对不上与派发早于锁的旧进程不能认领，持锁者写与续写（含子目录）放行，第二个写者（含子目录）拒绝并点名持锁者与出路，回执对不上的拒绝点名记录里找到的持锁者（找不到写锁登记的提示 sha256 前几位），"
-          "嵌套的子目录另派给别人持锁时，父目录锁的持有者写那个子目录、子目录锁的持有者写父目录与不持有任何一层的第三者都按最近一层的锁拦，"
-          "派发回执还没落盘的写（先写的非持锁者、真持锁者自己的第一次写）放行、不认领并记一处没判全（经入口时 stderr 一行、检出一条），回执落盘之后持锁者写才认领，认领之后没回执的与同一份提示的另一次派发被拒，"
-          "锁文件在而判不了（不是 JSON、缺 nonce / dispatched_at / prompt_sha256、锁的位置是目录）的拒绝并点名那份锁与出路，认领文件在而判不了（不是 JSON、缺 agent_id）的真持锁者写也拒、点名那份认领文件与出路，"
-          "主 agent、没有锁的目录、草稿根自己下面与草稿根之外不判，读不到库与判法自己出错照常放行并记一处没判全；接手换锁时锁内容写不进 JSON、锁的位置被目录占着都不留临时文件，"
-          "排他建锁与建认领时内容写不进 JSON 抛异常、不留临时文件也不落下，两次接手交错之后后一次接手的认领还在、第三个认领不成、别的进程正在写的认领临时文件不删；"
-          ".py 的语法在本进程里判、不起子进程，共用判据库一次写入只装一次；"
-          "往现行账本（拆分提案账本登记表里 current 那一份）追加「## <节号>、」标题（Edit、MultiEdit、Write 各一例）拒绝并点名 ledger-append-section.py 与出路，改节号、改正文、封存的账本、别的文件放行，"
-          "登记表读不到时放行并记一处没判全；"
-          "工具员用 Write、Edit、MultiEdit 改主工作区 scripts/、.claude/gate.d/、.claude/scripts/、task-server/、prune-server/、gpu-verification-server/ 下已存在的 .sh、.py 与带执行位无后缀的脚本拒绝"
-          "（经入口的两例点名 hook-swap.py、「要主 agent 跑的命令」与草稿目录），新建、不带执行位的 .tsv / .md / .json / .txt、fixtures 下的样本、主工作区之外（草稿目录与仓副本）、实现员与主 agent 放行，"
-          "认不出 agent 类型与 stat 失败的照常放行并记一处没判全；"
-          f"写进仓里 .md、.tsv 的批次代号（数字加字母加短横序号、两位数字加字母、挨着批次词的、天干编号的批号）拒绝，{len(batch_cases) + len(batch_context_cases)} 格里"
-          "两位会话短号、单位与倍数、路径与标识符、不带批次词的候选名、.py 与 .sh、变异表、仓外与反引号、字段值、算式、引号里的放行")
-    return 0
-
-# 弄坏开关与关闭开关只在自证里认：命令行不是单独一个 --selftest、也不是自证起的子进程（WRITE_GUARD_SELFTEST_MARK 对得上）而下面这些变量有一个非空，
-# 读 hook 的 JSON 之前就退 2、点名变量只在自证里认，不管值是什么（这道钩子退 2 是拒，所以外面漏进来的开关不会悄悄放宽写范围）。
+import ast, os, sys
+WRITE_GUARD_PART_NAMES = ("write_guard_decisions.py", "write_guard_selftest.py",)   # 按次序 import（后一份 import 前一份、没有环）；路径按钩子自己所在的目录（argv[1]）取
+WRITE_GUARD_PART_REQUIRED_NAMES = (   # 与上一行同次序、一份部分文件一组：入口要的名字（这一份第一个、最后一个绑定的名字与别份、入口引到的名字）；import 之前用 ast 核这一份顶层的 def、class 与赋值绑定了这些名字，缺一个就是不完整（截空、截短）
+    ("expanded_scope_patterns", "decide", "record_detection", "selftest_base_directory"),
+    ("selftest", "refuse_break_outside_selftest", "main"),
+)
+# 弄坏开关与关闭开关只在自证里认：自证起的子进程靠这两个值认（自证与读开关的代码在 write_guard_selftest.py）；引导在部分文件载入之前就读 WRITE_GUARD_BREAK，所以定义放在这里
 SELFTEST_MARK_VARIABLE = "WRITE_GUARD_SELFTEST_MARK"
 SELFTEST_MARK_CONTENT = "write-guard.sh --selftest 起的子进程"
-SELFTEST_ONLY_VARIABLES = ("WRITE_GUARD_BREAK", "LIB_WRITER_LOCK_BREAK", "WRITE_GUARD_DISABLE_OVERWRITE", "WRITE_GUARD_DISABLE_COMPILE_FIRST", "WRITE_GUARD_DISABLE_SCOPE",
-                           "WRITE_GUARD_DISABLE_CLOCK_TIMES", "WRITE_GUARD_DISABLE_SESSION_NAMES", "WRITE_GUARD_DISABLE_SYNTAX", "WRITE_GUARD_DISABLE_WRITER_LOCK")
 
-def refuse_break_outside_selftest(arguments):
-    set_names = [name for name in SELFTEST_ONLY_VARIABLES if os.environ.get(name)]
-    if not set_names or arguments == ["--selftest"] or os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT:
-        return None
-    for name in set_names:
-        print(f"  ✗ write-guard.sh：{name}={os.environ[name]} 是弄坏开关（只给自证用），只在自证（write-guard.sh --selftest）里认，平常跑设了就拒，这一次写没判", file=sys.stderr)
-    print(f"     → 怎么办：去掉 {'、'.join(set_names)} 再跑；要证红就跑 {set_names[0]}=<项> bash .claude/hooks/write-guard.sh --selftest", file=sys.stderr)
-    return 2
+def part_written_back(hook_part_path):
+    """这一次的 hook 输入是不是 Write 写回 hook_part_path：是交 hook 输入（dict），别的工具、别的目标、读不出输入交 None。目标按解开符号链接之后的落点比。"""
+    import json
+    try:
+        hook_input = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+        target = os.path.join(hook_input.get("cwd") or os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd(), hook_input["tool_input"]["file_path"])
+        if hook_input.get("tool_name") == "Write" and os.path.realpath(target) == os.path.realpath(hook_part_path):
+            return hook_input
+    except (ValueError, KeyError, TypeError, AttributeError, OSError):   # 不是 JSON 对象、没有目标、目标不是路径
+        pass
+    return None
 
+def record_part_written_back(hook_input, hook_part_path):
+    """部分文件载不全时放行的那一次写（写回那一份）照「放行但必记检出」往检出记录追加一行：decisions 的 record_detection 此刻用不了，借同目录 lib_work_root.py 的 record_unjudged_pass。交一句给人看的说明。"""
+    sys.dont_write_bytecode = True
+    try:
+        import importlib.util
+        specification = importlib.util.spec_from_file_location("lib_work_root", os.path.join(sys.argv[1], "lib_work_root.py"))
+        library = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(library)
+        return library.record_unjudged_pass("write-guard.sh", hook_input, f"Write：{hook_part_path}", [f"写闸没判全：部分文件 {hook_part_path} 载不全，这一次 Write 写回的就是它，放行"])[1]
+    except Exception as error:   # 文件不在、语法错都算读不到
+        return f"检出没记成：读不到同目录的 lib_work_root.py（{error!r}）"
 
-hook_dir = sys.argv[1]
-refused = refuse_break_outside_selftest(sys.argv[2:])
-if refused is not None:
-    sys.exit(refused)
-if len(sys.argv) > 2 and sys.argv[2] == "--selftest":
-    sys.exit(selftest(hook_dir))
-detections_path = os.environ.get("AGENT_HOOK_DETECTIONS") or DEFAULT_DETECTIONS
-raw = sys.stdin.buffer.read()
+def hook_part_unusable(hook_part_path, hook_part_error):
+    """一份部分文件载不全：这一次写没法判，按拒判（退 2、点名那一份）；Write 写回这一份本身的放行（只在钩子那种起法里读 hook 输入）。"""
+    if os.environ.get(SELFTEST_MARK_VARIABLE) == SELFTEST_MARK_CONTENT and os.environ.get("WRITE_GUARD_BREAK") == "part-unreadable-passes":
+        raise hook_part_error   # 弄坏开关 part-unreadable-passes：照原样抛错、进程退 1（只在自证起的子进程里认）
+    problem = f"读不到或编不过部分文件 {hook_part_path}（{type(hook_part_error).__name__}：{hook_part_error}）"
+    written_back = part_written_back(hook_part_path) if len(sys.argv) == 2 else None
+    if written_back is not None:
+        print(f"  ! write-guard.sh：{problem}；这一次是 Write 写回这一份，放行（没判）；{record_part_written_back(written_back, hook_part_path)}", file=sys.stderr)
+        sys.exit(0)
+    print(f"  ✗ write-guard.sh：{problem}，这一次写没法判，按拒判", file=sys.stderr)
+    print("     → 怎么办：把这一份恢复成编得过、完整的版本再写（git show HEAD:.claude/hooks/<这一份的文件名> 取内容，或让主 agent 换回）；这一份恢复之前，写闸拒每一次 Write、Edit、MultiEdit，只放行 Write 写回这一份本身", file=sys.stderr)
+    sys.exit(2)
+
+def hook_part_bound_names(hook_part_tree):
+    """部分文件顶层（不进 if、try、函数体）绑定的名字：def、class、赋值的目标。只读语法树，不执行这一份。"""
+    bound = set()
+    for statement in hook_part_tree.body:
+        if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            bound.add(statement.name)
+        elif isinstance(statement, ast.Assign):
+            for target in statement.targets:
+                bound.update(node.id for node in ast.walk(target) if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store))
+        elif isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name) and statement.value is not None:
+            bound.add(statement.target.id)
+    return bound
+
+sys.dont_write_bytecode = True   # 部分文件按同目录的模块 import：不往 __pycache__ 里写（自证拷一份钩子目录再写坏、截空其中一份，缓存的字节码不许盖住）
+sys.path.insert(0, sys.argv[1])   # 部分文件之间的 import 与下面的 import 都从钩子自己所在的目录找
+for hook_part_name, hook_part_required in zip(WRITE_GUARD_PART_NAMES, WRITE_GUARD_PART_REQUIRED_NAMES, strict=True):   # 每一份先读进来、核顶层绑定了入口要的名字、语法解析过（只读语法树、不执行），全核完全过了才 import：读不到、语法错或缺名字的，按缺依赖的处置（点名是哪一份、缺哪个名字），不让 python 在 main 之前抛错退 1 而被照常放行
+    hook_part_path = os.path.join(sys.argv[1], hook_part_name)
+    try:
+        with open(hook_part_path, encoding="utf-8") as hook_part_handle:
+            hook_part_tree = ast.parse(hook_part_handle.read(), hook_part_path)
+        hook_part_bound = hook_part_bound_names(hook_part_tree)
+        hook_part_missing = [name for name in hook_part_required if name not in hook_part_bound]
+        if hook_part_missing:
+            raise LookupError(f"顶层没有绑定 {'、'.join(hook_part_missing)}，这一份不完整")
+    except (OSError, SyntaxError, ValueError, LookupError) as hook_part_error:   # 文件不在、读不了、不是 UTF-8、语法错、含空字节、缺名字
+        hook_part_unusable(hook_part_path, hook_part_error)
+try:   # 每一份单独 import（后一份 import 前一份、没有环）：名字齐了、运行到一半抛错（引到被截掉的名字、模块层语句出错）点名出错的那一份
+    import write_guard_decisions
+except Exception as hook_part_error:
+    hook_part_unusable(os.path.join(sys.argv[1], "write_guard_decisions.py"), hook_part_error)
 try:
-    hook_input = json.loads(raw.decode("utf-8"))
-    if not isinstance(hook_input, dict):
-        raise ValueError(f"顶层是 {type(hook_input).__name__}，不是对象")
-except ValueError as error:   # 判不了：照常放行，打诊断并记一条检出（弄坏开关 unparsable-input-silent 下静默放行）
-    if os.environ.get("WRITE_GUARD_BREAK") != "unparsable-input-silent":
-        identity, text = unparsable_input_entry(raw, f"{type(error).__name__}: {error}")
-        note_unjudged(text)
-        record_detection(identity, [text], detections_path, "只记")
-    sys.exit(0)
-project_root = os.environ.get("CLAUDE_PROJECT_DIR") or hook_input.get("cwd") or os.getcwd()
-try:
-    code, message, finding = decide(hook_input, project_root, os.path.join(hook_dir, "agent-write-scope.tsv"), notations_library_path(hook_dir))
-except Exception as error:   # 判定自己抛异常：照常放行，打诊断并记检出
-    note_unjudged(f"判定自己抛异常，这一次放行：{type(error).__name__}: {error}")
-    code, message, finding = 0, None, None
-if code:
-    print(message, file=sys.stderr)
-    record_detection(hook_input, finding, detections_path)
-if UNJUDGED:
-    record_detection(hook_input, UNJUDGED, detections_path, "只记")
-sys.exit(code)
+    from write_guard_selftest import main
+except Exception as hook_part_error:
+    hook_part_unusable(os.path.join(sys.argv[1], "write_guard_selftest.py"), hook_part_error)
+sys.exit(main())   # 主函数由引导在核完之后调，不靠部分文件末行自己退出
 PY

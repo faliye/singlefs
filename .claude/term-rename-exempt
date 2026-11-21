@@ -47,11 +47,11 @@ records/2026-10-01-对接上游测试脚本规范.md  # 当时的定义与欠账
 .claude/hooks/runner-dispatch-guard.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 .claude/hooks/selftest-registry.tsv  # 登记表的数据行：脚本按列读、样本按字面比，不动；注释行已换
 crates/mutations.tsv  # 变异名与按名字引它的表：名字是标识，判定库按名字复用、别的表按名字点名，改名要连判定库一起作废
-crates/singlefs-verification/src/bin/e158_root_choice_repair.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-verification/src/bin/e161_crash_state_dedup_and_time_split.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-verification/src/bin/e170_specification_executor_export.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 crates/singlefs-verification/src/crash_state_enumeration.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 crates/singlefs-verification/src/lib.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 crates/singlefs-verification/tests/crash_enumeration_acquisition_barrier.rs  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
@@ -69,9 +69,9 @@ research/results/e142-new-pool-file-creation-dry-run-2026-09-25-r16-arm-n15.out 
 scripts/agents/agent-watch.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 scripts/crash/crash-point-replay.sh  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
 scripts/crash/lib_crash_point_replay_items.py  # 剩下的命中都在字符串里（日志、断言消息、自证用例、被脚本按字面认的输出与节名）：用户 2026-10-12 定不动代码逻辑，注释已换
-scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run/  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
-scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery.rs  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
+scripts/experiment-apparatus/e169_parallel_commit_append_and_prefix_recovery/  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e170_o3_spec_executor/comparator_q2_implementation_verdicts.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e170_o3_spec_executor/crash_image.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
 scripts/experiment-apparatus/e170_o3_spec_executor/synthetic_pool_for_tests.py  # 实验装置：源码 sha256 登记在实验页或跑前登记，印出来的串进产物；用户 2026-10-12 定装置与产物里印着的照原样留
@@ -229,8 +229,8 @@ records/2026-10-13-复用键与全仓改名.md:「上游 zh 会话发版 0.0.65�
 records/2026-10-13-复用键与全仓改名.md:「三路两段核查第三路（按入口与门禁）交回」  # 记这一批英文改名本身的一行：旧→新对照、旧库目录名新代码不读，换成新名就说不清是哪两个名字
 records/2026-10-13-复用键与全仓改名.md:「核出主 agent 补的快照哈希取错了版」  # 记这一批改名本身的一行：主 agent 逐条写的旧→新对照（含变异名「层 0」→「崩溃点重放」），换成新名就成了新名改成新名
 records/2026-10-13-欠账还五条.md:「把 `sb_mac` 登记进了排除表」  # 说 sb_mac 被术语清扫格报成旧名这件事本身，换掉就说不清当时报的是哪个名字
-scripts/experiment-apparatus/e162_crash_verdict_block_store.rs  # E162（崩溃放量判定块存储选型） 的依赖表第 8 行（records/2026-10-13-复用键与全仓改名.md）定实验装置不动：装置一改就要连产物重跑，下次重跑时连装置一起改名
-scripts/experiment-apparatus/e164_crash_amplification_design_function_test.rs  # E164（崩溃放量新设计的小范围功能测试） 的依赖表第 8 行（records/2026-10-13-复用键与全仓改名.md）定实验装置不动：装置一改就要连产物重跑，下次重跑时连装置一起改名
+scripts/experiment-apparatus/e162_crash_verdict_block_store/  # E162（崩溃放量判定块存储选型） 的依赖表第 8 行（records/2026-10-13-复用键与全仓改名.md）定实验装置不动：装置一改就要连产物重跑，下次重跑时连装置一起改名
+scripts/experiment-apparatus/e164_crash_amplification_design_function_test/  # E164（崩溃放量新设计的小范围功能测试） 的依赖表第 8 行（records/2026-10-13-复用键与全仓改名.md）定实验装置不动：装置一改就要连产物重跑，下次重跑时连装置一起改名
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/reuse_library.py  # E171（三oracle合谋测试） 的依赖表第 8 行（records/2026-10-13-复用键与全仓改名.md）定实验装置不动：装置一改就要连产物重跑，下次重跑时连装置一起改名
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/rows_orchestrator.py  # E171（三oracle合谋测试） 的依赖表第 8 行（records/2026-10-13-复用键与全仓改名.md）定实验装置不动：装置一改就要连产物重跑，下次重跑时连装置一起改名；第 219、1312、1397 行起的 scripts/crash/layer0-shard-configuration-check.sh 已改名，重跑前要跟着改
 scripts/experiment-apparatus/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_one_on_the_revision_6_tree_multi_host.sh  # E171（三oracle合谋测试） 的依赖表第 8 行（records/2026-10-13-复用键与全仓改名.md）定实验装置不动：装置一改就要连产物重跑，下次重跑时连装置一起改名
@@ -282,8 +282,8 @@ records/2026-10-13-里程碑四预开发.md:「里程碑三开工会话 回：ta
 .claude/kb/experiments-history.ja.md:「その行の上のコメントは `layer0-shard-run.sh:155` を引いていた」  # 引的是当时那份脚本注释的原文，换成新名就不是原文
 .claude/kb/experiments-history.ja.md:「コメントは `layer0-shard-run.sh` の `run_on_peer` 関数を引くよう変えた」  # 引的是当时那份脚本注释的原文，换成新名就不是原文
 records/2026-10-19-文档普查报告核实与修复.md:「有 R 行或登记过改名的 15 处照改（`55-qemu-device-streams.sh` 样本目录、`layer0-shard-configuration-check.sh`、`layer0-shard-run.sh`」  # 记历史改名处置过程列出的被改文件名，换成新名就成假话
-crates/singlefs-core/src/transaction.rs:「let first_transaction_of_the_batch = previous.highest_transaction_number_in_this_instance + 1;」  # 局部变量说的是这一批的第一个事务号，不是改过名的「新池新建文件」那个概念
-crates/singlefs-core/src/transaction.rs:「transaction: first_transaction_of_the_batch,」  # 同一个局部变量的引用，不是改过名的「新池新建文件」那个概念
+crates/singlefs-core/src/transaction/file_data_publishes.rs:「let first_transaction_of_the_batch = previous.highest_transaction_number_in_this_instance + 1;」  # 局部变量说的是这一批的第一个事务号，不是改过名的「新池新建文件」那个概念
+crates/singlefs-core/src/transaction/file_data_publishes.rs:「transaction: first_transaction_of_the_batch,」  # 同一个局部变量的引用，不是改过名的「新池新建文件」那个概念
 records/2026-10-30-路径关联与候选精度.md:「`crates/singlefs-core/src/superblock.rs` 对 `system_configuration.rs` 重合 76%」  # 记的是那一天拿后继原型量删掉的旧文件，旧路径是被量的对象本身，换成新名就成了新文件对自己
 records/2026-10-29-subagent拆分提案.md:「checker-tier-layer0-replay.sh」  # 记录当时执行命令的字面原文（先改名为 checker-tier-crash-point-replay.sh，并包后去前缀为 crash-point-replay.sh），换成新名就成了假话
 records/2026-11-02-文档代码逐项审核-E200产物逐行.json  # E200 逐行审核过程记录，包含被审核产物原文中的旧路径
@@ -327,7 +327,7 @@ records/2026-10-31-删兼容旧版本代码.md  # 历史记录：记的是改名
 .claude/gate.d/path-moves.tsv  # 搬迁登记表自己：旧前缀一列就是被搬走的旧路径
 records/2026-10-31-task-server巡检.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
 records/2026-10-18-里程碑三收尾与近期欠账.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
-scripts/experiment-apparatus/e203_admission_scan_cost.rs:「3 个有条目的号 × (1 + 最高层 2)」  # 这里的「最高层 2」是 3 个号加最高层号的计数式里的层数，不是已改名的层名
+scripts/experiment-apparatus/e203_admission_scan_cost/reconciliation_of_site_readings_tests.rs:「3 个有条目的号 × (1 + 最高层 2)」  # 这里的「最高层 2」是 3 个号加最高层号的计数式里的层数，不是已改名的层名
 records/2026-10-29-崩溃轻型与重型同一套逻辑.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
 records/2026-10-23-实验装置目录改名.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话
 records/2026-10-22-子agent结果落地审计.md  # 历史记录：记的是改名前那一版里的旧名与路径，换了就成假话

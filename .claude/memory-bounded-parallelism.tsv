@@ -6,8 +6,9 @@
 # 入口在不在、有没有登记两次、理由够不够长、登记的入口代码里还有没有按内存定并发的写法、代码里有这类写法的入口登没登记，由门禁 code-tooling 的 memory-bounded-parallelism 格判（判法在那一格函数上方的注释）。
 .claude/gate.d/crates-mutation-replay.sh	每个工作进程占一大块内存（整棵进程树的峰值以 GiB 计），按每台默认重活线程数同时开装不下；脚本照服务给的上限与自己量的峰值（共享根 crates-mutation-run-records/worker-peaks/）定开几个工作进程
 scripts/gate/test-targets-parallel.py	按条复用那一趟按测试目标同时起 --jobs 份测试二进制，合起来可能超过每台内存上限；脚本照共享根 test-targets-parallel-peaks/ 里量的每个测试目标的峰值按上限分片，一条测试函数也装不下才退 250
-cargo:singlefs-verification:e185_gc_batch_wall_clock_split	一件是一个取样点的准备（两份池），默认的取样点个数同时开装不下，装置按 E185_MEMORY_CAP 自排
-.claude/gate.d/code-tooling.sh	research-script-selftests 格按每台默认重活线程数分批并行，两条真仓现算单元图的大自证同批会叠到超过每台内存上限；大自证登记在 SELFTEST_RUNNERS_MEMORY_BOUND，各占一批，同一时刻至多一条
+cargo:singlefs-implementation-experiments:e185_gc_batch_wall_clock_split	一件是一个取样点的准备（两份池），默认的取样点个数同时开装不下，装置按 E185_MEMORY_CAP 自排
+.claude/gate.d/code-tooling.sh	门禁拆成入口加 lib/ 下的库，入口罩着整族：research-script-selftests 格按每台默认重活线程数分批并行，两条真仓现算单元图的大自证同批会叠到超过每台内存上限，大自证登记在 SELFTEST_RUNNERS_MEMORY_BOUND、各占一批、同一时刻至多一条；break-switch-replay、selftest-cells-alone、stage-break-switch-replay 三格各只在弄坏开关 replay-jobs-by-memory、cells-alone-jobs-by-memory、stage-replay-jobs-by-memory 下按内存上限与每趟内存算同时跑几条（⌊份额 ÷ 每趟内存⌋），平常不按内存算
 scripts/experiment-apparatus/e181-landing-check-long-run.sh	一份试写拷贝与一个走种子的线程各占一大块内存，按每台默认重活线程数同时开装不下；脚本按 E181_CAP_F9、E181_CAP_F10 两个内存预算算并发数
 scripts/experiment-apparatus/replay.sh	复跑表按量过的峰值与内存上限定同时开几行（脚本文件头「派行」），大行同时开装不下，不能照每台默认重活线程数一股脑开
-cargo:singlefs-verification:e168_delete_ring_window_borrow	一件是大片的一片，按每台默认重活线程数同时开会撞上限，装置按内存上限定同时跑几片
+cargo:singlefs-implementation-experiments:e168_delete_ring_window_borrow	一件是大片的一片，按每台默认重活线程数同时开会撞上限，装置按内存上限定同时跑几片
+cargo:singlefs-implementation-experiments:e171_three_oracle_collusion	取样线程数照内存上限收（上限扣掉取样线程之外的部分，余下的放得下几条取样线程就开几条），按每台默认重活线程数同时开会撞上限；装置按 E171 的内存上限自排

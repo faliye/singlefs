@@ -42,10 +42,8 @@ scripts/experiment-apparatus/e135_rollback_floor.rs  # 还没改完：实验要�
 scripts/experiment-apparatus/e136_fork_cost_rows.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e137_map_key_performance.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e138_per_disk_floor.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e139_tightened_floor.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e140_header_alignment.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e141_switch_reserve_mount_admission.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e142_new_pool_file_creation_dry_run.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e142_region_diff_independent.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e143_one_unit_per_transaction_journal.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e144_header_checksum_cost.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
@@ -57,15 +55,8 @@ scripts/experiment-apparatus/e149_pack_container_repair_options.rs  # 还没改�
 scripts/experiment-apparatus/e14_discrimination.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e150_rollback_reuse_of_abandoned_roots.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e151_arrival_and_container_arms.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e152_file_system_benchmark.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e153_ledger_shape_and_ring_holes.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e154_two_gates_serial_rejudge_and_reclaim_timing.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e155_fourth_run_group_commit_concurrency.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e155_fsync_write_volume.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e155_second_run_fsync_write_volume.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e155_third_run_release_cascade.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e157_parallel_line_one_clauses.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-scripts/experiment-apparatus/e159_fsync_wait_group_commit.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e160_random_small_read_share.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e16_journal.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e17_merge.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
@@ -152,19 +143,25 @@ scripts/experiment-apparatus/e97_entry_encoding.rs  # 还没改完：实验要�
 scripts/experiment-apparatus/e98_inode_record.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e99_writebuffer_sequence.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
 scripts/experiment-apparatus/e9_keylayout.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补
-crates/singlefs-verification/src/bin/e142_new_pool_file_creation_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e156_allocation_basis_counts.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（验证包改完直接跑，不开代码轮）
+crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（验证包改完直接跑，不开代码轮）
+crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（验证包改完直接跑，不开代码轮）
 crates/singlefs-verification/src/bin/crash_library_reader.rs  # 还没改完：只读读库程序，与同目录别的装置二进制一样还没接 preflight（admission: always、run-condition: command python3），接法与它们一批补；它在 crates/ 里，改动要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e158_root_choice_repair.rs  # 还没改完：实验要写 inputs-changed，登记它的结果取决于的全部输入（代码、决策、跑前登记），逐个对着跑前登记列完再补；它在 crates/ 里，改动要带测试、证红（验证包改完直接跑，不开代码轮）
 crates/singlefs-verification/src/bin/new_pool_file_creation_device_log_check.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/new_pool_file_creation_on_device.rs  # 在虚机的 busybox initramfs 里跑的静态二进制，那里没有 python3，preflight 判不了条件
-crates/singlefs-verification/src/bin/new_pool_file_creation_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
+crates/singlefs-implementation-experiments/src/bin/new_pool_file_creation_region_bytes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
 .claude/gate.d/lib-governance-refs.py  # 被门禁 doc-registries 调的函数库（治理文档里的门禁号、路径与「小节」指不指得到），不单独调
 scripts/experiment-apparatus/lib.rs  # 实验二进制共用的库（e7_index_bench 这个包的 lib），被各个 bin 引用，没有自己的入口，不单独调
-crates/singlefs-verification/src/bin/deletion_write_dump.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e168_delete_ring_window_borrow.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e170_specification_executor_export.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e171_three_oracle_collusion.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
-crates/singlefs-verification/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
+crates/singlefs-implementation-experiments/src/bin/deletion_write_dump.rs  # 还没改完：它在 crates/ 里，加 preflight 调用是 crates 代码改动，要带测试、证红（验证包改完直接跑，不开代码轮）
+scripts/experiment-apparatus/replay-inputs-and-build.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/replay-table-and-dispatch-limits.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/replay-selftest.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/replay-finish.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/replay-claims.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/replay-admission.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/replay-row-library.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/replay-dispatch.sh  # 被 scripts/experiment-apparatus/replay.sh 在同目录 source 的函数库，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_driver.py  # 被 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh 载入的模块，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/e165_replay_mutation_kill_bounds_selftest.py  # 被 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh 载入的模块，没有自己的入口，不单独调；准入与运行条件由入口判
+scripts/experiment-apparatus/e203_admission_scan_cost_counters_applying_edits_and_copying_the_tree.py  # 被 scripts/experiment-apparatus/e203_admission_scan_cost_counters.py import 的模块，没有自己的入口，不单独调；入口自己的准入与运行条件归入口那一份，preflight-lint 照判入口
+scripts/experiment-apparatus/e203_admission_scan_cost_counters_insertion_edits.py  # 被 scripts/experiment-apparatus/e203_admission_scan_cost_counters.py import 的模块，没有自己的入口，不单独调；入口自己的准入与运行条件归入口那一份，preflight-lint 照判入口
+scripts/experiment-apparatus/e203_admission_scan_cost_counters_row_table_and_module_template.py  # 被 scripts/experiment-apparatus/e203_admission_scan_cost_counters.py import 的模块，没有自己的入口，不单独调；入口自己的准入与运行条件归入口那一份，preflight-lint 照判入口
+scripts/experiment-apparatus/e203_admission_scan_cost_counters_selftest.py  # 被 scripts/experiment-apparatus/e203_admission_scan_cost_counters.py import 的模块，没有自己的入口，不单独调；入口自己的准入与运行条件归入口那一份，preflight-lint 照判入口

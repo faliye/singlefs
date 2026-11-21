@@ -3,8 +3,10 @@
 三处用这一份：
   .claude/hooks/runner-dispatch-guard.sh   派发那一刻在提示里「草稿目录：<路径>」那一行点名的目录里排他建锁，持锁的还在跑就拒（⑯）
   .claude/hooks/write-guard.sh             子 agent 用 Write / Edit / MultiEdit 写草稿根底下的文件时，认锁，不是持锁的那一个就拒（第九道）
-  .claude/hooks/bash-command-detector.sh   ⑫ 判 `mktemp -d` 的模板与 `-p`、`--tmpdir=` 指的目录在不在这个子 agent 认领的草稿目录里（own_scratch_directory）：只读，
-                                           用 find_lock_directory、read_lock、read_claim、launch_receipt 与 LAUNCH_SLACK_SECONDS，不建锁、不建认领
+  .claude/hooks/bash-command-detector.sh   ⑫ 两处：判 `mktemp -d` 的模板与 `-p`、`--tmpdir=` 指的目录在不在这个子 agent 认领的草稿目录里（own_scratch_directory）：只读，
+                                           用 find_lock_directory、read_lock、read_claim、launch_receipt 与 LAUNCH_SLACK_SECONDS，不建锁、不建认领；
+                                           只带 Read、Bash 的定义往草稿目录里写（writer_lock_refusal）：用 find_lock_directory、lock_state 与 writer_verdict，与写闸第九道同一份，
+                                           不建锁，回执对得上而还没有认领文件时同样排他建认领（writer_verdict 里的 try_claim）
 
 锁与认领（都在草稿目录里，不进仓）：
   .writer-lock            JSON：session_id（派发它的会话）、dispatched_at（派发时刻，秒）、dispatched_date（同一时刻的日期时间文字，给人看）、
@@ -16,7 +18,7 @@
   2. 还没有认领：在主会话记录（hook 输入的 transcript_path）里找这个子 agent 的派发回执（async_launched，agentId 对得上）。
      找到了：回执里的提示 sha256 要等于锁里的 prompt_sha256，回执时刻不早于锁的派发时刻（LAUNCH_SLACK_SECONDS 以内的误差不计），两样都对才认领；
      不对的是别的派发（重启之后留下的旧进程、同目录里另一件活的子 agent）拒，不认领。
-     找不到（回执还没落盘、记录读不了）：这一次写放行（"unclaimed"），不认领；写闸照「放行但必记检出」stderr 打一行、记一条检出（写明「回执还没落盘，没认领」）。
+     找不到（回执还没落盘、记录读不了）：这一次写放行（"unclaimed"），不认领；写闸照「放行但必记检出」stderr 打一行、记一条检出（写明「回执还没落盘，没认领」）；检出钩子 ⑫ 的 writer_lock_refusal 同样放行、打一行、记一条检出。
      回执落盘之后照旧核回执再认领。真持锁者自己的第一次写碰上回执还没落盘也是这一种，放行、不挡它；先写的非持锁者拿不到锁。
      认领只在核过回执之后建，所以 2 里排他建认领文件撞上已有的，读那份认领看是谁。
   3. 子 agent 的 agent_id 在 hook 输入里没有（主 agent 的写、没带身份的调用）：不判。
@@ -44,7 +46,7 @@ Bash 里的写这里看不见（write-guard.sh 只挂 Write / Edit / MultiEdit�
 用法：python 里把 .claude/hooks 放进 sys.path 再 import lib_writer_lock。
 
 弄坏开关 LIB_WRITER_LOCK_BREAK=<项>（一次设一个，认不出的值抛 ValueError；打开后红在哪几格写在 write-guard.sh 与 runner-dispatch-guard.sh 的文件头；
-bash-command-detector.sh 只读用，它的自证在下面十二项里任何一项打开时都不红）：
+bash-command-detector.sh 的 ⑫ 也调这份库，它的自证不登记下面十二项的红格）：
   LIB_WRITER_LOCK_BREAK=claim-not-exclusive  认领不排他：每次写都把认领文件改成自己，后写的抢走持锁者
       「✗ 自检：写者锁:持锁者认领之后，回执一直没落盘的乙写被拒」、「✗ 自检：写者锁:认领之后同一份提示的另一次派发写被拒」、「✗ 自检：写者锁:认领文件不是 JSON，真持锁者写也拒」、「✗ 自检：写者锁:认领文件缺 agent_id，真持锁者写也拒」、「✗ 自检：写者锁:认领文件判不了的拒绝点名那份认领文件与出路」、「✗ 自检：写者锁:认领文件判不了的不另建一份、不改它」、「✗ 自检：写者锁:不持有任何一层锁的第三者写嵌套的子目录被拦」、「✗ 自检：写者锁:认领时认领内容写不进 JSON，抛异常、不留临时文件也不留认领」、「✗ 自检：写者锁:两次接手交错（A 换锁、B 换锁并认领、A 清理）之后 B 的认领还在，第三个认领不成，旧认领删掉」、「✗ 自检：stdin:坏认领文件拒绝并点名那份认领文件（退出码 2）」
   LIB_WRITER_LOCK_BREAK=holder-ignored  不比 agent_id，谁写都放行

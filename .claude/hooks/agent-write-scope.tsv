@@ -1,10 +1,10 @@
-# 项目 subagent 用 Write / Edit 时的写范围：一个 agent 一个或几个路径模式，一行一个。由 agent-write-scope.sh 在 PreToolUse 里判。
+# 项目 subagent 的写范围：一个 agent 一个或几个路径模式，一行一个。Write / Edit 由 write-guard.sh、Bash 里的写由 bash-command-detector.sh 的 ⑫ 在 PreToolUse 里判。
 # 三列用制表符分隔：agent 名、路径模式、出处。路径模式相对仓根，以 / 开头的是绝对路径；** 跨目录，* 不跨目录。
 # 以 $SINGLEFS_WORK_ROOT/ 开头的是工作根（默认 ~/.local/share/singlefs/work/，只在 lib_work_root.py 里定义），只展开成工作根那一条；
 #    Claude Code 的会话临时目录根 /tmp/claude-<uid>/（各会话的 scratchpad 在里面）不在任何一行里，子 agent 写不进去。
 # ⚠️ 模式里只有 ** 与 * 两个元字符：write-guard.sh 的 glob_to_regex 把别的字符一律 re.escape，
 #    写 e[0-9]*.rs 会被当成字面的「e[0-9]」、永远匹配不上，而闸只报「越出写范围」、不会说模式没写对（2026-09-22 踩过）。
-# 只登记 tools 里有 Write 或 Edit 的定义；表与定义逐项一致由 code-tooling.sh 的 agent-write-scope 格判。Bash 里的写不经过 write-guard.sh，由 bash-command-detector.sh 的 ⑫ 照这张表判（读表与判法在 lib_write_scope.py，两边同一份；只判这张表里有行的 agent，往本仓写、落在它那几行之外的执行前拒绝）。
+# 每个定义都登记：tools 里有 Write 或 Edit 的，Write / Edit 由 write-guard.sh、Bash 里的写由 bash-command-detector.sh 的 ⑫ 照它那几行判；只带 Read、Bash 的（没有 Write、Edit），只有 ⑫ 判它在 Bash 里的写，行写的是它定义「写范围」一节允许的路径（几乎只有报告文件与草稿目录）。表与定义逐项一致（每个定义有行、每个名字有定义）由 code-tooling.sh 的 agent-write-scope 格判。读表与判法在 lib_write_scope.py，两边同一份；⑫ 只判这张表里有行的 agent，往本仓写、落在它那几行之外的执行前拒绝。
 implementation-writer	crates/**	implementation-writer.md「写范围」
 implementation-writer	litmus/**	implementation-writer.md「写范围」
 implementation-writer	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）（定义不许它写 kb 与 research/）
@@ -13,7 +13,9 @@ kb-scribe	crates/singlefs-checker/invariants/*.md	crates/singlefs-checker/invari
 kb-scribe	crates/singlefs-checker/invariants/**/*.md	crates/singlefs-checker/invariants/ 各层子目录里的不变量清单，只限这些 .md（* 不跨目录、**/*.md 不盖下一层，与上一行合起来盖住下一层与各层子目录；门禁 code-tooling 的 kb-directories-write-scope 格要登记的 kb 目录下一层与子目录都写得到，records/2026-09-16-subagent拆分提案.md 第九十节 ⑧）
 kb-scribe	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）
 experiment-runner	scripts/experiment-apparatus/**	experiment-runner.md「写范围」：bin 源文件
-experiment-runner	crates/singlefs-verification/src/bin/e*.rs	实验装置要驱动真实 crates/ 代码时的只读 bin（2026-09-22 E156 撞上：岔路问的是「今天这份代码的性质」，另写一份独立模型答不了）。限定 e 开头加数字，碰不到 new_pool_file_creation_* 那几个生产装置；这个 bin 不许改 core/checker；验证包的改动改完直接跑、不开代码轮（`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」），越界写由写闸管
+experiment-runner	crates/singlefs-verification/src/bin/e*.rs	验证包 src/bin 下以 e<数字> 起头的 .rs（验证包的 bin 是门禁与崩溃入口起的工具，装置在实验包）；限定 e 开头加数字，碰不到 new_pool_file_creation_* 那几个工具；这个 bin 不许改 core/checker，越界写由写闸管
+experiment-runner	crates/singlefs-implementation-experiments/src/bin/e*.rs	入库装置（实验包）：实验装置要驱动真实 crates/ 代码时的只读 bin，岔路问的是「今天这份代码的性质」、另写一份独立模型答不了。限定 e 开头加数字，碰不到 new_pool_file_creation_* 与 deletion_write_dump 那几个共用装置；这个 bin 不许改 core/checker；实验包的改动进代码轮三方（`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」），越界写由写闸管
+experiment-runner	crates/singlefs-implementation-experiments/src/bin/e*/**	入库装置长成目录（e<号>_<名>/main.rs 加子模块）的那一种，限定与 src/bin/e*.rs 那一条相同
 experiment-runner	crates/mutations.tsv	入库装置的变异行只追加进末尾（experiment-runner.md 第 2 步与「写范围」；2026-09-23 E158 撞上：闸拒了那次追加，三行落进 scripts/mutation/tables/ 下、门禁 crates-mutation-replay 复跑不到）
 experiment-runner	scripts/mutation/tables/**	变异表
 experiment-runner	research/results/**	这个实验的产物
@@ -52,3 +54,37 @@ clerk	records/**	clerk.md「写范围」：一次性的活常写的地方
 clerk	research/prompts/**	clerk.md「写范围」：事实表、拷进仓的证据
 clerk	research/results/**	clerk.md「写范围」：拷进仓的产物
 clerk	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）
+experiment-designer	research/prompts/e*-preregistration.md	experiment-designer.md「写范围」：claim-experiment.sh 排他新建的跑前登记，之后追加或定点替换
+experiment-designer	research/prompts/e*-r*-prereg.md	experiment-designer.md「写范围」：重跑已有实验时排他新建的重跑登记
+experiment-designer	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）
+mutation-triage	$SINGLEFS_WORK_ROOT/**	mutation-triage.md「写范围」：只有报告文件与草稿目录，不改变异表、源码与测试
+prior-art	$SINGLEFS_WORK_ROOT/**	prior-art.md「写范围」：只有报告文件与草稿目录，不改 .claude/kb/prior-art.md
+sweep	$SINGLEFS_WORK_ROOT/**	sweep.md「写范围」：只有报告文件与草稿目录，不改任何被搜到的文件
+three-way-attack	research/prompts/*-opus-output.md	three-way-attack.md「写范围」：报告文件（形态 research/prompts/<轮>-opus-output.md，只写自己这一条腿的报告）
+three-way-attack	research/prompts/*-opus-model/**	three-way-attack.md「写范围」：模型目录里的文件（形态 research/prompts/<轮>-opus-model/，只写自己这一条腿的）
+three-way-attack	research/prompts/*-opus-model	three-way-attack.md「写范围」：模型目录本身
+three-way-attack	research/prompts/*-opus-s2-output.md	three-way-attack.md「写范围」：第二次同立场腿的报告（形态 research/prompts/<轮>-opus-s2-output.md，.claude/rules/three-way-inference.md「一条腿只抽一次样不算一次观测——否定结论尤其不算」）
+three-way-attack	research/prompts/*-opus-s2-model/**	three-way-attack.md「写范围」：第二次同立场腿的模型目录里的文件（形态 research/prompts/<轮>-opus-s2-model/）
+three-way-attack	research/prompts/*-opus-s2-model	three-way-attack.md「写范围」：第二次同立场腿的模型目录本身
+three-way-attack	$SINGLEFS_WORK_ROOT/**	报告文件、草稿目录与草稿目录里的仓副本（工作根）
+three-way-defense	research/prompts/*-sonnet-output.md	three-way-defense.md「写范围」：报告文件（形态 research/prompts/<轮>-sonnet-output.md，只写自己这一条腿的报告）
+three-way-defense	research/prompts/*-sonnet-model/**	three-way-defense.md「写范围」：模型目录里的文件（形态 research/prompts/<轮>-sonnet-model/，只写自己这一条腿的）
+three-way-defense	research/prompts/*-sonnet-model	three-way-defense.md「写范围」：模型目录本身
+three-way-defense	research/prompts/*-sonnet-s2-output.md	three-way-defense.md「写范围」：第二次同立场腿的报告（形态 research/prompts/<轮>-sonnet-s2-output.md，.claude/rules/three-way-inference.md「一条腿只抽一次样不算一次观测——否定结论尤其不算」）
+three-way-defense	research/prompts/*-sonnet-s2-model/**	three-way-defense.md「写范围」：第二次同立场腿的模型目录里的文件（形态 research/prompts/<轮>-sonnet-s2-model/）
+three-way-defense	research/prompts/*-sonnet-s2-model	three-way-defense.md「写范围」：第二次同立场腿的模型目录本身
+three-way-defense	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）
+three-way-forward	research/prompts/*-sonnet-output.md	three-way-forward.md「写范围」：报告文件（形态 research/prompts/<轮>-sonnet-output.md，只写自己这一条腿的报告）
+three-way-forward	research/prompts/*-sonnet-model/**	three-way-forward.md「写范围」：模型目录里的文件（形态 research/prompts/<轮>-sonnet-model/，只写自己这一条腿的）
+three-way-forward	research/prompts/*-sonnet-model	three-way-forward.md「写范围」：模型目录本身
+three-way-forward	research/prompts/*-sonnet-s2-output.md	three-way-forward.md「写范围」：第二次同立场腿的报告（形态 research/prompts/<轮>-sonnet-s2-output.md，.claude/rules/three-way-inference.md「一条腿只抽一次样不算一次观测——否定结论尤其不算」）
+three-way-forward	research/prompts/*-sonnet-s2-model/**	three-way-forward.md「写范围」：第二次同立场腿的模型目录里的文件（形态 research/prompts/<轮>-sonnet-s2-model/）
+three-way-forward	research/prompts/*-sonnet-s2-model	three-way-forward.md「写范围」：第二次同立场腿的模型目录本身
+three-way-forward	$SINGLEFS_WORK_ROOT/**	报告文件与草稿目录（工作根）
+three-way-materials	research/prompts/_*-checklist.md	three-way-materials.md「写范围」：小节清单
+three-way-materials	research/prompts/_*-appendix.md	three-way-materials.md「写范围」：附录
+three-way-materials	research/prompts/_*-background.md	three-way-materials.md「写范围」：背景材料
+three-way-materials	research/prompts/_*-diff.md	three-way-materials.md「写范围」：代码轮的 diff 材料
+three-way-materials	research/prompts/*-snapshot/kb-sha256.txt	three-way-materials.md「写范围」：开工快照的 kb 清单
+three-way-materials	research/prompts/*-snapshot/crates-sha256.txt	three-way-materials.md「写范围」：开工快照的 crates 清单（代码轮）
+three-way-materials	$SINGLEFS_WORK_ROOT/**	辅助脚本与草稿目录（工作根）

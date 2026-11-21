@@ -32,8 +32,8 @@ crates/singlefs-background-gpu/src/live_slot_kernels.rs	# 选段打分段重复�
 crates/singlefs-core/src/instance_table_sweep.rs	# 实例表扫描与丢弃判定
 crates/singlefs-core/src/mount.rs	# 挂载状态机与阶段准入
 crates/singlefs-core/src/recovery.rs	# 崩溃恢复与版本重建
-crates/singlefs-verification/src/bin/e158_root_choice_repair.rs	# 根择取修复实验二进程
-crates/singlefs-verification/src/bin/e182_unreadable_abandoned_root_forks.rs	# 读不出根分支实验二进程
+crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair.rs	# 根择取修复实验二进程
+crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks.rs	# 读不出根分支实验二进程
 crates/singlefs-verification/src/bin/e205_c971_inverted_first_txg_arm_costs.rs	# 倒挂代价实验二进程
 crates/singlefs-verification/src/crash_injection.rs	# 崩溃注入与重放支持
 crates/singlefs-verification/src/crash_library.rs	# 崩溃库与场景构造
@@ -49,6 +49,16 @@ scripts/gate/admission.py	# 准入规则检查与判定
 scripts/gate/apply-writer-patch.py	# 写者补丁应用脚本
 scripts/gate/merge-and-verify.sh	# 合并与验证流水线脚本
 scripts/gate/refused-test-registry.py	# 拒测登记同步与自检
+records/2026-11-17-里程碑四收口续做.md	# 里程碑四收口调度记录：D22 已定项 2 用户定案与录制流不带块宽的判，kb 写回引它
+research/prompts/m4-close-c1040-c1041-code-r1-main-verification.md	# C1040、C1041 代码轮判决：只读挂载比探测值的改法，kb 写回引它
+crates/singlefs-core/src/mounted_read.rs	# 只读挂载逐盘比探测到的物理块大小（C1040 修补第二步）
+crates/singlefs-core/src/make_filesystem.rs	# mkfs 时参数与探测不同就拒（C1040 修补）
+crates/singlefs-verification/src/memory_pool.rs	# 内存池记每块盘的块宽（C1040 修补第二步）
+crates/singlefs-core/src/mount.rs	# 可写挂载逐盘比探测值与系统配置记录值（C1040），kb 写回 D22、D20、D21 的实现边界引它
+crates/singlefs-core/src/system_configuration.rs	# 系统配置几何段记 mkfs 时的 physical_block_size（C1040），kb 写回引它
+crates/singlefs-verification/src/crash_amplification/recorded_flow.rs	# 录制流的字节格式不带块宽（C1056），kb 写回引它
+scripts/experiment-apparatus/on-request-experiments.tsv	# E180 登成按要求才跑（用户定），实验页引它
+.claude/gate.d/path-moves.tsv	# crates 代码拆分的搬迁登记，实验页改拆后路径引它
 
 
 

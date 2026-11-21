@@ -21,7 +21,7 @@ scripts/gate/admission.py	selftest	# 临时仓里跑：单元键的阳性与阴�
 scripts/agents/agent-cost.py	selftest	# 造几条会话记录在内存里算账；outcome 那一段在临时目录里用 git 造一个小仓和一棵工作树（git init、commit、worktree add），再按它算桶，不起 cargo、编译、虚机
 scripts/agents/agent-handover.py	selftest	# 只起它自己（--selftest 的子角色）读造出来的会话记录
 scripts/agents/active-sessions.py	selftest	# 临时目录里造假的会话登记与会话记录，进程活没活由假的启动时刻表定，各格在本进程里按线程跑，自证不另起子进程
-scripts/agents/agent-watch.py	selftest	# 起的子进程是它自己（report、watch 各种起法，根分区可用量、状态目录、会话登记、草稿根都换成环境变量给的假值与临时目录）、开着样本输出文件的只睡的 sleep 与 bash（含 exec sleep），一个一直往文件里写的 python 小脚本，以及一个放在临时目录里、名字像 task-server/task wait 的只睡的 python 替身（不连任务服务）；不起 cargo、编译、虚机，不连真服务
+scripts/agents/agent-watch.py	selftest	# 起的子进程是它自己（report、watch 各种起法，根分区可用量、状态目录、会话登记、草稿根都换成环境变量给的假值与临时目录）、开着样本输出文件的只睡的 sleep 与 bash（含 exec sleep），一个一直往文件里写的 python 小脚本，以及一个放在临时目录里、名字像 task-server/task wait 的只睡的 python 替身（不连任务服务），以及在临时目录里造小仓、起 git（init、symbolic-ref、add、commit、mv、rm、update-ref、log、branch、status、diff、ls-files、cat-file、rev-parse，读用户与系统的配置一律关掉，只有本机 git 配置那一格换成临时目录里自造的配置文件）与一个只睡的 sh 脚本顶替 git（造超时，仓根、git 与时限都换成环境变量给的值，不读本仓），把这一节给人抄的几条 git 命令各原样写进临时目录里的一份 manual-command.sh、交给 bash 起那份文件（各在自己的进程组、60 秒到点停那一组、只读小仓），并读写小仓里的文件取内容摘要（含一个没有写端的命名管道，不打开它；文件名带换行与不是 UTF-8 字节的文件、目标不是 UTF-8 的符号链接、改执行位、写小仓的 .git/info/exclude 与一份 core.excludesfile），在临时会话目录里落盘基线，在本进程里照假时钟走几串看门狗的起来与退出（只调函数、不另起子进程、不等）；不起 cargo、编译、虚机，不连真服务
 scripts/gate/apply-writer-patch.py	selftest	# 临时仓里 git apply，门禁那一步换成 true；开工快照那两格在临时仓里造一轮三方轮的快照目录（只写文本），不编不跑
 scripts/gate/baseline-diff.sh	selftest	# 临时仓里用假门禁（fake-gate.sh、fake-doc-lint.sh）造局面，只起 git（worktree add / remove）、bash、python3，不起 cargo、编译、虚机；BASELINE_DIFF_BREAK 六个开关各让几项判红
 scripts/kb/archive-past-rounds.py	selftest	# 临时目录里 git 仓上判归档，不起编译
@@ -34,6 +34,7 @@ scripts/hosts/capped.sh	selftest	# 起 true、printenv、bash -c 'exit 7' 核线
 scripts/hosts/heavy-threads.sh	selftest	# 临时目录里造样本树（拷这一份与 heavy_threads.py、按格写登记），只起 bash 与 python3 取值、对拍，不起 cargo
 scripts/hosts/heavy_threads.py	selftest	# 临时目录里造样本树按格写登记，只起 python3 与 bash 取值、对拍，不起 cargo
 scripts/gate/changed-paths.sh	selftest	# 临时 git 仓里取改动路径
+scripts/gate/crate-cross-references-check.py	selftest	# 临时目录里现造几棵小树（录好的 .d 与包清单），起的 cargo 与 rustc 是判法自己写的假工具（只答版本、照清单打 metadata 与 check 的输出），另起 admission.py unit-key 算判法闭包的键与 rocksdb-prebuilt.py entry（假 cargo 带它认的标记、不判），不编；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/gate/crate-cross-references-check.py --selftest
 scripts/gate/checker-direction-overlap.py	selftest	# 临时目录里现造几棵小仓（两个小 crate 的 Cargo.toml 与 .rs、入口登记表），判法在进程内经 lib_function_units.py 读源码收闭包，只另起一次它自己（平常跑设弄坏开关被拒那一格），不起 cargo、编译
 scripts/crash/check-segment-registry.py	selftest	# 读真仓的布局表、它点名的 crates 用例与脚本旁边的产物样本（不读 research/），在临时目录里改坏一处看它判红，不起子进程
 scripts/agents/checklist-specs.py	selftest	# 造带空格标题的清单，只起它自己
@@ -49,6 +50,7 @@ scripts/crash/crash-amplification.sh	selftest	# 分项驱动换成假的（CRASH
 scripts/crash/crash-amplification-item.sh	selftest	# 拿造出来的派活计划行走判法，本机那一趟与双机驱动都是假的，不编、不跑、不上卡、不连第二台；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
 scripts/crash/crash-amplification-lib.sh	selftest	# 自证里的仓根是临时目录下的假树，cargo 是 PATH 前面的假脚本（跑着时占着一个文件、收到 TERM 慢一点放掉再退，sleep 加 trap 记录），不起 cargo、编译、虚机、GPU；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
 scripts/crash/crash-point-replay.sh	selftest	# 小仓里的合表、假的崩溃点重放门禁、假的放量入口与假的准入模块，PATH 最前面放假 cargo（起之前核 PATH 上解到的就是它）；清场走真的 gpu-quiesce-run.sh、多机配置是临时目录里只写假清场命令的一份；按条复用那几格在小仓（git 仓、一个包四条测试函数）上用真的 admission.py 算键、查库、写回临时 prune-server，cargo 与 rustc 只答版本：不编、不跑、不上卡；开关轮可分段点名单跑：CRASH_POINT_REPLAY_SELFTEST_WHEEL_SEGMENT=<段号>/10 写在包装前面（env 前缀）只跑开关轮那一段的开关，=base 只跑基准趟各格；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
+scripts/crash/crash-library-totals.sh	selftest	# 临时目录里的小仓（验证包清单）与只写 ENABLE_GPU 的两份多机配置，PATH 最前面放假 cargo：只记一行参数、目录与交来的多机配置，把造好的读库程序输出原样打出、照给的码退；真跑的只有 python3 的 rocksdb-prebuilt.py entry 与 lib_crash_point_replay_items.py reader-features；不编、不连 prune-server、不上卡
 scripts/crash/crash-point-replay-shard-configuration-check.sh	selftest	# 临时目录里造多机配置（主机数组是 127.0.0.1 与文档用的地址段，按台三键 CARGO_BIN_DIRECTORY_BY_HOST、BUILD_ROOT_BY_HOST、SLICE_MEMORY_CAP_BY_HOST 写全），PATH 最前面放假 ssh：判配置那几格的假 ssh 只记一行、退 255，两台都查 cargo 那几格的假 ssh 记一行、把要在对面跑的那条命令就地跑（两台那一项的 cargo 目录都在临时目录里）；开关轮再起自己的 --selftest；只判配置，不起 cargo、不连第二台
 scripts/crash/crash-amplification-two-hosts.sh	selftest	# 自证里本机那一趟、第二台（换掉 multi-host-run.sh）、清场（换掉 peer-host-lib.sh）与用例全是假的：不起 cargo、不连第二台、不上卡；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
 scripts/crash/gpu-exemptions-check.py	selftest	# 临时目录里造豁免表与 crates/ 下一份 .rs，只读文本、不起子进程
@@ -62,7 +64,11 @@ scripts/gate/crate-sources-reachable.py	selftest	# 临时目录里现造两棵�
 scripts/gate/refused-test-registry.py	selftest	# 临时目录里造登记表与 test-plan 的标准输出，另造假的 admission.py 起一趟子进程；不起 cargo，不连判定库服务
 scripts/gate/data-name-lint.py	selftest	# 临时目录里现造小仓（一份 .rs、一份 kb 表格、登记表与排除表），只读文本、判法在进程内，开关轮只再起自己的 --selftest-inner，不起 cargo
 scripts/gate/directory-layout-check.py	selftest	# 按内存里的文件清单判，另在临时目录里走一棵小树，只读文件，不起别的进程
+scripts/gate/crate-roles-check.py	selftest	# 每格在自己的临时目录里写一棵小 crates/（Cargo.toml、src、tests 与三张登记表）在进程内判，另起两次自己的入口（平常跑设开关、认不得的参数），不起 cargo、编译
+scripts/gate/large-file-git-hook.py	selftest	# 每格自己在临时目录里建小 git 仓与本地裸远端，经 core.hooksPath 起进仓的钩子，真跑 git commit、merge、am、cherry-pick、revert、rebase 与 git push 各种写法，各格并行；起的子进程是 git、bash、python3、sed 与放在 PATH 前面的假 git（diff 时睡 30 秒、造判法超时），不编不跑重活
+scripts/gate/git-hooks-install.py	selftest	# 每格自己在临时目录里建小 git 仓与桩钩子（git init、commit、worktree add、checkout、reset、config），经 core.hooksPath 核装没装上，各格并行；第二台那一支换成假的 peer-host-lib.sh，只起 bash 与 python3，不连第二台
 scripts/gate/rust-name-collisions.py	selftest	# 在临时目录里写两棵小工作区（Cargo.toml 与几份 .rs），经 lib_function_units 只读切单元判撞名，开关轮只起它自己的 --selftest-inner，不编译、不起 cargo
+scripts/gate/crates-split-pure-move.py	selftest	# 在临时目录里现造小工作区（Cargo.toml 与几份 .rs、.wgsl）、小变异表与小登记表目录，经 lib_function_units 只读切单元，各格并行；开关轮只再起它自己的 --selftest；不编译、不起 cargo
 scripts/gate/lkmm-selftest.sh	selftest	# 照门禁 lkmm 的样本 setup.sh 在临时目录造现场，PATH 前面放样本里的假 herd7（打固定版本串、照 litmus 交判定）与假内核树，起 .claude/scripts/lkmm.sh 与 lib_reuse_checks.py；不起真 herd7、cargo、编译；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
 scripts/gate/lib_reuse_checks.py	selftest	# 三问与哨兵在内存里判造出来的结局；命令行、上次红的清单与 audit 只在临时目录里起它自己与临时小仓里只 echo 的假自证，不起 cargo、编译、虚机；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
 scripts/mutation/crates-mutation-rows.py	selftest	# 临时仓里拿假 cargo（FAKE_CARGO）与假内存包装跑那一道的派活；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
@@ -99,6 +105,10 @@ scripts/experiment-apparatus/e165-pin-red-examples.py	selftest	# 桩装置、假
 scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh	selftest	# 临时仓里拿假 cargo（FAKE_CARGO）跑整轮；判定写进临时 prune-server（每一趟一份命名空间），续跑几格、改判法一格与复用六格的装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假树里的 Python 函数，judge: 换成自证写进假树的 e165_kill_bounds_selftest_judge.py::judge_variant（判法闭包在假树上算，不碰本仓）；裸跑退 2：起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash scripts/experiment-apparatus/e165-replay-mutation-kill-bounds.sh --selftest；不起 cargo build
 scripts/experiment-apparatus/e10-aging-compaction-run.sh	selftest	# 自证把本脚本与共用库拷进临时树（.claude 与 long_run_item_verdicts.py 是指回真仓的符号链接），默认位置上是假装置、PATH 最前面是假 nice 与假 cargo（只记一笔）；判定写进临时 prune-server，装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假树里的 Python 函数（算键只问 python3 --version）；九格加复用六格；不起 cargo、编译、虚机
 scripts/experiment-apparatus/e56-sweep.sh	selftest	# 自证把本脚本拷进临时树，PATH 最前面放假 cargo（build 退 0，run 打两行 E7RESULT），镜像落临时目录；三格；不起 cargo、编译、虚机
+scripts/experiment-apparatus/e56-vm-bench-run.sh	selftest	# 自证每格各造临时树：PATH 最前面放假 cargo（不编，按 --target 把假二进制放进环境给的编译目录并报位置）与假的 scripts/devices/vm-bench.sh（不开虚机）；十八格并行；不起 cargo、编译、虚机
+scripts/experiment-apparatus/e07-vm-bench-run.sh	selftest	# 自证每格各造临时树：PATH 最前面放假 cargo（不编，按 --target 把假二进制放进环境给的编译目录并报位置）与假的 scripts/devices/vm-bench.sh（不开虚机）；十九格并行；不起 cargo、编译、虚机
+scripts/experiment-apparatus/e53-vm-bench-run.sh	selftest	# 自证每格各造临时树：PATH 最前面放假 cargo（不编，按 --target 把假二进制放进环境给的编译目录并报位置）与假的 scripts/devices/vm-bench.sh（不开虚机）；二十格并行；不起 cargo、编译、虚机
+scripts/experiment-apparatus/e159-vm-bench-run.sh	selftest	# 自证每格各造临时树：PATH 最前面放假 cargo（不编，按 --target 把假二进制放进环境给的编译目录并报位置）与假的 scripts/devices/vm-bench.sh（不开虚机）；二十格并行；不起 cargo、编译、虚机
 scripts/experiment-apparatus/e180-reading-shards.sh	selftest	# 自证用假装置、PATH 最前面的假 cargo（只记一笔、编不过）、假机器清单与假的 task-server（照分片协议逐步起本脚本），十七格；不起真 cargo、编译、虚机
 scripts/experiment-apparatus/e181-landing-check-long-run.sh	selftest	# 自证把本脚本与共用库拷进临时树（E181_BINARY 指到树里的假装置；built-here 那一格 PATH 最前面是假 cargo；树里没有 scripts/hosts/）；判定写进临时 prune-server，装置入口经 LONG_RUN_ITEMS_SELFTEST_ENTRIES 换成假树里的 Python 函数（算键只问 python3 --version）；十格加复用六格；不起 cargo、编译、虚机
 scripts/experiment-apparatus/e182-single-device-long-run.sh	selftest	# 自证把本脚本拷进临时树，树里是假装置与 PATH 最前面的假 cargo（只记一笔；树里没有 scripts/hosts/，不套线程与内存包装），二十二格；不起 cargo、编译、虚机；片结果经中转目录并回临时 prune-server；裸跑退 2：自证只在临时 prune-server 上跑（开跑先调客户端 selftest_service_problem，不写真服务），起法 python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <单独一个 --selftest 的原命令>；包装起临时服务（整条不带 --server-binary，服务给编译目录、包装现编），盯轻重的仍是 -- 后面那条原命令
@@ -125,6 +135,7 @@ scripts/hosts/memory_peaks_lib.py	selftest	# 只调本库的函数、在临时�
 scripts/hosts/queue-health.py	selftest	# 临时目录里造 /proc、cgroup 与打固定几行的假 nvidia-smi；第二台那一段的命令文本放在本机 bash 里跑、不连 ssh；只另起它自己（开关轮、平常跑设开关被拒那一格），不起 cargo、编译、虚机
 scripts/hosts/multi_host_addresses.py	selftest	# 临时目录里的假多机配置（127.0.0.1 与文档用的地址段），起真的配置判法 --emit-addresses（只读配置与 ip -o addr show、不连任何一台），不起 cargo
 scripts/gate/hook-swap.py	selftest	# 临时目录里造假钩子与假共用模块，喂 JSON 只起 bash 与 python；结局文件的格在临时目录里 git init 小仓、swap 里问 git rev-parse 认仓根，只多起 git
+scripts/gate/make-swap-spec.py	selftest	# 临时目录里造基线与新版两棵小树，纯文本比对与施加，几格在线程池里并行；取工作根与仓副本的几格造小仓经 lib_repository_copy 起 rsync 拷文件
 scripts/kb/insert-row.py	selftest	# 临时文件上插行
 scripts/kb/ledger-append-section.py	selftest	# 临时目录里造假账本与假登记表，追加一节；两个进程同时追加只起它自己的入口（对齐目录里的文件排好先后），不起 cargo、虚机或别的重活
 scripts/kb/append-record.py	selftest	# 临时目录里造假仓（抄一份真的判据库）与假记录，追加、拒绝与读到写之间被改过都在进程里做；入口那几格只起它自己，不起 cargo、虚机或别的重活
@@ -178,6 +189,7 @@ scripts/agents/who-touched.py	selftest	# 临时目录里造假的会话登记与
 scripts/agents/three-way-rerun-template.sh	selftest	# 把自己拷进临时目录，用假仓（空 .git 与空包装文件）与假冻结副本起拷贝，只起 bash、cp、rsync、grep，不起 cargo
 scripts/agents/remind.sh	selftest	# 登记、重起、停、列各走临时登记目录，计时周期缩成零点几秒；只起它自己、sleep 与 ps，不起 cargo、编译、虚机
 scripts/gate/lib_rebuilt_packages.py	selftest	# 临时目录里手写补丁、Cargo.toml、编译日志与 dep-info，只调判法函数，不起 cargo
+scripts/gate/lib_rust_test_module_files.py	selftest	# 内存里与临时目录里摆几份几行的小 Rust 源码判整份算测试代码的文件，只读自己写的临时文件，不起子进程、cargo、编译
 scripts/mutation/lib_release_only_tests.py	selftest	# 临时目录里手写一份登记表，只调判法函数，不起子进程、不起 cargo
 scripts/gate/lib_function_units.py	selftest	# 临时目录里现造小 Rust 工作区（四个只有清单与源码的 crate）、python 与 shell 样本，判法在进程内，只起 bash -n / declare -f 解析样本 .sh；preflight 装载器两格在临时目录里拷一棵只有 .claude/ 的小树（另一格 git init 加 worktree add），起 bash source 与 python3 import 那两份装载器；import 时执行那一格起 python3 跑临时目录里的小入口看退出码；真仓那几格把本仓 scripts/ 与 .claude/（不带 fixtures、kb）拷进临时目录、在拷贝上改几处原文算键（unit-graph 输入那一格另拷 Cargo.lock 与 crates/singlefs-unit-graph 的源码，只读不编）；词法缓存目录名那两格在进程内把本仓这份库的原文改几处另执行成模块；自证夹具从同目录 lib_function_units_selftest_fixtures.py 载入；不起 cargo、rustc、编译
 scripts/gate/patch-of-the-current-tree.py	selftest	# 临时目录里造假仓（git init 的假树）与假补丁目录，进程内跑十格，只起 git，不起 cargo、编译、虚机
@@ -191,6 +203,7 @@ scripts/agents/lib_session_directory.py	selftest	# 在临时目录里造家目�
 scripts/agents/lib_session_registry.py	selftest	# 在临时目录里造假的会话登记与假的 /proc 启动时刻，进程内调读登记、判活、按会话号与按名字挑的几个函数，不读本机会话、不起子进程与 cargo
 # 钩子
 .claude/hooks/ask-user-claim-guard.sh	selftest	# 喂造出来的问句，只起它自己的入口
+.claude/hooks/ask-user-placement-guard.sh	selftest	# 喂造出来的弹窗，读仓里 .claude/rules/directory-layout.md 那一节，只起它自己的入口
 .claude/hooks/bash-command-detector.sh	selftest	# 在临时目录里判造出来的命令文本，只起它自己的入口
 .claude/hooks/continuation-guard.sh	selftest	# 喂造出来的会话记录，只起它自己的入口
 .claude/hooks/handback-guard.sh	selftest	# 喂造出来的交回正文，起一条 sleep 当在跑的任务
@@ -200,6 +213,7 @@ scripts/agents/lib_session_registry.py	selftest	# 在临时目录里造假的会
 .claude/hooks/lib_work_root.py	selftest	# 在内存里换环境变量、在自证自己的临时目录里写几份假多机配置与假 .git 判数据根、主工作树根、工作根与两张名单；命令行那几格只起它自己的入口，不起别的子进程
 .claude/hooks/lib_workspace_cargo_lock.py	selftest	# 临时目录里造一个 git 仓当主工作区、再 git worktree add 一棵，只起 git，不起 cargo；cargo 只是被判的命令文本
 .claude/hooks/remind-rearm-stop-guard.sh	selftest	# 临时登记目录里造登记，喂造出来的 hook JSON，起 sleep 与 bash -c 当在等的进程，不起 cargo
+.claude/hooks/session-number-stop-check.sh	selftest	# 喂造出来的 Stop 与 SubagentStop 的 hook JSON 与一份造出来的会话记录，状态目录与检出记录都写临时目录，只起它自己的入口，不起 cargo
 .claude/hooks/completion-cleanup-guard.sh	selftest	# 临时目录里造工作根、归属文件、运行目录与会话记录，喂造出来的 hook JSON，起 sleep、bash -c 与 python3 -c（只映射一份文件）当在跑的后台任务、起运行目录的假入口与占着文件的进程，只起 du、stat，不起 cargo
 .claude/hooks/runner-dispatch-guard.sh	selftest	# 喂造出来的派发提示，只起它自己的入口
 .claude/hooks/run-scope-guard.sh	selftest	# 在临时目录里判造出来的命令文本与驱动脚本，另起它自己的入口喂造出来的 hook JSON（检出记录与上次红的清单都写临时目录）；不起 cargo、编译、虚机
@@ -216,7 +230,7 @@ scripts/agents/lib_session_registry.py	selftest	# 在临时目录里造假的会
 .claude/gate.d/lib/broad-mutation-samples.py	selftest	# 没有自证入口，判别力由门禁 broad-mutation 的样本档覆盖；直接执行不带参数只打用法、退 2，什么都不跑
 # 门禁阶段的样本档（理由写样本里起的是什么、靠什么避开真家伙）
 .claude/gate.d/crash-point-replay.sh	samples:.crash-point-replay-sample-tools	# 样本根放了 .crash-point-replay-sample-tools（假 cargo、假 rustc，照 cases/ 打日志），阶段走样本档、判绿退 3；unit-key-samples-* 另由 admission.py 在样本的小工作区上算键、查库（不编不跑），unit-key-plan-* 由样本里的 .unit-verdict-sample/plan-failure 让 admission.py 装失灵（不编不跑）；static-check-red 没放标记，开跑前的静态判据先判红、不起 cargo
-.claude/gate.d/checker-independence-and-sync.sh	samples	# 只读样本里的 crates 源码与布局登记，不起 cargo
+.claude/gate.d/checker-independence-and-sync.sh	samples:.crate-cross-references-sample-tools	# 别的格只读样本里的 crates 源码与布局登记，不起 cargo；crate-cross-references 格的样本根放 .crate-cross-references-sample/（录好的 .d 与包清单），判法 scripts/gate/crate-cross-references-check.py 照它往 .crate-cross-references-sample-tools/ 写假 cargo 与假 rustc，不编；那一格的判法开跑先核临时 prune-server（selftest_service_problem），样本档包在临时 prune-server 底下起
 .claude/gate.d/broad-mutation.sh	samples:.broad-mutation-sample	# 样本根放了 .broad-mutation-sample（一行 scenario=<情形>），阶段在样本模式下先起 .claude/gate.d/lib/broad-mutation-samples.py 造现场：summary 族只写录好的 --summary 输出与退出码（只起 python3）；units 族另写一棵小工作区、载入驱动调算单元键的纯函数，经驱动把清单与判定写进判定库服务（临时命名空间），格再起真驱动 --summary（读判定库服务，--toolchain-from、--tools-from 取样本里的两份文件）；units 族要连得上服务，样本档包在临时 prune-server 底下起（python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d --item broad-mutation.sh）；不起 cargo、不编不跑
 .claude/gate.d/crates-mutation-replay.sh	samples:.crates-mutation-replay-sample-tools	# 样本根放 .crates-mutation-replay-sample-tools（标记）：起 cargo 的是 crates-mutation-rows.py sample-tools 现写的假 cargo 与假 llvm 工具，不编译，红绿样本照假 cargo 打的日志判
 .claude/gate.d/formal-verification.sh	samples:.formal-fake-tools	# 样本根的 .formal-fake-tools/ 由阶段开跑时写（verus-proof-check.py write-fake-tools：假 verus、cargo、cargo-verus），Verus 那几份样本不起真 Verus 与真 cargo

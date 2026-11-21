@@ -11,8 +11,9 @@ project-code-guard.sh（PreToolUse[Bash]）在 scan_decision() 里调这一份�
   ③ 编译目录：显式给的（--target-dir、CARGO_TARGET_DIR、CARGO_BUILD_TARGET_DIR、--config build.target-dir=…；变量先看命令文本里设的，再看钩子自己的环境）在仓外放行、在仓里拒；
      没显式给而包在 scripts/hosts/run-build-directory.sh 里的放行（它给这一次一个自己的编译目录、跑完删）；再看配置文件（起它的目录往上每层的 .cargo/config.toml、
      $CARGO_HOME/config.toml）的 build.target-dir；都没有就是默认的 <工作区根>/target，在仓里，拒。写了而此刻算不出（带没赋过的变量）的不拒，交一句 notice。
-  ④ 拒绝说明写出哪一条、为什么，与出路：经 task-server 提交（`task-server/task submit -- <原命令>`，服务给这一次一个仓外的编译目录、跑完留给提交它的 agent，
-     用完 `task-server/task clean <号>` 删；records/2026-10-30-编译绕过内存总上限.md「收尾批」那一节「统一收起来、统一管理」）。不再给「包一层」「自己给仓外 CARGO_TARGET_DIR」的写法：
+  ④ 拒绝说明写出哪一条、为什么，与出路：经 task-server 提交（`task-server/task submit -- <原命令>`，服务按这棵树给一个仓外的编译目录、经 CARGO_TARGET_DIR 交给命令；
+     编译目录归树、不归任务，不用自己删：树是任务 --cwd 解开符号链接后往上第一层有 .git 的那一层（哪一层都没有就是解开后的 --cwd 本身），
+     树删了服务跟着删它那一整组，task-server/README.md「编译目录」；records/2026-10-30-编译绕过内存总上限.md「收尾批」那一节「统一收起来、统一管理」）。不再给「包一层」「自己给仓外 CARGO_TARGET_DIR」的写法：
      不经服务直接起的会编的 cargo 由 project-code-guard.sh 文件头「经 task-server 起」① 照拒，那两种写法照抄也过不去。
   不读脚本正文：入口脚本自己起的 cargo 不在射程里。
 
@@ -33,7 +34,7 @@ project-code-guard.sh（PreToolUse[Bash]）在 scan_decision() 里调这一份�
       「编译目录：--target-dir 指到仓外：放行」「编译目录：--config build.target-dir 指到仓外：放行」「编译目录：包装脚本外面又给了仓里的 CARGO_TARGET_DIR：拒」等 9 格
   WORKSPACE_CARGO_LOCK_BREAK=wrapper-not-recognized  不认 run-build-directory.sh 包着的
       「编译目录：经包装脚本起：放行」「编译目录：内存包装里套包装脚本起：放行」「编译目录：包装脚本里 bash -c 再 cd 进 crates/ 起：放行」
-  WORKSPACE_CARGO_LOCK_BREAK=refusal-submit-dropped  拒绝说明不写经 task-server 提交与 task clean 的出路
+  WORKSPACE_CARGO_LOCK_BREAK=refusal-submit-dropped  拒绝说明不写经 task-server 提交的出路与编译目录归树的说明
       「编译目录：拒绝说明给出经 task-server 提交的出路」；project-code-guard.sh 自检「编译目录：拒绝说明给出经 task-server 提交的出路」「lib_workspace_cargo_lock.py 的自检」
   WORKSPACE_CARGO_LOCK_BREAK=non-building-refused  不编的子命令也判
       「编译目录：cargo fmt：放行」「编译目录：cargo metadata、cargo tree、cargo clean：放行」
@@ -221,11 +222,12 @@ def workspace_cargo_target_refusal(command, directory, shell_words, project_code
     if not refused:
         return None, notices
     lines = [f"✗ 主工作区里直接起的 cargo 会编进主仓 {main} 里：{refused[0]}"] + [f"  另有：{entry}" for entry in refused[1:]]
-    lines.append("  （用户定案「所有脚本自行编译，完成后自行删除 不再预留生成物」：编译目录用完就删，主工作区的 target/ 删了又长的那条路由这一道堵上）")
+    lines.append("  （这一道堵的是主工作区里直接起的会编的 cargo 编进 <仓根>/target、删了又长的那条路）")
     if not switch_is_set("refusal-submit-dropped"):
         lines += [f"→ 怎么办：经 task-server 提交：`{TASK_SERVER_CLIENT} submit -- <原命令>`（范围声明写在 submit 前面，内存包装去掉；有 &&、管道、cd 的写成 "
                   f"`{TASK_SERVER_CLIENT} submit -- bash -c '<命令>'`），再用 run_in_background 起 `{TASK_SERVER_CLIENT} wait <号>`；",
-                  f"  服务给这一次一个仓外的编译目录（wait 末行 build=），跑完留给你，用完 `{TASK_SERVER_CLIENT} clean <号>` 删，不直接 rm；",
+                  "  服务按这棵树给一个仓外的编译目录、经 CARGO_TARGET_DIR 交给命令（同一棵树先后交的接着编）；编译目录归树、不归任务：不用自己删、不直接 rm，"
+                  "树是任务 --cwd 解开符号链接后往上第一层有 .git 的那一层（哪一层都没有就是解开后的 --cwd 本身），树删了服务跟着删它那一整组；",
                   "  子 agent 不往统一任务服务交任务（submit、wait、clean 都不起）：把那一条拼成 submit 的整条写进报告「要主 agent 跑的命令」一节交回，由主 agent 交；",
                   "  不编的子命令（fmt、metadata、tree、clean）不拦；判法在 .claude/hooks/lib_workspace_cargo_lock.py 文件头「编译目录」一段，提交写法在 task-server/README.md「提交写法」。"]
     return "\n".join(lines), notices
@@ -302,7 +304,9 @@ def selftest():
         target_cell("编译目录：仓里的配置文件给的 build.target-dir 在仓里：拒", "cargo build", configured_inside, True)
         target_cell("编译目录：包装脚本外面又给了仓里的 CARGO_TARGET_DIR：拒", f"CARGO_TARGET_DIR={main}/target bash scripts/hosts/run-build-directory.sh cargo build", main, True)
         target_cell("编译目录：拒绝说明给出经 task-server 提交的出路", "SINGLEFS_RUN_SCOPE='x' bash scripts/hosts/run-with-memory-cap.sh 12G cargo test -p singlefs-verification --lib", main, True,
-                    extra=lambda message: "→ 怎么办" in message and f"{TASK_SERVER_CLIENT} submit -- " in message and f"{TASK_SERVER_CLIENT} clean <号>" in message
+                    extra=lambda message: "→ 怎么办" in message and f"{TASK_SERVER_CLIENT} submit -- " in message and "经 CARGO_TARGET_DIR 交给命令" in message
+                    and "解开符号链接后往上第一层有 .git 的那一层" in message and "解开后的 --cwd 本身" in message
+                    and "这一道堵的是主工作区里直接起的会编的 cargo" in message and "用完就删" not in message
                     and "默认编进" in message and RUN_BUILD_DIRECTORY_SCRIPT not in message)
         target_cell("编译目录：带仓外 CARGO_TARGET_DIR：放行", f"CARGO_TARGET_DIR={outside} cargo build", main, False)
         target_cell("编译目录：先赋变量再拼仓外 CARGO_TARGET_DIR：放行", f"D={work}; CARGO_TARGET_DIR=$D/outside-target cargo test -p singlefs-verification --lib", main, False)
@@ -334,7 +338,7 @@ def selftest():
               f"（剥包装在 lib_project_code_runs.py 的 command_under_launcher）；{BREAK_VARIABLE} 设着的话这里本来就该红（项与红的格见文件头）")
         return 1
     print(f"  ✓ lib_workspace_cargo_lock 自检通过（查了 {checked} 格）："
-          "编译目录：主仓里直接起的会编的 cargo（裸起、cd 进 crates/、经内存包装、capped.sh、nice、timeout、env、bash -c、/usr/bin/time 包着，CARGO_TARGET_DIR、--target-dir、配置文件指到仓里）拒绝并给出经 task-server 提交、用完 task clean 的出路，"
+          "编译目录：主仓里直接起的会编的 cargo（裸起、cd 进 crates/、经内存包装、capped.sh、nice、timeout、env、bash -c、/usr/bin/time 包着，CARGO_TARGET_DIR、--target-dir、配置文件指到仓里）拒绝并给出经 task-server 提交、编译目录归树不用自己删的出路，"
           "仓外的 CARGO_TARGET_DIR（命令前、export、env、会话环境）、--target-dir、--config、配置文件，run-build-directory.sh 包着的（连同内存包装里套它、它里面 bash -c），不编的子命令，仓副本与 git worktree 加出来的树放行，算不出的放行并记一条")
     return 0
 

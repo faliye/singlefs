@@ -14,6 +14,12 @@
 bash-command-detector.sh ⑫ 的 bash_scope_verdict 与 write-guard.sh 第二道都调 landings_out_of_scope，落点一份判法；
 它的弄坏开关 WRITE_GUARD_BREAK=landing-lexical-only 经 lexical_only 参数交进来（退回只按字面规整）。
 
+已有门禁的样本档目录（write-guard.sh 第十一道那一半与 bash-command-detector.sh ⑭ 那一半用同一份）：
+  existing_gate_of_fixture(relative, root, directory_itself=False) -> 门禁阶段的文件名或 None
+                                                                                    相对仓根的路径落在 .claude/gate.d/fixtures/<门禁>/ 里、<root>/.claude/gate.d/<门禁> 是已存在的普通文件；
+                                                                                    directory_itself 时 .claude/gate.d/fixtures/<门禁> 这个目录本身也算
+  holds_existing_gate_fixtures(relative, root) -> bool                              相对仓根的目录是样本档根或它的上级（仓根、.claude、.claude/gate.d），而样本档根下有已有门禁的样本目录
+
 弄坏开关不在这里：三个入口各有各的（write-guard.sh 的 WRITE_GUARD_BREAK=scope-root-unanchored 经 anchored 参数交进来；runner-dispatch-guard.sh 的
 RUNNER_DISPATCH_GUARD_BREAK=scope-library-unread 当作读不到这份库）。
 """
@@ -94,3 +100,37 @@ def landings_out_of_scope(expanded_patterns, raw_absolute, project_root, lexical
         list(expanded_patterns) + [resolved_pattern(pattern) for pattern in expanded_patterns if pattern.startswith("/")]))
     return [landing for landing in landing_forms(raw_absolute, lexical_only)
             if not any(path_in_scope(patterns, landing, root) for root in roots)]
+
+
+GATE_STAGE_DIRECTORY = ".claude/gate.d"              # 门禁阶段所在的那一层：阶段文件名就是样本档根下第一层的目录名
+GATE_FIXTURE_DIRECTORY = ".claude/gate.d/fixtures"   # 门禁样本档的根
+
+
+def existing_gate_of_fixture(relative, root, directory_itself=False):
+    """相对仓根的路径落在 GATE_FIXTURE_DIRECTORY/<门禁>/ 下、且 <root>/GATE_STAGE_DIRECTORY/<门禁> 是已存在的普通文件：交 <门禁>；别的交 None。
+    样本档根里直接放的文件不算哪一道的样本；directory_itself 时 GATE_FIXTURE_DIRECTORY/<门禁> 本身（往这个目录里写的落点）也交 <门禁>。"""
+    prefix = GATE_FIXTURE_DIRECTORY + "/"
+    if not relative.startswith(prefix):
+        return None
+    remainder = relative[len(prefix):]
+    if "/" not in remainder and not directory_itself:
+        return None
+    gate = remainder.split("/", 1)[0]
+    return gate if gate and os.path.isfile(os.path.join(root, GATE_STAGE_DIRECTORY, gate)) else None
+
+
+def holds_existing_gate_fixtures(relative, root):
+    """相对仓根的目录 relative 是 GATE_FIXTURE_DIRECTORY 或它往上的某一层（"." 是仓根），而 GATE_FIXTURE_DIRECTORY 下有已有门禁的样本目录（existing_gate_of_fixture 认的）：交 True。"""
+    normalized = os.path.normpath(relative)
+    ancestors = {"."}
+    parts = GATE_FIXTURE_DIRECTORY.split("/")
+    ancestors.update("/".join(parts[:count]) for count in range(1, len(parts) + 1))
+    if normalized not in ancestors:
+        return False
+    fixtures = os.path.join(root, GATE_FIXTURE_DIRECTORY)
+    try:
+        names = os.listdir(fixtures)
+    except OSError:
+        return False
+    return any(os.path.isdir(os.path.join(fixtures, name)) and existing_gate_of_fixture(f"{GATE_FIXTURE_DIRECTORY}/{name}", root, directory_itself=True)
+               for name in names)

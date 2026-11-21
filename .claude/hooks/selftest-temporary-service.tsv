@@ -5,6 +5,8 @@
 #              python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- <解释器> <脚本> --selftest
 #              （整条不带 --server-binary：包装前的赋值与任务环境里也没有 PRUNE_SERVER_BINARY 时，任务服务把这条命令认成会编的，两台都给编译目录，包装现编一遍 prune-server（认法在 task-server/task_server.py）；不经任务服务起、没有 CARGO_TARGET_DIR 时退 2，不现编；自己编了、两台都读得到的二进制才另加 --server-binary，写在整条之外）；
 #              裸写的 --selftest 在执行前被 project-code-guard.sh 拒，拒绝说明给整条写法（同上这一形，不带 --server-binary，lib_project_code_runs.py 的 temporary_service_bare_selftest）
+#              门禁阶段的样本档（stage-selftest.sh <阶段目录> --item <阶段>）同一类：阶段源码里出现 selftest_service_problem 的，样本档进门先核临时服务，
+#              裸写同样在执行前被 project-code-guard.sh 拒、给整条包装写法（lib_project_code_runs.py 的 temporary_service_bare_stage_samples）；哪几道要套每次从阶段源码现读，不登记在这张表里
 #   own-server 源码里出现 selftest_service_problem 这几个字，但 --selftest 自己用 --server-binary 或 PRUNE_SERVER_BINARY 起真 prune-server，不因环境里没有临时服务的标记退 2
 #              （二进制都没给、也没有任务服务给的 CARGO_TARGET_DIR 时退 2、不现编）；
 #              门禁 code-tooling 的 runner 表包着它只为把二进制交下去，不是它要临时服务。登记在这里是为了让下面「两边对一遍」的判法认得它不是漏登
@@ -35,6 +37,7 @@ scripts/experiment-apparatus/e203-admission-scan-cost-run.sh	required	# 开跑�
 scripts/experiment-apparatus/e206-fixed-point-cost-run.sh	required	# 开跑先经同目录 e206_fixed_point_cost_library.py 调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/e207-strict-scan-steps-run.sh	required	# 开跑先经同目录 e207_strict_scan_steps_library.py 调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/e209-spike-cause-run.sh	required	# 开跑先经同目录 e209_spike_cause_library.py 调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法见本表文件头 required 一条
+scripts/gate/crate-cross-references-check.py	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/replay.sh	required	# 开跑先调客户端 selftest_service_problem，没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/e10-aging-compaction-run.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起
 scripts/experiment-apparatus/e181-landing-check-long-run.sh	required	# 开跑先调客户端 selftest_service_problem（shell 入口经 long_run_item_verdicts.py selftest-service），没有临时 prune-server 退 2、什么都不判；包装写法起

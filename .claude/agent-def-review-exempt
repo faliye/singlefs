@@ -1,6 +1,6 @@
 # 用户逐次豁免三方论证的定义改动。一行三段，制表符分隔：路径、豁免时那一版的 sha256（豁免的是删掉一份定义时写 deleted）、为什么。
 # ⚠️ 按内容哈希认，不按文件名认：那份文件再改一个字，哈希就对不上、门禁 doc-process-records 的 agent-def-adversarial-review 格照常红。
-# 只有用户明说「这次不走三方」时才加一行，理由里写明是哪一次、他说了什么。
+# 不再加行：存量行补完一轮三方就删一行（`.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」）。
 .claude/agent-common.md	2dc9d03ad1f83079d84b221d048b23a434f168dae14d9279a020dc711dc754ff	用户 2026-09-23 指示加「崩溃点测试不衡量时间成本，也不为省时间缩范围」这一条，并当场明说「这个 agent 改动不需要三方验证」
 .claude/main-agent.md	c80794a59974332c8cbe6f5701b327344e63811ea1bed0e4910413b16cd4e059	用户 2026-09-23 指示看门狗改成调脚本填参数（「把看门狗的命令写成 带配置的脚本 以后不要手动输入」「调用时候直接调用 脚本填参数」），这一版只把「派出去之后」一节里两句手敲的 agent-watch.py 命令换成 bash scripts/agents/watch.sh，行为不变；弹窗问「要不要免三方」时用户选「免，这次改动不用三方」
 .claude/agents/experiment-designer.md	fec70d61fdc85b011aae978e98d1a15d7216fb5af3f722bc6cc61dcf68a3b247	用户 2026-09-26 自己在 frontmatter 加 effort: high（experiment-designer、kb-scribe 另有表格与「3b.」那行的缩进），弹窗问「是你改的吗、怎么处理」时答「我改的  不用三方」

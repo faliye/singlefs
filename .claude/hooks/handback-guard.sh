@@ -40,7 +40,7 @@
 #      提示里没有这一行的，取交回正文点名的）里，标题含「要主 agent 跑的命令」的那几节（sections_titled，到同级或更高一级的下一个标题为止）没把那棵树的两条命名检查都写上：
 #      门禁 code-source-discipline.sh 的 `--check` 点名的格含 vague-names、test-file-names、ordinal-names、data-names 四格、后面跟着根；上游 naming-lint.sh 后面跟着根
 #      （NAMING_STAGE_IN_REPORT、NAMING_LINT_IN_REPORT；根照 resolved 展开 ~、$HOME、$SINGLEFS_WORK_ROOT 起头的写法，相对路径从项目根起，真实路径与那棵树相同才算）。
-#      子 agent 一律不往统一任务服务交任务（records/2026-10-29-subagent拆分提案.md 第一百七十四节），命名检查由主 agent 交：只看报告里写没写，
+#      子 agent 一律不往统一任务服务交任务（records/2026-11-17-subagent账本自上而下清欠.md 第一百七十四节），命名检查由主 agent 交：只看报告里写没写，
 #      不看会话记录里跑没跑过。读不了的报告按那一节没写算。改动所在的树不是本仓登记过的工作树的（rsync 拷的没有 .git；minimal-copy.py 建的 .git 是目录、没有提交、
 #      不在 git worktree list 里）照仓根判：那一节两条的根要填仓根（共用约束写明 rsync 拷的副本 <根> 填仓根、两条交主 agent 在补丁打进主工作区后跑；
 #      命名检查的排除表按全仓登记，部分副本里判不全）。这一类副本里改、交补丁的，根还可以写占位 `<快照>`（共用约束「命名检查交主 agent 跑」：在副本里改、交补丁的
@@ -245,6 +245,8 @@
 #       执行员提示句中写「不是只补落产物」不算豁免、照判登记落地清单（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=landing-applies-always  landing_problems() 没写装置、没落产物的执行员也判
 #       执行员这一段没写装置、没落产物（只写实验页）不判登记落地清单（「应当返回 0，实际 2」）
+#   HANDBACK_GUARD_BREAK=landing-experiment-package-unrecognized  landing_applies() 的装置源文件不认实验包（crates/singlefs-implementation-experiments/src/bin/）底下的，只认验证包的
+#       执行员改了实验包 src/bin 下的装置、没有登记落地清单一节拒（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=landing-location-unchecked  landing_problems() 不核清单里的文件:行
 #       执行员登记落地清单的文件:行超出那份文件的行数拒（「应当返回 2，实际 0」）
 #       执行员登记落地清单的文件在副本与主工作区里都找不到拒（「应当返回 2，实际 0」）
@@ -460,10 +462,13 @@ LANDING_INDEX_SKIPPED = frozenset({"target", ".git", "__pycache__", "node_module
 LANDING_SOURCE_SUFFIXES = (".rs", ".py", ".sh")
 LANDING_INDEX_LIMIT = 200000
 LANDING_TREE_DIRECTORIES = ("crates", "scripts")
-# ⑦ 只判写了装置或落了产物的执行员（第 3c 步写在「跑产物之前」）：装置源文件（入库装置 src/bin/ 下、实验装置目录下，或 e<三位号>_ 起头的 .rs / .py / .sh；
+# ⑦ 只判写了装置或落了产物的执行员（第 3c 步写在「跑产物之前」）：装置源文件（入库装置所在的验证包与实验包的 src/bin/ 下、实验装置目录下，或 e<三位号>_ 起头的 .rs / .py / .sh；
 # replay.sh 是复跑入口的登记，不算），产物落在 research/results/ 下
-LANDING_APPARATUS_SOURCE = re.compile(r"(?:^|/)(?:crates/singlefs-verification/src/bin|scripts/experiment-apparatus|scripts/experiments)/(?:[^/\s]+/)*[^/\s]+\.(?:rs|py|sh)$"
+LANDING_APPARATUS_SOURCE = re.compile(r"(?:^|/)(?:crates/singlefs-verification/src/bin|crates/singlefs-implementation-experiments/src/bin|scripts/experiment-apparatus|scripts/experiments)/(?:[^/\s]+/)*[^/\s]+\.(?:rs|py|sh)$"
                                       r"|(?:^|/)e\d{3}_[A-Za-z0-9_]*\.(?:rs|py|sh)$")
+# 弄坏开关 landing-experiment-package-unrecognized 下用的：不认实验包 src/bin（只认验证包的）
+LANDING_APPARATUS_SOURCE_WITHOUT_EXPERIMENT_PACKAGE = re.compile(r"(?:^|/)(?:crates/singlefs-verification/src/bin|scripts/experiment-apparatus|scripts/experiments)/(?:[^/\s]+/)*[^/\s]+\.(?:rs|py|sh)$"
+                                                                 r"|(?:^|/)e\d{3}_[A-Za-z0-9_]*\.(?:rs|py|sh)$")
 LANDING_NOT_APPARATUS = frozenset({"replay.sh"})
 LANDING_PRODUCT_DIRECTORY = "research/results/"
 FILE_EDITING_TOOLS = {"Edit", "Write", "MultiEdit"}
@@ -1252,8 +1257,9 @@ def landing_file_index(directories, edited_files):
 def landing_applies(records, heavy):
     """⑦ 这个执行员这一段写了装置或落了产物没有：Edit / Write / MultiEdit 改了装置源文件（LANDING_APPARATUS_SOURCE），Bash 里输出重定向或 tee 写了装置源文件，
     或者往 research/results/ 下写了东西（Edit / Write，Bash 的输出重定向、tee、cp / mv 的目标、two-logs.sh 的名字）。只拷、只挪装置（cp / mv）的不算写了装置。"""
+    pattern = LANDING_APPARATUS_SOURCE_WITHOUT_EXPERIMENT_PACKAGE if BROKEN == "landing-experiment-package-unrecognized" else LANDING_APPARATUS_SOURCE
     def apparatus(path):
-        return bool(path) and LANDING_APPARATUS_SOURCE.search(path) is not None and os.path.basename(path) not in LANDING_NOT_APPARATUS
+        return bool(path) and pattern.search(path) is not None and os.path.basename(path) not in LANDING_NOT_APPARATUS
     def product(path):
         return bool(path) and ("/" + LANDING_PRODUCT_DIRECTORY) in ("/" + path.lstrip("./"))
     for name, arguments, cwd, ran in tool_calls(records):
@@ -1808,8 +1814,8 @@ def selftest(hook_dir):
         ]
 
         # ⑧ 「要主 agent 跑的命令」一节一行最多一条交任务的命令：报告照 ⑤ 的写法放进 naming_reports、派发提示行首「报告：」点名它；会话记录里没有改动（⑤ 不判）
-        command_scope = "SINGLEFS_RUN_SCOPE='种类=target; 跑什么=cargo build 全部目标; 范围=1 个工作区; 为什么=自证'"
-        command_build = f"{command_scope} {SUBMIT_CLIENT} submit -- cargo build --offline --all-targets"
+        command_scope = "SINGLEFS_RUN_SCOPE='种类=target; 跑什么=cargo build core 包的库与二进制; 范围=1 个包; 为什么=自证'"
+        command_build = f"{command_scope} {SUBMIT_CLIENT} submit -- cargo build --offline -p core"
         command_test = f"{command_scope} {SUBMIT_CLIENT} submit -- cargo test -p core --lib"
         chained_line = f"{command_build}; echo $? > {work}/exit-build; {command_test}; echo $? > {work}/exit-test"
         def command_report(name, section_body, other_sections=""):
@@ -1822,9 +1828,9 @@ def selftest(hook_dir):
             "two-spans": f"1. `{command_build}` 与 `{command_test}`\n",
             "or-chain": f"1. `{command_build} || true`\n",
             "one-per-line": f"1. `{command_build}`\n   在哪个目录起：仓根\n2. `{command_test}`\n   跑完看末行 TASK_SERVER_RESULT 的 exit=。\n",
-            "bash-c": f"```\n{command_scope} {SUBMIT_CLIENT} submit -- bash -c 'cargo build --offline && cargo test -p core --lib; echo $? > {work}/exit-inner'\n```\n",
+            "bash-c": f"```\n{command_scope} {SUBMIT_CLIENT} submit -- bash -c 'cargo build --offline -p core && cargo test -p core --lib; echo $? > {work}/exit-inner'\n```\n",
             "fence-without-submit": f"```\nfor name in build test; do cat {work}/exit-$name; done\n```\n",
-            "continued": f"```\n{command_scope} \\\n  {SUBMIT_CLIENT} submit -- cargo build --offline --all-targets\n```\n",
+            "continued": f"```\n{command_scope} \\\n  {SUBMIT_CLIENT} submit -- cargo build --offline -p core\n```\n",
         }
         for name, body in command_samples.items():
             transcript(f"command-{name}", [], command_report(name, body))
@@ -1936,6 +1942,10 @@ def selftest(hook_dir):
             handle.write(json.dumps({"type": "user", "timestamp": started.isoformat(), "message": {"role": "user", "content":
                          f"这一段回答的岔路：甲\n草稿目录：{landing_root}\n报告：{os.path.join(landing_root, 'absent-result.md')}\n"}}, ensure_ascii=False) + "\n")
             handle.write(landing_edit_records.replace(probe_source, os.path.join(work, ".claude", "kb", "experiments", "999-页.md")))
+        with open(os.path.join(session, "subagents", "agent-landing-experiment-package.jsonl"), "w", encoding="utf-8") as handle:   # 改了实验包 src/bin 下的装置（目录里的子模块）、没有登记落地清单一节
+            handle.write(json.dumps({"type": "user", "timestamp": started.isoformat(), "message": {"role": "user", "content":
+                         f"这一段回答的岔路：甲\n草稿目录：{landing_root}\n报告：{os.path.join(landing_root, 'absent-result.md')}\n"}}, ensure_ascii=False) + "\n")
+            handle.write(landing_edit_records.replace(probe_source, os.path.join(work, "crates", "singlefs-implementation-experiments", "src", "bin", "e999_landing_probe", "parts.rs")))
         with open(os.path.join(session, "subagents", "agent-landing-product.jsonl"), "w", encoding="utf-8") as handle:   # 落了产物（Bash 重定向进 research/results/）、没改装置
             handle.write(json.dumps({"type": "user", "timestamp": started.isoformat(), "message": {"role": "user", "content":
                          f"这一段回答的岔路：甲\n草稿目录：{landing_root}\n报告：{os.path.join(landing_root, 'absent-result.md')}\n"}}, ensure_ascii=False) + "\n")
@@ -1957,6 +1967,7 @@ def selftest(hook_dir):
             case("执行员提示句中写「不是只补落产物」不算豁免、照判登记落地清单", "experiment-runner", "交回", 2, "landing-negated"),
             case("执行员这一段没写装置、没落产物（只写实验页）不判登记落地清单", "experiment-runner", "交回", 0, "landing-page-only"),
             case("执行员落了产物、没有登记落地清单一节拒", "experiment-runner", "交回", 2, "landing-product"),
+            case("执行员改了实验包 src/bin 下的装置、没有登记落地清单一节拒", "experiment-runner", "交回", 2, "landing-experiment-package"),
             case("回扫员没有登记落地清单不判", "sweep", "交回", 0, "landing-absent"),
             ("执行员没有登记落地清单的拒绝说明写出那一节与出路", True,
              all(part in landing_refusal_text for part in ("登记落地清单", "experiment-runner.md 第 3c 步", "→ 怎么办"))),
