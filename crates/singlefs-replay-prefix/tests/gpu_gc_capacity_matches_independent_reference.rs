@@ -1,6 +1,19 @@
 use singlefs_replay_prefix::gpu_gc_capacity_proofs::*;
 
-const EDGES: [u64; 10] = [0, 1, 3, 4, 5, 16, 63, 1 << 32, u64::MAX - 3, u64::MAX];
+const EDGES: [u64; 12] = [
+    0,
+    1,
+    3,
+    4,
+    5,
+    16,
+    63,
+    1 << 32,
+    u64::MAX - 3,
+    u64::MAX - 2,
+    u64::MAX - 1,
+    u64::MAX,
+];
 
 fn reference_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> bool {
     let input_bytes = u128::from(input).max(1).div_ceil(4) * 4;
@@ -17,6 +30,31 @@ fn reference_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> bool
             .and_then(|total| total.checked_add(u128::from(capacity.fixed_bytes)))
             .is_some_and(|total| total <= u128::from(limit))
     })
+}
+
+// 三张映射表每项的字节数按产品交给核的布局逐个字段数出来（`crates/singlefs-background-gpu/src/region_record_kernels.rs`
+// 文件头「缓冲布局」绑定 3、4、5 那三行：条目、落点索引、按 key 排的序号），不抄被测核里的乘数。
+const WORD_BYTES: u128 = 4;
+const KEY_LENGTH_WORDS: u128 = 1;
+const KEY_WORDS: u128 = 7;
+const LOCATIONS_PER_MAPPING_ENTRY: u128 = 2;
+const WORDS_PER_LOCATION_OF_AN_ENTRY: u128 = 3;
+const WORDS_PER_LOCATION_ITEM: u128 = 4;
+const WORDS_PER_SORTED_INDEX_ITEM: u128 = 1;
+
+fn mapping_entry_item_bytes() -> u128 {
+    WORD_BYTES
+        * (KEY_LENGTH_WORDS
+            + KEY_WORDS
+            + LOCATIONS_PER_MAPPING_ENTRY * WORDS_PER_LOCATION_OF_AN_ENTRY)
+}
+
+fn location_item_bytes() -> u128 {
+    WORD_BYTES * WORDS_PER_LOCATION_ITEM
+}
+
+fn sorted_index_item_bytes() -> u128 {
+    WORD_BYTES * WORDS_PER_SORTED_INDEX_ITEM
 }
 
 #[test]
@@ -172,7 +210,12 @@ fn memory_caps_never_expand_and_allocation_failure_makes_progress() {
         let mut rounds = 0;
         while cap > 0 {
             let next = gpu_memory_cap_after_allocation_failure(cap);
-            assert_eq!(u128::from(next), u128::from(cap) / 2);
+            // 参照不做除法：折半的结果按它的定义判——它的两倍不超过失败的占用，它加一的两倍超过失败的占用。
+            let doubled = 2 * u128::from(next);
+            assert!(
+                doubled <= u128::from(cap) && u128::from(cap) < doubled + 2,
+                "cap={cap} next={next}：next 的两倍应不超过 cap，next 加一的两倍应超过 cap"
+            );
             assert!(next < cap);
             cap = next;
             rounds += 1;
@@ -186,9 +229,9 @@ fn memory_caps_never_expand_and_allocation_failure_makes_progress() {
 fn mapping_buffers_and_dispatch_cover_their_exact_full_width_sizes() {
     for entries in EDGES {
         for locations in EDGES {
-            let entry = 56 * u128::from(entries.max(1));
-            let location = 16 * u128::from(locations.max(1));
-            let index = 4 * u128::from(entries.max(1));
+            let entry = mapping_entry_item_bytes() * u128::from(entries.max(1));
+            let location = location_item_bytes() * u128::from(locations.max(1));
+            let index = sorted_index_item_bytes() * u128::from(entries.max(1));
             let expected = u64::try_from(entry + location + index).ok().map(|total| {
                 (
                     total,

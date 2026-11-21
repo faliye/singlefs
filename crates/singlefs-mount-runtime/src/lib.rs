@@ -1,26 +1,39 @@
 //! 挂载就起的后台运行库（D26（后台整理与放置回收） 已定项 13 第 5、6 条）：核心层不起线程，这一层在挂载入口起一条周期线程，
 //! 调用方挂载之后不调任何后台入口，水位越线的池上 GC 自己跑。
 //!
-//! 一把锁：攒批的会话连同盘表都在一把锁里（[`MountedRuntime`]），前台入口与后台批在它上面排队。每次发布之间放锁
-//! （`MountedSessionWithPendingChanges::run_compaction_in_the_background_for_at_most_one_publish`）；一批之内 GPU 仍在锁内等（D24（后台重活能不能卸给 GPU） 已定项 2 的射程，里程碑六拆）。
-//! 「前台有 fsync 在等」是锁外的原子计数：核心层问它的那一刻后台线程正拿着锁，答案不能在锁里。
+//! 一把锁：攒批的会话连同盘表都在一把锁里（[`MountedRuntime`]），前台入口与后台批在它上面排队。后台整理每一次调用拆三段
+//! （D26（后台整理与放置回收） 已定项 13 第 5 条、D24（后台重活能不能卸给 GPU） 已定项 2 的射程）：会话锁里取输入
+//! （`MountedSessionWithPendingChanges::take_the_input_of_a_background_compaction_batch`），放锁算（`BackgroundCompactionBatchTicket::compute_out_of_the_lock`，
+//! 要读盘上一段时回会话锁里读那一段再放锁），再取会话锁回锁发布（`MountedSessionWithPendingChanges::publish_the_batch_computed_out_of_the_lock`）。
+//! 算的那一段（等 GPU 与建索引、重扫、选段打分、算计划）不持会话锁：前台入口这时取得到锁。每次调用至多一次发布，调用之间放锁。
+//! 「前台有 fsync 在等」与「前台有别的入口在等会话锁」是锁外的两个原子计数：核心层问它们的那一刻后台线程正拿着锁，答案不能在锁里。
+//! 别的入口（收下改动、单发改动、切换后台计算、读）取会话锁先试一次，取不到才登记在等；两个都有时答 fsync 那一个。让路的下限（连着让路几次、让路累计多久之后下一批不让）
+//! 是挂载参数，每次调用交给核心层（D26（后台整理与放置回收） 已定项 13 第 6 条）。维护线程自己取锁不登记。
 //!
-//! 线程体之外有同步的 [`MountedRuntime::run_one_maintenance_pass`]：确定性测试不起线程，一拍一拍推，录制盘（不能跨线程）也走得通。
+//! 线程体之外有同步的 [`MountedRuntime::run_one_maintenance_pass`]：确定性测试不起线程，一拍一拍推，录制盘（不能跨线程）也走得通；
+//! 它在调用线程上算锁外那一段，三段在同一条线程上首尾相接：别的线程不碰这个运行库时中间没有别的发布，结果确定。
 //! 一个维护线程、两个到期时刻：`publish_poll_period` 到期调 `publish_when_due`（D16（发布语义） 丢失窗口里的 P），`compaction_period` 到期推后台整理。
+//! 维护线程把锁外那一段交给它起的一条工作线程算，自己等它的时候每过一个 `publish_poll_period` 回会话锁里重发冻结的发布、调 `publish_when_due`：
+//! 锁外那一段多长，丢失窗口里的 P 都不跟着变长（运行库在停时这两件不做）。
 //! 每一拍（两个到期时刻都算）先重发冻结的发布：写盘报错之后前台的写都被拒，等不到整理到期。前台 fsync（[`MountedRuntime::publish_pending_now`]）持锁时冻结着也先重发一次：
 //! 重发没成就交回错误，不答成功（D16（发布语义） 已定项 7）。
 //!
-//! 卸载等线程、重发冻结的发布、排空待发、走核心层的卸载；重发还失败就交回错误，盘交回，等价于崩溃（[`UnmountRefused::FrozenPublishResendFailed`]）。
+//! 卸载与丢弃先记下在停，再告诉交给核心层的每一份 GPU 实现调用方在停（`BackgroundGpuComputeHandle::tell_the_implementation_the_caller_is_stopping`），
+//! 再等线程：锁外那一段正在等卡时实现放弃那一等，维护线程见到在停就不回锁发那一批、只叫核心层记下丢掉了它（会话上不再记有一批在锁外），
+//! 活意图留在盘上，下次挂载续做（D26（后台整理与放置回收） 已定项 13 第 4 条「卸载时不等还在跑的提交」）。
+//! 卸载等线程之后重发冻结的发布、排空待发、走核心层的卸载；重发还失败就交回错误，盘交回，等价于崩溃（[`UnmountRefused::FrozenPublishResendFailed`]）。
+//! 排空被拒时运行库交回调用方接着用（[`UnmountRefused::PendingChangesNotPublished`]）：交回之前把 GPU 停标记撤掉。
 //! 丢弃（Drop）只停线程，不写盘，等价于崩溃（下一次挂载走恢复）。线程或前台在锁里 panic 等价于崩溃：
 //! 会话可能停在半个更新里，不接着用，之后每个入口报 [`RuntimeFailed`]，只能丢掉内存重挂。
 #![forbid(unsafe_code)]
 
 use std::any::Any;
 use std::fmt;
+use std::num::NonZeroU64;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::channel;
-use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
+use std::sync::mpsc::{channel, RecvTimeoutError, SendError};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, TryLockError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -36,7 +49,7 @@ use singlefs_core::compaction_plan::{
     AnswerOfTheCallerBeforeTheNextBatch, CallerMonotonicClockReading,
     CallerOfTheBackgroundCompaction, CompactionMountParameters, CompactionPacing,
     CompactionRunStop, CompactionTimerFallback, CompactionWriteBandwidthLimit,
-    COMPACTION_WRITE_BANDWIDTH_LIMIT_BY_DEFAULT,
+    CompactionYieldFloor, COMPACTION_WRITE_BANDWIDTH_LIMIT_BY_DEFAULT,
 };
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
 use singlefs_core::mount::{
@@ -45,12 +58,16 @@ use singlefs_core::mount::{
     WritableMountWithBackgroundComputeRefused,
 };
 use singlefs_core::mounted_session::{
-    AcceptRefused, BackgroundCompactionAfterThePendingChangesRefused, BackgroundCompactionCall,
-    BackgroundCompactionNotStarted, ChangeAccepted, CompactionRunOutcome, MountedSession,
-    MountedSessionWithPendingChanges, PublishOfThePendingChangesRefused,
-    PublishReportedByTheSession, UserChange, UserChangeAfterThePendingChangesRefused,
-    UserChangeRefused,
+    AcceptRefused, BackgroundCompactionAfterThePendingChanges,
+    BackgroundCompactionAfterThePendingChangesRefused, BackgroundCompactionBatchComputed,
+    BackgroundCompactionBatchTicket, BackgroundCompactionCall, BackgroundCompactionInputRefused,
+    BackgroundCompactionInputTaken, BackgroundCompactionNotStarted,
+    BackgroundCompactionRelockRefused, BatchOutOfTheLockDroppedByTheCaller, ChangeAccepted,
+    CompactionRunOutcome, MountedSession, MountedSessionWithPendingChanges,
+    PublishOfThePendingChangesRefused, PublishReportedByTheSession, UserChange,
+    UserChangeAfterThePendingChangesRefused, UserChangeRefused,
 };
+use singlefs_core::region_scan::{UnitBytesReadBeforeTheRegionScan, UnitReadsOfARegionScan};
 use singlefs_core::transaction::PublishError;
 
 /// 后台整理的周期默认：30 秒（D26（后台整理与放置回收） 已定项 13 第 5 条，挂载参数）。
@@ -59,6 +76,14 @@ pub const COMPACTION_PERIOD_BY_DEFAULT: Duration = Duration::from_secs(30);
 pub const PUBLISH_POLL_PERIOD_BY_DEFAULT: Duration = Duration::from_secs(1);
 /// 一拍里至多调几次放锁的后台入口：一趟至多 `3S − 4` 次发布（S 至多 16），另加几趟的收尾；用户改动不停时不让一拍一直不返回（卸载与 `publish_when_due` 要等它）。
 pub const COMPACTION_CALLS_PER_MAINTENANCE_PASS_AT_MOST: u32 = 64;
+/// 前台入口一直在等会话锁时，后台入口连着让路这么多次之后下一批不让（D26（后台整理与放置回收） 已定项 13 第 6 条的 N，挂载参数）：
+/// 推的，待量。取 8：一趟没完时一拍隔一个 `publish_poll_period`（默认 1 秒），连着让 8 次约是 8 秒，比下面那个时长的下限晚到，平常由时长先到。
+pub const FOREGROUND_YIELDS_IN_A_ROW_AFTER_WHICH_THE_NEXT_BATCH_DOES_NOT_YIELD_BY_DEFAULT:
+    NonZeroU64 = NonZeroU64::MIN.saturating_add(7);
+/// 前台入口一直在等会话锁时，后台入口从这一串让路的头一次起累计让这么久之后下一批不让（D26（后台整理与放置回收） 已定项 13 第 6 条的 T，挂载参数）：
+/// 推的，待量。取 5 秒：与 `T_time` 的默认值同一量级，前台一直在等时整理至多被挡这么久就照发一批。
+pub const FOREGROUND_YIELDING_TIME_AFTER_WHICH_THE_NEXT_BATCH_DOES_NOT_YIELD_BY_DEFAULT: Duration =
+    Duration::from_secs(5);
 
 /// 运行库的挂载参数（都不存盘）。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -72,6 +97,11 @@ pub struct RuntimeParameters {
     /// `publish_when_due` 的周期（D16（发布语义） 已定项 2、5 的 P），大于 0。
     pub publish_poll_period: Duration,
     pub write_bandwidth_limit: CompactionWriteBandwidthLimit,
+    /// 前台入口一直在等会话锁时，后台入口连着让路多少次之后下一批不让（让路的下限 N；一批发成、或取输入没让路清零）。
+    pub foreground_yields_in_a_row_after_which_the_next_batch_does_not_yield: NonZeroU64,
+    /// 前台入口一直在等会话锁时，后台入口从这一串让路的头一次起累计让多久之后下一批不让（让路的下限 T，读运行库的钟；一批发成、或取输入没让路清零）。
+    /// 0 是至多让一次。
+    pub foreground_yielding_time_after_which_the_next_batch_does_not_yield: Duration,
 }
 
 impl RuntimeParameters {
@@ -85,6 +115,22 @@ impl RuntimeParameters {
             compaction_period: COMPACTION_PERIOD_BY_DEFAULT,
             publish_poll_period: PUBLISH_POLL_PERIOD_BY_DEFAULT,
             write_bandwidth_limit: COMPACTION_WRITE_BANDWIDTH_LIMIT_BY_DEFAULT,
+            foreground_yields_in_a_row_after_which_the_next_batch_does_not_yield:
+                FOREGROUND_YIELDS_IN_A_ROW_AFTER_WHICH_THE_NEXT_BATCH_DOES_NOT_YIELD_BY_DEFAULT,
+            foreground_yielding_time_after_which_the_next_batch_does_not_yield:
+                FOREGROUND_YIELDING_TIME_AFTER_WHICH_THE_NEXT_BATCH_DOES_NOT_YIELD_BY_DEFAULT,
+        }
+    }
+
+    /// 交给核心层的让路下限：次数与时长两样都设，哪一个先到下一批就不让。
+    fn compaction_yield_floor(&self) -> CompactionYieldFloor {
+        CompactionYieldFloor {
+            yields_in_a_row_at_most: Some(
+                self.foreground_yields_in_a_row_after_which_the_next_batch_does_not_yield,
+            ),
+            yielding_time_at_most: Some(
+                self.foreground_yielding_time_after_which_the_next_batch_does_not_yield,
+            ),
         }
     }
 
@@ -239,6 +285,23 @@ pub struct RuntimeObservations {
     pub floor_raises_pushed_by_accepts: u64,
     /// 那几串一共发了几次空发布（占根环的格数）。
     pub empty_publishes_pushed_by_accepts: u64,
+    /// 后台入口为前台在等的 fsync 让路的次数（核心层交回的停因 `CompactionRunStop::YieldedToAForegroundFsync`）。
+    pub yields_to_a_foreground_fsync: u64,
+    /// 后台入口为前台在等会话锁的别的入口让路的次数（停因 `CompactionRunStop::YieldedToAForegroundEntryWaitingForTheSessionLock`）。
+    pub yields_to_a_foreground_entry_waiting_for_the_session_lock: u64,
+    /// 前台入口（收下改动、单发改动、切换后台计算、读）取会话锁取不到、登记成在等的次数，连同经
+    /// [`MountedRuntime::foreground_entry_is_waiting_for_the_session_lock`] 登记的。
+    pub foreground_entries_registered_as_waiting_for_the_session_lock: u64,
+    /// 前台 fsync（[`MountedRuntime::publish_pending_now`]）取会话锁取不到、登记成在等的次数，连同经
+    /// [`MountedRuntime::foreground_fsync_is_waiting`] 登记的。
+    pub foreground_fsyncs_registered_as_waiting_for_the_session_lock: u64,
+    /// 回锁时从计划里剔掉的单元数：核心层 `CompactionObservations::units_pruned_at_the_relock` 在每次回锁前后的差之和（剔完一个不剩的那一批也在里面）。
+    pub units_pruned_at_the_relock: u64,
+    /// 回锁时有冻结着的发布、丢掉的批数（停因 `CompactionRunStop::BatchDroppedWhileAPublishIsFrozenAtTheRelock`）。
+    pub batches_dropped_while_a_publish_is_frozen_at_the_relock: u64,
+    /// 回锁没收下、不是排空被拒的那两种（交回的不是这个会话此刻在锁外的那一批、盘表不是挂载核过的那一份）：那一批丢掉，
+    /// 这个会话之后取输入都拒（`last_not_started` 记成 `BackgroundCompactionNotStarted::ABatchOfThisSessionIsOutOfTheLock`）。
+    pub batches_out_of_the_lock_refused_at_the_relock: u64,
 }
 
 /// 同步的一拍做成了什么（[`MountedRuntime::run_one_maintenance_pass`]）。
@@ -348,7 +411,9 @@ pub enum UnmountRefused<Device> {
         devices: Vec<(DeviceIdentity, Device)>,
         refusal: Box<PublishError>,
     },
-    /// 排空待发没发成：运行库原样交回，待发没冻结时还在里面。维护线程已经停了，它不再自己发布与整理：腾出空间之后再调一次卸载（卸载先重发冻结的那一次）；丢掉它就是崩溃。
+    /// 排空待发没发成：运行库原样交回，待发没冻结时还在里面。维护线程已经停了，交回的运行库不起维护线程、不再自己发布与整理：腾出空间之后再调一次卸载
+    /// （卸载先重发冻结的那一次）；丢掉它就是崩溃。交回之前停线程时置的 GPU 停标记已撤、停的时候丢掉的那一批已不记在会话上：调用方自己推
+    /// [`MountedRuntime::run_one_maintenance_pass`]，后台整理照常取输入、发批。
     PendingChangesNotPublished {
         runtime: MountedRuntime<Device>,
         refusal: Box<UserChangeRefused>,
@@ -389,13 +454,18 @@ pub struct SessionAndDevices<Device> {
     pub devices: Vec<(DeviceIdentity, Device)>,
 }
 
-/// 运行库各处共用的那一份。`fsync_waiters`、`stopping` 不在会话锁里：核心层问它们的那一刻后台线程正拿着锁。
+/// 运行库各处共用的那一份。`fsync_waiters`、`foreground_entries_waiting_for_the_session_lock`、`stopping` 不在会话锁里：核心层问它们的那一刻后台线程正拿着锁。
 struct Shared<Device> {
     parameters: MakeFilesystemParameters,
     runtime_parameters: RuntimeParameters,
     locked: Mutex<SessionAndDevices<Device>>,
     fsync_waiters: AtomicU32,
+    /// 前台 fsync 之外的入口取会话锁取不到、正在等的个数。
+    foreground_entries_waiting_for_the_session_lock: AtomicU32,
     stopping: AtomicBool,
+    /// 交给核心层的每一份 GPU 把手（挂载那一份与切换收下的）：停的时候逐个告诉实现调用方在停，卸载排空被拒、交回运行库之前逐个撤。
+    /// 只在这把小锁里增、读，不跑会 panic 的代码。
+    gpu_computes_handed_to_the_core: Mutex<Vec<BackgroundGpuComputeHandle>>,
     sleep_lock: Mutex<()>,
     wake_the_maintenance_thread: Condvar,
     failed: Mutex<Option<RuntimeFailed>>,
@@ -413,10 +483,12 @@ struct BackgroundGpuOpenedAtTheMount {
     gpus_leaked: Option<Arc<dyn ReadsTheGpusLeakedByTheBackgroundGpu>>,
 }
 
-/// 后台入口每一批之前问的两样（核心层不起线程，钟与前台 fsync 都在这一层）。停线程时答「在停线程」：整理在下一批之前就返回，线程很快 join 得上。
+/// 后台入口每一批之前问的两样（核心层不起线程，钟与前台在等的计数都在这一层）。停线程时答「在停线程」：整理在下一批之前就返回，线程很快 join 得上。
+/// 前台 fsync 与别的入口都在等时答 fsync 那一个（fsync 也是在等会话锁的一个入口，它那一份计数另记，同样取不到锁才登记）。
 struct CallerOfTheRuntime<'shared> {
     clock: &'shared dyn ClockOfTheRuntime,
     fsync_waiters: &'shared AtomicU32,
+    foreground_entries_waiting_for_the_session_lock: &'shared AtomicU32,
     stopping: &'shared AtomicBool,
 }
 
@@ -430,13 +502,19 @@ impl CallerOfTheBackgroundCompaction for CallerOfTheRuntime<'_> {
             AnswerOfTheCallerBeforeTheNextBatch::CallerIsStoppingItsThread
         } else if self.fsync_waiters.load(Ordering::SeqCst) > 0 {
             AnswerOfTheCallerBeforeTheNextBatch::ForegroundFsyncIsWaiting
+        } else if self
+            .foreground_entries_waiting_for_the_session_lock
+            .load(Ordering::SeqCst)
+            > 0
+        {
+            AnswerOfTheCallerBeforeTheNextBatch::ForegroundEntryOtherThanAnFsyncIsWaitingForTheSessionLock
         } else {
             AnswerOfTheCallerBeforeTheNextBatch::NoForegroundFsyncWaiting
         }
     }
 }
 
-/// 前台有一个 fsync 在等：取锁之前登记，丢弃时减（错误返回与 panic 展开都走到）。
+/// 前台有一个 fsync 在等会话锁：取锁取不到时、开始等之前登记，丢弃时减（错误返回与 panic 展开都走到）。
 #[must_use = "丢掉就不算在等了"]
 pub struct ForegroundFsyncWaiting<'runtime> {
     fsync_waiters: &'runtime AtomicU32,
@@ -448,15 +526,57 @@ impl Drop for ForegroundFsyncWaiting<'_> {
     }
 }
 
+/// 前台 fsync 之外的一个入口在等会话锁：取锁取不到时、开始等之前登记，丢弃时减（错误返回与 panic 展开都走到）。
+#[must_use = "丢掉就不算在等了"]
+pub struct ForegroundEntryRegisteredAsWaitingForTheSessionLock<'runtime> {
+    foreground_entries_waiting_for_the_session_lock: &'runtime AtomicU32,
+}
+
+impl Drop for ForegroundEntryRegisteredAsWaitingForTheSessionLock<'_> {
+    fn drop(&mut self) {
+        self.foreground_entries_waiting_for_the_session_lock
+            .fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// 一拍里算锁外那一段的写法（`Shared::run_one_maintenance_pass` 收它）：同步入口在调用线程上算，维护线程交给它起的一条工作线程算。
+type ComputingOfTheBatchOutOfTheLock<'computing> =
+    &'computing dyn Fn(
+        BackgroundCompactionBatchTicket,
+    ) -> Result<BackgroundCompactionBatchComputed, RuntimeFailed>;
+
 impl<Device> Shared<Device> {
-    /// 叫维护线程停：拿着睡眠锁通知，线程在睡之前查 `stopping`，通知丢不了。
+    /// 叫维护线程停：先记下在停，再告诉 GPU 实现调用方在停，最后拿着睡眠锁通知（线程在睡之前查 `stopping`，通知丢不了）。
+    /// 次序不能倒：实现放弃那一等交回的错到维护线程手里时 `stopping` 已经是真，维护线程不拿它回锁（回锁会照出错停下整理、删掉活意图）。
     fn ask_the_maintenance_thread_to_stop(&self) {
         self.stopping.store(true, Ordering::SeqCst);
+        self.tell_the_gpu_computes_the_caller_is_stopping();
         let _sleep_guard = self
             .sleep_lock
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         self.wake_the_maintenance_thread.notify_all();
+    }
+
+    /// 告诉交给核心层的每一份 GPU 实现调用方在停（D26（后台整理与放置回收） 已定项 13 第 4 条「卸载时不等还在跑的提交」）：锁外那一段若正在等卡，
+    /// 实现读到就放弃那一等。只置把手里的原子标记，不取实现那把锁（锁外那一段此刻可能正借着它）。
+    fn tell_the_gpu_computes_the_caller_is_stopping(&self) {
+        for gpu_compute in self
+            .gpu_computes_handed_to_the_core
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+        {
+            gpu_compute.tell_the_implementation_the_caller_is_stopping();
+        }
+    }
+
+    /// 记下又交给核心层一份 GPU 把手（挂载那一份、切换收下的）。
+    fn keep_the_gpu_compute_handed_to_the_core(&self, gpu_compute: BackgroundGpuComputeHandle) {
+        self.gpu_computes_handed_to_the_core
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(gpu_compute);
     }
 }
 
@@ -487,18 +607,121 @@ impl<Device: BlockDevice> Shared<Device> {
             .clone()
     }
 
-    /// 取会话锁。坏过或锁中毒都报 [`RuntimeFailed`]：不用 `into_inner` 接着用半个更新里的会话。
+    /// 取会话锁（维护线程自己取的，不登记在等）。坏过或锁中毒都报 [`RuntimeFailed`]：不用 `into_inner` 接着用半个更新里的会话。
     fn lock_the_session(&self) -> Result<MutexGuard<'_, SessionAndDevices<Device>>, RuntimeFailed> {
         if let Some(failure) = self.failure_so_far() {
             return Err(failure);
         }
-        self.locked.lock().map_err(|_poisoned| {
-            let failure = RuntimeFailed {
-                description: "持着会话锁的线程 panic 过".to_string(),
-            };
-            self.note_the_failure(failure.description.clone());
-            failure
-        })
+        self.locked
+            .lock()
+            .map_err(|_poisoned| self.failure_of_a_poisoned_session_lock())
+    }
+
+    /// 会话锁中毒：记下坏了，交回那一份。
+    fn failure_of_a_poisoned_session_lock(&self) -> RuntimeFailed {
+        let failure = RuntimeFailed {
+            description: "持着会话锁的线程 panic 过".to_string(),
+        };
+        self.note_the_failure(failure.description.clone());
+        failure
+    }
+
+    /// 前台 fsync 之外的入口取会话锁（D26（后台整理与放置回收） 已定项 13 第 6 条「前台有任何入口在等会话锁时不发下一批」）：先试一次，
+    /// 取不到才登记在等、再等；交回登记（没等过是 `None`）与锁守卫。登记先于锁守卫声明：调用方照这个次序收，放锁在前、减计数在后。
+    /// 坏过或锁中毒同 [`Self::lock_the_session`]。
+    #[allow(
+        clippy::type_complexity,
+        reason = "交回的两样各有各的丢弃时刻，调用方按声明次序收：拼成一个结构体就把放锁与减计数的先后藏进了字段次序"
+    )]
+    fn lock_the_session_for_a_foreground_entry(
+        &self,
+    ) -> Result<
+        (
+            Option<ForegroundEntryRegisteredAsWaitingForTheSessionLock<'_>>,
+            MutexGuard<'_, SessionAndDevices<Device>>,
+        ),
+        RuntimeFailed,
+    > {
+        if let Some(failure) = self.failure_so_far() {
+            return Err(failure);
+        }
+        match self.locked.try_lock() {
+            Ok(locked) => Ok((None, locked)),
+            Err(TryLockError::Poisoned(_poisoned)) => {
+                Err(self.failure_of_a_poisoned_session_lock())
+            }
+            Err(TryLockError::WouldBlock) => {
+                let registered_before_waiting =
+                    Some(self.register_a_foreground_entry_waiting_for_the_session_lock());
+                let locked = self
+                    .locked
+                    .lock()
+                    .map_err(|_poisoned| self.failure_of_a_poisoned_session_lock())?;
+                Ok((registered_before_waiting, locked))
+            }
+        }
+    }
+
+    /// 前台 fsync 取会话锁（D26（后台整理与放置回收） 已定项 13 第 6 条，写法同 [`Self::lock_the_session_for_a_foreground_entry`]）：先试一次，
+    /// 取不到才登记有 fsync 在等、再等；交回登记（没等过是 `None`）与锁守卫，次序与收法同那一个。坏过或锁中毒同 [`Self::lock_the_session`]。
+    #[allow(
+        clippy::type_complexity,
+        reason = "交回的两样各有各的丢弃时刻，调用方按声明次序收：拼成一个结构体就把放锁与减计数的先后藏进了字段次序"
+    )]
+    fn lock_the_session_for_a_foreground_fsync(
+        &self,
+    ) -> Result<
+        (
+            Option<ForegroundFsyncWaiting<'_>>,
+            MutexGuard<'_, SessionAndDevices<Device>>,
+        ),
+        RuntimeFailed,
+    > {
+        if let Some(failure) = self.failure_so_far() {
+            return Err(failure);
+        }
+        let fsync_registered_before_waiting = match self.locked.try_lock() {
+            Ok(locked_without_waiting) => return Ok((None, locked_without_waiting)),
+            Err(TryLockError::Poisoned(_poisoned_lock)) => {
+                return Err(self.failure_of_a_poisoned_session_lock());
+            }
+            Err(TryLockError::WouldBlock) => {
+                self.register_a_foreground_fsync_waiting_for_the_session_lock()
+            }
+        };
+        let locked = self
+            .locked
+            .lock()
+            .map_err(|_poisoned| self.failure_of_a_poisoned_session_lock())?;
+        Ok((Some(fsync_registered_before_waiting), locked))
+    }
+
+    /// 登记一个前台 fsync 在等会话锁，记进观测；丢弃交回的那一份就减。
+    fn register_a_foreground_fsync_waiting_for_the_session_lock(
+        &self,
+    ) -> ForegroundFsyncWaiting<'_> {
+        self.fsync_waiters.fetch_add(1, Ordering::SeqCst);
+        self.update_the_observations(|observations| {
+            observations.foreground_fsyncs_registered_as_waiting_for_the_session_lock += 1;
+        });
+        ForegroundFsyncWaiting {
+            fsync_waiters: &self.fsync_waiters,
+        }
+    }
+
+    /// 登记一个前台 fsync 之外的入口在等会话锁，记进观测；丢弃交回的那一份就减。
+    fn register_a_foreground_entry_waiting_for_the_session_lock(
+        &self,
+    ) -> ForegroundEntryRegisteredAsWaitingForTheSessionLock<'_> {
+        self.foreground_entries_waiting_for_the_session_lock
+            .fetch_add(1, Ordering::SeqCst);
+        self.update_the_observations(|observations| {
+            observations.foreground_entries_registered_as_waiting_for_the_session_lock += 1;
+        });
+        ForegroundEntryRegisteredAsWaitingForTheSessionLock {
+            foreground_entries_waiting_for_the_session_lock: &self
+                .foreground_entries_waiting_for_the_session_lock,
+        }
     }
 
     fn update_the_observations(&self, update: impl FnOnce(&mut RuntimeObservations)) {
@@ -551,8 +774,16 @@ impl<Device: BlockDevice> Shared<Device> {
         CallerOfTheRuntime {
             clock: &*self.clock,
             fsync_waiters: &self.fsync_waiters,
+            foreground_entries_waiting_for_the_session_lock: &self
+                .foreground_entries_waiting_for_the_session_lock,
             stopping: &self.stopping,
         }
+    }
+
+    /// 记下排空待发发成的一次（锁已放开：事件不在锁里送）。
+    fn note_the_pending_changes_published(&self, published: &PublishReportedByTheSession) {
+        self.update_the_observations(|observations| observations.pending_publishes += 1);
+        self.deliver(&MaintenanceEvent::PendingChangesPublished(published));
     }
 
     /// `publish_when_due` 一次（持锁一次发布），结局送接收方。
@@ -595,9 +826,14 @@ impl<Device: BlockDevice> Shared<Device> {
         }
     }
 
-    /// 一拍：重发冻结的那一次、`publish_when_due`，再一次次调放锁的后台入口，每次之间放锁。没起跑、被节奏截住、出错或到了调用次数上限就停。
-    /// 用户改动之后那一趟（至多一批）停了接着调：定时兜底那一支在同一拍里轮得到，用户改动不断时整理不会只剩每拍一批。
-    fn run_one_maintenance_pass(&self) -> Result<MaintenancePass, RuntimeFailed> {
+    /// 一拍：重发冻结的那一次、`publish_when_due`，再一次次推后台整理，每次调用至多一次发布、调用之间放锁。没起跑、被节奏截住或让路、出错、
+    /// 运行库在停或到了调用次数上限就停。用户改动之后那一趟（至多一批）停了接着调：定时兜底那一支在同一拍里轮得到，用户改动不断时整理不会只剩每拍一批。
+    /// 每次调用三段（D26（后台整理与放置回收） 已定项 13 第 5 条）：会话锁里取输入；交到锁外的那一批照 `computing` 算，算的那一段不持会话锁；
+    /// 运行库在停就丢掉算完的那一批、不回锁（同条第 4 条「卸载时不等还在跑的提交」：活意图留在盘上，下次挂载续做），不然取会话锁回锁发布。
+    fn run_one_maintenance_pass(
+        &self,
+        computing: ComputingOfTheBatchOutOfTheLock<'_>,
+    ) -> Result<MaintenancePass, RuntimeFailed> {
         self.update_the_observations(|observations| observations.maintenance_passes += 1);
         let mut pass = MaintenancePass::default();
         if self.resend_the_frozen_publish_if_any()? {
@@ -605,81 +841,90 @@ impl<Device: BlockDevice> Shared<Device> {
         }
         self.publish_when_due_once()?;
         let pacing = self.runtime_parameters.compaction_pacing();
+        let yield_floor = self.runtime_parameters.compaction_yield_floor();
         let caller = self.caller();
         while pass.compaction_calls < COMPACTION_CALLS_PER_MAINTENANCE_PASS_AT_MOST
             && !self.stopping.load(Ordering::SeqCst)
         {
-            let (outcome, is_a_trip_under_way) = {
+            let (taken, is_a_trip_under_way_after_the_input) = {
                 let mut locked = self.lock_the_session()?;
                 let SessionAndDevices { session, devices } = &mut *locked;
-                let outcome = session.run_compaction_in_the_background_for_at_most_one_publish(
-                    devices, pacing, &caller,
+                let taken = session.take_the_input_of_a_background_compaction_batch(
+                    devices,
+                    pacing,
+                    yield_floor,
+                    &caller,
                 );
                 let is_a_trip_under_way = session
                     .session()
                     .compaction
                     .has_a_background_trip_under_way();
-                (outcome, is_a_trip_under_way)
+                (taken, is_a_trip_under_way)
             };
             pass.compaction_calls += 1;
-            pass.is_a_trip_under_way = is_a_trip_under_way;
+            pass.is_a_trip_under_way = is_a_trip_under_way_after_the_input;
             self.update_the_observations(|observations| observations.compaction_calls += 1);
-            let completed = match &outcome {
-                Ok(completed) => completed,
-                Err(refusal) => {
-                    self.deliver(&MaintenanceEvent::CompactionCallRefused(refusal));
+            let outcome = match taken {
+                Ok(BackgroundCompactionInputTaken::FinishedInTheLock(completed)) => Ok(completed),
+                Ok(BackgroundCompactionInputTaken::BatchOutOfTheLock {
+                    pending_changes_published_before_the_run,
+                    ticket,
+                }) => {
+                    if let Some(published) = &pending_changes_published_before_the_run {
+                        self.note_the_pending_changes_published(published);
+                    }
+                    let computed = computing(*ticket)?;
+                    if self.stopping.load(Ordering::SeqCst) {
+                        // 在停时不回锁发这一批：GPU 实现放弃那一等交回的错若拿去回锁，会照出错停下整理、删掉活意图。
+                        // 会话上「有一批在锁外」那一记照样清掉：卸载排空被拒时运行库交回调用方接着用，下一拍要取得到输入。
+                        self.drop_the_batch_computed_out_of_the_lock_while_stopping(computed)?;
+                        break;
+                    }
+                    let BatchRelocked {
+                        relocked,
+                        is_a_trip_under_way,
+                    } = self.publish_the_batch_computed_out_of_the_lock(computed, &caller)?;
+                    pass.is_a_trip_under_way = is_a_trip_under_way;
+                    match relocked {
+                        Ok(completed) => Ok(completed),
+                        Err(BackgroundCompactionRelockRefused::PublishOfThePendingChangesRefused(
+                            refusal,
+                        )) => Err(refusal),
+                        Err(
+                            BackgroundCompactionRelockRefused::NotTheBatchOutOfTheLockOfThisSession {
+                                ..
+                            }
+                            | BackgroundCompactionRelockRefused::DeviceTableOtherThanTheOneOfTheMount {
+                                ..
+                            },
+                        ) => {
+                            self.update_the_observations(|observations| {
+                                observations.batches_out_of_the_lock_refused_at_the_relock += 1;
+                            });
+                            break;
+                        }
+                    }
+                }
+                Err(BackgroundCompactionInputRefused::Refused(refusal)) => Err(refusal),
+                Err(BackgroundCompactionInputRefused::ABatchOfThisSessionIsOutOfTheLock) => {
+                    self.update_the_observations(|observations| {
+                        observations.last_not_started =
+                            Some(BackgroundCompactionNotStarted::ABatchOfThisSessionIsOutOfTheLock);
+                    });
                     break;
                 }
             };
-            if let Some(published) = &completed.pending_changes_published_before_the_run {
-                self.update_the_observations(|observations| observations.pending_publishes += 1);
-                self.deliver(&MaintenanceEvent::PendingChangesPublished(published));
-            }
-            self.deliver(&MaintenanceEvent::CompactionCallReturned(&completed.call));
-            if let Some(alarm) = completed
-                .call
-                .alarm_of_the_compaction_stopped_after_a_compute_error()
-            {
-                self.update_the_observations(|observations| {
-                    observations.alarms_received += 1;
-                    observations.last_alarm = Some(alarm.clone());
-                });
-            }
-            let keeps_going = match &completed.call {
-                BackgroundCompactionCall::NotStarted { reason, .. } => {
-                    self.update_the_observations(|observations| {
-                        observations.last_not_started = Some(*reason);
-                    });
-                    false
-                }
-                BackgroundCompactionCall::Ran { run, .. } => {
-                    let deletion_steps = run.deletion_steps_published;
-                    let publishes = u64::try_from(run.versions_published.len())
-                        .expect("一次调用的发布数")
-                        - deletion_steps;
-                    pass.compaction_publishes += publishes;
-                    pass.deletion_continuation_publishes += deletion_steps;
-                    self.update_the_observations(|observations| {
-                        observations.compaction_publishes += publishes;
-                        observations.deletion_continuation_publishes += deletion_steps;
-                    });
-                    match &run.outcome {
-                        CompactionRunOutcome::Stopped(stop) => {
-                            self.update_the_observations(|observations| {
-                                observations.last_stop = Some(*stop);
-                            });
-                            !matches!(
-                                stop,
-                                CompactionRunStop::YieldedToAForegroundFsync
-                                    | CompactionRunStop::YieldedToTheCallerStoppingItsThread
-                                    | CompactionRunStop::WriteBandwidthLimitReached { .. }
-                            )
-                        }
-                        CompactionRunOutcome::Failed(_) => false,
-                    }
+            let completed = match outcome {
+                Ok(completed) => completed,
+                Err(refusal) => {
+                    self.deliver(&MaintenanceEvent::CompactionCallRefused(&refusal));
+                    break;
                 }
             };
-            if !keeps_going {
+            let noted = self.note_the_compaction_call_returned(&completed);
+            pass.compaction_publishes += noted.compaction_publishes;
+            pass.deletion_continuation_publishes += noted.deletion_continuation_publishes;
+            if !noted.does_the_pass_call_again {
                 break;
             }
             self.publish_when_due_once()?;
@@ -687,7 +932,289 @@ impl<Device: BlockDevice> Shared<Device> {
         Ok(pass)
     }
 
-    /// 线程体：两个到期时刻。`stopping` 在睡之前查、卸载在拿着睡眠锁时通知，通知丢不了。
+    /// 回会话锁发锁外算完的那一批（`MountedSessionWithPendingChanges::publish_the_batch_computed_out_of_the_lock`），交回核心层的结局与回锁之后这一趟没完没有；
+    /// 回锁前后核心层剔掉的单元数之差记进观测。
+    fn publish_the_batch_computed_out_of_the_lock(
+        &self,
+        computed: BackgroundCompactionBatchComputed,
+        caller: &CallerOfTheRuntime<'_>,
+    ) -> Result<BatchRelocked, RuntimeFailed> {
+        let (relocked, units_pruned, is_a_trip_under_way) = {
+            let mut locked = self.lock_the_session()?;
+            let SessionAndDevices { session, devices } = &mut *locked;
+            let units_pruned_before_the_relock = session
+                .session()
+                .compaction
+                .observations
+                .units_pruned_at_the_relock;
+            let relocked =
+                session.publish_the_batch_computed_out_of_the_lock(devices, computed, caller);
+            let compaction = &session.session().compaction;
+            (
+                relocked,
+                compaction
+                    .observations
+                    .units_pruned_at_the_relock
+                    .checked_sub(units_pruned_before_the_relock)
+                    .expect("核心层的观测只增：回锁之后剔掉的单元数不比回锁之前少"),
+                compaction.has_a_background_trip_under_way(),
+            )
+        };
+        self.update_the_observations(|observations| {
+            observations.units_pruned_at_the_relock += units_pruned;
+        });
+        Ok(BatchRelocked {
+            relocked,
+            is_a_trip_under_way,
+        })
+    }
+
+    /// 运行库在停时丢掉锁外算完的那一批、不回锁发它：取会话锁交核心层记下调用方丢掉了这一批
+    /// （`MountedSessionWithPendingChanges::note_the_batch_computed_out_of_the_lock_dropped_by_the_caller_without_relocking`：会话上不再记有一批在锁外，
+    /// 一个写都不发、发布预算不扣，这一趟留着没完），带回的报警记进观测。不读盘、不写盘。
+    fn drop_the_batch_computed_out_of_the_lock_while_stopping(
+        &self,
+        computed: BackgroundCompactionBatchComputed,
+    ) -> Result<(), RuntimeFailed> {
+        let dropped = {
+            let mut locked = self.lock_the_session()?;
+            locked
+                .session
+                .note_the_batch_computed_out_of_the_lock_dropped_by_the_caller_without_relocking(
+                    computed,
+                )
+        };
+        match dropped {
+            BatchOutOfTheLockDroppedByTheCaller::TakenBackWithoutPublishing {
+                alarm_of_the_compaction_stopped_after_a_compute_error: Some(alarm),
+            } => {
+                self.update_the_observations(|observations| {
+                    observations.alarms_received += 1;
+                    observations.last_alarm = Some(alarm);
+                });
+            }
+            // 整理没停着就没有报警；不是此刻在锁外的那一批这里遇不到（票是同一拍刚从这个会话取的），遇到了会话也没动，不用做别的。
+            BatchOutOfTheLockDroppedByTheCaller::TakenBackWithoutPublishing {
+                alarm_of_the_compaction_stopped_after_a_compute_error: None,
+            }
+            | BatchOutOfTheLockDroppedByTheCaller::NotTheBatchOutOfTheLockOfThisSession => {}
+        }
+        Ok(())
+    }
+
+    /// 核心层交回一次调用的结局之后：送出排空待发的那几次与这一次的结局、记报警与观测，交回这一次发了几次、这一拍接不接着调。
+    fn note_the_compaction_call_returned(
+        &self,
+        completed: &BackgroundCompactionAfterThePendingChanges,
+    ) -> CompactionCallNoted {
+        if let Some(published) = &completed.pending_changes_published_before_the_run {
+            self.note_the_pending_changes_published(published);
+        }
+        if let Some(published) = &completed.pending_changes_published_at_the_relock {
+            self.note_the_pending_changes_published(published);
+        }
+        self.deliver(&MaintenanceEvent::CompactionCallReturned(&completed.call));
+        if let Some(alarm) = completed
+            .call
+            .alarm_of_the_compaction_stopped_after_a_compute_error()
+        {
+            self.update_the_observations(|observations| {
+                observations.alarms_received += 1;
+                observations.last_alarm = Some(alarm.clone());
+            });
+        }
+        match &completed.call {
+            BackgroundCompactionCall::NotStarted { reason, .. } => {
+                self.update_the_observations(|observations| {
+                    observations.last_not_started = Some(*reason);
+                });
+                CompactionCallNoted {
+                    compaction_publishes: 0,
+                    deletion_continuation_publishes: 0,
+                    does_the_pass_call_again: false,
+                }
+            }
+            BackgroundCompactionCall::Ran { run, .. } => {
+                let deletion_steps = run.deletion_steps_published;
+                let publishes = u64::try_from(run.versions_published.len())
+                    .expect("一次调用的发布数")
+                    - deletion_steps;
+                self.update_the_observations(|observations| {
+                    observations.compaction_publishes += publishes;
+                    observations.deletion_continuation_publishes += deletion_steps;
+                });
+                let does_the_pass_call_again = match &run.outcome {
+                    CompactionRunOutcome::Stopped(stop) => {
+                        self.note_the_stop_of_a_compaction_call(*stop);
+                        the_pass_calls_again_after(*stop)
+                    }
+                    CompactionRunOutcome::Failed(_) => false,
+                };
+                CompactionCallNoted {
+                    compaction_publishes: publishes,
+                    deletion_continuation_publishes: deletion_steps,
+                    does_the_pass_call_again,
+                }
+            }
+        }
+    }
+
+    /// 记下一次调用停在哪，让路两种与冻结丢批各自计数。
+    fn note_the_stop_of_a_compaction_call(&self, stop: CompactionRunStop) {
+        self.update_the_observations(|observations| {
+            observations.last_stop = Some(stop);
+            if stop == CompactionRunStop::YieldedToAForegroundFsync {
+                observations.yields_to_a_foreground_fsync += 1;
+            }
+            if stop == CompactionRunStop::YieldedToAForegroundEntryWaitingForTheSessionLock {
+                observations.yields_to_a_foreground_entry_waiting_for_the_session_lock += 1;
+            }
+            if stop == CompactionRunStop::BatchDroppedWhileAPublishIsFrozenAtTheRelock {
+                observations.batches_dropped_while_a_publish_is_frozen_at_the_relock += 1;
+            }
+        });
+    }
+
+    /// 照票算这一批（`BackgroundCompactionBatchTicket::compute_out_of_the_lock`），不持会话锁：要读盘上一段单元时回会话锁里读那一段再放锁
+    /// （D26（后台整理与放置回收） 已定项 13 第 5 条「每一圈要读盘上的一段时回会话锁里读」）。同步入口在调用线程上调它，维护线程在它起的工作线程上调它。
+    fn compute_the_batch_reading_in_the_session_lock(
+        &self,
+        ticket: BackgroundCompactionBatchTicket,
+    ) -> BackgroundCompactionBatchComputed {
+        ticket.compute_out_of_the_lock(&mut |reads| self.read_the_units_in_the_session_lock(reads))
+    }
+
+    /// 锁外那一段要读的一段单元：取会话锁读，放锁交回。运行库坏了（坏过、锁中毒）就一个单元都当读不到：回锁那一步取锁时照坏了报。
+    fn read_the_units_in_the_session_lock(
+        &self,
+        reads: UnitReadsOfARegionScan,
+    ) -> UnitBytesReadBeforeTheRegionScan {
+        match self.lock_the_session() {
+            Ok(locked) => locked
+                .session
+                .read_the_units_for_the_batch_out_of_the_lock(&locked.devices, reads),
+            Err(_failed) => reads.read_with(|_device, _slot, _unit_bytes| None),
+        }
+    }
+
+    /// 锁外那一段在维护线程上等的时候（每过一个 `publish_poll_period`）：运行库没在停就重发冻结的那一次，不冻着就 `publish_when_due` 一次
+    /// （维护线程自己的这两件不等锁外那一段算完）。在停时两件都不做，等那一批交回就丢。
+    fn publish_while_a_batch_is_computed_out_of_the_lock(&self) -> Result<(), RuntimeFailed> {
+        if self.stopping.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        if !self.resend_the_frozen_publish_if_any()? {
+            self.publish_when_due_once()?;
+        }
+        Ok(())
+    }
+}
+
+/// 回锁那一段交回的（[`Shared::publish_the_batch_computed_out_of_the_lock`]）：核心层的结局，与回锁之后这一趟没完没有。
+struct BatchRelocked {
+    relocked: Result<BackgroundCompactionAfterThePendingChanges, BackgroundCompactionRelockRefused>,
+    is_a_trip_under_way: bool,
+}
+
+/// 核心层交回的一次调用记下之后（[`Shared::note_the_compaction_call_returned`]）：这一次发了几次整理发布、几步删除续做，这一拍接不接着调。
+struct CompactionCallNoted {
+    compaction_publishes: u64,
+    deletion_continuation_publishes: u64,
+    does_the_pass_call_again: bool,
+}
+
+/// 一次调用停在 `stop` 之后这一拍接不接着调（停下的那一次已经发过的照记）。不接着调的：为前台在等的 fsync 或别的入口让路（让路就是这一拍不再叫）、
+/// 调用方在停线程、写带宽到了上限、回锁时有冻结着的发布（下一拍先重发）、显式入口那一种（后台入口走不到）。别的接着调：下一次调用照这一趟接着推或照常判起跑
+/// （回锁时剔完一个不剩、选中的段没了资格那两种，这一趟没完，下一批在现行那一版上重扫重选）；一拍至多 [`COMPACTION_CALLS_PER_MAINTENANCE_PASS_AT_MOST`] 次。
+const fn the_pass_calls_again_after(stop: CompactionRunStop) -> bool {
+    match stop {
+        CompactionRunStop::YieldedToAForegroundFsync => false,
+        CompactionRunStop::YieldedToAForegroundEntryWaitingForTheSessionLock => false,
+        CompactionRunStop::YieldedToTheCallerStoppingItsThread => false,
+        CompactionRunStop::WriteBandwidthLimitReached { .. } => false,
+        CompactionRunStop::BatchDroppedWhileAPublishIsFrozenAtTheRelock => false,
+        CompactionRunStop::NotRunWhileABatchOfThisSessionIsOutOfTheLock => false,
+        CompactionRunStop::BatchPrunedToNothingAtTheRelock { .. } => true,
+        CompactionRunStop::ChosenSegmentNoLongerEligibleAtTheRelock => true,
+        CompactionRunStop::ForcedToStopForTests
+        | CompactionRunStop::NoEligibleSegment
+        | CompactionRunStop::HolesOutsideTheRegionFewerThanItsUnitsToMove { .. }
+        | CompactionRunStop::NoYieldFromTheLastIntent { .. }
+        | CompactionRunStop::PublishBudgetSpent { .. }
+        | CompactionRunStop::PausedShortOfSpace
+        | CompactionRunStop::IssueRefusedShortOfSpace
+        | CompactionRunStop::NoLiveIntentLeftToContinue
+        | CompactionRunStop::NothingMovableButTheRegionIsNotEmpty
+        | CompactionRunStop::OneBatchAfterTheUserChangeDone
+        | CompactionRunStop::BatchAbandonedAfterABackgroundComputeError { .. }
+        | CompactionRunStop::BackgroundTaskStoppedAfterAnEarlierComputeError
+        | CompactionRunStop::OnlyRecordsUncertainThisRoundLeftToMove { .. }
+        | CompactionRunStop::IssueHeldBackByRecordsUncertainThisRound { .. }
+        | CompactionRunStop::CompactionPublishWouldLeaveFewerThanFourRollbackStates { .. }
+        | CompactionRunStop::RollbackStatesOfTheRingUnreadable
+        | CompactionRunStop::OnePublishOfTheTripDone
+        | CompactionRunStop::DeletionQueueWalkedWithoutACompactionPublish => true,
+    }
+}
+
+impl<Device: BlockDevice + Send> Shared<Device> {
+    /// 维护线程算锁外那一段：交给它起的一条工作线程算，自己每过一个 `publish_poll_period` 回会话锁里重发冻结的那一次、`publish_when_due`
+    /// （[`Shared::publish_while_a_batch_is_computed_out_of_the_lock`]），直到那一批算完交回（D26（后台整理与放置回收） 已定项 13 第 5 条与丢失窗口里的 P，
+    /// D16（发布语义） 已定项 5）。起不了工作线程就在维护线程上算，这一批算的时候那两件不跑。工作线程 panic 等价于维护线程 panic：记下坏了，交回 [`RuntimeFailed`]。
+    fn compute_the_batch_on_a_worker_while_publishing_when_due(
+        &self,
+        ticket: BackgroundCompactionBatchTicket,
+    ) -> Result<BackgroundCompactionBatchComputed, RuntimeFailed> {
+        let publish_poll_period = self.runtime_parameters.publish_poll_period;
+        let (hand_over_the_ticket, ticket_handed_over) =
+            channel::<BackgroundCompactionBatchTicket>();
+        let (hand_back_the_computed, computed_handed_back) =
+            channel::<BackgroundCompactionBatchComputed>();
+        std::thread::scope(|scope| {
+            let started = std::thread::Builder::new()
+                .name("singlefs-batch-out-of-the-lock".to_string())
+                .spawn_scoped(scope, move || {
+                    let Ok(ticket_received) = ticket_handed_over.recv() else {
+                        return;
+                    };
+                    let computed =
+                        self.compute_the_batch_reading_in_the_session_lock(ticket_received);
+                    // 收的一方只在交回错误之后才先走（运行库已坏），那时这一批没人要。
+                    let _computed_dropped_after_a_failure = hand_back_the_computed.send(computed);
+                });
+            let worker = match started {
+                Ok(worker) => worker,
+                Err(_not_started) => {
+                    return Ok(self.compute_the_batch_reading_in_the_session_lock(ticket));
+                }
+            };
+            if let Err(SendError(ticket_not_handed_over)) = hand_over_the_ticket.send(ticket) {
+                // 工作线程收票之前就结束了：票还在手里，在维护线程上算。
+                return Ok(
+                    self.compute_the_batch_reading_in_the_session_lock(ticket_not_handed_over)
+                );
+            }
+            loop {
+                match computed_handed_back.recv_timeout(publish_poll_period) {
+                    Ok(computed) => return Ok(computed),
+                    Err(RecvTimeoutError::Timeout) => {
+                        self.publish_while_a_batch_is_computed_out_of_the_lock()?;
+                    }
+                    Err(RecvTimeoutError::Disconnected) => {
+                        let description = match worker.join() {
+                            Ok(()) => "锁外那一段的工作线程没交回算完的那一批就结束了".to_string(),
+                            Err(payload) => description_of_a_panic(&*payload),
+                        };
+                        self.note_the_failure(description.clone());
+                        return Err(RuntimeFailed { description });
+                    }
+                }
+            }
+        })
+    }
+
+    /// 线程体：两个到期时刻。`stopping` 在睡之前查、卸载在拿着睡眠锁时通知，通知丢不了。锁外那一段交给工作线程算
+    /// （[`Shared::compute_the_batch_on_a_worker_while_publishing_when_due`]）。
     fn maintenance_thread_body(&self) -> Result<(), RuntimeFailed> {
         let compaction_period = self.runtime_parameters.compaction_period;
         let publish_poll_period = self.runtime_parameters.publish_poll_period;
@@ -695,7 +1222,9 @@ impl<Device: BlockDevice> Shared<Device> {
         while !self.stopping.load(Ordering::SeqCst) {
             let now = self.clock.reading().0;
             if now >= next_compaction_at {
-                let pass = self.run_one_maintenance_pass()?;
+                let pass = self.run_one_maintenance_pass(&|ticket| {
+                    self.compute_the_batch_on_a_worker_while_publishing_when_due(ticket)
+                })?;
                 next_compaction_at = now
                     + if pass.is_a_trip_under_way {
                         publish_poll_period
@@ -867,6 +1396,8 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
                 (None, None)
             }
         };
+        let gpu_computes_handed_to_the_core: Vec<BackgroundGpuComputeHandle> =
+            gpu_compute.iter().cloned().collect();
         let mounted = match mount_writable_with_background_compute_settings_the_gc_cpu_compensation_threshold_and_compaction_parameters(
             parameters,
             &mut devices,
@@ -894,6 +1425,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
             clock,
             receiver,
             background_gpu_opened_at_the_mount,
+            gpu_computes_handed_to_the_core,
         );
         Ok(RuntimeMounted { output, runtime })
     }
@@ -905,6 +1437,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         clock: Arc<dyn ClockOfTheRuntime>,
         receiver: Arc<dyn ReceiverOfTheMaintenanceEvents>,
         background_gpu_opened_at_the_mount: Option<BackgroundGpuOpenedAtTheMount>,
+        gpu_computes_handed_to_the_core: Vec<BackgroundGpuComputeHandle>,
     ) -> Self {
         MountedRuntime {
             shared: Arc::new(Shared {
@@ -912,7 +1445,9 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
                 runtime_parameters,
                 locked: Mutex::new(locked),
                 fsync_waiters: AtomicU32::new(0),
+                foreground_entries_waiting_for_the_session_lock: AtomicU32::new(0),
                 stopping: AtomicBool::new(false),
+                gpu_computes_handed_to_the_core: Mutex::new(gpu_computes_handed_to_the_core),
                 sleep_lock: Mutex::new(()),
                 wake_the_maintenance_thread: Condvar::new(),
                 failed: Mutex::new(None),
@@ -950,6 +1485,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
     /// 收下之前可能发抬 F 的空发布，一次准入至多 B − 1 次，全程持着会话那把锁（后台批与别的前台入口等到它返回；发布之间不放锁，推的那一串与再判之间不插别的发布），
     /// 写盘的时长算进这一次调用。推成的报在 [`ChangeAccepted`] 的 `floor_raises_pushed_for_space`（不进 `publishes`：空发布不改用户可见状态），
     /// 没收下时报在 `AcceptRefused::floor_raises_pushed_by_this_accept`；连同观测 `floor_raises_pushed_by_accepts`、`empty_publishes_pushed_by_accepts` 与事件 [`MaintenanceEvent::FloorRaisesPushedByAnAccept`]。
+    /// 会话锁取不到时先登记在等（整理在下一批之前让路，D26（后台整理与放置回收） 已定项 13 第 6 条），取到之后放锁时一并撤登记。
     ///
     /// # Errors
     /// 核心层拒的原样；运行库坏了报 `Failed`。
@@ -958,13 +1494,14 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         change: UserChange<'_>,
     ) -> Result<ChangeAccepted, RuntimeRefused<AcceptRefused>> {
         let now = self.shared.clock.reading();
-        let mut locked = self
+        let (registered_while_waiting, mut locked) = self
             .shared
-            .lock_the_session()
+            .lock_the_session_for_a_foreground_entry()
             .map_err(RuntimeRefused::Failed)?;
         let SessionAndDevices { session, devices } = &mut *locked;
         let accepted = session.accept(devices, change, now);
         drop(locked);
+        drop(registered_while_waiting);
         self.shared
             .note_the_floor_raises_pushed_by_an_accept(match &accepted {
                 Ok(accepted) => &accepted.floor_raises_pushed_for_space.floor_raises,
@@ -973,7 +1510,8 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         accepted.map_err(RuntimeRefused::Refused)
     }
 
-    /// fsync 走这里（`MountedSessionWithPendingChanges::publish_pending_now`）：进门先登记「有 fsync 在等」（取锁之前），整理在下一批之前让路，每次发布之间都放锁。
+    /// fsync 走这里（`MountedSessionWithPendingChanges::publish_pending_now`）：会话锁取不到时先登记「有 fsync 在等」再等（取得到就不登记，
+    /// [`Shared::lock_the_session_for_a_foreground_fsync`]），整理在下一批之前让路，每次发布之间都放锁。
     /// 持锁时冻结着一次发布就先重发一次（D16（发布语义） 已定项 7）：重发成了照常排空待发，答成功（待发空着时答 `None`，那一次已落盘）；重发没成交回错误，照旧冻结着。
     ///
     /// # Errors
@@ -984,11 +1522,10 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         Option<PublishReportedByTheSession>,
         RuntimeRefused<PublishOfThePendingChangesRefused>,
     > {
-        let _waiting = self.foreground_fsync_is_waiting();
         let now = self.shared.clock.reading();
-        let mut locked = self
+        let (_fsync_registered_while_waiting, mut locked) = self
             .shared
-            .lock_the_session()
+            .lock_the_session_for_a_foreground_fsync()
             .map_err(RuntimeRefused::Failed)?;
         let SessionAndDevices { session, devices } = &mut *locked;
         let was_frozen = session.session().allocator.frozen_publish().is_some();
@@ -1013,7 +1550,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         published.map_err(RuntimeRefused::Refused)
     }
 
-    /// 单发一次用户改动（`MountedSessionWithPendingChanges::publish_user_change`）。
+    /// 单发一次用户改动（`MountedSessionWithPendingChanges::publish_user_change`）。会话锁取不到时先登记在等，同 [`Self::accept`]。
     ///
     /// # Errors
     /// 同 [`Self::accept`]。
@@ -1025,9 +1562,9 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         RuntimeRefused<UserChangeAfterThePendingChangesRefused>,
     > {
         let now = self.shared.clock.reading();
-        let mut locked = self
+        let (_registered_while_waiting, mut locked) = self
             .shared
-            .lock_the_session()
+            .lock_the_session_for_a_foreground_entry()
             .map_err(RuntimeRefused::Failed)?;
         let SessionAndDevices { session, devices } = &mut *locked;
         session
@@ -1040,6 +1577,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
     /// 开卡的这段时间切换还没生效、照切换之前那一组跑，开完了在两批之间换上；重开到上限都没开成就在那时停 GC、报警
     /// （`singlefs_core::background_compute::BackgroundGpuCompute::put_the_gpus_opened_since_the_settings_were_handed_in_in_effect`）。
     /// 切到 `cpu` 时那一份实现开着的卡全部关掉（`singlefs_core::background_compute::BackgroundGpuCompute::use_no_gpu_from_the_next_batch`）。
+    /// 会话锁取不到时先登记在等，同 [`Self::accept`]。收下的那一份把手运行库也留着：卸载与丢弃时经它告诉实现调用方在停。
     ///
     /// # Errors
     /// 同 [`Self::accept`]。
@@ -1049,9 +1587,10 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         gpu_compute: Option<BackgroundGpuComputeHandle>,
         gc_cpu_compensation_threshold: Option<BackgroundGcCpuCompensationThreshold>,
     ) -> Result<(), RuntimeRefused<BackgroundComputeSettingsRefused>> {
-        let mut locked = self
+        let gpu_compute_kept_by_the_runtime = gpu_compute.clone();
+        let (_registered_while_waiting, mut locked) = self
             .shared
-            .lock_the_session()
+            .lock_the_session_for_a_foreground_entry()
             .map_err(RuntimeRefused::Failed)?;
         let switched = match gc_cpu_compensation_threshold {
             Some(threshold) => locked
@@ -1065,10 +1604,17 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
                 .session
                 .switch_background_compute_from_the_next_batch(settings, gpu_compute),
         };
+        if let (Ok(()), Some(gpu_compute_switched_to)) =
+            (&switched, gpu_compute_kept_by_the_runtime)
+        {
+            self.shared
+                .keep_the_gpu_compute_handed_to_the_core(gpu_compute_switched_to);
+        }
         switched.map_err(RuntimeRefused::Refused)
     }
 
     /// 在锁里读或改会话与盘（读路径 `read_at` 要盘表，走这里；用例摆开关也走这里）。闭包里 panic 等于前台在锁里 panic：运行库从此报 `Failed`。
+    /// 会话锁取不到时先登记在等，同 [`Self::accept`]。
     ///
     /// # Errors
     /// 运行库坏了。
@@ -1076,16 +1622,22 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         &self,
         work: impl FnOnce(&mut SessionAndDevices<Device>) -> Answer,
     ) -> Result<Answer, RuntimeFailed> {
-        let mut locked = self.shared.lock_the_session()?;
+        let (_registered_while_waiting, mut locked) =
+            self.shared.lock_the_session_for_a_foreground_entry()?;
         Ok(work(&mut *locked))
     }
 
-    /// 同步的一拍：线程体循环里那一次（重发冻结的那一次、`publish_when_due`、放锁的后台入口推到没得推）。不起线程的确定性测试直接调。
+    /// 同步的一拍：线程体循环里那一次（重发冻结的那一次、`publish_when_due`、后台整理推到没得推），锁外那一段在调用线程上算
+    /// （三段在这一条线程上首尾相接，算的那一段同样不持会话锁）。不起线程的确定性测试直接调。
     ///
     /// # Errors
     /// 运行库坏了。
     pub fn run_one_maintenance_pass(&self) -> Result<MaintenancePass, RuntimeFailed> {
-        self.shared.run_one_maintenance_pass()
+        self.shared.run_one_maintenance_pass(&|ticket| {
+            Ok(self
+                .shared
+                .compute_the_batch_reading_in_the_session_lock(ticket))
+        })
     }
 
     /// 累计的观测。
@@ -1098,15 +1650,24 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
             .clone()
     }
 
-    /// 登记一个前台 fsync 在等，丢弃交回的那一份就减（[`Self::publish_pending_now`] 自己走这里；用例拨它钉整理让路）。
+    /// 登记一个前台 fsync 在等会话锁，丢弃交回的那一份就减（[`Self::publish_pending_now`] 取锁取不到时自己走同一份登记；用例拨它钉整理让路）。
+    /// 登记一次记一次观测 `foreground_fsyncs_registered_as_waiting_for_the_session_lock`。
     pub fn foreground_fsync_is_waiting(&self) -> ForegroundFsyncWaiting<'_> {
-        self.shared.fsync_waiters.fetch_add(1, Ordering::SeqCst);
-        ForegroundFsyncWaiting {
-            fsync_waiters: &self.shared.fsync_waiters,
-        }
+        self.shared
+            .register_a_foreground_fsync_waiting_for_the_session_lock()
     }
 
-    /// 停线程并等它结束（线程在一拍之间查 `stopping`，整理在下一批之前让路）。一批之内 GPU 还在等时要等到那一批出来。
+    /// 登记一个前台 fsync 之外的入口在等会话锁，丢弃交回的那一份就减（收下改动、单发改动、切换后台计算、读取锁取不到时自己走同一份登记；
+    /// 用例拨它钉整理为这样的入口让路与让路的下限）。登记一次记一次观测 `foreground_entries_registered_as_waiting_for_the_session_lock`。
+    pub fn foreground_entry_is_waiting_for_the_session_lock(
+        &self,
+    ) -> ForegroundEntryRegisteredAsWaitingForTheSessionLock<'_> {
+        self.shared
+            .register_a_foreground_entry_waiting_for_the_session_lock()
+    }
+
+    /// 停线程并等它结束：先记下在停、告诉交给核心层的 GPU 实现调用方在停（[`Shared::ask_the_maintenance_thread_to_stop`]），线程在一拍之间查 `stopping`，
+    /// 整理在下一批之前让路；锁外那一段正在等卡时实现放弃那一等，维护线程丢掉那一批、不回锁，不等卡上那一次提交做完。
     fn stop_and_join_the_maintenance_thread(&mut self) {
         if let Some(thread) = self.maintenance_thread.take() {
             self.shared.ask_the_maintenance_thread_to_stop();
@@ -1114,7 +1675,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
         }
     }
 
-    /// 卸载：停线程 → 重发冻结的那一次（没有冻结着的发布就什么都不写）→ 排空待发 → 走核心层的卸载 → 丢会话（GPU 把手随它丢，有没交完的提交的那张卡整张泄漏、记进开卡器那份账）→ 盘交回。
+    /// 卸载：停线程（锁外那一段正在等卡时不等它，那一批不回锁）→ 重发冻结的那一次（没有冻结着的发布就什么都不写）→ 排空待发 → 走核心层的卸载 → 丢会话（GPU 把手随它丢，有没交完的提交的那张卡整张泄漏、记进开卡器那份账）→ 盘交回。
     /// 活意图不用做完：留在盘上，下次挂载续做。
     ///
     /// # Errors
@@ -1131,6 +1692,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
             clock,
             receiver,
             background_gpu_opened_at_the_mount,
+            gpu_computes_handed_to_the_core,
             ..
         } = Arc::try_unwrap(shared).unwrap_or_else(|_still_shared| {
             panic!("线程 join 过了、前台入口都借着 self：运行库是这一份的唯一持有者")
@@ -1161,6 +1723,13 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
                 Ok(drained_and_session) => drained_and_session,
                 Err(refused) => {
                     let refused = *refused;
+                    let gpu_computes_handed_to_the_core = gpu_computes_handed_to_the_core
+                        .into_inner()
+                        .unwrap_or_else(PoisonError::into_inner);
+                    // 交回的运行库接着用：停线程时置的停标记撤掉，不然 GPU 实现之后每一次等卡都当场放弃、后台任务停下。
+                    for gpu_compute in &gpu_computes_handed_to_the_core {
+                        gpu_compute.tell_the_implementation_the_caller_is_no_longer_stopping();
+                    }
                     return Err(Box::new(UnmountRefused::PendingChangesNotPublished {
                         runtime: MountedRuntime::of_the_session(
                             parameters,
@@ -1172,6 +1741,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
                             clock,
                             receiver,
                             background_gpu_opened_at_the_mount,
+                            gpu_computes_handed_to_the_core,
                         ),
                         refusal: refused.refusal,
                     }));
@@ -1198,7 +1768,7 @@ impl<Device: BlockDevice> MountedRuntime<Device> {
 }
 
 impl<Device> Drop for MountedRuntime<Device> {
-    /// 只停线程，不排空、不写盘（等价于崩溃）：析构里写盘失败无处可报。
+    /// 只停线程，不排空、不写盘（等价于崩溃）：析构里写盘失败无处可报。停法同卸载：先告诉 GPU 实现调用方在停，锁外那一段正在等卡时不等它。
     fn drop(&mut self) {
         if let Some(thread) = self.maintenance_thread.take() {
             self.shared.ask_the_maintenance_thread_to_stop();

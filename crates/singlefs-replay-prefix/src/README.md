@@ -2,9 +2,9 @@
 
 本目录不是整个文件系统的形式化实现。Verus 验证这个独立 crate 中的可执行纯函数、规格和引理；普通 Rust 构建擦除 ghost 代码后，core 调用其中一部分可执行函数。**某个核验证通过，不自动证明输入转换、设备实现或调用方满足其前提。**
 
-本次 GC 扩展的审查记录在 [records](../../../records/2026-10-24-GC形式化与core改动复核.md)。原始验证记录在 [扩展报告](../../../records/2026-10-24-GC实现与旧读者及崩溃协议形式化扩展.md)。以下说明当前源码，而非冻结历史。
+GC 扩展的审查记录在 [records](../../../records/2026-10-24-GC形式化与core改动复核.md)。原始验证记录在 [扩展报告](../../../records/2026-10-24-GC实现与旧读者及崩溃协议形式化扩展.md)。以下说明当前源码，而非冻结历史。
 
-## 八份源文件各负责什么
+## 十份源文件各负责什么
 
 | 文件 | 可执行产品入口 | 验证内容与主要边界 |
 | --- | --- | --- |
@@ -12,12 +12,14 @@
 | [compaction_plan_proofs.rs](compaction_plan_proofs.rs) | `choose_compaction_segment`、`plan_compaction_batch` | 选段资格、贪心和平局规则；计划顺序、数量、互异性和进展；另有按槽区间的搬迁保持引理（P4），前提含回退候选与读者的区间，它不是产品 I/O 代码 |
 | [gc_ring_interval_proofs.rs](gc_ring_interval_proofs.rs) | 无 | GC 搬迁协议的根环版：映射值是槽区间，F 分内存与持久两层，根按版本号点名；任意有限历史的读取保持、三个反例被拒、G7 |
 | [gc_crash_proofs.rs](gc_crash_proofs.rs) | **只有** `released_record_can_be_reclaimed` | 回收比较核，与「门槛蕴涵没被引用」那一条引理（两条前提显式写在 requires 里） |
-| [gpu_gc_proofs.rs](gpu_gc_proofs.rs) | 双核仲裁、预算、分片、区域准入和回读的八个纯函数入口 | [GPU GC 新增 20 项核心性质与边界](GPU_GC_PROOFS.md)：主机端纯核直验，抽象计数协议、区间打分与 WGSL 双字算术模型另列边界 |
-| [file_range_proofs.rs](file_range_proofs.rs) | `next_tail_batch`、`bytes_in_unit`、`checked_write_end`、`payload_length_from_start`、`units_covering_size`、`units_for_sequential_write`、`rounded_size_fits`、`checked_unit_byte_range`、`checked_bytes_in_indexed_unit` | 截断/删除的批量释放边界、进展与尾区间分区；部分写交集的精确覆盖、两侧偏移与容量上界；相邻单元无重叠无遗漏；按单元号算单元端点的乘加与溢出拒绝 |
+| [gpu_gc_proofs.rs](gpu_gc_proofs.rs) | 双核仲裁、预算、分片、区域准入和回读的八个纯函数入口 | [GPU GC 的 G01–G20 与边界](GPU_GC_PROOFS.md)：主机端纯核直验，抽象计数协议、区间打分与 WGSL 双字算术模型另列边界 |
+| [gpu_gc_capacity_proofs.rs](gpu_gc_capacity_proofs.rs) | `gpu_chunk_fits`、`largest_gpu_piece_input`、`tightened_gpu_memory_limit`、`checked_gpu_memory_hold`、`checked_gpu_memory_release`、`gpu_bytes_after_submission_wait`、`gpu_memory_cap_after_allocation_failure`、`gpu_workgroups_for_entries`、`checked_gpu_mapping_table_bytes`；`extended_gpu_chunk_input` 产品此刻没有调用点 | [G21–G30](GPU_GC_PROOFS.md)：切批准入、最大分片、显存账本、派发尺寸与映射表占用；显存界比的是交进来的上限，产品扣输入暂存那一层在核外 |
+| [gpu_gc_scoring_proofs.rs](gpu_gc_scoring_proofs.rs) | 无 | 两份 GPU 活槽打分算法（逐条走与二分查）的模型：二分下界、候选窗口、逐槽计数与排列等价，任意长度不超过 `u32::MAX` 的记录表；WGSL 到模型的翻译、主机排序与 GPU 执行在边界外（[GPU_GC_PROOFS.md](GPU_GC_PROOFS.md)「两份打分算法的归纳证明」） |
+| [file_range_proofs.rs](file_range_proofs.rs) | `next_tail_batch`、`bytes_in_unit`、`checked_write_end`、`payload_length_from_start`、`units_covering_size`、`units_for_sequential_write`、`rounded_size_fits`、`checked_unit_byte_range`、`checked_bytes_in_indexed_unit` | 截断/删除的批量释放边界、进展与尾区间分区；部分写交集的精确覆盖、精确交集长度（`range_intersection_length`，单元分界与请求分界两侧长度相加等于整体）、两侧偏移与容量上界；相邻单元无重叠无遗漏；按单元号算单元端点的乘加与溢出拒绝 |
 | [unlink_proofs.rs](unlink_proofs.rs) | `next_unlink_batch`、`size_after_an_unlink_batch` | unlink 的分批计划：整串计划的形状与步数、每个数据单元恰好释放一次、从任一中间版续做的计划等于一路做下来的后半截；删除批的下段节点每层至多重写截口那一个（按跨度模型）；size 乘法不回绕 |
 | [partial_write_proofs.rs](partial_write_proofs.rs) | `classify_partial_write_unit`、`first_unit_to_rewrite`、`units_after_partial_write`、`unit_containing_byte` | 部分写五类单元来源、重写起点、写后单元数；端点覆盖/相交判定与逐字节语义等价；抽象字节模型的覆盖规律与整单元覆盖不依赖旧内容 |
 
-核的入口文件为 `lib.rs`，另七份文件通过模块引入。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
+核的入口文件为 `lib.rs`。九份文件由 `lib.rs` 的九个 `pub mod` 引入，其中 `gc_ring_interval_proofs.rs` 又引入 `gc_ring_interval_proofs/` 下的两份；M3 的引理在 `lib.rs` 的私有模块 `idempotence_and_monotonicity_lemmas.rs`，纯函数核 `replay_core`、`choose_root_slot`、`first_copy_of_each_record_key` 在它的子模块 `idempotence_and_monotonicity_lemmas/pure_function_kernels.rs`，由 `lib.rs` 再导出。`.claude/gate.d/verus-pins.tsv` 登记核文件和固定工具版本；`verus-must-red-worlds.tsv` 登记反例。完整 proof 门禁同时做逐项验证和无过滤的整 crate 验证。
 
 ## core 到 compaction 核的转换
 
@@ -29,7 +31,7 @@
 
 核按 `live_slots` 最小选候选，只有严格更小时更新 best。输入顺序与段起点顺序相同，因此同分保留最早下标等价于原算法取最小槽号。返回下标再由相同公式转换为 CompactionRegion：有可搬项返回 Chosen，未扫描返回 ScanBeforeChoosing，无候选返回 NoEligibleSegment。
 
-这段论证依赖输入地址算术有效。core 已有的面积、地址宽度、段对齐和记录跨度约束不因接核而获得新证明。新转换还增加一个按完整段数分配的输入向量；并未证明其资源消耗上界适合所有池规模。
+这段论证依赖输入地址算术有效。core 的面积、地址宽度、段对齐和记录跨度约束不由核证明。转换另分配一个按完整段数的输入向量；并未证明其资源消耗上界适合所有池规模。
 
 ### 批计划
 
@@ -40,7 +42,7 @@
 5. 核返回前 K 个可搬记录的下标。产品从原扫描取 key 和**完整 Placement**，保留源槽和 span；key 身份值不成为产品映射 key。
 6. 没有计划项时，原扫描为空才是 RegionEmptied；有记录但全不可搬则是 NothingMovableButTheRegionIsNotEmpty。
 
-这建立了人工可审阅的转换论证，并有独立参考和边界用例。适配代码自身仍是普通 Rust，不应称为已由 Verus 证明的一般精化。`plan_batch_skipping_the_units_this_publish_rewrites_anyway` 的特殊分支也仍在 core，不能直接套“输出最多 K 项”：当区域仅剩本次本来就重写的节点时，它可以返回全部节点，这是原有契约。
+这建立了人工可审阅的转换论证，并有独立参考和边界用例。适配代码自身仍是普通 Rust，不应称为已由 Verus 证明的一般精化。`plan_batch_skipping_the_units_this_publish_rewrites_anyway` 的特殊分支也仍在 core，不能直接套“输出最多 K 项”：当区域仅剩本次本来就重写的节点时，它可以返回全部节点，这是它自己的契约。
 
 ## GC 搬迁协议的数学对象
 
@@ -102,11 +104,11 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
 
 `truncate::next_truncation_step` 把目标 size 换成单元数后调用 `next_tail_batch`；`unlink::next_unlink_step` 经 `unlink_proofs::next_unlink_batch` 以目标 0 调同一核（见下一节）。核只要求批大小大于 0，调用方的 `UnlinkBatchSize` 产品值为 144，测试值限制在 1 到 144。证明覆盖现有单元数小于目标（尾部有洞）、恰好一批、零单元与 u64 极值；size 到单元数的转换现由下述取整核证明；单元地址计算与事务发布仍不在这里证明。unlink 的剩余 size 乘法由下一节的独立核证明。
 
-`bytes_in_unit` 是求交那一半：核无前提，接受空或倒置区间：返回 None 当且仅当没有共同字节；返回 Some 时长度严格为正，两侧偏移指向同一文件字节，且范围恰好是交集。core 的 `PartialWriteOfAFile::bytes_written_into` 今天不再自己算单元端点再调它，而是调 `checked_bytes_in_indexed_unit`（本页「按单元号计算部分写区间」一节），单元端点的乘法与加法连同求交在同一证明里，地址溢出显式拒绝。相邻单元分区引理证明交集不重不漏，不等于证明完整写入流程或 I/O 正确。
+`bytes_in_unit` 是求交那一半：核无前提，接受空或倒置区间：返回 None 当且仅当没有共同字节；返回 Some 时长度严格为正，两侧偏移指向同一文件字节，且范围恰好是交集。core 的 `PartialWriteOfAFile::bytes_written_into` 不直接调它，调的是 `checked_bytes_in_indexed_unit`（本页「按单元号计算部分写区间」一节），单元端点的乘法与加法连同求交在同一证明里，地址溢出显式拒绝。相邻单元分区引理证明交集不重不漏，不等于证明完整写入流程或 I/O 正确。
 
-文件区间模块的 5 项 Verus 义务（两个产品入口、一个无前提边界见证、两个分区引理），并登记 7 个必须被拒绝的实现变异。普通 Rust 测试另外枚举小区间的实际字节集、逐批释放的单元集，并检查全宽端点。
+文件区间模块共 19 项 Verus 义务（按门禁 formal-verification 的 verus-proof 格成项：10 个 exec fn、9 个 proof fn，没有带 decreases 的 spec fn 与带值的 const）：9 个产品入口（文件表那一行列的）、8 条引理、2 个无前提见证（`witness_file_range_boundaries`、`witness_intersection_length_partitions`）。必须被拒绝的变异是必红表里第二段为 `crates/singlefs-replay-prefix/src/file_range_proofs.rs` 的各行。普通 Rust 测试另外枚举小区间的实际字节集、逐批释放的单元集，并检查全宽端点。
 
-文件区间模块合计 9 项义务；其中管 u64 边界与声明长度的 4 项：
+文件区间模块的 19 项义务里，管 u64 边界与声明长度的 4 项：
 
 - `PartialWriteOfAFile::new` 直接调用 `checked_write_end`，返回 Some 当且仅当数学和装得进 u64；等于 u64::MAX 仍允许，溢出拒绝，不作饱和截断。
 - `truncate::declared_length_within_a_size` 与 `write_request_split::payload_length_within_a_size` 在取得单元起点后调用 `payload_length_from_start`。后置条件证明返回值不超过容量，且 `[0, length)` 恰好包含单元中位于 EOF 之前的字节；空文件、EOF 后的起点和零容量均有定义。
@@ -114,14 +116,14 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
 
 这两处声明长度调用之前的单元起点乘法仍由调用方负责，没有移入证明。另有 7 个必红变异，包含删除两个引理各自的大小顺序前提。无前提边界见证覆盖恰好到 u64::MAX、溢出、部分载荷和 EOF 后起点，Rust 测试用 u128 数学和及枚举字节集合独立核对。
 
-同日继续补齐单元取整：新增三个产品函数与一个单调引理，加上取整边界的 nonlinear_arith 子证明，共 5 条义务。
+单元取整占这 19 项里的 4 项：3 个产品函数（exec fn）与 1 条单调引理（proof fn）；取整边界的 nonlinear_arith 子证明写在 `units_covering_size` 的函数体里，不单成一项。
 
 - `units_covering_size` 以 `(size - 1) / capacity + 1` 处理非零 size，零 size 返回 0。前提为 capacity > 0；后置条件同时给出 `size <= count × capacity` 和非零 size 时 `(count - 1) × capacity < size`，证明覆盖足够且没有多算。乘积在规格中是数学整数，返回 count 本身不溢出。
 - `units_for_sequential_write` 在此基础上使空文件保留一个单元，由 core 的 `data_unit_count_of_a_sequential_write` 直接调用，读侧数量检查、顺序写和截断目标计数因此共用同一核。
 - `rounded_size_fits` 用覆盖计数与 checked_mul 判断整单元取整后的数学值是否装得进 u64；core 的 `target_size_rounded_up_to_a_whole_data_unit_fits` 直接调用。零大小的准入仍按 0 个单元，与空文件保留 1 个单元的语义有意区分。
 - `lemma_covering_units_are_monotone` 证明在正容量与有序 size 前提下，所需单元数不倒退。
 
-容量从产品格式取值，仍由调用方保证正数。本轮新增 6 个必红变异与 3 个 Rust 回归测试；测试以逐字节触及的单元集合和 u128 向上取整作独立参照，并检查 core 使用真实净荷容量时的最大整倍数及后一字节。部分写那一路（`bytes_written_into`、`data_unit`）的单元起点与结束地址乘加已由 `checked_bytes_in_indexed_unit`、`checked_unit_byte_range` 证明（见「按单元号计算部分写区间」）；别的调用方各自的单元地址换算、调用方状态满足核的前提（计划公开字段的不变量）与完整 I/O 仍未由本模块证明。
+容量从产品格式取值，仍由调用方保证正数。单元取整这一块在必红表里有 6 行（`unit-count-` 开头三行、`sequential-write-empty-keeps-one-unit`、`rounded-size-refuses-overflow`、`unit-count-monotonicity-needs-ordered-sizes`），另有 3 个 Rust 回归测试（`file_range_proofs::tests` 的 `unit_count_matches_the_distinct_units_touched_by_each_byte`、`full_width_rounding_matches_wide_arithmetic_without_an_intermediate_overflow`，core `write_request_split` 的 `unit_count_and_truncation_admission_agree_at_the_last_representable_whole_unit`）；测试以逐字节触及的单元集合和 u128 向上取整作独立参照，并检查 core 使用真实净荷容量时的最大整倍数及后一字节。部分写那一路（`bytes_written_into`、`data_unit`）的单元起点与结束地址乘加已由 `checked_bytes_in_indexed_unit`、`checked_unit_byte_range` 证明（见「按单元号计算部分写区间」）；别的调用方各自的单元地址换算、调用方状态满足核的前提（计划公开字段的不变量）与完整 I/O 仍未由本模块证明。
 
 ## unlink 分批核到 core 的边界
 
@@ -133,17 +135,17 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
 - `lemma_continued_plan_equals_the_rest`：做完第 i 个非最后一批之后从留下的单元数续做，整串与一路做下来的后半截逐步相同（第 7 条 ①「计划相等」）。
 - `lemma_deletion_batch_rewrites_only_the_cut_path`：按「一层第 index 个节点罩 [index × span, index × span + span)」的模型，截到 kept 个时这一层重写的节点恰好是下标 kept ÷ span 那一个且只在 kept 不是 span 倍数时出现，换下的恰好是整个落在被截掉那一段里的（K-R3-1）。
 
-不证明：剩下的单元数从 extent 树怎么数出来、净荷容量取值、`plan_the_lower_segment_after_a_deletion_batch` 的 Vec 构造与它用的 `data_unit_range`（饱和乘加）与上面模型一致、事务发布与崩溃恢复。下段那条引理是模型上的结论，产品函数不调用它。必红世界表另登记 7 个变异（计划的边界、截多一个、续做起点、最后一批留一个、size 换成加法、截口叶误判整片留下、节点存在的边界差一）。
+不证明：剩下的单元数从 extent 树怎么数出来、净荷容量取值、`plan_the_lower_segment_after_a_deletion_batch` 的 Vec 构造与它用的 `data_unit_range`（饱和乘加）与上面模型一致、事务发布与崩溃恢复。下段那条引理是模型上的结论，产品函数不调用它。必红世界表里第二段是 `crates/singlefs-replay-prefix/src/unlink_proofs.rs` 的有 12 行：计划的边界、截多一个、续做起点、最后一批留一个、size 换成加法、截口叶误判整片留下、节点存在的边界差一，形状与步数两条引理各跳过归纳步、续做引理断言多要一批、逐单元释放引理断言最后一批的计划没有步、截口引理里节点存在的蕴涵反向。
 
 ## 部分写计划核到 core 的边界
 
-`PartialWriteOfAFile::data_unit` 将已有单元标记、写区间、单元区间传给 `classify_partial_write_unit`，再用穷尽 match 转回原有公开枚举；原有状态名称与两个读回标记方法保持在 core。五种来源的契约分别规定：旧单元仅整块被覆盖时免读，新单元只有被部分覆盖时读残留，未写到的新单元补零。两个引理证明在非空写区间、非空单元区间前提下，端点“整块覆盖”当且仅当每个单元字节都被写，端点“相交”当且仅当存在共同字节。
+`PartialWriteOfAFile::data_unit` 将已有单元标记、写区间、单元区间传给 `classify_partial_write_unit`，再用穷尽 match 转成 core 的公开枚举；状态名称与两个读回标记方法在 core。五种来源的契约分别规定：旧单元仅整块被覆盖时免读，新单元只有被部分覆盖时读残留，未写到的新单元补零。两个引理证明在非空写区间、非空单元区间前提下，端点“整块覆盖”当且仅当每个单元字节都被写，端点“相交”当且仅当存在共同字节。
 
-`first_rewritten_unit` 把写入起点、已有单元数和旧尾单元是否不满传给 `first_unit_to_rewrite`。契约给出精确起点，保证不晚于写入起点、不越过已有尾部；从旧尾之后写且旧尾未满时，必须把旧尾纳入重写。该布尔量仍由 core 用已验证的声明长度核求得，其输入单元起点换算不在本轮证明内。
+`first_rewritten_unit` 把写入起点、已有单元数和旧尾单元是否不满传给 `first_unit_to_rewrite`。契约给出精确起点，保证不晚于写入起点、不越过已有尾部；从旧尾之后写且旧尾未满时，必须把旧尾纳入重写。该布尔量仍由 core 用已验证的声明长度核求得，其输入单元起点换算不在本模块的证明内。
 
 `data_units_after` 调 `units_after_partial_write`，证明结果恰好为已有单元数与写入终点所需单元数的最大值；既不丢旧后缀，也能容纳本次写入。写入终点必须非零、容量必须为正；前者来自非零长度和构造时的溢出检查，后者来自产品净荷容量。
 
-本模块新增 6 个被验函数（含一条 nonlinear_arith 子证明，共 7 条义务）与 11 个必红变异。证明依赖输入区间有效：构造后的计划字段须保持一致，单元端点的乘加不溢出；不宣称已经证明公开字段被任意改写后的计划、区间地址转换、五类来源对应的真实 I/O 或整个发布事务。核测试枚举实际覆盖字节并确认五类都出现，core 包装测试单独核对公开枚举的读旧数据/读残留/补零标记。
+部分写计划这一块有 6 项义务（按门禁 formal-verification 的 verus-proof 格成项：`unit_containing_byte`、`classify_partial_write_unit`、`first_unit_to_rewrite`、`units_after_partial_write` 4 个 exec fn 与上面两条引理 2 个 proof fn；`unit_containing_byte` 函数体里的 nonlinear_arith 子证明不单成一项）；`partial_write_proofs` 模块连同下一节覆盖写的 8 个 proof fn 共 14 项。必红表里第二段是 `crates/singlefs-replay-prefix/src/partial_write_proofs.rs` 的有 35 行，部分写计划这一块是 `partial-` 开头的 12 行，其余 23 行是下一节覆盖写的。证明依赖输入区间有效：构造后的计划字段须保持一致，单元端点的乘加不溢出；不宣称已经证明公开字段被任意改写后的计划、区间地址转换、五类来源对应的真实 I/O 或整个发布事务。核测试枚举实际覆盖字节并确认五类都出现，core 包装测试单独核对公开枚举的读旧数据/读残留/补零标记。
 
 `first_written_unit` 与 `last_written_unit` 另调用 `unit_containing_byte`，分别定位写入首字节与末字节（end - 1）。核要求正容量，证明 `index × capacity <= byte < (index + 1) × capacity`；区间端点是数学整数，因此也覆盖 byte = u64::MAX，并不保证实际构造下一个单元地址时不会溢出。core 包装测试通过枚举写到的字节集合核对首尾单元，核测试以 u128 端点检查极值。
 
@@ -151,7 +153,7 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
 
 `partial_write_proofs` 的 `overwritten_bytes` 用 `Seq<u8>` 表示固定长度文件内的覆盖写，`overwrite_fits` 要求写入起点非负、整个请求位于文件内。证明义务包括：
 
-- `lemma_overwrite_changes_exactly_the_requested_bytes`：长度不变，写内字节来自请求，写外字节保留旧值，空请求不改变文件。
+- `lemma_overwrite_changes_exactly_the_requested_bytes`：长度不变，写内字节来自请求，写外字节保留旧值，空请求不改变文件；另按段说写入那一段恰是请求、前后两段恰是原值，这三条要 `overwrite_fits`（请求越出文件时那几段的 `subrange` 落在序列之外）。逐字节那一条是 `overwritten_bytes` 定义的展开，它钉住的是定义本身。
 - `lemma_overwriting_the_same_range_keeps_only_the_last_write`：同起点、同长度的连续覆盖只保留最后一次的内容。
 - `lemma_disjoint_overwrites_commute`：不相交的两次覆盖可以交换顺序，两种顺序下第二次写仍满足范围前提；允许相邻区间和空请求。
 - `lemma_whole_unit_overwrite_does_not_depend_on_old_bytes`：利用现有整单元覆盖引理，证明分类核的覆盖条件足以使单元结果不依赖旧内容。
@@ -160,28 +162,14 @@ core 的 `CheckpointTxg` 是单字段 u64 newtype，派生 Ord。将 `record.gen
 - `lemma_a_contained_overwrite_folds_into_the_payload`：后写完全位于前次请求内时，依序写入与先改请求内容、再整段写回相同，两条路径均满足范围前提。
 - `witness_split_and_contained_overwrites`：构造非空分段写入、严格包含的后写、两端分界与空后写，钉住组合后的具体字节。
 
-这些性质仅针对抽象字节模型，不代表 core 的缓冲区拷贝、扩展文件、补洞、设备 I/O 或持久化顺序已经精化到此模型。规格使用数学整数和有限序列，不新增运行时代码或可信假设。必红表含各函数的契约反例及删除关键前提的反例（同长度、不相交、整单元覆盖、合法分界、后写包含于请求）。组合性质另有后缀偏移错位、后写偏移错位和见证字节错误的反例。
+这些性质仅针对抽象字节模型，不代表 core 的缓冲区拷贝、扩展文件、补洞、设备 I/O 或持久化顺序已经精化到此模型。规格使用数学整数和有限序列，不带运行时代码或可信假设。必红表里这一块是 `overwrite-` 开头的 23 行：各函数的契约反例（`overwrite-contract-*` 五条、`overwrite-composition-contract-*` 三条，每条结论改成 false）、六条删除关键前提的反例（第一条引理的范围前提、同长度、不相交、整单元覆盖、合法分界、后写包含于请求）、两条改坏 `overwritten_bytes` 定义的反例（写入段整段右移一格、写入段少一格）、两条改坏另两条引理结论的反例（`overwrite-last-write-wins`、`overwrite-disjoint-writes-keep-both`）与两条改坏第一条引理另两条结论的反例（`overwrite-exact-keeps-the-length` 长度不变改成多一字节、`overwrite-exact-empty-request-keeps-the-file` 空请求不改文件放宽到长度不超过 1）；组合性质另有后缀偏移错位、后写偏移错位和见证字节错误的反例。
 
-复跑本模块（仓根执行；`VERUS` 指向 `.claude/gate.d/verus-pins.tsv` 固定版本的 `verus`，任务服务按确认单确认后运行）：
+复跑本模块（命令由主 agent 在仓根经统一任务服务交，`.claude/agent-common.md`「子 agent 不交任务」；证明逐项的项名是 `proof:<全路径>`，照门禁 formal-verification 的 `--list-items` 列出的写）：
 
 ```sh
-task-server/task submit --manual -- "$VERUS" --crate-type=lib --edition=2021 \
-  --crate-name singlefs_replay_prefix --no-cheating --rlimit 10 \
-  --verify-only-module partial_write_proofs crates/singlefs-replay-prefix/src/lib.rs
-task-server/task submit --manual -- python3 scripts/gate/verus-proof-check.py must-red-worlds . \
-  --item must-red:overwrite-last-needs-equal-lengths \
-  --item must-red:overwrite-commute-needs-disjoint-ranges \
-  --item must-red:overwrite-whole-needs-coverage \
-  --item must-red:overwrite-split-needs-suffix-offset \
-  --item must-red:overwrite-contained-needs-file-offset \
-  --item must-red:overwrite-split-needs-valid-boundary \
-  --item must-red:overwrite-contained-needs-payload-bounds
-task-server/task submit --manual -- cargo test -p singlefs-replay-prefix \
-  --offline --lib -- --exact \
-  partial_write_proofs::tests::located_unit_contains_the_byte_even_when_its_end_exceeds_u64 \
-  partial_write_proofs::tests::unit_sources_match_the_bytes_actually_overwritten \
-  partial_write_proofs::tests::rewrite_start_includes_the_gap_and_the_partial_old_tail \
-  partial_write_proofs::tests::after_count_preserves_old_units_and_covers_the_write_at_full_width
+SINGLEFS_RUN_SCOPE='种类=items; 跑什么=门禁 formal-verification.sh 带 --item; 范围=点名的 8 项; 为什么=复判覆盖写字节模型的范围前提、同长度、不相交、整单元覆盖、后缀偏移、后写偏移、合法分界与后写包含于请求八行反例' task-server/task submit -- bash .claude/gate.d/formal-verification.sh --item must-red:overwrite-exact-needs-fit --item must-red:overwrite-last-needs-equal-lengths --item must-red:overwrite-commute-needs-disjoint-ranges --item must-red:overwrite-whole-needs-coverage --item must-red:overwrite-split-needs-suffix-offset --item must-red:overwrite-contained-needs-file-offset --item must-red:overwrite-split-needs-valid-boundary --item must-red:overwrite-contained-needs-payload-bounds .
+
+SINGLEFS_RUN_SCOPE='种类=target; 跑什么=singlefs-replay-prefix 的 --lib 里 partial_write_proofs 的 4 条测试; 范围=4 个测试; 为什么=复核部分写计划核的四个 Rust 测试' task-server/task submit -- cargo test -p singlefs-replay-prefix --lib -- partial_write_proofs::tests::located_unit_contains_the_byte_even_when_its_end_exceeds_u64 partial_write_proofs::tests::unit_sources_match_the_bytes_actually_overwritten partial_write_proofs::tests::rewrite_start_includes_the_gap_and_the_partial_old_tail partial_write_proofs::tests::after_count_preserves_old_units_and_covers_the_write_at_full_width --exact
 ```
 
 ## 按单元号计算部分写区间
@@ -190,6 +178,10 @@ task-server/task submit --manual -- cargo test -p singlefs-replay-prefix \
 
 `checked_bytes_in_indexed_unit` 把地址换算与求交组合在同一证明中：外层 None 表示地址溢出，Some(None) 表示可表示区间内没有写入字节；Some(Some(...)) 给出两个相对偏移及正长度，并与数学上的逐字节交集等价。core 的 `bytes_written_into` 直接调用它，地址溢出时显式 panic，其余返回行为保持不变。
 
-`lemma_rounded_size_bounds_written_unit_addresses` 将取整准入条件连接到单元地址安全性：正容量、取整后长度可表示且单元号小于 size 所需单元数时，该单元终点不溢出。size 之外保留的已有单元需要文件状态另给界限。无前提边界见证覆盖该引理及两个新入口。
+`range_intersection_length` 用数学整数端点给出精确交集长度：最大起点到最小终点之间的正差，否则为零。`bytes_in_unit` 的空结果对应长度零，非空结果的 `length` 直接等于此规格；`checked_bytes_in_indexed_unit` 在地址可表示的外层 `Some` 内保留同样关联，单元端点使用数学乘法与加法。外层 `None` 仍只表示地址溢出，不能当作零长度交集。core 直接消费返回的 `length` 字段，因此该契约关联的是执行核给出的长度。
 
-这一步没有封闭计划公开字段的不变量，也没有验证五类来源到 core 枚举的转换或实际 I/O。原有其它单元地址换算仍各由调用方负责。
+`lemma_adjacent_unit_intersection_lengths_add_up` 证明在单元内合法分界时两侧交集长度相加等于整体，允许写区间为空或倒置。`lemma_split_write_intersection_lengths_add_up` 证明在写请求内合法分界时两段请求的交集长度相加等于整体，允许单元区间为空或倒置。无前提见证 `witness_intersection_length_partitions` 覆盖内部与两端分界、具体的 `4 = 1 + 3` 和 `4 = 2 + 2`、空与倒置区间及 u64 上界附近的单字节交集。规格与组合引理只涉及字节区间和返回长度，不代表缓冲区拷贝、设备 I/O 或持久化顺序已经精化到这些性质。
+
+`lemma_rounded_size_bounds_written_unit_addresses` 将取整准入条件连接到单元地址安全性：正容量、取整后长度可表示且单元号小于 size 所需单元数时，该单元终点不溢出。size 之外保留的已有单元需要文件状态另给界限。无前提边界见证覆盖该引理及 `checked_unit_byte_range`、`checked_bytes_in_indexed_unit` 两个入口。
+
+这一节的核没有封闭计划公开字段的不变量，也没有验证五类来源到 core 枚举的转换或实际 I/O。别的单元地址换算各由调用方负责。

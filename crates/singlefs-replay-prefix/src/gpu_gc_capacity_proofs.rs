@@ -1,4 +1,4 @@
-//! GPU GC 的切批准入、最大分片、显存账本和派发尺寸；产品调用同一份 exec 核。
+//! GPU GC 的切批准入、最大分片、显存账本和派发尺寸；G21–G29 由产品调用同一份 exec 核，G30 产品此刻没有调用点。
 //! G21–G30 续接 gpu_gc_proofs；设备完成信号的真实性和外围容器不在本模块证明。
 use crate::gpu_gc_proofs::{checked_gpu_chunk_bytes, checked_gpu_input_bytes};
 use vstd::prelude::*;
@@ -24,7 +24,7 @@ pub open spec fn chunk_fits(input: u64, entries: u64, capacity: GpuChunkCapacity
         }
 }
 
-/// G21：显存、输入绑定、条目绑定和派发四道界必须同时满足；乘加溢出不能误放行。
+/// G21：显存、输入绑定、条目绑定和派发四道界必须同时满足；乘加溢出不能误放行。显存那一道比的是交进来的上限，产品扣输入暂存那一层在调用方。
 pub fn gpu_chunk_fits(input: u64, entries: u64, capacity: &GpuChunkCapacity) -> (fits: bool)
     ensures fits == chunk_fits(input, entries, *capacity),
 {

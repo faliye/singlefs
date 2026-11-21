@@ -1,4 +1,4 @@
-//! GPU GC 的主机端纯核与着色器算术模型。20 项核心性质见 src/README.md。
+//! GPU GC 的主机端纯核与着色器算术模型。20 项核心性质的清单见 src/GPU_GC_PROOFS.md「覆盖清单」。
 //! 仲裁、预算、分片、回读与区域准入的 exec 函数由产品直接调用；
 //! Map/Seq 与双字算术证明不等于验证 WGSL 编译器、GPU 执行或设备 I/O。
 use crate::file_range_proofs::units_for_sequential_write;
@@ -282,13 +282,18 @@ pub fn checked_gpu_chunk_bytes(input: u64, entries: u64, per_entry: u64, fixed: 
     }
 }
 
-/// G17：各后台阶段共享显存预算；已占超限时不回绕，正的新增分配必在总限内。
+pub open spec fn allocation_stays_within_the_limit(held: u64, request: int, limit: u64) -> bool {
+    held + request <= limit
+}
+
+/// G17：各后台阶段共享显存预算；已占超限时不回绕，不超过剩余量的正的新增分配加上已占必在总限内。
 #[allow(clippy::implicit_saturating_sub, reason = "被验函数体与 ensures 的分支逐字对照，不换成饱和减")]
 pub fn remaining_gpu_memory(limit: u64, held: u64) -> (remaining: u64)
     ensures
         remaining == if held < limit { limit - held } else { 0int },
         remaining <= limit,
         held <= limit ==> held + remaining == limit,
+        forall|request: int| 0 < request <= remaining ==> #[trigger] allocation_stays_within_the_limit(held, request, limit),
 {
     if held >= limit { 0 } else { limit - held }
 }

@@ -1,6 +1,6 @@
 use singlefs_replay_prefix::gpu_gc_proofs::*;
 
-const EDGES: [u64; 9] = [
+const EDGES: [u64; 11] = [
     0,
     1,
     3,
@@ -9,6 +9,8 @@ const EDGES: [u64; 9] = [
     u32::MAX as u64,
     1u64 << 32,
     u64::MAX - 3,
+    u64::MAX - 2,
+    u64::MAX - 1,
     u64::MAX,
 ];
 

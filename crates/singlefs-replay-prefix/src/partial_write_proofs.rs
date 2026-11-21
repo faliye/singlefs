@@ -116,6 +116,7 @@ pub open spec fn overwritten_bytes(old: Seq<u8>, start: int, data: Seq<u8>) -> S
 }
 
 /// 写内每个字节来自请求，写外每个字节仍是原值；空写也包括在内。
+/// 按段说的三条（写入那一段恰是请求、前后两段恰是原值）要 overwrite_fits：请求越出文件时那几段的 subrange 落在序列之外，推不出相等。
 pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, start: int, data: Seq<u8>)
     requires overwrite_fits(old, start, data),
     ensures
@@ -123,10 +124,19 @@ pub proof fn lemma_overwrite_changes_exactly_the_requested_bytes(old: Seq<u8>, s
         forall|byte: int| 0 <= byte < old.len() ==>
             #[trigger] overwritten_bytes(old, start, data)[byte] ==
                 if start <= byte < start + data.len() { data[byte - start] } else { old[byte] },
+        overwritten_bytes(old, start, data).subrange(start, start + data.len()) == data,
+        overwritten_bytes(old, start, data).subrange(0, start) == old.subrange(0, start),
+        overwritten_bytes(old, start, data).subrange(start + data.len(), old.len() as int)
+            == old.subrange(start + data.len(), old.len() as int),
         data.len() == 0 ==> overwritten_bytes(old, start, data) == old,
 {
+    let written = overwritten_bytes(old, start, data);
+    assert(written.subrange(start, start + data.len()) =~= data);
+    assert(written.subrange(0, start) =~= old.subrange(0, start));
+    assert(written.subrange(start + data.len(), old.len() as int)
+        =~= old.subrange(start + data.len(), old.len() as int));
     if data.len() == 0 {
-        assert(overwritten_bytes(old, start, data) =~= old);
+        assert(written =~= old);
     }
 }
 

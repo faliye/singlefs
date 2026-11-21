@@ -153,14 +153,27 @@ pub open spec fn in_both_ranges(byte: int, write_start: u64, write_end: u64, uni
     write_start <= byte < write_end && unit_start <= byte < unit_end
 }
 
+/// 两个半开区间的精确交集长度；空区间、倒置区间与不相交区间的长度都是零。
+pub open spec fn range_intersection_length(
+    write_start: int, write_end: int, unit_start: int, unit_end: int,
+) -> int {
+    let intersection_start = if write_start > unit_start { write_start } else { unit_start };
+    let intersection_end = if write_end < unit_end { write_end } else { unit_end };
+    if intersection_start < intersection_end { intersection_end - intersection_start } else { 0 }
+}
+
 /// 返回（单元内偏移，请求内偏移，长度）；None 恰好表示交集为空。也接受空或倒置的区间。
 pub fn bytes_in_unit(write_start: u64, write_end: u64, unit_start: u64, unit_end: u64)
     -> (answer: Option<(u64, u64, u64)>)
     ensures
         match answer {
-            None => forall|byte: int| !in_both_ranges(byte, write_start, write_end, unit_start, unit_end),
+            None => {
+                &&& range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int) == 0
+                &&& forall|byte: int| !in_both_ranges(byte, write_start, write_end, unit_start, unit_end)
+            },
             Some((in_unit, in_write, length)) => {
                 &&& length > 0
+                &&& length == range_intersection_length(write_start as int, write_end as int, unit_start as int, unit_end as int)
                 &&& unit_start + in_unit as int == write_start + in_write as int
                 &&& in_unit + length as int <= unit_end - unit_start
                 &&& in_write + length as int <= write_end - write_start
@@ -204,9 +217,13 @@ pub fn checked_bytes_in_indexed_unit(write_start: u64, write_end: u64, unit_inde
             Some(intersection) => {
                 &&& unit_index * capacity + capacity <= u64::MAX
                 &&& match intersection {
-                    None => forall|byte: int| !byte_in_write_and_indexed_unit(byte, write_start, write_end, unit_index, capacity),
+                    None => {
+                        &&& range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity) == 0
+                        &&& forall|byte: int| !byte_in_write_and_indexed_unit(byte, write_start, write_end, unit_index, capacity)
+                    },
                     Some((in_unit, in_write, length)) => {
                         &&& length > 0
+                        &&& length == range_intersection_length(write_start as int, write_end as int, unit_index * capacity, unit_index * capacity + capacity)
                         &&& unit_index * capacity + in_unit == write_start + in_write as int
                         &&& in_unit + length as int <= capacity
                         &&& in_write + length as int <= write_end - write_start
@@ -322,6 +339,54 @@ pub proof fn lemma_adjacent_units_partition_the_write(write_start: u64, write_en
         forall|byte: int| !(in_both_ranges(byte, write_start, write_end, left, seam)
             && in_both_ranges(byte, write_start, write_end, seam, right)),
 {
+}
+
+/// 合法单元分界两侧的交集长度之和等于整段交集长度；写区间可以为空或倒置。
+pub proof fn lemma_adjacent_unit_intersection_lengths_add_up(
+    write_start: int, write_end: int, unit_start: int, boundary: int, unit_end: int,
+)
+    requires unit_start <= boundary <= unit_end,
+    ensures
+        range_intersection_length(write_start, write_end, unit_start, unit_end)
+            == range_intersection_length(write_start, write_end, unit_start, boundary)
+                + range_intersection_length(write_start, write_end, boundary, unit_end),
+{
+}
+
+/// 合法请求分界两侧的交集长度之和等于整请求交集长度；单元区间可以为空或倒置。
+pub proof fn lemma_split_write_intersection_lengths_add_up(
+    write_start: int, split: int, write_end: int, unit_start: int, unit_end: int,
+)
+    requires write_start <= split <= write_end,
+    ensures
+        range_intersection_length(write_start, write_end, unit_start, unit_end)
+            == range_intersection_length(write_start, split, unit_start, unit_end)
+                + range_intersection_length(split, write_end, unit_start, unit_end),
+{
+}
+
+/// 无前提见证：内部与两端分界、空与倒置区间，以及 u64 上界附近的单字节交集。
+pub proof fn witness_intersection_length_partitions()
+    ensures
+        range_intersection_length(3, 7, 0, 8) == 4,
+        range_intersection_length(3, 7, 0, 4) == 1,
+        range_intersection_length(3, 7, 4, 8) == 3,
+        range_intersection_length(1, 9, 3, 7) == 4,
+        range_intersection_length(1, 5, 3, 7) == 2,
+        range_intersection_length(5, 9, 3, 7) == 2,
+        range_intersection_length(3, 3, 0, 8) == 0,
+        range_intersection_length(7, 3, 0, 8) == 0,
+        range_intersection_length(1, 9, 5, 5) == 0,
+        range_intersection_length(1, 9, 7, 3) == 0,
+        range_intersection_length(u64::MAX as int - 1, u64::MAX as int,
+            u64::MAX as int - 1, u64::MAX as int) == 1,
+{
+    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 4, 8);
+    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 0, 8);
+    lemma_adjacent_unit_intersection_lengths_add_up(3, 7, 0, 8, 8);
+    lemma_split_write_intersection_lengths_add_up(1, 5, 9, 3, 7);
+    lemma_split_write_intersection_lengths_add_up(1, 1, 9, 3, 7);
+    lemma_split_write_intersection_lengths_add_up(1, 9, 9, 3, 7);
 }
 
 } // verus!

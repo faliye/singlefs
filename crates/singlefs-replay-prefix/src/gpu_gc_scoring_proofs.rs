@@ -43,6 +43,8 @@ pub proof fn lower_bound_of_sorted_records(records: Seq<ScoringRecord>, device: 
     if below < above {
         let middle = below + (above - below) / 2;
         assert(below <= middle < above);
+        // WGSL 里 below、above、middle 都是 u32，下一轮的 below 取 middle + 1u：requires 里记录数不超过 u32::MAX 这条界让它不回绕。
+        assert(middle + 1 <= u32::MAX);
         if record_key_before(records[middle], device, slot) {
             assert forall|position: int| 0 <= position < middle + 1 implies
                 #[trigger] record_key_before(records[position], device, slot) by {
@@ -89,6 +91,8 @@ pub proof fn lemma_counting_slots_equals_interval_intersection(first: int, span:
     }
 }
 
+/// 窗口下沿往前退 65535 个槽，比证明要的多一格：跨度不超过 65535 的记录，起点早于 start − 65534 的尾端不超过 start、贡献为零，
+/// 所以退 65534 个已不漏，退 65533 个才漏（必红表 gpu-score-window-too-narrow）。
 pub open spec fn earliest_candidate_start(start: int) -> int {
     if start >= 65535 { start - 65535 } else { 0 }
 }
