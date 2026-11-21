@@ -10,6 +10,12 @@
 //! 整卡重装：这张卡上的判器全换出，这条流与原来在这张卡上有待判态的那几条一起均分（原来那几条的表重传一次）。
 //! 水位线：计划里每张空着的卡都有批、每一批都装满了这个判器的一次派活就发；不满而池里最老的待判等过限时也发；池空不发。
 //! 越过显存额度的计划构造不出来：每张卡这一波之后驻留的判器只经 `CardMemoryLedger` 收进计划（`crate::card_memory_ledger`）。
+//!
+//! 新装那一刻：新装的判器的表在装的那一刻占两份（`crate::card_memory_ledger::mebibytes_while_loading_a_judge`），挑新流（装不装得下）与分草稿区
+//! 都照每张新表两份算，留着的判器照驻留的账算；这一波之后驻留的照旧只记一份表。弄坏开关 table-staging-not-reserved 下新表只算一份。
+//!
+//! 单独上一张腾空的卡（[`plan_a_lone_block_on_an_emptied_card`]，服务主循环接住 Out of Memory 之后用，`crate::service_loop` 文件头）：
+//! 这张卡上驻留的判器全换出，只装这一块那条流的判器（草稿区照整张卡分），把这一块没派的态连着切成几批，一波判完。
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::ops::Range;
@@ -351,15 +357,25 @@ impl<'inputs> WaveBuilding<'inputs> {
             .unwrap_or_default()
     }
 
-    /// 几条流能不能一起装进 `free_mebibytes`：表都放得下，剩下的均分之后每条至少装得下一个态。
+    /// 几条流新装的那一刻表占的（文件头「新装那一刻」）：每张表两份；弄坏开关 table-staging-not-reserved 下一份。
+    fn tables_while_loading(&self, streams: &[StreamKey]) -> u64 {
+        let copies = if self.breaks.is_on(BreakSwitch::TableStagingNotReserved) {
+            1
+        } else {
+            2
+        };
+        streams
+            .iter()
+            .map(|stream| copies * self.facts(*stream).table_mebibytes)
+            .sum()
+    }
+
+    /// 几条流能不能一起新装进 `free_mebibytes`：新装那一刻的表都放得下，剩下的均分之后每条至少装得下一个态。
     fn fit_together(&self, streams: &[StreamKey], free_mebibytes: u64) -> bool {
         if streams.is_empty() {
             return true;
         }
-        let tables: u64 = streams
-            .iter()
-            .map(|stream| self.facts(*stream).table_mebibytes)
-            .sum();
+        let tables = self.tables_while_loading(streams);
         let Some(scratch) = free_mebibytes.checked_sub(tables) else {
             return false;
         };
@@ -522,10 +538,7 @@ impl<'inputs> WaveBuilding<'inputs> {
                 }
                 let rank = self.rank_of_every_stream();
                 reloaded.sort_by_key(|reloaded_stream| (rank[reloaded_stream], *reloaded_stream));
-                let tables: u64 = reloaded
-                    .iter()
-                    .map(|reloaded_stream| self.facts(*reloaded_stream).table_mebibytes)
-                    .sum();
+                let tables = self.tables_while_loading(&reloaded);
                 let sizes =
                     self.split_the_scratch(card.mebibytes_for_the_judges() - tables, &reloaded);
                 let draft = drafts.get_mut(&card.card).expect("每张空卡都有一份");
@@ -689,10 +702,7 @@ impl<'inputs> WaveBuilding<'inputs> {
                 draft.evictions.push(evicted.stream);
             }
         }
-        let tables: u64 = newcomers
-            .iter()
-            .map(|stream| self.facts(*stream).table_mebibytes)
-            .sum();
+        let tables = self.tables_while_loading(&newcomers);
         let sizes = self.split_the_scratch(free - tables, &newcomers);
         for (stream, size) in newcomers.iter().zip(sizes) {
             if size == 0 {
@@ -739,4 +749,57 @@ impl<'inputs> WaveBuilding<'inputs> {
             resident_after_the_wave: ledger.into_resident_judges(),
         }
     }
+}
+
+/// 一块单独上一张腾空的卡（文件头「单独上一张腾空的卡」）：`residents_on_the_card` 里这张卡的判器全换出，只装 `block` 那条流的判器，
+/// 草稿区照整张卡分（新表留两份），这一块没派的态连着切成几批。这张卡腾空了也装不下这条流（新表两份加一个态）交 `None`。
+///
+/// # Panics
+/// 这条流不在 `streams` 里；算出的计划越过这张卡的显存额度（同 [`plan_the_next_wave`]）。
+#[must_use]
+pub fn plan_a_lone_block_on_an_emptied_card(
+    configuration: &BatchSchedulingConfiguration,
+    card: &CardOfTheService,
+    residents_on_the_card: &[ResidentJudge],
+    streams: &BTreeMap<StreamKey, StreamFacts>,
+    block: &PendingBlock,
+    now: Duration,
+) -> Option<WavePlan> {
+    let inputs = SchedulingInputs {
+        idle_cards: std::slice::from_ref(card),
+        residents: &[],
+        streams,
+        pending: std::slice::from_ref(block),
+        now,
+    };
+    let mut building = WaveBuilding::new(configuration, &inputs);
+    let stream = block.stream;
+    if !building.fit_together(&[stream], card.mebibytes_for_the_judges()) {
+        return None;
+    }
+    let scratch = card.mebibytes_for_the_judges() - building.tables_while_loading(&[stream]);
+    let states_per_dispatch = building.split_the_scratch(scratch, &[stream])[0];
+    let mut draft = CardWaveDraft {
+        evictions: residents_on_the_card
+            .iter()
+            .filter(|resident| resident.card == card.card)
+            .map(|resident| resident.stream)
+            .collect(),
+        loads: vec![JudgeToLoad {
+            stream,
+            states_per_dispatch,
+        }],
+        ..CardWaveDraft::default()
+    };
+    // 迭代上界：这一块没派的态数按一批的态数向上取整（切过的态不扣的弄坏开关下也停得下）
+    let batches = (block.undispatched.end - block.undispatched.start).div_ceil(states_per_dispatch);
+    for _ in 0..batches {
+        let Some(batch) = building.carve_a_batch(stream, states_per_dispatch) else {
+            break;
+        };
+        draft.batches.push(batch);
+    }
+    Some(WavePlan {
+        cards: vec![building.card_plan_through_the_ledger(card, draft)],
+    })
 }

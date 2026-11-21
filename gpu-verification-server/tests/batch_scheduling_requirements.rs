@@ -1,4 +1,6 @@
-//! 批次调度要满足的八条（规格「批次调度要满足的」），一条一个测试，都不上卡。
+//! 批次调度要满足的八条（规格「批次调度要满足的」）与新装那一刻给表的暂存留地方那一条（`src/batch_scheduling.rs` 文件头「新装那一刻」），
+//! 一条一个测试，都不上卡。新装的判器表在装的那一刻占两份，样本里卡的额度照两份表算。
+//! 核对器借的显存（`src/card_memory_ledger.rs` 文件头「核对器」）同一个道理：六张事实表照两份算，另一条测试核。
 //! 每条的弄坏开关（`GPU_VERIFICATION_SERVER_BREAK=<项>`，表在 `src/break_switches.rs` 的 `BreakSwitch::red_test`）打开时那一条必须红。
 
 mod common;
@@ -16,12 +18,23 @@ use gpu_verification_server::batch_scheduling::{
 };
 use gpu_verification_server::break_switches::BreakSwitches;
 use gpu_verification_server::card_memory_ledger::{
-    mebibytes_of_a_judge, mebibytes_of_one_state_rounded_up, states_fitting_in, CardIndex,
-    CardMemoryLedger, CardOfTheService,
+    bytes_of_one_facts_verifier_pass, bytes_of_the_facts_tables_on_the_card,
+    mebibytes_of_a_facts_verifier_under, mebibytes_of_a_judge, mebibytes_of_one_state_rounded_up,
+    mebibytes_while_loading_a_judge, states_fitting_in, CardIndex, CardMemoryLedger,
+    CardOfTheService, BYTES_PER_MEBIBYTE,
 };
 use gpu_verification_server::pending_pool::{InMemoryPendingPool, PendingPool};
 use gpu_verification_server::service_configuration::ServiceConfiguration;
 use gpu_verification_server::stream_identity::{StreamFacts, StreamKey};
+use singlefs_verification::crash_facts::FlowFacts;
+use singlefs_verification::gpu_memory_ledger::PASSES_ALIVE_AT_ONCE_ON_EACH_THREAD;
+
+/// 新装判器那一条用例的一个场景：名字、卡上留着的判器、要入池的块（流、序号区间、入池时刻）。
+type LoadingScenario = (
+    &'static str,
+    Vec<ResidentJudge>,
+    Vec<(StreamKey, std::ops::Range<u64>, Duration)>,
+);
 
 /// 排一波：限时 `limit_milliseconds`，此刻 `now`。
 fn decide(
@@ -111,8 +124,11 @@ fn random_scenario(numbers: &mut ScenarioNumbers) -> RandomScenario {
     let mut late_blocks = Vec::new();
     for tag in 0..numbers.between(1, 5) {
         let stream = stream_tagged(u8::try_from(tag + 1).expect("几条流"));
-        let table_mebibytes =
-            numbers.between(1, (largest - mebibytes_of_one_state_rounded_up()).min(400));
+        // 新装那一刻表占两份：表至多是最大那张卡给判器的减一个态之后的一半，每条流都有卡装得下
+        let table_mebibytes = numbers.between(
+            1,
+            ((largest - mebibytes_of_one_state_rounded_up()) / 2).min(400),
+        );
         let state_count = numbers.between(1, 300);
         streams.insert(
             stream,
@@ -341,8 +357,8 @@ fn a_wave_goes_out_when_every_card_fills_once_or_the_oldest_waited_the_limit_and
     let stream = stream_tagged(1);
     let streams = streams_of(&[(stream, 1, 1000)]);
     let cards = [
-        card_leaving(0, 1 + mebibytes_of_states(10)),
-        card_leaving(1, 1 + mebibytes_of_states(10)),
+        card_leaving(0, 1 + 1 + mebibytes_of_states(10)),
+        card_leaving(1, 1 + 1 + mebibytes_of_states(10)),
     ];
     assert_eq!(
         decide(100, &cards, &[], &streams, &[], milliseconds(10)),
@@ -448,7 +464,7 @@ fn streams_sharing_a_card_split_the_remaining_memory_and_a_short_stream_takes_it
     let long = stream_tagged(1);
     let short = stream_tagged(2);
     let streams = streams_of(&[(long, 4, 1000), (short, 2, 6)]);
-    let cards = [card_leaving(0, 4 + 2 + mebibytes_of_states(40))];
+    let cards = [card_leaving(0, 2 * (4 + 2) + mebibytes_of_states(40))];
     let pending = undispatched(&pool_with(&[
         (long, 0..1000, milliseconds(0)),
         (short, 0..6, milliseconds(1)),
@@ -484,7 +500,7 @@ fn streams_sharing_a_card_split_the_remaining_memory_and_a_short_stream_takes_it
 
     let other_long = stream_tagged(3);
     let two_long_streams = streams_of(&[(long, 4, 1000), (other_long, 4, 1000)]);
-    let cards_for_two_long_streams = [card_leaving(0, 8 + mebibytes_of_states(40))];
+    let cards_for_two_long_streams = [card_leaving(0, 2 * 8 + mebibytes_of_states(40))];
     let pending_of_two_long_streams = undispatched(&pool_with(&[
         (long, 0..1000, milliseconds(0)),
         (other_long, 0..1000, milliseconds(1)),
@@ -513,7 +529,7 @@ fn batches_of_streams_sharing_a_card_alternate_from_wave_to_wave() {
     let earlier = stream_tagged(1);
     let later = stream_tagged(2);
     let streams = streams_of(&[(earlier, 4, 1000), (later, 4, 1000)]);
-    let cards = [card_leaving(0, 8 + mebibytes_of_states(20))];
+    let cards = [card_leaving(0, 2 * 8 + mebibytes_of_states(20))];
     let each = states_fitting_in(mebibytes_of_states(20) / 2);
     let mut pool = pool_with(&[
         (earlier, 0..3 * each, milliseconds(0)),
@@ -552,7 +568,7 @@ fn streams_are_taken_in_entry_order_and_a_short_stream_is_not_left_behind_a_long
     let entered_first = stream_tagged(9);
     let entered_next = stream_tagged(1);
     let entry_order_streams = streams_of(&[(entered_first, 4, 1000), (entered_next, 4, 1000)]);
-    let entry_order_cards = [card_leaving(0, 8 + mebibytes_of_states(20))];
+    let entry_order_cards = [card_leaving(0, 2 * 8 + mebibytes_of_states(20))];
     let entry_order_pending = undispatched(&pool_with(&[
         (entered_first, 0..1000, milliseconds(0)),
         (entered_next, 0..1000, milliseconds(1)),
@@ -775,4 +791,139 @@ fn the_same_inputs_give_the_same_plan_whatever_order_they_come_in() {
     ));
     assert_eq!(once, shuffled, "输入的次序打乱了，计划照旧");
     assert!(once.batch_count() >= 3, "样本里三张卡都有活：{once:?}");
+}
+
+/// 一张卡这一波新装那一刻占的（MiB）：留着的判器照驻留的账，新装的每个判器照新装那一刻（表两份）。
+fn mebibytes_while_the_wave_loads(
+    card_plan: &CardPlanOfTheWave,
+    residents: &[ResidentJudge],
+    streams: &BTreeMap<StreamKey, StreamFacts>,
+) -> u64 {
+    let evicted: BTreeSet<StreamKey> = card_plan.evictions.iter().copied().collect();
+    let staying: u64 = residents
+        .iter()
+        .filter(|resident| resident.card == card_plan.card && !evicted.contains(&resident.stream))
+        .map(|resident| {
+            mebibytes_of_a_judge(&streams[&resident.stream], resident.states_per_dispatch)
+        })
+        .sum();
+    let loading: u64 = card_plan
+        .loads
+        .iter()
+        .map(|load| {
+            mebibytes_while_loading_a_judge(&streams[&load.stream], load.states_per_dispatch)
+        })
+        .sum();
+    staying + loading
+}
+
+/// 第 9 条：新装那一刻（`src/batch_scheduling.rs` 文件头「新装那一刻」）：判表上卡时另有一份同样大的暂存（验证包 `create_buffer_init`，
+/// wgpu 下一次提交做完才放），新装的判器分到的草稿区加上表两份不超过这张卡给判器的额度：一条流独占一张空卡、两条流一起新装、
+/// 卡上留着一个有待判态的判器再新装一条，三种都照这一条；这一波之后驻留的照旧只记一份表。
+/// 弄坏开关：table-staging-not-reserved（分草稿区时只给表留一份）。
+#[test]
+fn a_newly_loaded_judge_leaves_room_for_a_second_copy_of_its_table_while_it_loads() {
+    let large = stream_tagged(1);
+    let other = stream_tagged(2);
+    let streams = streams_of(&[(large, 300, 10_000), (other, 100, 10_000)]);
+    let card = card_leaving(0, 600 + mebibytes_of_states(40));
+    let kept = ResidentJudge {
+        card: CardIndex(0),
+        stream: other,
+        states_per_dispatch: 5,
+    };
+    let scenarios: [LoadingScenario; 3] = [
+        (
+            "一条流独占一张空卡",
+            Vec::new(),
+            vec![(large, 0..10_000, milliseconds(0))],
+        ),
+        (
+            "两条流一起新装",
+            Vec::new(),
+            vec![
+                (large, 0..10_000, milliseconds(0)),
+                (other, 0..10_000, milliseconds(1)),
+            ],
+        ),
+        (
+            "卡上留着一个有待判态的判器再新装一条",
+            vec![kept],
+            vec![
+                (other, 0..10_000, milliseconds(0)),
+                (large, 0..10_000, milliseconds(1)),
+            ],
+        ),
+    ];
+    for (scenario, residents, blocks) in scenarios {
+        let pending = undispatched(&pool_with(&blocks));
+        let plan = dispatched(decide(
+            0,
+            &[card],
+            &residents,
+            &streams,
+            &pending,
+            milliseconds(2),
+        ));
+        let on_the_card = card_plan(&plan, 0);
+        assert!(
+            !on_the_card.loads.is_empty(),
+            "{scenario}：这一波有新装的判器"
+        );
+        let while_loading = mebibytes_while_the_wave_loads(on_the_card, &residents, &streams);
+        assert!(
+            while_loading <= card.mebibytes_for_the_judges(),
+            "{scenario}：新装那一刻占 {while_loading} MiB（新表两份），这张卡给判器的只有 {} MiB：{:?}",
+            card.mebibytes_for_the_judges(),
+            on_the_card.loads
+        );
+        let tables_loaded: u64 = on_the_card
+            .loads
+            .iter()
+            .map(|load| streams[&load.stream].table_mebibytes)
+            .sum();
+        assert_eq!(
+            on_the_card.resident_after_the_wave().occupied_mebibytes() + tables_loaded,
+            while_loading,
+            "{scenario}：这一波之后驻留的照旧只记一份表"
+        );
+    }
+}
+
+/// 核对器借的显存（`src/card_memory_ledger.rs` 文件头「核对器」）：六张事实表照两份算（验证包用 `create_buffer_init` 建表，wgpu 另开一份同样大的暂存，
+/// 下一次提交做完才放；同判器新装那一刻），加同时还活着的几趟：借的不少于「表两份加几趟」折成的 MiB。样本的录制流写表 64 MiB（每次写 4 个字），
+/// 表只算一份时差出整整一份表、不被向上取整盖住。
+/// 弄坏开关：facts-tables-staging-not-reserved（表只算一份）。
+#[test]
+fn a_facts_verifier_borrows_two_copies_of_its_tables_and_its_passes() {
+    const RECORDED_WRITES: usize = 1 << 22;
+    const STATES_OF_THE_LARGEST_BLOCK: u64 = 64;
+    let facts = FlowFacts {
+        recorded_write_count: 0,
+        enumerated_write_count: 0,
+        is_tearable: vec![false; RECORDED_WRITES],
+        torn_images: Vec::new(),
+        segments: Vec::new(),
+        state_count: STATES_OF_THE_LARGEST_BLOCK,
+        units: Vec::new(),
+        roots: Vec::new(),
+        newest_base_root: None,
+    };
+    let tables = bytes_of_the_facts_tables_on_the_card(&facts);
+    assert!(
+        tables >= 4 * BYTES_PER_MEBIBYTE,
+        "取样：表要大到一份表差得出整 MiB（{tables} 字节）"
+    );
+    let passes = bytes_of_one_facts_verifier_pass(STATES_OF_THE_LARGEST_BLOCK)
+        * PASSES_ALIVE_AT_ONCE_ON_EACH_THREAD;
+    let lent = mebibytes_of_a_facts_verifier_under(
+        &facts,
+        STATES_OF_THE_LARGEST_BLOCK,
+        &BreakSwitches::of_the_environment(),
+    );
+    let at_least = (2 * tables + passes).div_ceil(BYTES_PER_MEBIBYTE);
+    assert!(
+        lent >= at_least,
+        "核对器借 {lent} MiB，少于表两份加几趟的 {at_least} MiB（表 {tables} 字节、几趟 {passes} 字节）"
+    );
 }

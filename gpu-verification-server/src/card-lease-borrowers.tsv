@@ -1,0 +1,5 @@
+# 借卡白名单：GPU 服务的 lease take 只借给可执行文件名逐字在这张表里的进程（gpu-verification-server/src/card_lease.rs 文件头「借卡白名单」）。
+# 可执行文件名是 /proc/<借的进程号>/exe 指到的那个文件的文件名：不看目录、不看包名、不看命令行；cargo 测试二进制带 -<十六位哈希> 后缀，对不上。
+# 一行一项：<可执行文件名>  # <理由：哪个真卡验证、为什么要自己开卡，写清出处>；以 # 起头的行与空行不算。加一行要用户同意。
+# 这张表经 include_str! 编进服务二进制：改了要重编、python3 gpu-verification-server/control install 重装服务才生效。
+e202_gpu_cpu_gc_comparison  # E202（GPU与CPU两种模式GC对照组）的装置二进制：GPU 与 CPU 两种模式的 GC 对照要在真卡上跑；用户定案原话在 records/2026-11-18-GPU服务OOM后整卡停用.md「借卡白名单」那一条

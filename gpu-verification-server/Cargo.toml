@@ -1,8 +1,7 @@
 # gpu-verification-server：GPU 批处理验证服务（records/2026-11-17-崩溃判器与测试流的效率优化.md 第九节）。
 # 崩溃放量与崩溃枚举用例后半段的卡上判：待判的块跨片、跨流进同一个池，批次调度按卡的显存额度与水位线一波一波发给各张卡的工作线程。
-# 仓根工作区的成员：与验证包同一份 Cargo.lock 与 profile。判器组键从仓根这两份读（crates/singlefs-verification/build.rs 里
-# effective_profile_lines 读仓根 Cargo.toml 的 profile、parse_lock_file 读仓根 Cargo.lock）：服务编出来的判器与 CPU 一侧算的键同出一份，
-# 这个目录不另带 Cargo.lock、不另写 profile。clippy 的编码纪律那几条照仓根工作区走（.claude/singlefs-ai-sop/scripts/check.sh 的 CODE_DISCIPLINE_LINTS）。
+# 仓根工作区的成员：与验证包同一份 Cargo.lock 与 profile，这个目录不另带 Cargo.lock、不另写 profile。
+# clippy 的编码纪律那几条照仓根工作区走（.claude/singlefs-ai-sop/scripts/check.sh 的 CODE_DISCIPLINE_LINTS）。
 [package]
 name = "gpu-verification-server"
 version = "0.1.0"
@@ -15,8 +14,7 @@ edition = "2021"
 singlefs-verification = { path = "../crates/singlefs-verification", default-features = false, features = ["gpu"] }
 # 判定库服务的客户端：认领、一帧带守卫写回结论与删待判行（src/library_pending_pool.rs）；测试在进程里起临时判定库服务（不写真服务）也用它。
 prune-server = { path = "../prune-server" }
-# 判器组键里有「依赖包在这一次编译里开了哪些特性」（crates/singlefs-verification/build.rs 文件头）：崩溃枚举用例的测试二进制编出来时，
-# 验证包的 dev 依赖给 singlefs-core 开着这两个特性，待判行里期待的结论版本键照它算。服务照同一组特性编，编进来的键才与待判行里的相同。
+# 验证包的 dev 依赖给 singlefs-core 开着这两个特性，服务照同一组特性编 singlefs-core。
 singlefs-core = { path = "../crates/singlefs-core", features = ["lookup-work-counters", "test-only-publish-thresholds"] }
 
 [dev-dependencies]
@@ -36,4 +34,14 @@ required-features = ["gpu"]
 [[test]]
 name = "library_service_path_agrees_with_the_direct_judge"
 path = "tests/library_service_path_agrees_with_the_direct_judge.rs"
+required-features = ["gpu"]
+
+[[test]]
+name = "facts_verifier_service_path_agrees_with_the_direct_verifier"
+path = "tests/facts_verifier_service_path_agrees_with_the_direct_verifier.rs"
+required-features = ["gpu"]
+
+[[test]]
+name = "packed_tables_service_path_agrees_with_the_direct_judge"
+path = "tests/packed_tables_service_path_agrees_with_the_direct_judge.rs"
 required-features = ["gpu"]

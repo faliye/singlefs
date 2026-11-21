@@ -5,7 +5,7 @@
 //! 接口（[`PendingPool`]）的实现是内存里的 [`InMemoryPendingPool`]：服务主循环与批次调度只看它。判定库里的待判行由
 //! `crate::library_pending_pool` 取出、认领之后入这一份，判完由它写回判定库。
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::ops::Range;
 use std::time::Duration;
 
@@ -19,14 +19,30 @@ use crate::stream_identity::StreamKey;
 /// 一个态的结论（GPU 判器交回的那几个字）。
 pub type StateVerdict = [u32; VERDICT_WORDS];
 
-/// 整块判完：哪一块、哪条流、哪几个态、按序号次序的结论、判了它各截的那几张卡（不空）。
+/// 一截在卡上判的账（工作线程量的，`crate::card_worker` 文件头「判的账」）：判它的那几次派活有几次（一次派活带着几块的截，每块各记一次），
+/// 与这一截分到的卡上用时（判它那一段的挂钟按态数摊到各截）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CardWorkOnAPiece {
+    pub dispatches: u64,
+    pub card_nanoseconds: u64,
+}
+
+/// 一块在一张卡上判的账：这张卡判了它几个态、判它的派活有几次、卡上用时之和。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CardWorkOnABlock {
+    pub states: u64,
+    pub dispatches: u64,
+    pub card_nanoseconds: u64,
+}
+
+/// 整块判完：哪一块、哪条流、哪几个态、按序号次序的结论、判了它各截的每张卡上的账（不空，按卡号排）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JudgedBlock {
     pub block: PendingBlockIdentifier,
     pub stream: StreamKey,
     pub ordinals: Range<u64>,
     pub verdicts: Vec<StateVerdict>,
-    pub judged_on_cards: BTreeSet<CardIndex>,
+    pub work_on_each_card: BTreeMap<CardIndex, CardWorkOnABlock>,
 }
 
 /// 池拒收的。
@@ -82,7 +98,7 @@ pub trait PendingPool {
     /// 没有这一块；这一截不是没派那一截的开头或越过了它。
     fn mark_dispatched(&mut self, piece: &BatchPiece) -> Result<(), PoolRefusal>;
 
-    /// 记一截在卡 `card` 上判出的结论；整块都有了结论就交回整块、从池里删掉。
+    /// 记一截在卡 `card` 上判出的结论与判它的账；整块都有了结论就交回整块、从池里删掉。
     ///
     /// # Errors
     /// 没有这一块；这一截里有没派出去的态、条数对不上、有态记过结论。
@@ -91,6 +107,7 @@ pub trait PendingPool {
         piece: &BatchPiece,
         card: CardIndex,
         verdicts: Vec<StateVerdict>,
+        work: CardWorkOnAPiece,
     ) -> Result<Option<JudgedBlock>, PoolRefusal>;
 
     /// 把一块整个撤掉（判它的卡坏了，向客户端报拒）：交回它的流；没有这一块交 `None`。
@@ -105,7 +122,7 @@ struct BlockInThePool {
     undispatched_from: u64,
     verdicts: Vec<Option<StateVerdict>>,
     states_with_a_verdict: u64,
-    judged_on_cards: BTreeSet<CardIndex>,
+    work_on_each_card: BTreeMap<CardIndex, CardWorkOnABlock>,
 }
 
 /// 内存里的待判池。
@@ -148,7 +165,7 @@ impl PendingPool for InMemoryPendingPool {
                 entered_at,
                 verdicts: vec![None; state_count],
                 states_with_a_verdict: 0,
-                judged_on_cards: BTreeSet::new(),
+                work_on_each_card: BTreeMap::new(),
             },
         );
         Ok(block)
@@ -199,6 +216,7 @@ impl PendingPool for InMemoryPendingPool {
         piece: &BatchPiece,
         card: CardIndex,
         verdicts: Vec<StateVerdict>,
+        work: CardWorkOnAPiece,
     ) -> Result<Option<JudgedBlock>, PoolRefusal> {
         let held = self
             .blocks
@@ -238,7 +256,17 @@ impl PendingPool for InMemoryPendingPool {
             *slot = Some(verdict);
         }
         held.states_with_a_verdict += piece.ordinals.end - piece.ordinals.start;
-        held.judged_on_cards.insert(card);
+        let on_this_card = held
+            .work_on_each_card
+            .entry(card)
+            .or_insert(CardWorkOnABlock {
+                states: 0,
+                dispatches: 0,
+                card_nanoseconds: 0,
+            });
+        on_this_card.states += piece.ordinals.end - piece.ordinals.start;
+        on_this_card.dispatches += work.dispatches;
+        on_this_card.card_nanoseconds += work.card_nanoseconds;
         if held.states_with_a_verdict < held.ordinals.end - held.ordinals.start {
             return Ok(None);
         }
@@ -252,7 +280,7 @@ impl PendingPool for InMemoryPendingPool {
                 .into_iter()
                 .map(|verdict| verdict.expect("每个态都记过结论"))
                 .collect(),
-            judged_on_cards: judged.judged_on_cards,
+            work_on_each_card: judged.work_on_each_card,
         }))
     }
 

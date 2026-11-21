@@ -13,8 +13,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use common::{
-    matching_expected_keys, new_pool_file_creation_judge_tables, pending_block_name, pending_names,
-    pending_row, put_pending_rows, stand_in_verdicts, version_keys_of_this_build,
+    conclusion_version_of_the_crash_image_judgement, new_pool_file_creation_judge_tables,
+    pending_block_name, pending_names, pending_row, put_pending_rows, stand_in_verdicts,
     StandInVerificationPackageSide, TemporaryLibraryService,
 };
 use gpu_verification_server::break_switches::BreakSwitches;
@@ -104,7 +104,7 @@ fn the_library_service_path_gives_the_verdicts_of_the_judge_called_directly() {
         materials.stream_facts(),
         Arc::clone(&materials),
     );
-    let expected = matching_expected_keys(&version_keys_of_this_build());
+    let conclusion_version = conclusion_version_of_the_crash_image_judgement();
     let block_states = state_count.div_ceil(PENDING_BLOCKS);
     let rows: Vec<(PendingBlockName, GpuPendingRow)> = (0..PENDING_BLOCKS)
         .map(|block| {
@@ -115,7 +115,7 @@ fn the_library_service_path_gives_the_verdicts_of_the_judge_called_directly() {
                 pending_row(
                     stream.tables_digest,
                     start..end,
-                    expected,
+                    conclusion_version,
                     ForcedRejudging::NotForced,
                     block,
                 ),
@@ -135,7 +135,6 @@ fn the_library_service_path_gives_the_verdicts_of_the_judge_called_directly() {
     let mut pool = LibraryPendingPool::new(
         side,
         library.open_client(),
-        version_keys_of_this_build(),
         CLAIM_LEASE_MILLISECONDS,
         BreakSwitches::none(),
     );
