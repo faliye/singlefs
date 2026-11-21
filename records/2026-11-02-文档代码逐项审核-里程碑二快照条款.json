@@ -2338,42 +2338,42 @@
         "semantic_status": "pending"
       },
       {
-        "path": "crates/singlefs-harness/src/bin/e142_first_transaction_write_dump.rs",
+        "path": "crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump.rs",
         "added": 50,
         "deleted": 23,
         "scope": "explicitly_excluded",
         "semantic_status": "pending"
       },
       {
-        "path": "crates/singlefs-harness/src/bin/e142_first_transaction_write_dump_one_device.rs",
+        "path": "crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs",
         "added": 90,
         "deleted": 31,
         "scope": "explicitly_excluded",
         "semantic_status": "pending"
       },
       {
-        "path": "crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs",
+        "path": "crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs",
         "added": 4417,
         "deleted": 2951,
         "scope": "explicitly_excluded",
         "semantic_status": "pending"
       },
       {
-        "path": "crates/singlefs-harness/src/bin/e158_root_choice_repair.rs",
+        "path": "crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs",
         "added": 6646,
         "deleted": 172,
         "scope": "explicitly_excluded",
         "semantic_status": "pending"
       },
       {
-        "path": "crates/singlefs-harness/src/bin/first_transaction_on_device.rs",
+        "path": "crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs",
         "added": 144,
         "deleted": 39,
         "scope": "listed_for_review",
         "semantic_status": "pending"
       },
       {
-        "path": "crates/singlefs-harness/src/bin/first_transaction_region_bytes.rs",
+        "path": "crates/singlefs-implementation-experiments/src/bin/new_pool_file_creation_region_bytes.rs",
         "added": 2,
         "deleted": 2,
         "scope": "listed_for_review",

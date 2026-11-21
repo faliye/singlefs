@@ -43,9 +43,9 @@
 ### 缺陷一：认领与删前缀无差别检查 `!group.batch.is_empty()` 拆散组提交，导致批处理退化为每帧独立 WAL 同步
 
 #### 位置
-- [`prune-server/src/committer.rs:303-315`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L303-L315)（`Committer::process_job` 认领分支）
-- [`prune-server/src/committer.rs:323-334`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L323-L334)（`Committer::process_job` 删前缀分支）
-- [`prune-server/src/committer.rs:6-7, 14-16`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L6-L7)（设计契约）
+- [`prune-server/src/committer.rs:303-315`](../prune-server/src/committer.rs#L303-L315)（`Committer::process_job` 认领分支）
+- [`prune-server/src/committer.rs:323-334`](../prune-server/src/committer.rs#L323-L334)（`Committer::process_job` 删前缀分支）
+- [`prune-server/src/committer.rs:6-7, 14-16`](../prune-server/src/committer.rs#L6-L7)（设计契约）
 
 #### 根因与触发路径
 
@@ -120,9 +120,9 @@
 ### 缺陷二：组提交失败（`fail_group`）替换拒绝帧时未释放原预留配额并重复强记配额，导致额度双重记账与虚高
 
 #### 位置
-- [`prune-server/src/committer.rs:795-814`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L795-L814)（`Committer::fail_group`）
-- [`prune-server/src/committer.rs:850-853`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L850-L853)（`send_now`）
-- [`prune-server/src/server.rs:385-406`](file:///home/fy5090/code/singlefs/prune-server/src/server.rs#L385-L406)（`PendingSlot` 配额伸缩）
+- [`prune-server/src/committer.rs:795-814`](../prune-server/src/committer.rs#L795-L814)（`Committer::fail_group`）
+- [`prune-server/src/committer.rs:850-853`](../prune-server/src/committer.rs#L850-L853)（`send_now`）
+- [`prune-server/src/server.rs:385-406`](../prune-server/src/server.rs#L385-L406)（`PendingSlot` 配额伸缩）
 
 #### 根因与触发路径
 
@@ -181,8 +181,8 @@ for queued in responses {
 ### 缺陷三：`ServiceInThisProcess::stop` 在 IPv6 监听环境下将 unspecified IP 误换为 IPv4 环回地址，导致唤醒连接失败与停机卡死 30 秒
 
 #### 位置
-- [`prune-server/src/server.rs:1164-1183`](file:///home/fy5090/code/singlefs/prune-server/src/server.rs#L1164-L1183)（`ServiceInThisProcess::stop_and_wait_for_the_library_to_close`）
-- [`prune-server/src/server.rs:926-934`](file:///home/fy5090/code/singlefs/prune-server/src/server.rs#L926-L934)（`TcpListener::bind`）
+- [`prune-server/src/server.rs:1164-1183`](../prune-server/src/server.rs#L1164-L1183)（`ServiceInThisProcess::stop_and_wait_for_the_library_to_close`）
+- [`prune-server/src/server.rs:926-934`](../prune-server/src/server.rs#L926-L934)（`TcpListener::bind`）
 
 #### 根因与触发路径
 
@@ -219,8 +219,8 @@ let _ = TcpStream::connect(wake_address);
 ### 缺陷四：离线删除超大值（`drop-oversized-values`）未同步清理对应的认领记录，导致服务重启后旧认领幽灵复活并阻断写入
 
 #### 位置
-- [`prune-server/src/oversized_values.rs:163-176`](file:///home/fy5090/code/singlefs/prune-server/src/oversized_values.rs#L163-L176)（`drop_rows_then_read_them_back_absent`）
-- [`prune-server/src/storage.rs:56-57, 520-530`](file:///home/fy5090/code/singlefs/prune-server/src/storage.rs#L56-L57)（`CLAIM_KEY_TAG` 与 `load_claims`）
+- [`prune-server/src/oversized_values.rs:163-176`](../prune-server/src/oversized_values.rs#L163-L176)（`drop_rows_then_read_them_back_absent`）
+- [`prune-server/src/storage.rs:56-57, 520-530`](../prune-server/src/storage.rs#L56-L57)（`CLAIM_KEY_TAG` 与 `load_claims`）
 
 #### 根因与触发路径
 
@@ -256,8 +256,8 @@ for oversized in oversized_values {
 ### 缺陷五：组提交内存查重对同组重发请求使用后发帧的条数覆盖真实历史生效条数，破坏幂等回执一致性
 
 #### 位置
-- [`prune-server/src/committer.rs:374-385`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L374-L385)（`Committer::add_write` 去重分支）
-- [`prune-server/src/committer.rs:137`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L137)（`Group::applied_in_group` 定义）
+- [`prune-server/src/committer.rs:374-385`](../prune-server/src/committer.rs#L374-L385)（`Committer::add_write` 去重分支）
+- [`prune-server/src/committer.rs:137`](../prune-server/src/committer.rs#L137)（`Group::applied_in_group` 定义）
 
 #### 根因与触发路径
 
@@ -301,8 +301,8 @@ applied_in_group: HashMap<(Vec<u8>, u64), u32>
 ### 缺陷六：未计费响应队满强关连接未在故障日志（`fault_log`）留痕，导致慢客户端静默断开且管理侧失察
 
 #### 位置
-- [`prune-server/src/connections.rs:165-190`](file:///home/fy5090/code/singlefs/prune-server/src/connections.rs#L165-L190)（`Responder::send` 溢出检查）
-- [`prune-server/src/fault_log.rs:20-40`](file:///home/fy5090/code/singlefs/prune-server/src/fault_log.rs#L20-L40)（`FaultKind` 定义）
+- [`prune-server/src/connections.rs:165-190`](../prune-server/src/connections.rs#L165-L190)（`Responder::send` 溢出检查）
+- [`prune-server/src/fault_log.rs:20-40`](../prune-server/src/fault_log.rs#L20-L40)（`FaultKind` 定义）
 
 #### 根因与触发路径
 

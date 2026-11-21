@@ -42,7 +42,7 @@ python3 `git show 59ce5a86550d:research/prompts/recovery-audit-checker-tier-2026
 
 **优先级 P2。确认的是比较覆盖不完整，不是实际恢复选择了错误版本。**
 
-位置：[crash_judge_conclusions.rs:367](../crates/singlefs-checker-tier/src/crash_judge_conclusions.rs) 的 `LandedRootWords` 和约 381 行的 `landed_root_words_of`；恢复字编码约 68 行，差异计数约 85 行。GPU 输出在 `crash_judge_recovery.wgsl:1538`、`1544` 两处只写 `effective_txg.x`。
+位置：[crash_judge_conclusions.rs:367](../crates/singlefs-verification/src/crash_judge_conclusions.rs) 的 `LandedRootWords` 和约 381 行的 `landed_root_words_of`；恢复字编码约 68 行，差异计数约 85 行。GPU 输出在 `crash_judge_recovery.wgsl:1538`、`1544` 两处只写 `effective_txg.x`。
 
 恢复版本类型为 u64 txg，但比较/存储仅保留低 32 位。代码确实明写了这个截断；本项不是声称它没有遵照自己的“取低 32 位”实现，而是指出这个实现不能承担“根版本身份相同”的完整验证。
 
@@ -80,11 +80,11 @@ B = (实例1, txg=(high<<32)|low)
 
 **优先级 P2。错误位于缓存契约与使用方之间；本轮没有复现缓存把坏镜像判成好镜像。**
 
-有损还原位置：[crash_judge_conclusions.rs:1066](../crates/singlefs-checker-tier/src/crash_judge_conclusions.rs)，约 1120 行明确将 `pool_checker_judged_bits` 置 0，扫描重建结局置 NOT_REACHED。块级 `count_vector` 另存，并非丢失。
+有损还原位置：[crash_judge_conclusions.rs:1066](../crates/singlefs-verification/src/crash_judge_conclusions.rs)，约 1120 行明确将 `pool_checker_judged_bits` 置 0，扫描重建结局置 NOT_REACHED。块级 `count_vector` 另存，并非丢失。
 
 实际调用方位于：
 
-- [随机历史测试:318](../crates/singlefs-checker-tier/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs)：`note_the_invariants_held` 用逐状态 `judged_bits & !violated_bits` 统计“成立过”。
+- [随机历史测试:318](../crates/singlefs-verification/tests/crash_given_states_of_random_histories_and_fault_injection_judged_through_the_library.rs)：`note_the_invariants_held` 用逐状态 `judged_bits & !violated_bits` 统计“成立过”。
 - 同文件约 511 行调用该方法。
 - 同文件约 1271 行，全量测试要求 I-3.1、I-5.4、I-3.11、I-7.9、I-9.15 至少成立过一次。
 

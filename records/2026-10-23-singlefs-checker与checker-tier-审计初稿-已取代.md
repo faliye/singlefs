@@ -128,7 +128,7 @@ checker 逐盘扫描：保留 txg=20。
 
 ## F03：txg 高 32 位在对拍与持久结论里被抹掉
 
-**位置：** [crash_judge_conclusions.rs:367](../crates/singlefs-checker-tier/src/crash_judge_conclusions.rs) 的 `LandedRootWords`、381 行 `landed_root_words_of`、68 行恢复字编码、85 行 `recovery_passes_differ`。GPU 输出对应在 `crash_judge_recovery.wgsl:1533` 附近，只写 `effective_txg.x`。
+**位置：** [crash_judge_conclusions.rs:367](../crates/singlefs-verification/src/crash_judge_conclusions.rs) 的 `LandedRootWords`、381 行 `landed_root_words_of`、68 行恢复字编码、85 行 `recovery_passes_differ`。GPU 输出对应在 `crash_judge_recovery.wgsl:1533` 附近，只写 `effective_txg.x`。
 
 恢复的 `CheckpointTxg` 是 u64，但结论只记录 `checkpoint_txg_low: u32`。公开探针构造两份合法类型的报告：
 
@@ -149,7 +149,7 @@ checker 逐盘扫描：保留 txg=20。
 
 ## F04：撕裂态的旧字节与当前持久集合无关，漏掉可达状态
 
-**位置：** [crash.rs:2347](../crates/singlefs-checker-tier/src/crash.rs) 的 `WritesWithTornImages::of`。约 2371 行先把这次写之前的所有写完整施加到 `image_before_the_write`，再固定生成这一写的唯一撕裂镜像。生成函数在 2309 行。
+**位置：** [crash.rs:2347](../crates/singlefs-verification/src/crash.rs) 的 `WritesWithTornImages::of`。约 2371 行先把这次写之前的所有写完整施加到 `image_before_the_write`，再固定生成这一写的唯一撕裂镜像。生成函数在 2309 行。
 
 同一段允许每次写分别选择未持久、撕裂、完全持久。但撕裂字节按“此前全部写都持久”的历史预先计算。这两种假设在同段重叠覆写时不相容。
 
@@ -188,7 +188,7 @@ W0、W1 位于同一段，都可撕裂。
 
 ## F05：缓存往返后的结论不再是原来的 CrossCheckWords
 
-**位置：** [crash_judge_conclusions.rs:1066](../crates/singlefs-checker-tier/src/crash_judge_conclusions.rs) 的 `cross_check_words_of_a_stored_given_state`，约 1120 行把 `pool_checker_judged_bits` 固定为 0，把 `scan_rebuild_outcome` 固定为 NOT_REACHED。实际读取路径在 `crash_amplification.rs:15502` 附近。
+**位置：** [crash_judge_conclusions.rs:1066](../crates/singlefs-verification/src/crash_judge_conclusions.rs) 的 `cross_check_words_of_a_stored_given_state`，约 1120 行把 `pool_checker_judged_bits` 固定为 0，把 `scan_rebuild_outcome` 固定为 NOT_REACHED。实际读取路径在 `crash_amplification.rs:15502` 附近。
 
 公开探针让 I-1.13 成立，先得到对拍字，再按实际红项和恢复字存储表示还原：
 
@@ -207,7 +207,7 @@ W0、W1 位于同一段，都可撕裂。
 
 ## F06：不同恢复不变量失败在对拍中被合并
 
-**位置：** [crash_judge_conclusions.rs:295](../crates/singlefs-checker-tier/src/crash_judge_conclusions.rs) 的 `gpu_failure_point_code`，以及约 397 行 `outcome_and_failure_point_of`。
+**位置：** [crash_judge_conclusions.rs:295](../crates/singlefs-verification/src/crash_judge_conclusions.rs) 的 `gpu_failure_point_code`，以及约 397 行 `outcome_and_failure_point_of`。
 
 目前失败点按 `RecoveryFailure` 的 enum 成员编码，不保留其中的不变量名或稳定的语义子原因。例如：
 

@@ -23,8 +23,8 @@
 
 ### 位置
 
-- [`prune-server/src/committer.rs:303-315`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L303-L315)（`Committer::process_job` 认领分支）
-- [`prune-server/src/committer.rs:323-334`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L323-L334)（`Committer::process_job` 删前缀分支）
+- [`prune-server/src/committer.rs:303-315`](../prune-server/src/committer.rs#L303-L315)（`Committer::process_job` 认领分支）
+- [`prune-server/src/committer.rs:323-334`](../prune-server/src/committer.rs#L323-L334)（`Committer::process_job` 删前缀分支）
 
 ### 根因与触发路径
 
@@ -48,8 +48,8 @@
    - 处理第 1 帧认领：`group.batch` 初始为空，认领写入加入 `group.batch`，返回非空的 `group`；
    - 处理第 2 帧认领：执行 `if !group.batch.is_empty()` 判定为真，**第 1 帧认领被立刻强制触发 `self.commit(group)` 并调用 `flush_wal(true)` 执行一次磁盘同步！**
    - 处理第 3 帧认领：同样被第 2 帧打断并再次触发一次 `flush_wal(true)`。
-4. 删前缀（`DeletePrefix`）分支存在完全相同的缺陷：连续的多帧删前缀之间无法组提交，每一帧都被前一帧的删除写批强制打断，各自进行独立的 WAL 同步。
-5. 更严重的是行为分化：若第 1 帧认领中的键由于“已被持有”或“已有结论”导致未写入任何认领行（`group.batch` 为空），则第 2 帧认领可以与第 1 帧合批；而一旦认领成功，后一帧就被强制拆分。这种因业务结局偶发分化的组提交机制使得高并发认领与连续删前缀退化为最慢的串行磁盘同步瓶颈。
+4. 删前缀（`DeletePrefix`）分支存在完全相同的缺陷：连续的多帧删前缀之间无法组提交，每一帧都被前一帧的删除写批打断，各自做独立的 WAL 同步。
+5. 更严重的是行为分化：若第 1 帧认领中的键由于“已被持有”或“已有结论”导致未写入任何认领行（`group.batch` 为空），则第 2 帧认领可以与第 1 帧合批；而一旦认领成功，后一帧就被强制拆分。这种按业务结局分化的组提交机制让并发认领与连续删前缀退化为串行磁盘同步。
 
 ### 修复建议
 
@@ -61,9 +61,9 @@
 
 ### 位置
 
-- [`prune-server/src/committer.rs:795-814`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L795-L814)（`Committer::fail_group`）
-- [`prune-server/src/committer.rs:850-853`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L850-L853)（`send_now`）
-- [`prune-server/src/server.rs:385-406`](file:///home/fy5090/code/singlefs/prune-server/src/server.rs#L385-L406)（`PendingSlot` 配额伸缩）
+- [`prune-server/src/committer.rs:795-814`](../prune-server/src/committer.rs#L795-L814)（`Committer::fail_group`）
+- [`prune-server/src/committer.rs:850-853`](../prune-server/src/committer.rs#L850-L853)（`send_now`）
+- [`prune-server/src/server.rs:385-406`](../prune-server/src/server.rs#L385-L406)（`PendingSlot` 配额伸缩）
 
 ### 根因与触发路径
 
@@ -88,7 +88,7 @@
    }
    ```
    `send_now` 无条件调用 `slot.force_response(rejection.len())`，将拒绝消息字节（通常几百字节）强制追加到 `slot` 内部的 `ByteReservation` 中。
-4. **致命漏洞在于：原本存放在 `queued.slot` 中预先划给正常回应的字节数（认领与删前缀帧可达几万至数十万字节）完全没有调用 `slot.release_response(...)` 予以释放！**
+4. **问题在于：`queued.slot` 中预先划给正常回应的字节数（认领与删前缀帧可达几万至数十万字节）没有调 `slot.release_response(...)` 释放。**
 5. `queued.response` 正常帧被就地 drop，但其对应的内存记账依然锁在 `slot` 中。拒绝帧又强行追加了一笔新的记账，导致 `slot.bytes` 变成了 `原请求体 + 原预留响应体 + 新错误拒绝响应体`。
 6. 在写线程将拒绝帧写出套接字之前，`admission.pending_bytes` 与连接的 `budget.held_bytes` 发生严重双重记账与额度虚高，极易触发后续请求误报 `Busy` 拒绝。
 
@@ -102,7 +102,7 @@
 
 ### 位置
 
-- [`prune-server/src/server.rs:1164-1183`](file:///home/fy5090/code/singlefs/prune-server/src/server.rs#L1164-L1183)（`ServiceInThisProcess::stop_and_wait_for_the_library_to_close`）
+- [`prune-server/src/server.rs:1164-1183`](../prune-server/src/server.rs#L1164-L1183)（`ServiceInThisProcess::stop_and_wait_for_the_library_to_close`）
 
 ### 根因与触发路径
 
@@ -137,7 +137,7 @@ if wake_address.ip().is_unspecified() {
 
 ### 位置
 
-- [`prune-server/src/oversized_values.rs:163-176`](file:///home/fy5090/code/singlefs/prune-server/src/oversized_values.rs#L163-L176)（`drop_rows_then_read_them_back_absent`）
+- [`prune-server/src/oversized_values.rs:163-176`](../prune-server/src/oversized_values.rs#L163-L176)（`drop_rows_then_read_them_back_absent`）
 
 ### 根因与触发路径
 
@@ -168,12 +168,12 @@ batch.delete(crate::storage::claim_key(&oversized.key));
 
 ### 位置
 
-- [`prune-server/src/committer.rs:374-385`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L374-L385)（`Committer::add_write` 去重分支）
-- [`prune-server/src/committer.rs:137`](file:///home/fy5090/code/singlefs/prune-server/src/committer.rs#L137)（`Group::applied_in_group` 定义）
+- [`prune-server/src/committer.rs:374-385`](../prune-server/src/committer.rs#L374-L385)（`Committer::add_write` 去重分支）
+- [`prune-server/src/committer.rs:137`](../prune-server/src/committer.rs#L137)（`Group::applied_in_group` 定义）
 
 ### 根因与触发路径
 
-1. 在 `Committer::add_write` 中，服务对已生效请求号进行查重。当请求已在库中生效时，`applied_request_entries` 从记账键中读出当初落盘的真实条目数 `earlier_entries`；
+1. 在 `Committer::add_write` 中，服务对已生效请求号查重。当请求已在库中生效时，`applied_request_entries` 从记账键中读出当初落盘的真实条目数 `earlier_entries`；
 2. 但如果该请求号是**在当前组提交批次中刚刚生效的**：
    ```rust
    let entries_written = u32::try_from(entries.len()).expect("条数来自帧里的 u32 字段");
@@ -197,7 +197,7 @@ batch.delete(crate::storage::claim_key(&oversized.key));
 
 ### 位置
 
-- [`prune-server/src/connections.rs:165-190`](file:///home/fy5090/code/singlefs/prune-server/src/connections.rs#L165-L190)（`Responder::send` 溢出检查）
+- [`prune-server/src/connections.rs:165-190`](../prune-server/src/connections.rs#L165-L190)（`Responder::send` 溢出检查）
 
 ### 根因与触发路径
 

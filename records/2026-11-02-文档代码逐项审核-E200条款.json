@@ -652,7 +652,7 @@
       "product": "frozen-tree.out"
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs",
       "class": "device",
       "product": "frozen-tree.out"
     },

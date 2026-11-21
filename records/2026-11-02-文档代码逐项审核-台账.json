@@ -77419,7 +77419,7 @@
       "present_at_checkpoint": false
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/crash_library_reader.rs",
+      "path": "crates/singlefs-verification/src/bin/crash_library_reader.rs",
       "status": "pending",
       "size_bytes": 15749,
       "sha256": "1f294fb965198a105b1d2f14be8b4aa34e28e509b3ca4ce1b1d5502213b6f607",
@@ -77429,7 +77429,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/deletion_write_dump.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/deletion_write_dump.rs",
       "status": "pending",
       "size_bytes": 17753,
       "sha256": "176c86c23c459226befdf8cedb77c8e18e264d5fbeaec710d36e79442f062270",
@@ -77439,7 +77439,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump.rs",
       "status": "pending",
       "size_bytes": 25454,
       "sha256": "31eca3f7efed7eb9506ede7a487a86e99a41b27dcf8d2781174500585a062edd",
@@ -77449,7 +77449,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e142_new_pool_file_creation_write_dump_one_device.rs",
       "status": "pending",
       "size_bytes": 14094,
       "sha256": "6672397912b4f8cbf26433b3ddba5c8cdac0c7d9cb59ab49679777ba06fb64df",
@@ -77459,7 +77459,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e156_allocation_basis_counts/main.rs",
       "status": "pending",
       "size_bytes": 331697,
       "sha256": "8db37bbe9bca222d776b46ad2002ac31d10939cafe2477881568b584bd84417b",
@@ -77469,7 +77469,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e158_root_choice_repair/main.rs",
       "status": "pending",
       "size_bytes": 1124219,
       "sha256": "55a2210677f4d196facf5d79bdd4b3232166c0179cce230718e3ba5330b29adf",
@@ -77479,7 +77479,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e161_crash_state_dedup_and_time_split/main.rs",
       "status": "pending",
       "size_bytes": 262299,
       "sha256": "7050e69455abcfb7d2eccb371864af5d05eb184def94ff9295a3edff1e0162a1",
@@ -77489,7 +77489,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs",
+      "path": "crates/singlefs-verification/src/bin/e165_replay_bounded_enumeration/main.rs",
       "status": "pending",
       "size_bytes": 883394,
       "sha256": "bdc7c7a55e1cd09fed59dea5509ba13e782c9f99e35b0b427bf9a3edce85ad62",
@@ -77499,7 +77499,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e168_delete_ring_window_borrow/main.rs",
       "status": "pending",
       "size_bytes": 225454,
       "sha256": "a348e50a2f3c4a961ae626e39105051b7c5aaf0ecf703969aea7cb8102c5f656",
@@ -77509,7 +77509,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e170_specification_executor_export/main.rs",
       "status": "pending",
       "size_bytes": 167243,
       "sha256": "7bf68ca1584c7bc2b9a6187cf197de602376540137319d5978d159ef47c034c0",
@@ -77519,7 +77519,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion/main.rs",
       "status": "pending",
       "size_bytes": 289771,
       "sha256": "b22e832db90f9756960f42880d1085647e9efda6148971ae8e60de7ac2a48d29",
@@ -77529,7 +77529,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/main.rs",
       "status": "pending",
       "size_bytes": 596678,
       "sha256": "3314525b4381118a77b40022710137ca69ffb989aff6d085292155cf1d97287c",
@@ -77539,7 +77539,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e173_checkpoint_cost_against_empty_publish_cost.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e173_checkpoint_cost_against_empty_publish_cost/main.rs",
       "status": "pending",
       "size_bytes": 121576,
       "sha256": "2f5871453c7b6901d89c880ad0fd9814ef00aee0ed98275a2a3e5f01f7d77a0a",
@@ -77549,7 +77549,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e180_admission_reading_versus_writable_bytes.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e180_admission_reading_versus_writable_bytes/main.rs",
       "status": "pending",
       "size_bytes": 254110,
       "sha256": "36700fa07ce069d26bd8fc7185bda2f87fe584f9af99834b24158add2b3ba76a",
@@ -77559,7 +77559,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e181_landing_check_fixed_point_and_mount_lower_bound/main.rs",
       "status": "pending",
       "size_bytes": 218260,
       "sha256": "3d96a0b2ff4c0f52b0416b56e8bc28d09ced5dae014c390a45521a3d56214e48",
@@ -77569,7 +77569,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e182_unreadable_abandoned_root_forks.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks/main.rs",
       "status": "changed_requires_revalidation",
       "size_bytes": 216520,
       "sha256": "df52b0f914e03736e7ceba586f0c71b4835a596f03dee4723554224c74e9e9d2",
@@ -77605,7 +77605,7 @@
       "sha256_at_checkpoint": "723e6081fe32d11e7fdb05cfb8451df6c12a52160d4c663d4ce798267d834530"
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e183_capacity_read_cache_reserve_and_sweep_costs/main.rs",
       "status": "pending",
       "size_bytes": 340158,
       "sha256": "92c480bd63087bf342d98489eec967de17bea94ed452f3e435fc4f80920e4284",
@@ -77615,7 +77615,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e184_regular_layer_cost_counts.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts/main.rs",
       "status": "pending",
       "size_bytes": 299562,
       "sha256": "07d47d6c02f81c0d7a4924f0aa54952eb1d8e1a783c39cdcdff0afe6dc978f2e",
@@ -77625,7 +77625,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e184_regular_layer_cost_counts_write_dump.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e184_regular_layer_cost_counts_write_dump.rs",
       "status": "pending",
       "size_bytes": 67828,
       "sha256": "bfb160797e83c1162f71275c0e9b1aede778d16cdd8857f5ceee3923ad23fb23",
@@ -77635,7 +77635,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e185_gc_batch_wall_clock_split.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e185_gc_batch_wall_clock_split/main.rs",
       "status": "pending",
       "size_bytes": 1125184,
       "sha256": "a5b48b734f034114a6e2fe3a81f17ecd171dafba5e5b5ec1082e1b150fa5f082",
@@ -77645,7 +77645,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e197_scan_journal_glue_memory_by_device_count.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e197_scan_journal_glue_memory_by_device_count/main.rs",
       "status": "pending",
       "size_bytes": 85312,
       "sha256": "3b46a82772cd499a0e5bf23da7673a5e066925d5dde3ce7e72e6ff9493c0bfd7",
@@ -77655,7 +77655,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs",
+      "path": "crates/singlefs-verification/src/bin/new_pool_file_creation_device_log_check.rs",
       "status": "pending",
       "size_bytes": 45783,
       "sha256": "a0064ee4b64f5a69b4a0a20c1a9e7f8c3c80a2b537a79a26b0322641376bbbc5",
@@ -77665,7 +77665,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs",
+      "path": "crates/singlefs-verification/src/bin/new_pool_file_creation_on_device/main.rs",
       "status": "pending",
       "size_bytes": 157586,
       "sha256": "27616cb8d85e425c0343e4e1e2c223358312433920e4d8970d4aa7ecf8f05263",
@@ -77675,7 +77675,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/new_pool_file_creation_region_bytes.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/new_pool_file_creation_region_bytes.rs",
       "status": "pending",
       "size_bytes": 6702,
       "sha256": "714c865466beb233ae3a4b8da0cbb98a5f11e24f184c462721ea040395ea5f2f",
@@ -142245,7 +142245,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-checker-tier/src/bin/e198_instance_table_pointer_birth_skip_premise.rs",
+      "path": "crates/singlefs-implementation-experiments/src/bin/e198_instance_table_pointer_birth_skip_premise/main.rs",
       "status": "pending",
       "size_bytes": 231102,
       "sha256": "077f57b18e916b3bf365b1f3c6677f9aa7cc842347cfdcd3fdbf2ddb124b3b9c",
@@ -147150,7 +147150,7 @@
       "present_at_checkpoint": true
     },
     {
-      "path": "crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs",
+      "path": "crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs",
       "status": "pending",
       "size_bytes": 326393,
       "sha256": "298426e2be9aac9df0f228c3704bdd6689ad8823c0568302aa97b1c274b7db9f",
@@ -162425,7 +162425,7 @@
       "README.en.md",
       "README.ja.md",
       "README.md",
-      "crates/singlefs-checker-tier/src/bin/e182_unreadable_abandoned_root_forks.rs",
+      "crates/singlefs-implementation-experiments/src/bin/e182_unreadable_abandoned_root_forks/main.rs",
       "crates/singlefs-checker-tier/src/crash_amplification.rs",
       "crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl",
       "crates/singlefs-checker-tier/src/crash_library.rs",
@@ -164901,7 +164901,7 @@
         "briefs/2026-11-03.en.md",
         "briefs/2026-11-03.ja.md",
         "briefs/2026-11-03.md",
-        "crates/singlefs-background-gpu/src/bin/e202_gpu_cpu_gc_comparison.rs",
+        "crates/singlefs-background-gpu-tests/src/bin/e202_gpu_cpu_gc_comparison/main.rs",
         "crates/singlefs-background-gpu/src/measured_host_cpu_time_per_submission.rs",
         "crates/singlefs-checker-tier/tests/common_compaction_relocation_on_the_background_compute/mod.rs",
         "crates/singlefs-checker-tier/tests/crash_enumeration_compaction_relocation_stream_on_the_gpu_path.rs",

@@ -76,7 +76,7 @@ cargo test --release --offline -j 2 -p singlefs-harness \
 
 ## H01：读日志包装器吞掉底层支持的 discard
 
-位置：[read_tally.rs:194](../crates/singlefs-harness/src/read_tally.rs) 的 `BlockDevice for ReadLoggingBlockDevice<Inner>`。该实现转发了普通读、写、清零、屏障和 journal 提示，却没有覆盖 `discard_at`。
+位置：[read_tally.rs:194](../crates/singlefs-verification/src/read_tally.rs) 的 `BlockDevice for ReadLoggingBlockDevice<Inner>`。该实现转发了普通读、写、清零、屏障和 journal 提示，却没有覆盖 `discard_at`。
 
 因此 Rust 使用 [block_device.rs:198](../crates/singlefs-core/src/block_device.rs) 的 trait 默认实现：请求合法且长度非零时返回 `Unsupported`，不调用 inner。接口文档已明确规定设备包装应转给内层；默认实现只适用于不支持 discard 的后端。
 
@@ -105,9 +105,9 @@ cargo test --release --offline -j 2 -p singlefs-harness \
 
 位置：
 
-- [RecordingBlockDevice](../crates/singlefs-harness/src/lib.rs)。
-- [FaultInjectingBlockDevice](../crates/singlefs-harness/src/fault_injection.rs)。
-- [ReadLoggingBlockDevice](../crates/singlefs-harness/src/read_tally.rs)。
+- [RecordingBlockDevice](../crates/singlefs-verification/src/lib.rs)。
+- [FaultInjectingBlockDevice](../crates/singlefs-verification/src/fault_injection.rs)。
+- [ReadLoggingBlockDevice](../crates/singlefs-verification/src/read_tally.rs)。
 
 三者均未覆盖以下四个 BlockDevice 方法：
 
@@ -143,7 +143,7 @@ core 的 `mounted_session.rs:1015` 确有对上述接口的非默认实现，用
 
 ## H03：模型允许冷启动答案被空发布结果替代
 
-入口：[model.rs:6972](../crates/singlefs-harness/src/model.rs) 的 `judge_and_advance`；缺口在约 7282 行 `judge_effect` 的 `ObservedEffect::Publishes` 分支。
+入口：[model.rs:6972](../crates/singlefs-verification/src/model.rs) 的 `judge_and_advance`；缺口在约 7282 行 `judge_effect` 的 `ObservedEffect::Publishes` 分支。
 
 该分支检查上限、回退目标及根列表，却不核对 `answer.operation` 是否允许 Publishes。`answer_cold_start_recover` 给出空 `expected_roots` 和非空 `expected_read_back`；调用者若交入 `Publishes { roots: [], reported_ceiling: None }`，空根列表比较通过，预期读回结果完全未使用，然后 `successes_matched += 1`。
 
