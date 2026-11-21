@@ -12,8 +12,7 @@
 #   gpu_cards_by_priority（环境里的 GPU_CARDS_BY_PRIORITY，有就原样交给本机那一趟；没有是空串，照样往下跑）、
 #   common_environment、cargo_build_arguments、cargo_test_arguments（数组）
 #   卡只归 GPU 批处理验证服务（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：这里不领卡、不挑卡、不清场，不读多机配置里的显卡先后。
-#     开了 GPU 的判段（验证包 crash_amplification 的 judge_my_blocks_on_gpu）把要判的块写成判定库里的待判行、等 GPU 批处理服务判完；
-#     服务不在跑时验证包打 CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行、退 78，下面「运行条件与失败分类」把它认成 gpu-verification-server、调用方退 78。
+#     开了 GPU 的判段（验证包 crash_amplification 的 judge_my_blocks_on_gpu）把要判的块写成判定库里的待判行、等 GPU 批处理服务判完；服务读不了时判段一直等，卡住由任务服务判。
 #     弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=cards-read-from-configuration 下从多机配置读 GPU_CARDS_BY_PRIORITY（不看环境），
 #     由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红（红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
 #   crash_amplification_recorded_blocks <日志>        打日志里 CRASH_AMPLIFICATION_RECORDED 行 blocks= 之和（CRASH_LIBRARY_RECORDED 行不带块数，记 0）。
@@ -40,22 +39,19 @@
 #       别的（缺键、写法不对）只报那一句；弄坏开关 emit-failure-said-host-unrecognized、host-unrecognized-unsaid 由本份 --selftest 证红（下面「弄坏开关」表）。
 #       弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=this-host-from-hosts-order 下不问那一份、一律当 HOSTS 头一项是这一台；card-address-outside-hosts-accepted 下
 #       显卡先后里地址不在 HOSTS 的项照认、当成另一台的卡。两条由 scripts/crash/crash-amplification-item.sh --selftest 证红。
-#   crash_amplification_failure_kind <日志…>           一趟没跑成，日志里说的是哪一类：gpu-verification-server（开了 GPU 而 GPU 批处理服务不在跑：验证包打的
-#       CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行，运行条件，调用方退 78）、
-#       observer-images-without-a-card（观察者交回的盘要在卡上判、取不到卡：验证包打的 CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS 行，
+#   crash_amplification_failure_kind <日志…>           一趟没跑成，日志里说的是哪一类：observer-images-without-a-card（观察者交回的盘要在卡上判、取不到卡：验证包打的 CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS 行，
 #       任务不拿卡、这一族待判行 GPU 批处理服务还不收，记本次未跑，调用方退 78；经 cargo test 出来的退出码是 101，只能按这一行认）、
 #       device（显卡或显存用不上，含给定状态表的判器借不到显存那一行，运行条件，调用方退 78）、
 #       build（这份二进制跑不了这一趟：结论的版本与树对不上、配置开了 GPU 而没编进 gpu 特性，运行条件，调用方退 78）、
 #       algorithm（算法上判不了：有状态 GPU 判不了、内核展开超预算、建不出表，调用方退 248），都不是打空串；
-#       几类都有时先 gpu-verification-server、再 observer-images-without-a-card、再 device、再 build
-#   crash_amplification_exit_code_of_a_failed_run <那一趟的退出码> <日志…>   打调用方该退的码：gpu-verification-server、observer-images-without-a-card、device 与 build 78、
+#       几类都有时先 observer-images-without-a-card、再 device、再 build
+#   crash_amplification_exit_code_of_a_failed_run <那一趟的退出码> <日志…>   打调用方该退的码：observer-images-without-a-card、device 与 build 78、
 #     algorithm 248，别的原样（内存包装退的 245 显存不够照原样，出路由 crash_amplification_explain_exit_code 的 245 那一支打）
-#   crash_amplification_explain_exit_code <要退的码> [<日志…>]   打出路（标准错误）：给了日志而日志里是 gpu-verification-server 那一类时 78 打起 GPU 批处理服务的命令
-#       （python3 gpu-verification-server/control start，再照 check 的出路修到它退 0）；是 observer-images-without-a-card 那一类时 78 打
+#   crash_amplification_explain_exit_code <要退的码> [<日志…>]   打出路（标准错误）：给了日志而日志里是 observer-images-without-a-card 那一类时 78 打
 #       「这条用例的观察者交回了盘、要上卡判，任务不拿卡；等 GPU 批处理服务收这一族待判行」（crash_amplification_observer_images_without_a_card_howto）；别的照码打。
 #   弄坏开关读 CRASH_AMPLIFICATION_ITEM_BREAK（开关表与该红的格在 scripts/crash/crash-amplification-item.sh 文件头）：
 #   accept-missing-peer-cards、accept-peer-cards-without-across、accept-missing-card-list、device-unusable-as-run-failure、algorithm-refusal-as-run-failure、
-#   version-differs-as-run-failure、gpu-feature-missing-as-run-failure、gpu-verification-server-not-running-as-run-failure、this-host-from-hosts-order、card-address-outside-hosts-accepted。
+#   version-differs-as-run-failure、gpu-feature-missing-as-run-failure、this-host-from-hosts-order、card-address-outside-hosts-accepted。
 #   given-states-run-condition-as-run-failure（给定状态表借不到显存那一行不认、不退 78）只由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红
 #   （红在哪一格写在那份文件头「共用库 crash-amplification-lib.sh 的开关」一段）。
 #   其中 device-unusable-as-run-failure、algorithm-refusal-as-run-failure 打开时 scripts/crash/crash-amplification-two-hosts.sh --selftest 也红
@@ -190,9 +186,6 @@ CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="-I/usr/lib/gcc/x86_64-linux-gnu/1
 # 给定状态表的判器借不到显存时引擎打的那一行的行首（crates/singlefs-verification/src/crash_amplification.rs 的 GIVEN_STATES_RUN_CONDITION_NOT_MET_LINE_PREFIX）：
 # 运行条件不满足，调用方退 78；crash_amplification_failure_kind 的 device 那一组与崩溃点重放入口 scripts/crash/crash-point-replay.sh 按条复用的那一段都照这一份认
 CRASH_AMPLIFICATION_GIVEN_STATES_RUN_CONDITION_LINE_PREFIX="CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET"
-# 开了 GPU 而 GPU 批处理验证服务不在跑时验证包打的那一行的行首（crates/singlefs-verification/src/crash_amplification.rs 的 GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX）：
-# 运行条件不满足，调用方退 78、出路是起服务的命令（文件头「运行条件与失败分类」）；门禁 crash-point-replay 的崩溃枚举用例那一路照同一份认
-CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX="CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING"
 # 观察者交回的盘要在卡上判、取不到卡时验证包打的那一行的行首（crates/singlefs-verification/src/crash_amplification.rs 的
 # IMAGES_AFTER_THE_OBSERVERS_WITHOUT_A_CARD_LINE_PREFIX）：任务不拿卡，记本次未跑、调用方退 78（文件头「运行条件与失败分类」）；
 # 门禁 crash-point-replay 的崩溃枚举用例那一路照同一份认
@@ -676,25 +669,6 @@ crash_amplification_record_on_this_host() { # <日志> [<份> [<附加环境 键
   return 0
 }
 
-# 一台机器判这一趟的总速度（态/秒，取整）：各条流要判的状态加起来 ÷ 各条流估的用时加起来。一条用例里几条流各打一行，
-# 各行的 states_per_second_on_this_host 是各自那条流的速度，直接相加没有意义（五条流各每秒 50 万，合起来仍是每秒 50 万上下）。
-# 一行都没有打空串；估的用时合计是 0（没有一条流量出速度）打 0。
-crash_amplification_placement_rate() { # <日志>
-  python3 - "$1" <<'PYTHON'
-import re, sys
-pending, seconds, lines = 0, 0, 0
-for line in open(sys.argv[1], encoding="utf-8", errors="replace"):
-    if not line.startswith("CRASH_AMPLIFICATION_PLACEMENT "):
-        continue
-    lines += 1
-    fields = dict(re.findall(r"(\w+)=([0-9]+)(?= |$)", line.strip()))
-    pending += int(fields.get("pending_states", 0))
-    seconds += int(fields.get("estimated_seconds_on_this_host", 0))
-if lines:
-    print(pending // seconds if seconds else 0)
-PYTHON
-}
-
 # 日志里 CRASH_AMPLIFICATION_PLACEMENT 行某个字段的合计（一条用例里几条流各打一行）；一行都没有打空串。
 crash_amplification_placement_total() { # <日志> <字段名>
   python3 - "$1" "$2" <<'PYTHON'
@@ -906,7 +880,6 @@ crash_amplification_run_condition_holds() { # [<仓根>]：对得上交回 0；�
 }
 
 # 一趟没跑成，日志里说的是哪一类（判据是用例与判器报错的原话，出处见各串旁边）：
-#   gpu-verification-server：行首是 CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 的那一行（CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX）
 #   observer-images-without-a-card：行首是 CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS 的那一行（观察者交回的盘要在卡上判、取不到卡；
 #     CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX）。弄坏开关 CRASH_AMPLIFICATION_LIB_BREAK=observer-images-without-a-card-unrecognized 下不认
 #   device：显卡或显存用不上——GPU_CARD_NOT_USABLE 行（crates/singlefs-verification/src/gpu_unit_checks.rs）、
@@ -922,7 +895,6 @@ crash_amplification_run_condition_holds() { # [<仓根>]：对得上交回 0；�
 # 弄坏开关 version-differs-as-run-failure、gpu-feature-missing-as-run-failure：build 那两句各自不认（表与该红的格在 crash-amplification-item.sh 文件头）。
 # 弄坏开关 given-states-run-condition-as-run-failure：给定状态表借不到显存那一行不认（红在 crash-amplification-two-hosts.sh --selftest 的 shard-given-states-run-condition）。
 crash_amplification_failure_kind() { # <日志…>
-  local gpu_verification_server_pattern="^[[:space:]]*${CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX}( |\$)"
   local observer_images_without_a_card_pattern="^[[:space:]]*${CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX}( |\$)"
   local device_pattern='GPU_CARD_NOT_USABLE|这台机器却没有一张用得了的卡|没有一张卡装得下这条流的表|GPU_CARDS_BY_PRIORITY 里没有'
   local given_states_run_condition_pattern="^[[:space:]]*${CRASH_AMPLIFICATION_GIVEN_STATES_RUN_CONDITION_LINE_PREFIX}( |\$)"
@@ -932,8 +904,6 @@ crash_amplification_failure_kind() { # <日志…>
   local logs=() log
   for log in "$@"; do [[ -f "$log" ]] && logs+=("$log"); done
   (( ${#logs[@]} > 0 )) || return 0
-  if ! crash_amplification_item_break_is gpu-verification-server-not-running-as-run-failure \
-     && grep -qE -- "$gpu_verification_server_pattern" < <(crash_amplification_lines_without_test_prefix "${logs[@]}"); then echo gpu-verification-server; return 0; fi
   if ! crash_amplification_lib_break_is observer-images-without-a-card-unrecognized \
      && grep -qE -- "$observer_images_without_a_card_pattern" < <(crash_amplification_lines_without_test_prefix "${logs[@]}"); then echo observer-images-without-a-card; return 0; fi
   if ! crash_amplification_item_break_is device-unusable-as-run-failure && grep -qE -- "$device_pattern" "${logs[@]}"; then echo device; return 0; fi
@@ -949,7 +919,7 @@ crash_amplification_exit_code_of_a_failed_run() { # <那一趟的退出码> <日
   shift
   kind="$(crash_amplification_failure_kind "$@")"
   case "$kind" in
-    gpu-verification-server|observer-images-without-a-card|device|build) echo 78 ;;
+    observer-images-without-a-card|device|build) echo 78 ;;
     algorithm) echo 248 ;;
     *) echo "$run_exit" ;;
   esac
@@ -961,13 +931,8 @@ crash_amplification_observer_images_without_a_card_howto() {
 }
 
 crash_amplification_explain_exit_code() { # <调用方要退的码> [<日志…>]：78、248 与 245（内存包装认出的显存不够）打对应的出路（标准错误），别的不打
-  # 给了日志而日志里是 GPU 批处理服务不在跑那一类（文件头「运行条件与失败分类」）：78 的出路是起服务的命令
   local failure_kind=""
   if [[ "$1" == 78 ]] && (( $# > 1 )); then failure_kind="$(crash_amplification_failure_kind "${@:2}")"; fi
-  if [[ "$failure_kind" == gpu-verification-server ]]; then
-    echo "  → 怎么办：开了 GPU，判段只把块写成待判行、等 GPU 批处理验证服务判，服务不在跑（日志里 ${CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING_LINE_PREFIX} 那一行点名控制命令与它说的原因）：先起服务 python3 gpu-verification-server/control start，再跑 python3 gpu-verification-server/control check 照它的出路修到退 0，然后重跑同一条命令（录下的照录入键复用，判过的块已经在库里）" >&2
-    return 0
-  fi
   if [[ "$failure_kind" == observer-images-without-a-card ]]; then
     echo "  → 怎么办：$(crash_amplification_observer_images_without_a_card_howto)" >&2
     return 0

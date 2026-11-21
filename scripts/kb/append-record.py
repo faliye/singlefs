@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # admission: always 每一次追加都是对此刻那份记录做一次写入，上一次判过的文本不替这一次作保
 # run-condition: none 只读写仓里 records/ 下点名的那一份记录与判据库，除了 python3 之外没有环境要求
-"""往 records/ 下一份已有的 .md 末尾追加一段文本：写之前照门禁 doc-text 的 clock-times、session-names 与批次代号同一份判据判这段文本，
+"""往 records/ 下一份已有的 .md 末尾追加一段文本：写之前照门禁 doc-text 的 clock-times、session-names 与批次代号、任务号与会话短号与批号同一份判据判这段文本，
 命中就拒、点名第几行；读时记 sha256、换上之前复核、同目录临时文件加改名换上。
 Bash 里往 records/ 下的 .md 追加（>>、&>>、tee -a、python 的 open(…, 'a')）由 .claude/hooks/bash-command-detector.sh 的 ⑲ 在执行前拒，出路指到这里。
 
@@ -11,14 +11,15 @@ Bash 里往 records/ 下的 .md 追加（>>、&>>、tee -a、python 的 open(…
   append-record.py --selftest
 
   <记录>      records/ 下一份已有的 .md（后缀不分大小写，子目录里的也收；相对路径从当前目录起算，解开符号链接之后要落在 <仓根>/records/ 下）。
-              新记录用 Write 新建（写闸 write-guard.sh 照判钟点、会话号与批次代号），之后再经这里追加。
+              新记录用 Write 新建（写闸 write-guard.sh 照判钟点、会话号、批次代号与任务号、会话短号、批号），之后再经这里追加。
   <文本文件>  要追加的文本，UTF-8。记录不以换行收尾的先补一个换行，文本不以换行收尾的补一个；别的不加（要空一行就写进文本）。
               文本里不许有一、二级标题（去掉 0–3 个前导空格之后以 # 或 ## 加空白或行尾起头的行；四个空格以上缩进的是代码，不算；
               围栏代码块里的不算，围栏按 scripts/kb/lib_markdown.py 认：0–3 个空格缩进的 ``` 或 ~~~ 起、同字符且不短于开头的那一行收，没收的护到文末；
               三级以下照写）：新开一节用 Edit 接在文件末尾（写闸照判同几样），
               拆分提案现行账本加节经 scripts/kb/ledger-append-section.py（它现取节号、索引行与节一次写入）。
   --root      仓根，默认是这份脚本所在的仓；判据库取 <仓根>/.claude/gate.d/lib-forbidden-notations.py。
-  判文本：钟点、时区词、时间戳（scripts/kb/lib_notation_check.py 的 clock_refusal）与会话号、批次代号（同一份的 session_name_refusal），
+  判文本：钟点、时区词、时间戳（scripts/kb/lib_notation_check.py 的 clock_refusal）与会话号、批次代号（同一份的 session_name_refusal）只判追加的这段文本；
+  任务号、会话短号与批号判追加之前、之后两份整份记录，追加之后多出来的违例行才拒（记录里已有的旧号不挡，记录末尾开着的围栏被收掉、后面那一行出了围栏的照拒），
   与 insert-row.py、ledger-append-section.py、写闸 write-guard.sh 的第五道与第七道、门禁 doc-text 的 clock-times 与 session-names 格读同一份判据库，这里不另抄。
   拒绝说明里的「第 N 行」是追加之后那一行在记录里的行号。
 
@@ -27,13 +28,13 @@ Bash 里往 records/ 下的 .md 追加（>>、&>>、tee -a、python 的 open(…
 
 退出码：0 追加了（或干跑）；1 用法不对、文本文件读不到或不是 UTF-8、自检没过；2 记录不在 <仓根>/records/ 下、不是 .md、不在或读不到；
 4 读到写之间记录被改过（没写，重跑）；5 没换上（硬链接、只读、建不了临时文件、写或改名失败）；6 文本带钟点、时区词或时间戳；
-7 文本带会话号或批次代号；8 文本或记录不合（文本是空的、有一二级标题、带 CR；记录带 CR 或不是 UTF-8）。2–8 都是记录没动、没留临时文件。
+7 文本带会话号、批次代号或任务号、会话短号、批号；8 文本或记录不合（文本是空的、有一二级标题、带 CR；记录带 CR 或不是 UTF-8）。2–8 都是记录没动、没留临时文件。
 9 已经追加了（改名换上做完），之后被 Ctrl-C 打断（lib_atomic_replace.py 的 ReplacedThenInterrupted / ReplacedThenFailed）：别重跑（会追加两遍），先看记录末尾。
 
 弄坏开关（只给 --selftest 证红用，平常跑设了退 2、点名只在自证里认；不认识的值同样退 2）。逐项写开关名、弄坏哪一处、打开后自证哪几格红（括号里是那条「✗ 自检失败：」的开头）：
   APPEND_RECORD_BREAK=no-recheck-before-write  换上之前不复核 sha256，读到写之间别人写进去的那一行被盖掉
       读到写之间被改过（「✗ 自检失败：读到写之间被改过没拒」）
-  APPEND_RECORD_BREAK=no-notation-guard  不判文本里的钟点、时区词、时间戳、会话号与批次代号
+  APPEND_RECORD_BREAK=no-notation-guard  不判文本里的钟点、时区词、时间戳、会话号、批次代号与任务号、会话短号、批号
       写之前判文本（「✗ 自检失败：写之前判文本没判对」）
   APPEND_RECORD_BREAK=headings-allowed  不拒文本里的一、二级标题
       拒绝的几种输入（「✗ 自检失败：拒绝的几种输入没判对」）
@@ -43,8 +44,18 @@ Bash 里往 records/ 下的 .md 追加（>>、&>>、tee -a、python 的 open(…
       正常追加（「✗ 自检失败：正常追加没成」：四个反引号的围栏里那一行 ``` 被当成收尾，后面围栏里的二级标题被拒）
   APPEND_RECORD_BREAK=heading-indent-unstripped  一、二级标题按没去前导空格的行认
       拒绝的几种输入（「✗ 自检失败：拒绝的几种输入没判对」：两个空格缩进的二级标题没拒）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=task-and-session-numbers  共用判据库 .claude/gate.d/lib-forbidden-notations.py 不判任务号、会话短号与批号这一形态（写法在它文件头）
+      写之前判文本（「✗ 自检失败：写之前判文本没判对」）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=after-lines-judged-alone  共用判据库判追加前后两份整份记录时逐行单判、不认围栏与表头
+      写之前判文本（「✗ 自检失败：写之前判文本没判对」：表头是批次的那一列的批号与围栏里的会话短号、批号那一条没放行）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-not-netted  共用判据库不拿追加之前记录里已有的违例行相抵
+      写之前判文本（「✗ 自检失败：写之前判文本没判对」：记录里已有旧号时追加的那一条没放行）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=session-descriptions  共用判据库不判拿「<做什么>那一路」的描述指别的会话那一条判据行
+      写之前判文本（「✗ 自检失败：写之前判文本没判对」：拿描述指别的会话的那一条没拒）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=session-descriptions-loose  共用判据库把那一条判据行换成宽的认法：带「一路」的、mainagent( 与 subagent( 一律算
+      写之前判文本（「✗ 自检失败：写之前判文本没判对」：按出场次序的叫法与不跟会话词的一路那一条没放行）
   ATOMIC_REPLACE_BREAK=rawafterrename  共用库 lib_atomic_replace.py 的弄坏开关（写法在它文件头）：改名之后到的 Ctrl-C 原样抛，自证同样走它
-      写回的方式（「✗ 自检失败：写回的方式不对」，下面几行以「[改名之后被打断]」起头）
+      写回的方式（「✗ 自检失败：写回的方式不对」；下面几行是 [改名之后被打断] 的明细，不以 ✗ 起头，不另点名）
 """
 import argparse
 import contextlib
@@ -59,7 +70,7 @@ import tempfile
 from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, inside_selftest, leftover_temporary_files, \
     problems_with_replacement_by_rename, replace_file_contents_by_rename
 from lib_markdown import fenced_flags
-from lib_notation_check import clock_refusal, copy_library_into, repository_root, session_name_refusal
+from lib_notation_check import clock_refusal, closing_remedy, copy_library_into, repository_root, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -108,7 +119,7 @@ def record_target(record, root):
                       "     → 怎么办：这个工具只往 records/ 下的记录追加；别的文件用 Edit 改，或用 scripts/kb/insert-row.py、replace-once.py 定点改")
     if not os.path.isfile(real):
         raise Refused(2, f"{relative} 不在（或不是普通文件），一个字节没写",
-                      "     → 怎么办：新记录用 Write 新建（写闸照判钟点、会话号与批次代号），之后再经这个工具追加；路径写错了的改对再跑")
+                      "     → 怎么办：新记录用 Write 新建（写闸照判钟点、会话号、批次代号与任务号、会话短号、批号），之后再经这个工具追加；路径写错了的改对再跑")
     return real, relative
 
 
@@ -144,14 +155,15 @@ def fenced_line_flags(lines):
 
 
 def plan(original, text):
-    """记录此刻的文本 + 要追加的文本 → (新文本, 补过换行的追加文本, 它在新文件里的首行行号, 末行行号)。不合抛 Refused(8)。"""
+    """记录此刻的文本 + 要追加的文本 → (新文本, 补过换行的追加文本, 它在新文件里的首行行号, 末行行号)。不合抛 Refused(8)。
+    新文本就是补过换行的记录原文接上追加文本，所以新文本去掉末尾的追加文本就是追加之前的那一段。"""
     if "\r" in original:
         raise Refused(8, "记录带 CR（CRLF 换行），这个工具只认 LF，一个字节没写",
                       "     → 怎么办：记录一直是 LF；先查是谁把它改成了 CRLF，改回 LF 再追加")
     problem = text_problem(text)
     if problem:
         raise Refused(8, f"{problem}，一个字节没写",
-                      "     → 怎么办：文本非空、只用 LF、不带一二级标题（三级以下可以）；新开一节用 Edit 接在记录末尾（写闸照判钟点、会话号与批次代号），"
+                      "     → 怎么办：文本非空、只用 LF、不带一二级标题（三级以下可以）；新开一节用 Edit 接在记录末尾（写闸照判钟点、会话号、批次代号与任务号、会话短号、批号），"
                       f"拆分提案现行账本加节经 {LEDGER_TOOL}，改完重跑")
     head = original if original == "" or original.endswith("\n") else original + "\n"
     body = text if text.endswith("\n") else text + "\n"
@@ -159,16 +171,18 @@ def plan(original, text):
     return head + body, body, first_line, first_line + body.count("\n") - 1
 
 
-def notation_refusal(path, body, first_line, notation_root):
-    """钟点与会话号、批次代号：与 insert-row.py、ledger-append-section.py 同一份判据（lib_notation_check.py）；放行交 None，拒绝交 Refused。"""
+def notation_refusal(path, body, first_line, notation_root, before_text, after_text):
+    """钟点与会话号、批次代号、任务号与会话短号与批号：与 insert-row.py、ledger-append-section.py 同一份判据（lib_notation_check.py）；放行交 None，拒绝交 Refused。
+    钟点、会话号与批次代号判追加的文本 body；任务号、会话短号与批号判追加之前（before_text）、之后（after_text）两份整份记录，写后多出来的违例行才拒
+    （记录里已有的旧号不挡这一次追加；记录末尾开着的围栏被以收尾围栏起头的文本收掉、后面那一行出了围栏的照拒）。"""
     if BROKEN == "no-notation-guard":   # 弄坏开关：不判
         return None
     refusal = clock_refusal(path, body, first_line, notation_root)
     if refusal:
         return Refused(6, "\n".join(refusal), "  → 怎么办：文本里的钟点、时区词与时间戳删掉，只写日期，再追加")
-    refusal = session_name_refusal(path, body, first_line, notation_root)
+    refusal = session_name_refusal(path, body, first_line, notation_root, before_text=before_text, after_text=after_text)
     if refusal:
-        return Refused(7, "\n".join(refusal), "  → 怎么办：会话号换成「别的会话」这类不带号的说法，批次代号换成那一批做了什么，事情与日期照留，再追加")
+        return Refused(7, "\n".join(refusal), "  → 怎么办：" + closing_remedy(refusal) + "，再追加")
     return None
 
 
@@ -189,7 +203,7 @@ def append_text(path, text, dry_run=False, notation_root=None, interleave=None):
         except UnicodeDecodeError as error:
             raise Refused(8, f"记录 {path} 不是 UTF-8（{error}），一个字节没写", "     → 怎么办：先查记录是被谁写坏的，改回 UTF-8 再追加") from error
         new_text, body, first_line, last_line = plan(decoded, text)
-        refusal = notation_refusal(path, body, first_line, notation_root)
+        refusal = notation_refusal(path, body, first_line, notation_root, decoded, new_text)
         if refusal:
             raise refusal
     except Refused as refused:
@@ -365,7 +379,10 @@ def problems_with_refused_inputs(work):
 
 
 def problems_with_notation_guard(work):
-    """文本带时间戳拒（6），带会话号或批次代号拒（7），干跑也拒，点名命中的那一行；只写日期放行。
+    """文本带时间戳拒（6），带会话号、批次代号或任务号、会话短号、批号拒（7），干跑也拒，点名命中的那一行；只写日期放行；
+    记录里的 A/B 读数一行（只在判决里照写）与围栏里的任务号拒，记录末尾开着围栏而追加的文本以收尾围栏起头的、后面那一行照判；
+    表格行里的批号、长跑拆分一行、围栏里的会话短号与批号放行，记录里已有的旧号不挡追加；拿「那一路会话」指别的会话的拒，
+    按出场次序的 mainagent(A)、subagent(A) 与不跟会话词的「一路」放行。
     样本里的会话名与时间戳拆开拼，这份源码里不出现字面写法（门禁 doc-text 也扫它）。"""
     problems = []
     glue = "".join
@@ -375,7 +392,13 @@ def problems_with_notation_guard(work):
     for label, text, wanted_code, wanted_texts in (
             ("第二行带紧凑时间戳", glue(("- 乙做完\n运行目录 ", stamp, "\n")), 6, (stamp, "第 7 行")),
             ("带会话号", glue(("已发消息，", session, " 回话\n")), 7, (session, "第 6 行")),
-            ("带批次代号", "- 24c-1 交回\n", 7, ("写了批次代号", "第 6 行"))):
+            ("带批次代号", "- 24c-1 交回\n", 7, ("写了批次代号", "第 6 行")),
+            ("带任务号", "- 调度那一条跑完（任务 21036）\n", 7, ("写了任务号、会话短号或批号", "第 6 行", "任务 21036")),
+            ("带括号里的会话短号", "- 这件事 (5b) 知道\n", 7, ("写了任务号、会话短号或批号", "第 6 行", "(5b)")),
+            ("带批号", "- 乙做完\n- 批 118 量读数：退 0\n", 7, ("写了任务号、会话短号或批号", "第 7 行", "批 118")),
+            ("记录里带 A/B 读数一行（只在判决里照写）", "A/B 读数：任务 11964\n", 7, ("写了任务号、会话短号或批号", "第 6 行", "任务 11964")),
+            ("围栏里的任务号", "```\n任务 21036 退 0\n```\n", 7, ("写了任务号、会话短号或批号", "第 7 行", "任务 21036")),
+            ("拿描述指别的会话", "- 再发给改检出钩子那一路会话，它认领了\n", 7, ("写了任务号、会话短号或批号", "第 6 行", "那一路会话"))):
         for dry_run in (False, True):
             code, said = quietly(lambda: append_record(record, text, root, dry_run))
             if code != wanted_code or any(item not in said for item in wanted_texts) or "→ 怎么办" not in said or read(record) != SAMPLE_RECORD:
@@ -383,6 +406,26 @@ def problems_with_notation_guard(work):
     code, said = quietly(lambda: append_record(record, "- 只写日期 2026-11-03 的一行\n", root))
     if code != 0:
         problems.append(f"只写日期的文本本该放行，实际退 {code}：{said!r}")
+    # 记录末尾开着围栏，追加的文本以收尾的围栏起头：后面那一行照判（判的是追加前后两份整份记录，不交整份的话这里本来就该红）
+    fenced_record = SAMPLE_RECORD + "```\n代码\n"
+    write(record, fenced_record)
+    code, said = quietly(lambda: append_record(record, "```\n\n正文：这件事 (5b) 知道\n", root))
+    if code != 7 or "(5b)" not in said or "第 10 行" not in said or read(record) != fenced_record:
+        problems.append(f"记录末尾开着围栏、追加的文本以收尾围栏起头：本该退 7、点名第 10 行的 (5b)、记录不动，实际退 {code}：{said!r}")
+    # 照写号的两种行与围栏里的会话短号、批号放行（LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=task-and-session-numbers、fenced-blocks-judged 或 after-lines-judged-alone 设着的话这里本来就该红）；
+    # 记录里已有的旧号不挡这一次追加：写前写后两份相抵（LIB_FORBIDDEN_NOTATIONS_BREAK=violations-not-netted 设着的话这里本来就该红）
+    write(record, SAMPLE_RECORD + "- 旧行（任务 20461）\n")
+    kept = "| 批次 | 内容 |\n|---|---|\n| 批 6 | 交回 |\n- 长跑拆分：项 x，任务 21036，拆成两项\n```\n(5b) 批 105 退 0\n```\n"
+    code, said = quietly(lambda: append_record(record, kept, root))
+    if code != 0 or read(record) != SAMPLE_RECORD + "- 旧行（任务 20461）\n" + kept:
+        problems.append(f"表头是批次的那一列的批号、长跑拆分一行与围栏里的会话短号、批号本该放行（记录里已有的旧号也不挡），实际退 {code}：{said!r}")
+    # 按出场次序的 mainagent(A)、subagent(A) 与不跟会话词的「一路」放行（LIB_FORBIDDEN_NOTATIONS_BREAK=session-descriptions-loose 设着的话这里本来就该红）
+    write(record, SAMPLE_RECORD)
+    lettered = "- mainagent(A) 在改判据库，subagent(B) 交回；这一路、那一路径、一路绿、按块那一路都照写\n"
+    code, said = quietly(lambda: append_record(record, lettered, root))
+    if code != 0 or read(record) != SAMPLE_RECORD + lettered:
+        problems.append(f"按出场次序的叫法与不跟会话词的一路本该放行，实际退 {code}：{said!r}")
+    write(record, SAMPLE_RECORD)
     return problems
 
 
@@ -455,14 +498,16 @@ def selftest():
           "records/ 下的 .tsv、records 外与仓外的 .md、同名前缀的兄弟目录、不在的、"
           "经 .. 或符号链接爬出去的拒（退 2），子目录、大写后缀、指进 records 的链接放行；空文本、一二级标题（两个空格缩进的、四个空格缩进的假围栏之后的也拒）、"
           "账本节标题、CR、记录 CRLF 或不是 UTF-8 拒（退 8）；"
-          "时间戳（6）、会话号与批次代号（7）拒且点名那一行，干跑也拒，只写日期放行；读到写之间被改过拒（4）；"
+          "时间戳（6）、会话号、批次代号、任务号、括号里的会话短号与批号（7）拒且点名那一行，干跑也拒，记录里的 A/B 读数一行、围栏里的任务号与记录末尾开着围栏时以收尾围栏起头的文本里的号拒，"
+          "拿描述指别的会话的「那一路会话」拒，只写日期、表格行里的批号、长跑拆分一行与围栏里的会话短号、批号、按出场次序的 mainagent(A)、subagent(A) 与不跟会话词的一路放行，"
+          "记录里已有的旧号不挡；读到写之间被改过拒（4）；"
           "写回换新 inode、权限位不变、在读的进程读旧内容、符号链接、硬链接与只读文件拒绝、fsync 或改名失败不留临时文件、改名之后被 Ctrl-C 打断退 9 且已追加；"
           "入口的相对路径、标准输入、会话号与缺参数")
     return 0
 
 
 def main(argv):
-    parser = argparse.ArgumentParser(add_help=True, description="往 records/ 下一份已有的 .md 末尾追加一段文本，写之前判钟点、会话号与批次代号")
+    parser = argparse.ArgumentParser(add_help=True, description="往 records/ 下一份已有的 .md 末尾追加一段文本，写之前判钟点、会话号、批次代号与任务号、会话短号、批号")
     parser.add_argument("record", nargs="?")
     parser.add_argument("text_file", nargs="?")
     parser.add_argument("--root")

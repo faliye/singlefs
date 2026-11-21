@@ -71,8 +71,13 @@
 #   环境里没设 SINGLEFS_DATA_ROOT 时 .claude/hooks/lib_work_root.py 照它取；写法（绝对路径、落在 NFS_SHARED_ROOTS 某一段下）由那份库判，没写而又要用时那份库报错、不补缺省。
 #   --emit-assignments、--emit-hosts 不打它。
 #
-# task-server 的四个键 TASK_SERVER_STATE_DIRECTORY、TASK_SERVER_RUNTIME_DIRECTORY、TASK_SERVER_SIGNING_KEY_FILE、TASK_SERVER_BUILD_DIRECTORY（可以不写；这里只认键名、不判值）：
-#   task-server 的状态目录、运行目录、签名密钥文件与编译目录，意思与缺省见仓根 multi-host.env.example，读法与判法归 task-server/。--emit-assignments、--emit-hosts 不打它们。
+# task-server 的五个键 TASK_SERVER_STATE_DIRECTORY、TASK_SERVER_RUNTIME_DIRECTORY、TASK_SERVER_SIGNING_KEY_FILE、TASK_SERVER_BUILD_DIRECTORY、TASK_SERVER_IO_PRESSURE_LIMIT（可以不写；这里只认键名、不判值）：
+#   task-server 的状态目录、运行目录、签名密钥文件、编译目录与磁盘压力阈值，意思与缺省见仓根 multi-host.env.example，读法与判法归 task-server/。--emit-assignments、--emit-hosts 不打它们。
+#
+# 清场脚本的九个键 QUIESCE_LOOP_UNITS_BY_HOST、QUIESCE_SERVICE_UNITS_BY_HOST、QUIESCE_HEALTHCHECK_TIMERS_BY_HOST、QUIESCE_MODEL_SERVICE_UNIT、
+#   QUIESCE_MODEL_SERVICE_ONLINE_CHECK_COMMAND、QUIESCE_MODEL_SERVICE_DOWN_COMMAND、QUIESCE_GATEWAY_UNIT、QUIESCE_GATEWAY_IN_FLIGHT_URL、
+#   QUIESCE_SUDO_PASSWORD_KEY_BY_HOST（可以不写；这里只认键名、不判值）：清场四个键指到的私有清场脚本按台要停哪些单元、怎么停，意思与写法见仓根 multi-host.env.example，
+#   读法与判法归那几份私有脚本（两台都跑得起：这一台照 scripts/hosts/multi_host_addresses.py 认，单元清单按台读）。--emit-assignments、--emit-hosts 不打它们。
 #
 # 两台对称（records/2026-10-31-task-server巡检.md 问题 94；任务 3925：同一份配置、同一条命令派到两台，结局要相同）：哪一台是自己只照 HOSTS 与这一台网卡上的地址认，
 #   HOSTS 里另一项就是第二台；不读随台变的角色变量。两台判同一份配置，退出码相同（双机开着时各连对方），
@@ -86,7 +91,7 @@
 # 弄坏开关 MULTI_HOST_CONFIGURATION_BREAK=<项>（只在自证里认：第一个参数是 --selftest，或祖先进程里有命令行带 --selftest 的算自证起的；平常跑设了就在读参数之前退 2、点名它只在自证里认）。
 # 逐项写开关名、弄坏哪一处、打开后哪一份自证的哪几格红（「本份 --selftest 的」那几格由这一份末尾那一轮核；别的写的是调用方自证的格名，括号里抄细节的句首）：
 #   MULTI_HOST_CONFIGURATION_BREAK=switch-off-is-on  ENABLE_ACROSS_MACHINES 没写或写 0 也按开判
-#       本份 --selftest 的 complete-configuration-off、gpu-card-keys-accepted、data-root-key-accepted、task-server-keys-accepted、prune-address-in-hosts-accepted、serial-compile-hosts-accepted
+#       本份 --selftest 的 complete-configuration-off、gpu-card-keys-accepted、data-root-key-accepted、task-server-keys-accepted、quiesce-script-keys-accepted、prune-address-in-hosts-accepted、serial-compile-hosts-accepted
 #       multi-host-run.sh 的「Ⓗ 配置里没写 ENABLE_ACROSS_MACHINES ⇒ --peer 拒（退 255，出路写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑、第二台没建目录」（「退 0，命令跑了」）
 #   MULTI_HOST_CONFIGURATION_BREAK=switch-value-unchecked  两个开关键写了 0、1 之外的值也不报错
 #       本份 --selftest 的 switch-value-refused
@@ -120,8 +125,10 @@
 #       本份 --selftest 的 emit-addresses-serial-compile-hosts
 #   MULTI_HOST_CONFIGURATION_BREAK=data-root-key-unknown  SHARED_DATA_ROOT 当不认得的键（认它之前的样子）
 #       本份 --selftest 的 data-root-key-accepted
-#   MULTI_HOST_CONFIGURATION_BREAK=task-server-keys-unknown  task-server 的四个键当不认得的键（认它们之前的样子）
+#   MULTI_HOST_CONFIGURATION_BREAK=task-server-keys-unknown  task-server 的五个键当不认得的键（认它们之前的样子）
 #       本份 --selftest 的 task-server-keys-accepted
+#   MULTI_HOST_CONFIGURATION_BREAK=quiesce-script-keys-unknown  清场脚本的九个键当不认得的键
+#       本份 --selftest 的 quiesce-script-keys-accepted
 #   MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown  显卡的两个键当不认得的键（并进多机配置之前的样子）
 #       本份 --selftest 的 gpu-card-keys-accepted
 #       scripts/crash/crash-amplification-item.sh --selftest 的第 22 格（「多机配置写了显卡的两个键却判不过…」）
@@ -173,7 +180,9 @@ MULTI_HOST_SERVICE_KEYS=(PRUNE_SERVER_TCP_ADDRESS)  # 可以不写：判定库�
 MULTI_HOST_HOSTS_KEY=HOSTS  # 要写：各台有线直连段的 IP，空格分隔，至少两项（文件头「主机数组」）
 MULTI_HOST_ADDRESS_PATTERN='^(([0-9]{1,3}[.]){3}[0-9]{1,3}|[0-9A-Fa-f]*:[0-9A-Fa-f:.]*)$'   # 主机数组的一项：IPv4 点分或 IPv6
 MULTI_HOST_DATA_ROOT_KEY=SHARED_DATA_ROOT  # 可以不写，这里不判值：共享数据根（文件头「共享数据根」；读法与判法归 .claude/hooks/lib_work_root.py）
-MULTI_HOST_TASK_SERVER_KEYS=(TASK_SERVER_STATE_DIRECTORY TASK_SERVER_RUNTIME_DIRECTORY TASK_SERVER_SIGNING_KEY_FILE TASK_SERVER_BUILD_DIRECTORY)  # 可以不写，这里不判值（文件头「task-server 的四个键」；读法与判法归 task-server/）
+MULTI_HOST_TASK_SERVER_KEYS=(TASK_SERVER_STATE_DIRECTORY TASK_SERVER_RUNTIME_DIRECTORY TASK_SERVER_SIGNING_KEY_FILE TASK_SERVER_BUILD_DIRECTORY TASK_SERVER_IO_PRESSURE_LIMIT)  # 可以不写，这里不判值（文件头「task-server 的五个键」；读法与判法归 task-server/）
+MULTI_HOST_QUIESCE_SCRIPT_KEYS=(QUIESCE_LOOP_UNITS_BY_HOST QUIESCE_SERVICE_UNITS_BY_HOST QUIESCE_HEALTHCHECK_TIMERS_BY_HOST QUIESCE_MODEL_SERVICE_UNIT
+  QUIESCE_MODEL_SERVICE_ONLINE_CHECK_COMMAND QUIESCE_MODEL_SERVICE_DOWN_COMMAND QUIESCE_GATEWAY_UNIT QUIESCE_GATEWAY_IN_FLIGHT_URL QUIESCE_SUDO_PASSWORD_KEY_BY_HOST)  # 可以不写，这里不判值（文件头「清场脚本的九个键」；读法与判法归私有清场脚本）
 MULTI_HOST_NFS_KEY=NFS_SHARED_ROOTS  # 要写：两台在同一绝对路径上共享（NFS）的目录，冒号分隔（文件头「NFS 共享的根」）
 NFS_README_POINTER='task-server/README.md「## NFS 共享」'
 MEMORY_CAP_PATTERN='^[1-9][0-9]*[KMGT]$'
@@ -406,8 +415,14 @@ configuration_selftest() {
   { cat "$work/complete.env"; echo "SHARED_DATA_ROOT=$work/tree/data-root"; } > "$work/data-root.env"
   judge data-root-key-accepted "$work/data-root.env" 3 "双机：关"
   { cat "$work/complete.env"; printf '%s\n' "TASK_SERVER_STATE_DIRECTORY=$work/tree/service-state" "TASK_SERVER_RUNTIME_DIRECTORY=$work/tree/service-runtime" \
-      "TASK_SERVER_SIGNING_KEY_FILE=$work/tree/service-key-sample" "TASK_SERVER_BUILD_DIRECTORY=$work/tree/service-builds"; } > "$work/service-keys.env"
+      "TASK_SERVER_SIGNING_KEY_FILE=$work/tree/service-key-sample" "TASK_SERVER_BUILD_DIRECTORY=$work/tree/service-builds" "TASK_SERVER_IO_PRESSURE_LIMIT=50"; } > "$work/service-keys.env"
   judge task-server-keys-accepted "$work/service-keys.env" 3 "双机：关"
+  { cat "$work/complete.env"; printf '%s\n' "QUIESCE_LOOP_UNITS_BY_HOST='127.0.0.1=selftest-loop.service 192.0.2.1=selftest-peer-loop.service'" \
+      "QUIESCE_SERVICE_UNITS_BY_HOST='127.0.0.1=selftest-model.service,selftest-gateway.service'" "QUIESCE_HEALTHCHECK_TIMERS_BY_HOST='127.0.0.1=selftest-health.timer'" \
+      "QUIESCE_MODEL_SERVICE_UNIT=selftest-model.service" "QUIESCE_MODEL_SERVICE_ONLINE_CHECK_COMMAND='true'" "QUIESCE_MODEL_SERVICE_DOWN_COMMAND='true'" \
+      "QUIESCE_GATEWAY_UNIT=selftest-gateway.service" "QUIESCE_GATEWAY_IN_FLIGHT_URL='http://127.0.0.1:9/in-flight'" \
+      "QUIESCE_SUDO_PASSWORD_KEY_BY_HOST='127.0.0.1=SELFTEST_PASSWORD_HERE 192.0.2.1=SELFTEST_PASSWORD_PEER'"; } > "$work/quiesce-script-keys.env"
+  judge quiesce-script-keys-accepted "$work/quiesce-script-keys.env" 3 "双机：关"
   { grep -v '^ENABLE_GPU=' "$work/complete.env"; echo ENABLE_GPU=1; echo 'GPU_CARDS_BY_PRIORITY="127.0.0.1:0:15G"'; echo 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="127.0.0.1:0:24G"'; } > "$work/cards.env"
   judge gpu-card-keys-accepted "$work/cards.env" 3 "GPU：开"
   { grep -v '^ENABLE_ACROSS_MACHINES=' "$work/complete.env"; echo ENABLE_ACROSS_MACHINES=1; } > "$work/across.env"
@@ -620,8 +635,11 @@ while IFS= read -r configuration_line || [[ -n "$configuration_line" ]]; do
   if [[ "$configuration_break" != task-server-keys-unknown ]]; then
     for expected_key in "${MULTI_HOST_TASK_SERVER_KEYS[@]}"; do [[ "$expected_key" == "$configuration_key" ]] && known_key=1; done
   fi
+  if [[ "$configuration_break" != quiesce-script-keys-unknown ]]; then
+    for expected_key in "${MULTI_HOST_QUIESCE_SCRIPT_KEYS[@]}"; do [[ "$expected_key" == "$configuration_key" ]] && known_key=1; done
+  fi
   [[ "$configuration_break" == unknown-keys-accepted ]] && known_key=1
-  (( known_key )) || refuse "$configuration_file 第 $line_number 行的键 $configuration_key 不认得（认的是 ${CRASH_POINT_REPLAY_SHARD_CONFIGURATION_KEYS[*]} $MULTI_HOST_HOSTS_KEY ${MULTI_HOST_BY_HOST_KEYS[*]} $MULTI_HOST_SERIAL_COMPILE_KEY $MULTI_HOST_NFS_KEY ${MULTI_HOST_SWITCH_KEYS[*]} ${MULTI_HOST_GPU_CARD_KEYS[*]} ${MULTI_HOST_SERVICE_KEYS[*]} $MULTI_HOST_DATA_ROOT_KEY ${MULTI_HOST_TASK_SERVER_KEYS[*]}；写法照仓根 multi-host.env.example，不认的键删掉或改成那里的写法）"
+  (( known_key )) || refuse "$configuration_file 第 $line_number 行的键 $configuration_key 不认得（认的是 ${CRASH_POINT_REPLAY_SHARD_CONFIGURATION_KEYS[*]} $MULTI_HOST_HOSTS_KEY ${MULTI_HOST_BY_HOST_KEYS[*]} $MULTI_HOST_SERIAL_COMPILE_KEY $MULTI_HOST_NFS_KEY ${MULTI_HOST_SWITCH_KEYS[*]} ${MULTI_HOST_GPU_CARD_KEYS[*]} ${MULTI_HOST_SERVICE_KEYS[*]} $MULTI_HOST_DATA_ROOT_KEY ${MULTI_HOST_TASK_SERVER_KEYS[*]} ${MULTI_HOST_QUIESCE_SCRIPT_KEYS[*]}；写法照仓根 multi-host.env.example，不认的键删掉或改成那里的写法）"
   [[ -z "${configuration[$configuration_key]+set}" ]] || refuse "$configuration_file 里 $configuration_key 写了两遍"
   configuration[$configuration_key]="$configuration_value"
 done < "$configuration_file"

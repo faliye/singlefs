@@ -18,12 +18,16 @@
 
 判法：
   placement：
-  ① 扫 crates/*/tests/*.rs（不进子目录：子目录是共用模块，不是测试目标）与 crates/*/src/**/*.rs（库与装置二进制里 #[cfg(test)] 的内联测试）
-     里每个带 #[test] 的函数：函数体里调了 enumerate_crash_states 一族（名字以 enumerate_crash_states 起头的函数，名字里带什么都算），
+  ① 扫 crates/*/tests/ 下的测试目标与 crates/*/src/**/*.rs（库与装置二进制里 #[cfg(test)] 的内联测试）
+     里每个带 #[test] 的函数。测试目标有两种写法（cargo 都认，目标名都是 <名>）：tests/<名>.rs 一个文件；tests/<名>/main.rs 一个目录——
+     main.rs 与它沿 `mod <名>;` 声明到的子模块文件（<名>.rs 或 <名>/mod.rs，子模块自己再声明的住在 <名>/ 底下）合成一个目标，一起判；
+     带 #[path = …] 的 mod 指到共用模块目录，不是这个目标自己的文件，不收；没有 main.rs、只有 mod.rs 的子目录是共用模块，不是测试目标；
+     目录式目标里 helper 的传递认法跨这个目标的全部文件。
+     函数体里调了 enumerate_crash_states 一族（名字以 enumerate_crash_states 起头的函数，名字里带什么都算），
      或自己逐个造崩溃状态（名字带 every_crash；或某个 for 循环体里对录制操作取到循环变量为止的前缀去 apply、或造 CrashImage），
      或调了同一文件里一个（传递地）这样做的函数，算崩溃枚举用例；只造一个固定崩溃态的不算；
   ② 它要住在 crates/singlefs-verification/tests/（验证包，.claude/rules/verification.md「门禁管哪一半」崩溃枚举用例住在验证包那一行）：
-     写在别的包（singlefs-core 这类）里判红，那会让 cargo test 那个包的人跑到全量枚举；
+     写在别的包（singlefs-core 这类）里判红，那会让 cargo test 那个包的人跑到全量枚举；例外只有 ⑤ 那两种 src/ 下的内联测试；
   ③ 验证包里的崩溃枚举用例都要登记进崩溃点重放：崩溃点重放合表 .claude/gate.d/crash-point-replay-items.tsv（入口
      scripts/crash/crash-point-replay.sh 照它跑）有一项点名的部分落到 <测试目标>:<这个函数名>（测试目标是文件名去掉 .rs）——
      点名的 crash-case: 行（.claude/gate.d/stage-inputs.tsv 里键是 crash-case:<名>、第三列 test=singlefs-verification:<测试目标>:<函数名>），
@@ -33,20 +37,23 @@
   ④ 合表本身核得过（同一份核法 lib_crash_point_replay_items.py 的 problems：每条 crash-case: 与每个放量分项恰好被一项点名，写法在合表表头）；
      有问题逐处报成 placement 的问题。
   ⑤ 验证包 crates/singlefs-verification/src/ 下的内联测试（库与装置二进制里的 #[cfg(test)]）不要求登记：崩溃枚举用例的跑法是
-     cargo test --test <测试目标>，点不到内联测试，它们跟着门禁的测试函数那一段按条复用地跑；别的包 src/ 下的内联测试照 ② 报住错了包。
+     cargo test --test <测试目标>，点不到内联测试，它们跟着门禁的测试函数那一段按条复用地跑。
+     实验装置包 src/ 下的内联测试同一个待遇（不要求住 tests/、不要求登记）：哪几个包是实验装置，读被判那棵树的 .claude/gate.d/crate-roles.tsv
+     （CRATE_ROLE_TABLE，四列：包名、角色、目录、理由），角色是「实验装置」、目录是 crates/<名> 的那几个；装置二进制的内联单测跟着它那个包的测试一起跑。
+     角色表读不到（不在、读不了）就没有哪个包算实验装置；产品、测试支撑与没登记角色的包 src/ 下的内联测试照 ② 报住错了包。
   豁免（确实不是崩溃用例，只录流不枚举、只建判表、两份造法对拍这类）只有一种写法：测试函数上面的注释
   「crash-case-check:not-a-crash-case <理由>」，理由至少 4 个字；没有豁免表。
-  modules：crates/singlefs-verification/tests/*.rs 里代码（去掉字符串字面量与 // 注释）从 singlefs_verification:: 导入了 CRASH_ENGINE_MODULES 里模块的、
-     与第一行写了声明的，第一行「//! 验证包模块：<模块，按 CRASH_ENGINE_MODULES 的次序用、隔开>」与它从
-     singlefs_verification:: 导入的模块逐个相同；一个都不导入的写「无（为什么）」。
-  file-names：crates/singlefs-verification/tests/*.rs 与 crates/singlefs-verification/tests/*.rs 的文件名不带里程碑序数、步号、增补号、
+  modules：验证包的测试目标（crates/singlefs-verification/tests/*.rs，与目录式目标 tests/<名>/main.rs 连同它的子模块文件）里代码（去掉字符串字面量与 // 注释）从 singlefs_verification:: 导入了
+     CRASH_ENGINE_MODULES 里模块的、与第一行写了声明的，第一行「//! 验证包模块：<模块，按 CRASH_ENGINE_MODULES 的次序用、隔开>」与它从
+     singlefs_verification:: 导入的模块逐个相同；一个都不导入的写「无（为什么）」。目录式目标的声明写在 main.rs 第一行，导入取这个目标全部文件的并。
+  file-names：验证包 tests/*.rs 的文件名；目录式目标判目录名（目标名）与 main.rs 之外的子模块文件名，都不带里程碑序数、步号、增补号、
      并行线号、欠账号（MILESTONE_FILE_NAME）。
   test-names（C638）：crates/*/tests/ 下（含子目录）与 crates/*/src/ 下 .rs 里带 #[test] 的函数名，拿同一条 MILESTONE_FILE_NAME 判：
      带里程碑序数、步号、增补号、并行线号、欠账号（c<三位数>）的判红，来历进 commit message 或 .claude/kb/。
      立账时已在的存量登记在 .claude/gate.d/test-function-names-exempt.tsv（一行「<相对仓根的文件><TAB><函数名><TAB># 理由>」，理由至少 4 个字），
      登记了的不判；一行在那份文件里一条带欠账号的 #[test] 都对不上（函数改了名、删了、文件不在）判红：那一行删掉。表只缩不涨（不判涨，靠 review）。
      带实验号（e<数>）与 m<数>_ 的不在 MILESTONE_FILE_NAME 里，不判（算不算来历没定）。
-  one-scenario：crates/singlefs-verification/tests/*.rs 里带 #[test] 的函数，
+  one-scenario：验证包的测试目标（tests/*.rs 与目录式目标的 main.rs 连同子模块文件）里带 #[test] 的函数，
      函数体里某个 for 循环体每一轮新建一个池（FRESH_POOL_CALL），判红；用例上面写了「harness-test-granularity:one-scenario <理由>」的不判。
   must-red（K5，出口 4「每条流至少一个必红世界」，按崩溃枚举用例数）：.claude/gate.d/stage-inputs.tsv 每一行 crash-case:<名>（test=<包>:<测试目标>:<函数>）
      在 crates/mutations.tsv 里至少有一行变异，cargo test 的参数那一列带 -p <包>（或 --package <包>）与 --test <测试目标>；变异行归到用例只靠测试目标反推，
@@ -55,8 +62,8 @@
   knobs（K7，出口 4「旋钮登记表带取值依据」）：.claude/gate.d/crash-knobs.tsv 一行一个旋钮「<旋钮><TAB><取值><TAB><依据><TAB><出处路径>」，
      四列都不许空（依据凭感觉取的写「推的」），出处路径（相对仓根）要在，旋钮名不许重；表不在记无对象可判。扫值不在这一样（六·4 的扫值产物另做）。
   provenance（拆分提案第一百三十二节）：崩溃点重放合表 .claude/gate.d/crash-point-replay-items.tsv（读法 lib_crash_point_replay_items.py 的 read_items）每一项：
-     第二列点名的 crash-case: 键里有一条的测试目标文件（crates/singlefs-verification/tests/<测试目标>.rs，测试目标照 stage-inputs.tsv 那一行的 test=）
-     写着 enumerate_crash_states 的，来历表 crates/singlefs-verification/src/crash_point_replay_provenance.rs（PROVENANCE_SOURCE，去掉 // 注释之后读）里
+     第二列点名的 crash-case: 键里有一条的测试目标的源码（crates/singlefs-verification/tests/<测试目标>.rs，或目录式目标 tests/<测试目标>/main.rs 连同它 mod 声明到的子模块文件；
+     测试目标照 stage-inputs.tsv 那一行的 test=）写着 enumerate_crash_states 的，来历表 crates/singlefs-verification/src/crash_point_replay_provenance.rs（PROVENANCE_SOURCE，去掉 // 注释之后读）里
      要有一行 enumeration_of_the_item("<流名>", "<这一项的项名>", …)；第三列点名的每个放量分项要有一行 amplification_of_the_item("<流名>", "<分项名>", …)。
      缺的逐条列、判红；与验证包的 crash_points_observer_registration_is_complete 用例判同一件事（那条在提交时才跑，这里读源码、不起 cargo）。
      来历表或合表不在，记无对象可判。管不到：来历表那一行写的来历对不对、流名对不对（归那条用例与观察者）。
@@ -67,10 +74,11 @@
 退出码：0 选中的都齐（至少一样判过）；1 有缺的（逐个列出）；2 用法错或读不了登记表；77 选中的每一样都无对象可判。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头；
-每一项红时都另有汇总行「✗ 自检 24 种里有 N 处判错」）：
+每一项红时都另有汇总行「✗ 自检 28 种里有 N 处判错」）：
   CRASH_CASE_CHECK_BREAK=fresh-pool-loop-unseen  one_scenario_problems() 不报循环里每轮新建池的用例
       循环里每轮新建池（「✗ 自检：循环里每轮新建池的用例应当报出来」）、
-      按参数循环（「✗ 自检：按参数循环、每轮新建池的用例应当报出来」）
+      按参数循环（「✗ 自检：按参数循环、每轮新建池的用例应当报出来」）、
+      目录式目标的子模块里循环每轮新建池（「✗ 自检：目录式测试目标的子模块里循环每轮新建池的用例应当报出来」）
   CRASH_CASE_CHECK_BREAK=test-names-unseen  test_function_name_problems() 不报带欠账号的 #[test] 函数名
       用例名带欠账号（「✗ 自检：带欠账号的 #[test] 函数名应当报出来」）
   CRASH_CASE_CHECK_BREAK=test-names-exempt-stale-unseen  test_function_name_problems() 不报对不上的豁免行
@@ -82,10 +90,15 @@
       登记的用例标了 ignore（「✗ 自检：登记了的崩溃枚举用例标了 ignore 应当报出来」）
   CRASH_CASE_CHECK_BREAK=inline-tests-require-rows  problems_in() 对 验证包 src/ 下的内联测试也要求登记
       内联测试（「✗ 自检：验证包 src/ 下的内联测试不要求登记（0 处问题）」）
-  CRASH_CASE_CHECK_BREAK=milestone-names-unseen  test_file_name_problems() 不报按里程碑起名的测试文件
-      按里程碑起名（「✗ 自检：按里程碑起名的测试文件应当报出来」）
+  CRASH_CASE_CHECK_BREAK=experiment-apparatus-judged-as-other-packages  problems_in() 对角色表里是实验装置的包 src/ 下的内联测试照别的包判（报住错了包）
+      实验装置包的内联测试（「✗ 自检：角色表里是实验装置的包 src/ 下的内联测试不要求登记（0 处问题）」）
+  CRASH_CASE_CHECK_BREAK=milestone-names-unseen  test_file_name_problems() 不报按里程碑起名的测试文件、目录名、子模块文件名
+      按里程碑起名（「✗ 自检：按里程碑起名的测试文件应当报出来」）、
+      目录名（「✗ 自检：目录式测试目标的目录名按里程碑起名的应当报出来」）、
+      子模块文件名（「✗ 自检：目录式测试目标的子模块文件名按里程碑起名的应当报出来」）
   CRASH_CASE_CHECK_BREAK=module-declaration-unchecked  module_declaration_problems() 不比第一行声明的模块与导入的模块
       声明与导入对不上（「✗ 自检：声明与导入对不上的测试文件应当报出来」）、
+      目录式目标的声明与导入对不上（「✗ 自检：目录式测试目标 main.rs 第一行声明与子模块导入的崩溃引擎模块对不上的应当报出来」）、
       writable_mount_phases 的次序（「✗ 自检：writable_mount_phases 排在 crash_injection 之前的声明应当报出来」）、
       crash_given_states 的次序（「✗ 自检：crash_given_states 排在 writable_mount_phases 之前的声明应当报出来」）
   CRASH_CASE_CHECK_BREAK=module-declaration-scans-strings  module_declaration_problems() 把字符串字面量里的模块路径也算成导入
@@ -104,9 +117,13 @@
       sweeps_every_prefix（「✗ 自检：别的包里自己逐个造崩溃状态的 sweeps_every_prefix 应当报住错了包」）、
       crash_image_on_each_boundary（「✗ 自检：别的包里自己逐个造崩溃状态的 crash_image_on_each_boundary 应当报住错了包」）、
       through_a_named_sweep（「✗ 自检：别的包里自己逐个造崩溃状态的 through_a_named_sweep 应当报住错了包」）、
-      别的包 src/ 下的内联测试（「✗ 自检：别的包 src/ 下的内联测试调枚举函数应当报住错了包」）
+      别的包 src/ 下的内联测试（「✗ 自检：别的包 src/ 下的内联测试调枚举函数应当报住错了包」）、
+      产品与测试支撑包的内联测试（「✗ 自检：角色表里是产品、测试支撑的包 src/ 下的内联测试调枚举函数应当报住错了包」）、
+      读不到角色表（「✗ 自检：读不到角色表时实验装置包 src/ 下的内联测试照报住错了包」）、
+      别的包的目录式目标（「✗ 自检：目录式测试目标的子模块里没登记的枚举用例、别的包的目录式目标里的枚举用例应当报出来」）
   CRASH_CASE_CHECK_BREAK=rows-ignored  problems_in() 不判调枚举函数的用例有没有登记成 crash-case
-      调枚举函数没登记（「✗ 自检：验证包里调枚举函数没登记的用例应当报缺登记」）
+      调枚举函数没登记（「✗ 自检：验证包里调枚举函数没登记的用例应当报缺登记」）、
+      目录式目标的子模块里没登记（「✗ 自检：目录式测试目标的子模块里没登记的枚举用例、别的包的目录式目标里的枚举用例应当报出来」）
   CRASH_CASE_CHECK_BREAK=self-sweep-unseen  sweeps_crash_states_itself() 不认自己逐个造崩溃状态的用例
       sweeps_every_prefix（「✗ 自检：别的包里自己逐个造崩溃状态的 sweeps_every_prefix 应当报住错了包」）、
       crash_image_on_each_boundary（「✗ 自检：别的包里自己逐个造崩溃状态的 crash_image_on_each_boundary 应当报住错了包」）、
@@ -128,10 +145,41 @@
       旋钮登记表依据空着（「✗ 自检：依据空着的旋钮应当报出来」）
   CRASH_CASE_CHECK_BREAK=provenance-unchecked  provenance_problems() 不报来历表里没有行的项与分项
       来历表核对（「✗ 自检：合表多一项而来历表没有它的 enumeration_of_the_item 行，应当报出来」、
-      「✗ 自检：放量分项在来历表里没有 amplification_of_the_item 行，应当报出来」）
+      「✗ 自检：放量分项在来历表里没有 amplification_of_the_item 行，应当报出来」、
+      目录式目标的子模块（「✗ 自检：目录式测试目标的子模块里调 enumerate_crash_states 的项，来历表没有它的行应当报出来」）
+  CRASH_CASE_CHECK_BREAK=directory-target-provenance-unread  provenance_problems() 只读 tests/<目标>.rs，目录式目标读不到、悄悄当不调枚举
+      来历表（「✗ 自检：目录式测试目标的子模块里调 enumerate_crash_states 的项，来历表没有它的行应当报出来」）
+  CRASH_CASE_CHECK_BREAK=directory-targets-unseen  directory_targets() 一个目录式目标都不认（tests/<名>/main.rs 的目录落出射程）
+      placement 的目录式目标（「✗ 自检：目录式测试目标里 mod 声明到的子模块调枚举函数、登记在目标名下的应当认出 1 条、不报；没被 mod 声明的文件与只有 mod.rs 的共用模块目录不判」）、
+      别的包的目录式目标（「✗ 自检：目录式测试目标的子模块里没登记的枚举用例、别的包的目录式目标里的枚举用例应当报出来」）、
+      modules（「✗ 自检：目录式测试目标 main.rs 第一行声明与子模块导入的崩溃引擎模块对不上的应当报出来」）、
+      目录名（「✗ 自检：目录式测试目标的目录名按里程碑起名的应当报出来」）、
+      子模块文件名（「✗ 自检：目录式测试目标的子模块文件名按里程碑起名的应当报出来」）、
+      one-scenario（「✗ 自检：目录式测试目标的子模块里循环每轮新建池的用例应当报出来」）
+  CRASH_CASE_CHECK_BREAK=directory-submodules-unread  directory_targets() 只收 main.rs、不沿 mod 声明收子模块文件（provenance_problems 读目录式目标的源码也经 target_sources.target_source_files，同样只收 main.rs）
+      placement 的目录式目标（「✗ 自检：目录式测试目标里 mod 声明到的子模块调枚举函数、登记在目标名下的应当认出 1 条、不报；没被 mod 声明的文件与只有 mod.rs 的共用模块目录不判」）、
+      来历表（「✗ 自检：目录式测试目标的子模块里调 enumerate_crash_states 的项，来历表没有它的行应当报出来」）、
+      子模块里没登记（「✗ 自检：目录式测试目标的子模块里没登记的枚举用例、别的包的目录式目标里的枚举用例应当报出来」）、
+      声明与导入对得上（「✗ 自检：目录式测试目标 main.rs 第一行声明与它和子模块导入的崩溃引擎模块对得上的不该报」）、
+      声明与导入对不上（「✗ 自检：目录式测试目标 main.rs 第一行声明与子模块导入的崩溃引擎模块对不上的应当报出来」）、
+      子模块文件名（「✗ 自检：目录式测试目标的子模块文件名按里程碑起名的应当报出来」）、
+      one-scenario（「✗ 自检：目录式测试目标的子模块里循环每轮新建池的用例应当报出来」）
+  CRASH_CASE_CHECK_BREAK=directory-undeclared-files-judged  directory_targets() 收目录里的全部 .rs，不只收 mod 声明到的
+      没被 mod 声明的文件（「✗ 自检：目录式测试目标里 mod 声明到的子模块调枚举函数、登记在目标名下的应当认出 1 条、不报；没被 mod 声明的文件与只有 mod.rs 的共用模块目录不判」）
+  CRASH_CASE_CHECK_BREAK=directory-without-main-as-target  directory_targets() 把只有 mod.rs、没有 main.rs 的共用模块目录也当目标
+      共用模块目录（「✗ 自检：目录式测试目标里 mod 声明到的子模块调枚举函数、登记在目标名下的应当认出 1 条、不报；没被 mod 声明的文件与只有 mod.rs 的共用模块目录不判」）
+  CRASH_CASE_CHECK_BREAK=directory-target-modules-unjudged  module_declaration_problems() 不判目录式目标
+      声明与导入对不上（「✗ 自检：目录式测试目标 main.rs 第一行声明与子模块导入的崩溃引擎模块对不上的应当报出来」）
+  CRASH_CASE_CHECK_BREAK=directory-target-name-unjudged  test_file_name_problems() 不判目录式目标的目录名
+      目录名（「✗ 自检：目录式测试目标的目录名按里程碑起名的应当报出来」）
+  CRASH_CASE_CHECK_BREAK=directory-submodule-file-names-unjudged  test_file_name_problems() 不判目录式目标的子模块文件名
+      子模块文件名（「✗ 自检：目录式测试目标的子模块文件名按里程碑起名的应当报出来」）
+  CRASH_CASE_CHECK_BREAK=directory-target-one-scenario-unjudged  one_scenario_problems() 不判目录式目标
+      one-scenario（「✗ 自检：目录式测试目标的子模块里循环每轮新建池的用例应当报出来」）
   合表核法自己的开关 CRASH_POINT_REPLAY_ITEMS_BREAK（表在 scripts/crash/lib_crash_point_replay_items.py 文件头）也由这份自证证红：
   每一格判错打「✗ 自检：合表核法 <格名>：…」，汇总行同上。
 """
+import collections
 import glob
 import os
 import re
@@ -147,6 +195,10 @@ BROKEN = os.environ.get("CRASH_CASE_CHECK_BREAK", "")
 # 崩溃点重放合表的读法与核法只在这一份库里（入口 scripts/crash/crash-point-replay.sh 用同一份）
 sys.path.insert(0, SCRIPT_DIRECTORY)
 import lib_crash_point_replay_items as replay_items  # noqa: E402
+# 测试目标名到源文件的认法（tests/<名>.rs 与目录式的 tests/<名>/main.rs）只在这一份库里
+GATE_DIRECTORY = os.path.join(SCRIPT_DIRECTORY, "..", "gate")
+sys.path.insert(0, GATE_DIRECTORY)
+import lib_test_target_sources as target_sources  # noqa: E402
 
 VERIFICATION_PACKAGE = "singlefs-verification"
 ITEMS = {
@@ -167,10 +219,14 @@ CRASH_CASE_ROW = re.compile(r"^crash-case:[^\t]+\t[^\t]*\t(?:.*\s)?test=([\w-]+)
 CRASH_CASE_KEYED_ROW = re.compile(r"^(crash-case:[^\t]+)\t[^\t]*\t(?:.*\s)?test=([\w-]+):(\w+):(\w+)")
 MUTATIONS_TABLE = os.path.join("crates", "mutations.tsv")
 KNOBS_TABLE = os.path.join(".claude", "gate.d", "crash-knobs.tsv")
+CRATE_ROLE_TABLE = os.path.join(".claude", "gate.d", "crate-roles.tsv")
+EXPERIMENT_APPARATUS_ROLE = "实验装置"
 TEST_NAMES_EXEMPT = os.path.join(".claude", "gate.d", "test-function-names-exempt.tsv")
 PROVENANCE_SOURCE = os.path.join("crates", VERIFICATION_PACKAGE, "src", "crash_point_replay_provenance.rs")
 PROVENANCE_ENUMERATION_ROW = re.compile(r'\benumeration_of_the_item\(\s*"[^"]*"\s*,\s*"([^"]*)"')
 PROVENANCE_AMPLIFICATION_ROW = re.compile(r'\bamplification_of_the_item\(\s*"[^"]*"\s*,\s*"([^"]*)"')
+# 测试目标：名字、它的源码文件（目录式的 main.rs 排头）、是不是目录式（tests/<名>/main.rs）
+TestTarget = collections.namedtuple("TestTarget", "name files directory")
 
 
 def function_body(text, start):
@@ -226,38 +282,64 @@ def enumerating_helpers(text):
     return enumerating
 
 
+def directory_targets(tests_directory):
+    """tests/ 下目录式的测试目标：有 main.rs 的子目录（cargo 认 tests/<名>/main.rs 为名叫 <名> 的目标）连同它沿 mod 声明到的子模块文件（认法在 lib_test_target_sources.py）；
+    没有 main.rs、只有 mod.rs 的子目录是共用模块，不是目标。弄坏开关 directory-targets-unseen 一个都不认，directory-without-main-as-target 把只有 mod.rs 的共用模块目录也认成目标，
+    directory-submodules-unread 只收 main.rs、不沿 mod 声明收子模块文件，directory-undeclared-files-judged 收目录里的全部 .rs（没被 mod 声明的也收）。"""
+    if BROKEN == "directory-targets-unseen":
+        return []
+    return [TestTarget(os.path.basename(os.path.dirname(entry)),
+                       target_sources.directory_target_files(entry, follow_submodules=BROKEN != "directory-submodules-unread", every_file=BROKEN == "directory-undeclared-files-judged"), True)
+            for entry in target_sources.directory_target_entries(tests_directory, entries_without_main=BROKEN == "directory-without-main-as-target")]
+
+
+def test_target_units(tests_directory):
+    """tests/ 下的测试目标：tests/<名>.rs 一个文件一个目标，tests/<名>/main.rs 的目录一个目标（directory_targets）。"""
+    flat = [TestTarget(os.path.basename(path)[:-len(".rs")], [path], False) for path in sorted(glob.glob(os.path.join(tests_directory, "*.rs")))]
+    return flat + directory_targets(tests_directory)
+
+
+def placement_units(root):
+    """placement 扫的源码单元：crates/*/tests/ 下的测试目标（test_target_units）与 crates/*/src/**/*.rs（一个文件一个单元，目标名取文件名）。"""
+    units = []
+    for tests_directory in sorted(glob.glob(os.path.join(root, "crates", "*", "tests"))):
+        units += test_target_units(tests_directory)
+    for path in sorted(glob.glob(os.path.join(root, "crates", "*", "src", "**", "*.rs"), recursive=True)):
+        units.append(TestTarget(os.path.basename(path)[:-len(".rs")], [path], False))
+    return units
+
+
 def placement_source_paths(root):
-    """placement 扫的源码：crates/*/tests/*.rs 与 crates/*/src/**/*.rs。"""
-    paths = sorted(glob.glob(os.path.join(root, "crates", "*", "tests", "*.rs")))
-    return paths + sorted(glob.glob(os.path.join(root, "crates", "*", "src", "**", "*.rs"), recursive=True))
+    """placement 扫的源码文件：placement_units 的全部文件。"""
+    return [path for unit in placement_units(root) for path in unit.files]
 
 
 def crash_enumeration_tests(root):
-    """→ [(包, 测试目标, 函数名, 带没带 ignore, 文件:行)]。"""
+    """→ [(包, 测试目标, 函数名, 带没带 ignore, 文件:行)]。目录式目标的 helper 跨这个目标的全部文件传递地认。"""
     found = []
-    for path in placement_source_paths(root):
-        relative = os.path.relpath(path, os.path.join(root, "crates"))
-        package_directory = relative.split(os.sep)[0]
-        target = os.path.basename(path)[:-3]
-        text = open(path, encoding="utf-8", errors="replace").read()
-        helpers = enumerating_helpers(text)
-        for match in TEST_FUNCTION.finditer(text):
-            attributes = match.group(1)
-            if "#[test]" not in attributes:
-                continue
-            body = function_body(text, match.end())
-            calls = ENUMERATION_CALL.findall(body)
-            calls += [helper for helper in helpers if re.search(r"\b" + re.escape(helper) + r"\s*\(", body)]
-            if sweeps_crash_states_itself(match.group(2), body):
-                calls.append("自己逐个造崩溃状态")
-            if not calls:
-                continue
-            waiver = re.search(r"crash-case-check:not-a-crash-case\s+(\S.{3,})", attributes)
-            if waiver and BROKEN != "waiver-ignored":
-                continue
-            ignored = bool(re.search(r"#\[ignore\b", attributes)) and BROKEN != "ignore-unseen"
-            line = text.count("\n", 0, match.start(2)) + 1
-            found.append((package_directory, target, match.group(2), ignored, f"{os.path.relpath(path, root)}:{line}"))
+    for unit in placement_units(root):
+        texts = {path: open(path, encoding="utf-8", errors="replace").read() for path in unit.files}
+        helpers = enumerating_helpers("\n".join(texts.values()))
+        for path, text in texts.items():
+            relative = os.path.relpath(path, os.path.join(root, "crates"))
+            package_directory = relative.split(os.sep)[0]
+            for match in TEST_FUNCTION.finditer(text):
+                attributes = match.group(1)
+                if "#[test]" not in attributes:
+                    continue
+                body = function_body(text, match.end())
+                calls = ENUMERATION_CALL.findall(body)
+                calls += [helper for helper in helpers if re.search(r"\b" + re.escape(helper) + r"\s*\(", body)]
+                if sweeps_crash_states_itself(match.group(2), body):
+                    calls.append("自己逐个造崩溃状态")
+                if not calls:
+                    continue
+                waiver = re.search(r"crash-case-check:not-a-crash-case\s+(\S.{3,})", attributes)
+                if waiver and BROKEN != "waiver-ignored":
+                    continue
+                ignored = bool(re.search(r"#\[ignore\b", attributes)) and BROKEN != "ignore-unseen"
+                line = text.count("\n", 0, match.start(2)) + 1
+                found.append((package_directory, unit.name, match.group(2), ignored, f"{os.path.relpath(path, root)}:{line}"))
     return found
 
 
@@ -277,6 +359,30 @@ def is_inline_test_of_the_verification_package(where):
     return where.startswith(f"crates/{VERIFICATION_PACKAGE}/src/")
 
 
+def is_inline_test_of_the_package(package_directory, where):
+    """where（相对仓根的路径:行号）在 crates/<package_directory>/src/ 下：那个包的库与二进制里的 #[cfg(test)] 测试。"""
+    return where.startswith(f"crates/{package_directory}/src/")
+
+
+def experiment_apparatus_package_directories(root):
+    """被判那棵树的角色表 CRATE_ROLE_TABLE（四列：包名、角色、目录、理由）里角色是实验装置、目录是 crates/<名> 的那几个 <名>（文件头 placement ⑤）。
+    表读不到（不在、读不了、不是 UTF-8）交空集合：那棵树里没有哪个包算实验装置，它们 src/ 下调枚举的内联测试照 ② 报住错了包。"""
+    try:
+        text = open(os.path.join(root, CRATE_ROLE_TABLE), encoding="utf-8").read()
+    except (OSError, UnicodeDecodeError):
+        return set()
+    directories = set()
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        columns = line.split("\t")
+        if len(columns) >= 3 and columns[1].strip() == EXPERIMENT_APPARATUS_ROLE:
+            parts = columns[2].strip().strip("/").split("/")
+            if len(parts) == 2 and parts[0] == "crates" and parts[1]:
+                directories.add(parts[1])
+    return directories
+
+
 def problems_in(root):
     """placement：→ (认出的崩溃枚举用例, 问题)。读不了登记表抛 OSError。"""
     if BROKEN == "crash-case-rows-only":
@@ -284,9 +390,13 @@ def problems_in(root):
     else:
         registered_targets = replay_items.registered_functions(root)
     tests = crash_enumeration_tests(root)
+    apparatus_packages = experiment_apparatus_package_directories(root)
     problems = []
     for package_directory, target, function, ignored, where in tests:
         if package_directory == VERIFICATION_PACKAGE and is_inline_test_of_the_verification_package(where) and BROKEN != "inline-tests-require-rows":
+            continue
+        if (package_directory in apparatus_packages and is_inline_test_of_the_package(package_directory, where)
+                and BROKEN != "experiment-apparatus-judged-as-other-packages"):
             continue
         if package_directory != VERIFICATION_PACKAGE and BROKEN != "package-unchecked":
             problems.append(f"{where} {function}：直接调全量崩溃枚举，却写在 {package_directory} 包里（崩溃枚举用例要住在 crates/{VERIFICATION_PACKAGE}/tests/）")
@@ -327,28 +437,32 @@ MILESTONE_FILE_NAME = re.compile(r"(^|_)(first|second|third)_transaction(_|$)|_s
                                  r"|(^|_)supplement_(one|two|three|four)(_|$)|(^|_)parallel_line_(one|two|three)(_|$)|(^|_)c[0-9]{3}(_|$)")
 
 
-def verification_test_paths(root):
-    return sorted(glob.glob(os.path.join(root, "crates", VERIFICATION_PACKAGE, "tests", "*.rs")))
+def verification_test_units(root):
+    """验证包的测试目标（test_target_units）。"""
+    return test_target_units(os.path.join(root, "crates", VERIFICATION_PACKAGE, "tests"))
 
 
 def one_scenario_problems(root):
-    """one-scenario：→ (查了几条验证包用例, 问题)。"""
+    """one-scenario：→ (查了几条验证包用例, 问题)。目录式目标判 main.rs 与它的子模块文件（弄坏开关 directory-target-one-scenario-unjudged 下不判）。"""
     problems, counted = [], 0
-    for path in verification_test_paths(root):
-        text = open(path, encoding="utf-8", errors="replace").read()
-        for match in TEST_FUNCTION.finditer(text):
-            attributes = match.group(1)
-            if "#[test]" not in attributes:
-                continue
-            counted += 1
-            if "harness-test-granularity:one-scenario" in attributes:
-                continue
-            body = function_body(text, match.end())
-            for loop in FOR_LOOP.finditer(body):
-                if FRESH_POOL_CALL.search(function_body(body, loop.end())) and BROKEN != "fresh-pool-loop-unseen":
-                    line = text.count("\n", 0, match.start(2)) + 1
-                    problems.append(f"{os.path.relpath(path, root)}:{line} {match.group(2)}：循环里每一轮新建一个池，是一条用例装了几个独立场景")
-                    break
+    for unit in verification_test_units(root):
+        if unit.directory and BROKEN == "directory-target-one-scenario-unjudged":
+            continue
+        for path in unit.files:
+            text = open(path, encoding="utf-8", errors="replace").read()
+            for match in TEST_FUNCTION.finditer(text):
+                attributes = match.group(1)
+                if "#[test]" not in attributes:
+                    continue
+                counted += 1
+                if "harness-test-granularity:one-scenario" in attributes:
+                    continue
+                body = function_body(text, match.end())
+                for loop in FOR_LOOP.finditer(body):
+                    if FRESH_POOL_CALL.search(function_body(body, loop.end())) and BROKEN != "fresh-pool-loop-unseen":
+                        line = text.count("\n", 0, match.start(2)) + 1
+                        problems.append(f"{os.path.relpath(path, root)}:{line} {match.group(2)}：循环里每一轮新建一个池，是一条用例装了几个独立场景")
+                        break
     return counted, problems
 
 
@@ -410,23 +524,32 @@ def test_function_name_problems(root):
 
 
 def test_file_name_problems(root):
-    """file-names：→ (查了几份测试文件, 问题)。"""
-    problems = []
-    paths = verification_test_paths(root)
-    for path in paths:
-        stem = os.path.basename(path)[:-len(".rs")]
-        if MILESTONE_FILE_NAME.search(stem) and BROKEN != "milestone-names-unseen":
-            problems.append(f"{os.path.relpath(path, root)}：文件名按里程碑、步号、增补号或欠账号起（{stem}），改成它测什么：领域在前、场景在后")
-    return len(paths), problems
+    """file-names：→ (查了几个名字, 问题)。tests/*.rs 判文件名；目录式目标判目录名（目标名）与 main.rs 之外的子模块文件名
+    （弄坏开关 directory-target-name-unjudged、directory-submodule-file-names-unjudged 各不判一种）。"""
+    problems, counted = [], 0
+    for unit in verification_test_units(root):
+        judged = [(unit.files[0], unit.name, "目录名" if unit.directory else "文件名")]
+        if unit.directory and BROKEN == "directory-target-name-unjudged":
+            judged = []
+        if unit.directory and BROKEN != "directory-submodule-file-names-unjudged":
+            judged += [(path, os.path.basename(path)[:-len(".rs")], "子模块文件名") for path in unit.files[1:]]
+        for path, stem, what in judged:
+            counted += 1
+            if MILESTONE_FILE_NAME.search(stem) and BROKEN != "milestone-names-unseen":
+                problems.append(f"{os.path.relpath(path, root)}：{what}按里程碑、步号、增补号或欠账号起（{stem}），改成它测什么：领域在前、场景在后")
+    return counted, problems
 
 
 def module_declaration_problems(root):
     """modules：→ (查了几份验证包测试文件, 要声明的几份, 问题)。导入（去掉字符串字面量与 // 注释之后的代码里 singlefs_verification::<模块>）了
     CRASH_ENGINE_MODULES 里模块的、或第一行写了声明的要声明、要对得上；两样都没有的（只用 model、memory_pool 这类脚手架模块的）不判。"""
     problems, scanned_files, declaring_files = [], 0, 0
-    for path in verification_test_paths(root):
+    for unit in verification_test_units(root):
+        if unit.directory and BROKEN == "directory-target-modules-unjudged":
+            continue
         scanned_files += 1
-        text = open(path, encoding="utf-8", errors="replace").read()
+        path = unit.files[0]   # 声明写在入口文件（tests/<名>.rs 或 tests/<名>/main.rs）的第一行，导入取这个目标全部文件的并
+        text = "\n".join(open(file_path, encoding="utf-8", errors="replace").read() for file_path in unit.files)
         declared = MODULE_DECLARATION.match(text.split("\n", 1)[0])
         scan_text = text if BROKEN == "module-declaration-scans-strings" else STRING_LITERAL.sub("", text)
         used = sorted({name for name in re.findall(r"singlefs_verification::(\w+)", scan_text) if name in CRASH_ENGINE_MODULES}, key=CRASH_ENGINE_MODULES.index)
@@ -549,8 +672,12 @@ def provenance_problems(root):
         targets = [cases[key][0] for key in item.crash_cases if key in cases]
         runs_the_enumeration = False
         for target in targets:
-            test_path = os.path.join(root, "crates", VERIFICATION_PACKAGE, "tests", f"{target}.rs")
-            if os.path.isfile(test_path) and "enumerate_crash_states" in open(test_path, encoding="utf-8", errors="replace").read():
+            tests_directory = os.path.join(root, "crates", VERIFICATION_PACKAGE, "tests")
+            if BROKEN == "directory-target-provenance-unread":   # 只认 tests/<目标>.rs，目录式目标读不到、悄悄当不调枚举
+                test_files = [path for path in [os.path.join(tests_directory, f"{target}.rs")] if os.path.isfile(path)]
+            else:
+                test_files = target_sources.target_source_files(tests_directory, target, follow_submodules=BROKEN != "directory-submodules-unread")
+            if any("enumerate_crash_states" in open(path, encoding="utf-8", errors="replace").read() for path in test_files):
                 runs_the_enumeration = True
         if runs_the_enumeration:
             checked += 1
@@ -576,20 +703,23 @@ def judge(root, items):
             tests, problems = problems_in(root)
             table_items, _ = replay_items.read_items(root)
             inline_count = sum(1 for test in tests if test[0] == VERIFICATION_PACKAGE and is_inline_test_of_the_verification_package(test[4]))
+            apparatus_packages = experiment_apparatus_package_directories(root)
+            apparatus_inline_count = sum(1 for test in tests if test[0] in apparatus_packages and is_inline_test_of_the_package(test[0], test[4]))
             results[item] = (scanned, problems,
                              f"崩溃枚举用例都住在 {VERIFICATION_PACKAGE} 包里、都登记进了崩溃点重放合表、没有标 #[ignore] 的（扫了 {scanned} 份测试源码，认出 {len(tests)} 条，"
-                             f"其中 src/ 下的内联测试 {inline_count} 条点不到、不要求登记，源码注释注明不是崩溃用例的不算；"
+                             f"其中 {VERIFICATION_PACKAGE} 的 src/ 下的内联测试 {inline_count} 条点不到、不要求登记，"
+                             f"角色表里实验装置的包（{'、'.join(sorted(apparatus_packages)) or '无'}）src/ 下的内联测试 {apparatus_inline_count} 条同样不要求，源码注释注明不是崩溃用例的不算；"
                              f"合表 {len(table_items)} 项核过；"
-                             "按测试函数直接调 enumerate_crash_states 一族、自己逐个造崩溃状态、或经同一文件里的函数传递地这样做认；"
-                             "经 tests/<子目录>/ 里的共用函数间接调的、宏展开出来的认不出）")
+                             "按测试函数直接调 enumerate_crash_states 一族、自己逐个造崩溃状态、或经同一文件里的函数传递地这样做认（目录式目标 tests/<名>/main.rs 连同它 mod 声明到的文件一起扫，函数传递跨这些文件）；"
+                             "经 tests/<共用模块目录>/ 里的共用函数间接调的、宏展开出来的认不出）")
         elif item == "modules":
             scanned_files, declaring_files, problems = module_declaration_problems(root)
-            results[item] = (scanned_files, problems, f"验证包 {scanned_files} 份测试文件里导入崩溃引擎模块或写了声明的 {declaring_files} 份都声明了测哪几个模块、与导入对得上"
-                                                      f"（另 {scanned_files - declaring_files} 份只用脚手架模块、没写声明，不判）")
+            results[item] = (scanned_files, problems, f"验证包 {scanned_files} 个测试目标（tests/*.rs 与目录式的 tests/<名>/main.rs）里导入崩溃引擎模块或写了声明的 {declaring_files} 个都声明了测哪几个模块、与导入对得上"
+                                                      f"（另 {scanned_files - declaring_files} 个只用脚手架模块、没写声明，不判）")
         elif item == "file-names":
             test_files, problems = test_file_name_problems(root)
             results[item] = (test_files, problems,
-                             f"查了 {test_files} 份测试文件的名字（验证包的 tests/*.rs），没有按里程碑、步号、增补号、并行线号或欠账号起的")
+                             f"查了 {test_files} 个名字（验证包 tests/*.rs 的文件名，目录式目标的目录名与子模块文件名），没有按里程碑、步号、增补号、并行线号或欠账号起的")
         elif item == "test-names":
             tests, exempted, problems = test_function_name_problems(root)
             results[item] = (tests, problems,
@@ -616,7 +746,7 @@ REMEDIES = {
                   ".claude/gate.d/stage-inputs.tsv，再放进崩溃点重放合表 .claude/gate.d/crash-point-replay-items.tsv 它那条流的那一项（写法在合表表头）；",
                   "合表报的问题照那一句改（.claude/rules/verification.md「门禁管哪一半」崩溃枚举用例住在验证包那一行）；不调枚举函数的小流测试不用登记；",
                   "调了枚举一族函数又确实不是崩溃用例的（只录流不枚举、只建判表、两份造法对拍），在函数上面写 // crash-case-check:not-a-crash-case <理由>（理由至少 4 个字）。"],
-    "modules": ["验证包里导入崩溃引擎模块的测试文件第一行写「//! 验证包模块：<它导入的模块，按 " + "、".join(CRASH_ENGINE_MODULES) + " 的次序用、隔开>」，",
+    "modules": ["验证包里导入崩溃引擎模块的测试文件（目录式目标是 main.rs，导入取它与子模块文件的并）第一行写「//! 验证包模块：<它导入的模块，按 " + "、".join(CRASH_ENGINE_MODULES) + " 的次序用、隔开>」，",
                 "写了声明而一个都不导入的写「无（为什么）」（.claude/rules/verification.md「门禁管哪一半」崩溃枚举用例住在验证包那一行）。"],
     "file-names": ["测试文件按它测什么起名：领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号，来历进 commit message 或 .claude/kb/",
                    "（.claude/rules/test-script-discipline.md「用例原子化：每一条都能单独跑」）；改名照 .claude/rules/path-moves.md「怎么做」改全仓引用。"],
@@ -680,8 +810,10 @@ def run(root, items):
 
 SELFTEST_CASES = ["登记了的放行、注明不是用例的不算", "调枚举函数没登记", "登记了的用例标了 ignore", "住错了包（直接调、经 helper、自己逐个造崩溃状态）",
                   "固定崩溃态不算枚举", "每轮新建池与豁免", "模块声明缺与对不上", "writable_mount_phases 的次序（排在 crash_injection 之后）", "crash_given_states 的次序（排在 writable_mount_phases 之后、bad_disk_input 之前）", "字符串字面量里的模块路径不算真导入", "只用脚手架模块的测试文件不要求声明", "按里程碑起名", "用例名带欠账号", "用例名豁免过期", "按参数循环", "--only 只判点名的",
-                  "合表点名的放量分项算登记", "合表没点名的 crash-case 报出来", "验证包 src 内联测试不要求登记", "合表核法（lib_crash_point_replay_items.py 的 selftest_cells）",
-                  "必红世界有与缺", "必红世界包对不上", "旋钮登记表齐与缺", "来历表核对（合表多一项、放量分项来历表没行、不调枚举的项不要求）"]
+                  "合表点名的放量分项算登记", "合表没点名的 crash-case 报出来", "验证包 src 内联测试不要求登记",
+                  "实验装置包 src 内联测试不要求登记", "产品与测试支撑包 src 内联测试照报住错了包", "读不到角色表时实验装置包照报住错了包", "合表核法（lib_crash_point_replay_items.py 的 selftest_cells）",
+                  "必红世界有与缺", "必红世界包对不上", "旋钮登记表齐与缺", "来历表核对（合表多一项、放量分项来历表没行、不调枚举的项不要求）",
+                  "目录式测试目标（tests/<名>/main.rs 连同 mod 声明到的子模块：登记、住错包、模块声明、命名、一个场景、来历表）"]
 
 
 def placement_world(work, name, stage_rows, table_rows, pipeline_rows, streamy_attributes=""):
@@ -699,6 +831,102 @@ def placement_world(work, name, stage_rows, table_rows, pipeline_rows, streamy_a
     open(os.path.join(root, "scripts", "crash", "crash-amplification.sh"), "w").write(
         "ITEMS=(\n" + "".join(f"  $'{row}'\n" for row in pipeline_rows) + ")\n")
     return root
+
+
+def inline_tests_world(work, name, role_rows, inline_tests):
+    """placement 的一个小仓，只有 src/ 下的内联测试：role_rows 是角色表 CRATE_ROLE_TABLE 的内容行（None 就不写这张表），
+    inline_tests 是 {包目录名: 内联测试函数名}，每个包 src/bin/e9_measure.rs 里一条调 enumerate_crash_states 的 #[cfg(test)] 测试。"""
+    root = placement_world(work, name, [], [], [])
+    os.remove(os.path.join(root, "crates", VERIFICATION_PACKAGE, "tests", "streamy.rs"))
+    if role_rows is not None:
+        open(os.path.join(root, CRATE_ROLE_TABLE), "w").write("# 样本角色表\n" + "".join(row + "\n" for row in role_rows))
+    for package, function in inline_tests.items():
+        os.makedirs(os.path.join(root, "crates", package, "src", "bin"))
+        open(os.path.join(root, "crates", package, "src", "bin", "e9_measure.rs"), "w").write(
+            f"fn main() {{}}\n\n#[cfg(test)]\nmod tests {{\n    #[test]\n    fn {function}() {{\n        enumerate_crash_states(&s);\n    }}\n}}\n")
+    return root
+
+
+def write_directory_target(root, target, files, package=VERIFICATION_PACKAGE):
+    """crates/<package>/tests/<target>/ 底下按 files（{文件名: 正文}）写目录式测试目标。"""
+    directory = os.path.join(root, "crates", package, "tests", target)
+    os.makedirs(directory)
+    for file_name, text in files.items():
+        open(os.path.join(directory, file_name), "w").write(text)
+
+
+def directory_target_world(work, name, stage_rows, table_rows):
+    """目录式测试目标的一个小仓：placement_world 的登记表与合表照给的写，tests/ 下一个文件都不留（目标由 write_directory_target 往里写）。"""
+    root = placement_world(work, name, stage_rows, table_rows, [])
+    os.remove(os.path.join(root, "crates", VERIFICATION_PACKAGE, "tests", "streamy.rs"))
+    return root
+
+
+def selftest_directory_targets(work):
+    """目录式测试目标（tests/<名>/main.rs）的各样判法 → 判错的说明清单：登记与住错包（placement）、模块声明（modules）、命名（file-names）、一个场景（one-scenario）、来历表（provenance）。"""
+    failures = []
+    registered_flow = ([f"crash-case:split-flow\tcrates/\ttest={VERIFICATION_PACKAGE}:split_flow:split_flow_full"], ["split-flow\tcrash-case:split-flow\t-"])
+    full_case = "#[test]\nfn split_flow_full() {\n    enumerate_crash_states(&stream);\n}\n"
+    # placement：子模块里登记了的用例认出、不报；没被 mod 声明的文件与没有 main.rs 的共用模块目录不判
+    declared_only = directory_target_world(work, "directory-target-placement", *registered_flow)
+    write_directory_target(declared_only, "split_flow", {"main.rs": "mod flows;\n", "flows.rs": full_case,
+                                                         "undeclared.rs": "#[test]\nfn undeclared_full() {\n    enumerate_crash_states(&stream);\n}\n"})
+    write_directory_target(declared_only, "common_shared", {"mod.rs": "#[test]\nfn shared_full() {\n    enumerate_crash_states(&stream);\n}\n"})
+    declared_tests, problems = problems_in(declared_only)
+    found = [(test[1], test[2], test[4]) for test in declared_tests]
+    if found != [("split_flow", "split_flow_full", f"crates/{VERIFICATION_PACKAGE}/tests/split_flow/flows.rs:2")] or problems:
+        failures.append("目录式测试目标里 mod 声明到的子模块调枚举函数、登记在目标名下的应当认出 1 条、不报；没被 mod 声明的文件与只有 mod.rs 的共用模块目录不判"
+                        f"，实际 {found}、{problems}")
+    # placement：子模块里没登记的用例报缺登记（目标名是目录名）；别的包的目录式目标里的枚举用例报住错了包
+    with_forgotten = directory_target_world(work, "directory-target-forgotten", *registered_flow)
+    write_directory_target(with_forgotten, "split_flow", {"main.rs": "mod flows;\n", "flows.rs": full_case
+                                                          + "\n#[test]\nfn forgot_in_the_submodule() {\n    enumerate_crash_states_selecting(&stream, 1);\n}\n"})
+    write_directory_target(with_forgotten, "core_split", {"main.rs": "mod sweep;\n", "sweep.rs": "#[test]\nfn core_split_full() {\n    enumerate_crash_states(&s);\n}\n"},
+                           package="singlefs-core")
+    _, problems = problems_in(with_forgotten)
+    forgotten_reported = any("forgot_in_the_submodule" in problem and f"test={VERIFICATION_PACKAGE}:split_flow:forgot_in_the_submodule" in problem for problem in problems)
+    other_package_reported = any("core_split_full" in problem and "singlefs-core 包里" in problem for problem in problems)
+    registered_quiet = not any("split_flow_full" in problem for problem in problems)
+    if not (forgotten_reported and other_package_reported and registered_quiet):
+        failures.append(f"目录式测试目标的子模块里没登记的枚举用例、别的包的目录式目标里的枚举用例应当报出来，实际 {problems}")
+    # modules：声明写在 main.rs 第一行，导入取 main.rs 与子模块的并
+    modules_root = directory_target_world(work, "directory-target-modules", [], [])
+    write_directory_target(modules_root, "split_modules", {"main.rs": "//! 验证包模块：crash、crash_injection\nuse singlefs_verification::crash::A;\nmod part;\n",
+                                                           "part.rs": "use singlefs_verification::crash_injection::B;\n"})
+    write_directory_target(modules_root, "split_mismatch", {"main.rs": "//! 验证包模块：crash\nmod part;\n",
+                                                            "part.rs": "use singlefs_verification::crash_point_replay_progress::C;\n"})
+    _scanned, _declaring, module_problems = module_declaration_problems(modules_root)
+    if any("split_modules" in problem for problem in module_problems):
+        failures.append(f"目录式测试目标 main.rs 第一行声明与它和子模块导入的崩溃引擎模块对得上的不该报，实际 {module_problems}")
+    if not any("split_mismatch/main.rs" in problem and "crash_point_replay_progress" in problem for problem in module_problems):
+        failures.append(f"目录式测试目标 main.rs 第一行声明与子模块导入的崩溃引擎模块对不上的应当报出来，实际 {module_problems}")
+    # file-names：目录名与 main.rs 之外的子模块文件名各判一回
+    names_root = directory_target_world(work, "directory-target-names", [], [])
+    write_directory_target(names_root, "second_transaction_split", {"main.rs": "mod part_step_one;\n", "part_step_one.rs": "#[test]\nfn fine() {}\n"})
+    write_directory_target(names_root, "clean_split", {"main.rs": "mod clean_part;\n", "clean_part.rs": "#[test]\nfn fine() {}\n"})
+    _count, name_problems = test_file_name_problems(names_root)
+    if not any("目录名" in problem and "second_transaction_split" in problem for problem in name_problems) or any("clean_split" in problem for problem in name_problems):
+        failures.append(f"目录式测试目标的目录名按里程碑起名的应当报出来，实际 {name_problems}")
+    if not any("子模块文件名" in problem and "part_step_one" in problem for problem in name_problems):
+        failures.append(f"目录式测试目标的子模块文件名按里程碑起名的应当报出来，实际 {name_problems}")
+    # one-scenario：子模块里循环每轮新建池的报，main.rs 里写了豁免的不报
+    scenario_root = directory_target_world(work, "directory-target-scenarios", [], [])
+    write_directory_target(scenario_root, "split_scenarios", {
+        "main.rs": "mod part;\n\n// harness-test-granularity:one-scenario 同一个池按次序覆盖写，几轮合起来是一个场景\n"
+                   "#[test]\nfn waived_in_main() {\n    for seed in [1, 2] {\n        let pool = build_pool(\"w\");\n    }\n}\n",
+        "part.rs": "#[test]\nfn several_in_the_submodule() {\n    for size in [1, 2] {\n        let pool = build_pool(\"x\");\n    }\n}\n"})
+    _count, scenario_problems = one_scenario_problems(scenario_root)
+    if not any("split_scenarios/part.rs" in problem and "several_in_the_submodule" in problem for problem in scenario_problems) or any("waived_in_main" in problem for problem in scenario_problems):
+        failures.append(f"目录式测试目标的子模块里循环每轮新建池的用例应当报出来，实际 {scenario_problems}")
+    # provenance：合表点名的用例在目录式目标的子模块里调 enumerate_crash_states，来历表没有它的行要报（读不到子模块、悄悄当不调枚举的是缺陷）
+    provenance_root = directory_target_world(work, "directory-target-provenance", *registered_flow)
+    write_directory_target(provenance_root, "split_flow", {"main.rs": "mod flows;\n", "flows.rs": full_case})
+    os.makedirs(os.path.dirname(os.path.join(provenance_root, PROVENANCE_SOURCE)))
+    open(os.path.join(provenance_root, PROVENANCE_SOURCE), "w").write("pub const PROVENANCE_OF_THE_FLOWS: &[ProvenanceOfAFlow] = &[\n];\n")
+    provenance_checked, provenance_found = provenance_problems(provenance_root)
+    if provenance_checked != 1 or not any("项 split-flow" in problem for problem in provenance_found):
+        failures.append(f"目录式测试目标的子模块里调 enumerate_crash_states 的项，来历表没有它的行应当报出来（核 1 处），实际核 {provenance_checked} 处、{provenance_found}")
+    return failures
 
 
 def selftest():
@@ -753,6 +981,21 @@ def selftest():
         _, problems = problems_in(inline_tests)
         if not any("other_package_inline" in problem and "demo-core 包里" in problem for problem in problems):
             failures.append(f"别的包 src/ 下的内联测试调枚举函数应当报住错了包，实际 {problems}")
+        # 角色表里是实验装置的包 src/ 下的内联测试同验证包 src/ 的待遇（不要求住 tests/、不要求登记）；产品、测试支撑的照报住错了包；
+        # 被判那棵树里读不到角色表的，实验装置包也照报（开关 experiment-apparatus-judged-as-other-packages 下实验装置包照别的包判）
+        role_rows = [f"{VERIFICATION_PACKAGE}\t验证\tcrates/{VERIFICATION_PACKAGE}\t样本验证包", "demo-experiments\t实验装置\tcrates/demo-experiments\t样本实验包",
+                     "demo-product\t产品\tcrates/demo-product\t样本产品包", "demo-support\t测试支撑\tcrates/demo-support\t样本测试支撑包"]
+        _, problems = problems_in(inline_tests_world(work, "apparatus-inline-tests", role_rows, {"demo-experiments": "apparatus_inline_sweep"}))
+        if problems:
+            failures.append(f"角色表里是实验装置的包 src/ 下的内联测试不要求登记（0 处问题），实际 {problems}")
+        _, problems = problems_in(inline_tests_world(work, "product-and-support-inline-tests", role_rows,
+                                                     {"demo-product": "product_inline_sweep", "demo-support": "support_inline_sweep"}))
+        if not (any("product_inline_sweep" in problem and "demo-product 包里" in problem for problem in problems)
+                and any("support_inline_sweep" in problem and "demo-support 包里" in problem for problem in problems)):
+            failures.append(f"角色表里是产品、测试支撑的包 src/ 下的内联测试调枚举函数应当报住错了包，实际 {problems}")
+        _, problems = problems_in(inline_tests_world(work, "apparatus-inline-tests-without-roles", None, {"demo-experiments": "apparatus_inline_sweep"}))
+        if not any("apparatus_inline_sweep" in problem and "demo-experiments 包里" in problem for problem in problems):
+            failures.append(f"读不到角色表时实验装置包 src/ 下的内联测试照报住错了包，实际 {problems}")
         # 来历表核对：合表三项——streamy 有来历行；added-stream 是合表多出来的一项（调枚举、来历表没它的行，注释里写的那一行不算），
         # 它的放量分项 added-piped 也没行；given-states 的测试目标不调枚举，不要求行
         provenance_world = placement_world(
@@ -907,6 +1150,7 @@ def selftest():
             failures.append(f"依据空着的旋钮应当报出来，实际 {knob_found}")
         if not any("批大小 的出处路径" in problem for problem in knob_found):
             failures.append(f"出处路径不在的旋钮应当报出来，实际 {knob_found}")
+        failures += selftest_directory_targets(work)
         checked = len(SELFTEST_CASES)
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
@@ -917,6 +1161,7 @@ def selftest():
         print("  ✓ crash-case-check 自检通过：验证包里登记了的放行、注明不是用例的不算，调枚举函数没登记的报缺登记，登记了的标了 ignore 的报出来，"
               "写在别的包里的（直接调或经同文件 helper 调、自己逐个造崩溃状态）报住错了包，每轮新建池的、导入崩溃引擎模块而没声明的、按里程碑起名的各报出来，只用脚手架模块的不要求声明，"
               "合表点名的放量分项算登记、合表没点名的 crash-case 报出来，验证包 src 内联测试不要求登记，"
+              "角色表里实验装置的包 src 内联测试不要求登记、产品与测试支撑的照报住错了包、读不到角色表的照报，"
               "没有必红变异的崩溃枚举用例与依据空着、出处不在的旋钮各报出来，"
               "来历表里没有行的崩溃枚举项与放量分项报出来，"
               f"--only 只判点名的那几样（查了 {checked} 种；合表核法 {len(table_cells)} 格）")

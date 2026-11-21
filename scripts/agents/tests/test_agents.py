@@ -289,9 +289,11 @@ class CostTests(ScriptCase):
 
 class WatchTests(ScriptCase):
     def test_progress_deleted_before_read_is_reported(self):
-        module = load_script('agent-watch.py')
-        with mock.patch.object(module, 'progress_file_of', return_value=str(self.root / 'missing')):
-            note = module.progress_note(SimpleNamespace(), module.datetime.now(module.timezone.utc))
+        load_script('agent-watch.py')
+        # progress_note 在 agent_watch_alerts 里按自己模块的全局名查 progress_file_of，补丁要打在它上面
+        alerts = sys.modules['agent_watch_alerts']
+        with mock.patch.object(alerts, 'progress_file_of', return_value=str(self.root / 'missing')):
+            note = alerts.progress_note(SimpleNamespace(), alerts.datetime.now(alerts.timezone.utc))
         self.assertIn('已消失或不可读', note)
 
 

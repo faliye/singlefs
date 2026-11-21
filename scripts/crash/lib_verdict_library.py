@@ -115,8 +115,21 @@ JUDGING_UNITS_COLUMN = "判法单元指纹"
 LIBRARY_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 REPOSITORY_ROOT = os.path.dirname(os.path.dirname(LIBRARY_DIRECTORY))
 FUNCTION_UNITS_PATH = os.path.join(REPOSITORY_ROOT, "scripts", "gate", "lib_function_units.py")
-# 管怎么存、怎么算键的两份：它们的单元不进任何判法单元指纹（judging_unit_key）
-NOT_JUDGING_FILES = ("scripts/crash/lib_verdict_library.py", "scripts/gate/lib_function_units.py")
+# 管怎么存、怎么算键的那几份（这份库与 lib_function_units.py 入口加拆出的各份）：它们的单元不进任何判法单元指纹（judging_unit_key）
+NOT_JUDGING_FILES = (
+    "scripts/crash/lib_verdict_library.py", "scripts/gate/lib_function_units.py", "scripts/gate/lib_function_units_lexer.py",
+    "scripts/gate/lib_function_units_base.py", "scripts/gate/lib_function_units_registry.py", "scripts/gate/lib_function_units_python_facts.py",
+    "scripts/gate/lib_function_units_shell_text.py", "scripts/gate/lib_function_units_shell_index.py",
+    "scripts/gate/lib_function_units_python_data_reads.py", "scripts/gate/lib_function_units_python_launches.py",
+    "scripts/gate/lib_function_units_python_module.py", "scripts/gate/lib_function_units_rust_file.py",
+    "scripts/gate/lib_function_units_rust_verus.py", "scripts/gate/lib_function_units_unit_graph.py",
+    "scripts/gate/lib_function_units_rust_workspace.py", "scripts/gate/lib_function_units_wgsl.py",
+    "scripts/gate/lib_function_units_rust_closure.py", "scripts/gate/lib_function_units_script_closure.py",
+    "scripts/gate/lib_function_units_closure_keys.py", "scripts/gate/lib_function_units_selftest_fixture_trees.py",
+    "scripts/gate/lib_function_units_selftest_rust_cells.py", "scripts/gate/lib_function_units_selftest_program_registries.py",
+    "scripts/gate/lib_function_units_selftest_closure_rules.py", "scripts/gate/lib_function_units_selftest_real_repo.py",
+    "scripts/gate/lib_function_units_selftest_run.py",
+)
 BREAK = {item for item in os.environ.get("VERDICT_LIBRARY_BREAK", "").split(",") if item}
 DETAIL_UNIT_LIMIT = 6
 _FUNCTION_UNITS = []

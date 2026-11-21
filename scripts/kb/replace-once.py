@@ -29,6 +29,9 @@
 （.claude/gate.d/lib-forbidden-notations.py 的会话号形态，lib_notation_check.py 的 session_name_refusal 调它，三份定点写入脚本共用）判新串；
 带会话名的拒绝，逐处列出行号与出路（写成「别的会话」这类不带号的说法）。后缀不限，范围与写闸判 Write、Edit 一致：排除前缀、.sh .py .rs 里带
 「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
+同一个退出码另判批次代号（新串）与任务号、会话短号、批号（写前、写后两份整文，写后每一行只拿它配上的写前那一行上的同一种去抵、抵不掉的才拒：文件里已有的旧号不挡，
+只改了带号那一行别处的不挡；同一行新加的号、整份多出来的同一个号、同一字面的旧号离开写前它所在的那一行、这一次替换让后面已有的行出了围栏或离开「批次」那一列的照拒），
+拒绝说明末尾「→ 归总：」一句按拒的是哪一判写（lib_notation_check.py 的 closing_remedy）。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证红的那几格（「」里是失败行的开头：自证逐条以 ✗ 起头列出判错的格，末尾一句「✗ --selftest 没通过：N 项」是汇总）：
   REPLACE_ONCE_BREAK=no-nearest  nearest_hint() 什么都不给
@@ -48,6 +51,24 @@
       compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红；
       session-names（整个会话号形态不判）时「写会话号：」的拒绝几条全红；LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 时带放行标记的那一条红，
       LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names 时排除前缀下放行的那一条红
+  LIB_FORBIDDEN_NOTATIONS_BREAK=after-lines-judged-alone  共用库判写前、写后两份整文时逐行单判、不认围栏与表头
+      「✗ 写会话号：新串只写一行围栏、让后面已有的批号出了围栏」「✗ 写会话号：.md 目标（记录）里表头是批次的那一列的批号」
+      「✗ 写会话号：围栏里已有批号的那一行挪到围栏外」「✗ 写会话号：改了表头、已有的批号离开批次那一列」
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-not-netted  共用库不拿写前文件里已有的违例相抵
+      「✗ 写会话号：写前文件里已有的旧号不挡这一次写」「✗ 写会话号：行里已有任务号、同一行只改路径」「✗ 写会话号：整份多出一行带同一个旧号」
+      「✗ 写会话号：只改同一行别处照放行」
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-by-line-text  共用库按行文相抵：行里别处一改，那一行原有的号就算新写的
+      「✗ 写会话号：行里已有任务号、同一行只改路径」「✗ 写会话号：只改同一行别处照放行」
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-by-line-number  共用库写前哪一行号上有违例，写后同一行号上的违例全抵掉
+      「✗ 写会话号：行里已有任务号、同一行新加第二个任务号」「✗ 写会话号：只改同一行别处照放行」
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-uncounted  共用库按判据与命中的串整份相抵但不计数、不看在哪一行：写前出现过的串，写后出现几处都抵掉
+      「✗ 写会话号：整份多出一行带同一个旧号」「✗ 写会话号：旧号挪到另一句照拒」「✗ 写会话号：旧号挪到另一行照拒」
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-across-lines  共用库按判据与命中的串整份计数相抵、不看在哪一行：同一字面的旧号挪到别的行也抵掉
+      「✗ 写会话号：旧号挪到另一句照拒」「✗ 写会话号：旧号挪到另一行照拒」
+  LIB_FORBIDDEN_NOTATIONS_BREAK=line-pairing-positional  共用库一块改动里写前写后的行按位置从上往下配：带旧号那一行前面加了一行，它就配不上原来那一行
+      「✗ 写会话号：只改同一行别处照放行」
+  LIB_FORBIDDEN_NOTATIONS_BREAK=before-context-ignored  共用库写前那一份逐行单判（不认围栏与表头），写后照认
+      「✗ 写会话号：新串只写一行围栏、让后面已有的批号出了围栏」「✗ 写会话号：围栏里已有批号的那一行挪到围栏外」「✗ 写会话号：改了表头、已有的批号离开批次那一列」
   ATOMIC_REPLACE_BREAK=rawafterrename  共用库 lib_atomic_replace.py 的弄坏开关（写法在它文件头）：改名之后到的 Ctrl-C 原样抛，自证同样走它
       「✗ [改名之后被打断]」（目录 fsync 时与改名刚返回时两个时刻：库没抛 ReplacedThenInterrupted、replace_once 没接住、没退 5）
 """
@@ -60,7 +81,7 @@ import tempfile
 
 from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, problems_with_replacement_by_rename, \
     replace_file_contents_by_rename
-from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
+from lib_notation_check import clock_refusal, closing_remedy, copy_library_into, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -142,11 +163,12 @@ def replace_once(path, old_text, new_text, notation_root=None):
         refusal = clock_refusal(path, new_text, content[:content.index(old_text)].count('\n') + 1, notation_root)
         if refusal:
             return 7, '\n'.join(refusal)
-    if os.environ.get('REPLACE_ONCE_BREAK') != 'no-session-guard':   # 弄坏开关 no-session-guard：不判新串里的会话号
-        refusal = session_name_refusal(path, new_text, content[:content.index(old_text)].count('\n') + 1, notation_root)
-        if refusal:
-            return 8, '\n'.join(refusal)
     replaced = content.replace(old_text, new_text, 1)
+    if os.environ.get('REPLACE_ONCE_BREAK') != 'no-session-guard':   # 弄坏开关 no-session-guard：不判新串里的会话号
+        refusal = session_name_refusal(path, new_text, content[:content.index(old_text)].count('\n') + 1, notation_root,
+                                       before_text=content, after_text=replaced)
+        if refusal:
+            return 8, '\n'.join(refusal) + '\n     → 归总：' + closing_remedy(refusal)
     try:
         notes = replace_file_contents_by_rename(
             path, replaced, check_before_rename=lambda: unchanged_bytes(path, original_bytes))

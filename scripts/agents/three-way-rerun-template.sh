@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
+# task-server-compiles: yes
 # 三方腿模型目录里 tools/rerun.sh 的模板：腿把它拷成 <模型目录>/tools/rerun.sh，只改 rerun_steps 那一段。
 # 仓根与冻结副本只从参数接，不从这份脚本自己的路径往上推：判决复跑时模型目录被拷进草稿目录跑
 # （.claude/rules/three-way-inference.md 判决要引的复跑数那一条），从自身路径推出来的仓根在副本里就不是仓了。
 #
-# 用法（整条交 task-server 跑，工作目录随意；不套内存包装、不写线程：上限、线程与机器都由服务定）：
-#   task-server/task submit -- bash <模型目录>/tools/rerun.sh --repo <仓根> --frozen <冻结副本> --work <新的草稿目录> [--model <模型目录>]
+# 用法（整条交 task-server 跑；不套内存包装、不写线程：上限、线程与机器都由服务定）：
+#   task-server/task submit --cwd <新的草稿目录> -- bash <仓根>/research/prompts/<轮>-opus-model/tools/rerun.sh --repo <仓根> --frozen <冻结副本> --work <新的草稿目录> [--model <仓根>/research/prompts/<轮>-opus-model]
+#     脚本路径、模型目录与 <仓根>、<冻结副本>、<新的草稿目录> 都写绝对路径：命令里的相对路径照 --cwd 解，--cwd 换成草稿目录之后相对仓根的路径找不到（bash 退 127）。
+#     <新的草稿目录> 交之前先建成空目录（--cwd 要在）：它解开符号链接后往上没有 .git，服务按解开后的它本身认树（task-server/task_server_lib.py 文件头「编译目录」），
+#     那一组编译目录只给这一次复跑拷进去的那棵树用，复跑用完删掉这个目录，服务跟着删那一组。
+#     文件头的会编声明「# task-server-compiles: yes」让服务给这一次尝试 CARGO_TARGET_DIR（rerun_steps 里的 cargo 只在脚本正文里，服务只读命令位置上那份脚本的文件头前 60 行）：
+#     拷成 rerun.sh 之后留着；外面再包一层交的，外层脚本的文件头另写同一行。
 #   bash <这份脚本> --selftest
 #     --repo    仓根：要有 .git 与 task-server/task（判是不是本仓）
 #     --frozen  冻结副本（腿开工时拷出的那棵树）：要是一个目录
@@ -23,6 +29,8 @@
 #   RERUN_TEMPLATE_BREAK=root-check-by-wrapper  判是不是本仓看 scripts/hosts/run-with-memory-cap.sh 在不在（不看 task-server/task）
 #       「✗ 自检：--repo 指到只有内存包装、没有 task-server/task 的旧仓应当退 2」那一格红
 #       连带红的格（自证里的假仓只有 task-server/task、没有内存包装，被当成不是本仓）：「✗ 自检：拷进与仓无关的临时目录、传参应当跑通」、「✗ 自检：--work 指到已有输出的目录应当退 2、不在旧输出上接着写」
+#   RERUN_TEMPLATE_BREAK=compiles-declaration-dropped  自证读的 rerun.sh 文件头前 60 行摘录去掉会编声明「# task-server-compiles: yes」那一行（拷出的 rerun.sh 本身照旧是本脚本的原样拷贝）
+#       「✗ 自检：拷出的 rerun.sh 文件头前 60 行应当有会编声明」那一格红
 set -euo pipefail
 
 refuse() {   # refuse <卡在哪>：打出卡在哪、出路与用法，退 2
@@ -76,6 +84,7 @@ parse_arguments() {
 
 # ── 这一腿要跑的步骤：腿把这一段换成自己的 ──
 # 路径只用 $REPO_ROOT、$FROZEN、$MODEL、$WORK 四个变量引，不写死、不从 $0 推；cargo 直接起（线程由 task-server 给整条套的 capped.sh <N> 定，这里不再套），
+# 编进服务给的 CARGO_TARGET_DIR（文件头的会编声明让服务给），二进制取 "${CARGO_TARGET_DIR:?}/<输出目录>/<bin 名>"（<输出目录> 的取法在 .claude/agents/three-way-attack.md 第 3b 步）；
 # 输出写进 $WORK，最后打出与 $MODEL/out/ 里哪一份逐行比。模板自带的这一段只拷冻结副本、打出四个路径，自证跑的就是它。
 rerun_steps() {
   mkdir -p "$WORK/tree"
@@ -100,6 +109,18 @@ selftest() {
   echo 编译产物 > "$scratch/frozen/crates/target/junk"
   copy="$scratch/elsewhere/r1-opus-model/tools/rerun.sh"
   cp "${BASH_SOURCE[0]}" "$copy"
+
+  # 拷出的 rerun.sh 文件头带会编声明（服务读声明只看前 60 行，task-server/task_server_lib_constants.py 的 DECLARED_HEADER_LINES）
+  # $copy 只被 cp 写一次：函数单元的算键（scripts/gate/lib_function_units_shell_text.py 的 generated_scripts）要它是单一来源的拷贝才折得出下面几处 bash "$copy"
+  checked=$((checked + 1))
+  if [[ "${RERUN_TEMPLATE_BREAK:-}" == compiles-declaration-dropped ]]; then
+    head -n 60 "$copy" | grep -v '^# task-server-compiles:' > "$scratch/copy-head.txt" || true
+  else
+    head -n 60 "$copy" > "$scratch/copy-head.txt"
+  fi
+  if ! grep -qx '# task-server-compiles: yes' "$scratch/copy-head.txt"; then
+    failures+=("拷出的 rerun.sh 文件头前 60 行应当有会编声明 # task-server-compiles: yes（服务只读命令位置上那份脚本的文件头给 CARGO_TARGET_DIR），实际没有")
+  fi
 
   checked=$((checked + 1))
   if (cd "$scratch/cwd" && bash "$copy" --repo "$scratch/fake-repo" --frozen "$scratch/frozen" --work "$scratch/work1") \
@@ -147,7 +168,7 @@ selftest() {
     echo "    → 怎么办：看 parse_arguments() 与 rerun_steps()；RERUN_TEMPLATE_BREAK 设着的话这里本来就该红"
     return 1
   fi
-  echo "  ✓ 自检通过（查了 $checked 格）：拷进与仓无关的临时目录、从别的目录起，传参跑通；不传参、缺 --frozen、--repo 不是仓、--repo 是没有 task-server/task 的旧仓、--work 非空都退 2 并说明"
+  echo "  ✓ 自检通过（查了 $checked 格）：拷出的 rerun.sh 文件头带会编声明；拷进与仓无关的临时目录、从别的目录起，传参跑通；不传参、缺 --frozen、--repo 不是仓、--repo 是没有 task-server/task 的旧仓、--work 非空都退 2 并说明"
   return 0
 }
 

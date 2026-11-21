@@ -7,6 +7,8 @@
 | 文件 | 做什么 |
 |---|---|
 | `crash-point-replay.sh`、`lib_crash_point_replay_items.py` | 崩溃点重放的入口与合表的读法、核法 |
+| `crash-point-replay-selftest.sh` | `crash-point-replay.sh` 的自证、自证并行与开关轮（被 source 的函数库，只在 `--selftest` 那一支载入） |
+| `crash-library-totals.sh` | 崩溃判定库按态数的总账（只读查询，平常查库用它）：起一次读库程序 `crash_library_reader keys`，原样转出它的行，再出录下的、当前键下判过的、只在别的键下判过的、一种判器的结论都没有的态数（带块数与折成的亿）与按结论种类的合计，核三类态数之和与各种类对数两道完整性闸；不带参数，经 `task-server/task submit -- bash scripts/crash/crash-library-totals.sh` 交 |
 | `crash-amplification.sh`、`crash-amplification-item.sh`、`crash-amplification-two-hosts.sh`、`crash-amplification-lib.sh`、`lib_verdict_library.py` | 崩溃放量：全量入口、一个分项、照 task-server 分片协议两片分着判（计划、各片、合并三步）、共用段、判定库 |
 | `crash-point-replay-shard-configuration-check.sh` | 多机配置的判法（崩溃枚举用例由门禁 `crash-point-replay` 自己照 task-server 分片协议分片判，写法在它文件头「分片」） |
 | `gpu-quiesce-run.sh`、`gpu-exemptions-check.py` | 用 GPU 之前清场并回读（task-server 给 GPU 任务分卡、经它清场再起）；不走 GPU 的计算的豁免登记核对 |

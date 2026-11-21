@@ -20,7 +20,8 @@
   --judgement、--history-rows、--open-rows  索引表那一行的后三格（节号之后），默认「新登」「—」「整节」；格里不许有 | 与换行。
   节号：账本里所有「## <节号>、」标题与「## 索引」表里每一行的节号（汉字数字；围栏代码块里的不算）取最大值加一，写成汉字数字（一百七十八之后是一百七十九）。
   索引表与标题对不上的（只在一边出现的节号）：打一行「!」说明，照常追加；对不上由门禁 ledger-section-numbers 判。
-  写之前判新文本：钟点、时区词、时间戳与会话号，同 insert-row.py（共用 lib_notation_check.py）。
+  写之前判新文本：钟点、时区词、时间戳、会话号与批次代号判索引行与新节，同 insert-row.py（共用 lib_notation_check.py）；任务号、会话短号与批号判换上前后两份整份账本，
+  写后多出来的违例行才拒（索引表没有「批次」那一列，格里的批号照拒）；拒绝说明末尾「→ 怎么办：」按拒的是哪一判写（closing_remedy，任务号与批号不说成会话号）。
 
 并发：真写（不是 --dry-run）时，从读账本、取号、复核到改名换上，都罩在账本锁里。锁是账本这份文件（那个 inode）上的 flock 排他锁，
 可写打开（NFS 上排他锁要可写打开），等锁最多 LOCK_WAIT_SECONDS 秒（超时退 10，没写）；同一进程里的几条线程另先排进程内的一把锁（NFS 上 flock 按进程算，线程之间互不挡）。
@@ -32,7 +33,7 @@
 
 退出码：0 追加了（或干跑）；1 用法不对或自检没过；2 登记表读不到或不合（没有 current 恰好一行、路径不在 records/ 下）或账本读不到；
 3 账本里没有「## 索引」一节，或那一节里没有表格行；4 读到写之间账本被改过（没写，重跑）；5 没换上（硬链接、只读、建不了临时文件、写或改名失败）；
-6 新文本带钟点、时区词或时间戳（账本是仓里的 .md）；7 新文本带会话号；8 标题或正文不合（空、标题有换行、正文有一二级标题、索引格里有 | 或换行、账本含 CRLF）；
+6 新文本带钟点、时区词或时间戳（账本是仓里的 .md）；7 新文本带会话号、批次代号，或换上之后的账本多出带任务号、会话短号、批号的行；8 标题或正文不合（空、标题有换行、正文有一二级标题、索引格里有 | 或换行、账本含 CRLF）；
 10 等账本锁超时（别的追加者一直没放锁，没写，看是谁拿着再重跑）。2–8 与 10 都是账本没动、没留临时文件。
 9 已经追加了（改名换上做完），之后被 Ctrl-C 打断（lib_atomic_replace.py 的 ReplacedThenInterrupted / ReplacedThenFailed）：别重跑（会再追加一节），先看账本末尾。
 
@@ -56,7 +57,11 @@
   LEDGER_APPEND_SECTION_BREAK=leftover-unchecked  样本跑完不核它的进程组里还留着什么进程（processes_left_in_group 一律交空表）
       样本跑完留下的进程（「✗ 自检失败：样本跑完进程组里留着的进程没核出」）
   ATOMIC_REPLACE_BREAK=rawafterrename  共用库 lib_atomic_replace.py 的弄坏开关（写法在它文件头）：改名之后到的 Ctrl-C 原样抛，自证同样走它
-      写回的方式（「✗ 自检失败：写回的方式不对」，下面几行以「[改名之后被打断]」起头）
+      写回的方式（「✗ 自检失败：写回的方式不对」；下面几行是 [改名之后被打断] 的明细，不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=table-batch-any-column  共用判据库 .claude/gate.d/lib-forbidden-notations.py 在 records/ 下的表格行里任何一列的批号都放过（写法在它文件头）
+      写之前判新文本（「✗ 自检失败：写之前判新文本没判对」：索引表那一行的判定格写批号的那一条没拒）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-not-netted  共用判据库不拿换上之前账本里已有的违例行相抵
+      写之前判新文本（「✗ 自检失败：写之前判新文本没判对」：账本里已有旧号时追加一节干净的那一条没放行）
 """
 import argparse
 import contextlib
@@ -75,7 +80,7 @@ import time
 from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, inside_selftest, leftover_temporary_files, \
     problems_with_replacement_by_rename, replace_file_contents_by_rename
 from lib_markdown import fenced_flags
-from lib_notation_check import clock_refusal, copy_library_into, repository_root, session_name_refusal
+from lib_notation_check import clock_refusal, closing_remedy, copy_library_into, numbers_refusal, repository_root, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -267,17 +272,24 @@ def plan(text, title, body, cells):
     return new_text, name, last_row + 2, heading_line, notes
 
 
-def notation_refusal(path, row, row_line, section, section_line, notation_root):
-    """钟点与会话号：用 insert-row.py 同一份判据；放行交 None，拒绝交 Refused。"""
+def notation_refusal(path, original_text, new_text, row_line, section_start, section_line, notation_root):
+    """钟点与会话号、批次代号、任务号与会话短号与批号：用 insert-row.py 同一份判据；放行交 None，拒绝交 Refused。
+    new_text 是换上之后的整份账本：索引行是它的第 row_line 行，新节从 section_start（字符下标）起、在第 section_line 行；钟点、会话号与批次代号判这两段新文本。
+    任务号、会话短号与批号判换上之前（original_text）、之后（new_text）两份整份账本，写后多出来的违例行才拒（索引表那一行按表头认列：账本索引表没有「批次」那一列，
+    格里的批号照拒；账本末尾开着的围栏被新节收掉、后面那一行出了围栏的照拒）。"""
     if BROKEN == "no-notation-guard":
         return None
-    for new_text, first_line in ((row, row_line), (section, section_line)):
-        refusal = clock_refusal(path, new_text, first_line, notation_root)
+    lines = new_text.split("\n")
+    for text, first_line in ((lines[row_line - 1], row_line), (new_text[section_start:], section_line)):
+        refusal = clock_refusal(path, text, first_line, notation_root)
         if refusal:
             return Refused(6, "\n".join(refusal), "  → 怎么办：新文本里的钟点、时区词与时间戳删掉，只写日期，再追加")
-        refusal = session_name_refusal(path, new_text, first_line, notation_root)
+        refusal = session_name_refusal(path, text, first_line, notation_root, before_text=None, after_text=None)
         if refusal:
-            return Refused(7, "\n".join(refusal), "  → 怎么办：新文本里的会话号换成「别的会话」这类不带号的说法，事情与日期照留，再追加")
+            return Refused(7, "\n".join(refusal), "  → 怎么办：" + closing_remedy(refusal) + "，再追加")
+    refusal = numbers_refusal(path, original_text, new_text, notation_root)
+    if refusal:
+        return Refused(7, "\n".join(refusal), "  → 怎么办：" + closing_remedy(refusal) + "，再追加")
     return None
 
 
@@ -406,8 +418,7 @@ def append_section_holding_ledger(handle, path, title, body, cells, dry_run, not
     before = hashlib.sha256(original).hexdigest()
     try:
         new_text, name, row_line, heading_line, notes = plan(original.decode("utf-8"), title, body, cells)
-        row = new_text.split("\n")[row_line - 1]
-        refusal = notation_refusal(path, row, row_line, new_text[new_text.rindex("\n## %s、" % name) + 1:], heading_line, notation_root)
+        refusal = notation_refusal(path, original.decode("utf-8"), new_text, row_line, new_text.rindex("\n## %s、" % name) + 1, heading_line, notation_root)
         if refusal:
             raise refusal
     except Refused as refused:
@@ -610,6 +621,23 @@ def problems_with_notation_guard(work):
     code, said = run_append(ledger, root, body="只写日期 2026-11-02 的正文\n")
     if code != 0:
         problems.append("只写日期的正文本该放行，实际退 %d：%r" % (code, said))
+    # 账本末尾开着围栏、新节正文以收尾围栏起头：后面那一行照判（判的是换上前后两份整份账本，不交整份的话这一条本来就该红）
+    root, ledger = make_root(work, "notation-fence", sample_ledger(["一"], ["一"], extra="```\n代码\n"))
+    fenced_original = read(ledger)
+    code, said = run_append(ledger, root, body="```\n\n正文：这件事 (5b) 知道\n")
+    if code != 7 or "(5b)" not in said or read(ledger) != fenced_original:
+        problems.append("账本末尾开着围栏、新节正文以收尾围栏起头：本该退出码 7、点名 (5b) 且不写账本，实际 %d：%r" % (code, said))
+    # 索引表那一行的判定格写批号：索引表没有「批次」那一列，照拒，出路照任务号与批号写（LIB_FORBIDDEN_NOTATIONS_BREAK=reserved-lines-any-file 设着的话这一条本来就该红）
+    root, ledger = make_root(work, "notation-index", sample_ledger(["一"], ["一"]))
+    index_original = read(ledger)
+    code, said = run_append(ledger, root, cells=(("判定", "别的会话第 105 批"), ("历史", "—"), ("开着的", "整节")))
+    if code != 7 or "第 105 批" not in said or "那一批做了什么" not in said or "会话号换成" in said or read(ledger) != index_original:
+        problems.append("索引表那一行的判定格写批号：本该退出码 7、点名「第 105 批」、出路照批号写（不说成会话号）且不写账本，实际 %d：%r" % (code, said))
+    # 账本里已有的旧号不挡这一次追加（LIB_FORBIDDEN_NOTATIONS_BREAK=violations-not-netted 设着的话这一条本来就该红）
+    root, ledger = make_root(work, "notation-old-number", sample_ledger(["一"], ["一"], extra="旧行（任务 21036）\n"))
+    code, said = run_append(ledger, root)
+    if code != 0:
+        problems.append("账本里已有旧号时追加一节干净的：本该放行，实际 %d：%r" % (code, said))
     return problems
 
 

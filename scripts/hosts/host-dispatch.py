@@ -307,7 +307,7 @@ def live_quiesce_holders(settings):
 @dataclass
 class Prediction:
     key: str
-    memory_predicted: int        # 字节
+    memory_recorded_peak: int    # 字节：这把键记录的峰值（没有记录、重试、钉值的各取服务给它们定的那个数）
     memory_cap: int              # 字节：这一次的上限
     memory_booked: int           # 字节：记账量
     memory_history: str          # 从哪来（服务写它自己的那几种：记录、重试、钉值、没有记录）
@@ -361,14 +361,14 @@ def judge_host(host, report, prediction, gpu, pending_memory, pending_gpu, confi
     else:
         free, room = memory["free"] - pending_memory, room - pending_memory
     # 要的空闲量：预测加余量，但不超过这一条的上限（上限已是 slice 总上限减余量，顶格的再加一遍余量就要的比这台能给的还多，永远放不下）
-    needed = prediction.memory_predicted + margin if broken("margin-over-cap") else min(prediction.memory_predicted + margin, cap)
+    needed = prediction.memory_recorded_peak + margin if broken("margin-over-cap") else min(prediction.memory_recorded_peak + margin, cap)
     never = booked > memory["slice_total"] or needed > memory["mem_total"]
     reasons = []
     fits = needed <= free and booked <= room
     memory_short = 0 if fits else max(0, needed - free, booked - room)
     gpu_short = 0
     if not fits:
-        reasons.append(f"内存：要的空闲 {human(needed)}（记录的峰值 {human(prediction.memory_predicted)} + 这台此刻的余量 {human(margin)}，不超过上限 {human(cap)}）、要记 {human(booked)}，"
+        reasons.append(f"内存：要的空闲 {human(needed)}（记录的峰值 {human(prediction.memory_recorded_peak)} + 这台此刻的余量 {human(margin)}，不超过上限 {human(cap)}）、要记 {human(booked)}，"
                        f"此刻空闲 {human(max(free, 0))}、slice 减去余量放得下 {human(max(room, 0))}")
     if gpu and not broken("ignore-gpu"):
         gpu_report = report.get("gpu") or {}

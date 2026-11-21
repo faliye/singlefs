@@ -41,6 +41,9 @@
 （.claude/gate.d/lib-forbidden-notations.py 的会话号形态，lib_notation_check.py 的 session_name_refusal 调它，三份定点写入脚本共用）判 --line 给的新行；
 带会话名的拒绝，逐处列出行号与出路（写成「别的会话」这类不带号的说法）。后缀不限，范围与写闸判 Write、Edit 一致：排除前缀、.sh .py .rs 里带
 「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
+同一个退出码另判新行里的批次代号，与插之前、插之后两份整文里的任务号、会话短号、批号（写后每一行只拿它配上的写前那一行上的同一种去抵、抵不掉的才拒：文件里已有的旧号不挡，
+新行里再写一次文件里已有的号、插一行围栏让后面已有的行出了围栏、插一行让表头变了而已有的批号离开「批次」那一列的照拒），
+「→ 怎么办：」那一句按拒的是哪一判写（lib_notation_check.py 的 closing_remedy）。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（括号里是那条「✗ 自检失败：」的开头）：
   INSERT_ROW_BREAK=vague-anchor-hint  anchor_hints() 只说「把正则写得更具体些」，不点元字符、不列行号
@@ -62,7 +65,23 @@
       clock-times（整个钟点形态不判）时写 .md 的拒绝几条全红；iso-compact-timestamp 时只有新行带紧凑时间戳的那几条红；
       compact-timestamp-loose 时「8 位数字后跟 T 但不是时间戳」的放行那一条红；
       session-names（整个会话号形态不判）时「写会话号：」的拒绝几条全红；LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names 时带放行标记的那一条红，
-      LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names 时排除前缀下放行的那一条红
+      LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names 时排除前缀下放行的那一条红；
+      after-lines-judged-alone（写前、写后两份逐行单判、不认围栏与表头）时「写会话号：新串只写一行围栏、让后面已有的批号出了围栏」
+      「写会话号：.md 目标（记录）里表头是批次的那一列的批号」「写会话号：围栏里已有批号的那一行挪到围栏外」「写会话号：改了表头、已有的批号离开批次那一列」四条红；
+      violations-not-netted（不拿写前的违例相抵）时「写会话号：写前文件里已有的旧号不挡这一次写」「写会话号：行里已有任务号、同一行只改路径」
+      「写会话号：整份多出一行带同一个旧号」「写会话号：只改同一行别处照放行」四条红；
+      violations-netted-uncounted（按判据与命中的串整份相抵但不计数、不看在哪一行）时「写会话号：整份多出一行带同一个旧号」
+      「写会话号：旧号挪到另一句照拒」「写会话号：旧号挪到另一行照拒」三条红；
+      violations-netted-across-lines（按判据与命中的串整份计数相抵、不看在哪一行）时「写会话号：旧号挪到另一句照拒」「写会话号：旧号挪到另一行照拒」两条红；
+      line-pairing-positional（一块改动里写前写后的行按位置从上往下配）时「写会话号：只改同一行别处照放行」那一条红；
+      before-context-ignored（写前那一份逐行单判）时「写会话号：新串只写一行围栏、让后面已有的批号出了围栏」「写会话号：围栏里已有批号的那一行挪到围栏外」
+      「写会话号：改了表头、已有的批号离开批次那一列」三条红；
+      violations-netted-by-line-number（写前哪一行号上有违例、写后同一行号上的全抵掉）时插进的一行把带旧号的行往后挪了一行，
+      「写会话号：写前文件里已有的旧号不挡这一次写」「写会话号：行里已有任务号、同一行只改路径」「写会话号：整份多出一行带同一个旧号」
+      「写会话号：只改同一行别处照放行」四条红；
+      violations-netted-by-line-text（按行文相抵）时「写会话号：只改同一行别处照放行」那一条红（写前写后整文直接交 numbers_refusal 的那一格；
+      经插行的格不红：插行不改已有的行，证它的那几格在 replace-once.py、replace-batch.py 的自证里）
+      （旧号挪到另一句、另一行与只改同一行别处那三格写前写后整文直接交 numbers_refusal，不经插行：插行挪不走已有的号）
 """
 import argparse
 import contextlib
@@ -75,7 +94,7 @@ import sys
 
 from lib_atomic_replace import ReplaceRefused, leftover_temporary_files, problems_with_replacement_by_rename, \
     replace_file_contents_by_rename
-from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
+from lib_notation_check import clock_refusal, closing_remedy, copy_library_into, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -194,18 +213,6 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_r
             print(line)
         return 3
     at = matched[0] + (1 if where == "after" else 0)
-    if BROKEN != "no-clock-guard":   # 弄坏开关 no-clock-guard：不判新行里的钟点
-        refusal = clock_refusal(path, line, at + 1, notation_root)
-        if refusal:
-            print("  ✗ " + "\n".join(refusal))
-            print("  → 怎么办：新行里的钟点、时区词与时间戳删掉，只写日期，再插")
-            return 6
-    if BROKEN != "no-session-guard":   # 弄坏开关 no-session-guard：不判新行里的会话号
-        refusal = session_name_refusal(path, line, at + 1, notation_root)
-        if refusal:
-            print("  ✗ " + "\n".join(refusal))
-            print("  → 怎么办：新行里的会话号换成「别的会话」这类不带号的说法，事情与日期照留，再插")
-            return 7
     ending = endings[matched[0]] or next((value for value in endings if value), '\n')
     if at == len(lines):
         endings[-1] = ending
@@ -213,6 +220,19 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_r
     else:
         endings.insert(at, ending)
     lines.insert(at, line)
+    written = ''.join(value + ending for value, ending in zip(lines, endings))   # 插好之后的整份：判任务号与批号、写盘都用它
+    if BROKEN != "no-clock-guard":   # 弄坏开关 no-clock-guard：不判新行里的钟点
+        refusal = clock_refusal(path, line, at + 1, notation_root)
+        if refusal:
+            print("  ✗ " + "\n".join(refusal))
+            print("  → 怎么办：新行里的钟点、时区词与时间戳删掉，只写日期，再插")
+            return 6
+    if BROKEN != "no-session-guard":   # 弄坏开关 no-session-guard：不判新行里的会话号
+        refusal = session_name_refusal(path, line, at + 1, notation_root, before_text=original.decode('utf-8'), after_text=written)
+        if refusal:
+            print("  ✗ " + "\n".join(refusal))
+            print("  → 怎么办：" + closing_remedy(refusal) + "，再插")
+            return 7
     if dry_run:
         print("  （干跑）会插在 %s:%d，锚点是第 %d 行" % (path, at + 1, matched[0] + 1))
         return 0
@@ -224,8 +244,7 @@ def insert(path, anchor, where, line, absent, dry_run, literal=False, notation_r
             raise ChangedSinceRead(digest_now)
 
     try:
-        notes = replace_file_contents_by_rename(path, ''.join(value + ending for value, ending in zip(lines, endings)),
-                                                check_before_rename=verify_unchanged_since_read)
+        notes = replace_file_contents_by_rename(path, written, check_before_rename=verify_unchanged_since_read)
     except ChangedSinceRead as changed:
         print("  ✗ 读到写之间 %s 被改过（sha256 %s → %s），没写" % (path, before[:12], changed.digest_now[:12]))
         print("     → 怎么办：别的会话刚写过这份文件，重跑一次本命令；手里那份内容已经不是要改的那一份了。")

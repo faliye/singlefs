@@ -11,15 +11,23 @@
 
 会话号一判（session_name_refusal）：判据是同一份库里的 session-names 那一形态（write-guard.sh 的第七道、门禁 doc-text 的 session-names 格读的就是它），
 排除前缀、「# session-names:allow <理由>」放行标记（.sh、.py、.rs 里）、仓外不判都由那份库管，这里没有另抄；与钟点不同的是后缀不限：写闸对 Write、Edit 的内容
-不分后缀都判，这里照同一个范围。出路用那份库登记的 remedy（头一条是「只写两位短号，或写成「别的会话」这类不带号的说法」）。
-新串里没有会话号的，同一个函数接着判批次代号（同一份库的 batch-codes 形态，write-guard.sh 第七道里「写了批次代号」那一判读的也是它）：
-库按后缀只判 .md、.tsv、.txt，排除前缀与上下文规则都在库里；拒绝的退出码与会话号同一个（三份脚本不另分），出路用那一形态的 remedy。
-两样都有时先报会话号，改完再写一次报批次代号。三份脚本的 no-session-guard 开关关掉这个函数，两样一起不判。
+不分后缀都判，这里照同一个范围。出路用那份库登记的 remedy（头一条是「全名与两位短号都不写，别的会话写成 mainagent(A)、mainagent(B) 这类按出场次序的叫法」）。
+新串里没有会话号的，同一个函数接着判批次代号（同一份库的 batch-codes 形态，write-guard.sh 第七道里「写了批次代号」那一判读的也是它），
+再没有的接着判任务号、会话短号与批号（同一份库的 task-and-session-numbers 形态，write-guard.sh 第七道里「写了任务号、会话短号或批号」那一判读的也是它）：
+这一形态判的不是新串，是写前、写后两份整文（库的 new_violation_hits：两份各判一遍，写后每一行配上写前的一行，违例按判据行名字与命中的串只拿配上的那一行去抵，抵不掉的才拒；
+文件里已有的旧号不挡这一次写，只改了那一行别处的也不挡；同一字面的旧号离开写前它所在的那一行、这一次写让后面已有的行出了围栏、离开了「批次」那一列的照拒），
+调用方把这一次写之前的整份与写之后的整份交进来；
+两种形态库都按后缀只判 .md、.tsv、.txt，排除前缀、上下文规则、围栏与表头都在库里；拒绝的退出码与会话号同一个（三份脚本不另分），出路用那一形态的 remedy，
+调用方另接的收尾一句按拒绝的是哪一判取（closing_remedy）。
+几样都有时按会话号、批次代号、任务号与批号的次序报第一样，改完再写一次报下一样。三份脚本的 no-session-guard 开关关掉这个函数，几样一起不判。
+append-record.py、ledger-append-section.py 调的也是这个函数。
 
 用法（给 scripts/kb/ 里写文件的脚本 import；脚本按路径跑时 sys.path[0] 就是这个目录）：
-    from lib_notation_check import clock_refusal, session_name_refusal, session_guard_problems
+    from lib_notation_check import clock_refusal, closing_remedy, session_name_refusal, session_guard_problems
     refusal = clock_refusal(路径, 新串, 新串第一行在改完之后文件里的行号)    # None 放行；否则是说明行的列表，第一行是摘要（不带「✗」）
-    refusal = session_name_refusal(路径, 新串, 行号)                      # 同上，判会话号，没有会话号再判批次代号
+    refusal = session_name_refusal(路径, 新串, 行号, before_text=写前整份, after_text=写后整份)   # 同上，判会话号，再判批次代号，再判任务号、会话短号与批号
+    refusal = numbers_refusal(路径, 写前整份, 写后整份)                    # 只判任务号、会话短号与批号（session_name_refusal 两份都交 None 时调用方另调它）
+    closing_remedy(refusal)                                              # 收尾那一句出路
     problems = session_guard_problems(临时目录, attempt, 拒绝时的退出码)    # 三份脚本的自证共用的会话号样本，见函数说明
 
 范围：钟点——目标路径以 JUDGED_SUFFIXES 那几种（.md、.json、.txt，不分大小写）结尾、在仓里（以这份文件所在的仓为准）、不在那份库里钟点那一形态的排除前缀下才判；别的后缀与仓外不判。
@@ -41,8 +49,25 @@ import sys
 FORM_KEY = 'clock-times'
 SESSION_FORM_KEY = 'session-names'
 BATCH_FORM_KEY = 'batch-codes'
+NUMBERS_FORM_KEY = 'task-and-session-numbers'
 JUDGED_SUFFIXES = ('.md', '.json', '.txt')
 LISTED_HITS_LIMIT = 20
+NUMBERS_SUMMARY = '新串写了任务号、会话短号或批号（写前、写后整份各判一遍，每一行只拿它配上的写前那一行上的同一种去抵，抵不掉的），共 {count} 处，{relative} 一个字节没写：'
+# 调用方在 session_name_refusal 的说明行之后各接一句收尾的出路：按拒绝说明第一行是哪一判取（closing_remedy）
+CLOSING_REMEDIES = (
+    ('新串写了会话号', '会话号换成按出场次序的叫法（别的会话写 mainagent(A)、mainagent(B)，子 agent 写 subagent(A)、subagent(B)），事情与日期照留'),
+    ('新串写了批次代号', '批次代号换成那一批做了什么事'),
+    ('新串写了任务号', '任务号换成交给服务的那条命令（不带号）或结局行的 type= 与 exit= 那一段，引日志只抄那一行的内容、不抄日志路径；'
+                    '批号换成那一批做了什么、改了哪几个文件；会话短号与「<做什么>那一路的会话」这类描述换成按出场次序的叫法'
+                    '（别的会话写 mainagent(A)、mainagent(B)，子 agent 写 subagent(A)、subagent(B)），写清它改了哪个文件、做了什么'),
+    ('读不到', '先照上面那一句把判据库恢复了'),
+)
+
+
+def closing_remedy(refusal):
+    """session_name_refusal 交的说明行（第一行是摘要）对应的收尾出路：按摘要的开头取 CLOSING_REMEDIES 里那一句；都对不上的交通用的一句。"""
+    head = refusal[0] if refusal else ''
+    return next((remedy for prefix, remedy in CLOSING_REMEDIES if head.startswith(prefix)), '照上面每一条的出路改')
 
 
 def repository_root():
@@ -75,10 +100,11 @@ def copy_library_into(root):
     return destination
 
 
-def form_refusal(form_key, form_name, summary, show_shape, suffixes, path, new_text, first_line, root=None):
+def form_refusal(form_key, form_name, summary, show_shape, suffixes, path, new_text, first_line, root=None, before_text=None):
     """新串在共用库 form_key 那一形态下有命中就返回说明行的列表（第一行是摘要，其余行自带缩进与「→」），放行返回 None。
     suffixes 不是 None 时只判这些后缀的目标（不分大小写）；目标不在仓里（以 root 为准）不判；读不到库按拒绝处理。
-    summary 里的 {count} 与 {relative} 换成命中数与目标相对仓根的路径；show_shape 为真时每处命中带判据行的名字。"""
+    summary 里的 {count} 与 {relative} 换成命中数与目标相对仓根的路径；show_shape 为真时每处命中带判据行的名字。
+    before_text 不是 None 时 new_text 是写之后的整份文件：交库的 new_violation_hits 判写前、写后两份整文（每一行只拿它配上的写前那一行上的同一种去抵，抵不掉的才算），行号就是写后文件的行号，first_line 不用。"""
     if not new_text or (suffixes is not None and not path.lower().endswith(suffixes)):
         return None
     root = os.path.realpath(root or repository_root())
@@ -91,7 +117,11 @@ def form_refusal(form_key, form_name, summary, show_shape, suffixes, path, new_t
         library = load_library(root)
         if library.is_excluded(form_key, relative):
             return None
-        hits = library.all_hits(form_key, new_text, relative)
+        if before_text is None:
+            hits = library.all_hits(form_key, new_text, relative)
+        else:
+            hits = library.new_violation_hits(form_key, before_text, new_text, relative)
+            first_line = 1
         remedy = list(library.FORMS_BY_KEY[form_key]['remedy'])
     except Exception as error:   # 文件不在、语法错、弄坏开关写错都算读不到
         return [f'读不到{form_name}判据 {library_path}（{type(error).__name__}：{error}），写进 {relative} 的新串没法判，按拒绝处理，一个字节没写',
@@ -118,34 +148,49 @@ def clock_refusal(path, new_text, first_line, root=None):
                         path, new_text, first_line, root)
 
 
-def session_name_refusal(path, new_text, first_line, root=None):
+def session_name_refusal(path, new_text, first_line, root=None, *, before_text, after_text):
     """新串带会话号（ListAgents 列的会话名）就返回说明行的列表（形状同 clock_refusal），放行返回 None。仓内任何后缀的目标都判，与写闸判 Write、Edit 的范围一致。
-    没有会话号的接着判批次代号（库里 batch-codes 那一形态，库按后缀只判 .md、.tsv、.txt）；读不到库时交会话号那一判的拒绝，不再判批次代号。
-    first_line、root 的意思同 clock_refusal。"""
-    refusal = form_refusal(SESSION_FORM_KEY, '会话号', '新串写了会话号（ListAgents 列的会话名），共 {count} 处，{relative} 一个字节没写：', False, None,
-                           path, new_text, first_line, root)
-    if refusal is not None:
-        return refusal
-    return form_refusal(BATCH_FORM_KEY, '批次代号', '新串写了批次代号，共 {count} 处，{relative} 一个字节没写：', True, None,
-                        path, new_text, first_line, root)
+    没有会话号的接着判新串里的批次代号（库里 batch-codes 那一形态），再没有的接着判任务号、会话短号与批号（库里 task-and-session-numbers 那一形态）：
+    这一形态判的是写前、写后两份整文（before_text 是这一次写之前的整份文件，不在是空串；after_text 是写之后的整份），每一行只拿它配上的写前那一行上的同一种去抵、抵不掉的才拒，行号是写后文件的行号；
+    后两种库按后缀只判 .md、.tsv、.txt。读不到库时交会话号那一判的拒绝，后两种不再判。first_line、root 的意思同 clock_refusal。
+    before_text、after_text 都交 None 的，任务号那一形态这里不判，由调用方按文件另调 numbers_refusal（一次写改同一份文件几处的 replace-batch.py）。"""
+    for form_key, form_name, summary, show_shape in (
+            (SESSION_FORM_KEY, '会话号', '新串写了会话号（ListAgents 列的会话名），共 {count} 处，{relative} 一个字节没写：', False),
+            (BATCH_FORM_KEY, '批次代号', '新串写了批次代号，共 {count} 处，{relative} 一个字节没写：', True)):
+        new_text_refusal = form_refusal(form_key, form_name, summary, show_shape, None, path, new_text, first_line, root)
+        if new_text_refusal is not None:
+            return new_text_refusal
+    if before_text is None and after_text is None:
+        return None
+    return numbers_refusal(path, before_text, after_text, root)
+
+
+def numbers_refusal(path, before_text, after_text, root=None):
+    """写前（before_text，文件原来不在是空串）、写后（after_text）两份整文的任务号、会话短号与批号（库里 task-and-session-numbers 那一形态的 new_violation_hits）：
+    每一行只拿它配上的写前那一行上的同一种（判据与命中的串）去抵，抵不掉的有命中就返回说明行的列表（形状同 clock_refusal，行号是写后文件的行号），放行返回 None。读不到库按拒绝处理。"""
+    return form_refusal(NUMBERS_FORM_KEY, '任务号与批号', NUMBERS_SUMMARY, True, None, path, after_text, 1, root, before_text)
 
 
 def session_guard_problems(workspace, attempt, refused_code, entry=None):
     """三份定点写入脚本（replace-once.py、insert-row.py、replace-batch.py）的自证共用的会话号样本：交问题列表，空表是全过。
     样本里的会话名在这里拆开拼，这份源码里不出现字面写法（门禁 doc-text 也扫它）。
     workspace：自证的临时目录，里面造一个假仓（抄一份真的共用库），另造一个没有库的假仓核「读不到判据」那一支。
-    attempt(路径, 新串, 假仓根, 干跑) → (退出码, 说明文字)：把新串写在 `第一行 甲\\n第二行 乙\\n` 的第 2 行（替换第 2 行，或插在第 1 行之后），文字是脚本打出来的；
+    attempt(路径, 新串, 假仓根, 干跑) → (退出码, 说明文字)：把新串写在 `第一行 甲\\n第二行 乙\\n` 的第 2 行（替换「第二行 乙」那一行，或插在「第一行」起头的那一行之后），
+      文字是脚本打出来的；写前写后那几格的文件头上多一行开着的围栏，或尾巴上多几行（批号、旧任务号），或「第二行 乙」那一行本身带旧任务号、在围栏里、是表头，
+      脚本要把写前、写后的整份交给 session_name_refusal 的 before_text、after_text。
       没有干跑的脚本忽略第四个参数。refused_code：会话号被拒时这个脚本的退出码。
-    entry(路径, 新串, 假仓根) → (退出码, 说明文字)：从脚本的入口（main）走一遍，说明文字要以「✗ 新串写了会话号」起头（可带缩进）；不给就不核入口。"""
+    entry(路径, 新串, 假仓根) → (退出码, 说明文字)：从脚本的入口（main）走一遍，说明文字要以「✗ 新串写了会话号」起头（可带缩进）；不给就不核入口。
+    旧号挪到另一句、另一行与只改同一行别处那三格不经 attempt：写前、写后两份整文直接交 numbers_refusal，三份脚本判得一样。"""
     problems = []
     glue = ''.join
     session = glue(('singlefs-', 'e152'))
     original = '第一行 甲\n第二行 乙\n'
     root = os.path.join(workspace, 'session-repo')
-    for directory in ('records', 'scripts', os.path.join('.claude', 'gate.d', 'fixtures')):
+    for directory in ('records', 'scripts', os.path.join('research', 'prompts'), os.path.join('.claude', 'gate.d', 'fixtures')):
         os.makedirs(os.path.join(root, directory))
     copy_library_into(root)
     markdown = os.path.join(root, 'records', 'notes.md')
+    verdict = os.path.join(root, 'research', 'prompts', 'demo-r1-main-verification.md')
     program = os.path.join(root, 'scripts', 'probe.py')
     excluded = os.path.join(root, '.claude', 'gate.d', 'fixtures', 'case.md')
     outside = os.path.join(workspace, 'outside-session.md')
@@ -201,6 +246,86 @@ def session_guard_problems(workspace, attempt, refused_code, entry=None):
         if not refused and (code != 0 or new_text not in content_of(target)):
             problems.append(f'写会话号：{label}，本该放行（退出码 0）并写进文件，实际 {code}：{said!r}'
                             '（LIB_FORBIDDEN_NOTATIONS_BREAK=judged-suffixes-ignored 让批次代号什么后缀都判的话这一条本来就该红）')
+    # 任务号、会话短号与批号与会话号同一个函数判（排在批次代号之后）：.md 目标的新串带三条判据行之一拒（记录里的「A/B 读数：」一行与反引号里的任务号也拒），
+    # 记录里表头是「批次」那一列的批号、判决里行首的「A/B 读数：」一行与 .py 目标放行
+    for label, target, new_text, row in (
+            ('.md 目标的新串带任务号', markdown, '调度那一条跑完（任务 21036）', 'task-numbers'),
+            ('.md 目标（记录）里带「A/B 读数：」的一行', markdown, 'A/B 读数：任务 11964', 'task-numbers'),
+            ('.md 目标的新串带反引号里的任务号', markdown, '结局行 `任务 21036 退 0` 原样', 'task-numbers'),
+            ('.md 目标的新串带括号里的会话短号', markdown, '这件事 (5b) 知道', 'session-short-codes'),
+            ('.md 目标的新串带别的会话的批号', markdown, '它的批 105 在修', 'batch-numbers'),
+            ('.md 目标的新串拿描述指别的会话（那一路会话）', markdown, '检出钩子换上前问过改 ㉒ 那一路会话，换完把新 sha256 发给它', 'session-descriptions')):
+        reset(target)
+        code, said = run(target, new_text)
+        if code != refused_code or '写了任务号、会话短号或批号' not in said or '第 2 行' not in said or '→ 怎么办' not in said or content_of(target) != original:
+            problems.append(f'写会话号：{label}，本该退出码 {refused_code}、说「写了任务号、会话短号或批号」点名第 2 行带出路且不写文件，实际 {code}：{said!r}'
+                            f'（脚本的 no-session-guard、LIB_FORBIDDEN_NOTATIONS_BREAK=task-and-session-numbers 或 ={row} 关掉这一判的话这一条本来就该红）')
+    # 写前、写后整份各判一遍，写后每一行上的违例拿它配上的写前那一行上的同一种（判据行名字与命中的串）去抵：(说明, 写前的文件, 新串, 该不该拒, 打开时这一条该红的开关)。
+    # 新串都不带号的五条：插入点前开着的围栏被新串收掉、后面那一行出了围栏；新串只写一行围栏、让后面已有的批号出了围栏；文件里已有的旧号不挡这一次写；
+    # 带号那一行只改别处（替换的两份改的是带号那一行本身，insert-row.py 插在它前面）；围栏里带批号的那一行被新串挪到围栏外；新串改了表头、已有的批号离开「批次」那一列。
+    # 新串带号的两条：同一行新加第二个任务号（替换的两份加在带旧号那一行里）；整份多出一行带同一个旧号（只报一处、点名新写的第 2 行，check_lines 里的两段都要在）
+    numbers_line = '第二行 乙（任务 21036）'
+    table_before = '第一行 甲\n| 第二行 乙 | 批次 |\n|---|---|\n| 交回 | 批 6 |\n'
+    for label, before, new_text, refused, switches, check_lines in (
+            ('插入点前围栏开着、新串以收尾围栏起头', '```\n' + original, '```\n\n正文：这件事 (5b) 知道', True,
+             '脚本没把写前、写后的整份交给 session_name_refusal', None),
+            ('新串只写一行围栏、让后面已有的批号出了围栏', original + '```\n那一路第 7 批交回\n```\n', '```', True,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=after-lines-judged-alone 或 before-context-ignored 或脚本没把写前、写后的整份交给 session_name_refusal', None),
+            ('写前文件里已有的旧号不挡这一次写', original + '旧行（任务 21036）\n', '第二行 丙', False, 'LIB_FORBIDDEN_NOTATIONS_BREAK=violations-not-netted', None),
+            ('行里已有任务号、同一行只改路径', '第一行 甲\n' + numbers_line + '\n', 'crates/new/src/lib.rs', False,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-by-line-text 或 violations-not-netted', None),
+            ('行里已有任务号、同一行新加第二个任务号', '第一行 甲\n' + numbers_line + '\n', '第二行 丙（任务 21037）', True,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-by-line-number', None),
+            ('围栏里已有批号的那一行挪到围栏外', '第一行 甲\n```\n第二行 乙 那一路第 7 批交回\n```\n', '```\n第二行 乙', True,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=before-context-ignored 或 after-lines-judged-alone', None),
+            ('改了表头、已有的批号离开批次那一列', table_before, '| 第二行 丙 | 内容', True,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=before-context-ignored 或 after-lines-judged-alone', None),
+            ('整份多出一行带同一个旧号', original + '旧行（任务 21036）\n', '第二行 丙（任务 21036）', True,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-uncounted 或 violations-not-netted', ('共 1 处', '第 2 行（'))):
+        with open(markdown, 'w', encoding='utf-8') as handle:
+            handle.write(before)
+        code, said = run(markdown, new_text)
+        if refused and (code != refused_code or '写了任务号、会话短号或批号' not in said or content_of(markdown) != before):
+            problems.append(f'写会话号：{label}，本该退出码 {refused_code}、说「写了任务号、会话短号或批号」且不写文件，实际 {code}：{said!r}（{switches}的话这一条本来就该红）')
+        elif refused and check_lines is not None and not all(piece in said for piece in check_lines):
+            problems.append(f'写会话号：{label}，拒绝说明本该只点名新写的那一行（说「{check_lines[0]}」、点名「{check_lines[1]}」：原样留着的那一行先拿去抵），'
+                            f'实际：{said!r}（{switches}的话这一条本来就该红）')
+        if not refused and (code != 0 or new_text not in content_of(markdown)):
+            problems.append(f'写会话号：{label}，本该放行（退出码 0）并写进文件，实际 {code}：{said!r}（{switches} 设着的话这一条本来就该红）')
+    # 相抵按行配：同一字面的旧号离开写前它所在的那一行照拒，只改同一行别处照放行。insert-row.py 只插行、挪不走已有的号，这三格不经 attempt，
+    # 写前、写后两份整文直接交 numbers_refusal（三份脚本判任务号与批号都走它），三份自证判得一样：(说明, 写前, 写后, 该不该拒, 打开时这一条该红的开关, 拒绝说明里要有的两段)。
+    # 挪到另一句：号从头一句挪进下一行那一句，两行都改了、行数没变；挪到另一行：号从头一行挪进末尾新加的一行；
+    # 只改同一行别处：带号那一行改了路径，前面另加了一行（两行连成一块改动，要按去掉违例之后的字配回原来那一行）
+    for label, before, after, refused, switches, check_lines in (
+            ('旧号挪到另一句照拒', '甲句（任务 21036）。\n乙句说另一件事。\n', '甲句。\n乙句说另一件事（任务 21036）。\n', True,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-across-lines 或 violations-netted-uncounted', ('共 1 处', '第 2 行（')),
+            ('旧号挪到另一行照拒', '第一行 甲（任务 21036）\n第二行 乙\n第三行 丙\n', '第一行 甲\n第二行 乙\n第三行 丙\n第四行 丁（任务 21036）\n', True,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-across-lines 或 violations-netted-uncounted', ('共 1 处', '第 4 行（')),
+            ('只改同一行别处照放行', '第一行 甲\n第二行 乙改了 a/b.rs（任务 21036）。\n', '第一行 甲\n新加的一行说明。\n第二行 乙改了 a/c/main.rs（任务 21036）。\n', False,
+             'LIB_FORBIDDEN_NOTATIONS_BREAK=line-pairing-positional、violations-netted-by-line-text、violations-netted-by-line-number 或 violations-not-netted', None)):
+        refusal = numbers_refusal(markdown, before, after, root)
+        said = '\n'.join(refusal or ())
+        if refused and (refusal is None or '写了任务号、会话短号或批号' not in said or not all(piece in said for piece in check_lines)):
+            problems.append(f'写会话号：{label}，写前写后两份整文交 numbers_refusal 本该拒、说「写了任务号、会话短号或批号」「{check_lines[0]}」并点名「{check_lines[1]}」，'
+                            f'实际：{said!r}（{switches}的话这一条本来就该红）')
+        if not refused and refusal is not None:
+            problems.append(f'写会话号：{label}，写前写后两份整文交 numbers_refusal 本该放行，实际：{said!r}（{switches}设着的话这一条本来就该红）')
+    for label, target, new_text in (
+            ('.md 目标（记录）里表头是批次的那一列的批号', markdown, '| 批次 | 内容 |\n|---|---|\n| 批 6 | 交回 |'),
+            ('判决里行首的「A/B 读数：」一行', verdict, 'A/B 读数：任务 11964'),
+            ('.py 目标的新串带任务号（这一形态只判 .md、.tsv、.txt）', program, 'VALUE = 1  # 任务 21036 跑完')):
+        reset(target)
+        code, said = run(target, new_text)
+        if code != 0 or new_text not in content_of(target):
+            problems.append(f'写会话号：{label}，本该放行（退出码 0）并写进文件，实际 {code}：{said!r}'
+                            '（LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=task-and-session-numbers 或 judged-suffixes-ignored 设着的话这一条本来就该红）')
+    # 按出场次序的 mainagent(A)、subagent(A) 与不跟会话词的「一路」不算拿描述指别的会话（LIB_FORBIDDEN_NOTATIONS_BREAK=session-descriptions-loose 设着的话这一条本来就该红）
+    lettered = 'mainagent(A) 在改判据库，subagent(B) 交回；这一路、那一路径、一路绿、按块那一路都照写'
+    reset(markdown)
+    code, said = run(markdown, lettered)
+    if code != 0 or lettered not in content_of(markdown):
+        problems.append(f'写会话号：.md 目标的新串用按出场次序的叫法与不跟会话词的一路，本该放行（退出码 0）并写进文件，实际 {code}：{said!r}'
+                        '（LIB_FORBIDDEN_NOTATIONS_BREAK=session-descriptions-loose 设着的话这一条本来就该红）')
     reset(excluded)
     code, said = run(excluded, refused_text)
     if code != 0 or refused_text not in content_of(excluded):

@@ -75,8 +75,8 @@
       「✗ 自证 no-process-with-unread-host：」
   QUEUE_HEALTH_BREAK=cross-check-skipped  不比现算与 cgroup
       「✗ 自证 cross-check-mismatch-red：」
-  QUEUE_HEALTH_BREAK=unread-cgroup-as-zero  cgroup 读不了的当 0
-      「✗ 自证 cross-check-unread-red：」「✗ 自证 unread-printed-not-zero：」
+  QUEUE_HEALTH_BREAK=unread-cgroup-as-zero  cgroup 读不了的当 0（进程合计对着 0 比，报告里多一行「现算与 cgroup 对不上」，unread-printed-not-zero 把整份报告原文打进失败说明，那一行也以 ✗ 起头）
+      「✗ 自证 cross-check-unread-red：」「✗ 自证 unread-printed-not-zero：」「✗ 任务 501 第 2 次 · 本机：现算与 cgroup 对不上」
   QUEUE_HEALTH_BREAK=near-cap-unjudged  占用贴着上限也不报
       「✗ 自证 near-cap-red：」
   QUEUE_HEALTH_BREAK=caps-ratio-omitted  每台那一行不写现算合计占在跑上限之和的比例
@@ -101,6 +101,16 @@
       「✗ 自证 usage-refused：」
   QUEUE_HEALTH_BREAK=source-form-unmatched  核尝试标签与 scope 的写法时拿一串对不上的字去找
       「✗ 自证 attempt-forms-match-sources：」
+  QUEUE_HEALTH_BREAK=imported-modules-unread  读任务服务源码只读入口那一份，不读它的拆分族（拆出并真载入的同目录模块）
+      「✗ 自证 attempt-forms-match-sources：」「✗ 自证 attempt-forms-found-in-imported-modules：」「✗ 自证 attempt-forms-found-in-import-module-modules：」
+  QUEUE_HEALTH_BREAK=unimported-modules-read  读任务服务源码把同目录每份 .py 都读，不认拆分族
+      「✗ 自证 attempt-forms-skip-unimported-modules：」「✗ 自证 attempt-forms-skip-name-like-unloaded-modules：」「✗ 自证 attempt-forms-skip-loaded-shared-modules：」「✗ 自证 attempt-forms-skip-comment-named-modules：」
+  QUEUE_HEALTH_BREAK=name-like-unloaded-read  读任务服务源码只按名字认拆分族：名字像部分文件的同目录模块都读，不看入口载没载入
+      「✗ 自证 attempt-forms-skip-name-like-unloaded-modules：」「✗ 自证 attempt-forms-skip-comment-named-modules：」
+  QUEUE_HEALTH_BREAK=loaded-shared-read  读任务服务源码只按载入认拆分族：入口 import 的同目录模块都读，不看名字像不像部分文件
+      「✗ 自证 attempt-forms-skip-loaded-shared-modules：」
+  QUEUE_HEALTH_BREAK=loaded-by-text-read  读任务服务源码认拆分族的载入按文本行扫：注释、文档串里写的文件名与 import 行都算载入，importlib.import_module 认不出
+      「✗ 自证 attempt-forms-skip-comment-named-modules：」「✗ 自证 attempt-forms-found-in-import-module-modules：」
 """
 import os as preflight_os, sys as preflight_sys  # noqa: E401,E402
 preflight_sys.dont_write_bytecode = True
@@ -138,7 +148,7 @@ TOP_NAME_COUNT = 5
 THIS_HOST_NAME, PEER_HOST_NAME = "本机", "第二台"
 LEVEL_FINE, LEVEL_NOTICE, LEVEL_PROBLEM, LEVEL_UNREAD = "fine", "notice", "problem", "unread"
 EXIT_FINE, EXIT_PROBLEM, EXIT_USAGE, EXIT_UNREAD, EXIT_NOTHING_READ = 0, 1, 2, 3, 78
-# 这几种写法照抄自这两份源码；attempt-forms-match-sources 格核它们还在
+# 这几种写法照抄自任务服务（task-server/task_server.py 加它的拆分族）与内存包装；attempt-forms-match-sources 格核它们还在
 ATTEMPT_UNIT_SOURCE_FORM = "singlefs-task-{self.store.tag}-{task['id']}-{number}.service"
 ATTEMPT_LABEL_SOURCE_FORM = "task-{self.store.tag}-{task['id']}-{number}"
 SCOPE_SOURCE_FORM = 'unit="singlefs-memory-cap-'
@@ -147,6 +157,43 @@ SCOPE_SOURCE_FORM = 'unit="singlefs-memory-cap-'
 # ── 读这一台（第二台上由 PROBE_FUNCTIONS 这几份源码现跑，只用标准库与 memory_peaks_lib，不引用模块层的名字）──
 def broken(item, environment):
     return item in (environment.get("QUEUE_HEALTH_BREAK") or "").split(",")
+
+
+def split_family_library():
+    """scripts/gate/lib_split_family_loaded.py：认「入口加它拆出的部分文件」只在那一份里写，按路径载入。"""
+    path = os.path.join(REPOSITORY_ROOT, "scripts", "gate", "lib_split_family_loaded.py")
+    specification = importlib.util.spec_from_file_location("lib_split_family_loaded_for_queue_health", path)
+    library = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(library)
+    return library
+
+
+def entry_with_split_family(entry, environment):
+    """入口加它的拆分族的路径，入口在前：族是名字落在命名族里、又被入口（或族里别的文件）载入的同目录 .py（import、from … import、字面量参数的 importlib.import_module，
+    注释与文档串里写的不算），认法在 split_family_library；不按通配、不写名单。"""
+    library = split_family_library()
+    candidates = [path for path in library.sibling_files(entry) if path.endswith(".py")]
+    if broken("unimported-modules-read", environment):
+        return [entry] + [path for path in candidates if path != entry]
+    if broken("imported-modules-unread", environment):
+        return [entry]
+    defects = set()
+    if broken("name-like-unloaded-read", environment):
+        defects.add(library.NAME_ONLY)
+    if broken("loaded-shared-read", environment):
+        defects.add(library.LOADED_ONLY)
+    if broken("loaded-by-text-read", environment):
+        defects.add(library.TEXT_SCAN)
+    return library.loaded_family(entry, candidates, defects)
+
+
+def forms_found_in_files(paths, forms, suffix=""):
+    """每种写法（后面接 suffix）在这几份文件的文本里找不找得到：→ {写法: 是否}。"""
+    text = ""
+    for path in paths:
+        with open(path, encoding="utf-8") as handle:
+            text += handle.read() + "\n"
+    return {form: form + suffix in text for form in forms}
 
 
 def attempt_patterns():
@@ -1133,12 +1180,48 @@ def selftest_cells():
                              env=dict(os.environ, **{BREAK_VARIABLE: "watch-keeps-latest"}))
     verify("break-refused-outside-selftest", outside.returncode == EXIT_USAGE and "只在自证里认" in outside.stderr, f"退 {outside.returncode}：{outside.stderr.strip()}")
 
-    forms_read = {}
-    for relative, form in (("task-server/task_server.py", ATTEMPT_UNIT_SOURCE_FORM), ("task-server/task_server.py", ATTEMPT_LABEL_SOURCE_FORM), ("scripts/hosts/run-with-memory-cap.sh", SCOPE_SOURCE_FORM)):
-        with open(os.path.join(REPOSITORY_ROOT, relative), encoding="utf-8") as handle:
-            looked_for = form + "不在任何源码里" if broken("source-form-unmatched", environment) else form
-            forms_read[form] = looked_for in handle.read()
+    task_server_forms = (ATTEMPT_UNIT_SOURCE_FORM, ATTEMPT_LABEL_SOURCE_FORM)
+    unmatched_suffix = "不在任何源码里" if broken("source-form-unmatched", environment) else ""
+    task_server_files = entry_with_split_family(os.path.join(REPOSITORY_ROOT, "task-server", "task_server.py"), environment)
+    forms_read = forms_found_in_files(task_server_files, task_server_forms, unmatched_suffix)
+    forms_read.update(forms_found_in_files([os.path.join(REPOSITORY_ROOT, "scripts", "hosts", "run-with-memory-cap.sh")], (SCOPE_SOURCE_FORM,), unmatched_suffix))
     verify("attempt-forms-match-sources", all(forms_read.values()), f"尝试单元、尝试标签与 scope 的写法在源码里要找得到：{forms_read}")
+
+    def forms_found_in_sample_family(files):
+        """在一个临时目录里写好 files（[(文件名, 文本)]），读 fake_entry.py 的拆分族，核两种写法找不找得到。"""
+        with scratch_cell() as directory:
+            for name, text in files:
+                with open(os.path.join(directory, name), "w", encoding="utf-8") as handle:
+                    handle.write(text)
+            return forms_found_in_files(entry_with_split_family(os.path.join(directory, "fake_entry.py"), environment), task_server_forms)
+
+    both_forms = f'unit = f"{ATTEMPT_UNIT_SOURCE_FORM}"\nlabel = f"{ATTEMPT_LABEL_SOURCE_FORM}"\n'
+    found_in_split_family = forms_found_in_sample_family((
+        ("fake_entry.py", "import os\nimport fake_entry_unit\nfrom fake_entry_label import Piece\n"),
+        ("fake_entry_unit.py", f'unit = f"{ATTEMPT_UNIT_SOURCE_FORM}"\n'),
+        ("fake_entry_label.py", "import fake_entry_label_deeper\n"),
+        ("fake_entry_label_deeper.py", f'label = f"{ATTEMPT_LABEL_SOURCE_FORM}"\n')))
+    found_in_unrelated = forms_found_in_sample_family((("fake_entry.py", "import os\n"), ("fake_unrelated_module.py", both_forms)))
+    found_in_name_like_unloaded = forms_found_in_sample_family((("fake_entry.py", "import os\n"), ("fake_entry_shadow.py", both_forms)))
+    found_in_loaded_shared = forms_found_in_sample_family((("fake_entry.py", "import os\nimport fake_shared_checks\n"), ("fake_shared_checks.py", both_forms)))
+    found_in_comment_named = forms_found_in_sample_family((
+        ("fake_entry.py", '# 别处留下的 "fake_entry_shadow.py" 不归这一份\n"""用法说明：\n    import fake_entry_shadow   # 别这样写\n"""\nimport os\n'),
+        ("fake_entry_shadow.py", both_forms)))
+    found_in_import_module = forms_found_in_sample_family((
+        ("fake_entry.py", 'import importlib\nfake_entry_part = importlib.import_module("fake_entry_part")\n'),
+        ("fake_entry_part.py", both_forms)))
+    verify("attempt-forms-found-in-imported-modules", all(found_in_split_family.values()),
+           f"两种写法只在入口 import 的、名字像部分文件的同目录模块里（label 那份是入口 import 的那份再 import 的），要照旧找得到：{found_in_split_family}")
+    verify("attempt-forms-skip-unimported-modules", not any(found_in_unrelated.values()),
+           f"入口没 import、名字也不像部分文件的同目录模块里有这两种写法，不许算找到（不按通配）：{found_in_unrelated}")
+    verify("attempt-forms-skip-name-like-unloaded-modules", not any(found_in_name_like_unloaded.values()),
+           f"名字像部分文件（fake_entry_shadow.py）而入口没 import 的同目录模块里有这两种写法，不许算找到：{found_in_name_like_unloaded}")
+    verify("attempt-forms-skip-loaded-shared-modules", not any(found_in_loaded_shared.values()),
+           f"入口 import 的共用库（fake_shared_checks.py，名字不像它拆出的部分文件）里有这两种写法，不许算找到：{found_in_loaded_shared}")
+    verify("attempt-forms-skip-comment-named-modules", not any(found_in_comment_named.values()),
+           f"入口只在注释与文档串里点名 fake_entry_shadow.py、写 import fake_entry_shadow（没有载入它）：那份里有这两种写法，不许算找到：{found_in_comment_named}")
+    verify("attempt-forms-found-in-import-module-modules", all(found_in_import_module.values()),
+           f"入口按字面量参数的 importlib.import_module 载入的部分文件（fake_entry_part.py）里有这两种写法，要找得到：{found_in_import_module}")
     return failures, checked
 
 
@@ -1173,6 +1256,12 @@ SWITCH_EXPECTED_CELLS = {
     "peer-failure-read-as-empty": {"peer-failure-unread"},
     "task-number-unchecked": {"usage-refused"},
     "source-form-unmatched": {"attempt-forms-match-sources"},
+    "imported-modules-unread": {"attempt-forms-match-sources", "attempt-forms-found-in-imported-modules", "attempt-forms-found-in-import-module-modules"},
+    "unimported-modules-read": {"attempt-forms-skip-unimported-modules", "attempt-forms-skip-name-like-unloaded-modules", "attempt-forms-skip-loaded-shared-modules",
+                                "attempt-forms-skip-comment-named-modules"},
+    "name-like-unloaded-read": {"attempt-forms-skip-name-like-unloaded-modules", "attempt-forms-skip-comment-named-modules"},
+    "loaded-shared-read": {"attempt-forms-skip-loaded-shared-modules"},
+    "loaded-by-text-read": {"attempt-forms-skip-comment-named-modules", "attempt-forms-found-in-import-module-modules"},
 }
 
 

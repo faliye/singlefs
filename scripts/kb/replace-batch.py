@@ -23,7 +23,8 @@ REPLACE_BATCH_WRITE_EACH=1 强制逐处写盘（不是 --dry-run 时才走；--d
 
 退出码：0 写成功（或 --dry-run 核过）；1 锚点命中数不对，一个文件都没写；2 用法不对，或平常跑设了只给自证用的开关；3 写完回读不一致；
 4 没换上：预演时被拒，一个文件都没换；预演过了、真换时失败或改名之后被 Ctrl-C 打断，已经换上的文件逐个列出（被打断的那一个算已换上）；
-5 目标在仓里（任何后缀），某一处的新串带会话号（ListAgents 列的会话名），一个文件都没写（--dry-run 同样判）；
+5 目标在仓里（任何后缀），某一处的新串带会话号（ListAgents 列的会话名）或批次代号，或某个 .md、.tsv、.txt 写后整份比写前多出任务号、会话短号、批号（按判据与命中的串计数），
+  一个文件都没写（--dry-run 同样判）；
 6 目标是仓里的 .md、.json 或 .txt，某一处的新串带钟点、时区词或时间戳（含运行目录名、日志文件名里连写的紧凑写法），一个文件都没写（--dry-run 同样判）。
 核的时候每一处都核完（对不上的那一处不施加、接着核下一处），对不上的逐处列全再退 1（--dry-run 同样）：
 命中 0 次的附上文件里最像的一段与第一处不同（replace-once.py 的 nearest_hint，同一份算法），文件读不了的点名那个文件。
@@ -32,6 +33,10 @@ REPLACE_BATCH_WRITE_EACH=1 强制逐处写盘（不是 --dry-run 时才走；--d
 （.claude/gate.d/lib-forbidden-notations.py 的会话号形态，lib_notation_check.py 的 session_name_refusal 调它，三份定点写入脚本共用）判规格里每一处的 new；
 带会话名的逐处列出文件、行号与出路（写成「别的会话」这类不带号的说法）。后缀不限，范围与写闸判 Write、Edit 一致：排除前缀、.sh .py .rs 里带
 「# session-names:allow <理由>」的一行、仓外不判。拦不住的写法（shell 重定向、heredoc、python 的 open）靠提交时门禁 doc-text 的 session-names 格兜底。
+同一个退出码另判每一处新串里的批次代号，与每个文件的任务号、会话短号、批号：拿锚点核对时读到的原文与规格全部施加完（count 几处都在内）的整份交
+lib_notation_check.py 的 numbers_refusal，写后每一行只拿它配上的写前那一行上的同一种去抵、抵不掉的才拒（只改了带号那一行别处的不拒；
+同一字面的旧号离开写前它所在的那一行的，一处 count 2 头一处在围栏里、第二处在外的，先写进围栏再删开头围栏行的，都照拒）；
+拒绝说明末尾「→ 怎么办：」一句按拒的是哪一判写（closing_remedy：任务号与批号的出路照任务号与批号写，不说成会话号）。
 写仓里的 .md、.json、.txt 之前判每一处的新串里的钟点（退出码 6）：锚点都核对得上之后、判会话号之前（--dry-run 也判），用 write-guard.sh 的第五道与门禁 doc-text 的 clock-times 格
 同一份判据（.claude/gate.d/lib-forbidden-notations.py 的钟点形态，lib_notation_check.py 的 clock_refusal 调它，与 replace-once.py、insert-row.py 同一份）判规格里每一处的 new；
 带钟点、时区词、时间戳的逐处列出文件、行号、形态与出路。判新串不判旧串；别的后缀、仓外、排除前缀下的文件不判；读不到判据库按拒绝办（退出码 6）。
@@ -42,12 +47,31 @@ REPLACE_BATCH_WRITE_EACH=1 强制逐处写盘（不是 --dry-run 时才走；--d
   REPLACE_BATCH_BREAK=no-clock-guard  run() 不判新串里的钟点
       写 .md 之前判新串里的钟点（「✗ 自证：写 .md 之前判新串里的钟点没判对」，下面逐条以「写 .md：」开头：新串带紧凑时间戳、带日期钟点时区词、带光秃时区词、
       --dry-run 也拒、两处里一处带钟点时一个文件都不写、入口退出码 6）
-  REPLACE_BATCH_BREAK=no-session-guard  run() 不判新串里的会话号
-      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」，下面逐条以「写会话号：」开头：.md 与 .py 目标的新串带会话名、--dry-run 也拒、入口退出码 5 与不写文件）
+  REPLACE_BATCH_BREAK=no-session-guard  run() 不判新串里的会话号、批次代号与任务号、会话短号、批号
+      按文件写前写后整份判任务号与批号（「✗ 自证：任务号与批号按文件写前写后整份判没判对」；排在会话号那一格前面，自证停在这一格）
+  REPLACE_BATCH_BREAK=numbers-new-text-only  任务号、会话短号与批号只判每一处的新串，不判每个文件写前写后的整份
+      按文件写前写后整份判任务号与批号（「✗ 自证：任务号与批号按文件写前写后整份判没判对」；明细里两处依次施加那一条，不以 ✗ 起头，不另点名）
   LIB_FORBIDDEN_NOTATIONS_BREAK=session-names  共用库的弄坏开关（写法在 lib-forbidden-notations.py 文件头），自证同样走它：整个会话号形态不判
       写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」，下面「写会话号：」开头的拒绝几条全红）；
       同一个库另有 LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=session-names（放行标记不认：只有带放行标记的那一条红）与
       LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=session-names（排除前缀不生效：只有排除前缀下放行的那一条红），失败行同上
+  LIB_FORBIDDEN_NOTATIONS_BREAK=after-lines-judged-alone  同一个库判写前、写后两份整文时逐行单判、不认围栏与表头，自证同样走它
+      按文件写前写后整份判任务号与批号（「✗ 自证：任务号与批号按文件写前写后整份判没判对」；明细里只把批号写进围栏那一条，不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-not-netted  同一个库不拿写前文件里已有的违例相抵，自证同样走它
+      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」；明细里写前文件里已有的旧号、带号那一行只改路径、整份多出一行带同一个旧号、只改同一行别处照放行那四条，
+      不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-by-line-text  同一个库按行文相抵（行里别处一改，那一行原有的号就算新写的），自证同样走它
+      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」；明细里带号那一行只改路径、只改同一行别处照放行那两条，不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-by-line-number  同一个库写前哪一行号上有违例、写后同一行号上的违例全抵掉，自证同样走它
+      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」；明细里同一行新加第二个任务号、只改同一行别处照放行那两条，不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-uncounted  同一个库按判据与命中的串整份相抵但不计数、不看在哪一行，自证同样走它
+      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」；明细里整份多出一行带同一个旧号、旧号挪到另一句照拒、旧号挪到另一行照拒那三条，不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=violations-netted-across-lines  同一个库按判据与命中的串整份计数相抵、不看在哪一行（同一字面的旧号挪到别的行也抵掉），自证同样走它
+      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」；明细里旧号挪到另一句照拒、旧号挪到另一行照拒那两条，不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=line-pairing-positional  同一个库一块改动里写前写后的行按位置从上往下配（带旧号那一行前面加了一行，它就配不上原来那一行），自证同样走它
+      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」；明细里只改同一行别处照放行那一条，不以 ✗ 起头，不另点名）
+  LIB_FORBIDDEN_NOTATIONS_BREAK=before-context-ignored  同一个库写前那一份逐行单判（不认围栏与表头）、写后照认，自证同样走它
+      写之前判新串里的会话号（「✗ 自证：写会话号之前判新串没判对」；明细里新串只写一行围栏、围栏里的那一行挪到围栏外、改了表头那三条，不以 ✗ 起头，不另点名）
   LIB_FORBIDDEN_NOTATIONS_BREAK=clock-times  同一个库的钟点形态整个不判，自证同样走它
       写 .md 之前判新串里的钟点（「✗ 自证：写 .md 之前判新串里的钟点没判对」，下面「写 .md：」开头的拒绝几条全红）
   replace-once.py 的 REPLACE_ONCE_BREAK=no-nearest 同样让这一格红（最像的一段是从那里取的）
@@ -56,7 +80,7 @@ REPLACE_BATCH_WRITE_EACH=1 强制逐处写盘（不是 --dry-run 时才走；--d
   REPLACE_BATCH_BREAK=write-each-ignores-dry-run  REPLACE_BATCH_WRITE_EACH=1 时 --dry-run 也逐处写盘：逐处写盘那一支排在干跑之前
       干跑不写盘（「✗ 自证：REPLACE_BATCH_WRITE_EACH=1 时 --dry-run 写了盘」）
   ATOMIC_REPLACE_BREAK=rawafterrename  共用库 lib_atomic_replace.py 的弄坏开关（写法在它文件头）：改名之后到的 Ctrl-C 原样抛，自证同样走它
-      写回的方式（「✗ 自证：写回的方式不对」，下面几行以「[改名之后被打断]」起头）
+      写回的方式（「✗ 自证：写回的方式不对」；下面几行是 [改名之后被打断] 的明细，不以 ✗ 起头，不另点名）
 """
 import contextlib
 import importlib.util
@@ -69,7 +93,7 @@ import tempfile
 
 from lib_atomic_replace import ReplaceRefused, ReplacedThenFailed, ReplacedThenInterrupted, leftover_temporary_files, \
     problems_with_replacement_by_rename, replace_file_contents_by_rename, unchanged_bytes
-from lib_notation_check import clock_refusal, copy_library_into, session_guard_problems, session_name_refusal
+from lib_notation_check import clock_refusal, closing_remedy, copy_library_into, numbers_refusal, session_guard_problems, session_name_refusal
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -119,15 +143,15 @@ def plan_in_memory(edits, originals=None):
 
 
 def new_text_refusals(edits, check, notation_root=None, originals=None):
-    """按计划顺序检查新串；优先复用锚点核对时读到的字节，避免重复读取和换行转换。"""
+    """按计划顺序逐处检查新串（check 是 clock_refusal 这类只判新串的函数）；优先复用锚点核对时读到的字节，避免重复读取和换行转换。
+    各处按数组次序在内存里依次施加，「第 n 行」是那一处改完之后新串第一行在文件里的行号。"""
     texts, refusals = {}, []
     for edit in edits:
         path = edit['file']
         if path not in texts:
             data = originals[path] if originals is not None else pathlib.Path(path).read_bytes()
             texts[path] = data.decode('utf-8')
-        first_line = texts[path][:texts[path].find(edit['old'])].count('\n') + 1
-        refusal = check(path, edit['new'], first_line, notation_root)
+        refusal = check(path, edit['new'], texts[path][:texts[path].find(edit['old'])].count('\n') + 1, notation_root)
         if refusal:
             refusals.append(refusal)
         texts[path] = texts[path].replace(edit['old'], edit['new'])
@@ -136,18 +160,28 @@ def new_text_refusals(edits, check, notation_root=None, originals=None):
 
 def clock_refusals(edits, notation_root=None, originals=None):
     """规格里每一处新串的钟点判定（共用库 clock-times 那一形态，写闸与 replace-once.py、insert-row.py 同一份）：→ [说明行列表]，每个有命中的新串一个。
-    只判仓里 .md、.json、.txt 目标（clock_refusal 自己管后缀、仓外与排除前缀）；「第 n 行」的算法同 session_name_refusals。弄坏开关 no-clock-guard 不判。"""
+    只判仓里 .md、.json、.txt 目标（clock_refusal 自己管后缀、仓外与排除前缀）。弄坏开关 no-clock-guard 不判。"""
     if os.environ.get("REPLACE_BATCH_BREAK") == "no-clock-guard":
         return []
     return new_text_refusals(edits, clock_refusal, notation_root, originals)
 
 
-def session_name_refusals(edits, notation_root=None, originals=None):
-    """规格里每一处新串的会话号判定（共用库 session-names 那一形态，写闸同一份）：→ [说明行列表]，每个有命中的新串一个。
-    各处按数组次序在内存里依次施加，「第 n 行」是那一处改完之后新串第一行在文件里的行号。弄坏开关 no-session-guard 不判。"""
+def session_name_refusals(edits, texts, notation_root=None, originals=None):
+    """会话号、批次代号、任务号与会话短号与批号的判定（共用库，写闸同一份）：→ [说明行列表]。会话号与批次代号逐处判新串（每个有命中的新串一个）；
+    任务号、会话短号与批号按文件判一次：写前（originals 里读到的原文）、写后（texts，plan_in_memory 把每一处 count 次都施加完的整份）两份整文，
+    写后每一行只拿它配上的写前那一行上的同一种（判据与命中的串）去抵、抵不掉的才拒（每个有命中的文件一个），一处的 count 几次都在内。弄坏开关 no-session-guard 不判。"""
     if os.environ.get("REPLACE_BATCH_BREAK") == "no-session-guard":
         return []
-    return new_text_refusals(edits, session_name_refusal, notation_root, originals)
+    refusals = new_text_refusals(edits, lambda path, new, first, root: session_name_refusal(path, new, first, root, before_text=None, after_text=None),
+                                 notation_root, originals)
+    if os.environ.get("REPLACE_BATCH_BREAK") == "numbers-new-text-only":   # 弄坏开关：任务号那一形态只判每一处的新串（看不到写之后整份的样子）
+        return refusals + [refusal for edit in edits for refusal in [numbers_refusal(edit['file'], '', edit['new'], notation_root)] if refusal]
+    for path, written in texts.items():
+        before = (originals[path] if originals is not None else pathlib.Path(path).read_bytes()).decode('utf-8')
+        refusal = numbers_refusal(path, before, written, notation_root)
+        if refusal:
+            refusals.append(refusal)
+    return refusals
 
 
 def apply_each_edit_to_disk(edits):
@@ -245,12 +279,13 @@ def run(edits, dry_run, notation_root=None):
         print(f"✗ {len(edits)} 处里 {len(clock_hits)} 处的新串在描述里写了钟点、时区词或时间戳{'，--dry-run 没写' if dry_run else '，什么都没写'}")  # gate-lint:summary
         print("→ 怎么办：照上面每一处的出路改新串（钟点与时区词去掉、只写日期，运行目录名与日志文件名里的时间戳不抄进 .md），改规格整份重跑")
         return 6
-    refusals = session_name_refusals(edits, notation_root, originals)
+    refusals = session_name_refusals(edits, texts, notation_root, originals)
     if refusals:
         for refusal in refusals:
             print("✗ " + "\n".join(refusal))  # gate-lint:detail
-        print(f"✗ {len(edits)} 处里 {len(refusals)} 处的新串写了会话号{'，--dry-run 没写' if dry_run else '，什么都没写'}")  # gate-lint:summary
-        print("→ 怎么办：新串里的会话号换成「别的会话」这类不带号的说法，事情与日期照留，改规格整份重跑")
+        print(f"✗ {len(edits)} 处的规格里 {len(refusals)} 处判出会话号、批次代号或任务号、会话短号、批号"
+              f"（会话号与批次代号按每一处的新串判，任务号那一形态按每个文件写前写后的整份判）{'，--dry-run 没写' if dry_run else '，什么都没写'}")  # gate-lint:summary
+        print("→ 怎么办：" + "；".join(dict.fromkeys(closing_remedy(refusal) for refusal in refusals)) + "；改规格整份重跑")
         return 5
     if dry_run:
         print(f"✓ {len(edits)} 处都命中得对（{len(texts)} 个文件），--dry-run 没写")
@@ -380,6 +415,31 @@ def problems_with_session_guard(directory):
     return session_guard_problems(directory, attempt, 5, entry)
 
 
+def problems_with_whole_file_numbers(directory):
+    """任务号、会话短号与批号按文件判写前、写后两份整文：(说明, 文件原文, 规格里的几处, 该不该拒)。批号都在围栏里写进去，单看每一处的新串与它前面的文字判不出。
+    假仓里抄一份真的判据库（copy_library_into）。"""
+    problems = []
+    root = os.path.join(directory, "repo")
+    os.makedirs(os.path.join(root, "records"))
+    copy_library_into(root)
+    target = os.path.join(root, "records", "notes.md")
+    batch = "那一路第 7 批交回"
+    for label, original, edits, refused in (
+            ("一处 count 2、头一处在围栏里而第二处在外", "```\n占位甲\n```\n占位甲\n", [{"old": "占位甲", "new": batch, "count": 2}], True),
+            ("两处依次施加：先写进围栏、再删开头围栏行", "前文\n尾巴\n", [{"old": "尾巴", "new": "```\n" + batch + "\n```"}, {"old": "前文\n```\n", "new": "前文\n"}], True),
+            ("只把批号写进围栏", "前文\n尾巴\n", [{"old": "尾巴", "new": "```\n" + batch + "\n```"}], False)):
+        pathlib.Path(target).write_text(original, encoding="utf-8")
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = run([dict(edit, file=target) for edit in edits], False, notation_root=root)
+        said = captured.getvalue()
+        if refused and (code != 5 or "写了任务号、会话短号或批号" not in said or pathlib.Path(target).read_text(encoding="utf-8") != original):
+            problems.append(f"{label}：本该退出码 5、说「写了任务号、会话短号或批号」且一个字节不写，实际 {code}：{said!r}")
+        if not refused and code != 0:
+            problems.append(f"{label}：本该放行（退出码 0），实际 {code}：{said!r}")
+    return problems
+
+
 def selftest():
     with tempfile.TemporaryDirectory() as directory:
         first = pathlib.Path(directory, "first.md")
@@ -479,6 +539,15 @@ def selftest():
                 print(f"   {problem}")  # gate-lint:detail
             print("→ 看 run() 里调 clock_refusals 的那一段与 lib_notation_check.py；REPLACE_BATCH_BREAK=no-clock-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 设着的话这里本来就该红")
             return 1
+    # 任务号、会话短号与批号按文件判写前写后整份（count 每一处都在内、几处依次施加之后的样子）
+    with tempfile.TemporaryDirectory() as directory:
+        number_problems = problems_with_whole_file_numbers(directory)
+        if number_problems:
+            print("✗ 自证：任务号与批号按文件写前写后整份判没判对")
+            for problem in number_problems:
+                print(f"   {problem}")  # gate-lint:detail
+            print("→ 看 session_name_refusals() 是不是拿 plan_in_memory() 施加完的整份与原文交给 numbers_refusal；REPLACE_BATCH_BREAK=no-session-guard 或 LIB_FORBIDDEN_NOTATIONS_BREAK 设着的话这里本来就该红")
+            return 1
     # 写之前判新串里的会话号
     with tempfile.TemporaryDirectory() as directory:
         session_problems = problems_with_session_guard(directory)
@@ -513,7 +582,8 @@ def selftest():
           "写仓里的 .md 之前判每一处新串里的钟点：带紧凑时间戳、日期钟点时区词、光秃时区词的拒绝（6，--dry-run 也拒、两处里一处带钟点一个文件都不写）并点名形态与行号，"
           "非时间戳的 8 位数字加 T、只写日期、删掉钟点的改动、别的后缀与仓外放行，假仓里没有共用库时读不到钟点判据按拒绝办，入口退出码 6；"
           "写仓里任何后缀的文件之前判每一处新串里的会话号：.md 与 .py 目标带会话名的拒绝（5，--dry-run 也拒）并点名行号与出路「别的会话」且一个文件都不写，干净的新串、.py 里带放行标记的一行、"
-          "排除前缀下的文件、仓外的文件放行，假仓里没有共用库时读不到会话号判据按拒绝办（退出码 5），入口退出码 5")
+          "排除前缀下的文件、仓外的文件放行，假仓里没有共用库时读不到会话号判据按拒绝办（退出码 5），入口退出码 5；"
+          "任务号与批号按文件判写前写后整份：一处 count 2 头一处在围栏里第二处在外、两处依次施加先写进围栏再删开头围栏行的都拒（5），只把批号写进围栏放行")
     return 0
 
 

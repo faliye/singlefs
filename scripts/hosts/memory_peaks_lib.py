@@ -39,10 +39,12 @@ import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys
       这条命令的 --check 点的格（逗号连起来的几格、给几次的都算）全在它登记的那几格里时，--item 后面那个词（与「--item=<值>」的，换成「--item <值>」两个词）照留进键，
       不换成〈条目〉；几个 --item 各留各的、照写的次序，不并。
       表里登了两格。门禁 code-tooling 的 break-switch-replay：它点名的是一份脚本或脚本里的一条开关（<脚本路径>:<开关名>=<值>），各份的开关数与自证用量差得远
-      （服务记的峰值：scripts/gate/admission.py 一份 1.1–1.3 GiB、task-server/task_server_lib.py 一份 16.6 GiB），这一格又按内存上限定开关趟的并行条数（上限给得越大并行越多、峰值跟着涨）。
+      （服务记的峰值：scripts/gate/admission.py 一份 1.1–1.3 GiB、task-server/task_server_lib.py 一份 16.6 GiB）；这一格的开关趟并行条数取每台默认重活线程数、不随内存上限变（`.claude/gate.d/code-tooling.sh` 里 break-switch-replay 格的注释）。
       门禁 crash-point-replay 的 crash-case-replay：它点名的是崩溃枚举用例（crash-case:<用例名>），各用例的稳态峰值差得远（服务记的：一条用例每片 10.3–12.2 GiB，
       而各用例共用的那把键上记的最大只有 9.0 GiB，那条用例每片连撞三次）。点哪一份、哪一条都落一把键时，大的连撞、小的被抬高；所以各份、各条各一把键，各从自己的记录起，
       没有记录的从服务的缺省起、撞了由服务放大重排。
+      这两格只在命令带着原样的 --check 与 --item 进本库换算时认（内存包装直接按命令取键）；经 task-server 交的，服务在这之前先照 task_server_lib.py 的 selection_class_words
+      把本仓门禁的 --check 格名换成 *、--item 连值去掉，到这里认不出这两格、不照留，各份各条落同一把键：经服务跑的以服务那把键为准，这两格的登记不管它。
       别的入口（崩溃点重放入口、崩溃放量、crates 变异重放这类）、这两道阶段别的格与不给 --check 的、--only / --skip / --exact 照上面「条目」折。
     文件（FILE_TOKEN）：照留的那一个脚本或可执行文件之后的位置参数里写成路径形态的（path_shaped：带 /、以 FILE_EXTENSIONS 结尾、或以②的三个记号起头；
       以 - 起头、带 = 的不算）。照留的是命令词本身；命令词是解释器（INTERPRETER_NAMES）的照留它后面第一个不以 - 起头的词（-c 后面那段代码照一条命令再认，-m 后面的模块照留），
@@ -51,7 +53,7 @@ import 本身不起子进程、不开文件。用法（脚本按路径跑时 sys
     不换的：命令词、照留的脚本、子命令（cargo test 的 test）、选项本身、KEPT_VALUE_OPTIONS（-p、--test、--features、--manifest-path 这类）的值、
       cargo test 的 -- 之后 LIBTEST_VALUE_OPTIONS（--test-threads 这类）的值、--item 这类范围开关、不是路径形态的别的位置参数（数、名字）：这些决定跑什么、要多少内存。
   ④ 换算是幂等的：换过的键再换一次不变。
-入口（command_entry；task-server 新键没有自己的记录时退回同入口的记录，task_server.py 的 family_prediction 调这一处，不另写一份认法）：
+入口（command_entry；认一把键是哪个入口，目前只有本库自证调它；task-server 定额度不借同入口的记录：这把键自己没有记录的从缺省起，task_server.py 的 recorded_prediction）：
   换算过的键按空格切词，去掉起头的赋值、前缀命令（PREFIX_COMMANDS，连同选项、选项值与时长）、解释器（INTERPRETER_NAMES，连同它的选项；-c 后面那段照一条命令再认，-m 取模块名）之后的那一个词，
   去掉起头的 ./；它是 cargo 的取「cargo <子命令> -p <包名>」，没有 -p / --package 的取「cargo <子命令>」。一个词都不剩交整把键。
 峰值表的口径与列见 run-with-memory-cap.sh 文件头「峰值表」一段；这里只读不写（写在包装那一边，表旁的 <表>.lock 那把锁里）。
@@ -117,7 +119,7 @@ FOLD_TOKENS = (ITEM_TOKEN, FILE_TOKEN, BREAK_VALUE_TOKEN)
 ITEM_OPTIONS = ("--item", "--only", "--skip", "--exact")                     # 后面那个词（或 = 之后）是点名的条目，换成 ITEM_TOKEN
 CELL_OPTIONS = ("--check",)                                                    # 后面那个词（或 = 之后）是点名的门禁格名，照留进键（路径形态的换成 FILE_TOKEN）
 ITEM_KEPT_OPTION = "--item"                                                    # 文件头「键」③ 照留的条目：ITEM_KEPT_CELLS 登记的格里，这个选项后面的值照留进键
-ITEM_KEPT_CELLS = {".claude/gate.d/code-tooling.sh": ("break-switch-replay",),          # 门禁阶段（仓根下的相对路径）→ --check 只点这几格时 --item 的值照留进键
+ITEM_KEPT_CELLS = {".claude/gate.d/code-tooling.sh": ("break-switch-replay",),          # 门禁阶段（仓根下的相对路径）→ --check 只点这几格时 --item 的值照留进键（只管直接带 --check 与 --item 的命令；经 task-server 交的已被服务折掉，文件头「键」③）
                    ".claude/gate.d/crash-point-replay.sh": ("crash-case-replay",)}
 ITEM_VARIABLE_SUFFIXES = ("_SELFTEST_CELLS",)                                  # 环境变量名以它结尾的，值是点名的格
 ITEM_VARIABLES = ("GATE_MUTATION_ROW_SELECTION",)                              # 环境变量名照写的，值是点名的条目
@@ -195,7 +197,7 @@ CARGO_PACKAGE_OPTIONS = ("-p", "--package")   # command_entry：cargo 的入口�
 
 
 def command_entry(key):
-    """一把命令键的入口（文件头「入口」；task-server 定额度的同入口退回，task_server.py 的 family_prediction）：键文本按空格切词，
+    """一把命令键的入口（文件头「入口」；目前只有本库自证调它，task-server 定额度不借同入口的记录）：键文本按空格切词，
     照 kept_command_position 去掉起头的赋值、前缀命令（连同选项与时长）、解释器与它的选项之后的那一个词（-c 后面那段脚本照一条命令再认、取它的命令词，-m 取模块名），
     去掉起头的 ./；那个词是 cargo 的取「cargo <子命令> -p <包名>」（子命令是 cargo 后面头一个不以 - 或 + 起头、不是选项值的词；没有 -p / --package 的取「cargo <子命令>」）。
     一个词都不剩交整把键。弄坏开关 entry-first-word 下取键的头一个词（env、bash、python3 这类当入口）。"""

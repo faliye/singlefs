@@ -7,6 +7,7 @@
 | 文件 | 做什么 |
 |---|---|
 | `watch.sh`、`watch.conf`、`agent-watch.py` | 看门狗：复检子 agent 的会话记录与 hook 的检出记录；`--processes` 只等本实例底下起的长命令退出。任务卡不卡、停不停、用多少内存与核数、异常结局都归 `task-server`（经 `task wait` 叫醒），服务自己健不健康由 task-server 自己盯、出事直接发消息给发起任务的会话（`task-server/README.md`「## 发消息给会话」），人手查一次用 `control check`，看门狗不读服务；它另查根分区可用量（`根分区余量过低`）；`--ack` 三种写法见 `agent-watch.py` 文件头「--ack 的写法」；阈值在 `watch.conf` |
+| `agent_watch_transcripts.py`、`agent_watch_repository.py`、`agent_watch_alerts.py` | `agent-watch.py` 拆出的三块（被 import 的模块，入口导入并再导出）：会话记录与后台任务、草稿根与根分区余量；知识同步提醒的仓现状；单个子 agent 的告警、整份报告、hook 检出、`--ack` 与整查一轮；各块带测它的自证用例 |
 | `dispatch-prompt.py` | 派发提示的骨架与检查 |
 | `copy-originals.py` | 改仓内文件之前把原文件留底：`copy <草稿目录> <文件>…` 拷到 `<草稿目录>/originals/<相对仓根的路径>` 并记清单（路径、sha256），`check <草稿目录>` 列出自那以后改过的；目标由它照相对路径算，不在 Bash 里拼 `$(echo $f | tr / _)` 这类变量目标 |
 | `agent-handover.py` | 从会话记录抽交接摘要 |

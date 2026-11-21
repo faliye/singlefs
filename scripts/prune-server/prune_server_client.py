@@ -7,7 +7,7 @@
 帧格式照 prune-server/src/protocol.rs 文件头（冻结，这里只照抄、不另定）：
   每帧 [u32 帧体长度][帧体]，整数小端；请求帧体 [u64 序号][u8 操作码][内容]，回应帧体 [u64 序号][u8 状态][u8 操作码][内容]。
   用到的操作码：成批点读 1、成批写 2（带客户端身份与请求号）、按前缀扫 3、统计 4、认领 5、报到 6（序号 0、服务不回）、宣布停服务 8（只认 unix socket，只给自证）、删前缀 9、
-  不在才写 10、写结论 11（两者也带客户端身份与请求号）。
+  不在才写 10、写结论 11（两者也带客户端身份与请求号）、列认领 13（只读，请求是前缀、续扫起点、条数上限，不带请求号）。
   回应状态：0 做完、1 内容解不开、2 认不得的操作码、3 帧长度不对（序号 0，服务随后关连接）、4 存储层出错、5 忙、6 服务停了（序号 0）、
   7 守卫不过（只回写结论：认领被别的持有者持着、租期没到，或守卫那一行、一把删键那一行此刻的样子与写的一方读到的不同；不是错，见「GPU 判的三族」）。
   表只用结论表（表号 3）。TCP 上不认证（服务那一侧没有认证）。
@@ -19,7 +19,9 @@
 
 键空间（library_store 一处定，三家不各抄一份）：结论表里，键 = 族名 [@ 命名空间] / 种类 / 相对路径（UTF-8）。
   族名：verdict-library（lib_verdict_library.py，种类是「<固定目录名>/<种类>」，例 singlefs-formal-unit-verdicts/proof-function）、
-        unit-verdicts（admission.py，种类是 singlefs-unit-verdicts/ 下那一层目录名）、mutation-units（lib_mutation_units.py，种类是库目录名，
+        unit-verdicts（admission.py，种类是 singlefs-unit-verdicts/ 下那一层目录名；门禁 checker-independence-and-sync 的 crate-cross-references 格的判法
+        scripts/gate/crate-cross-references-check.py 也写这一族，种类 crate-cross-references-check.py:packages，库目录照 admission.py 的写法取名，
+        一个包一条判定写 keys/<键>.json 与 items/<包目录的 sha256>.json，那份文件头「复用」）、mutation-units（lib_mutation_units.py，种类是库目录名，
         例 singlefs-crates-mutation-library、singlefs-mutate-library）、
         broad-mutation（scripts/mutation/broad-mutation.py 的 Library；种类固定 broad-mutation-units，不随库目录名；相对路径是「<表>/<条目>」，
         只追加的表一行一个条目、条目名按写入次序升序，表与条目的写法在它文件头「判定库」）。
@@ -75,6 +77,9 @@ GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_jud
   调用（一问一答，与别的帧同一套容错；三种写都带请求号，回存储出错照同一请求号重发）：
     Client.write_if_absent_frame(entries)          不在才写：键已在的不动，交 (真写了几条, 早已生效)；待判行走它
     Client.claim(holder_identity, keys, lease)     以给的持有者身份认领，交每个键的 (claimed | held-by-other | already-concluded, 持有者, 剩余租期)
+    Client.list_claims_after(prefix, after_key, n) 列认领一帧（prune-server/src/protocol.rs 文件头「列认领」）：前缀要以 gpu-claim/ 起头；交 ([(键, 持有者身份, 剩余租期毫秒)], 截断了没有)，
+                                                   只列租期没到的、按键升序；截断了拿最后一条的键作下一帧的 after_key
+    Client.list_claims(prefix)                     列出前缀下此刻有效的全部认领，一帧 CLAIM_LISTING_ENTRIES_PER_FRAME 条接着列到不再截断，交 [(键, 持有者身份, 剩余租期毫秒)]
     Client.write_guarded_conclusion(...)           写结论（prune-server/src/protocol.rs 文件头「写结论」）：交 dict，result 是 written、
                                                    claim-held-by-other（带 holder、remaining_lease_milliseconds）、guard-row-changed（带 current：库里那一份的 SHA-256 或 None）
                                                    或 deleted-row-changed（带 key 与 current：删键那一行此刻的样子与写的一方读到的不同）；deleted_keys 每把带写的一方读到的那一份；
@@ -147,8 +152,26 @@ GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_jud
       non_records=<值不是带 item 的 JSON 对象的条数> refused=<没删的条数>。--dry-run 只数不删、口径和删一样。退 0；参数不对、名单读不了或格式不对退 2；
       某条的键是同一种类里另一把原键的前缀（删前缀会连带删掉那一把）时那一条不删、点名，整次退 1；服务那一侧的拒绝与连不上照客户端的退出码。
       先 --dry-run 数一遍并核对逐条打出的键与项名，再不带它删，再 --dry-run 数到 matched=0。
+  python3 scripts/prune-server/prune_server_client.py delete-conclusions [--dry-run] [--repository-root <目录>] <结论种类>
+      判器或观察者的判法改了之后由人登记、整族删那一种结论再全部重判：结论种类取 image-judgement（结论种类字节 01：池级 checker 与 GPU 判器；另整张删表 17、21）、
+      observer（结论种类字节 02；另整张删表 15、16、1A、1B）、facts-verifier（整张删表 08）、pairing（整张删表 19）。崩溃判定库的键以表标签那一个字节起头；
+      键里带结论种类的六张表（0A、0B、0C、0D、0E、18，键是「表标签 ‖ 块键（定长 72 字节）‖ 结论种类 ‖ 版本…」）只删结论种类字节对得上的行：扫一遍这张表（值也读回来），
+      按完整原键删（连段键与版本登记键，这几张表同一张里原键定长、一把原键不会是另一把的前缀），别的结论种类的行不动；整张删的表按表标签前缀删（同 delete-prefix --hex）。
+      哪个种类删哪些表、表标签、结论种类字节与块键长度是照验证包抄的，开跑先对账（conclusion_source_problems）：--repository-root（缺省是这份客户端所在的仓）
+      底下 crates/singlefs-verification/src/verdict_store.rs 的 VerdictStoreTable::key_tag、文件头里键里带结论种类的表、「结论种类 = `01`（镜像判定…）、`02`（观察者）」、
+      「定长 72 字节」；对不上退 1、一条不删。
+      验证包改了表或块键长度，先改这份客户端的 CONCLUSION_KIND_*、TABLES_KEYED_BY_CONCLUSION_KIND 与块键长度再跑；对账读仓里的源码，所以要在验证包补丁合进来之后的树里跑。
+      接着列持有者：此刻租期没到的 gpu-claim/ 认领（服务只有一份库，两台的 GPU 批处理服务与登记的临时库持有的认领都在里面）按持有者身份逐个打
+      PRUNE_SERVER_DELETE_CONCLUSIONS_HOLDER holder=… claims=… longest_remaining_milliseconds=… example_key=…；不带 --dry-run 而有持有者：退 1、一条不删，
+      出路是停两台的 GPU 批处理服务（python3 gpu-verification-server/control stop）、等租期过了再跑；判段是任务服务里的任务、没有认领可列，由人先停。
+      每一片（一张表，或一张表里结论种类字节对得上的行）打 PRUNE_SERVER_DELETE_CONCLUSIONS_SLICE mode=dry-run|deleted kind=… table=<标签> member=<VerdictStoreTable 成员名>
+      select=whole-table|kind-byte:<字节> keys=<条数>（整张表数的是前缀底下的全部键、含段键；按结论种类字节挑的数的是行）；--dry-run 只数不删。
+      末行 PRUNE_SERVER_DELETE_CONCLUSIONS mode=… kind=… slices=… keys=… holders=…；中途死掉重跑同一条（删是幂等的）。
+      退 0；1 拒绝（有持有者、对不上账）；2 用法错（结论种类不认得、个数不对）；
+      服务那一侧的拒绝与连不上照客户端的退出码。键里带结论种类的六张表要把值读回来才认得到键，条目多时是重活，整张删的表不读值。
   python3 scripts/prune-server/prune_server_client_selftest.py --selftest [--server-binary <prune-server 二进制>]
-      自证：每格在临时目录起一份真 prune-server（unix socket 加回环 TCP），逐格走一遍；
+      自证：每格在临时目录起一份真 prune-server（unix socket 加 TCP，TCP 绑多机配置 HOSTS 里这一台的地址、端口由内核挑，两台的 GPU 批处理服务都连得到；
+      HOSTS 读不到、认不出这一台退 78，不补回环），逐格走一遍；
       二进制从 --server-binary 或环境变量 PRUNE_SERVER_BINARY 取，都没给时：环境里有任务服务给的 CARGO_TARGET_DIR 才在这里起 cargo build --release --offline 编一份进那个编译目录（是重活，交 task-server）；
       没有 CARGO_TARGET_DIR 不现编（会编进主仓的 prune-server/target），退 2，出路是整条经 task-server 交（服务给编译目录、包装现编一遍 prune-server，不带 --server-binary）：
       task-server/task submit -- python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service -- python3 scripts/prune-server/prune_server_client_selftest.py --selftest；
@@ -159,8 +182,9 @@ GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_jud
       起一份临时服务，逐份对它跑三家与它们旁路的原有自证（family_selftests），每份打一行 FAMILY_SELFTEST script=… exit=…，
       末行 PRUNE_SERVER_FAMILY_SELFTESTS scripts=… passed=… failed=…。
   python3 scripts/prune-server/prune_server_client_selftest.py --with-temporary-service [--server-binary <…>] -- <命令> [<参数>…]
-      起一份临时服务（二进制取法同 --selftest），把连哪一处（SOCKET_VARIABLE 与 TCP_ADDRESS_VARIABLE）指到它、设 TEMPORARY_SERVICE_VARIABLE，
-      起那条命令（不经 shell，标准输出与标准错误照原样），等它退出再停服务；退出码是那条命令的，起不了服务退 2。
+      起一份临时服务（二进制取法同 --selftest；TCP 绑多机配置 HOSTS 里这一台的地址、端口由内核挑，TCP_ADDRESS_VARIABLE 交出去的就是这个地址加端口，
+      两台的 GPU 批处理服务都连得到），把连哪一处（SOCKET_VARIABLE 与 TCP_ADDRESS_VARIABLE）指到它、设 TEMPORARY_SERVICE_VARIABLE，
+      起那条命令（不经 shell，标准输出与标准错误照原样），等它退出再停服务；退出码是那条命令的，起不了服务退 2，HOSTS 读不到、认不出这一台退 78（一条命令都不起）。
       三家与旁路的原有自证（family_selftests 那几份）只在这样起的临时服务上跑：开跑前调 selftest_service_problem()，
       不是临时服务（没有 TEMPORARY_SERVICE_VARIABLE，或它与连哪一处对不上、socket 不在）就退 2、一格都不跑，不写真服务。
       自证起的子进程照继承这几个变量，沿用同一份临时服务（各格的库目录在各自的临时目录里，命名空间不串）。
@@ -219,6 +243,15 @@ GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_jud
                                       另一个种类里同名的项与没点名的项一条不少；再 --dry-run 数到 matched=0；名单里没找到记录的项名逐条点名
   batched-read-answer-over-frame-limit-split  五把各正好一段长（不分段存）、合计超过帧长上限的值，中间夹一条小值与一把不在的键，一次 read_many 读全：
                                       逐字节对、次序与问的相同；那五把都没有版本登记键（真没分段）
+  delete-conclusions-by-kind          临时服务底下照验证包文件头的形状写样本行（键里带结论种类的 0A、0B、18 两种结论种类各几行，0A 里 image-judgement 有一行大到分段存；整张删的 17、21、15、16、1A、1B、08、19；
+                                      旁观者 05、0F、11、1D），--repository-root 指一棵与样本一致的假源码树。四个结论种类依次：--dry-run 退 0、每一片数到的条数对、库不动；
+                                      删：退 0、各自的行（键里带结论种类的只少结论种类字节对得上的行，含大值的段键）与各自整张删的表没了，别种类的行、旁观者一条不少；再 --dry-run 每一片 0 条
+  delete-conclusions-refuses-while-claims-are-live  一个持有者认领了 gpu-claim/ 下一块、租期长：删退 1、点名这个持有者、不打末行、库一行不少；--dry-run 退 0、照列持有者、库不动；
+                                      另一份服务里一个持有者认领一块、租期 300 毫秒、等过期之后：删退 0、删了（租期过了的不算持有者）；结论种类不认得、没给、给两个、只有 --dry-run 都退 2
+  delete-conclusions-refuses-a-source-that-differs  --repository-root 指的假源码树里 ConclusionBlocks 的表标签、块键长度各改一处、verdict_store.rs 缺了：各退 1、点名对不上的那一处、
+                                      不打末行、库一行不少；一棵都对得上的 --dry-run 退 0（拒的是对不上，不是别的）
+  conclusion-kinds-match-the-verdict-store  客户端抄的表标签、结论种类字节与块键长度对这一棵仓里的验证包源码（conclusion_source_problems(REPOSITORY_ROOT)）一个问题都没有；
+                                      不起服务；验证包的表在补丁里改了，要在补丁合进来之后的树里才绿
   write-storage-failure-replayed      服务带 --selftest-write-failure-file 起、造错文件在：写一条收到存储出错、照同一请求号退避重发，等故障日志出现
                                       storage-write-failed 之后删掉造错文件，这一次写做完（不抛错）、重发过至少一次、读回值；造错文件一直在、重连总时长 2 秒：
                                       写在限时里退 75（storage-failing），不退 3
@@ -227,6 +260,11 @@ GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_jud
   gpu-conclusion-write-guarded        写结论：别的持有者持着、租期没到交 claim-held-by-other（持有者对、不退出）；持有者自己写（强制现判）交 written 3 条；
                                       读到「不在」的旧写方再写交 guard-row-changed、带库里那一份的 SHA-256；库里结论块是持有者写的、待判行删了、
                                       强制现判行的持有者与结论摘要对
+  gpu-claim-listing-lists-live-claims  列认领：两个持有者各认领一块（一个长租期、一个短租期、等过短租期）加另一条流的一块：按族前缀列只回两条流里租期没到的块
+                                      （键、持有者身份、剩余租期都对），按一条流的认领键前缀列只回这条流的块，一帧至多两条接着列合起来不重不漏
+  temporary-service-binds-the-address-of-this-host  临时服务的 TCP 绑多机配置 HOSTS 里这一台的地址（scripts/hosts/multi_host_addresses.py 的 resolve），不是回环：
+                                      就绪行 tcp= 的地址正是这一台、不是回环、端口是内核挑的非 0 端口；只设这个 TCP 地址（没有 socket 文件）写一条读回一条、走 tcp
+  temporary-service-refuses-without-readable-hosts  SINGLEFS_MULTI_HOST_CONFIG 指到不在的文件：--with-temporary-service 退 78、点名 HOSTS、起的命令一条都没跑，不退回回环
 弄坏开关 PRUNE_SERVER_CLIENT_BREAK=<项>（只在自证里认：自证给自己和它起的子进程设 PRUNE_SERVER_CLIENT_SELFTEST=1；直接执行别的用法时设了就退 2）。
 一条一行「PRUNE_SERVER_CLIENT_BREAK=<项>  弄坏哪一处」，下一行起写打开后红的格（失败行「✗ 自证 <格名>：」的句首；自证末尾的开关轮按 BREAK_RED_CELLS 逐条核同一格）：
   PRUNE_SERVER_CLIENT_BREAK=read-failure-reported-as-absent  读失败时交回「键都不在」
@@ -285,6 +323,22 @@ GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_jud
       delete-by-item-name-picks-by-value（「✗ 自证 delete-by-item-name-picks-by-value：」）
   PRUNE_SERVER_CLIENT_BREAK=item-name-dry-run-deletes  delete-by-item-name 带 --dry-run 也删
       delete-by-item-name-picks-by-value（「✗ 自证 delete-by-item-name-picks-by-value：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-kind-byte-ignored  delete-conclusions 键里带结论种类的表也整张删，不看结论种类字节
+      delete-conclusions-by-kind（「✗ 自证 delete-conclusions-by-kind：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-every-kind-deleted  delete-conclusions 把四个结论种类一起删
+      delete-conclusions-by-kind（「✗ 自证 delete-conclusions-by-kind：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-dry-run-deletes  delete-conclusions 带 --dry-run 也删
+      delete-conclusions-by-kind（「✗ 自证 delete-conclusions-by-kind：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-claims-ignored  delete-conclusions 有持有者也删
+      delete-conclusions-refuses-while-claims-are-live（「✗ 自证 delete-conclusions-refuses-while-claims-are-live：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-name-unchecked  delete-conclusions 结论种类不认得时照 image-judgement 做
+      delete-conclusions-refuses-while-claims-are-live（「✗ 自证 delete-conclusions-refuses-while-claims-are-live：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-source-not-checked  delete-conclusions 不对验证包源码的账
+      delete-conclusions-refuses-a-source-that-differs（「✗ 自证 delete-conclusions-refuses-a-source-that-differs：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-table-tag-drifted  delete-conclusions 里 ConclusionBlocks 的表标签错一个
+      conclusion-kinds-match-the-verdict-store（「✗ 自证 conclusion-kinds-match-the-verdict-store：」）
+  PRUNE_SERVER_CLIENT_BREAK=conclusions-block-key-length-drifted  delete-conclusions 里块键长度多 1
+      conclusion-kinds-match-the-verdict-store（「✗ 自证 conclusion-kinds-match-the-verdict-store：」）
   PRUNE_SERVER_CLIENT_BREAK=delete-prefix-without-namespace  LibraryStore.delete_prefix 拼的前缀不带命名空间（改前的键空间样子）
       delete-prefix-by-namespace（「✗ 自证 delete-prefix-by-namespace：」）
   PRUNE_SERVER_CLIENT_BREAK=write-storage-failure-abandoned  写帧回存储出错当「服务拒了」退 3、不重放（改前的样子）
@@ -295,6 +349,14 @@ GPU 判的三族（键、值、写结论帧的拼法与 prune-server/src/gpu_jud
       gpu-conclusion-write-guarded（「✗ 自证 gpu-conclusion-write-guarded：」）
   PRUNE_SERVER_CLIENT_BREAK=gpu-rejudged-row-dropped  gpu_conclusion_write 不带强制现判行
       gpu-conclusion-write-guarded（「✗ 自证 gpu-conclusion-write-guarded：」）
+  PRUNE_SERVER_CLIENT_BREAK=claim-listing-prefix-widened  list_claims_after 发的前缀换成 gpu-claim/，不按调用方给的筛
+      gpu-claim-listing-lists-live-claims（「✗ 自证 gpu-claim-listing-lists-live-claims：」）
+  PRUNE_SERVER_CLIENT_BREAK=claim-listing-resume-key-dropped  list_claims_after 发的续扫起点总是空
+      gpu-claim-listing-lists-live-claims（「✗ 自证 gpu-claim-listing-lists-live-claims：」）
+  PRUNE_SERVER_CLIENT_BREAK=temporary-service-binds-loopback  TestServer 的 TCP 不取 HOSTS 里这一台的地址、一律绑 127.0.0.1:0
+      temporary-service-binds-the-address-of-this-host（「✗ 自证 temporary-service-binds-the-address-of-this-host：」）
+  PRUNE_SERVER_CLIENT_BREAK=temporary-service-loopback-when-hosts-unreadable  HOSTS 读不到时 TestServer 退回绑 127.0.0.1:0、不退 78
+      temporary-service-refuses-without-readable-hosts（「✗ 自证 temporary-service-refuses-without-readable-hosts：」）
 没有弄坏开关的格：round-trip-unix、prefix-scan、tcp-round-trip（帧格式由服务那一侧的自证与弄坏开关管，这里错了每一格都红）。
 """
 import contextlib
@@ -303,6 +365,7 @@ import importlib.util
 import json
 import os
 import random
+import re
 import shutil
 import signal
 import socket
@@ -366,6 +429,8 @@ OPERATION_ANNOUNCE_STOP = 8
 OPERATION_CLAIM = 5
 OPERATION_WRITE_IF_ABSENT = 10
 OPERATION_GUARDED_CONCLUSION_WRITE = 11
+OPERATION_LIST_CLAIMS = 13
+CLAIM_LISTING_ENTRIES_PER_FRAME = 1000   # list_claims 一帧要几条（与 prune-server 的 CLAIM_LISTING_ENTRIES_PER_FRAME 相同）
 # 带身份与请求号、服务按它们去重的几种写（回存储出错时照同一请求号重发，文件头「容错」）
 REQUEST_NUMBERED_OPERATIONS = (OPERATION_WRITE, OPERATION_WRITE_IF_ABSENT, OPERATION_GUARDED_CONCLUSION_WRITE)
 STATUS_COMPLETED = 0
@@ -948,6 +1013,45 @@ class Client:
                 outcomes.append((CLAIM_OUTCOMES[code], None, None))
         cursor.finished()
         return outcomes
+
+    def list_claims_after(self, prefix, after_key=b"", maximum_entries=CLAIM_LISTING_ENTRIES_PER_FRAME):
+        """一帧列认领（prune-server/src/protocol.rs 文件头「列认领」）：键以 prefix 起头（要以 gpu-claim/ 起头）、租期此刻没到的认领，按键升序，
+        从排在 after_key 之后的第一把键起（空是从前缀起），至多 maximum_entries（至少 1）条；只读，不带请求号。
+        交 ([(键, 持有者身份, 剩余租期毫秒)], 截断了没有)；截断了就拿最后一条的键作下一帧的 after_key。
+        前缀不是 gpu-claim/ 起头、条数上限 0、续扫起点不以前缀起头，服务回状态 1、这里退 3。
+        弄坏开关 claim-listing-prefix-widened 下发的前缀换成 gpu-claim/（不按调用方给的筛），claim-listing-resume-key-dropped 下发的续扫起点总是空。"""
+        if break_is("claim-listing-prefix-widened"):
+            prefix = GPU_CLAIM_FAMILY_PREFIX
+        if break_is("claim-listing-resume-key-dropped"):
+            after_key = b""
+        payload = length_prefixed(prefix) + length_prefixed(after_key) + struct.pack("<I", maximum_entries)
+        cursor = Cursor(self.exchange(OPERATION_LIST_CLAIMS, payload, f"列认领（前缀 {len(prefix)} 字节、续扫起点 {len(after_key)} 字节）"))
+        truncated = cursor.unpack("<B", "截断标记")
+        if truncated not in (0, 1):
+            fail("protocol", f"列认领的截断标记只能是 0 或 1，收到 {truncated}")
+        count = cursor.unpack("<I", "条数")
+        claims = []
+        for _ in range(count):
+            key = bytes(cursor.length_prefixed("键"))
+            holder = bytes(cursor.take(cursor.unpack("<B", "持有者身份长"), "持有者身份"))
+            claims.append((key, holder, cursor.unpack("<Q", "剩余租期毫秒")))
+        cursor.finished()
+        return claims, truncated == 1
+
+    def list_claims(self, prefix):
+        """列出 prefix 下此刻有效（租期没到）的全部认领：一帧 CLAIM_LISTING_ENTRIES_PER_FRAME 条、接着列到不再截断，按键升序，交 [(键, 持有者身份, 剩余租期毫秒)]。
+        服务说还有、却一条都没回，或续扫没往前走（头一条的键不大于续扫起点），退 3（protocol）。"""
+        claims, after_key = [], b""
+        while True:
+            frame, truncated = self.list_claims_after(prefix, after_key)
+            if frame and after_key and frame[0][0] <= after_key:
+                fail("protocol", f"列认领的续扫没往前走：续扫起点 {shown_key(after_key)} 之后回的头一条键 {shown_key(frame[0][0])} 不大于它")
+            claims.extend(frame)
+            if not truncated:
+                return claims
+            if not frame:
+                fail("protocol", "列认领说前缀下还有认领，却一条都没回：续不下去")
+            after_key = frame[-1][0]
 
     def write_guarded_conclusion(self, holder_identity, claim_key, guard_key, guard_expectation, entries, deleted_keys, request_number=None):
         """一帧写结论（prune-server/src/protocol.rs 文件头「写结论」）：holder_identity 是认领的持有者，guard_expectation 是写的一方读到的守卫那一行
@@ -1730,6 +1834,148 @@ def command_delete_by_item_name(arguments):
     return 1 if refused else 0
 
 
+# ── 命令行：delete-conclusions（崩溃判定库按结论种类整族删） ──
+
+# 对账的源码（文件头「命令行」delete-conclusions）：表标签、结论种类字节与块键长度都在验证包里，这里照抄的每一样开跑前都要对得上，不另定
+VERDICT_STORE_SOURCE = os.path.join("crates", "singlefs-verification", "src", "verdict_store.rs")
+TABLE_TAG_BYTES = 1
+BLOCK_KEY_BYTES = 72                       # verdict_store.rs 文件头：块键定长 72 字节
+# 结论种类名 → 文件头「结论种类 = 01（镜像判定…）、02（观察者）」里那一种在块键之后写的一个字节
+CONCLUSION_KIND_BYTES = {"image-judgement": 0x01, "observer": 0x02}
+# 键是「表标签 ‖ 块键 ‖ 结论种类 ‖ 版本…」的几张表（表标签，VerdictStoreTable 的成员名）：一个结论种类只删其中结论种类字节对得上的行
+TABLES_KEYED_BY_CONCLUSION_KIND = ((0x0A, "ConclusionBlocks"), (0x0B, "ConclusionViolations"), (0x0C, "RecoveryWords"),
+                                   (0x0D, "ConclusionCountVectors"), (0x0E, "ConclusionBlockAttributes"), (0x18, "AbandonedRootsNamedByThePoolChecker"))
+# 每个结论种类另外整张删的表：键里不带结论种类字节，整张表只属于这一种判器的结论或它录下的观察
+CONCLUSION_KIND_WHOLE_TABLES = {
+    "image-judgement": ((0x17, "ObservedImageJudgements"), (0x21, "PackedTablesVerdictWords")),
+    "observer": ((0x15, "ObservedImages"), (0x16, "ObserverBlocks"), (0x1A, "ObserverReadSetWitnessRows"), (0x1B, "ObserverReadSets")),
+    "facts-verifier": ((0x08, "VerifierVerdicts"),),
+    "pairing": ((0x19, "PairingConclusions"),),
+}
+CONCLUSION_KINDS = tuple(CONCLUSION_KIND_WHOLE_TABLES)
+EXIT_REFUSED = 1
+
+
+def conclusion_block_key_bytes():
+    """块键的字节数；弄坏开关 conclusions-block-key-length-drifted 下多 1。"""
+    return BLOCK_KEY_BYTES + (1 if break_is("conclusions-block-key-length-drifted") else 0)
+
+
+def conclusion_slices(kind):
+    """一个结论种类名要删的几片：[(表标签, VerdictStoreTable 成员名, 结论种类字节)]，结论种类字节是 None 的整张表删。
+    弄坏开关 conclusions-kind-byte-ignored 下键里带结论种类的表也整张删，conclusions-table-tag-drifted 下 ConclusionBlocks 的表标签错一个。"""
+    slices = []
+    if kind in CONCLUSION_KIND_BYTES:
+        for tag, member in TABLES_KEYED_BY_CONCLUSION_KIND:
+            if break_is("conclusions-table-tag-drifted") and member == "ConclusionBlocks":
+                tag = 0x0F
+            slices.append((tag, member, None if break_is("conclusions-kind-byte-ignored") else CONCLUSION_KIND_BYTES[kind]))
+    slices.extend((tag, member, None) for tag, member in CONCLUSION_KIND_WHOLE_TABLES[kind])
+    return slices
+
+
+def conclusion_source_problems(root):
+    """上面抄的表标签、结论种类字节与块键长度对 root 底下验证包源码的账：交问题句的列表，空表是对上了。
+    读法（只认文件头与代码里的这几处）：表标签是 verdict_store.rs 里
+    VerdictStoreTable::key_tag 的「Self::<成员名> => 0x<标签>,」；键里带结论种类的表在文件头里写成「`<标签>` ‖ 块键 ‖ 结论种类」；
+    结论种类字节是文件头「结论种类 = `01`（镜像判定…）、`02`（观察者）」；块键长度是文件头「定长 72 字节」。"""
+    path, problems = os.path.join(root, VERDICT_STORE_SOURCE), []
+    try:
+        with open(path, encoding="utf-8") as handle:
+            store = handle.read()
+    except OSError as error:
+        return [f"{path} 读不了：{error}"]
+    length = re.search(r"定长 (\d+) 字节", store)
+    if not length or int(length.group(1)) != conclusion_block_key_bytes():
+        problems.append(f"{VERDICT_STORE_SOURCE} 文件头里的块键长度是 {length.group(1) if length else '（找不到）'} 字节，客户端按 {conclusion_block_key_bytes()} 字节找结论种类那一字节")
+    for kind, pattern in (("image-judgement", r"结论种类 = `([0-9A-Fa-f]{2})`（镜像判定"), ("observer", r"`([0-9A-Fa-f]{2})`（观察者）")):
+        written = re.search(pattern, store)
+        if not written or int(written.group(1), 16) != CONCLUSION_KIND_BYTES[kind]:
+            problems.append(f"{VERDICT_STORE_SOURCE} 文件头里「{kind}」的结论种类字节是 {written.group(1) if written else '（找不到）'}，客户端用 {CONCLUSION_KIND_BYTES[kind]:02X}")
+    for kind in CONCLUSION_KINDS:
+        for tag, member, kind_byte in conclusion_slices(kind):
+            key_tag = re.search(rf"Self::{member} => 0x([0-9A-Fa-f]{{2}}),", store)
+            if not key_tag or int(key_tag.group(1), 16) != tag:
+                problems.append(f"{VERDICT_STORE_SOURCE} 里 {member} 的表标签是 {key_tag.group(1) if key_tag else '（找不到）'}，客户端要删的是 {tag:02X}（结论种类 {kind}）")
+            if kind_byte is not None and f"`{tag:02X}` ‖ 块键 ‖ 结论种类" not in store:
+                problems.append(f"{VERDICT_STORE_SOURCE} 文件头里 {member}（{tag:02X}）的键不是「表标签 ‖ 块键 ‖ 结论种类 ‖ …」，客户端按这个形状找结论种类那一字节")
+    return list(dict.fromkeys(problems))
+
+
+def live_claim_holders(client):
+    """此刻租期没到的 gpu-claim/ 认领（两台的 GPU 批处理服务与登记的临时库持有的都在这一份库里），按持有者身份归：{身份: [(键, 剩余租期毫秒)]}。"""
+    holders = {}
+    for key, holder, remaining in client.list_claims(GPU_CLAIM_FAMILY_PREFIX):
+        holders.setdefault(holder, []).append((key, remaining))
+    return holders
+
+
+def delete_conclusion_slice(client, tag, kind_byte, count_only):
+    """一片：整张表（kind_byte 是 None）按表标签前缀数或删，交那个前缀底下的键数；键里带结论种类的表扫一遍这张表，数或删结论种类字节对得上的行
+    （按完整原键 delete_prefix 连段键与版本登记键一起删；这几张表同一张里原键定长，一把原键不会是另一把的前缀），交行数。"""
+    prefix = bytes([tag])
+    if kind_byte is None:
+        return client.delete_prefix(prefix, count_only)
+    offset = TABLE_TAG_BYTES + conclusion_block_key_bytes()
+    rows = [key for key, _value in client.raw_scan_stream(prefix)
+            if segment_key_parts(key) is None and not has_version_registry_key_shape(key) and len(key) > offset and key[offset] == kind_byte]
+    if not count_only:
+        for key in rows:
+            client.delete_prefix(key)
+    return len(rows)
+
+
+def command_delete_conclusions(arguments):
+    """delete-conclusions [--dry-run] [--repository-root <目录>] <结论种类>（文件头「命令行」）：按验证包文件头登记的表与键前缀删一个结论种类的全部行，
+    删之前对账、列持有者，有持有者拒绝。每片打一行 PRUNE_SERVER_DELETE_CONCLUSIONS_SLICE，末行 PRUNE_SERVER_DELETE_CONCLUSIONS。
+    退 0 做完（--dry-run：只数了）；1 拒绝（有持有者、对不上账）；2 用法错。弄坏开关 conclusions-* 见文件头。"""
+    count_only, root, names = False, REPOSITORY_ROOT, []
+    words = list(arguments)
+    while words:
+        word = words.pop(0)
+        if word == "--dry-run":
+            count_only = True
+        elif word == "--repository-root" and words:
+            root = words.pop(0)
+        else:
+            names.append(word)
+    unchecked = break_is("conclusions-name-unchecked")
+    if len(names) != 1 or (names[0] not in CONCLUSION_KINDS and not unchecked):
+        print(f"  ✗ delete-conclusions 要 [--dry-run] [--repository-root <目录>] <结论种类>，结论种类只认 {'、'.join(CONCLUSION_KINDS)}；收到 {' '.join(arguments) or '（没给）'}", file=sys.stderr)
+        print("     → 怎么办：照文件头「命令行」delete-conclusions 那一条写；先停判段与两台的 GPU 批处理服务，再 --dry-run 看每一片的条数", file=sys.stderr)
+        return EXIT_USAGE
+    kind = names[0] if names[0] in CONCLUSION_KINDS else CONCLUSION_KINDS[0]
+    problems = [] if break_is("conclusions-source-not-checked") else conclusion_source_problems(root)
+    if problems:
+        for problem in problems:
+            print(f"  ✗ {problem}", file=sys.stderr)
+        print("     → 怎么办：客户端抄的表标签、结论种类与块键长度和 --repository-root（缺省是这份客户端所在的仓）里的验证包对不上，没删："
+              "先把这份客户端对到验证包的现状（或在补丁合进来之后的树里跑），再重跑", file=sys.stderr)
+        return EXIT_REFUSED
+    client = process_client()
+    holders = live_claim_holders(client)
+    for holder, claims in sorted(holders.items()):
+        print(f"PRUNE_SERVER_DELETE_CONCLUSIONS_HOLDER holder={shown_key(holder)} claims={len(claims)} longest_remaining_milliseconds={max(remaining for _key, remaining in claims)} "
+              f"example_key={shown_key(claims[0][0])}", flush=True)
+    if holders and not count_only and not break_is("conclusions-claims-ignored"):
+        print(f"  ✗ 此刻有 {len(holders)} 个持有者的 gpu-claim/ 认领租期没到（上面逐个列了）：它们是在跑的 GPU 批处理服务或登记的临时库，删到一半它们还会写结论，没删", file=sys.stderr)
+        print("     → 怎么办：停判段与两台的 GPU 批处理服务（python3 gpu-verification-server/control stop），等认领的租期过了（上面列的剩余租期），重跑；"
+              "--dry-run 不拦，只列持有者与每一片的条数", file=sys.stderr)
+        return EXIT_REFUSED
+    mode = "dry-run" if count_only else "deleted"
+    kinds = CONCLUSION_KINDS if break_is("conclusions-every-kind-deleted") else (kind,)
+    slices_done = keys_total = 0
+    for each_kind in kinds:
+        for tag, member, kind_byte in conclusion_slices(each_kind):
+            keys = delete_conclusion_slice(client, tag, kind_byte, count_only and not break_is("conclusions-dry-run-deletes"))
+            print(f"PRUNE_SERVER_DELETE_CONCLUSIONS_SLICE mode={mode} kind={each_kind} table={tag:02x} member={member} "
+                  f"select={'whole-table' if kind_byte is None else f'kind-byte:{kind_byte:02x}'} keys={keys}", flush=True)
+            slices_done += 1
+            keys_total += keys
+    print(f"PRUNE_SERVER_DELETE_CONCLUSIONS mode={mode} kind={kind} slices={slices_done} keys={keys_total} holders={len(holders)}")
+    return 0
+
+
 def main(arguments):
     if os.environ.get(BREAK_VARIABLE) and os.environ.get(SELFTEST_VARIABLE) != "1":
         print(f"  ✗ {BREAK_VARIABLE} 只在 --selftest 里认（弄坏开关只给自证证红用），这一趟不是自证", file=sys.stderr)
@@ -1747,8 +1993,10 @@ def main(arguments):
         return command_delete_prefix(arguments[1:])
     if arguments[:1] == ["delete-by-item-name"]:
         return command_delete_by_item_name(arguments[1:])
+    if arguments[:1] == ["delete-conclusions"]:
+        return command_delete_conclusions(arguments[1:])
     print(f"  ✗ 认不出的用法：{' '.join(arguments) or '（没给参数）'}", file=sys.stderr)
-    print("     → 怎么办：看文件头「命令行」：check、read、delete-prefix、delete-by-item-name；自证在 prune_server_client_selftest.py", file=sys.stderr)
+    print("     → 怎么办：看文件头「命令行」：check、read、delete-prefix、delete-by-item-name、delete-conclusions；自证在 prune_server_client_selftest.py", file=sys.stderr)
     return EXIT_USAGE
 
 

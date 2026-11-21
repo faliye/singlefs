@@ -22,6 +22,9 @@
                                                      crash-point-replay.sh --list-items --with-keys（report）调它
     lib_crash_point_replay_items.py case-states <日志>   打门禁放的一条崩溃枚举用例日志里 CRASH_POINT_REPLAY_PARALLEL_FINISHED 行 states= 之和，读不出退 1；
                                                      crash-point-replay.sh 每跑完一趟崩溃点重放部分用它取态数写进 .scope
+    lib_crash_point_replay_items.py target-source-file <仓根> <测试目标>
+                                                     打验证包这个测试目标的根文件的绝对路径：tests/<目标>.rs，目录式目标是 tests/<目标>/main.rs；两样都不在的照旧打 tests/<目标>.rs
+                                                     （调用方拿它在不在认出自证造的假目标）；两个放量入口 crash-amplification-item.sh、crash-amplification-two-hosts.sh 写上次红的清单时取
     lib_crash_point_replay_items.py reader-features <验证包的 Cargo.toml> <真跑带的特性，逗号隔开，可空>
                                                      打读库程序要带的特性串（真跑带的特性加上包清单 [dev-dependencies] 里每个带特性的依赖的 <依赖>/<特性>），
                                                      清单读不了退 1；crash-point-replay.sh 的 --list-items --with-keys 与上面的 scoped-domain 同用这一份
@@ -96,6 +99,10 @@
       segments-field-count
   CRASH_POINT_REPLAY_ITEMS_BREAK=shared-target-given-to-every-item  测试目标给点名它里面部分的每一项（一条流按步拆成几项，目标里别的测试函数跟着每一步各跑一遍）
       shared-target-first-item
+  CRASH_POINT_REPLAY_ITEMS_BREAK=setting-files-flat-only  setting_files_of() 设点文件只给 tests/<目标>.rs，目录式目标的 main.rs 与子模块文件不收
+      setting-files-directory-target
+  CRASH_POINT_REPLAY_ITEMS_BREAK=target-source-file-flat-only  target_source_file() 只给 tests/<目标>.rs，目录式目标的 main.rs 不认
+      target-source-file-directory-target
 """
 import argparse
 import collections
@@ -113,6 +120,10 @@ SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
 REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
+# 测试目标名到源文件的认法（tests/<名>.rs 与目录式的 tests/<名>/main.rs）只在 lib_test_target_sources.py 里
+GATE_DIRECTORY = os.path.join(SCRIPT_DIRECTORY, "..", "gate")
+sys.path.insert(0, GATE_DIRECTORY)
+import lib_test_target_sources as target_sources  # noqa: E402
 
 BROKEN = os.environ.get("CRASH_POINT_REPLAY_ITEMS_BREAK", "")
 ITEMS_TABLE = os.path.join(".claude", "gate.d", "crash-point-replay-items.tsv")
@@ -475,6 +486,27 @@ def selftest_cells():
                     "流 stream_one_Flow 第 2 段已在第 3 行登记过")
     expect_segments("segments-field-count", segments_world("segments-field-count", [["stream-one", "0", "3", digest]]), "是 4 段，要五段")
     expect_segments("segments-table-missing", segments_world("segments-table-missing", None), "读不了按段登记文件")
+
+    # 目录式测试目标（tests/<名>/main.rs 连同 mod 声明到的子模块）：设点文件与根文件的取法；平铺的照旧，一份源文件都没有的照给 tests/<名>.rs
+    directory_root = os.path.join(work, "directory-targets")
+    tests_root = os.path.join(directory_root, VERIFICATION_TESTS)
+    os.makedirs(os.path.join(tests_root, "split_flow"))
+    for relative, text in (("flat_flow.rs", "#[test]\nfn flat() {}\n"), ("split_flow/main.rs", "mod flows;\n"),
+                           ("split_flow/flows.rs", "#[test]\nfn split() {}\n"), ("split_flow/undeclared.rs", "#[test]\nfn undeclared() {}\n")):
+        with open(os.path.join(tests_root, relative), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    cells.append("setting-files-directory-target")
+    wanted_files = [f"{VERIFICATION_TESTS}/flat_flow.rs", f"{VERIFICATION_TESTS}/split_flow/main.rs", f"{VERIFICATION_TESTS}/split_flow/flows.rs",
+                    f"{VERIFICATION_TESTS}/absent_flow.rs"]
+    found_files = Subject("directory", [], ["directory-piped"], ["flat_flow", "split_flow", "absent_flow", "split_flow"], root=directory_root).setting_files
+    if found_files != wanted_files:
+        failures.append(("setting-files-directory-target", f"设点文件应当是平铺目标的 tests/<名>.rs、目录式目标的 main.rs 连同 mod 声明到的子模块（没被声明的不收）、"
+                                                           f"一份源文件都没有的目标照给 tests/<名>.rs：要 {wanted_files}，实际 {found_files}"))
+    cells.append("target-source-file-directory-target")
+    wanted_roots = [os.path.join(tests_root, name) for name in ("flat_flow.rs", os.path.join("split_flow", "main.rs"), "absent_flow.rs")]
+    found_roots = [target_source_file(directory_root, name) for name in ("flat_flow", "split_flow", "absent_flow")]
+    if found_roots != wanted_roots:
+        failures.append(("target-source-file-directory-target", f"根文件应当是平铺目标的 tests/<名>.rs、目录式目标的 tests/<名>/main.rs、一份都没有的照给 tests/<名>.rs：要 {wanted_roots}，实际 {found_roots}"))
     shutil.rmtree(work, ignore_errors=True)
     return cells, failures
 
@@ -497,14 +529,33 @@ LibraryItem = collections.namedtuple("LibraryItem", "recorded to_judge reusable"
 Estimate = collections.namedtuple("Estimate", "label states source text")
 
 
-class Subject:
-    """一个点名项：合表的一项（崩溃点重放部分的用例键、放量分项）或放量入口自己的一个分项；设点文件是读库程序要的测试目标文件。"""
+def setting_files_of(root, targets):
+    """测试目标的设点文件（仓根起的相对路径，读库程序按它认路径索引里的点）：tests/<目标>.rs；目录式目标是 tests/<目标>/main.rs 连同它 mod 声明到的子模块文件
+    （设点所在的 file!() 落在哪个文件上，就是哪个）；root 给 None 或目标在 root 里一份源文件都没有的，照给 tests/<目标>.rs。弄坏开关 setting-files-flat-only 下只给 tests/<目标>.rs。"""
+    files = []
+    for target in dict.fromkeys(targets):
+        found = [] if root is None or BROKEN == "setting-files-flat-only" else target_sources.target_source_files(os.path.join(root, VERIFICATION_TESTS), target)
+        files += [os.path.relpath(path, root) for path in found] or [f"{VERIFICATION_TESTS}/{target}.rs"]
+    return files
 
-    def __init__(self, label, case_keys, flows, targets):
+
+def target_source_file(root, target):
+    """验证包测试目标 target 的根文件（root 下的路径）：tests/<目标>.rs，目录式目标是 tests/<目标>/main.rs；两样都不在的照给 tests/<目标>.rs。
+    弄坏开关 target-source-file-flat-only 下只给 tests/<目标>.rs。"""
+    tests_directory = os.path.join(root, VERIFICATION_TESTS)
+    found = None if BROKEN == "target-source-file-flat-only" else target_sources.target_root_file(tests_directory, target)
+    return found or os.path.join(tests_directory, target + ".rs")
+
+
+class Subject:
+    """一个点名项：合表的一项（崩溃点重放部分的用例键、放量分项）或放量入口自己的一个分项；设点文件是读库程序要的测试目标文件（setting_files_of；
+    root 是仓根，不给就只认平铺的 tests/<目标>.rs）。"""
+
+    def __init__(self, label, case_keys, flows, targets, root=None):
         self.label = label
         self.case_keys = list(case_keys)
         self.flows = list(flows)
-        self.setting_files = [f"{VERIFICATION_TESTS}/{target}.rs" for target in dict.fromkeys(targets)]
+        self.setting_files = setting_files_of(root, targets)
 
     def has_crash_domain(self):
         return bool(self.case_keys or self.flows)
@@ -513,14 +564,14 @@ class Subject:
 def merged_subject(root, name):
     """合表里的一项 → Subject；整趟才跑的那几类（whole-run:<类>）没有崩溃域；别的名字合表里没有返回 None。"""
     if name.startswith("whole-run:"):
-        return Subject(name, [], [], [])
+        return Subject(name, [], [], [], root=root)
     items, _ = read_items(root)
     cases = crash_case_rows(root)
     pipeline_rows = pipeline_items(root)
     for item in items:
         if item.name == name:
             targets = [cases[key][0] for key in item.crash_cases if key in cases] + [pipeline_rows[flow][0] for flow in item.pipeline_items if flow in pipeline_rows]
-            return Subject(name, item.crash_cases, item.pipeline_items, targets)
+            return Subject(name, item.crash_cases, item.pipeline_items, targets, root=root)
     return None
 
 
@@ -864,12 +915,21 @@ def command_scoped_domain(arguments):
             print(f"  ✗ --flow 要写 <分项>:<测试目标>，得到「{flow}」", file=sys.stderr)
             print("  → 怎么办：照 crash-amplification.sh 的 ITEMS 一行的头两段写", file=sys.stderr)
             return 2
-        subjects.append(Subject(name, [], [name], [target]))
+        subjects.append(Subject(name, [], [name], [target], root=root))
     if not subjects:
         print("  ✗ scoped-domain 一项都没点名", file=sys.stderr)
         print("  → 怎么办：给 --item <合表项> 或 --flow <分项>:<测试目标>", file=sys.stderr)
         return 2
     return run_scoped_domain(options.mode, root, options.runs, options.expand_up_to, options.gpu == "1", options.defect, subjects)
+
+
+def command_target_source_file(arguments):
+    if len(arguments) != 2:
+        print("  ✗ target-source-file 要两个参数：仓根与测试目标", file=sys.stderr)
+        print("  → 怎么办：lib_crash_point_replay_items.py target-source-file <仓根> <测试目标>", file=sys.stderr)
+        return 2
+    print(target_source_file(os.path.abspath(arguments[0]), arguments[1]))
+    return 0
 
 
 def command_case_states(arguments):
@@ -910,8 +970,10 @@ def main(arguments):
         return command_reader_features(arguments[1:])
     if arguments and arguments[0] == "case-states":
         return command_case_states(arguments[1:])
+    if arguments and arguments[0] == "target-source-file":
+        return command_target_source_file(arguments[1:])
     print(f"  ✗ 认不出的参数 {' '.join(arguments) or '（没给）'}")
-    print("  → 怎么办：lib_crash_point_replay_items.py list [仓根] | check [仓根] | segments [仓根] | scoped-domain … | reader-features …（核法的自证在 scripts/crash/crash-case-check.py --selftest）")
+    print("  → 怎么办：lib_crash_point_replay_items.py list [仓根] | check [仓根] | segments [仓根] | scoped-domain … | reader-features … | target-source-file <仓根> <测试目标>（核法的自证在 scripts/crash/crash-case-check.py --selftest）")
     return 2
 
 

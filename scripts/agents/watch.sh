@@ -73,7 +73,7 @@ repository_session_directory() {
 }
 
 # 配置里认的键（agent-watch.py 的长选项名去掉 --）：新加的键写在这一处，自证⑩逐个核它们转得成同名选项、且都是 agent-watch.py 认的选项
-KNOWN_CONFIG_KEYS=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes progress-stale-minutes kept-copy-hours scratch-idle-hours root-free-gib-alert "
+KNOWN_CONFIG_KEYS=" interval-seconds max-minutes tool-minutes wait-loop-minutes idle-minutes repeat-count context-tokens not-started-minutes active-minutes detection-poll-seconds leftover-background-grace-minutes ask-every-minutes progress-stale-minutes kept-copy-hours scratch-idle-hours root-free-gib-alert repository-report-lines "
 # 配置转成选项；不认识的 key、不是整数的值都拒绝，免得一个拼错的 key 被安静地丢掉
 config_options() {
   local line key value known="$KNOWN_CONFIG_KEYS"
@@ -213,7 +213,7 @@ selftest() {
     || { echo "  ✗ 自检⑬：agent-watch.py 的 SELFTEST_MARK_CONTENT 不是「$watchdog_selftest_mark」，真起的看门狗子进程带弄坏开关时认不出这是自证"; fail=1; }   # gate-lint:detail
   agent_break=""
   [[ "${WATCH_BREAK:-}" == ackclassfiltered ]] && agent_break=ackclassfiltered
-  printf 'max-minutes=0\nroot-free-gib-alert=128\n' > "$scratch/ack-class.conf"
+  printf 'max-minutes=0\nroot-free-gib-alert=128\nrepository-report-lines=0\n' > "$scratch/ack-class.conf"   # 定时回报的「知识同步提醒」写 0 不打：这几趟真起的看门狗不读真仓
   ack_class_run() {   # $1：这一趟的状态目录名；其余原样交给 watch.sh
     local state_name="$1"
     shift

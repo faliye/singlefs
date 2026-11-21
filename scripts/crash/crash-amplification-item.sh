@@ -20,13 +20,12 @@
 #       引擎在两种行之后、见到叫停之前还做的几样（读回录入的流、数库里的块与复用数、建观察者要的枚举表、把观察者基底写进库）照做。
 #       不给是两段先后跑（下面「步骤」）；分两次起（录完、判各一趟）由调用方定。值写别的退 2。
 #       --judge-binary：只跟 --stage judge 一起给（别的写法退 2），是 --stage record 那一趟打的路径；开了 GPU 时判段直接起它、不再编（它不在或不可执行打一行「!」、照没给）。
-#   crash-amplification-item.sh --selftest      拿造出来的派活计划行与日志走一遍判法、运行条件与失败分类、排计划那一趟借不到显存的本次未跑、判段没跑那一行的转打、逐趟汇总行（GPU_PASS）的转打、往引擎送的按段登记文件、环境里交的卡原样交下去、不领卡、GPU 批处理服务不在跑退 78（第 17、43 格）、只录与只判、先编后判（第 46 格）、认不出的选项退 2（不编、不跑、不上卡、不连第二台）；
+#   crash-amplification-item.sh --selftest      拿造出来的派活计划行与日志走一遍判法、运行条件与失败分类、没编进 gpu 特性而排计划那一趟退 0 也退 78（第 19 格）、判段没跑那一行的转打、逐趟汇总行（GPU_PASS）的转打、往引擎送的按段登记文件、环境里交的卡原样交下去、不领卡、只录与只判、先编后判（第 46 格）、排计划那一趟观察者交回的盘取不到卡记本次未跑退 78（第 17 格）、认不出的选项退 2（不编、不跑、不上卡、不连第二台）；
 #       只在临时 prune-server 上跑（scripts/prune-server/prune_server_client_selftest.py --with-temporary-service 起，crash-amplification-lib.sh 的 crash_amplification_selftest_service_problem 判），不是就退 2、一格都不跑
 #
 # 测试目标是 crates/singlefs-verification/tests/ 下一条走 crash_amplification::run_from_environment 的用例。
 # 运行条件分两半：配置上判得了的（多机配置开了 GPU 却一份卡都没写、点名的卡与双机开关对不上；配置怎么找见 crash-amplification-lib.sh 文件头「配置」）由文件头的 run-condition: check 在开跑之前判，
-#   带 --force 越过时在运行中照判、退 78；跑起来才知道的（GPU 批处理验证服务不在跑、点名的卡用不了、显存装不下）在运行中退 78。
-#   GPU 批处理服务不在跑的出路是起服务（共用库 crash_amplification_explain_exit_code 打 python3 gpu-verification-server/control start），别的出路是「修好设备，或改配置」。
+#   带 --force 越过时在运行中照判、退 78；跑起来才知道的（点名的卡用不了、显存装不下）在运行中退 78，出路是「修好设备，或改配置」。
 #   算法上判不了的（有状态 GPU 判不了、内核展开超预算、建不出表）不是运行条件，退 248。日志怎么分这几类见 crash-amplification-lib.sh 的 crash_amplification_failure_kind。
 # 步骤：
 #   ① 多机配置（${SINGLEFS_MULTI_HOST_CONFIG:-主工作树的根 multi-host.env}，按 git common-dir 找）没开 GPU：先在本机整份录入段，再本机 CPU 判（SHARE 0/1）。
@@ -34,18 +33,14 @@
 #      给了 --judge-binary 的不编、用它；编不成照日志分类退：设备与这份二进制跑不了 78、算法 248、别的原样退编那一趟的退出码，判段一趟都不起；
 #      取不到二进制的打一行「!」、判段照旧经 cargo），排计划与本机判两趟都直接起这份二进制、不经 cargo（编完之后树被改过也不在判段重编）。
 #      这里不领卡：环境里有 GPU_CARDS_BY_PRIORITY 就原样交下去，没有照样往下跑；判段把要判的块写成待判行、等 GPU 批处理服务判完
-#      （验证包 crash_amplification 的 judge_my_blocks_on_gpu），服务不在跑时那一趟打 CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行，照日志分类退 78。
+#      （验证包 crash_amplification 的 judge_my_blocks_on_gpu）；服务读不了时判段一直等，卡住由任务服务判。
 #      再在本机跑一趟只排派活计划（SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1，不判），读它打的 CRASH_AMPLIFICATION_PLACEMENT 行
-#      （一条用例里几条流各一行，逐个字段加起来）：要判的状态数 pending_states、本机的卡试判量到的速度 states_per_second_on_this_host。
-#      一行都没有就不跑，打出日志里 panicked 那几行，照日志分类退：设备用不上 78、算法上判不了 248、那一趟退了非 0 而认不出原因退它的退出码、退 0 却没打计划行 247。
-#      只有一种例外是本次未跑：那一趟退 0、一行计划都没有，日志里有产品路径借不到显存的那一行
-#      （NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason=<为什么>：起过卡池的进程里池里的卡等满了也登记不上、借不到）。
-#      这时不跑，打 CRASH_AMPLIFICATION_DECISION where=not-run 与一行 CRASH_AMPLIFICATION_NOT_RUN，退 77（见「退出码」77）。
-#      别的用例名的 NOT_RUN_NO_GPU_ADAPTER 行、那一趟退了非 0 的，都不算这一种，照上面分类。
-#      有计划行、又有产品路径借不到显存的那一行（一条用例几条流，有的流借到了、有的没借到）：借到的照计划判；没借到的流逐条打一行
-#      CRASH_AMPLIFICATION_NOT_RUN step=placement … flow=<第几条流>/<几条流> reason=…（第几条按排计划那一趟日志里计划行与那一行的先后数），
-#      标准错误逐条说这不是通过；退出码照跑的那一趟，入口照这几行把这一项记 not-run、不算全量通过。
-#   ③ 有计划行：本机一台跑（SHARE 0/1）。那一趟退非 0，照 run.log 分类：GPU 批处理服务不在跑与设备用不上 78、算法上判不了 248，别的原样退它的退出码。
+#      （一条用例里几条流各一行，逐个字段加起来）：判器要判的状态数 pending_states、核对要核而库里还没有核对行的状态数 verifier_pending_states，
+#      两个合计打进 DECISION 行。这一趟不取卡、不借显存、不试判，行里没有速度与估时，这里也不算速度。有计划行就跑：两个数都是 0 的一趟（全部复用）也跑，复用数与判红由判段那一趟报。
+#      一行都没有就不跑，打出日志里 panicked 那几行，照日志分类退：设备用不上 78、算法上判不了 248、那一趟退了非 0 而认不出原因退它的退出码、退 0 却没打计划行 247；
+#      没编进 gpu 特性的二进制遇到 ENABLE_GPU=1，那一趟日志里有 CRASH_AMPLIFICATION_NOT_RUN step=judge 与 NOT_RUN_NO_GPU_ADAPTER 两行（crates/singlefs-verification/src/crash_amplification.rs 的
+#      not_run_lines_without_the_gpu_feature），原因写「这份二进制没有编进 gpu 特性」，照日志分类退 78（build 那一类），不记本次未跑。
+#   ③ 有计划行：本机一台跑（SHARE 0/1）。那一趟退非 0，照 run.log 分类：设备用不上 78、算法上判不了 248，别的原样退它的退出码。
 # 判定库与日志：崩溃判定只在 prune-server 里那一份库（crash-amplification-lib.sh 文件头「判定库」：引擎经客户端直接读写，这里不拼库目录、不送库的变量；重跑同一条命令就是续跑），
 #   录入段每趟照起，引擎按录入键（录入函数单元指纹与录入输入摘要）查服务，命中就不再录（crates/singlefs-verification/src/crash_library.rs 的 two_stages），
 #   日志在 <家目录>/runs/<标签>/（家目录 ${SINGLEFS_CRASH_AMPLIFICATION_HOME:-<工作根>/crash-amplification}，共用库 crash_amplification_home_directory，两台同一份）：
@@ -53,12 +48,9 @@
 # 按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10）：往引擎送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY。
 #   调用方送了（崩溃放量入口与崩溃点重放入口都送 <被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv，开跑前已核过）就照它；没送就送本树那一份的绝对路径
 #   （<本树根>/.claude/gate.d/crash-point-replay-segments.tsv，这里不核，写坏了由引擎在录入段拒）。录入段、排计划、本机判都从环境继承。
-# 输出：CRASH_AMPLIFICATION_PLACEMENT 行原样转打；一行 CRASH_AMPLIFICATION_DECISION where=<local|local-cpu|not-run> reason=<为什么> …；
+# 输出：CRASH_AMPLIFICATION_PLACEMENT 行原样转打；一行 CRASH_AMPLIFICATION_DECISION where=<local|local-cpu> reason=<为什么> …（where=local 带 pending_states=、verifier_pending_states= 两个合计）；
 #   那一趟的 CRASH_AMPLIFICATION、CRASH_AMPLIFICATION_GPU_CARD、CRASH_AMPLIFICATION_GPU_TOTAL、CRASH_AMPLIFICATION_GPU_PASS 行按它们在 run.log 里的次序原样转打
 #   （GPU_PASS 是判器逐趟的汇总行，紧跟在 GPU_TOTAL 之后；没有这种行的判器打出的日志照常过，不算错）。
-#   排计划那一趟借不到显存而本次未跑（步骤 ②）：一行 CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment reason=<那一行 reason= 之后原样>，
-#   不打 CRASH_AMPLIFICATION 行；崩溃放量入口照这一行把这一项记 not-run（入口文件头「一项怎么判」）。几条流里只有几条没借到的，那几条各一行（带 flow=），
-#   跑的那一趟的 CRASH_AMPLIFICATION 行照转打。
 #   判段没跑（配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性：引擎每一趟判段打一行 CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment flow=<流> reason=…
 #   与一行 NOT_RUN_NO_GPU_ADAPTER、录入段照录、退 0）：本机一台跑的那一趟的 step=judge 行原样转打（两台分片跑时由双机驱动在合并那一步从各片的日志转打），
 #   崩溃放量入口照它把这一项记 not-run（入口文件头「一项怎么判」）。
@@ -68,23 +60,24 @@
 #   标准错误说这不是通过，退 77（本次未跑），不落红：那一趟的汇总行不转打，红了也不按红退；崩溃放量入口照这一行把这一项记 not-run，崩溃点重放入口照 ITEM 行的 verdict=not-run 报本次未跑并点名这条原因。
 #   录入段之后算不出摘要的打一行说明、判段前后不核。弄坏开关 record-judge-source-unchecked：不核。
 # 退出码（0、2、77、78 的含义照 .claude/rules/test-script-discipline.md「入口脚本：不带参数就是剪枝跑全部项」那张表）：
-#   0        跑的那一趟退 0。有流本次未跑也是 0（几条流里没借到的那几条打了 CRASH_AMPLIFICATION_NOT_RUN 行、判段没跑的流打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行、真跑那一趟被叫停的行里 stopped_early=true）：
+#   0        跑的那一趟退 0。有流本次未跑也是 0（判段没跑的流打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行、真跑那一趟被叫停的行里 stopped_early=true）：
 #            退 0 不等于全判过了，看有没有 CRASH_AMPLIFICATION_NOT_RUN 行与 stopped_early=true
-#   77       一项都没跑到：排计划那一趟借不到显存、一块都没判（打了 CRASH_AMPLIFICATION_NOT_RUN 行）；或判段跑的过程中源码变了（上面「源码中途变了」，打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行）。本次未跑，不是通过，也不是失败
+#   77       一项都没跑到：判段跑的过程中源码变了（上面「源码中途变了」，打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行）。本次未跑，不是通过，也不是失败
 #   2        用法错（参数认不得、缺测试目标、带值的选项缺值：--test-filter、--label、--stage 后面没给值，或给的是空串、以 - 起头；--stage 的值不是 record、judge、flow-shape）
 #   78       运行条件不满足：开了 GPU 却没在多机配置里写显卡先后、点名的卡与双机开关对不上（开跑前由 run-condition: check 拒；带 --force 越过时照跑到下面那几样）、
-#            开了 GPU 而 GPU 批处理验证服务不在跑（判段那一趟打的 CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行；录入段已跑完；
-#            出路打起服务的命令 python3 gpu-verification-server/control start），
 #            点名的卡用不了或显存装不下、结论的版本与树对不上（CRASH_POINT_REPLAY_NOT_WRITTEN_CONCLUSION_VERSION_DIFFERS_FROM_THE_BUILD 那一行，整趟不写库）、
-#            多机配置开了 GPU 而二进制没编进 gpu 特性（这四样都照日志分类，crash-amplification-lib.sh 的 crash_amplification_failure_kind）。出路：修好设备，或改配置
-#   247      排派活计划那一趟退 0，却一行 CRASH_AMPLIFICATION_PLACEMENT 都没打，日志里也认不出是设备还是算法，也没有产品路径借不到显存的那一行（那一种退 77，见上）
+#            多机配置开了 GPU 而二进制没编进 gpu 特性（这三样都照日志分类，crash-amplification-lib.sh 的 crash_amplification_failure_kind）。出路：修好设备，或改配置；
+#            观察者交回的盘要在卡上判、取不到卡（CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS 那一行，同照日志分类）记本次未跑：任务不拿卡，
+#            出路是等 GPU 批处理服务收这一族待判行（共用库 crash_amplification_observer_images_without_a_card_howto），不是红
+#   247      排派活计划那一趟退 0，却一行 CRASH_AMPLIFICATION_PLACEMENT 都没打，日志里也认不出是设备还是算法
 #   248      算法上判不了：有状态 GPU 判不了（表越过内核容量）、内核展开超预算、GPU 判器建不出表（照日志分类）
 #   其余     跑的那一趟（cargo test，或起编好的判段测试二进制）的退出码，原样；编判段要的测试二进制那一趟（cargo test --no-run）退非 0 而认不出类的，原样退它的退出码
 # 上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」「测试目标」，.claude/hooks/run-scope-guard.sh 的拒绝说明读它）：
 #   <数据根>/last-runs/scripts__crash__crash-amplification-item.sh.tsv（SINGLEFS_LAST_RUNS_DIRECTORY 盖过；数据根取 .claude/hooks/lib_work_root.py、两台同一份），红的测试名一行一个：
 #   「<测试目标>」，带 --test-filter 的「<测试目标>::<用例函数>」；退 0 是绿、退 2 / 77 / 130 / 143 照留，别的退出码是红；整个目标跑的那一趟换掉这个目标的全部项，
 #   点名用例的那一趟只换那一项。开跑之后每一种退法都写（EXIT 钩子 item_write_last_run）；只判不跑那一支不写；
-#   测试目标的源文件不在、又没显式设 SINGLEFS_LAST_RUNS_DIRECTORY 的（别的自证拿假目标起这一份）不写。
+#   测试目标的源文件（tests/<目标>.rs，目录式目标是 tests/<目标>/main.rs；认法在 lib_crash_point_replay_items.py 的 target-source-file）不在、又没显式设 SINGLEFS_LAST_RUNS_DIRECTORY 的
+#   （别的自证拿假目标起这一份）不写。
 # 编译目录（自己用完自己删，不跨趟复用）：建好这一项的运行目录（<家目录>/runs/<标签>/）之后，调用方没设 CARGO_TARGET_DIR 时
 #   在里面建 target、export 给本机那几趟 cargo；正常结束、红了、被 TERM / INT 停（等手里那一趟退出）都在 EXIT 钩子里删
 #   （scripts/hosts/run-build-directory.sh；删之前核本机没有进程开着里面的文件，有就不删、报出进程、退非 0）。调用方（崩溃放量入口、task-server）设了的照它、不删：
@@ -95,26 +88,22 @@
 # 弄坏开关 CRASH_AMPLIFICATION_ITEM_BREAK=<项>（只给 --selftest 证红用；格号是 run_selftest 里的第 1–48 格，判错的那一格打「✗ 自证第 <号> 格」）：
 #   accept-peer-cards-without-across   双机没开、显卡配置却点名了第二台的卡也照跑（「配置自相矛盾就拒绝」判错）   第 3 格
 #   accept-missing-peer-cards          双机开着、显卡配置里却没有第二台的卡也照跑（「两台都要有 GPU 干活」判错）   第 4 格
-#   accept-missing-placement           计划行一行都没有也照本机跑（「没有计划行就不跑」判错）                   第 6 格、第 8 格、第 9 格、第 19 格、第 23 格、第 24 格（后两格的日志也没有计划行：结论版本对不上、没编进 gpu 特性那两句本该退 78，开关一开先走「没有计划行照本机跑」，没退 78）
-#   placement-not-run-as-refusal       排计划那一趟借不到显存的那一行不认，照没有计划行退 247（「本次未跑不是拒绝」判错）  第 19 格
-#   accept-any-not-run-line            别的用例名的 NOT_RUN_NO_GPU_ADAPTER 行也当产品路径借不到显存（「只认产品路径那一行」判错）  第 19 格
-#   accept-not-run-after-failed-placement  排计划那一趟退了非 0 也照那一行记本次未跑（「退了非 0 就照日志分类」判错）  第 19 格
-#   not-run-exits-0                    一项都没跑到（排计划那一趟借不到显存）也退 0（「一项都没跑到退 77」判错）  第 19 格
-#   partial-not-run-unreported         有计划行时那几条借不到显存的流不报（只照计划行往下跑）（「没借到的流逐条报本次未跑」判错）  第 20 格
+#   accept-missing-placement           计划行一行都没有也照本机跑（「没有计划行就不跑」判错）                   第 6 格、第 8 格、第 9 格、第 17 格、第 19 格、第 23 格、第 24 格（第 17、19、23、24 格的日志也没有计划行：没编进 gpu 特性、结论版本对不上、观察者交回的盘取不到卡那几句本该退 78，开关一开先走「没有计划行照本机跑」，没退 78）
+#   verifier-pending-states-not-counted  DECISION 行里核对要核的 verifier_pending_states 不取计划行的合计，恒写 0（「两个合计都打进 DECISION 行」判错）  第 20 格
 #   device-unusable-as-run-failure     日志里卡用不上的原话不认（不退 78）                                    第 8 格、第 11 格
 #   algorithm-refusal-as-run-failure   日志里算法判不了的原话不认（不退 248）                                 第 9 格
 #   accept-missing-card-list           开了 GPU、多机配置里一份卡都没写也照跑（「没写卡就退 78」判错）           第 10 格、第 13 格
 #   missing-value-exits-1              带值的选项缺值时退 1（不按用法错退 2）                                    第 12 格
 #   （共用库 crash-amplification-lib.sh 里配置那几处的开关：configuration-from-tree-root（多机配置按树根找、不按 git common-dir 找）红在第 21 格；
 #    home-under-home-directory（没设 SINGLEFS_CRASH_AMPLIFICATION_HOME 时运行目录取 $HOME 底下那一份、不取工作根）红在第 38 格；cards-read-from-configuration（显卡先后从多机配置读、不看环境里交的那一张）
-#    红在第 15 格、第 17 格、第 42 格）
-#   gpu-verification-server-not-running-as-run-failure  共用库不认 GPU 批处理服务不在跑那一行（不退 78、不打起服务的命令）（「GPU 批处理服务不在跑退 78」判错）   第 17 格、第 43 格
+#    红在第 15 格、第 42 格、第 44 格）
 #   （共用库的开关 given-states-run-condition-as-run-failure（给定状态表的判器借不到显存那一行 CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET 不认、不退 78）
 #    打开时这里一格不红：这里的格都不造那一行；它由 scripts/crash/crash-amplification-two-hosts.sh --selftest 证红，红在 shard-given-states-run-condition 格）
 #   （共用库的开关 library-marker-not-accepted（录入段只认 CRASH_AMPLIFICATION_RECORDED 行、不认崩溃枚举用例经判定库两段跑时打的 CRASH_LIBRARY_RECORDED 行）红在第 28 格：
 #    照崩溃点重放用例的样子造的假用例录入段只打 CRASH_LIBRARY_RECORDED、退 1；scripts/crash/crash-amplification-two-hosts.sh --selftest 另红在 crash-case-shaped-records 格）
 #   version-differs-as-run-failure     日志里结论版本对不上那一行不认（不退 78）                               第 23 格
-#   gpu-feature-missing-as-run-failure 日志里「这份二进制没有编进 gpu 特性」不认（不退 78）                    第 24 格
+#   gpu-feature-missing-as-run-failure 日志里「这份二进制没有编进 gpu 特性」不认（不退 78）                    第 19 格、第 24 格（第 19 格：排计划那一趟退 0、没有计划行、日志里只有没编进 gpu 特性那两行，本该退 78，开关一开认不出原因退 247）
+#   observer-images-without-a-card-as-run-failure  排计划那一趟没有计划行时，观察者交回的盘取不到卡那一类不认（照认不出的原因退 247，不退 78、不打共用库那一类的出路）（「观察者交回的盘取不到卡记本次未跑退 78」判错）   第 17 格
 #   record-failure-ignored             录入段没跑成也照样往下排计划、判（「录入段没跑成，判段一趟都不起」判错）   第 26 格
 #   segments-registry-not-sent         调用方没送按段登记文件时也不送本树那一份（「每一趟都带按段登记文件的绝对路径」判错）   第 27 格
 #   judge-not-run-dropped              本机一台跑的那一趟打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行不转打（「判段没跑记本次未跑」判错）   第 29 格
@@ -122,6 +111,7 @@
 #   threads-default-cores              线程数取本机核数减一，不取服务交的 SINGLEFS_THREAD_CAP 与登记的重活默认并行度        第 30 格
 #   unknown-option-accepted            认不出的选项也照收、当没给（「认不出的选项退 2」判错）   第 18 格
 #   last-run-unwritten                 跑完不写上次红的清单                                        第 31 格
+#   target-file-flat-only              上次红的清单的 --target-file 只给 tests/<目标>.rs，目录式目标的 tests/<目标>/main.rs 不认（那份文件算「不在」，清单悄悄不写）   第 43 格
 #   run-target-kept                    跑完不删这一项自己建的编译目录（在仓根照仓根的 target 编、跨趟留着）（「跑完运行目录里不剩它建的编译目录」判错）   第 33 格、第 34 格、第 35 格
 #   this-host-from-hosts-order         共用库不问多机配置判法 --emit-addresses，一律当 HOSTS 头一项是这一台（「哪一台是这一台照网卡上的地址认」判错）   第 37 格
 #   card-address-outside-hosts-accepted  共用库照认显卡先后里地址不在 HOSTS 的项（「写坏的显卡先后退 78」判错）   第 40 格
@@ -132,8 +122,7 @@
 #   flow-shape-judge-binary-built      --stage flow-shape 开了 GPU 时也接着编判段要的测试二进制并打 CRASH_AMPLIFICATION_JUDGE_BINARY 行（「只录流、不编判段二进制」判错）   第 48 格
 #   （多机配置判法 scripts/crash/crash-point-replay-shard-configuration-check.sh 的开关 MULTI_HOST_CONFIGURATION_BREAK=gpu-card-keys-unknown 红在第 22 格）
 # 只供测试（只在 --selftest 里认：run_selftest 给它起的子进程设 CRASH_AMPLIFICATION_ITEM_SELFTEST=1；没有这个标记而设了下面任一个，参数解析之后退 2、点名设了的几个、一趟都不起）：
-#   CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY=<造好的 placement.log> 时不编不跑，只拿那份日志判、打 CRASH_AMPLIFICATION_DECISION 行就退
-#   （一块都没判那一种另打 CRASH_AMPLIFICATION_NOT_RUN 行、退 77；有流没借到的照样逐条打那一行）；
+#   CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY=<造好的 placement.log> 时不编不跑，只拿那份日志判、打 CRASH_AMPLIFICATION_DECISION 行就退；
 #   CRASH_AMPLIFICATION_ITEM_SOURCE_ROOT=<树根> 代替算被测源码摘要的树（缺省是本脚本所在的仓根；自证给一棵造出来的小树，不读真仓的 crates/——别的会话正改着它）；
 #   CRASH_AMPLIFICATION_ITEM_SWITCHES=<gpu>,<双机> 代替读配置里的这两样（双机那一位只给运行条件判）；CRASH_AMPLIFICATION_ITEM_CARDS=<显卡配置的值> 代替运行条件读的显卡配置；
 #   CRASH_AMPLIFICATION_ITEM_LOCAL_RUN=<脚本> 换掉本机那一趟（调法：<脚本> <share> <日志> [<附加环境 键=值>…]，自己写日志；环境照真的那一趟组（共用库
@@ -154,6 +143,14 @@ repository_root="$(cd "$item_script_directory/../.." && pwd)"
 source "$item_script_directory/crash-amplification-lib.sh"
 
 item_break_is() { crash_amplification_item_break_is "$1"; }
+# <测试目标>：上次红的清单的 --target-file（item_write_last_run）：测试目标的源文件，tests/<目标>.rs，目录式目标是 tests/<目标>/main.rs，两样都不在的照给 tests/<目标>.rs（拿它在不在认出自证造的假目标）。
+#   认法在 lib_crash_point_replay_items.py 的 target-source-file，取不出也给 tests/<目标>.rs；弄坏开关 target-file-flat-only 下只给 tests/<目标>.rs
+item_target_source_file() {
+  if ! item_break_is target-file-flat-only; then
+    python3 "$item_script_directory/lib_crash_point_replay_items.py" target-source-file "$repository_root" "$1" 2>/dev/null && return 0
+  fi
+  echo "$repository_root/crates/singlefs-verification/tests/$1.rs"
+}
 exit_code_is_explained() { [[ "$1" == 78 || "$1" == 248 ]]; }   # <要退的码>：78、248 由 crash_amplification_explain_exit_code 打出路
 
 usage() { # [<哪里不对>]
@@ -195,56 +192,13 @@ done
 # --judge-binary 只跟 --stage judge 一起给（文件头用法）
 if [[ -n "$judge_binary_given" && "$item_stage" != judge ]]; then usage "--judge-binary 只跟 --stage judge 一起给（它是 --stage record 那一趟编好的判段测试二进制）"; fi
 
-# 产品路径借不到显存的那一行（文件头步骤 ②）：起过卡池的进程等满了也借不到时 Rust 打的，记号与产品路径的名字照
-#   crates/singlefs-verification/src/gpu_memory_ledger.rs 的 GPU_NOT_RUN_MARKER 与 crates/singlefs-verification/src/crash_amplification.rs 的 PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE
-PLACEMENT_NOT_RUN_PREFIX='NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason='
-placement_not_run_line() { # <placement.log> <排计划那一趟的退出码>：那一趟退 0、日志里有那一行就打第一行，别的打空串
-  local prefix="$PLACEMENT_NOT_RUN_PREFIX"
-  item_break_is placement-not-run-as-refusal && return 0
-  [[ "$2" == 0 ]] || item_break_is accept-not-run-after-failed-placement || return 0
-  item_break_is accept-any-not-run-line && prefix='NOT_RUN_NO_GPU_ADAPTER test='
-  [[ -f "$1" ]] || return 0
-  awk -v prefix="$prefix" 'index($0, prefix) == 1 { print; exit }' "$1"
-}
-# 本次未跑（文件头步骤 ②、「输出」）：打 CRASH_AMPLIFICATION_NOT_RUN 行，标准错误说一句这不是通过
-report_placement_not_run() { # <那一行>
-  local reason="${1#*reason=}"
-  echo "CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment reason=$reason"
-  echo "  ! 本次未跑（这不是通过）：排派活计划那一趟借不到显存，一块都没判：$reason" >&2
-  echo "  · 等占着卡的 GPU 用例或测试进程跑完，再重跑同一条命令（判过的块在库里，接着判）" >&2
-}
-# 有计划行、又有那一行（文件头步骤 ②：一条用例几条流，有的借到有的没借到）：没借到的流逐条打 CRASH_AMPLIFICATION_NOT_RUN 行，
-#   第几条按 placement.log 里计划行与那一行的先后数；标准错误逐条说这不是通过。没有这种行时什么都不打
-report_placement_partial_not_run() { # <placement.log>
-  local partial_lines partial_line
-  item_break_is partial-not-run-unreported && return 0
-  [[ -f "$1" ]] || return 0
-  partial_lines="$(awk -v prefix="$PLACEMENT_NOT_RUN_PREFIX" '
-    index($0, "CRASH_AMPLIFICATION_PLACEMENT ") == 1 { flows++; next }
-    index($0, prefix) == 1 { flows++; missing++; ordinal[missing] = flows; reason[missing] = substr($0, length(prefix) + 1) }
-    END { for (i = 1; i <= missing; i++) printf "CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment flow=%d/%d reason=%s\n", ordinal[i], flows, reason[i] }' "$1")"
-  [[ -n "$partial_lines" ]] || return 0
-  printf '%s\n' "$partial_lines"
-  while IFS= read -r partial_line; do
-    partial_line="${partial_line#* flow=}"
-    echo "  ! 本次未跑（这不是通过）：排派活计划那一趟第 ${partial_line%% *} 条流借不到显存，没排进计划、这一趟不判它：${partial_line#*reason=}" >&2
-  done <<<"$partial_lines"
-  echo "  · 借到的流照计划判；没借到的那几条，等占着卡的 GPU 用例或测试进程跑完再重跑同一条命令（判过的块在库里，接着判）" >&2
-}
-
 # 跑不跑：读 placement.log，打 CRASH_AMPLIFICATION_DECISION 行；交回 0 本机一台跑（在哪台机器由 task-server 管）、
-# 20 本次未跑（那一行放进 decided_not_run_line：排计划那一趟退 0、没有计划行、有产品路径借不到显存的那一行）、
-# 1 没有计划行（该退的码放进 refused_exit_code：设备用不上 78、算法上判不了 248、那一趟退了非 0 就是它的退出码、退 0 却没打计划行 247）
+# 1 没有计划行（该退的码放进 refused_exit_code：设备用不上 78、算法上判不了 248、没编进 gpu 特性与结论版本对不上 78、那一趟退了非 0 而认不出原因就是它的退出码、退 0 却没打计划行 247）
 decide_where_to_run() { # <placement.log> <排计划那一趟的退出码>
   local placement_log="$1" placement_exit="$2"
-  local pending local_speed kind
+  local pending verifier_pending kind
   pending="$(crash_amplification_placement_total "$placement_log" pending_states)"
   if [[ -z "$pending" ]]; then
-    decided_not_run_line="$(placement_not_run_line "$placement_log" "$placement_exit")"
-    if [[ -n "$decided_not_run_line" ]]; then
-      echo "CRASH_AMPLIFICATION_DECISION where=not-run reason=no-card-of-the-pool-had-room-in-time"
-      return 20
-    fi
     if item_break_is accept-missing-placement; then
       echo "CRASH_AMPLIFICATION_DECISION where=local reason=no-placement-line"
       return 0
@@ -252,8 +206,11 @@ decide_where_to_run() { # <placement.log> <排计划那一趟的退出码>
     echo "  ✗ 排派活计划那一趟（退 $placement_exit）一行 CRASH_AMPLIFICATION_PLACEMENT 都没打，不跑；日志 $placement_log" >&2
     grep -h -A 3 'panicked at' "$placement_log" 2>/dev/null | head -8 | sed 's/^/    /' >&2
     kind="$(crash_amplification_failure_kind "$placement_log")"
+    # 观察者交回的盘要在卡上判、取不到卡那一类（共用库文件头「运行条件与失败分类」）记本次未跑、退 78，出路照共用库那一类打（crash_amplification_explain_exit_code）。
+    #   弄坏开关 observer-images-without-a-card-as-run-failure 下不认这一类，照认不出的原因退
+    [[ "$kind" == observer-images-without-a-card ]] && item_break_is observer-images-without-a-card-as-run-failure && kind=""
     case "$kind" in
-      gpu-verification-server|device|build) refused_exit_code=78 ;;
+      gpu-verification-server|observer-images-without-a-card|device|build) refused_exit_code=78 ;;
       algorithm) refused_exit_code=248 ;;
       *) if [[ "$placement_exit" != 0 ]]; then refused_exit_code="$placement_exit"; else refused_exit_code=247; fi ;;
     esac
@@ -264,9 +221,10 @@ decide_where_to_run() { # <placement.log> <排计划那一趟的退出码>
     fi
     return 1
   fi
-  report_placement_partial_not_run "$placement_log"
-  local_speed="$(crash_amplification_placement_rate "$placement_log")"
-  echo "CRASH_AMPLIFICATION_DECISION where=local reason=placed-on-this-host pending_states=$pending states_per_second_on_this_host=$local_speed placed_by=task-server"
+  # 核对要核的状态数：弄坏开关 verifier-pending-states-not-counted 下不取，恒写 0
+  verifier_pending="$(crash_amplification_placement_total "$placement_log" verifier_pending_states)"
+  item_break_is verifier-pending-states-not-counted && verifier_pending=0
+  echo "CRASH_AMPLIFICATION_DECISION where=local reason=placed-on-this-host pending_states=$pending verifier_pending_states=$verifier_pending placed_by=task-server"
   return 0
 }
 
@@ -290,8 +248,8 @@ run_selftest() {
   export CRASH_AMPLIFICATION_ITEM_SOURCE_ROOT="$work/source-tree"
   # 调用方交的卡与编译目录（CARGO_TARGET_DIR）不从调用方带进来（卡由第 15、44 格自己给，编译目录由第 36、45 格自己给）
   unset GPU_CARDS_BY_PRIORITY CARGO_TARGET_DIR
-  # 假的本机那一趟的次序记录（第 46 格自己给）与它演 GPU 批处理服务不在跑的标记（第 17、43 格自己给）不从调用方带进来
-  unset STUB_ORDER_LOG STUB_GPU_VERIFICATION_SERVER_DOWN
+  # 假的本机那一趟的次序记录（第 46 格自己给）不从调用方带进来
+  unset STUB_ORDER_LOG
   # 自证里换掉这一台网卡上的地址的变量（多机配置判法只在自证里认它）不从调用方带进来：第 37 格自己给
   unset CONFIGURATION_SELFTEST_LOCAL_ADDRESSES
   # 子进程的运行条件只认这里给的：多机配置指到写全了必写键与假清场命令的一份（两个开关都关、一份卡都没写），开关与卡由各格的 CRASH_AMPLIFICATION_ITEM_* 给。
@@ -312,7 +270,7 @@ run_selftest() {
     "QUIESCE_STARTED_CHECK_COMMAND='[[ \"\${STUB_STARTED_CHECK:-ok}\" == ok ]]'"; } >"$work/multi-host.env"
   # 第 16 格指到这一份：写着假的清场命令与清场之后那一份显卡先后
   { cat "$work/multi-host.env"; printf '%s\n' 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="127.0.0.1:0:15G"'; } >"$work/multi-host-quiesce-commands.env"
-  # 两份开了 GPU 的多机配置：一份卡都没写（第 13 格）；只点名本机的卡（第 14 格，第 15、17 格也读它：配置里的卡与环境里服务交的卡分得开）
+  # 两份开了 GPU 的多机配置：一份卡都没写（第 13 格）；只点名本机的卡（第 14 格，第 15 格也读它：配置里的卡与环境里服务交的卡分得开）
   { cat "$work/multi-host-required.env"; printf '%s\n' ENABLE_GPU=1 QUIESCE_STOP_COMMAND= QUIESCE_STOPPED_CHECK_COMMAND= QUIESCE_START_COMMAND= QUIESCE_STARTED_CHECK_COMMAND=; } \
     >"$work/multi-host-gpu-on-without-cards.env"
   { cat "$work/multi-host-gpu-on-without-cards.env"; printf '%s\n' 'GPU_CARDS_BY_PRIORITY="127.0.0.1:0:15G"' 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="127.0.0.1:0:24G"'; } \
@@ -322,8 +280,8 @@ run_selftest() {
     echo "     → 怎么办：$2" >&2
     failures=$((failures + 1))
   }
-  placement_line() { # <要判的> <本机速度>：估的用时 = 要判的 ÷ 速度
-    echo "CRASH_AMPLIFICATION_PLACEMENT host=127.0.0.1 judge=gpu pending_blocks=4 pending_states=$1 states_reused=0 tables_mebibytes=10 cards=127.0.0.1:0:100:100,2001:db8::65:2:50:50 states_placed_on_this_host=100 states_placed_on_other_hosts=50 states_per_second_on_this_host=$2 estimated_seconds_on_this_host=$(( $1 / $2 ))"
+  placement_line() { # <判器要判的态数> <核对要核的态数>：引擎只排计划那一趟打的一行（crash_amplification.rs 的 placement_line_of_the_pending_blocks）
+    echo "CRASH_AMPLIFICATION_PLACEMENT judge=gpu pending_blocks=4 pending_states=$1 states_reused=0 tables_mebibytes=10 verifier_pending_blocks=2 verifier_pending_states=$2"
   }
   decision_of() { # <placement.log> <gpu,双机> <显卡配置的值>：打 where= 的值与退出码
     local output exit_code
@@ -331,7 +289,7 @@ run_selftest() {
     printf '%s %s\n' "$(grep -o 'where=[a-z-]*' <<<"$output" | head -1)" "$exit_code"
   }
   local both="127.0.0.1:0:15G 2001:db8::65:2:10G" local_only="127.0.0.1:0:15G"
-  placement_line 1000 10 >"$work/plan.log"
+  placement_line 1000 300 >"$work/plan.log"
   # 第 1 格：双机开着、两台都有卡 ⇒ 照样本机一台跑（在哪台机器、分不分两台由 task-server 管，这里不分）
   cells=$((cells + 1))
   [[ "$(decision_of "$work/plan.log" 1,1 "$both")" == "where=local 0" ]] \
@@ -348,13 +306,12 @@ run_selftest() {
   cells=$((cells + 1))
   [[ "$(decision_of "$work/plan.log" 1,1 "$local_only")" == " 78" ]] \
     || selftest_cell_failed "双机开着、第二台没有点名的卡却没退 78：$(decision_of "$work/plan.log" 1,1 "$local_only")" "看 crash_amplification_cards_match_the_hosts 里 across 那一支"
-  # 第 5 格：一条用例几条流：要判的加起来，速度是合计的状态 ÷ 合计的用时（两条流 400 态每秒 10 态、400 态每秒 40 态 ⇒ 800 态、50 秒、每秒 16 态；
-  #   把各行的速度直接相加是 50，只取第一行是 10）
-  cells=$((cells + 1)); { placement_line 400 10; placement_line 400 40; } >"$work/two-flows.log"
+  # 第 5 格：一条用例几条流：判器要判的状态数加起来（两条流各 400 态 ⇒ 800 态；只取第一行是 400）
+  cells=$((cells + 1)); { placement_line 400 100; placement_line 400 200; } >"$work/two-flows.log"
   local two_flows
   two_flows="$(CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY="$work/two-flows.log" CRASH_AMPLIFICATION_ITEM_SWITCHES=1,1 CRASH_AMPLIFICATION_ITEM_CARDS="$both" bash "$0" some-target 2>/dev/null)"
-  grep -q 'pending_states=800 states_per_second_on_this_host=16 ' <<<"$two_flows" \
-    || selftest_cell_failed "两条流的要判状态没加起来、或速度没按合计的状态 ÷ 合计的用时算：$two_flows" "看 crash_amplification_placement_total 与 crash_amplification_placement_rate"
+  grep -q ' pending_states=800 ' <<<"$two_flows" \
+    || selftest_cell_failed "两条流的要判状态没加起来：$two_flows" "看 crash-amplification-lib.sh 的 crash_amplification_placement_total 与 decide_where_to_run 里读 pending_states 的那一句"
   # 第 6 格：一行计划都没有、日志里认不出原因、那一趟退 0 ⇒ 不跑，退 247
   cells=$((cells + 1)); echo "test result: FAILED" >"$work/none.log"
   [[ "$(decision_of "$work/none.log" 1,1 "$both")" == " 247" ]] \
@@ -420,24 +377,15 @@ if [[ " $* " == *" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1 "* ]]; then
   echo "placement" >> "${STUB_CALLS:?}"
   # STUB_MUTATE_SOURCE（第 41 格）：给的文件追加一行，演判段跑的过程中别的会话往树里打了补丁
   if [[ -n "${STUB_MUTATE_SOURCE:-}" && "${STUB_MUTATE_IN:-}" == placement ]]; then echo "changed" >> "$STUB_MUTATE_SOURCE"; fi
-  if [[ "${STUB_PLACEMENT_NOT_RUN:-0}" == 1 ]]; then
-    # 第 19 格：演起过卡池的产品路径借不到显存——照 Rust 那一行打（不打计划行），退 STUB_PLACEMENT_EXIT（没给退 0）
+  if [[ "${STUB_PLACEMENT_WITHOUT_THE_GPU_FEATURE:-0}" == 1 ]]; then
+    # 第 19 格：演没编进 gpu 特性的二进制遇到 ENABLE_GPU=1——照 Rust 的 not_run_lines_without_the_gpu_feature 打那两行（不打计划行），退 0
     printf '%s\n' "running 1 test" \
-      "NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason=等了 1800 秒，池里没有一张卡空得出 2560 MiB（每张卡的账 [15360]；这台机器上别的 GPU 用例或测试进程一直占着）" \
-      "test result: ok. 1 passed; 0 failed" > "$log"
-    exit "${STUB_PLACEMENT_EXIT:-0}"
-  fi
-  if [[ "${STUB_PLACEMENT_PARTIAL:-0}" == 1 ]]; then
-    # 第 20 格：一条用例三条流，第 2 条借不到显存——两行计划夹着 Rust 那一行；STUB_PLACEMENT_PARTIAL_TEST 换掉那一行的用例名（别的用例的那一行）
-    printf '%s\n' "running 1 test" \
-      "CRASH_AMPLIFICATION_PLACEMENT host=127.0.0.1 judge=gpu pending_blocks=4 pending_states=1000 states_reused=0 tables_mebibytes=10 cards=127.0.0.1:0:100:100 states_placed_on_this_host=1000 states_placed_on_other_hosts=0 states_per_second_on_this_host=1 estimated_seconds_on_this_host=1000" \
-      "NOT_RUN_NO_GPU_ADAPTER test=${STUB_PLACEMENT_PARTIAL_TEST:-crash_amplification::run_from_environment} reason=等了 1800 秒，池里没有一张卡空得出 5120 MiB（第 2 条流）" \
-      "CRASH_AMPLIFICATION_PLACEMENT host=127.0.0.1 judge=gpu pending_blocks=4 pending_states=1000 states_reused=0 tables_mebibytes=10 cards=127.0.0.1:0:100:100 states_placed_on_this_host=1000 states_placed_on_other_hosts=0 states_per_second_on_this_host=1 estimated_seconds_on_this_host=1000" \
+      "CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment flow=stub reason=配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（假的用例）" \
+      "NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason=配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（假的用例）" \
       "test result: ok. 1 passed; 0 failed" > "$log"
     exit 0
   fi
-  # STUB_PLACEMENT_PENDING（第 39 格）：计划行里要现判的态数（没给 1000）；0 是这一项全部复用
-  echo "CRASH_AMPLIFICATION_PLACEMENT host=127.0.0.1 judge=gpu pending_blocks=4 pending_states=${STUB_PLACEMENT_PENDING:-1000} states_reused=0 tables_mebibytes=10 cards=127.0.0.1:0:100:100,2001:db8::65:2:50:50 states_placed_on_this_host=100 states_placed_on_other_hosts=50 states_per_second_on_this_host=1 estimated_seconds_on_this_host=1000" > "$log"
+  echo "CRASH_AMPLIFICATION_PLACEMENT judge=gpu pending_blocks=4 pending_states=1000 states_reused=0 tables_mebibytes=10 verifier_pending_blocks=2 verifier_pending_states=300" > "$log"
 else
   echo "local-run" >> "${STUB_CALLS:?}"
   if [[ -n "${STUB_MUTATE_SOURCE:-}" && "${STUB_MUTATE_IN:-}" == run ]]; then echo "changed" >> "$STUB_MUTATE_SOURCE"; fi
@@ -448,13 +396,6 @@ else
   fi
   if [[ "${STUB_RUN_DEVICE_FAILURE:-0}" == 1 ]]; then
     echo "GPU_CARD_NOT_USABLE index=0：配置点名了这张卡，本机却用不了它" > "$log"
-    exit 101
-  fi
-  # STUB_GPU_VERIFICATION_SERVER_DOWN=1（第 17、43 格）：照验证包那一行演 GPU 批处理服务不在跑（接在 libtest 的「test <名> ... 」后面），cargo test 退 101
-  if [[ "${STUB_GPU_VERIFICATION_SERVER_DOWN:-0}" == 1 ]]; then
-    printf '%s\n' "running 1 test" \
-      "test crash_amplification_stub ... CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING control=/stub/gpu-verification-server/control exit_code=78 said=没在跑：配了 GPU，判段只把块写成待判行、等 GPU 批处理服务判，服务不在跑就退 78，不退回进程内判。出路：python3 gpu-verification-server/control start，再照 check 的出路修到它退 0" \
-      "error: test failed, to rerun pass \`--test some-target\`" > "$log"
     exit 101
   fi
   echo "CRASH_AMPLIFICATION mode=single_host_gpu states_checked_here=1000 red=0" > "$log"
@@ -544,18 +485,20 @@ STUB
   if [[ "$quiesce_exit" != 0 || "$(tr '\n' ' ' <"$work/calls")" != "record placement local-run " ]] || grep -q 'gpu-quiesce-run.sh' "$work/no-quiesce.out"; then
     selftest_cell_failed "开了 GPU 时不该再自己清场（退 $quiesce_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」）" "卡与清场归 GPU 批处理验证服务：这里不经 scripts/crash/gpu-quiesce-run.sh 重起自己"
   fi
-  # 第 17 格：多机配置开了 GPU（显卡先后写着 127.0.0.1:0:15G）、环境里没有卡、本机那一趟（判段）打了 GPU 批处理服务不在跑那一行、退 101 ⇒ 录入段、排计划、跑照起，
-  #   三趟收到的卡都是 unset（不领、不从多机配置挑），退 78，标准错误有起服务的命令 python3 gpu-verification-server/control start。
-  #   弄坏开关 gpu-verification-server-not-running-as-run-failure 下不认那一行、退 101、不打起服务的命令；cards-read-from-configuration 下三趟收到配置里那一张
+  # 第 17 格：排计划那一趟没打计划行，日志里是观察者交回的盘要在卡上判、取不到卡那一行（行首 CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS，
+  #   接在「test <名> ... 」后面，共用库 crash_amplification_failure_kind 认成 observer-images-without-a-card）⇒ 记本次未跑、退 78，
+  #   标准错误打共用库那一类的出路（crash_amplification_observer_images_without_a_card_howto）。弄坏开关 observer-images-without-a-card-as-run-failure 下照认不出原因退 247
   cells=$((cells + 1))
-  : > "$work/calls"; : > "$work/calls.cards"
-  STUB_CALLS="$work/calls" STUB_GPU_VERIFICATION_SERVER_DOWN=1 SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on-with-cards.env" \
-    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" bash "$0" some-target >"$work/gpu-server-down.out" 2>&1; card_exit=$?
-  if [[ "$card_exit" != 78 || "$(tr '\n' ' ' <"$work/calls")" != "record placement local-run " || "$(tr '\n' ' ' <"$work/calls.cards")" != "cards=[unset] cards=[unset] cards=[unset] " ]] \
-     || ! grep -qF 'python3 gpu-verification-server/control start' "$work/gpu-server-down.out"; then
-    selftest_cell_failed "开了 GPU、GPU 批处理服务不在跑：应当三趟都不带卡、退 78、打起服务的命令（退 $card_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」，收到的卡「$(tr '\n' ' ' <"$work/calls.cards")」）" \
-      "看 crash-amplification-lib.sh 的 crash_amplification_failure_kind（gpu-verification-server 那一类）、crash_amplification_explain_exit_code 给了日志那一支与 run_on_this_host_alone 交日志的那一句"
-  fi
+  local observer_exit
+  { echo "running 1 test"
+    echo "test crash_amplification::run_from_environment ... ${CRASH_AMPLIFICATION_NO_CARD_FOR_THE_IMAGES_AFTER_THE_OBSERVERS_LINE_PREFIX} reason=取卡等满了也没领到"
+    echo "thread 'the_case' panicked at crates/singlefs-verification/src/crash_amplification.rs:1:1:"
+    echo "test result: FAILED. 0 passed; 1 failed"; } >"$work/observer-images.log"
+  CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY="$work/observer-images.log" CRASH_AMPLIFICATION_ITEM_SWITCHES=1,0 CRASH_AMPLIFICATION_ITEM_CARDS="$local_only" \
+    bash "$0" some-target >"$work/observer-images.out" 2>"$work/observer-images.err"; observer_exit=$?
+  [[ "$observer_exit" == 78 ]] && grep -qF '这一条记本次未跑（退 78），不是红' "$work/observer-images.err" \
+    || selftest_cell_failed "观察者交回的盘取不到卡那一行却没记本次未跑、退 78、打共用库那一类的出路（退 $observer_exit，标准错误「$(tr '\n' ' ' <"$work/observer-images.err" | cut -c1-240)」）" \
+      "看 decide_where_to_run 里 pending 为空那一支的 case：observer-images-without-a-card 与 device、build 同退 78，出路由 crash_amplification_explain_exit_code 照日志分类打"
   # 第 18 格：认不出的选项（用一个从没用过的名字）⇒ 退 2、一趟都不起（调用记录是空的）、一行判定都不打
   cells=$((cells + 1))
   : > "$work/calls"
@@ -565,64 +508,31 @@ STUB
   if [[ "$unknown_option_exit" != 2 || -s "$work/calls" || -n "$unknown_option_output" ]]; then
     selftest_cell_failed "认不出的选项应当退 2、一趟都不起、一行判定都不打（退 $unknown_option_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」，标准输出「$(tr '\n' ' ' <<<"$unknown_option_output" | cut -c1-160)」）" "看参数解析那一段：-* 的分支交 usage（退 2）"
   fi
-  # 第 19 格：排计划那一趟借不到显存（起过卡池的产品路径打 NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment 那一行、退 0、没有计划行）⇒
-  #   一项都没跑到：打 DECISION where=not-run 与 CRASH_AMPLIFICATION_NOT_RUN 行、退 77，不跑（双机开着也一样），不退 247、不退 0。
-  #   两样不算这一种：别的用例名的 NOT_RUN_NO_GPU_ADAPTER 行照没有计划行退 247；那一趟退了非 0（101）照日志分类原样退 101、也不跑。
+  # 第 19 格：没编进 gpu 特性的二进制遇到 ENABLE_GPU=1，排计划那一趟退 0、没有计划行、日志里只有 Rust 打的那两行（CRASH_AMPLIFICATION_NOT_RUN step=judge 与
+  #   NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment，原因写「这份二进制没有编进 gpu 特性」）⇒ 照日志分类退 78（build 那一类）：
+  #   调用次序只有「record placement」（不跑本机那一趟）、不退 77。
+  #   弄坏开关 accept-missing-placement 下没有计划行照本机跑（起了本机那一趟、退 0），gpu-feature-missing-as-run-failure 下这一类不认、退 247
   cells=$((cells + 1))
-  local not_run_exit not_run_calls not_run_wrong=""
+  local feature_missing_exit feature_missing_calls feature_missing_wrong=""
   : > "$work/calls"
-  STUB_CALLS="$work/calls" STUB_PLACEMENT_NOT_RUN=1 CRASH_AMPLIFICATION_ITEM_SWITCHES=1,1 CRASH_AMPLIFICATION_ITEM_CARDS="$both" \
+  STUB_CALLS="$work/calls" STUB_PLACEMENT_WITHOUT_THE_GPU_FEATURE=1 CRASH_AMPLIFICATION_ITEM_SWITCHES=1,1 CRASH_AMPLIFICATION_ITEM_CARDS="$both" \
     CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" \
-    bash "$0" some-target >"$work/not-run.out" 2>&1; not_run_exit=$?
-  not_run_calls="$(tr '\n' ' ' <"$work/calls")"
-  if [[ "$not_run_exit" != 77 || "$not_run_calls" != "record placement " ]] \
-     || ! grep -q '^CRASH_AMPLIFICATION_DECISION where=not-run ' "$work/not-run.out" \
-     || ! grep -q '^CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment reason=等了 1800 秒，池里没有一张卡空得出 2560 MiB' "$work/not-run.out" \
-     || ! grep -q '本次未跑（这不是通过）：排派活计划那一趟借不到显存' "$work/not-run.out" || grep -q '^CRASH_AMPLIFICATION ' "$work/not-run.out"; then
-    not_run_wrong+="产品路径借不到显存那一趟退 $not_run_exit、调用次序「$not_run_calls」、输出尾部 $(tail -n 3 "$work/not-run.out" | tr '\n' '|')；"
+    bash "$0" some-target >"$work/feature-missing.out" 2>&1; feature_missing_exit=$?
+  feature_missing_calls="$(tr '\n' ' ' <"$work/calls")"
+  if [[ "$feature_missing_exit" != 78 || "$feature_missing_calls" != "record placement " ]]; then
+    feature_missing_wrong+="没编进 gpu 特性、排计划那一趟退 0 而没有计划行：退 $feature_missing_exit（要 78）、调用次序「$feature_missing_calls」（要「record placement 」）、输出尾部 $(tail -n 3 "$work/feature-missing.out" | tr '\n' '|')；"
   fi
-  printf '%s\n' "NOT_RUN_NO_GPU_ADAPTER test=some_gpu_parity_test reason=本机没有 NVIDIA 卡" "test result: ok. 1 passed; 0 failed" >"$work/other-not-run.log"
-  [[ "$(decision_of "$work/other-not-run.log" 1,0 "$local_only")" == " 247" ]] \
-    || not_run_wrong+="别的用例名的 NOT_RUN_NO_GPU_ADAPTER 行没照没有计划行退 247（$(decision_of "$work/other-not-run.log" 1,0 "$local_only")）；"
-  : > "$work/calls"
-  STUB_CALLS="$work/calls" STUB_PLACEMENT_NOT_RUN=1 STUB_PLACEMENT_EXIT=101 CRASH_AMPLIFICATION_ITEM_SWITCHES=1,0 CRASH_AMPLIFICATION_ITEM_CARDS="$local_only" \
-    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" \
-    bash "$0" some-target >"$work/not-run-failed.out" 2>&1; not_run_exit=$?
-  not_run_calls="$(tr '\n' ' ' <"$work/calls")"
-  if [[ "$not_run_exit" != 101 || "$not_run_calls" != "record placement " ]] || grep -q '^CRASH_AMPLIFICATION_NOT_RUN ' "$work/not-run-failed.out"; then
-    not_run_wrong+="排计划那一趟退 101 而日志里有那一行，退 $not_run_exit、调用次序「$not_run_calls」（要原样退 101、不跑、不打 CRASH_AMPLIFICATION_NOT_RUN）；"
-  fi
-  [[ -z "$not_run_wrong" ]] \
-    || selftest_cell_failed "排计划那一趟借不到显存没按一项都没跑到退 77、或不该算的也算了：$not_run_wrong" \
-      "看 decide_where_to_run 里 pending 为空那一支开头的 placement_not_run_line（只认那一趟退 0、行首是「$PLACEMENT_NOT_RUN_PREFIX」的那一行）与末尾 case 的 20 那一支"
-  # 第 20 格：一条用例三条流、第 2 条借不到显存（两行计划夹着产品路径那一行，那一趟退 0）⇒ 借到的照判：本机一台跑（DECISION pending_states=2000、跑了 local-run、退 0），
-  #   没借到的那一条打一行 CRASH_AMPLIFICATION_NOT_RUN step=placement … flow=2/3 reason=…、标准错误说这不是通过；只判不跑、双机开着也照打那一行。
-  #   别的用例名的 NOT_RUN_NO_GPU_ADAPTER 行夹在计划行之间不算，不打 CRASH_AMPLIFICATION_NOT_RUN
+  [[ -z "$feature_missing_wrong" ]] \
+    || selftest_cell_failed "排计划那一趟退 0、没有计划行时分类不对：$feature_missing_wrong" \
+      "看 decide_where_to_run 里 pending 为空那一支：没有计划行一律照 crash_amplification_failure_kind 分类（没编进 gpu 特性是 build 那一类、退 78），认不出原因才退 247"
+  # 第 20 格：计划行里核对要核的状态数 verifier_pending_states：两条流各一行（核对要核 100、200）⇒ DECISION 行写 verifier_pending_states=300（各行加起来；只取第一行是 100）；
+  #   判器要判与核对要核都是 0 的一趟（全部复用）也照本机跑：DECISION where=local、退 0（复用数与判红由判段那一趟报）。
+  #   弄坏开关 verifier-pending-states-not-counted 下 DECISION 行恒写 verifier_pending_states=0
   cells=$((cells + 1))
-  local partial_exit partial_calls partial_wrong="" partial_decision
-  : > "$work/calls"
-  STUB_CALLS="$work/calls" STUB_PLACEMENT_PARTIAL=1 CRASH_AMPLIFICATION_ITEM_SWITCHES=1,0 CRASH_AMPLIFICATION_ITEM_CARDS="$local_only" \
-    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" \
-    bash "$0" some-target >"$work/partial.out" 2>&1; partial_exit=$?
-  partial_calls="$(tr '\n' ' ' <"$work/calls")"
-  if [[ "$partial_exit" != 0 || "$partial_calls" != "record placement local-run " ]] \
-     || ! grep -q '^CRASH_AMPLIFICATION_DECISION where=local .*pending_states=2000 ' "$work/partial.out" \
-     || [[ "$(grep -c '^CRASH_AMPLIFICATION_NOT_RUN ' "$work/partial.out")" != 1 ]] \
-     || ! grep -q '^CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment flow=2/3 reason=等了 1800 秒，池里没有一张卡空得出 5120 MiB（第 2 条流）$' "$work/partial.out" \
-     || ! grep -q '本次未跑（这不是通过）：排派活计划那一趟第 2/3 条流借不到显存' "$work/partial.out" || ! grep -q '^CRASH_AMPLIFICATION mode=' "$work/partial.out"; then
-    partial_wrong+="三条流第 2 条借不到显存那一趟退 $partial_exit、调用次序「$partial_calls」、CRASH_AMPLIFICATION_NOT_RUN $(grep -c '^CRASH_AMPLIFICATION_NOT_RUN ' "$work/partial.out") 行、输出尾部 $(tail -n 4 "$work/partial.out" | tr '\n' '|')；"
-  fi
-  printf '%s\n' "running 1 test" "$(placement_line 1000 10)" \
-    "NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason=第 2 条流借不到" "$(placement_line 1000 10)" >"$work/partial-plan.log"
-  partial_decision="$(CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY="$work/partial-plan.log" CRASH_AMPLIFICATION_ITEM_SWITCHES=1,1 CRASH_AMPLIFICATION_ITEM_CARDS="$both" bash "$0" some-target 2>/dev/null)"
-  grep -q '^CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment flow=2/3 reason=第 2 条流借不到$' <<<"$partial_decision" \
-    || partial_wrong+="只判不跑、双机开着时没打 flow=2/3 那一行：$(tr '\n' '|' <<<"$partial_decision")；"
-  printf '%s\n' "$(placement_line 1000 10)" "NOT_RUN_NO_GPU_ADAPTER test=some_gpu_parity_test reason=本机没有 NVIDIA 卡" "$(placement_line 1000 10)" >"$work/partial-other.log"
-  partial_decision="$(CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY="$work/partial-other.log" CRASH_AMPLIFICATION_ITEM_SWITCHES=1,0 CRASH_AMPLIFICATION_ITEM_CARDS="$local_only" bash "$0" some-target 2>/dev/null)"
-  if grep -q '^CRASH_AMPLIFICATION_NOT_RUN ' <<<"$partial_decision"; then partial_wrong+="别的用例名的那一行夹在计划行之间也打了 CRASH_AMPLIFICATION_NOT_RUN：$(tr '\n' '|' <<<"$partial_decision")；"; fi
-  [[ -z "$partial_wrong" ]] \
-    || selftest_cell_failed "几条流里有的借不到显存，没借到的没逐条报本次未跑、或借到的没照判：$partial_wrong" \
-      "看 decide_where_to_run 里 pending 不空那一支开头的 report_placement_partial_not_run（只认行首是「$PLACEMENT_NOT_RUN_PREFIX」的那一行，第几条按计划行与那一行的先后数）"
+  placement_line 0 0 >"$work/all-reused.log"
+  grep -q ' verifier_pending_states=300 ' <<<"$two_flows" && [[ "$(decision_of "$work/all-reused.log" 1,1 "$both")" == "where=local 0" ]] \
+    || selftest_cell_failed "核对要核的状态数没加起来写进 DECISION 行、或两个数都是 0 的一趟没照本机跑：$(tr '\n' '|' <<<"$two_flows" | cut -c1-200)；全部复用 $(decision_of "$work/all-reused.log" 1,1 "$both")" \
+      "看 decide_where_to_run 里 verifier_pending 那两句：取 crash_amplification_placement_total 的 verifier_pending_states 合计，有计划行就本机跑"
   # 第 21 格：没设 SINGLEFS_MULTI_HOST_CONFIG 时多机配置按 git common-dir 找主工作树那一份（在 worktree 里跑也读主工作树的 multi-host.env，判决 r3 第二节 M1-3）：
   #   临时目录里 git init 一个主仓、加一个 worktree，从 worktree 的树根找，要找到主仓根下的那一份；不是 git 工作树的目录退回它自己的树根
   cells=$((cells + 1))
@@ -894,16 +804,15 @@ STUB
     selftest_cell_failed "开了 GPU、环境里没有卡：三趟都不该带卡（不领、不从多机配置挑），退 0（退 $no_card_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」，收到的卡「$(tr '\n' ' ' <"$work/calls.cards")」）" \
       "看 crash-amplification-lib.sh 的 crash_amplification_prepare 取卡那一段与 crash_amplification_environment_for_this_host"
   fi
-  # 第 43 格：--stage judge（调用方已录过）、开了 GPU、环境里没有卡、本机那一趟打了 GPU 批处理服务不在跑那一行、退 101 ⇒ 不跑录入段，排计划与本机判照起，退 78、
-  #   标准错误有起服务的命令。弄坏开关 gpu-verification-server-not-running-as-run-failure 下不认那一行、退 101、不打起服务的命令
+  # 第 43 格：测试目标的源文件（上次红的清单的 --target-file，文件头「上次红的清单」）：平铺的取 tests/<目标>.rs，目录式的取 tests/<目标>/main.rs，两样都不在的照给 tests/<目标>.rs。
+  #   弄坏开关 target-file-flat-only 下目录式目标取 tests/<目标>.rs（那份文件不在，清单悄悄不写）
   cells=$((cells + 1))
-  : > "$work/calls"
-  STUB_CALLS="$work/calls" STUB_GPU_VERIFICATION_SERVER_DOWN=1 SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on-with-cards.env" \
-    CRASH_AMPLIFICATION_ITEM_LOCAL_RUN="$work/local-run.sh" bash "$0" some-target --stage judge >"$work/judge-gpu-server-down.out" 2>&1; no_card_exit=$?
-  if [[ "$no_card_exit" != 78 || "$(tr '\n' ' ' <"$work/calls")" != "placement local-run " ]] || ! grep -qF 'python3 gpu-verification-server/control start' "$work/judge-gpu-server-down.out"; then
-    selftest_cell_failed "--stage judge、GPU 批处理服务不在跑：应当不录、排计划与本机判照起、退 78、打起服务的命令（退 $no_card_exit，调用次序「$(tr '\n' ' ' <"$work/calls")」）" \
-      "看 crash-amplification-lib.sh 的 crash_amplification_failure_kind（gpu-verification-server 那一类）与 run_on_this_host_alone 交日志给 crash_amplification_explain_exit_code 的那一句"
-  fi
+  local target_file_tests="$work/target-file-root/crates/singlefs-verification/tests" target_files_seen target_file_name
+  mkdir -p "$target_file_tests/dir_target" && : >"$target_file_tests/flat_target.rs" && : >"$target_file_tests/dir_target/main.rs"
+  target_files_seen="$(repository_root="$work/target-file-root"; for target_file_name in flat_target dir_target absent_target; do item_target_source_file "$target_file_name"; done | tr '\n' ' ')"
+  [[ "$target_files_seen" == "$target_file_tests/flat_target.rs $target_file_tests/dir_target/main.rs $target_file_tests/absent_target.rs " ]] \
+    || selftest_cell_failed "测试目标的源文件应当平铺的取 tests/<目标>.rs、目录式的取 tests/<目标>/main.rs、两样都不在的照给 tests/<目标>.rs（实际「$target_files_seen」）" \
+      "看 item_target_source_file：经 lib_crash_point_replay_items.py 的 target-source-file 取；目录式目标取成 tests/<目标>.rs，那份文件不在，上次红的清单悄悄不写"
   # 第 44 格：分两次起（文件头用法 --stage）：--stage record 只跑录入段、退 0；--stage judge 带着调用方交的卡（GPU_CARDS_BY_PRIORITY）不跑录入段，
   #   排计划与本机判都用那一张；--stage 写别的值退 2、一趟都不起
   cells=$((cells + 1))
@@ -1046,7 +955,7 @@ STUB
     echo "     → 怎么办：照上面每一格给的出路改，再跑 $0 --selftest" >&2
     exit 1
   fi
-  echo "  ✓ --selftest：双机开着与没开都本机一台跑（不交双机驱动）、没开双机却点名第二台的卡退 78、开了双机第二台没卡退 78、几条流累加、没有计划行认不出原因退 247、卡用不了退 78、算法判不了退 248、开了 GPU 没写卡退 78、本机那一趟卡用不了退 78、带值的选项缺值退 2、运行条件读多机配置里的显卡先后、三趟收到的卡是环境里交的那一张（不读多机配置里的显卡先后）、不再自己清场、GPU 批处理服务不在跑退 78 并打起服务的命令、认不出的选项退 2、排计划那一趟借不到显存一项都没跑到退 77（别的用例名的那一行退 247、那一趟退了非 0 原样退）、几条流里没借到的逐条报本次未跑而借到的照判、没设 SINGLEFS_MULTI_HOST_CONFIG 时多机配置按 git common-dir 找、多机配置判法认显卡的两个键、结论版本对不上与没编进 gpu 特性都退 78、不在临时 prune-server 底下起的自证退 2、录入段没跑成就停（判段一趟都不起）、调用方没送按段登记文件时两趟都送本树那一份的绝对路径（送了照它）、照崩溃点重放用例的样子造的用例（录入段只打 CRASH_LIBRARY_RECORDED）点名了也照跑录入段并算录入成了、本机那一趟判段没跑时转打 CRASH_AMPLIFICATION_NOT_RUN step=judge 那一行、本机那一趟日志里的 CRASH_AMPLIFICATION、GPU_CARD、GPU_TOTAL、GPU_PASS 行按次序原样转打（没有 GPU_PASS 行的日志照常过）、线程数取服务交的 SINGLEFS_THREAD_CAP（没交取登记的重活默认并行度）、跑完写上次红的清单（点名用例的只换那一项）、没开 GPU 开了双机时本机 CPU 一台跑、跑完运行目录里不剩它建的编译目录（正常、红、被 TERM 停）而调用方设的 CARGO_TARGET_DIR 不删、哪几项是这一台的卡照 --emit-addresses 认（这一台是 HOSTS 里的 IPv6 那一项时它的卡照过、同一份配置在 127.0.0.1 上退 78）、没设放量家目录时运行目录在工作根下、只供测试的变量不在自证里设了退 2、显卡先后里地址不在 HOSTS 里退 78、判段跑的过程中源码变了记本次未跑退 77 不落红、不领卡（开了 GPU、环境里没有卡时三趟都不带卡，--stage judge 时 GPU 批处理服务不在跑同样退 78）、--stage 只录与只判、服务给的 CARGO_TARGET_DIR 照用不删（上一次尝试的产物照留）、先编后判（判段要的测试二进制判段之前编好、两趟直接起它，--stage record 编好打路径，--stage judge --judge-binary 不再编）、--stage flow-shape 只录流（给引擎已经存在的叫停文件、转打 CRASH_FLOW_COVERAGE 行、不编判段二进制），$cells 格都对"
+  echo "  ✓ --selftest：双机开着与没开都本机一台跑（不交双机驱动）、没开双机却点名第二台的卡退 78、开了双机第二台没卡退 78、几条流累加（判器要判的与核对要核的）、没有计划行认不出原因退 247、卡用不了退 78、算法判不了退 248、开了 GPU 没写卡退 78、本机那一趟卡用不了退 78、带值的选项缺值退 2、运行条件读多机配置里的显卡先后、三趟收到的卡是环境里交的那一张（不读多机配置里的显卡先后）、不再自己清场、认不出的选项退 2、没编进 gpu 特性而排计划那一趟退 0、没有计划行时退 78、核对要核的状态数合计写进 DECISION 行而两个数都是 0 的一趟也本机跑、没设 SINGLEFS_MULTI_HOST_CONFIG 时多机配置按 git common-dir 找、多机配置判法认显卡的两个键、结论版本对不上与没编进 gpu 特性都退 78、不在临时 prune-server 底下起的自证退 2、录入段没跑成就停（判段一趟都不起）、调用方没送按段登记文件时两趟都送本树那一份的绝对路径（送了照它）、照崩溃点重放用例的样子造的用例（录入段只打 CRASH_LIBRARY_RECORDED）点名了也照跑录入段并算录入成了、本机那一趟判段没跑时转打 CRASH_AMPLIFICATION_NOT_RUN step=judge 那一行、本机那一趟日志里的 CRASH_AMPLIFICATION、GPU_CARD、GPU_TOTAL、GPU_PASS 行按次序原样转打（没有 GPU_PASS 行的日志照常过）、线程数取服务交的 SINGLEFS_THREAD_CAP（没交取登记的重活默认并行度）、跑完写上次红的清单（点名用例的只换那一项）、没开 GPU 开了双机时本机 CPU 一台跑、跑完运行目录里不剩它建的编译目录（正常、红、被 TERM 停）而调用方设的 CARGO_TARGET_DIR 不删、哪几项是这一台的卡照 --emit-addresses 认（这一台是 HOSTS 里的 IPv6 那一项时它的卡照过、同一份配置在 127.0.0.1 上退 78）、没设放量家目录时运行目录在工作根下、只供测试的变量不在自证里设了退 2、显卡先后里地址不在 HOSTS 里退 78、判段跑的过程中源码变了记本次未跑退 77 不落红、不领卡（开了 GPU、环境里没有卡时三趟都不带卡）、--stage 只录与只判、服务给的 CARGO_TARGET_DIR 照用不删（上一次尝试的产物照留）、先编后判（判段要的测试二进制判段之前编好、两趟直接起它，--stage record 编好打路径，--stage judge --judge-binary 不再编）、--stage flow-shape 只录流（给引擎已经存在的叫停文件、转打 CRASH_FLOW_COVERAGE 行、不编判段二进制）、排计划那一趟观察者交回的盘取不到卡记本次未跑退 78 并打共用库那一类的出路，$cells 格都对"
   exit 0
 }
 if (( selftest )); then run_selftest; fi
@@ -1068,11 +977,10 @@ if [[ "${CRASH_AMPLIFICATION_ITEM_SELFTEST:-}" != 1 ]] && ! item_break_is test-v
 fi
 # 只判不跑（自证用）：拿造好的日志判跑不跑
 if [[ -n "${CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY:-}" ]]; then
-  refused_exit_code=""; decided_not_run_line=""
+  refused_exit_code=""
   decide_where_to_run "$CRASH_AMPLIFICATION_ITEM_DECIDE_ONLY" 0; decision=$?
   case "$decision" in
     0) exit 0 ;;
-    20) report_placement_not_run "$decided_not_run_line"; item_break_is not-run-exits-0 && exit 0; exit 77 ;;
     *) exit "${refused_exit_code:-247}" ;;
   esac
 fi
@@ -1087,7 +995,7 @@ item_write_last_run() { # <这一趟的退出码>
   item_break_is last-run-unwritten && return 0   # 弄坏开关：跑完不写
   [[ "$item_stage" == record || "$item_stage" == flow-shape ]] && return 0
   python3 "$repository_root/scripts/gate/lib_reuse_checks.py" last-run-target scripts/crash/crash-amplification-item.sh "$test_target" "$1" \
-    ${test_filter:+--test-filter "$test_filter"} --target-file "$repository_root/crates/singlefs-verification/tests/$test_target.rs" >/dev/null 2>&1 \
+    ${test_filter:+--test-filter "$test_filter"} --target-file "$(item_target_source_file "$test_target")" >/dev/null 2>&1 \
     || echo "  ! 上次红的清单没写成（scripts/gate/lib_reuse_checks.py last-run-target），这一趟的判定不受影响" >&2
 }
 # EXIT 钩子：写上次红的清单，再删这一项自己建的编译目录（文件头「编译目录」；没建的不动，删不成而本来要退 0 的改退 1）。
@@ -1260,13 +1168,9 @@ item_exit_if_source_changed "排计划那一趟起跑前"
 crash_amplification_run_on_this_host 0/1 "$run_directory/placement.log" SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1; placement_exit=$?
 item_exit_if_source_changed "排计划那一趟收尾后"
 grep -h '^CRASH_AMPLIFICATION_PLACEMENT ' "$run_directory/placement.log" 2>/dev/null
-refused_exit_code=""; decided_not_run_line=""
+refused_exit_code=""
 decide_where_to_run "$run_directory/placement.log" "$placement_exit"; decision=$?
 case "$decision" in
   0) run_on_this_host_alone; exit $? ;;
-  20) # 一项都没跑到（文件头步骤 ②、退出码 77）：不跑；弄坏开关 not-run-exits-0 下退 0
-    report_placement_not_run "$decided_not_run_line"
-    item_break_is not-run-exits-0 && exit 0
-    exit 77 ;;
   *) exit "${refused_exit_code:-247}" ;;
 esac

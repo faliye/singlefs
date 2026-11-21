@@ -14,7 +14,7 @@
           只认这三段：带 I-x.y=<数>/<数> 的写法但不是三段的（两段、四段）整行记成「写法不对」，不按段数分别认。
           流 = <来源>:<这一行在第一个 I- 之前头一个全大写的词>（例 crash_enumeration_fixed_script_stream:CRASH_POINT_REPLAY_FIXED_SCRIPT；没有这样的词记 -；
           那之前另有 stream=<名> 或 flow=<名> 的接成 <词>/<名>，例 crash_enumeration_tree_split_streams:CRASH_POINT_REPLAY_TREE_SPLIT/AccountingLeafSplit），
-          来源是测试目标名（tests/<名>.rs 去掉 .rs；库的单测记 lib，装置二进制记 bin/<名>），放量那一段记 crash-amplification。同一个流打了几行，次数相加。
+          来源是测试目标名（tests/<名>.rs 去掉 .rs，目录式目标 tests/<名>/main.rs 记目录名；库的单测记 lib，装置二进制记 bin/<名>），放量那一段记 crash-amplification。同一个流打了几行，次数相加。
 
 记录（这份脚本自己的中间格式，一行一条，制表符隔开，行首可带空白）：
   CRASH_FLOW_RECORD coverage <来源> <入口> <步骤> <段> <展开方式>
@@ -102,6 +102,9 @@
       「✗ 自检 …格里有…格判错」
   CRASH_FLOW_COVERAGE_BREAK=count-shape-unchecked  计数行不核段数：不是三段的行不记成写法不对（两段的行被当成没有计数）
       「✗ 自检 extract-count-shape：」
+      「✗ 自检 …格里有…格判错」
+  CRASH_FLOW_COVERAGE_BREAK=directory-target-root-unmapped  source_of_target_root 目录式测试目标（tests/<名>/main.rs）不记 <名>，照目标根文件原样记
+      「✗ 自检 source-of-directory-target：」
       「✗ 自检 …格里有…格判错」
 """
 import glob
@@ -245,8 +248,11 @@ def read_records(paths):
 
 
 def source_of_target_root(target_root):
-    if target_root.startswith("tests/") and target_root.endswith(".rs"):
-        return target_root[len("tests/"):-len(".rs")]
+    """目标根文件（cargo 段头 Running 那一行与 test-plan 第五列的写法）→ 来源：tests/<名>.rs 与目录式的 tests/<名>/main.rs 都记 <名>，src/lib.rs 记 lib，src/bin 的记 bin/<名>。
+    弄坏开关 directory-target-root-unmapped 下目录式测试目标记成目标根文件原样。"""
+    found = re.match(r"^tests/([^/]+?)(?:/main)?\.rs$", target_root)
+    if found and not ("directory-target-root-unmapped" in BROKEN and target_root.endswith("/main.rs")):
+        return found.group(1)
     if target_root == "src/lib.rs":
         return "lib"
     match = re.match(r"^src/bin/([^/]+?)(?:/main)?\.rs$", target_root)
@@ -945,6 +951,9 @@ def selftest_cases(work):
     odd_counts = records_of_lines(["CHECKER record_root_without_record=0 I-1.1=4/0 I-2.1=0/0", "SAMPLE I-1.1=1/0/0/0", "SAMPLE I-1.1=1/0/0"], "s")
     expect("extract-count-shape", [record[0] for record in odd_counts] == ["malformed", "malformed", "counts"],
            f"计数行只认三段：两段的、四段的整行应当记成写法不对，三段的照认，实际 {odd_counts}")
+    sources = [source_of_target_root(target_root) for target_root in ("tests/flat_stream.rs", "tests/split_stream/main.rs", "src/lib.rs", "src/bin/probe/main.rs")]
+    expect("source-of-directory-target", sources == ["flat_stream", "split_stream", "lib", "bin/probe"],
+           f"来源应当平铺的 tests/<名>.rs 与目录式的 tests/<名>/main.rs 都记 <名>、库记 lib、装置二进制记 bin/<名>，实际 {sources}")
     members, names, problem = read_step_kinds(sample_world(work, "steps"))
     expect("step-kinds-read", members == ["ZeroFill", "UnitWrite", "Barrier"] and names.get("UnitWrite") == "unit_write" and not problem,
            f"StepKind 应当读出 ZeroFill、UnitWrite、Barrier（注释里的不算）与 name() 的串，实际 {members} {names} {problem}")

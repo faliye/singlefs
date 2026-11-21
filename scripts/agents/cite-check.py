@@ -11,10 +11,14 @@
 认的两种写法（同一行里）：
     「原文」（`路径:行号`）  或  「原文」(`路径:行号`)        引号紧挨着括号里的位置
     `路径:行号`：「原文」    或  `路径:行号` 「原文」          位置之后紧跟引号
-行号可以是区间（`路径:12-15`）；位置也可以写成小节：`路径@标题`（标题不带井号、逐字，原文要在那一节里，到同级或更高一级的下一个标题为止；
-标题命中不是恰好一次判红）——引规则与 kb 的条款优先这样写，不用为一个行号再读一遍文件。路径带目录的按 --root（默认仓根）逐个找；只写文件名的按文件名找，恰好一个才判：--root 是 git 仓根的在 `git ls-files` 里找，不是 git 仓根的（snapshot-tree.py 铺的树、草稿目录）按目录逐层找实际文件（不进 .git、不跟目录链接）；几个 --root 的合起来找。
+行号可以是区间（`路径:12-15`）；位置也可以写成小节：`路径@标题`（标题不带井号、逐字；标题里成对的括号照取（括号里再套一层也行）：带反引号的取到反引号为止，不带的取到与开头那一层配对的右括号、「：」加引号或行尾为止；原文要在那一节里，到同级或更高一级的下一个标题为止；
+标题命中不是恰好一次判红；不带反引号的标题末尾紧跟括号说明时，整串命中不了就去掉末尾的括号说明再找，去掉之后是文件里恰好一处的整行标题就取它）——引规则与 kb 的条款优先这样写，不用为一个行号再读一遍文件。路径带目录的按 --root（默认仓根）逐个找；只写文件名的按文件名找，恰好一个才判：--root 是 git 仓根的在 `git ls-files` 里找，不是 git 仓根的（snapshot-tree.py 铺的树、草稿目录）按目录逐层找实际文件（不进 .git、不跟目录链接）；几个 --root 的合起来找。
 原文里的「…」与「……」是省略：切开的每一段要按次序出现在那一行（或区间）里。比对前两边都去掉 ** 与反引号、把连续空白并成一个空格。
-判不了的不判、单列：路径认不出（不在、文件名不唯一）、行号超出文件、给了 --unchanged-since 而被引文件在那之后改过。
+判不了的不判、单列：路径认不出（不在、文件名不唯一）、行号超出文件、给了 --unchanged-since 而被引文件在那之后改过、小节标题认不出结尾
+（不带反引号的标题里带「，」「。」而文件里没有这样的整行标题——多半是标题后面接了说明；位置的形态是小节写法（路径加 @ 加标题）、紧挨着引文而标题的结尾认不出的：
+括号没配上、取到的一串超出八十个字、或结尾认不出；说明里写「小节标题认不出结尾」和是哪一种，不整条丢掉）。
+带反引号的标题，反引号把头尾定死了：里面带「，」「。」而文件里没有这样的整行标题照判红（标题命中 0 次）。
+位置与引文之间隔着别的话（「`路径@标题` 里说「原文」」这类散文）的不是引文写法，不收、不判、不列进没判。
 裸行号（紧挨着没有引文的 `路径:行号` 或 `路径:起-止`，路径的认法与上面同一份）也核，只核行号在不在文件里：
     文件找得到而行号（区间的止）大于文件行数 → 判红，说「`路径` 只有 N 行，引的是第 M 行——多半是背景材料附录里的行号」；
     行号在范围内 → 没有引文可比，列进「没判」并单独计数（行首写「没判（裸行号，没有引文可比）」）；
@@ -27,7 +31,8 @@
   CITE_CHECK_BREAK=always-ok  judge() 与 judge_section() 不比原文，每处引文都判对上
       行号错一行（「✗ 自检：行号错一行：应当判红」）、指到标题行（「✗ 自检：指到标题行：应当判红」）、
       行号是背景材料的（「✗ 自检：行号是背景材料的：应当判红」）、小节写法：原文不在那一节（「✗ 自检：小节写法：原文不在那一节：应当判红」）、
-      非 git 根上只写文件名、行号错（「✗ 自检：非 git 根上只写文件名、行号错：应当判红」）
+      非 git 根上只写文件名、行号错（「✗ 自检：非 git 根上只写文件名、行号错：应当判红」）、
+      标题后紧跟括号说明、原文不在那一节（「✗ 自检：小节写法：标题后紧跟括号说明、原文不在那一节：应当判红」）
   CITE_CHECK_BREAK=ignore-changed  judge() 不看 --unchanged-since，开工之后改过的被引文件照判
       被引文件在开工之后改过（「✗ 自检：被引文件在开工之后改过：应当只列进没判」）
   CITE_CHECK_BREAK=no-background-check  judge() 不比背景材料，行号是背景材料的不单报
@@ -35,7 +40,10 @@
   CITE_CHECK_BREAK=no-heading-check  judge() 不单判行号指到标题行
       指到标题行（「✗ 自检：指到标题行：应当判红」）
   CITE_CHECK_BREAK=title-any-section  judge_section() 不要求标题恰好命中一次，原文在整份文件里找
-      小节写法：标题不在（「✗ 自检：小节写法：标题不在：应当判红」）
+      小节写法：标题不在（「✗ 自检：小节写法：标题不在：应当判红」）、
+      带反引号、标题后紧跟逗号（「✗ 自检：小节写法：带反引号、标题后紧跟逗号：应当判红」）、带反引号、标题后紧跟句号（「✗ 自检：小节写法：带反引号、标题后紧跟句号：应当判红」）、
+      位置在前、带反引号、标题后紧跟逗号（「✗ 自检：小节写法：位置在前、带反引号、标题后紧跟逗号：应当判红」）、
+      标题后紧跟括号说明、括号前的标题重名（「✗ 自检：小节写法：标题后紧跟括号说明、括号前的标题重名：应当判红」）
   CITE_CHECK_BREAK=bare-line-refs-ignored  citations_in() 不收裸行号，超出文件的裸行号既不判红也不数
       裸行号超出文件（「✗ 自检：裸行号超出文件：应当判红」）、裸行号区间的止超出文件（「✗ 自检：裸行号区间的止超出文件：应当判红」）、
       裸行号只写文件名、仓里唯一（「✗ 自检：裸行号只写文件名、仓里唯一：应当判红」）、
@@ -47,6 +55,42 @@
   CITE_CHECK_BREAK=non-git-root-unindexed  tracked_files_by_basename() 在不是 git 仓根的 --root 上不按目录找文件名、交空表（只写文件名的引文一律认不出、只列进没判；
       records/2026-10-23-subagent拆分提案.md 第一百二十二节 ①）
       非 git 根上只写文件名的引文行号错（「✗ 自检：非 git 根上只写文件名、行号错：应当判红」）、非 git 根上只写文件名的引文对上（「✗ 自检：非 git 根上只写文件名、对上：应当判绿且判了」）
+  CITE_CHECK_BREAK=title-lazy  LOCATION 的小节标题不认结尾，懒匹配只取两个字（引文在前、后面只剩反引号或括号的写法交「分支」）
+      带反引号的长标题（「✗ 自检：小节写法：带反引号的长标题：应当判绿」）、不带反引号的长标题（「✗ 自检：小节写法：不带反引号的长标题：应当判绿」）、
+      三种写法交同一个完整标题（「✗ 自检：小节写法：三种写法交同一个完整标题：应当都交」）、
+      标题带括号、带反引号（「✗ 自检：小节写法：标题带括号、带反引号：应当判绿」）、标题带括号、不带反引号（「✗ 自检：小节写法：标题带括号、不带反引号：应当判绿」）、
+      标题带逗号、整行逐字（「✗ 自检：小节写法：标题带逗号、整行逐字：应当判绿」）、反引号后紧跟逗号（「✗ 自检：小节写法：反引号后紧跟逗号：应当判绿」）、
+      标题后紧跟逗号（「✗ 自检：小节写法：标题后紧跟逗号：应当只列进没判」）、标题后紧跟句号（「✗ 自检：小节写法：标题后紧跟句号：应当只列进没判」）、
+      括号没配上（「✗ 自检：小节写法：括号没配上：应当只列进没判」）、四种写法交同一个带括号的标题（「✗ 自检：小节写法：标题带括号的四种写法交同一个完整标题：应当都交」）、
+      标题带逗号、带反引号、整行逐字（「✗ 自检：小节写法：标题带逗号、带反引号、整行逐字：应当判绿」）、
+      带反引号、标题后紧跟逗号（「✗ 自检：小节写法：带反引号、标题后紧跟逗号：应当判红」）、带反引号、标题后紧跟句号（「✗ 自检：小节写法：带反引号、标题后紧跟句号：应当判红」）、
+      标题超出八十个字（「✗ 自检：小节写法：标题超出八十个字：应当只列进没判」）
+  CITE_CHECK_BREAK=title-parens-unpaired  LOCATION 的小节标题不认成对的括号：带反引号的标题里不许有括号，不带的遇到括号就停，带括号的标题落进「认不出结尾」
+      标题带括号、带反引号（「✗ 自检：小节写法：标题带括号、带反引号：应当判绿」）、标题带括号、不带反引号（「✗ 自检：小节写法：标题带括号、不带反引号：应当判绿」）、
+      位置在前、标题带括号、带反引号（「✗ 自检：小节写法：位置在前、标题带括号、带反引号：应当判绿」）、位置在前、标题带括号、不带反引号（「✗ 自检：小节写法：位置在前、标题带括号、不带反引号：应当判绿」）、
+      反引号后紧跟逗号（「✗ 自检：小节写法：反引号后紧跟逗号：应当判绿」）、
+      标题后紧跟括号说明、不带反引号（「✗ 自检：小节写法：标题后紧跟括号说明、不带反引号：应当判绿」）、
+      位置在前、标题后紧跟括号说明、不带反引号（「✗ 自检：小节写法：位置在前、标题后紧跟括号说明、不带反引号：应当判绿」）、
+      标题后紧跟括号说明、原文不在那一节（「✗ 自检：小节写法：标题后紧跟括号说明、原文不在那一节：应当判红」）、
+      标题后紧跟括号说明、括号前的标题重名（「✗ 自检：小节写法：标题后紧跟括号说明、括号前的标题重名：应当判红」）
+  CITE_CHECK_BREAK=title-unknown-end-dropped  citations_in() 不收认不出结尾的小节写法，括号没配上的整条丢掉、不判也不列进没判
+      括号没配上（「✗ 自检：小节写法：括号没配上：应当只列进没判」）、标题超出八十个字（「✗ 自检：小节写法：标题超出八十个字：应当只列进没判」）
+  CITE_CHECK_BREAK=title-comma-judged  judge_section() 不给不带反引号、带「，」「。」又命中 0 次的标题单列，照标题不在判红
+      标题后紧跟逗号（「✗ 自检：小节写法：标题后紧跟逗号：应当只列进没判」）、标题后紧跟句号（「✗ 自检：小节写法：标题后紧跟句号：应当只列进没判」）
+  CITE_CHECK_BREAK=ticked-title-comma-skipped  judge_section() 对带反引号的标题也给带「，」「。」又命中 0 次的单列，列进没判、不判红
+      带反引号、标题后紧跟逗号（「✗ 自检：小节写法：带反引号、标题后紧跟逗号：应当判红」）、带反引号、标题后紧跟句号（「✗ 自检：小节写法：带反引号、标题后紧跟句号：应当判红」）、
+      位置在前、带反引号、标题后紧跟逗号（「✗ 自检：小节写法：位置在前、带反引号、标题后紧跟逗号：应当判红」）
+  CITE_CHECK_BREAK=paren-note-not-peeled  judge_section() 不去掉不带反引号的标题末尾的括号说明，整串命中不了就判红
+      标题后紧跟括号说明、不带反引号（「✗ 自检：小节写法：标题后紧跟括号说明、不带反引号：应当判绿」）、
+      位置在前、标题后紧跟括号说明、不带反引号（「✗ 自检：小节写法：位置在前、标题后紧跟括号说明、不带反引号：应当判绿」）、
+      标题后紧跟括号说明、原文不在那一节（「✗ 自检：小节写法：标题后紧跟括号说明、原文不在那一节：应当判红」）
+  CITE_CHECK_BREAK=paren-note-peeled-any  judge_section() 去掉括号说明之后文件里有几处同名标题也取头一处，不要求恰好一处
+      标题后紧跟括号说明、括号前的标题重名（「✗ 自检：小节写法：标题后紧跟括号说明、括号前的标题重名：应当判红」）
+  CITE_CHECK_BREAK=loose-takes-prose  兜底的标题可以越过反引号：位置与引文之间隔着别的话的散文也收进没判
+      位置后接散文再接引文（「✗ 自检：小节写法：位置后接散文再接引文：应当既不判也不列进没判」）、
+      两处位置并排、后接引文（「✗ 自检：小节写法：两处位置并排、后接引文：应当判绿且判了」）
+  CITE_CHECK_BREAK=unknown-end-reason-generic  认不出结尾的理由一律写成括号没配上或标题超出八十个字二选一，不按取到的那一串分
+      括号没配上（「✗ 自检：小节写法：括号没配上：应当只列进没判」）、标题超出八十个字（「✗ 自检：小节写法：标题超出八十个字：应当只列进没判」）
 """
 import os
 import re
@@ -61,10 +105,39 @@ sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("CITE_CHECK_BREAK", "")
 
-LOCATION = r"`?(?P<path>[A-Za-z0-9_./\-一-鿿]+\.[A-Za-z0-9]+)(?::(?P<first>\d+)(?:[-–](?P<last>\d+))?|@(?P<title>[^`」（）()\n]{2,80}?))`?"
+# 小节标题取到它自己的结尾为止，标题里成对的括号（括号里最多再套一层）照取：
+#   带反引号的（位置前有反引号）取到反引号；不带的取到与开头那一层配对的右括号、行尾，或位置在前写法里紧跟的「：」加引号；
+#   结尾不写出来，懒匹配会在后面只剩可选反引号时只取两个字
+PATH = r"[A-Za-z0-9_./\-一-鿿]+\.[A-Za-z0-9]+"
+TITLE_CHARACTER = r"[^`」（）()\n]"
+TITLE_GROUP = r"[（(](?:" + TITLE_CHARACTER + r"|[（(]" + TITLE_CHARACTER + r"*[）)])*[）)]"
+if BROKEN == "title-parens-unpaired":   # 弄坏开关：标题里不认成对的括号
+    TITLE_TICKED = TITLE_UNTICKED = TITLE_CHARACTER + r"{2,80}?"
+else:
+    TITLE_TICKED = r"[^`」\n]{2,80}?"
+    TITLE_UNTICKED = r"(?:" + TITLE_CHARACTER + r"|" + TITLE_GROUP + r"){2,80}?"
+TITLE_TICKED_END = "" if BROKEN == "title-lazy" else r"(?=`)"   # 弄坏开关：标题不认结尾
+TITLE_UNTICKED_END = "" if BROKEN == "title-lazy" else r"(?=`|[）)]|$|\s*[：:]?\s*「)"
+LOCATION = (r"(?P<tick>`)?(?P<path>" + PATH + r")(?::(?P<first>\d+)(?:[-–](?P<last>\d+))?|@(?P<title>(?(tick)" + TITLE_TICKED + TITLE_TICKED_END
+            + r"|" + TITLE_UNTICKED + TITLE_UNTICKED_END + r")))`?")
 QUOTE = r"「(?P<quote>[^「」]{2,400})」"
 QUOTE_THEN_LOCATION = re.compile(QUOTE + r"\s*[（(]\s*(?:[^（）()`]{0,12}?)" + LOCATION)
 LOCATION_THEN_QUOTE = re.compile(LOCATION + r"\s*[：:]?\s*" + QUOTE)
+# 小节写法里标题认不出结尾（括号没配上、超出长度）的兜底：位置的形态是路径加 @ 加标题、同样紧挨着引文（引文在前：括号里；位置在前：标题之后只隔可选的反引号与冒号），
+# 标题取到行尾或引文之前、不越过反引号，列进没判、不整条丢掉；反引号之后还隔着别的话的是散文，不收
+LOOSE_TITLE_CHARACTER = r"[^\n「」]" if BROKEN == "loose-takes-prose" else r"[^`\n「」]"   # 弄坏开关：兜底的标题越过反引号，把后面的散文也取进来
+LOOSE_QUOTE_THEN_LOCATION = re.compile(QUOTE + r"\s*[（(]\s*(?:[^（）()`]{0,12}?)`?(?P<path>" + PATH + r")@(?P<title>" + LOOSE_TITLE_CHARACTER + r"{2,200})")
+LOOSE_LOCATION_THEN_QUOTE = re.compile(r"`?(?P<path>" + PATH + r")@(?P<title>" + LOOSE_TITLE_CHARACTER + r"{2,200}?)`?\s*[：:]?\s*" + QUOTE)
+# citations_in 交的第四项（末行）：小节写法放位置前有没有反引号（带反引号的标题头尾定死了，不带的才可能后面接着说明），或标题认不出结尾的原因；
+# 末行是这几个记号时第三项是标题（认不出结尾的是取到的那一串，不是认准的标题）
+SECTION_TICKED = "section-ticked"
+SECTION_PLAIN = "section-plain"
+UNKNOWN_END_REASONS = {
+    "title-end-unpaired": "括号没配上",
+    "title-end-too-long": "标题超出八十个字",
+    "title-end-other": "标题的结尾认不出（反引号没配上，或标题里带「」）",
+}
+UNKNOWN_END_REASON_GENERIC = "括号没配上，或标题超出八十个字"   # 弄坏开关 unknown-end-reason-generic 下的理由
 ELLIPSIS = re.compile(r"…+|\.\.\.")
 # 裸行号：`路径:行号` 或 `路径:起-止`，路径的认法与 LOCATION 同一份；扩展名要以字母起头（不收 0.5:1、1.2:3 这类数字写法），路径前不许紧挨路径字符与冒号（不收 URL 里的 host.com:8080）
 BARE_LINE_REF = re.compile(r"(?<![A-Za-z0-9_./\-一-鿿:@])`?(?P<path>[A-Za-z0-9_./\-一-鿿]+\.[A-Za-z][A-Za-z0-9]*):(?P<first>\d+)(?:[-–](?P<last>\d+))?")
@@ -72,6 +145,24 @@ BARE_LINE_REF = re.compile(r"(?<![A-Za-z0-9_./\-一-鿿:@])`?(?P<path>[A-Za-z0-9
 
 def normalized(text):
     return re.sub(r"\s+", " ", text.replace("**", "").replace("`", "")).strip()
+
+
+def unknown_end(title):
+    """兜底那一支取到的一串 → (取到的标题, 认不出结尾的原因记号)：取到第一个没有左括号配着的右括号之前（那是引文外面那层括号）；
+    左括号没配上右括号的记括号没配上，其余取到的一串超过八十个字的记超出八十个字，再没有别的记结尾认不出。"""
+    depth, cut = 0, len(title)
+    for index, character in enumerate(title):
+        if character in "（(":
+            depth += 1
+        elif character in "）)":
+            if depth == 0:
+                cut = index
+                break
+            depth -= 1
+    taken = title[:cut].strip()
+    if depth:
+        return taken, "title-end-unpaired"
+    return taken, ("title-end-too-long" if len(taken) > 80 else "title-end-other")
 
 
 def citations_in(report_text):
@@ -84,7 +175,7 @@ def citations_in(report_text):
             for match in pattern.finditer(line):
                 located.add(match.start("path"))
                 if match.group("title") is not None:
-                    first, last = match.group("title").strip(), None   # 小节写法：first 放标题、last 空
+                    first, last = match.group("title").strip(), (SECTION_TICKED if match.group("tick") else SECTION_PLAIN)   # 小节写法：first 放标题、last 放位置前有没有反引号
                 else:
                     first = int(match.group("first"))
                     last = int(match.group("last") or first)
@@ -92,6 +183,19 @@ def citations_in(report_text):
                 if key not in seen:
                     seen.add(key)
                     found.append((line_number, match.group("path"), first, last, match.group("quote")))
+        if BROKEN != "title-unknown-end-dropped":   # 弄坏开关：认不出结尾的小节写法整条丢掉
+            for pattern in (LOOSE_QUOTE_THEN_LOCATION, LOOSE_LOCATION_THEN_QUOTE):
+                for match in pattern.finditer(line):
+                    if match.start("path") in located:
+                        continue
+                    taken, reason = unknown_end(match.group("title"))
+                    if not taken:
+                        continue
+                    located.add(match.start("path"))
+                    key = (match.group("path"), taken[:60], reason, match.group("quote"))
+                    if key not in seen:
+                        seen.add(key)
+                        found.append((line_number, match.group("path"), key[1], reason, match.group("quote")))
         if BROKEN == "bare-line-refs-ignored":   # 弄坏开关：裸行号不认
             continue
         outside_quotes = re.sub(QUOTE, lambda quoted: " " * len(quoted.group(0)), line)   # 引号里的字不扫；长度不变，下标对得上
@@ -169,6 +273,9 @@ def judge(citation, roots, by_basename, background_lines, unchanged_since):
         return "skip", f"路径认不出（{why}）"
     if unchanged_since is not None and os.path.getmtime(absolute) > unchanged_since and BROKEN != "ignore-changed":
         return "skip", "被引文件在开工之后改过，行号可能是开工那一刻的"
+    if last in UNKNOWN_END_REASONS:
+        reason = UNKNOWN_END_REASON_GENERIC if BROKEN == "unknown-end-reason-generic" else UNKNOWN_END_REASONS[last]   # 弄坏开关：理由不按取到的那一串分
+        return "skip", f"小节标题认不出结尾（取到「{first}」；{reason}）"
     lines = open(absolute, encoding="utf-8", errors="replace").read().splitlines()
     if quote is None:   # 裸行号：没有引文可比，只核行号在不在文件里
         if first < 1 or first > last:
@@ -176,8 +283,8 @@ def judge(citation, roots, by_basename, background_lines, unchanged_since):
         if last > len(lines):
             return "bad", f"`{path}` 只有 {len(lines)} 行，引的是第 {last} 行——多半是背景材料附录里的行号"
         return "bare-skip", "行号在文件范围内，没有引文可比"
-    if last is None:   # `路径@标题`：原文要在那一节里
-        return judge_section(lines, first, quote)
+    if last in (SECTION_TICKED, SECTION_PLAIN):   # `路径@标题`：原文要在那一节里
+        return judge_section(lines, first, quote, last == SECTION_TICKED)
     if first < 1 or last > len(lines) or first > last:
         return "bad", f"行号超出文件（文件共 {len(lines)} 行）"
     cited = "\n".join(lines[first - 1:last])
@@ -196,10 +303,43 @@ def judge(citation, roots, by_basename, background_lines, unchanged_since):
     return "bad", f"那一行不含这句{where}{background_hint}"
 
 
-def judge_section(lines, title, quote):
-    """标题逐字命中恰好一行；那一节从标题行起、到同级或更高一级的下一个标题之前；原文要在节里。"""
-    heads = [(index, len(line) - len(line.lstrip("#"))) for index, line in enumerate(lines)
-             if line.startswith("#") and line.lstrip("#").strip() == title]
+def headings_titled(lines, title):
+    """[(行下标, 井号个数)]：整行逐字是这个标题的标题行。"""
+    return [(index, len(line) - len(line.lstrip("#"))) for index, line in enumerate(lines)
+            if line.startswith("#") and line.lstrip("#").strip() == title]
+
+
+def without_trailing_group(title):
+    """去掉标题末尾那一层成对的括号（里面可以再套）与括号前的空白；末尾不是右括号、括号没配上、括号前没有字的交回 None。"""
+    if not title or title[-1] not in "）)":
+        return None
+    depth = 0
+    for index in range(len(title) - 1, -1, -1):
+        if title[index] in "）)":
+            depth += 1
+        elif title[index] in "（(":
+            depth -= 1
+            if depth == 0:
+                return title[:index].rstrip() or None
+    return None
+
+
+def judge_section(lines, title, quote, ticked):
+    """标题逐字命中恰好一行；那一节从标题行起、到同级或更高一级的下一个标题之前；原文要在节里。
+    ticked 是位置前带反引号：反引号把标题的头尾定死了，命中不了就是标题不对；不带反引号的标题后面可能接着括号说明或别的话。"""
+    heads = headings_titled(lines, title)
+    if not heads and not ticked and BROKEN != "paren-note-not-peeled":   # 弄坏开关：括号说明不去掉
+        shorter = without_trailing_group(title)
+        while shorter is not None:
+            found = headings_titled(lines, shorter)
+            if found:   # 去掉说明之后命中了：恰好一处就取它；几处同名的取不准，照整串判
+                if len(found) == 1 or BROKEN == "paren-note-peeled-any":   # 弄坏开关：同名的几处也取头一处
+                    heads, title = found[:1], shorter
+                break
+            shorter = without_trailing_group(shorter)
+    skipped_for_comma = not ticked or BROKEN == "ticked-title-comma-skipped"   # 弄坏开关：带反引号的标题也列进没判
+    if not heads and skipped_for_comma and re.search("[，。]", title) and BROKEN != "title-comma-judged":   # 弄坏开关：带「，」「。」又命中 0 次的标题照标题不在判红
+        return "skip", f"小节标题认不出结尾（取到「{title}」，里面带「，」或「。」，文件里又没有这样的整行标题——多半是标题后面接了说明）"
     if len(heads) != 1 and BROKEN != "title-any-section":
         return "bad", (f"标题「{title}」在这份文件里命中 {len(heads)} 次（要恰好 1 次）" + ("" if heads else "；标题逐字抄，不带井号"))
     start, level = heads[0] if heads else (0, 0)
@@ -237,7 +377,7 @@ def check_reports(report_paths, roots, background_paths, unchanged_since):
                 total += 1
             verdict, explanation = judge(citation, roots, by_basename, background_lines, unchanged_since)
             report_line, path, first, last, quote = citation
-            span = f"@{first}" if last is None else (f"{first}" if first == last else f"{first}-{last}")
+            span = f"@{first}" if not isinstance(last, int) else (f"{first}" if first == last else f"{first}-{last}")
             joiner = "" if span.startswith("@") else ":"
             shown = "" if quote is None else f"「{quote[:60]}」"
             if verdict == "bad":
@@ -312,7 +452,7 @@ def selftest():
         subprocess.run(["git", "-C", work, "init", "-q"], check=True)
         os.makedirs(os.path.join(work, "kb"))
         with open(os.path.join(work, "kb", "rule.md"), "w", encoding="utf-8") as handle:
-            handle.write("# 规则\n\n## 一节\n\n第一条：**先查** 再写。\n第二条：引文整行抄，不许摘句。\n")
+            handle.write("# 规则\n\n## 一节\n\n第一条：**先查** 再写。\n第二条：引文整行抄，不许摘句。\n\n## 分支的三条约束\n\n三条都要守：先查、再写、后验。\n\n## 不为省空间牺牲自包含（附）\n\n自包含优先：先复制，再引用。\n\n## 先查，再写\n\n逗号写在标题里：整行逐字抄就判。\n\n## 重名\n\n甲方的话\n\n## 重名\n\n乙方的话\n")
         with open(os.path.join(work, "code.rs"), "w", encoding="utf-8") as handle:
             handle.write("fn main() {\n    let answer = 42;\n}\n")
         with open(os.path.join(work, "background.md"), "w", encoding="utf-8") as handle:
@@ -337,6 +477,9 @@ def selftest():
             ("小节写法：位置在前", "`kb/rule.md@一节`：「第一条：先查 再写」", 0),
             ("小节写法：标题不在", "「先查」（`kb/rule.md@没有的节`）", 1),
             ("小节写法：原文不在那一节", "「let answer = 42」（`kb/rule.md@一节`）", 1),
+            ("小节写法：带反引号的长标题", "「三条都要守：先查、再写、后验」（`kb/rule.md@分支的三条约束`）", 0),
+            ("小节写法：位置在前的长标题", "`kb/rule.md@分支的三条约束`：「三条都要守：先查、再写、后验」", 0),
+            ("小节写法：不带反引号的长标题", "「三条都要守：先查、再写、后验」（kb/rule.md@分支的三条约束）", 0),
         ]
         failures = []
         for label, text, want in cases:
@@ -351,6 +494,62 @@ def selftest():
                 got = 0
             if total != 1 or got != want:
                 failures.append(f"{label}：应当{'判红' if want else '判绿'}，实际数到 {total} 处、{'判红' if got else '判绿'}（{bad}）")
+        # 小节标题：三种写法（引文在前带反引号、位置在前带反引号、引文在前不带反引号）交同一个完整标题
+        section_titles = {text: [found[2] for found in citations_in(text)] for text in (
+            "「三条都要守：先查、再写、后验」（`kb/rule.md@分支的三条约束`）",
+            "`kb/rule.md@分支的三条约束`：「三条都要守：先查、再写、后验」",
+            "「三条都要守：先查、再写、后验」（kb/rule.md@分支的三条约束）")}
+        if any(titles != ["分支的三条约束"] for titles in section_titles.values()):
+            failures.append(f"小节写法：三种写法交同一个完整标题：应当都交「分支的三条约束」，实际 {list(section_titles.values())}")
+        # 标题里成对的括号照取：带不带反引号、引文在前还是位置在前，四种写法交同一个带括号的完整标题
+        paren_quote = "「自包含优先：先复制，再引用」"
+        paren_texts = (f"{paren_quote}（`kb/rule.md@不为省空间牺牲自包含（附）`）",
+                       f"{paren_quote}（kb/rule.md@不为省空间牺牲自包含（附））",
+                       f"`kb/rule.md@不为省空间牺牲自包含（附）`：{paren_quote}",
+                       f"kb/rule.md@不为省空间牺牲自包含（附）：{paren_quote}")
+        paren_titles = [[found[2] for found in citations_in(text)] for text in paren_texts]
+        if any(titles != ["不为省空间牺牲自包含（附）"] for titles in paren_titles):
+            failures.append(f"小节写法：标题带括号的四种写法交同一个完整标题：应当都交「不为省空间牺牲自包含（附）」，实际 {paren_titles}")
+        # 小节标题的写法：(标签, 报告行, 结局, 说明里该有的字, 说明里不该有的字)
+        #   结局 green 判绿且判了；skipped 只列进没判并说「小节标题认不出结尾」；red 判红；none 既不判也不列进没判（散文不是引文写法）
+        title_cases = [
+            ("标题带括号、带反引号", f"{paren_quote}（`kb/rule.md@不为省空间牺牲自包含（附）`）", "green", (), ()),
+            ("标题带括号、不带反引号", f"{paren_quote}（kb/rule.md@不为省空间牺牲自包含（附））", "green", (), ()),
+            ("位置在前、标题带括号、带反引号", f"`kb/rule.md@不为省空间牺牲自包含（附）`：{paren_quote}", "green", (), ()),
+            ("位置在前、标题带括号、不带反引号", f"kb/rule.md@不为省空间牺牲自包含（附）：{paren_quote}", "green", (), ()),
+            ("标题带逗号、整行逐字", "「逗号写在标题里」（kb/rule.md@先查，再写）", "green", (), ()),
+            ("标题带逗号、带反引号、整行逐字", "「逗号写在标题里」（`kb/rule.md@先查，再写`）", "green", (), ()),
+            ("反引号后紧跟逗号", f"{paren_quote}（`kb/rule.md@不为省空间牺牲自包含（附）`，见上）", "green", (), ()),
+            ("标题后紧跟逗号", "「第一条：先查 再写」（kb/rule.md@一节，见上）", "skipped", (), ()),
+            ("标题后紧跟句号", "「第一条：先查 再写」（kb/rule.md@一节。）", "skipped", (), ()),
+            ("带反引号、标题后紧跟逗号", "「let answer = 42」（`kb/rule.md@一节，见上`）", "red", ("命中 0 次",), ()),
+            ("带反引号、标题后紧跟句号", "「let answer = 42」（`kb/rule.md@一节。`）", "red", ("命中 0 次",), ()),
+            ("位置在前、带反引号、标题后紧跟逗号", "`kb/rule.md@一节，见上`：「let answer = 42」", "red", ("命中 0 次",), ()),
+            ("标题后紧跟括号说明、不带反引号", "「第一条：先查 再写」（kb/rule.md@一节（见上））", "green", (), ()),
+            ("位置在前、标题后紧跟括号说明、不带反引号", "kb/rule.md@一节（见上）：「第一条：先查 再写」", "green", (), ()),
+            ("标题后紧跟括号说明、原文不在那一节", "「let answer = 42」（kb/rule.md@一节（见上））", "red", ("里不含这句",), ()),
+            ("标题后紧跟括号说明、括号前的标题重名", "「甲方的话」（kb/rule.md@重名（见上））", "red", ("命中",), ()),
+            ("位置后接散文再接引文", "见 `kb/rule.md@一节` 里说「第一条：先查 再写」", "none", (), ()),
+            ("两处位置并排、后接引文", "`kb/rule.md@一节（见上）` 与 `kb/rule.md@一节`：「第一条：先查 再写」", "green", (), ()),
+            ("括号没配上", "「第一条：先查 再写」（kb/rule.md@一节（附，后面没有右括号", "skipped", ("括号没配上",), ("超出八十个字",)),
+            ("标题超出八十个字", "「第一条：先查 再写」（kb/rule.md@" + "长" * 90 + "）", "skipped", ("超出八十个字",), ("括号没配上",)),
+        ]
+        for label, text, outcome, wanted, unwanted in title_cases:
+            report = os.path.join(work, "result.md")
+            with open(report, "w", encoding="utf-8") as handle:
+                handle.write(f"报告\n{text}\n")
+            total, _, bad, skipped, _ = check_reports([report], [work], [], None)
+            said = " ".join(bad + skipped)
+            actual = f"实际数到 {total} 处、对不上 {bad}、没判 {skipped}"
+            if outcome == "green" and not (total == 1 and not bad and not skipped):
+                failures.append(f"小节写法：{label}：应当判绿且判了（不是列进没判），{actual}")
+            if outcome == "skipped" and not (total == 1 and not bad and len(skipped) == 1 and "小节标题认不出结尾" in skipped[0]
+                                             and all(word in said for word in wanted) and not any(word in said for word in unwanted)):
+                failures.append(f"小节写法：{label}：应当只列进没判、说「小节标题认不出结尾」{'、理由写' + '、'.join(wanted) if wanted else ''}，{actual}")
+            if outcome == "red" and not (total == 1 and len(bad) == 1 and not skipped and all(word in said for word in wanted)):
+                failures.append(f"小节写法：{label}：应当判红（说清{'、'.join(wanted)}、不是列进没判），{actual}")
+            if outcome == "none" and (total or bad or skipped):
+                failures.append(f"小节写法：{label}：应当既不判也不列进没判（位置与引文之间隔着别的话，是散文），{actual}")
         # 非 git 根（snapshot-tree.py 铺的树、草稿目录这类）上只写文件名的引文：按目录找文件名，恰好一个才判（开关 non-git-root-unindexed 下认不出、只列进没判，两格都红）
         plain_root = tempfile.mkdtemp(prefix="cite-check-plain-root-")
         plain_roots.append(plain_root)
@@ -417,9 +616,11 @@ def selftest():
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
-            print("  → 看 citations_in() / judge() / judge_section() / tracked_files_by_basename() 的判法；CITE_CHECK_BREAK（always-ok、no-heading-check、no-background-check、ignore-changed、title-any-section、bare-line-refs-ignored、non-git-root-unindexed）设着的话这里本来就该红")
+            print("  → 看 citations_in() / judge() / judge_section() / tracked_files_by_basename() 的判法；CITE_CHECK_BREAK（always-ok、no-heading-check、no-background-check、ignore-changed、title-any-section、bare-line-refs-ignored、non-git-root-unindexed、title-lazy、title-parens-unpaired、title-unknown-end-dropped、title-comma-judged、ticked-title-comma-skipped、paren-note-not-peeled、paren-note-peeled-any、loose-takes-prose、unknown-end-reason-generic）设着的话这里本来就该红")
             return 1
         print(f"  ✓ cite-check 自检通过：对上的、位置在前、省略号、只写文件名、区间放行，错行、标题行、背景材料行号、超出文件判红，认不出的与开工后改过的只列不判（{len(cases) + 1} 种）；"
+              f"小节标题 {len(title_cases)} 种：成对的括号照取，末尾的括号说明去掉后恰好一处同名的照取，带反引号的标题带逗号句号而文件里没有照判红、不带的列进没判，"
+              "认不出结尾的按括号没配上、超出八十个字分开写理由，位置与引文之间隔着别的话的散文不收；"
               "非 git 根上只写文件名的按目录找到、照判（行号错判红、对上判绿，2 种）；"
               f"裸行号 {len(bare_cases)} 种：超出文件与区间的止超出文件判红并报实际行数，在范围内的列进没判单独计数，带引文的、引号里的、网址端口不当裸行号；"
               f"命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的报告与背景材料、写错的 --unchanged-since 退 2 带出路")

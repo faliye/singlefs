@@ -79,6 +79,8 @@ record-run-start：把一趟门禁的开跑时刻写进 --run-times-file（本�
       「✗ --selftest 没通过（破坏开关 smartskipped）」
   TEST_ENVIRONMENT_CHECK_BREAK=unknownoptionaccepted  main() 对认不出的选项不拒（用 parse_known_args 收下、丢掉）
       「✗ --selftest 没通过（破坏开关 unknownoptionaccepted）」
+  TEST_ENVIRONMENT_CHECK_BREAK=experimentpoolunmatched  名字带 pid 的形态里不认实验包造池的镜像名（singlefs-experiment-pool-<tag>-<进程号>-<号>-device<盘号>.img），这类条目照名字里没有 pid 判（自检「实验包造池的镜像名认出创建者 pid」那几条不中）
+      「✗ --selftest 没通过（破坏开关 experimentpoolunmatched）」
   TEST_ENVIRONMENT_CHECK_BREAK=guardoff  关守卫项：平常跑（命令行里没有 --selftest）设了 TEST_ENVIRONMENT_CHECK_BREAK 也不拒（自检「平常跑设了破坏开关退 2 并点名只在自证里认」那一条不中）；单独一项时才认，与别的项同写照拒
       「✗ --selftest 没通过（破坏开关 guardoff）」
 """
@@ -106,7 +108,7 @@ SCRIPT_RELATIVE_PATH = 'scripts/hosts/test-environment-check.py'
 BREAK_SWITCH_VARIABLE = 'TEST_ENVIRONMENT_CHECK_BREAK'
 BREAK_SWITCH_NAMES = ('aliveowner', 'allowlist', 'openfile', 'pidreuse', 'recent',
                       'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard', 'gaterunscanned', 'crossrununscanned',
-                      'previousrunignored', 'runtimesnotrotated', 'smartskipped', 'unknownoptionaccepted', 'guardoff')
+                      'previousrunignored', 'runtimesnotrotated', 'smartskipped', 'unknownoptionaccepted', 'experimentpoolunmatched', 'guardoff')
 # 退出码 4：clean --refuse-too-recent 预演见到太新、这一趟清不掉的项
 EXIT_TOO_RECENT = 4
 TOKYO_TIMEZONE = datetime.timezone(datetime.timedelta(hours=9))
@@ -127,12 +129,15 @@ ALLOWLIST = (
 )
 
 # 名字里带创建者 pid 的形态：按 pid 判创建者在不在。第一个捕获组是 pid。
+EXPERIMENT_POOL_IMAGE_SOURCE = 'crates/singlefs-implementation-experiments/src/experiment_pool.rs 的 image_file_path（实验包装置造池的两块镜像）'
 PROCESS_IDENTIFIER_NAME_PATTERNS = (
     (re.compile(r'^singlefs-replay-([0-9]+)$'), 'scripts/experiment-apparatus/replay.sh 的 OUT_DIR'),
     (re.compile(r'^singlefs-step[0-9]+-.+-([0-9]+)-[0-9]+-dev[0-9]+\.img$'),
      'crates/singlefs-verification/tests/ 的 image_path'),
     (re.compile(r'^singlefs-core-fake-sysfs-([0-9]+)$'), 'crates/singlefs-core/src/block_device.rs 的测试 queue_attributes_are_read_from_the_sysfs_tree_and_missing_ones_are_none'),
     (re.compile(r'^singlefs-core-.+-([0-9]+)-[0-9]+\.img$'), 'crates/singlefs-core/src/block_device.rs 的测试辅助函数 temporary_image_path'),
+    # singlefs-experiment-pool-<tag>-<进程号>-<这一对的号>-device<盘号>.img：tag 里可以带 - 与数字，进程号取倒数第二段数字
+    (re.compile(r'^singlefs-experiment-pool-.+-([0-9]+)-[0-9]+-device[0-9]+\.img$'), EXPERIMENT_POOL_IMAGE_SOURCE),
 )
 
 
@@ -343,6 +348,8 @@ def match_allowlist(name):
 
 def match_process_identifier(name):
     for pattern, source in PROCESS_IDENTIFIER_NAME_PATTERNS:
+        if source == EXPERIMENT_POOL_IMAGE_SOURCE and break_switch_is('experimentpoolunmatched'):
+            continue
         matched = pattern.match(name)
         if matched:
             return int(matched.group(1)), source
@@ -1467,6 +1474,11 @@ def build_temporary_samples(fake_temporary, outside_directory, holders):
     make_sparse_file(os.path.join(fake_temporary, image_alive), 64 << 20)
     expectations[image_alive] = 'in_use'
 
+    # 实验包造池的镜像（tag 带 - 与数字）：创建者已不在，刚写过也判残留——不认这一形态时它照名字里没有 pid、太新判在用
+    pool_image_dead = f'singlefs-experiment-pool-e158-r5-{dead_identifier}-3-device1.img'
+    make_sparse_file(os.path.join(fake_temporary, pool_image_dead), 64 << 20)
+    expectations[pool_image_dead] = 'residual'
+
     replay_reused = f'singlefs-replay-{anchor_holder.pid}'
     os.mkdir(os.path.join(fake_temporary, replay_reused))
     with open(os.path.join(fake_temporary, replay_reused, 'E2.out'), 'w') as handle:
@@ -1516,6 +1528,13 @@ def check_temporary_samples(recorder, fake_temporary, outside_directory, expecta
                         f'临时条目 {name} 应判 {expected_verdict}，实际 {actual}'
                         f'（{verdicts[name].reason if name in verdicts else ""}）')
     recorder.expect('other-directory' not in verdicts, '不以 singlefs- 开头的 other-directory 不该被扫进来')
+    pool_names = [name for name in expectations if name.startswith('singlefs-experiment-pool-')]
+    pool_reasons = [verdicts[name].reason if name in verdicts else '没扫到' for name in pool_names]
+    recorder.expect(len(pool_names) == 1 and EXPERIMENT_POOL_IMAGE_SOURCE in pool_reasons[0],
+                    f'实验包造池的镜像名认出创建者 pid：判定理由要点名形态出处 {EXPERIMENT_POOL_IMAGE_SOURCE}，实际 {pool_reasons}')
+    pool_match = match_process_identifier('singlefs-experiment-pool-e1-2-12345-0-device0.img')
+    recorder.expect(pool_match == (12345, EXPERIMENT_POOL_IMAGE_SOURCE),
+                    f'实验包造池的镜像名认出创建者 pid：tag 带数字段 e1-2 时取倒数第二段数字 12345，实际 {pool_match}')
     recorder.expect(not unreadable_directories, f'样本临时目录应读得了：{unreadable_directories}')
     sparse_names = [name for name in verdicts if name.endswith('-dev0.img')]
     if sparse_names:
@@ -1968,7 +1987,7 @@ def run_selftest():
             print(f'       {failure}')
         print('     → 怎么办：按上面不中的那几条修本脚本的判据；设了破坏开关时判红是对的，没设时每一条都要中')
         return 1
-    print(f'  ✓ --selftest 通过{switch_note}：{recorder.assertion_count} 条断言都中（临时条目分类、'
+    print(f'  ✓ --selftest 通过{switch_note}：{recorder.assertion_count} 条断言都中（临时条目分类、实验包造池的镜像名认出创建者 pid、'
           '删除护栏、稀疏文件按实际占用、loop / dm / 挂载 / qemu、clean 预演与动手及次序、'
           '宿主盘只读 / 剩余空间 / ext4 计数 / 内核日志 / 退出码 / 报告不覆盖、'
           '这一轮门禁的临时目录不进临时目录残留而 loop 照旧算它、gate.sh 开跑前的 TMPDIR 也扫、'

@@ -49,8 +49,7 @@
 #   工作根在多机配置 NFS_SHARED_ROOTS 点名的共享根里，两台同一绝对路径，不经 $HOME；各片与合并写进同一份，本机读得到第二台那一片的日志）。
 # 跑法：配置（crash-amplification-lib.sh 文件头「配置」那一份多机配置）ENABLE_GPU=1 就带 gpu 特性编。不读多机配置里的显卡先后、不领卡、不挑卡、不自己清场：
 #   卡归 GPU 批处理验证服务（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）。环境里有 GPU_CARDS_BY_PRIORITY 就原样交给各趟，没有照样往下跑；
-#   开了 GPU 的判段（各片判段那一趟、合并的核账那一趟）把要判的块写成待判行、等 GPU 批处理服务判完，服务不在跑时那一趟打
-#   CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行，照日志分类退 78、出路是起服务的命令（共用库 crash_amplification_explain_exit_code）。
+#   开了 GPU 的判段（各片判段那一趟、合并的核账那一趟）把要判的块写成待判行、等 GPU 批处理服务判完；服务读不了时判段一直等，卡住由任务服务判。
 #   带 --given-states 的不起录入段（引擎每一趟先录再判）。
 #   走 GPU 的计算类不送（引擎开了 GPU 就三类全走 GPU）。
 #   开了 GPU 与没开的一样，cargo test 的参数不带 --test-threads：测试线程照服务交下来的 RUST_TEST_THREADS（下面「线程」）。
@@ -82,7 +81,7 @@
 #   1 合并时产物表里没有第 0 片、或除第 0 片之外不是恰好一片，核账那一趟现判了块（两片判的块有按此刻的键在服务里读不到的）或一行计数行都没打，
 #     计划那一步写不成计划、拷不成按段登记文件，建不了运行目录、产物目录；
 #   77 本次未跑：合并之前核出源码中途变了（上面「源码中途变了」）；
-#   78 运行条件不满足：开了 GPU 而 GPU 批处理验证服务不在跑（那一趟打的 CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING 行，同一个函数判 gpu-verification-server）；一片认不出这一台（多机配置判法 --emit-addresses 判不过）；哪一趟的日志里有卡用不了的原话、给定状态表的判器借不到显存那一行（crash-amplification-lib.sh 的
+#   78 运行条件不满足：一片认不出这一台（多机配置判法 --emit-addresses 判不过）；哪一趟的日志里有卡用不了的原话、给定状态表的判器借不到显存那一行（crash-amplification-lib.sh 的
 #      crash_amplification_failure_kind 判 device）、这份二进制跑不了这一趟（结论版本与树对不上、开了 GPU 而没编进 gpu 特性；同一个函数判 build）；本机起 cargo 之前 RocksDB 预编库的取值没判过
 #      （共用库 crash_amplification_run_on_this_host 里 scripts/hosts/rocksdb-prebuilt.py entry）；观察者版本变了而核账那一趟红了；
 #   75 prune-server 不可用（引擎读写判定库连不上服务，那一趟原样退）；248 算法上判不了（同一个函数判 algorithm）；其余是那一趟 cargo test 的退出码，原样。
@@ -120,8 +119,7 @@
 #       shards-run-own-share（两片都只起一趟、不设选段）、merge-checks-both-shards-readable（核账那一趟没设成只判）、crash-case-shaped-records、
 #       record-then-judge-without-card（只起一趟，没有不带卡的录入段那一趟）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=record-for-given-states  带了 --given-states 也先起录入段
-#       given-states-not-recorded、serial-compile-follows-the-address（带 --given-states 跑的两片各多起一趟录入段）、
-#       shard-gpu-verification-server-down（判段那一趟之前多起了一趟录入段：带 --given-states 的那一片只该起一趟）
+#       given-states-not-recorded、serial-compile-follows-the-address（带 --given-states 跑的两片各多起一趟录入段）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=other-shard-judges-only  单独起时第 1 片不跑录入段、只判（它那一份观察者没人录）
 #       shards-run-own-share（第 1 片报先跑录入段、退 101）、merge-checks-both-shards-readable（合并没起）、
 #       shard-gpu-pass-lines-forwarded（第 1 片退 101、share.log 里没有 GPU_ 开头的行）
@@ -151,10 +149,11 @@
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=segments-registry-not-planned  计划那一步不拷按段登记文件，各片照调用方环境里的路径（派到第二台的那一片读不到）
 #       registry-from-plan
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=shard-failure-ignored  一片那一趟退非 0 也报这一片成了（退 0）
-#       shard-card-unusable、shard-given-states-run-condition、shard-algorithm-refused（整份的一片那一趟算法判不了也报这一片成了：退 0，不退 248）、
-#       shard-gpu-verification-server-down（整份的一片那一趟 GPU 批处理服务不在跑也报这一片成了：退 0，不退 78）
+#       shard-card-unusable、shard-given-states-run-condition、shard-algorithm-refused（整份的一片那一趟算法判不了也报这一片成了：退 0，不退 248）
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=last-run-unwritten  跑完不写上次红的清单
 #       last-run-list
+#   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=target-file-flat-only  上次红的清单的 --target-file 只给 tests/<目标>.rs，目录式目标的 tests/<目标>/main.rs 不认（那份文件算「不在」，清单悄悄不写）
+#       target-file-directory-target
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=run-directory-owner-unrecorded  建运行目录之后不写归属记录 .owner（起它的进程不在了，完工清理闸认不出这一趟归哪个会话）
 #       run-directory-owner-recorded
 #   CRASH_AMPLIFICATION_TWO_HOSTS_BREAK=usage-exits-1  用法错退 1（不退 2）
@@ -169,10 +168,8 @@
 #   CRASH_AMPLIFICATION_ITEM_BREAK=given-states-run-condition-as-run-failure  给定状态表的判器借不到显存那一行（CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET）不认
 #       shard-given-states-run-condition（退 101，不退 78）
 #   CRASH_AMPLIFICATION_ITEM_BREAK=cards-read-from-configuration  显卡先后从多机配置读（不看环境里交的那一张）
-#       service-card-passed（调用记录里 cards= 是多机配置里的 127.0.0.1:0:8G）、shard-gpu-verification-server-down（那一趟收到多机配置里的卡）、
+#       service-card-passed（调用记录里 cards= 是多机配置里的 127.0.0.1:0:8G）、
 #       record-then-judge-without-card（两趟收到多机配置里的卡）
-#   CRASH_AMPLIFICATION_ITEM_BREAK=gpu-verification-server-not-running-as-run-failure  GPU 批处理服务不在跑那一行（CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING）不认
-#       shard-gpu-verification-server-down（退 101，不退 78）
 #   CRASH_AMPLIFICATION_ITEM_BREAK=library-marker-not-accepted  录入段只认 CRASH_AMPLIFICATION_RECORDED 行，不认崩溃枚举用例经判定库两段跑时打的 CRASH_LIBRARY_RECORDED 行
 #       crash-case-shaped-records（退 1、一趟判段都不起）
 #   CRASH_AMPLIFICATION_ITEM_BREAK=this-host-service-threads-dropped  本机那一趟两步 cargo 起之前清掉服务交下来的 CARGO_BUILD_JOBS、RUST_TEST_THREADS，吃 cargo 自己的缺省
@@ -200,6 +197,14 @@ if [[ -n "${CRASH_AMPLIFICATION_TWO_HOSTS_SELFTEST_MARK:-}" && -f "${CRASH_AMPLI
 fi
 
 two_hosts_break_is() { [[ ",${CRASH_AMPLIFICATION_TWO_HOSTS_BREAK:-}," == *",$1,"* ]]; }
+# <测试目标>：上次红的清单的 --target-file（two_hosts_on_exit）：测试目标的源文件，tests/<目标>.rs，目录式目标是 tests/<目标>/main.rs，两样都不在的照给 tests/<目标>.rs（拿它在不在认出自证造的假目标）。
+#   认法在 lib_crash_point_replay_items.py 的 target-source-file，取不出也给 tests/<目标>.rs；弄坏开关 target-file-flat-only 下只给 tests/<目标>.rs
+two_hosts_target_source_file() {
+  if ! two_hosts_break_is target-file-flat-only; then
+    python3 "$two_hosts_script_directory/lib_crash_point_replay_items.py" target-source-file "$repository_root" "$1" 2>/dev/null && return 0
+  fi
+  echo "$repository_root/crates/singlefs-verification/tests/$1.rs"
+}
 # 观察者版本（文件头「观察者版本」）：录入段之后记下、核账那一趟对一遍。版本取自这一趟 cargo test 在日志里打的 Running … (<测试二进制>) 那一行指到的二进制：
 # 二进制里编进去一份判器键表（crates/singlefs-verification/src/crash_identity.rs 的 COMPILED_JUDGING_UNITS_KEYS_TEXT，构建脚本写的 judging_units_keys.tsv，表头
 # 「# singlefs entry group keys」），观察者版本由其中观察者代码那一组（observer_code:…）、观察者结论拼块那一组（observer_conclusion_composition）、池级 checker 那一组
@@ -384,7 +389,7 @@ run_selftest() {
 # 假的本机那一趟（自证用；调法 <share> <日志> [<附加环境 键=值>…]，环境由驱动照真的那一趟组好）：判定库是 STUB_SERVICE 指的目录（假的 prune-server）。
 #   录入段（STAGE=record）把领的块录进 records、打录入行就退；STAGE 没设先录再判；STAGE=judge 只判，领的块没录过就照真引擎报「先跑录入段」、退 101。
 #   判段：领的块在 blocks 里就复用，不在就现判、写进 blocks。整份（n=1）那一趟对账：6 块有没判的退 101。
-#   STUB_FAILURE=<哪一种趟：record|judge>:<怎么坏：device|algorithm|given-states|gpu-verification-server|plain|judge-not-run|silent> 照点名演那一趟（silent：一行计数行都不打、退 0）；
+#   STUB_FAILURE=<哪一种趟：record|judge>:<怎么坏：device|algorithm|given-states|plain|judge-not-run|silent> 照点名演那一趟（silent：一行计数行都不打、退 0）；
 #   STUB_CASE_SHAPE=crash-case 照崩溃点重放用例的样子（录入段只打 CRASH_LIBRARY_RECORDED；
 #   判段打 CRASH_CASE_BLOCKS 行、不打 CRASH_AMPLIFICATION 行）；STUB_GPU_LINES=1 判段在计数行之前打一组 GPU_CARD、GPU_TOTAL、两行 GPU_PASS（带自己的 SHARE）；STUB_BINARY_<RECORD|JUDGE> 照 cargo 打那一行 Running … (<二进制>)。
 #   每一趟往 STUB_CALLS 记一行：step= kind= share= stage= kernels= cards=[…] registry=[…] args=[…]
@@ -406,7 +411,6 @@ if [[ -n "$failure" && "${failure%%:*}" == "$kind" ]]; then
     device) echo "GPU_CARD_NOT_USABLE index=0：配置点名了这张卡，本机却用不了它"; exit 101 ;;
     algorithm) echo "卡 0 判不了点 p 块内第 5 个状态（恢复内核第 1 字 7、checker 内核第 3 字 9：表越过了内核的容量）"; exit 101 ;;
     given-states) echo "CRASH_POINT_REPLAY_GIVEN_STATES_RUN_CONDITION_NOT_MET reason=假的：池里没有一张卡借得出显存"; exit 101 ;;
-    gpu-verification-server) echo "CRASH_AMPLIFICATION_GPU_VERIFICATION_SERVER_NOT_RUNNING control=/stub/gpu-verification-server/control exit_code=78 said=假的：没在跑：出路：python3 gpu-verification-server/control start"; exit 101 ;;
     plain) echo "test result: FAILED. 0 passed; 1 failed"; exit 101 ;;
     silent) echo "test result: ok. 1 passed; 0 failed"; exit 0 ;;
     judge-not-run) echo "CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment flow=stub reason=假的：这份二进制没有编进 gpu 特性" ;;
@@ -842,16 +846,6 @@ print(" ".join(("pin=" + shard["pin"] if "pin" in shard else "unpinned") + ":" +
     cell_failed service-card-passed "开了 GPU：每一趟应当收到环境里服务交的那一张卡（127.0.0.1:1:20G）、cargo test 不带 --test-threads（退 $step_exit）" \
       "看 crash-amplification-lib.sh 的 crash_amplification_prepare 取卡那一段、crash_amplification_environment_for_this_host 与 two_hosts_prepare"
   fi
-  # shard-gpu-verification-server-down（文件头「跑法」）：开了 GPU（多机配置写着 127.0.0.1:0:8G）、环境里没有卡、带 --given-states、那一趟打了 GPU 批处理服务不在跑那一行、退 101
-  #   ⇒ 只起那一趟（不带卡，cards=[unset]），退 78，标准错误有起服务的命令
-  scene_new shard-gpu-verification-server-down
-  whole_share_step "$scene" main SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on.env" STUB_FAILURE=judge:gpu-verification-server -- some-target --given-states
-  cells=$((cells + 1))
-  if [[ "$step_exit" != 78 || "$(wc -l <"$scene/calls")" != 1 || "$(cat "$scene/calls")" != "step=main kind=judge "*" cards=[unset] "* ]] \
-     || ! grep -qF 'python3 gpu-verification-server/control start' "$scene/main.output"; then
-    cell_failed shard-gpu-verification-server-down "开了 GPU、GPU 批处理服务不在跑：应当只起那一趟、不带卡、退 78、打起服务的命令（退 $step_exit，调用「$(tr '\n' ';' <"$scene/calls")」）" \
-      "看 two_hosts_refuse_failed_run 交日志给 crash_amplification_explain_exit_code 的那一句与 crash-amplification-lib.sh 的 crash_amplification_failure_kind（gpu-verification-server 那一类）" "$scene"
-  fi
   # record-then-judge-without-card（文件头「跑法」）：开了 GPU（多机配置写着 127.0.0.1:0:8G）、环境里没有卡、单独起（要录入段）⇒ 录入段与判段两趟都不带卡（cards=[unset]），
   #   不领卡，退 0
   scene_new record-then-judge-without-card
@@ -877,6 +871,15 @@ print(" ".join(("pin=" + shard["pin"] if "pin" in shard else "unpinned") + ":" +
   [[ "$last_run_seen" == "101[beta-target,]0[beta-target,]101[beta-target,beta-target::one_case,]0[]" ]] \
     || cell_failed last-run-list "四趟之后的退出码与清单应当依次是 101「beta-target」、0「beta-target」、101「beta-target、beta-target::one_case」、0「空」，实际 $last_run_seen" \
       "看 two_hosts_on_exit（经 scripts/gate/lib_reuse_checks.py last-run-target）"
+  # target-file-directory-target（文件头「上次红的清单」）：上次红的清单的 --target-file 平铺的取 tests/<目标>.rs，目录式的取 tests/<目标>/main.rs，两样都不在的照给 tests/<目标>.rs；
+  #   弄坏开关 target-file-flat-only 下目录式目标取 tests/<目标>.rs（那份文件不在，清单悄悄不写）
+  cells=$((cells + 1))
+  local target_file_tests="$work/target-file-root/crates/singlefs-verification/tests" target_files_seen target_file_name
+  mkdir -p "$target_file_tests/dir_target" && : >"$target_file_tests/flat_target.rs" && : >"$target_file_tests/dir_target/main.rs"
+  target_files_seen="$(repository_root="$work/target-file-root"; for target_file_name in flat_target dir_target absent_target; do two_hosts_target_source_file "$target_file_name"; done | tr '\n' ' ')"
+  [[ "$target_files_seen" == "$target_file_tests/flat_target.rs $target_file_tests/dir_target/main.rs $target_file_tests/absent_target.rs " ]] \
+    || cell_failed target-file-directory-target "测试目标的源文件应当平铺的取 tests/<目标>.rs、目录式的取 tests/<目标>/main.rs、两样都不在的照给 tests/<目标>.rs（实际「$target_files_seen」）" \
+      "看 two_hosts_target_source_file：经 lib_crash_point_replay_items.py 的 target-source-file 取；目录式目标取成 tests/<目标>.rs，那份文件不在，上次红的清单悄悄不写"
   # run-directory-owner-recorded（文件头「运行目录的归属记录」）：会话号给了 ⇒ 合并那一步建的运行目录里有 .owner、第一行是那个会话号
   merge_scene run-directory-owner-recorded "1 3 5"
   merge_in "$scene" WORK_DIRECTORY_OWNER_SESSION=selftest-session -- some-target --given-states
@@ -996,7 +999,7 @@ print(" ".join(("pin=" + shard["pin"] if "pin" in shard else "unpinned") + ":" +
   echo "    产物表里第 0 片之外不是恰好一片退 1、核账那一趟现判了块或一行计数行都没打退 1、核账红原样退、源码中途变了退 77 而不起核账、观察者版本变了而红退 78、判段没跑那一行转打一次）、没有 TASK_SERVER_SHARD_PHASE 退 2、"
   echo "    TASK_SERVER_SHARD_PHASE 认不出退 2、卡用不了与给定状态表借不到显存退 78、算法判不了退 248、--given-states 不起录入段、选段交过来是 judge 两片都只判、"
   echo "    --skip 每一趟都带、崩溃点重放样子的用例录入段真跑、服务交的卡照收（多机配置里的不读）且开了 GPU 也不带 --test-threads、"
-  echo "    开了 GPU、GPU 批处理服务不在跑退 78 并打起服务的命令、录入段与判段都不带卡也不领卡、上次红的清单、运行目录的归属记录、认不出的选项退 2、本机那一趟两步 cargo 直接起而线程照服务交的、开关轮的判法，$cells 格都对；"
+  echo "    开了 GPU 时录入段与判段都不带卡也不领卡、上次红的清单、运行目录的归属记录、认不出的选项退 2、本机那一趟两步 cargo 直接起而线程照服务交的、开关轮的判法，$cells 格都对；"
   echo "    开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读：双机 $(grep -c . <<<"$in_table_two") 个、共用库 $(( listed_count - $(grep -c . <<<"$in_table_two") )) 个；共用库另有 $unlisted_count 个表里没列、要它一格不红）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的格"
   exit 0
 }
@@ -1130,7 +1133,7 @@ two_hosts_shard() {
       export SINGLEFS_CRASH_AMPLIFICATION_STAGE=judge
     fi
   fi
-  # 判段那一趟（文件头「跑法」）：不领卡；开了 GPU 时判段写待判行、等 GPU 批处理服务判，服务不在跑照日志分类退 78
+  # 判段那一趟（文件头「跑法」）：不领卡；开了 GPU 时判段写待判行、等 GPU 批处理服务判
   echo "  · 第 $position 片（$host_name）：SHARE=$share，判的块写进 prune-server，日志 $output/share.log"
   if crash_amplification_run_on_this_host "$share" "$output/share.log"; then run_exit=0; else run_exit=$?; fi
   # 转打的四种行（文件头「输出」）；弄坏开关 gpu-pass-lines-dropped 下少 CRASH_AMPLIFICATION_GPU_PASS 那一种
@@ -1285,7 +1288,7 @@ two_hosts_on_exit() { # <这一趟的退出码>
   [[ "$phase" == plan || "$phase" == shard ]] && return 0
   two_hosts_break_is last-run-unwritten && return 0
   python3 "$repository_root/scripts/gate/lib_reuse_checks.py" last-run-target scripts/crash/crash-amplification-two-hosts.sh "$test_target" "$1" \
-    ${test_filter:+--test-filter "$test_filter"} --target-file "$repository_root/crates/singlefs-verification/tests/$test_target.rs" >/dev/null 2>&1 \
+    ${test_filter:+--test-filter "$test_filter"} --target-file "$(two_hosts_target_source_file "$test_target")" >/dev/null 2>&1 \
     || echo "  ! 上次红的清单没写成（scripts/gate/lib_reuse_checks.py last-run-target），这一趟的判定不受影响" >&2
 }
 trap 'two_hosts_exit_code=$?; two_hosts_on_exit "$two_hosts_exit_code"' EXIT

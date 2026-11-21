@@ -19,6 +19,8 @@
     这一节的认法就是门禁 .claude/gate.d/doc-process-records.sh 的「点名一节」：标题逐字、二级标题，节到下一个一级或二级标题为止，
     节里写了否定词的行（门禁里 REVIEWED_SECTION_NEGATIONS 那几个词）不算点名；预填的行不带那些词。
     其余各节与回看决策表预填的「（待填）」是占位：填完删掉，门禁的回看决策格对没填的表行判红。
+    待填提示不叫人把任务号写进判决：判决引的读数写命令与结局行的 type=、exit= 那一段；「## 三、改法」带一行行首的「A/B 读数：任务 <号>」，
+    给零轮改法填号（派发闸 .claude/hooks/runner-dispatch-guard.sh 认这一行，判据库只在判决里放过它），没有零轮改法的删掉。
 退出码：0 写好；1 --selftest 有格红；2 用法错、快照目录或清单不合、输出文件已在。
 
 弄坏开关 VERDICT_SKELETON_BREAK 只在自证（--selftest）里认：平常跑设了它，不管值是什么，参数解析之前就退 2。几项可以逗号连写。
@@ -33,8 +35,13 @@
       「✗ 自检：默认不读 kb-sha256.txt」「✗ 自检：被判过的文件一节应当每个路径一行、同一路径只一行」「✗ 自检：快照目录里没有清单应当退 2」（只有 kb 清单的目录也照写了）
   VERDICT_SKELETON_BREAK=empty-snapshot-accepted  快照目录里没有可读的清单也照写一个空的被判过的文件一节
       「✗ 自检：快照目录里没有清单应当退 2」
+  VERDICT_SKELETON_BREAK=readings-task-number-asked  「一、腿与核查」的待填提示叫人把判决引的读数写成任务号
+      「✗ 自检：骨架的待填提示不要求把任务号写进判决」
+  VERDICT_SKELETON_BREAK=zero-round-reading-line-dropped  「三、改法」里不带「A/B 读数：任务 <号>」那一行
+      「✗ 自检：骨架里零轮改法那一条带一行派发闸认的 A/B 读数」
 """
 import datetime
+import importlib.util
 import os
 import re
 import subprocess
@@ -54,11 +61,22 @@ GATE_PATH = '.claude/gate.d/doc-process-records.sh'
 REVIEWED_HEADING = '## 这一轮被判过的文件'
 HEADINGS = ['## 一、腿与核查', '## 二、判决', '## 三、改法', '## 交用户的', REVIEWED_HEADING, '## 回看决策']
 KB_MANIFEST = 'kb-sha256.txt'
+# 判决里的号只写零轮改法那一行行首的「A/B 读数：任务 <号>」（派发闸 .claude/hooks/runner-dispatch-guard.sh 的 ZERO_ROUND_READING_LINE 与 ZERO_ROUND_TASK_NUMBER 认它，
+# 判据库 .claude/gate.d/lib-forbidden-notations.py 只在 research/prompts/*-main-verification.md 里放过它）；别处的读数写命令与结局行的 type=、exit=
+READINGS_PROMPT = '（待填：cite-check 与 snapshot-tree 两条命令原样与它们判了什么；判决引的读数由主 agent 复跑，写那条命令与结局行的 type= 与 exit= 那一段，不写任务号）'
+ZERO_ROUND_PROMPT = ('（待填：腿提的、判决里推的改法逐条标「量过」或「零轮」；标零轮的，写进产品代码之前先在探针里做 A/B，'
+                     '读数写在那一条下面单起的一行「A/B 读数：任务 <号>」（行首起，<号> 换成那条 A/B 任务的号），别处不写任务号；没有零轮改法的删掉下面这一行）')
+ZERO_ROUND_READING_PLACEHOLDER = 'A/B 读数：任务 <号>'
+DISPATCH_GUARD_PATH = '.claude/hooks/runner-dispatch-guard.sh'
+NOTATIONS_LIBRARY_PATH = '.claude/gate.d/lib-forbidden-notations.py'
+NUMBERS_FORM = 'task-and-session-numbers'
+SAMPLE_TASK_NUMBER = '12345'   # 自证里填进「<号>」的样本
 MANIFEST_LINE = re.compile(r'^[0-9a-f]{64} [ *](?P<path>.+)$')
 ROUND_NAME = re.compile(r'^[A-Za-z0-9][A-Za-z0-9._-]*$')
 
 BREAK_VARIABLE = 'VERDICT_SKELETON_BREAK'
-BREAK_ITEMS = ('reviewed-heading-typo', 'placeholder-negated', 'overwrite-existing', 'kb-manifest-read', 'empty-snapshot-accepted')
+BREAK_ITEMS = ('reviewed-heading-typo', 'placeholder-negated', 'overwrite-existing', 'kb-manifest-read', 'empty-snapshot-accepted',
+               'readings-task-number-asked', 'zero-round-reading-line-dropped')
 SELFTEST_MARK_VARIABLE = 'VERDICT_SKELETON_SELFTEST_MARK'
 SELFTEST_MARK_CONTENT = 'verdict-skeleton.py --selftest 起的子进程'
 
@@ -124,10 +142,11 @@ def skeleton_text(round_name, paths):
         '',
         HEADINGS[0], '',
         '| 腿 | 报告 | 结论（腿的原话，当线索） |', '|---|---|---|', '| （待填） | （待填） | （待填） |', '',
-        '（待填：cite-check 与 snapshot-tree 两条命令原样与它们判了什么；判决引的读数由主 agent 复跑，写任务号）', '',
+        READINGS_PROMPT.replace('，不写任务号）', '，写任务号）') if 'readings-task-number-asked' in broken_items() else READINGS_PROMPT, '',
         HEADINGS[1], '', '（待填）', '',
         HEADINGS[2], '',
-        '（待填：腿提的、判决里推的改法逐条标「量过」或「零轮」；标零轮的，写进产品代码之前先在探针里做 A/B，读数的任务号写在这一条里）', '',
+        ZERO_ROUND_PROMPT,
+        *([] if 'zero-round-reading-line-dropped' in broken_items() else [ZERO_ROUND_READING_PLACEHOLDER]), '',
         HEADINGS[3], '', '（待填）', '',
         reviewed_heading, '',
         *[f'- {path}：{placeholder}' for path in paths], '',
@@ -184,6 +203,35 @@ def gate_judge(repository, verdict):
     return done.stdout
 
 
+def dispatch_guard_reading_patterns(repository):
+    """派发闸认零轮读数那一行的三条（LINE_START、ZERO_ROUND_READING_LINE、ZERO_ROUND_TASK_NUMBER）从它的源码原样抽出来执行 → (读数行, 任务号) 两条正则。
+    抽不出就抛 Refusal：自证判不了，不当绿。"""
+    guard_file = os.path.join(repository, DISPATCH_GUARD_PATH)
+    try:
+        guard = open(guard_file, encoding='utf-8').read()
+    except OSError as error:
+        raise Refusal(f'读不了派发闸 {guard_file}：{error.strerror}', '自证拿派发闸的认法核骨架里的 A/B 读数一行，派发闸文件要在')
+    namespace = {'re': re}
+    for name in ('LINE_START', 'ZERO_ROUND_READING_LINE', 'ZERO_ROUND_TASK_NUMBER'):
+        match = re.search(rf'^{name} = .*$', guard, re.M)
+        if match is None:
+            raise Refusal(f'{guard_file} 里找不到 {name} = 那一行', '派发闸改了写法：这份自证跟着改')
+        exec(match.group(0), namespace)
+    return namespace['ZERO_ROUND_READING_LINE'], namespace['ZERO_ROUND_TASK_NUMBER']
+
+
+def notations_library(repository):
+    """判据库 .claude/gate.d/lib-forbidden-notations.py（不留 __pycache__）；读不到抛 Refusal。"""
+    library_file = os.path.join(repository, NOTATIONS_LIBRARY_PATH)
+    try:
+        specification = importlib.util.spec_from_file_location('lib_forbidden_notations', library_file)
+        library = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(library)
+    except (OSError, SyntaxError, AttributeError) as error:
+        raise Refusal(f'读不了判据库 {library_file}：{error}', '判据库是写闸与检出钩子共用的那一份，先 git status 看它在不在、是不是被改坏了')
+    return library
+
+
 def selftest():
     os.environ[SELFTEST_MARK_VARIABLE] = SELFTEST_MARK_CONTENT   # 自证起的子进程（环境原样继承）靠它认：弄坏开关只在自证里认
     failures = []
@@ -236,6 +284,26 @@ def selftest():
             listed_lines = [line for line in lines if line.startswith('- ') and '：（待填：' in line]
             if len(listed_lines) != len(sample_paths):
                 red('被判过的文件一节应当每个路径一行、同一路径只一行', f'读到 {len(listed_lines)} 行：{listed_lines}')
+            # 判决里的号只写零轮改法那一行：待填提示不叫人写任务号；「三、改法」带一行派发闸认的「A/B 读数：任务 <号>」，填上号之后判据库在判决里放过、在记录里照拒
+            asked = [line for line in lines if '写任务号' in line.replace('不写任务号', '')]
+            if asked:
+                red('骨架的待填提示不要求把任务号写进判决', f'这几行叫人写任务号：{asked}')
+            try:
+                reading_line, task_number = dispatch_guard_reading_patterns(DEFAULT_REPOSITORY)
+                library = notations_library(DEFAULT_REPOSITORY)
+            except Refusal as refusal:
+                red('派发闸的读数认法与判据库要拿得到', f'{refusal}；{refusal.way_out}')
+                reading_line = None
+            if reading_line is not None:
+                section = lines[positions[2] + 1:positions[3]] if -1 not in positions[2:4] else []
+                filled = [line.replace('<号>', SAMPLE_TASK_NUMBER) for line in section if '<号>' in line and reading_line.match(line.replace('<号>', SAMPLE_TASK_NUMBER))]
+                filled = [line for line in filled if task_number.search(reading_line.match(line).group('value'))]
+                if not filled:
+                    red('骨架里零轮改法那一条带一行派发闸认的 A/B 读数', f'「三、改法」一节里没有一行照派发闸 {DISPATCH_GUARD_PATH} 的 ZERO_ROUND_READING_LINE 与 ZERO_ROUND_TASK_NUMBER 认得出：{section}')
+                verdict_hits = [hit for line in filled for hit in library.all_hits(NUMBERS_FORM, line, 'research/prompts/demo-r1-main-verification.md')]
+                record_hits = [hit for line in filled for hit in library.all_hits(NUMBERS_FORM, line, 'records/demo.md')]
+                if filled and (verdict_hits or not record_hits):
+                    red('判据库应当在判决里放过骨架那一行填上号之后的样子、在记录里照拒', f'判决里命中 {verdict_hits}，记录里命中 {record_hits}（填好的行：{filled}）')
         # 排他新建
         if os.path.isfile(default_out):
             before = open(default_out, encoding='utf-8').read()
@@ -283,7 +351,8 @@ def selftest():
         print('     → 怎么办：看上面每一行「✗ 自检：<格名>」和它下面缩进的明细，按那一格改 verdict-skeleton.py 的骨架或判法，再跑一遍 --selftest')
         return 1
     print(f'  ✓ 自检通过：骨架逐字带 {len(HEADINGS)} 节标题，门禁的点名判法认得出每个预填路径（含中文文件名、./ 与 * 写法、多份清单去重），'
-          'kb 清单默认不读，已有文件不覆盖，没有快照与坏清单与坏轮名都退 2')
+          'kb 清单默认不读，已有文件不覆盖，没有快照与坏清单与坏轮名都退 2；待填提示不叫人写任务号，「三、改法」带一行派发闸认的「A/B 读数：任务 <号>」，'
+          '填上号之后判据库在判决里放过、在记录里照拒')
     return 0
 
 

@@ -19,9 +19,9 @@
 #                                                           scripts/crash/lib_crash_point_replay_items.py（文件头「指定范围的崩溃域上限」），崩溃点重放入口共用。经服务按项分片的，这一判在计划那一步做，
 #                                                           各片与合并不再判；崩溃点重放入口起这里时交 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1（它已按合表项判过），这里就不再判
 #   crash-amplification.sh --list-items                     逐行列出可点名的分项：分项名、测试目标、用例函数（TAB 隔开）；不清场、不跑
-#   crash-amplification.sh --selftest                       用假的分项驱动走一遍第 1–67 格（不领卡是第 67 格：开了 GPU、环境里没有卡时每项交驱动整趟跑、驱动收到的卡是 unset，驱动报 GPU 批处理服务不在跑退 78 时整趟退 78、起服务的命令照转出；指定范围的崩溃域上限是第 61–66 格：超上限判拒、点名项全部可复用放行、缩过域放行、估不出判拒、缩过域的记录不当全域、已判过的标记不再判；复用三问与上次红的清单是第 45、46 格，RocksDB 取值没判过不起是第 48 格，不在临时 prune-server 底下起的自证退 2 是第 53 格，缩域参数交变量是第 59 格、值写坏退 2 是第 60 格；列项、点名、拒绝、不清场、认不出的选项退 2、各种判红、本次未跑、复用数、派出收回、
+#   crash-amplification.sh --selftest                       用假的分项驱动走一遍第 1–65 格（不领卡是第 65 格：开了 GPU、环境里没有卡时每项交驱动整趟跑、驱动收到的卡是 unset；指定范围的崩溃域上限是第 59–64 格：超上限判拒、点名项全部可复用放行、缩过域放行、估不出判拒、缩过域的记录不当全域、已判过的标记不再判；复用三问与上次红的清单是第 43、44 格，RocksDB 取值没判过不起是第 46 格，不在临时 prune-server 底下起的自证退 2 是第 51 格，缩域参数交变量是第 57 格、值写坏退 2 是第 58 格；列项、点名、拒绝、不清场、认不出的选项退 2、各种判红、本次未跑、复用数、派出收回、
 #                                                           只供自证的变量、有红又有项退 78、按登记整批不判的数、驱动行的 red= 与不带参数时的零态、复用数是各行之和、几条流各留的块相加、
-#                                                           分项驱动退 77 与它报的本次未跑、几条流里有的没借到、不带参数时一项不穷举红在那一项、
+#                                                           分项驱动退 77 与它报的本次未跑、不带参数时一项不穷举红在那一项、
 #                                                           只因登记的段不穷举不红而报段号与写数、没登段的流照旧红、往驱动送按段登记文件、登记文件写坏拒跑、
 #                                                           登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段、驱动行没报那个字段照不穷举红、
 #                                                           登记段分片枚举不红而报全展开与分片已判几态、分片段已判 0 态而那一行现判与复用都是 0 红在那条流与那一段、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑、
@@ -40,8 +40,7 @@
 # （配置中一台机器就要跑一台，配置中两台机器就要跑两台，配置中有 gpu 就一定要让 GPU 工作，如果不行就明确报错拒绝，不接受默认降级）。
 # 运行条件：配置上判得了的（多机配置开了 GPU 却一份卡都没写、点名的卡与双机开关对不上）由文件头 run-condition: check 在开跑之前判（同分项驱动，判法在
 #   crash-amplification-lib.sh 的 crash_amplification_run_condition_holds）；跑起来才知道的退 78：某一项的驱动退 78
-#   （GPU 批处理验证服务不在跑、显卡或第二台用不上）。GPU 批处理服务不在跑的出路是驱动转出的起服务的命令（python3 gpu-verification-server/control start），
-#   别的出路是「修好设备，或改配置」。
+#   （显卡或第二台用不上），出路是「修好设备，或改配置」。
 # 卡只归 GPU 批处理验证服务（.claude/rules/verification.md「卡只归 GPU 服务，任务不拿卡」）：这里不领卡、不挑卡、不清场、不重起自己。
 #   每项交分项驱动整趟跑（录入段与判段在驱动里先后跑），开了 GPU 的判段把要判的块写成待判行、等 GPU 批处理服务判完；
 #   环境里有 GPU_CARDS_BY_PRIORITY 就原样留给驱动，没有照样跑。按项分片的一片只跑一项；合并那一步只重放。
@@ -140,14 +139,14 @@
 #   not-run（本次未跑：不计进 failed，也不算通过，照 .claude/singlefs-ai-sop/rules/show-me-test.md「门禁不许假装通过」逐项报；环境里有 GATE_NOT_RUN_FILE
 #     时每项往里追加一行）：不红，而有一行带 stopped_early=true、或有一行 unjudged_blocks>0（没判的块是各行之和）。入口只交分项驱动、一律本机整份跑
 #     （文件头 gate-similar 那几行），收到的每一行都是本机一台判整份的那一趟打的，没有哪一行留的块该由别的行补上。
-#     分项驱动退 77（一项都没跑到：排派活计划那一趟借不到显存、一块都没判，或第二台排计划那一趟借不到显存，或判段跑的过程中源码变了；
+#     分项驱动退 77（一项都没跑到：判段跑的过程中源码变了，打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行；
 #     scripts/crash/crash-amplification-item.sh 文件头「退出码」）也是 not-run，不按「驱动退非 0」判红；原因照它打的第一行 CRASH_AMPLIFICATION_NOT_RUN
-#     的 step= 与 reason= 写：step=placement（排计划那一趟）才写借不到显存，别的 step（step=judge 的跑的过程中源码变了这类）只写没判成与 reason=（没打那一行的照写没打）。
-#     驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN 行（一条用例几条流，没借到显存的那几条各一行，借到的照判）同样是 not-run，原因写几条流没判与第一行的 reason=：
-#     这一项不算通过。驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行（配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性：判段这一趟不跑、录入段照录，
-#     分项驱动或双机驱动转打的那几行，一条流一行）也是这一种，原因写几条流判段没跑与第一行 step=judge 的 reason=。这几种都不按「驱动退 0 却 0 行」判红，不带参数的跑法里也不按「现判 0 态、复用 0 态」判红；行里报了红照样记 red。
+#     的 step= 与 reason= 写：写没判成与 reason=（没打那一行的照写没打）。
+#     驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行（配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性：判段这一趟不跑、录入段照录，
+#     分项驱动或双机驱动转打的那几行，一条流一行）同样是 not-run，原因写几条流判段没跑与第一行 step=judge 的 reason=：这一项不算通过。
+#     这两种都不按「驱动退 0 却 0 行」判红，不带参数的跑法里也不按「现判 0 态、复用 0 态」判红；行里报了红照样记 red。
 #     派出的项全是 not-run 时整趟退 77。
-#   驱动退 78（显卡用不上或多机配置不满足）：行里没报红（red 之和为 0、每行的 red= 都对）就记 exit=78 verdict=not-run；
+#   驱动退 78（显卡用不上、多机配置不满足）：行里没报红（red 之和为 0、每行的 red= 都对）就记 exit=78 verdict=not-run；
 #     行里报了红记 exit=78 verdict=red（判出来的红不让 78 盖掉）。两种都停在这一项、后面的项不再派。
 #     整趟有红先判：别的项或这一项红就退 1，没有红才退 78；退 78 的那一项都在 ✗ 里点名。
 #   green：别的。
@@ -186,15 +185,15 @@
 #       平常跑时带了只给自证用的变量（见「只供自证」）、按段登记文件核不过（见「按段登记」；逐处列出问题，不清场、一项都不跑）
 #   77  派出的项一项都没判完（全是 not-run），也没有红
 #   79  指定范围的崩溃域超上限：带了 --item、没缩域，点名的分项这一趟要现判约多少崩溃状态超过 200000 态，或估不出来（一项都没起；出路：带 --crash-expand-up-to <n> 缩域，或留给提交时不指定范围的那一趟）
-#   78  运行条件不满足（出路：修好设备，或改配置；GPU 批处理验证服务不在跑的出路是驱动转出的起服务的命令）：preflight 判的（文件头两条 run-condition；含开了 GPU 而多机配置里一份卡都没写）、
-#       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时；含开了 GPU 而 GPU 批处理验证服务不在跑）、
+#   78  运行条件不满足（出路：修好设备，或改配置）：preflight 判的（文件头两条 run-condition；含开了 GPU 而多机配置里一份卡都没写）、
+#       建不了放每项输出的目录、某一项的驱动退 78（这一趟没有红时）、
 #       起任何一项之前 scripts/hosts/rocksdb-prebuilt.py entry 判红（这台没装预编库、此刻进程环境的取值缺了或对不上；出路是开新会话，
 #       或命令前 eval "$(python3 scripts/hosts/rocksdb-prebuilt.py env)"）
 #   preflight 自己判不了条件（声明写坏）时退 1，见 .claude/singlefs-ai-sop/rules/preflight-discipline.md「不满足时」。没有别的退出码。
 # 项与项之间串行（判过并行这一条路走不通）：点名的项一项一项交分项驱动，不同时起几项。理由：开了 GPU 时各项照 task-server 交的同一张卡与额度用卡，
 #   卡池的显存账按进程记，几个进程同时上卡互相不排队。每一项里引擎照登记的线程数（SINGLEFS_CRASH_AMPLIFICATION_THREADS）并行判。
 # 弄坏开关 CRASH_AMPLIFICATION_BREAK=<项>（几个用逗号连；只在自证起的子进程里认）。逐项写开关名、弄坏哪一处、打开后 --selftest 哪几格该红
-#   （格号是 run_selftest 里的第 1–67 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
+#   （格号是 run_selftest 里的第 1–65 格，判错的那一格打「✗ 自证第 <号> 格：<失败行>」）。
 # 写法（B 写法，样板是 scripts/mutation/mutate.sh 文件头「弄坏开关」一段）：一行「#   CRASH_AMPLIFICATION_BREAK=<开关名>  <弄坏哪一处>」，下一行起以「#       」开头
 #   写点名的格「第 N 格」（、隔开；括号里是那一格失败行的句首，开关轮不读，括号外的每一段都算一格）。--selftest 末尾那一轮（开关轮）从这张表现读
 #   （crash-amplification-lib.sh 的 crash_amplification_read_switch_table，与双机驱动同一份读法）：表里 CRASH_AMPLIFICATION_BREAK 的开关与代码里认的开关要相等
@@ -202,42 +201,42 @@
 #   CRASH_AMPLIFICATION_BREAK=swallow-exit  分项驱动退非 0 也记 0
 #       第 8 格（「驱动退非 0 没记成红」）、第 18 格（「驱动退 78 却没停下退 78」）、第 20 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、
 #       第 21 格（「驱动退 78 而行里报了红，这一项没记红」）、第 28 格（「照常跑完应当退 0、有项红退 1，两趟都不清场」）、
-#       第 29 格（「分项驱动退 77 没记进本次未跑」）、第 46 格（「上次红的清单不对」：红的那一项没记成红）、
-#       第 50 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」：这一项没记红、整趟退 0）、
-#       第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：ITEM 行记成 exit=0）、
-#       第 57 格（「按项分片的合并应当……」：重放那一项的退 1 被吞成 0、整趟退 0）、第 67 格（「不领卡、GPU 批处理服务不在跑……」：那一项记退 0、0 行判红，接着派第二项，整趟退 1）
+#       第 44 格（「上次红的清单不对」：红的那一项没记成红）、
+#       第 48 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」：这一项没记红、整趟退 0）、
+#       第 52 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：ITEM 行记成 exit=0）、
+#       第 55 格（「按项分片的合并应当……」：重放那一项的退 1 被吞成 0、整趟退 0）
 #   CRASH_AMPLIFICATION_BREAK=logs-single  每一项驱动的输出只写一份全量日志（tee，不经 two-logs.sh，没有 .problems.log）
-#       第 47 格（「每一项的输出应当出两份日志…」）
+#       第 45 格（「每一项的输出应当出两份日志…」）
 #   CRASH_AMPLIFICATION_BREAK=skip-filter  调驱动时不带 --test-filter
-#       第 4 格（「全量没把每个分项各调一次驱动」）、第 6 格（「不该清场：各项应当带 --test-filter、不经清场包装重起」）
+#       第 4 格（「不带参数没把每个分项各调一次驱动」）、第 6 格（「不该清场：各项应当带 --test-filter、不经清场包装重起」）
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-item  不认得的分项名照跑
 #       第 2 格（「不认得的分项名没有退 2 并列出可点名的项」）
 #   CRASH_AMPLIFICATION_BREAK=unknown-option-accepted  认不出的选项也照收、当没给（不拒）
-#       第 7 格（「认不出的选项应当用法错退 2、一项都不跑」）、第 58 格（「--no-shard 不是这一份的选项，应当用法错退 2……」）
+#       第 7 格（「认不出的选项应当用法错退 2、点名它、一项都不跑」）、第 56 格（「--no-shard 不是这一份的选项，应当用法错退 2……」）
 #   CRASH_AMPLIFICATION_BREAK=expand-up-to-not-passed  给了 --crash-expand-up-to 不把变量交给分项驱动（TOTAL 行与成功句照写缩过域）
-#       第 59 格（「给了 --crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给每一项的分项驱动…」：驱动收到的是 unset）
+#       第 57 格（「给了 --crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给每一项的分项驱动…」：驱动收到的是 unset）
 #   CRASH_AMPLIFICATION_BREAK=narrowed-run-unlabelled  缩过域的那一趟 TOTAL 行不接 expand_up_to=、成功句不写「缩过域、不算门禁通过」
-#       第 59 格（「给了 --crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给每一项的分项驱动…」：TOTAL 行没有 expand_up_to=6、成功句没有缩过域那一句）
+#       第 57 格（「给了 --crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给每一项的分项驱动…」：TOTAL 行没有 expand_up_to=6、成功句没有缩过域那一句）
 #   CRASH_AMPLIFICATION_BREAK=expand-up-to-unchecked  --crash-expand-up-to 的值与环境里的变量不核是不是非负整数
-#       第 60 格（「--crash-expand-up-to 的值不是非负整数时应当退 2、一项都不跑」）
+#       第 58 格（「--crash-expand-up-to 的值……不是非负整数时应当退 2、一项都不跑」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-unbounded  带 --item、没缩域也不判指定范围的崩溃域上限
-#       第 61 格（「估数超过 200000 态应当退 79、一项都不起」）、第 62 格（「点名项全部可复用的放行，不论上一趟的态数多大」：不判就不打「全部复用，现判 0 态」那一句）、
-#       第 64 格（「估不出应当退 79」）、第 65 格（「只有缩过域的记录算不出全域态数，应当退 79」）
+#       第 59 格（「带 --item、没缩域，估数超过 200000 态应当退 79」）、第 60 格（「库里录下的块键都对得上，不论上一趟的态数多大都应当放行、现判 0 态」：不判就不打「全部复用、现判 0 态」那一句）、
+#       第 62 格（「估不出应当退 79」）、第 63 格（「缩过域那一趟的态数少，拿来当全域会估小，只有它时应当算不出、退 79」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-narrowed-refused  缩了域（--crash-expand-up-to 小于引擎常量）也照没缩判：缩域值不交给判法
-#       第 63 格（「缩过域的放行，不读库、不判上限」）
+#       第 61 格（「带了 --crash-expand-up-to 6 应当放行、不读库、不判上限」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-reusable-counted  库里录下的块键都对得上、全部可复用的分项也按上一趟全域真跑的态数算（上一趟有记录才算）
-#       第 62 格（「点名项全部可复用的放行，不论上一趟的态数多大」）
+#       第 60 格（「库里录下的块键都对得上，不论上一趟的态数多大都应当放行、现判 0 态」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-unknown-passed  估不出现判多少态的分项按 0 态放行
-#       第 64 格（「估不出应当退 79」）、第 65 格（「只有缩过域的记录算不出全域态数，应当退 79」）
+#       第 62 格（「估不出应当退 79」）、第 63 格（「缩过域那一趟的态数少，拿来当全域会估小，只有它时应当算不出、退 79」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-suggestion-dropped  拒绝说明里不写算得出的 n
-#       第 61 格（「说明里应当写能压到上限以内的 --crash-expand-up-to 6」）
+#       第 59 格（「说明里应当写能压到上限以内的 --crash-expand-up-to 6」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-shrunk-records-used  估上一趟全域态数时不看展开深度，取最新的一份记录（缩过域的那趟也当全域）
-#       第 65 格（「只有缩过域的记录算不出全域态数，应当退 79」）
+#       第 63 格（「缩过域那一趟的态数少，拿来当全域会估小，只有它时应当算不出、退 79」）
 #   CRASH_AMPLIFICATION_BREAK=scoped-domain-handshake-ignored  崩溃点重放入口交了 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1 也照判一遍
-#       第 66 格（「收到已判过的标记就不再判上限」）
+#       第 64 格（「收到 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1 就不再判指定范围的上限」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-as-zero  取得出的复用数也记 0
 #       第 10 格（「复用数取错」）、第 26 格（「复用数没照各行之和取」）、第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」：ITEM 行复用写成 0）、
-#       第 43 格（「全部复用的一趟…判了红、或 ITEM 行没照实写现判 3 复用 7」：ITEM 行复用写成 0）、第 45 格（「复用三问没过」：键相同的一趟 ITEM 行写复用 0，折成现判）
+#       第 41 格（「全部复用的一趟…判了红、或 ITEM 行没照实写现判 3 复用 7」：ITEM 行复用写成 0）、第 43 格（「复用三问没过」：键相同的一趟 ITEM 行写复用 0，折成现判）
 #   CRASH_AMPLIFICATION_BREAK=accept-unknown-reuse  取不出复用数的项记成 reused=0、不计进 reuse_unknown、成功句不点名
 #       第 11 格（「取不出复用数的项没照实报出」）、第 12 格（「叫停的行被拿来推复用数」）
 #   CRASH_AMPLIFICATION_BREAK=reuse-from-stopped-line  叫停的行（stopped_early=true）没报 states_reused= 也拿 states 减 states_checked_here 当复用数
@@ -249,17 +248,16 @@
 #   CRASH_AMPLIFICATION_BREAK=accept-zero-lines  驱动退 0、0 行 CRASH_AMPLIFICATION 不判红
 #       第 14 格（「驱动退 0、0 行却没判红」）
 #   CRASH_AMPLIFICATION_BREAK=accept-not-exhaustive  有行不是穷举也不判红
-#       第 15 格（「有行不是穷举却没判红」）、第 31 格（「不带参数时一项不穷举，没有红在那一项」）、
-#       第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
-#       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
+#       第 15 格（「有行不是穷举却没判红」）、第 29 格（「不带参数时一项不穷举，没有红在那一项」）、
+#       第 31 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=skip-not-exhaustive-in-whole-scope  不带参数（scope=whole）时不判不穷举，点名的照判
-#       第 31 格（「不带参数时一项不穷举，没有红在那一项」）
+#       第 29 格（「不带参数时一项不穷举，没有红在那一项」）
 #   CRASH_AMPLIFICATION_BREAK=count-stopped-as-run  叫停与留了没判的块的项也记 green
 #       第 16 格（「被叫停的项没按本次未跑逐项报」）、第 17 格（「派出的项全没判完却没退 77」）、第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」）
 #   CRASH_AMPLIFICATION_BREAK=item-78-as-failure  驱动退 78 照普通失败记、接着派后面的项
-#       第 18 格（「驱动退 78 却没停下退 78」）、第 20 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、第 21 格（「驱动退 78 而行里报了红，这一项没记红」）、
-#       第 67 格（「不领卡、GPU 批处理服务不在跑……」：没停在头一项，整趟退 1）
+#       第 18 格（「驱动退 78 却没停下退 78」）、第 20 格（「有红又有一项退 78 时没退 1」；这一格带出的分项驱动输出里另有一行「✗ 点名的卡用不了（假驱动）」）、第 21 格（「驱动退 78 而行里报了红，这一项没记红」）
 #   CRASH_AMPLIFICATION_BREAK=honor-test-variables-outside-selftest  平常跑时也认只供自证的变量，不拒；关守卫项，整值比，只在它是 CRASH_AMPLIFICATION_BREAK 唯一一项时认，与别的项同写平常跑照拒并点名
 #       第 19 格（「平常跑时带了只供自证的变量却没拒」）
 #   CRASH_AMPLIFICATION_BREAK=condition-before-red  有红又有一项驱动退 78 时整趟退 78（不让红优先）
@@ -268,7 +266,7 @@
 #       第 21 格（「驱动退 78 而行里报了红，这一项没记红」）
 #   CRASH_AMPLIFICATION_BREAK=skip-ignore-report  成功句不报按登记整批不判的点数与态数
 #       第 22 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 23 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、
-#       第 42 格（「按登记不判的点数与态数没按流分组、每组只取一次」：成功句没报）
+#       第 40 格（「按登记不判的点数与态数没按流分组、每组只取一次」：成功句没报）
 #   CRASH_AMPLIFICATION_BREAK=ignore-unknown-as-zero  驱动行没报 ignored_points= / states_skipped_by_ignore= 的记成 0、不点名
 #       第 23 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）
 #   CRASH_AMPLIFICATION_BREAK=accept-bad-red-field  有行缺 red= 或 red 不是非负整数也不判红
@@ -276,81 +274,78 @@
 #   CRASH_AMPLIFICATION_BREAK=accept-zero-whole-item  不带参数时一项现判 0 态、复用 0 态也不判红
 #       第 25 格（「不带参数时一项现判 0 态、复用 0 态却没判红」）
 #   CRASH_AMPLIFICATION_BREAK=driver-not-run-as-zero-lines  不认分项驱动的 CRASH_AMPLIFICATION_NOT_RUN 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
-#       第 29 格（「分项驱动退 77 没记进本次未跑」：原因里没有那一行的 reason=）、第 30 格（「几条流里有的没借到显存，这一项却记了通过」）、
-#       第 44 格（「分项驱动报判段没跑…的那一项没记本次未跑」）、第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：原因写成了没打那一行）
+#       第 42 格（「分项驱动报判段没跑…的那一项没记本次未跑」）、第 52 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：原因写成了没打那一行）
 #   CRASH_AMPLIFICATION_BREAK=driver-77-as-failure  分项驱动退 77 照别的非 0 退出码判红
-#       第 29 格（「分项驱动退 77 没记进本次未跑」）、第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：记成了红）
+#       第 52 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：记成了红）
 #   CRASH_AMPLIFICATION_BREAK=judge-not-run-ignored  不认分项驱动转打的 CRASH_AMPLIFICATION_NOT_RUN step=judge 行（退 0 而 0 行的照「驱动退 0 却 0 行」判红）
-#       第 44 格（「分项驱动报判段没跑…的那一项没记本次未跑」）、第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：原因写成了没打那一行）
-#   CRASH_AMPLIFICATION_BREAK=not-run-cause-always-vram  分项驱动退 77 而打了 CRASH_AMPLIFICATION_NOT_RUN 行时，原因前半句不看 step= 一律写借不到显存
-#       第 54 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」）
+#       第 42 格（「分项驱动报判段没跑…的那一项没记本次未跑」）、第 52 格（「分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了…」：原因写成了没打那一行）
 #   CRASH_AMPLIFICATION_BREAK=registered-segments-ignored  不认驱动行的 registered_segments=（exhaustive=false 一律算不穷举）
-#       第 32 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
-#       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 38 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）、
-#       第 39 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）、
-#       第 40 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
-#       第 41 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）、
-#       第 43 格（「全部复用的一趟…判了红」：登记段不认、stub 那条照不穷举红）
+#       第 30 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 31 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 36 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）、
+#       第 37 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）、
+#       第 38 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
+#       第 39 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）、
+#       第 41 格（「全部复用的一趟…判了红」：登记段不认、stub 那条照不穷举红）
 #   CRASH_AMPLIFICATION_BREAK=registered-excuses-the-whole-item  一项里有一行登了段，这一项 exhaustive=false 的行就都不算不穷举（不按行判）
-#       第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
+#       第 31 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
 #   CRASH_AMPLIFICATION_BREAK=dash-counts-as-registered  registered_segments=- 也算登了段
-#       第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
+#       第 31 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）
 #   CRASH_AMPLIFICATION_BREAK=registered-segments-unreported  ITEM 行的 registered_segments= 写 -、成功句不报按段登记那一段
-#       第 32 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
-#       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 38 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
+#       第 30 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 31 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 36 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
 #   CRASH_AMPLIFICATION_BREAK=segments-registry-not-sent  不往分项驱动送 SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY
-#       第 34 格（「分项驱动没收到按段登记文件的绝对路径」）
+#       第 32 格（「分项驱动没收到按段登记文件的绝对路径」）
 #   CRASH_AMPLIFICATION_BREAK=segments-registry-unchecked  开跑前不核按段登记文件
-#       第 35 格（「按段登记文件写坏了却没整趟拒跑」）
+#       第 33 格（「按段登记文件写坏了却没整趟拒跑」）
 #   CRASH_AMPLIFICATION_BREAK=beyond-expansion-ignored  不按 unregistered_segments_beyond_expansion= 判（登了段的行一律不算不穷举）
-#       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
+#       第 34 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=beyond-expansion-missing-as-dash  驱动行没报 unregistered_segments_beyond_expansion= 当成报了 -（ITEM 行写 - 不写 unknown，判法上当成没有展不开的段）
 #       第 22 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 23 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 26 格（「复用数没照各行之和取」）、
-#       第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」）、第 32 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
+#       第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」）、第 30 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）
 #   CRASH_AMPLIFICATION_BREAK=beyond-expansion-unreported  ITEM 行的 unregistered_segments_beyond_expansion= 写 -、成功句不报展开上限盖不住又没登记的段
 #       第 22 格（「按登记整批不判的点数与态数没照实写进 ITEM、TOTAL 与成功句」）、第 23 格（「驱动行没报按登记整批不判的两个数，却没照实报取不出」）、第 26 格（「复用数没照各行之和取」）、
-#       第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」）、第 32 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
-#       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 38 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
+#       第 27 格（「几条流各留了块，没判的块没照各行之和报本次未跑」）、第 30 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 31 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 36 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）
 #   CRASH_AMPLIFICATION_BREAK=slice-progress-zero-accepted  分片段已判 0 态也不判红
-#       第 39 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）
+#       第 37 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」）
 #   CRASH_AMPLIFICATION_BREAK=slice-zero-despite-reuse  分片段已判 0 态不看那一行的现判与复用（全部复用的一趟也红）
-#       第 43 格（「全部复用的一趟…判了红」）
+#       第 41 格（「全部复用的一趟…判了红」）
 #   CRASH_AMPLIFICATION_BREAK=domains-missing-accepted  登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，当成没有登记段的域（不判红，ITEM 行写 -）
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 40 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 38 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）
 #   CRASH_AMPLIFICATION_BREAK=domain-unlisted-segment-accepted  registered_segments= 列的段不在 registered_segment_domains= 里、分片段不在 registered_segment_progress= 里都不判红
-#       第 41 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
+#       第 39 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
 #   CRASH_AMPLIFICATION_BREAK=slice-domains-unreported  ITEM 行的 registered_segment_domains= / registered_segment_progress= 写 -、成功句不报登记段的域那一段
-#       第 32 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 33 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
-#       第 36 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
-#       第 37 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
-#       第 38 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）、
-#       第 39 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」：ITEM 行的进度没照实写）、
-#       第 40 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
-#       第 41 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
+#       第 30 格（「一行 exhaustive=false 只因登记的段…这一项却判了红」）、第 31 格（「一行 exhaustive=false registered_segments=- 没照旧判红在那一条流」）、
+#       第 34 格（「登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段」）、
+#       第 35 格（「登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎」）、
+#       第 36 格（「登记段分片枚举…判了红、或 ITEM 行没带…或成功句没报全展开与分片已判几态」）、
+#       第 37 格（「分片段这一趟已判 0 态却没判红在那条流与那一段」：ITEM 行的进度没照实写）、
+#       第 38 格（「登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流」）、
+#       第 39 格（「registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红」）
 #   CRASH_AMPLIFICATION_BREAK=ignore-summed-per-row  按登记不判的 ignored_points= / states_skipped_by_ignore= 对每一行相加（同一条流叫停再续这类几行重复计），不按流分组只取一次、同组各行不同也不记 unknown
-#       第 42 格（「按登记不判的点数与态数没按流分组、每组只取一次」）
+#       第 40 格（「按登记不判的点数与态数没按流分组、每组只取一次」）
 #   CRASH_AMPLIFICATION_BREAK=rocksdb-entry-unchecked  清场与起分项之前不调 scripts/hosts/rocksdb-prebuilt.py entry
-#       第 48 格（「验证包依赖 rocksdb 而进程环境里没有预编库的取值，应当在清场与起任何一项之前退 78…」）
+#       第 46 格（「验证包依赖 rocksdb 而进程环境里没有预编库的取值，应当在清场与起任何一项之前退 78…」）
 #   CRASH_AMPLIFICATION_BREAK=shard-phase-ignored  不认 TASK_SERVER_SHARD_PHASE 这几个变量，计划、一片、合并都照不分片跑（文件头「经 task-server 按项分片」）
-#       第 55 格（「按项分片的计划那一步应当……」）、第 56 格（「按项分片的一片应当……」）、第 57 格（「按项分片的合并应当……」）
+#       第 53 格（「按项分片的计划那一步应当……」）、第 54 格（「按项分片的一片应当……」）、第 55 格（「按项分片的合并应当……」）
 #   CRASH_AMPLIFICATION_BREAK=run-target-kept  跑完不删这一趟自己建的编译目录（分项在仓根照仓根的 target 编、跨趟留着）
-#       第 49 格（「跑完运行目录里不剩它建的编译目录（正常退 0）」）、第 50 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」）、
-#       第 51 格（「跑完运行目录里不剩它建的编译目录（被 TERM 停）」）
+#       第 47 格（「跑完运行目录里不剩它建的编译目录（正常退 0）」）、第 48 格（「跑完运行目录里不剩它建的编译目录（驱动退 1）」）、
+#       第 49 格（「跑完运行目录里不剩它建的编译目录（被 TERM 停）」）
 # 只供自证（自证起的子进程里才认；平常跑时有一个非空就在参数解析之前退 2 拒跑、拒绝句逐个点名，只有 --selftest 本身不拒，--list-items 与认不得的选项也先看这个）：
 #   CRASH_AMPLIFICATION_BREAK=<项>（上面那张表）；CRASH_AMPLIFICATION_SELFTEST_RED_ITEM=1 每项的测试目标名后面加 -red（假驱动见了退 1）；
 #   CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT=<分项> 跑完那一项不打它的 CRASH_AMPLIFICATION_ITEM 行、不计进汇总（造一项收不回）；
 #   CRASH_AMPLIFICATION_ITEM_DRIVER=<脚本> 换掉分项驱动（自证用假的）；
 #   CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT=<目录> 按段登记的被判仓根换成它（核与送的都是 <目录>/.claude/gate.d/crash-point-replay-segments.tsv，见「按段登记」）；
-#     起 cargo 之前 rocksdb-prebuilt.py entry 判的树同样换成它（小仓里没有依赖 rocksdb 的清单，entry 报不判；第 48 格往里写一份依赖 rocksdb 的清单证红）。
+#     起 cargo 之前 rocksdb-prebuilt.py entry 判的树同样换成它（小仓里没有依赖 rocksdb 的清单，entry 报不判；第 46 格往里写一份依赖 rocksdb 的清单证红）。
 #   「自证起的子进程」的标记：CRASH_AMPLIFICATION_SELFTEST_MARK=<文件>，那份文件在、内容是 SELFTEST_MARK_CONTENT 那一行；只有 run_selftest 设它。
 #   这几个变量读完就从环境里清掉，不传给分项驱动。
 #   CRASH_AMPLIFICATION_SWITCH_TABLE=<文件>：--selftest 末尾的开关轮从这份文件的文件头读开关表（不设读本脚本自己的），代码里认的开关照旧从本脚本取；
@@ -368,7 +363,7 @@ preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT
 
 crash_amplification_script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "$crash_amplification_script_directory/../.." && pwd)"
-# 共用库：这里只用它的弄坏开关轮（读表的 crash_amplification_read_switch_table 与逐个打开的 crash_amplification_switch_wheel，--selftest 末尾那一轮，与双机驱动共用）
+# 共用库：这里用它的弄坏开关轮（读表的 crash_amplification_read_switch_table 与逐个打开的 crash_amplification_switch_wheel，--selftest 末尾那一轮，与双机驱动共用），
 source "$crash_amplification_script_directory/crash-amplification-lib.sh"
 
 # 分项登记表：分项名 <TAB> 测试目标 <TAB> 用例函数（次序就是不带参数时的跑序：先短的流，长的流复用它们的前缀）
@@ -877,10 +872,10 @@ run_selftest() {
   export SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host.env" SINGLEFS_CRASH_AMPLIFICATION_HOME="$work/home" SINGLEFS_LAST_RUNS_DIRECTORY="$work/last-runs"
   unset CRASH_AMPLIFICATION_SELFTEST_RED_ITEM CRASH_AMPLIFICATION_SELFTEST_DROP_RESULT CRASH_AMPLIFICATION_ITEM_SWITCHES CRASH_AMPLIFICATION_ITEM_CARDS GATE_NOT_RUN_FILE SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO STUB_EXPAND_LOG
   unset SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT
-  # 服务给的编译目录（CARGO_TARGET_DIR）与调用方交的卡不从调用方带进来（编译目录那几格要看到本趟自己建的那一份，第 52 格自己给；第 67 格要看驱动收到的是 unset）
-  unset CARGO_TARGET_DIR GPU_CARDS_BY_PRIORITY STUB_CARD_LOG STUB_GPU_VERIFICATION_SERVER_DOWN
+  # 服务给的编译目录（CARGO_TARGET_DIR）与调用方交的卡不从调用方带进来（编译目录那几格要看到本趟自己建的那一份，第 50 格自己给；第 65 格要看驱动收到的是 unset）
+  unset CARGO_TARGET_DIR GPU_CARDS_BY_PRIORITY STUB_CARD_LOG
   unset TASK_SERVER_SHARD_PHASE TASK_SERVER_SHARD TASK_SERVER_SHARD_PLAN_DIRECTORY TASK_SERVER_SHARD_OUTPUT_DIRECTORY TASK_SERVER_SHARD_OUTPUTS TASK_SERVER_SHARD_HOST
-  # 按段登记的仓根（文件头「按段登记」）：合表照抄仓里那一份，按段登记文件只写一行核得过的（第 35 格临时换成写坏的一份、跑完换回）
+  # 按段登记的仓根（文件头「按段登记」）：合表照抄仓里那一份，按段登记文件只写一行核得过的（第 33 格临时换成写坏的一份、跑完换回）
   local segments_root="$work/segments-root" segments_registry
   segments_registry="$segments_root/.claude/gate.d/crash-point-replay-segments.tsv"
   mkdir -p "$segments_root/.claude/gate.d"
@@ -892,27 +887,21 @@ run_selftest() {
 # 假的分项驱动：记下参数、收到的按段登记文件路径（给了 STUB_EXPAND_LOG 的另记收到的缩域变量）；形态按 STUB_SHAPE_<测试目标>（没给按 STUB_SHAPE，再没给 single-host）打几行 CRASH_AMPLIFICATION（照真驱动的几种行），
 # 每行的 expand_up_to 固定报 7（假的引擎常量，不收展开深度的参数）；测试目标名以 -red 结尾的退 1
 printf 'driver %s segments=[%s]\n' "$*" "${SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY-unset}" >> "${STUB_LOG:?}"
-# 缩域那几格（第 59、60 格）：记下收到的缩域变量（没设记 unset）
+# 缩域那几格（第 57、58 格）：记下收到的缩域变量（没设记 unset）
 [[ -z "${STUB_EXPAND_LOG:-}" ]] || printf '%s\n' "${SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO-unset}" >> "$STUB_EXPAND_LOG"
-# 编译目录那几格（第 49–52 格）：记下收到的 CARGO_TARGET_DIR、往里写一份产物；给了 STUB_SLEEP 睡这么多秒（被 TERM 停那一格）
+# 编译目录那几格（第 47–50 格）：记下收到的 CARGO_TARGET_DIR、往里写一份产物；给了 STUB_SLEEP 睡这么多秒（被 TERM 停那一格）
 if [[ -n "${STUB_TARGET_LOG:-}" ]]; then
   printf '%s\n' "${CARGO_TARGET_DIR-unset}" >> "$STUB_TARGET_LOG"
   [[ -z "${CARGO_TARGET_DIR:-}" ]] || { mkdir -p "$CARGO_TARGET_DIR/release" && echo built > "$CARGO_TARGET_DIR/release/artifact"; }
 fi
 [[ -z "${STUB_SLEEP:-}" ]] || sleep "$STUB_SLEEP"
-# 不领卡那一格（第 67 格）：给了 STUB_CARD_LOG 的记一笔「<测试目标> <--stage 的值，没给是 none> cards=[<收到的卡>]」；
-#   STUB_GPU_VERIFICATION_SERVER_DOWN=1 时照真驱动演 GPU 批处理服务不在跑：往标准错误打 ✗ 与起服务的命令、一行汇总行都不打，退 78
+# 不领卡那一格（第 65 格）：给了 STUB_CARD_LOG 的记一笔「<测试目标> <--stage 的值，没给是 none> cards=[<收到的卡>]」
 stub_stage=none; stub_previous=""
 for stub_word in "$@"; do
   [[ "$stub_previous" == --stage ]] && stub_stage="$stub_word"
   stub_previous="$stub_word"
 done
 [[ -z "${STUB_CARD_LOG:-}" ]] || printf '%s %s cards=[%s]\n' "$1" "$stub_stage" "${GPU_CARDS_BY_PRIORITY-unset}" >> "$STUB_CARD_LOG"
-if [[ "${STUB_GPU_VERIFICATION_SERVER_DOWN:-0}" == 1 ]]; then
-  echo "  ✗ 本机那一趟退 101；日志（假驱动）" >&2
-  echo "  → 怎么办：开了 GPU，判段只把块写成待判行、等 GPU 批处理验证服务判，服务不在跑（假驱动）：先起服务 python3 gpu-verification-server/control start，再跑 python3 gpu-verification-server/control check 照它的出路修到退 0" >&2
-  exit 78
-fi
 target="$1"; expand=7
 shape_variable="STUB_SHAPE_$(printf '%s' "${target%-red}" | tr -c 'A-Za-z0-9_' '_')"
 shape="${!shape_variable:-${STUB_SHAPE:-single-host}}"
@@ -924,7 +913,7 @@ case "$shape" in
     echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=2 states_reused=5 blocks_checked_here=1 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true" ;;
   flow) # amplify_prepared_flow 打的那种行：不带 states=，取不出复用数
     echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=2 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 expand_up_to=$expand exhaustive=true" ;;
-  library) # 复用三问那一格（第 45 格）：照 STUB_SERVICE 指的目录（演 prune-server 里那一份判定库）按这一项测试目标的单元文件（$STUB_UNITS/<测试目标>）内容摘要记判过没有：
+  library) # 复用三问那一格（第 43 格）：照 STUB_SERVICE 指的目录（演 prune-server 里那一份判定库）按这一项测试目标的单元文件（$STUB_UNITS/<测试目标>）内容摘要记判过没有：
     #   判过的这一趟现判 0 态、复用 10 态，没判过的现判 10 态并记下（真驱动的判定在服务里按块键记，这里只演「按键存、键相同复用」）
     unit_key="$(sha256sum "${STUB_UNITS:?}/$target" | cut -c1-64)"
     record="${STUB_SERVICE:?}/$target.$unit_key"
@@ -935,14 +924,6 @@ case "$shape" in
       echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=10 blocks_checked_here=2 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true"
     fi ;;
   silent) ;; # cargo 筛出 0 条：退 0、一行都不打
-  placement-not-run) # 排派活计划那一趟借不到显存、一项都没跑到：照真驱动打 DECISION 与 CRASH_AMPLIFICATION_NOT_RUN 行、退 77，不打 CRASH_AMPLIFICATION 行
-    echo "CRASH_AMPLIFICATION_DECISION where=not-run reason=no-card-of-the-pool-had-room-in-time across_machines=0"
-    echo "CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment reason=等了 1800 秒，池里没有一张卡空得出 2560 MiB（假驱动）"
-    echo "  ! 本次未跑（这不是通过）：排派活计划那一趟借不到显存，一块都没判（假驱动）" >&2
-    exit 77 ;;
-  partial-not-run) # 一条用例三条流、第 2 条借不到显存：借到的照判（一行判完的汇总行），没借到的那一条照真驱动打 CRASH_AMPLIFICATION_NOT_RUN 行，退 0
-    echo "CRASH_AMPLIFICATION_NOT_RUN step=placement test=crash_amplification::run_from_environment flow=2/3 reason=等了 1800 秒，池里没有一张卡空得出 5120 MiB（假驱动）"
-    echo "CRASH_AMPLIFICATION mode=single_host_cpu share=0/1 cards=0 states=10 states_checked_here=7 blocks_checked_here=2 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true" ;;
   source-changed-not-run) # 判段跑的过程中源码变了：照真分项驱动打 CRASH_AMPLIFICATION_NOT_RUN step=judge … reason=跑的过程中源码变了…、退 77，不打 CRASH_AMPLIFICATION 行
     echo "CRASH_AMPLIFICATION_NOT_RUN step=judge test=crash_amplification::run_from_environment reason=跑的过程中源码变了，判段没在录入段那份源码上判完（假驱动）"
     echo "  ! 本次未跑（这不是通过）：跑的过程中源码变了，判段没在录入段那份源码上判完（假驱动）" >&2
@@ -994,11 +975,11 @@ case "$shape" in
   zero) # 一态都没判到：现判 0、复用 0
     echo "CRASH_AMPLIFICATION flow=stub mode=single_host_cpu states_checked_here=0 states_reused=0 blocks_checked_here=0 unjudged_blocks=0 red=0 expand_up_to=$expand exhaustive=true" ;;
   placement-then-whole) # 排派活计划那一趟的计划行带 states_reused=（它不是 CRASH_AMPLIFICATION 行，不取），之后本机整份那一趟判 60 态、复用 40 态：这一项现判 60、复用 40
-    echo "CRASH_AMPLIFICATION_PLACEMENT host=local judge=gpu pending_blocks=6 pending_states=60 states_reused=40 tables_mebibytes=1 cards=local:0:100:100 states_per_second_on_this_host=10 estimated_seconds_on_this_host=6"
+    echo "CRASH_AMPLIFICATION_PLACEMENT judge=gpu pending_blocks=6 pending_states=60 states_reused=40 tables_mebibytes=1 verifier_pending_blocks=2 verifier_pending_states=20"
     echo "CRASH_AMPLIFICATION mode=single_host_cpu_with_gpus share=0/1 cards=1 states=100 states_checked_here=60 blocks_checked_here=6 unjudged_blocks=0 red=0 states_reused=40 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0" ;;
   two-flows-with-placement) # 两条流各一趟、各带一行计划行：a 判 14 复用 16、b 判 8 复用 2；计划行的 states_reused= 不取。这一项现判 22、复用 18（连计划行一起加是 36）
-    echo "CRASH_AMPLIFICATION_PLACEMENT host=local judge=gpu pending_blocks=2 pending_states=14 states_reused=16 tables_mebibytes=1 cards=local:0:100:100 states_per_second_on_this_host=7 estimated_seconds_on_this_host=2"
-    echo "CRASH_AMPLIFICATION_PLACEMENT host=local judge=gpu pending_blocks=1 pending_states=8 states_reused=2 tables_mebibytes=1 cards=local:0:100:100 states_per_second_on_this_host=8 estimated_seconds_on_this_host=1"
+    echo "CRASH_AMPLIFICATION_PLACEMENT judge=gpu pending_blocks=2 pending_states=14 states_reused=16 tables_mebibytes=1 verifier_pending_blocks=1 verifier_pending_states=5"
+    echo "CRASH_AMPLIFICATION_PLACEMENT judge=gpu pending_blocks=1 pending_states=8 states_reused=2 tables_mebibytes=1 verifier_pending_blocks=1 verifier_pending_states=3"
     echo "CRASH_AMPLIFICATION flow=a mode=single_host_cpu states_checked_here=14 blocks_checked_here=2 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=16 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0"
     echo "CRASH_AMPLIFICATION flow=b mode=single_host_cpu states_checked_here=8 blocks_checked_here=1 unjudged_blocks=0 red=0 violations_in_the_library=0 states_reused=2 exhaustive=true expand_up_to=$expand ignored_points=0 states_skipped_by_ignore=0" ;;
   two-flows-unjudged) # 两条流各一趟、各留了块：a 判 4 复用 0 留 2 块、b 判 7 复用 1 留 1 块：这一项现判 11、复用 1、留 3 块没判，本次未跑
@@ -1023,7 +1004,7 @@ STUB
   # 假 cargo（自证用）：入口自己不起 cargo，只有指定范围的崩溃域上限起读库程序 crash_library_reader 的 items 子命令（lib_crash_point_replay_items.py 的 scoped-domain）时才起。
   #   照命令行上 --item 的次序每组按 STUB_ITEM_RECORDED、STUB_ITEM_TO_JUDGE、STUB_ITEM_REUSABLE 答一行块账（不给是录下的块全部可复用），items 之后的参数整串记进 STUB_ITEM_CALLS；
   #   只问版本的答版本；别的一律退 99。
-  #   不写 rocksdb-prebuilt.py 认的假 cargo 标记：第 48 格要它照常判（PATH 最前面放它，后面所有格起的入口、读库程序都找得到它）
+  #   不写 rocksdb-prebuilt.py 认的假 cargo 标记：第 46 格要它照常判（PATH 最前面放它，后面所有格起的入口、读库程序都找得到它）
   mkdir -p "$work/bin"
   cat >"$work/bin/cargo" <<'STUB'
 #!/usr/bin/env bash
@@ -1321,40 +1302,9 @@ STUB
     selftest_cell_failed "照常跑完应当退 0、有项红退 1，两趟都不清场（照常那一趟退 $not_restored_exit、有项红那一趟退 $exit_code，调用次序「$not_restored_calls」，GPU_QUIESCE 行 $(grep -c '^GPU_QUIESCE ' "$errors") 行）" \
       "看主循环收尾的退出码：清场归 GPU 批处理验证服务，这里不经 gpu-quiesce-run.sh"
   fi
-  # 第 29 格：分项驱动排派活计划那一趟借不到显存、一项都没跑到（CRASH_AMPLIFICATION_NOT_RUN 行、退 77、0 行 CRASH_AMPLIFICATION）：
-  #   两项里这一项 exit=77 verdict=not-run、不红，逐项报本次未跑（标准错误与 GATE_NOT_RUN_FILE 各一笔，原因带那一行的 reason=），整趟退 0、成功句点名它；
-  #   只点名这一项时一项都没判完，整趟退 77
+  # 本次未跑那几格（第 42 格与第 52 格）共用的：GATE_NOT_RUN_FILE 指的文件、只点名这一项时整趟的退出码
   local not_run_file="$work/gate-not-run" only_not_run_exit
-  cells=$((cells + 1)); : > "$not_run_file"
-  output="$(GATE_NOT_RUN_FILE="$not_run_file" STUB_SHAPE_crash_enumeration_tree_split_streams=placement-not-run \
-    entry --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
-  STUB_SHAPE=placement-not-run entry --item tree-split-streams >/dev/null 2>&1; only_not_run_exit=$?
-  if [[ "$exit_code" != 0 || "$only_not_run_exit" != 77 ]] \
-     || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=77 states=0 .* lines=0 .* verdict=not-run ' <<<"$output" \
-     || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 .* verdict=green ' <<<"$output" \
-     || ! grep -q 'CRASH_AMPLIFICATION_TOTAL dispatched=2 items=2 failed=0 not_run=1 ' <<<"$output" \
-     || ! grep -q '本次未跑（这不是通过）：崩溃放量分项 tree-split-streams：分项驱动退 77（一项都没跑到），报本次未跑（CRASH_AMPLIFICATION_NOT_RUN step=placement）：借不到显存，这一项没判成（等了 1800 秒' "$errors" \
-     || ! grep -q '^崩溃放量分项 tree-split-streams：分项驱动退 77（一项都没跑到）' "$not_run_file" \
-     || ! grep -q '本次未跑 1 项：tree-split-streams（分项驱动退 77' <<<"$output"; then
-    selftest_cell_failed "分项驱动退 77 没记进本次未跑：没逐项报、被判了红、原因里没有那一行的 reason=、成功句没点名，或只点名这一项时没退 77（两项那一趟退 $exit_code、只点名这一项退 $only_not_run_exit）：$output" \
-      "看主循环里 item_exit_not_run 与 item_driver_not_run 那几处：驱动退 77 不按「驱动退非 0」判红、记 not-run，原因取 CRASH_AMPLIFICATION_NOT_RUN 行的 step= 与 reason="
-  fi
-  # 第 30 格：一条用例几条流，有的借不到显存（分项驱动退 0，打一行判完的 CRASH_AMPLIFICATION 与一行 flow=2/3 的 CRASH_AMPLIFICATION_NOT_RUN）：
-  #   这一项 verdict=not-run、不红也不算通过，原因写 1 条流没判；两项那一趟退 0、成功句点名它；只点名这一项时没有一项判完，整趟退 77
-  cells=$((cells + 1)); : > "$not_run_file"
-  output="$(GATE_NOT_RUN_FILE="$not_run_file" STUB_SHAPE_crash_enumeration_tree_split_streams=partial-not-run \
-    entry --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
-  STUB_SHAPE=partial-not-run entry --item tree-split-streams >/dev/null 2>&1; only_not_run_exit=$?
-  if [[ "$exit_code" != 0 || "$only_not_run_exit" != 77 ]] \
-     || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=0 states=7 .* lines=1 .* verdict=not-run ' <<<"$output" \
-     || ! grep -q 'CRASH_AMPLIFICATION_TOTAL dispatched=2 items=2 failed=0 not_run=1 ' <<<"$output" \
-     || ! grep -q '本次未跑（这不是通过）：崩溃放量分项 tree-split-streams：分项驱动报 1 条流本次未跑（CRASH_AMPLIFICATION_NOT_RUN）：借不到显存没判，借到的照判了（等了 1800 秒' "$errors" \
-     || ! grep -q '^崩溃放量分项 tree-split-streams：分项驱动报 1 条流本次未跑' "$not_run_file" \
-     || ! grep -q '本次未跑 1 项：tree-split-streams（分项驱动报 1 条流本次未跑' <<<"$output"; then
-    selftest_cell_failed "几条流里有的没借到显存，这一项却记了通过：没记 not-run、没逐项报、成功句没点名，或只点名这一项时没退 77（两项那一趟退 $exit_code、只点名这一项退 $only_not_run_exit）：$output" \
-      "看主循环里 item_driver_not_run_lines：驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN 行，这一项记 not-run，原因写几条流没判"
-  fi
-  # 第 31 格：不带参数（scope=whole），只有 multi-record-publish 的驱动行报 exhaustive=false（flow=stub）：
+  # 第 29 格：不带参数（scope=whole），只有 multi-record-publish 的驱动行报 exhaustive=false（flow=stub）：
   #   红在这一项（ITEM 行 exhaustive=false verdict=red，✗ 点名它与不穷举的流、出路写「按段登记（.claude/gate.d/crash-point-replay-segments.tsv）或加深展开」，重跑命令只点名它），
   #   别的每一项 verdict=green、✗ 里不点名；TOTAL 报派出、收回都是登记的项数、failed=1、scope=whole，整趟退 1、不打成功句
   local not_exhaustive_greens
@@ -1373,7 +1323,7 @@ STUB
     selftest_cell_failed "不带参数时一项不穷举，没有红在那一项：那一项没记红、别的项被连带判红、整趟没退 1、✗ 没点名不穷举的流或没给出路（退 $exit_code，绿项 $not_exhaustive_greens 个）：$output" \
       "看主循环里不穷举那一条：有一行不是 exhaustive=true 又没按段登记就记这一项红，理由点名 item_not_exhaustive_flows、出路写按段登记或加深展开"
   fi
-  # 第 32 格：不带参数的全量里一项的一行 exhaustive=false registered_segments=3:300 unregistered_segments_beyond_expansion=-（只因登记的段不穷举，flow=stub），
+  # 第 30 格：不带参数的全量里一项的一行 exhaustive=false registered_segments=3:300 unregistered_segments_beyond_expansion=-（只因登记的段不穷举，flow=stub），
   #   同一项另一条流穷举：这一项不红（ITEM 行照实写 exhaustive=false、verdict=green、registered_segments=stub@3:300、unregistered_segments_beyond_expansion=-），
   #   别的项 registered_segments=- unregistered_segments_beyond_expansion=unknown（假驱动那几种行没报这个字段），整趟退 0、成功句说全量，
   #   末尾报「按段登记 1 段（1 项…）：position-addressed-trees 流 stub 段 3（300 写）」与「展开上限盖不住又没登记的段：0 段（另有 7 项取不出：…）」
@@ -1390,7 +1340,7 @@ STUB
     selftest_cell_failed "一行 exhaustive=false 只因登记的段（registered_segments=3:300），这一项却判了红、或 ITEM 行与成功句没报段号与写数（退 $exit_code，别的项绿 $registered_greens 个）：$output" \
       "看 summarize_the_item 里 registered_segments 那一段（exhaustive=false 而登了段的行不算不穷举、段按流记下）与成功句的 registered_part"
   fi
-  # 第 33 格：点名一项：stub 那条流登了第 3 段（exhaustive=false），other 那条也不穷举而 registered_segments=-：
+  # 第 31 格：点名一项：stub 那条流登了第 3 段（exhaustive=false），other 那条也不穷举而 registered_segments=-：
   #   这一项照旧红在 other（✗ 只点名 other，出路写按段登记或加深展开），ITEM 行照样报 stub 登的段，整趟退 1、不打成功句
   cells=$((cells + 1))
   output="$(STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-and-unregistered entry --item position-addressed-trees 2>"$errors")"; exit_code=$?
@@ -1402,7 +1352,7 @@ STUB
     selftest_cell_failed "一行 exhaustive=false registered_segments=- 没照旧判红在那一条流：没记红、把没登段的流也放过了、或 ✗ 点名了登了段的流（退 $exit_code）：$output" \
       "看 summarize_the_item：只有 exhaustive=false 而本行 registered_segments= 是 <段号>:<写数>[,…] 的行才不算不穷举，- 与没报的照算，按行判、不按项判"
   fi
-  # 第 34 格：每一趟分项驱动都收到按段登记文件的绝对路径（SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv，
+  # 第 32 格：每一趟分项驱动都收到按段登记文件的绝对路径（SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv，
   #   假驱动记进调用记录），标准错误点名送了哪一份
   local registry_calls
   cells=$((cells + 1)); : > "$log"
@@ -1413,7 +1363,7 @@ STUB
     selftest_cell_failed "分项驱动没收到按段登记文件的绝对路径（退 $exit_code，2 趟里收到 $registry_calls 趟；调用记录 $(tr '\n' '|' <"$log")）" \
       "看选分项之后「按段登记」那一段：核过之后 export SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<被判仓根>/.claude/gate.d/crash-point-replay-segments.tsv"
   fi
-  # 第 35 格：按段登记文件写坏一行（摘要写成大写十六进制，lib_crash_point_replay_items.py 的 segment_problems 认的一种坏法）：整趟退 2、不清场、不起驱动，
+  # 第 33 格：按段登记文件写坏一行（摘要写成大写十六进制，lib_crash_point_replay_items.py 的 segment_problems 认的一种坏法）：整趟退 2、不清场、不起驱动，
   #   标准错误逐处列出（那一处的原话）并点名那份文件
   cells=$((cells + 1)); : > "$log"; : > "$QUIESCE_LOG"
   cp -- "$segments_registry" "$work/segments-saved.tsv"
@@ -1425,7 +1375,7 @@ STUB
     selftest_cell_failed "按段登记文件写坏了却没整趟拒跑（退 $exit_code，驱动调用 $(wc -l <"$log") 次，清场记录 $(wc -l <"$QUIESCE_LOG") 笔）" \
       "看选分项之后「按段登记」那一段：开跑前调 lib_crash_point_replay_items.py segments <被判仓根>，核不过打它逐处列的问题、退 2，在清场之前"
   fi
-  # 第 36 格：stub 那条流登了第 0 段（322 写），驱动行报 unregistered_segments_beyond_expansion=1:290（第 1 段没登、展开上限盖不住）：
+  # 第 34 格：stub 那条流登了第 0 段（322 写），驱动行报 unregistered_segments_beyond_expansion=1:290（第 1 段没登、展开上限盖不住）：
   #   点名这一项：红在这一项，✗ 点名流 stub 与 1:290、出路写按段登记或加深展开，ITEM 行报 registered_segments=stub@0:322
   #   unregistered_segments_beyond_expansion=stub@1:290，整趟退 1、不打成功句
   cells=$((cells + 1))
@@ -1438,7 +1388,7 @@ STUB
     selftest_cell_failed "登了段的流里另有展开上限盖不住又没登记的段，没判红在那条流与那几段：没记红、✗ 没点名流与段号写数、没给出路（退 $exit_code）：$output" \
       "看 summarize_the_item 里 unregistered_segments_beyond_expansion 那一段（登了段的行这个字段不是 - 就记下那几段）与主循环里 item_beyond_lines 那一条红因、成功句的 beyond_part"
   fi
-  # 第 37 格：旧引擎打的行：stub 那条登了第 3 段、exhaustive=false，没报 unregistered_segments_beyond_expansion=：点名这一项：
+  # 第 35 格：旧引擎打的行：stub 那条登了第 3 段、exhaustive=false，没报 unregistered_segments_beyond_expansion=：点名这一项：
   #   照不穷举红在这一项，✗ 点名流 stub，出路写「引擎没报 unregistered_segments_beyond_expansion=，重编引擎」，ITEM 行这个字段写 unknown，整趟退 1
   cells=$((cells + 1))
   output="$(STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-old-engine entry --item position-addressed-trees 2>"$errors")"; exit_code=$?
@@ -1451,7 +1401,7 @@ STUB
     selftest_cell_failed "登了段的行没报 unregistered_segments_beyond_expansion=，没照不穷举判红、出路不是重编引擎（退 $exit_code）：$output" \
       "看 summarize_the_item：登了段、exhaustive=false 的行没报这个字段（或写得认不得）记进没报的行数与流名，主循环里 item_beyond_missing_lines 那一条红因与「重编引擎」那一句出路"
   fi
-  # 第 38–41 格：登记段装不进 u64 时的分片枚举（文件头「按段登记」），都用假驱动形态 registered-tail，stub 那条流登记段的几个字段由 STUB_REGISTERED_TAIL 给
+  # 第 36–39 格：登记段装不进 u64 时的分片枚举（文件头「按段登记」），都用假驱动形态 registered-tail，stub 那条流登记段的几个字段由 STUB_REGISTERED_TAIL 给
   # 总态数：3^290-1 的十进制（139 位）与一个 141 位的十进制串，都超过 u64（引擎的态数是 768 位宽整数，驱动行照十进制数字串报）
   local slice_total=2318269218083089908234280468459894595445540070540355238386428052606631732586480323016481331702297098820479338186895528168360391078014797448
   local slice_total_141=100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000515377520732011331036461129765621272702107522001
@@ -1463,7 +1413,7 @@ STUB
     local tail="$1"; shift
     STUB_SHAPE_crash_enumeration_position_addressed_trees=registered-tail STUB_REGISTERED_TAIL="$tail" entry "$@"
   }
-  # 第 38 格：stub 那条流登了第 0 段（322 写，域全展开）与第 1 段（290 写，域分片：这一趟为止已判 4294967296 态、域共 3^290-1 态，照十进制 139 位报），别的段都盖得住：
+  # 第 36 格：stub 那条流登了第 0 段（322 写，域全展开）与第 1 段（290 写，域分片：这一趟为止已判 4294967296 态、域共 3^290-1 态，照十进制 139 位报），别的段都盖得住：
   #   点名这一项，不红、退 0；ITEM 行带两个字段（registered_segment_domains=stub@0:full,stub@1:slice
   #   registered_segment_progress=stub@1:4294967296/<那 139 位>）；成功句报「段 0：全展开」「段 1：分片，已判 4294967296/<那 139 位>」。
   #   第二趟换总态数的另两种长度（装得进 u64 的 18446744073709551615、141 位的十进制串）：照样不红，ITEM 行与成功句照原样报
@@ -1485,7 +1435,7 @@ STUB
     selftest_cell_failed "登记段分片枚举（全展开一段、分片一段，总态数是超过 u64 的十进制串）判了红、或 ITEM 行没带 registered_segment_domains= / registered_segment_progress=、或成功句没报全展开与分片已判几态（退 $exit_code，另两种写法那一趟退 $slice_forms_exit）：$output｜$slice_forms_output" \
       "看 summarize_the_item 的 domains_problem_of_the_line（两个字段的写法、进度的两个数只认十进制数字串）与主循环里 domains_of_the_item_for_the_success_line、成功句的 domain_part"
   fi
-  # 第 39 格：分片段的进度是 1:0/<那 139 位>，stub 那条这一趟现判 0 态、复用 0 态（一个态都没判，也没复用）：点名这一项，红在这一项，
+  # 第 37 格：分片段的进度是 1:0/<那 139 位>，stub 那条这一趟现判 0 态、复用 0 态（一个态都没判，也没复用）：点名这一项，红在这一项，
   #   ✗ 点名流 stub 与段 1，出路写「这一趟一个态都没判，看录入段与判段的日志」，整趟退 1、不打成功句
   cells=$((cells + 1))
   slice_tail="registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice registered_segment_progress=1:0/$slice_total"
@@ -1499,7 +1449,7 @@ STUB
     selftest_cell_failed "分片段这一趟已判 0 态却没判红在那条流与那一段、或出路不是看录入段与判段的日志（退 $exit_code）：$output" \
       "看 summarize_the_item 里分片进度那一段（已判是 0 的段记进 zero）与主循环里 item_zero_lines 那一条红因（不看展开深度）、slice_zero_failed_names 那一句出路"
   fi
-  # 第 40 格：登了段的行，两个字段没报全或写法认不得（四趟：两个都缺，即分片之前的引擎；只缺 registered_segment_progress=；域写成 1:partial；
+  # 第 38 格：登了段的行，两个字段没报全或写法认不得（四趟：两个都缺，即分片之前的引擎；只缺 registered_segment_progress=；域写成 1:partial；
   #   总态数写成幂的形态 3^290-1，不是十进制数字串）：
   #   每一趟都红在这一项，✗ 点名流 stub，出路写「引擎没报 registered_segment_domains= / registered_segment_progress=，重编引擎」，ITEM 行两个字段写 unknown，整趟退 1
   cells=$((cells + 1)); slice_wrong=""; slice_run=0
@@ -1521,8 +1471,8 @@ STUB
     selftest_cell_failed "登了段的行 registered_segment_domains= / registered_segment_progress= 缺了或写法认不得，没判红在那条流、出路不是重编引擎：$slice_wrong" \
       "看 summarize_the_item 的 domains_problem_of_the_line：两个字段都要报、写法认得（返回 1 的那几种），记进 domain_bad 的行数与流名；主循环里 item_domain_bad_lines 那一条红因与 domain_field_missing_failed_names 那一句出路"
   fi
-  # 第 41 格：登了第 0、1 段，registered_segment_domains= 漏了段 1（0:full），或段 1 是分片而 registered_segment_progress= 没列它（-）：
-  #   两趟都红在这一项，✗ 与出路同第 40 格，ITEM 行两个字段写 unknown，整趟退 1
+  # 第 39 格：登了第 0、1 段，registered_segment_domains= 漏了段 1（0:full），或段 1 是分片而 registered_segment_progress= 没列它（-）：
+  #   两趟都红在这一项，✗ 与出路同第 38 格，ITEM 行两个字段写 unknown，整趟退 1
   cells=$((cells + 1)); slice_wrong=""; slice_run=0
   for slice_tail in 'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full registered_segment_progress=-' \
                     'registered_segments=0:322,1:290 unregistered_segments_beyond_expansion=- registered_segment_domains=0:full,1:slice registered_segment_progress=-'; do
@@ -1539,7 +1489,7 @@ STUB
     selftest_cell_failed "registered_segment_domains= 漏了登记的段、或分片段没在 registered_segment_progress= 里，没判红：$slice_wrong" \
       "看 summarize_the_item 的 domains_problem_of_the_line：registered_segments= 列的每一段都要在域里、域里每个分片段都要在进度里（返回 2 的那两种）"
   fi
-  # 第 42 格：按登记不判的 ignored_points= / states_skipped_by_ignore= 按流分组、每组只取一次（文件头「按登记整批不判」），点名 tree-split-streams 一项，三趟：
+  # 第 40 格：按登记不判的 ignored_points= / states_skipped_by_ignore= 按流分组、每组只取一次（文件头「按登记整批不判」），点名 tree-split-streams 一项，三趟：
   #   两条流各一份（1/10 与 2/20，a 流两行同报一份）→ 3 个点、30 态；两行都不带 flow=（归一组，各报 2/50）→ 2 个点、50 态。
   #   每趟 ITEM 行与 TOTAL 行钉绝对值，退 0、成功句报同样的数。末一趟同流两行报的不同（a 流 1/10 与 1/11，b 流 2/20）：ITEM 两个数写 unknown、
   #   TOTAL 的 ignore_unknown=1 且不加这一项，标准错误与成功句点名 a 流，退 0（不红）
@@ -1571,7 +1521,7 @@ STUB
     selftest_cell_failed "按登记不判的点数与态数没按流分组、每组只取一次：同流各行重复计、不同的流没各取一次相加、没带 flow= 的行没归一组，或同流各行报的不同却没记 unknown 并点名那条流（共 $ignore_run 趟）：$ignore_wrong" \
       "看 summarize_the_item 里 ignored_points / states_skipped_by_ignore 那一段：按 flow= 分组（没有的归一组），组里数相同取那一份、不同记 ignore_conflict 并让两个数写 unknown，各组相加；主循环 item_ignore_conflict_flows 那几处点名流"
   fi
-  # 第 43 格：全部复用的一趟（文件头「按段登记」）：stub 那条流这一趟现判 0 态、0 块，复用 7 态，分片段的进度是 1:0/<那 139 位>：
+  # 第 41 格：全部复用的一趟（文件头「按段登记」）：stub 那条流这一趟现判 0 态、0 块，复用 7 态，分片段的进度是 1:0/<那 139 位>：
   #   分片段已判 0 态只在现判与复用都是 0 时红，这一趟不红：点名这一项，ITEM 行 states=3（只有 other 那条现判）
   #   reused=7 verdict=green，标准错误里没有「分片段已判 0 态」，整趟退 0、打成功句
   cells=$((cells + 1))
@@ -1583,7 +1533,7 @@ STUB
     selftest_cell_failed "全部复用的一趟（stub 那条现判 0、复用 7，分片段进度 1:0/…）判了红、或 ITEM 行没照实写现判 3 复用 7（退 $exit_code）：$output" \
       "看 summarize_the_item 里 line_idle 那一句：分片段已判 0 态只在这一行 states_checked_here= 与 states_reused= 都不是正整数时记进 zero"
   fi
-  # 第 44 格：分项驱动退 0、打了一行 CRASH_AMPLIFICATION_NOT_RUN step=judge（不带 gpu 特性的二进制遇到多机配置 ENABLE_GPU=1：判段这一趟不跑、录入段照录）、
+  # 第 42 格：分项驱动退 0、打了一行 CRASH_AMPLIFICATION_NOT_RUN step=judge（不带 gpu 特性的二进制遇到多机配置 ENABLE_GPU=1：判段这一趟不跑、录入段照录）、
   #   没有 CRASH_AMPLIFICATION 行：两项里这一项 exit=0 lines=0 verdict=not-run、不红（不按「驱动退 0 却 0 行」判红），原因写 1 条流判段没跑与那一行的 reason=，
   #   标准错误与 GATE_NOT_RUN_FILE 各一笔，整趟退 0、成功句写「本次未跑 1 项」；只点名这一项时一项都没判完，整趟退 77
   cells=$((cells + 1)); : > "$not_run_file"
@@ -1599,7 +1549,7 @@ STUB
     selftest_cell_failed "分项驱动报判段没跑（CRASH_AMPLIFICATION_NOT_RUN step=judge）的那一项没记本次未跑：判了红、没逐项报、原因没写判段没跑与那一行的 reason=、成功句没点名，或只点名这一项时没退 77（两项那一趟退 $exit_code、只点名这一项退 $only_not_run_exit）：$output" \
       "看主循环里 item_judge_not_run_lines：驱动退 0 而打了 CRASH_AMPLIFICATION_NOT_RUN step=judge 行，这一项记 not-run，原因写几条流判段没跑"
   fi
-  # 第 45 格：复用三问（scripts/gate/lib_reuse_checks.py 文件头「一」）：假驱动 library 形态照 $STUB_UNITS/<测试目标> 的内容摘要按键记判过没有，
+  # 第 43 格：复用三问（scripts/gate/lib_reuse_checks.py 文件头「一」）：假驱动 library 形态照 $STUB_UNITS/<测试目标> 的内容摘要按键记判过没有，
   #   点名三项各跑四趟：头一趟、同一份输入、加一份哪个测试目标都不读的单元文件（闭包外）、改 fixed-script-through-rollback 那个测试目标的单元文件（闭包内）；
   #   每一趟从 ITEM 行取这一项复用还是现判（states=0 而 reused 是正整数是复用），照三问判、打规范输出。入口自己不判复用（判定在引擎里）：
   #   这一格核的是它每一趟都不清掉服务里判过的（入口不碰判定库）、不因闭包外的改动重判，并照实把驱动报的现判与复用写进 ITEM 行
@@ -1622,7 +1572,7 @@ STUB
     selftest_cell_failed "复用三问没过：$(tr '\n' ' ' <"$work/three.log")" "照规范输出那一行 red 的那一问查：ITEM 行的 states=、reused= 取法（文件头「复用数怎么取」），与入口有没有清掉驱动判过的东西"
   fi
   grep '^REUSE_SELFTEST ' "$work/three.log"
-  # 第 46 格：上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」）：点名 multi-record-publish 红一趟，清单是它；再点名 fixed-script-through-unmount 绿一趟，清单照留它；
+  # 第 44 格：上次红的清单（scripts/gate/lib_reuse_checks.py 文件头「三」）：点名 multi-record-publish 红一趟，清单是它；再点名 fixed-script-through-unmount 绿一趟，清单照留它；
   #   再点名 multi-record-publish 绿一趟，清单成空文件（这两项都没登段，按段登记那几个开关碰不到它们）
   cells=$((cells + 1))
   local last_run_file="$work/last-runs/scripts__crash__crash-amplification.sh.tsv" last_red last_kept last_cleared
@@ -1634,11 +1584,11 @@ STUB
     selftest_cell_failed "上次红的清单不对：红一趟之后「$last_red」、点名别的项绿一趟之后「$last_kept」、那一项绿了之后「$last_cleared」" \
       "看主循环收尾写 last-run 那一段：红的分项一行一个，点名了分项的只换跑到的那几项（scripts/gate/lib_reuse_checks.py last-run --ran）"
   fi
-  # 第 47 格：每一项的输出出两份日志（scripts/hosts/two-logs.sh）：全量 <分项>.log，旁边同名的 <分项>.problems.log 带行号收「本次未跑」那一行、末行写收了几行全量几行；
-  #   输出点名这份日志的路径。假驱动退 77 并在 stderr 打「! 本次未跑」那一行（placement-not-run 形态）
+  # 第 45 格：每一项的输出出两份日志（scripts/hosts/two-logs.sh）：全量 <分项>.log，旁边同名的 <分项>.problems.log 带行号收「本次未跑」那一行、末行写收了几行全量几行；
+  #   输出点名这份日志的路径。假驱动退 77 并在 stderr 打「! 本次未跑」那一行（source-changed-not-run 形态）
   cells=$((cells + 1))
   local two_logs_output two_logs_directory two_logs_problems two_logs_last_line
-  two_logs_output="$(STUB_SHAPE=placement-not-run entry --item tree-split-streams 2>&1)"
+  two_logs_output="$(STUB_SHAPE=source-changed-not-run entry --item tree-split-streams 2>&1)"
   two_logs_directory="$(ls -td "$work/home/runs"/entry-* 2>/dev/null | head -n 1)"
   two_logs_problems="$two_logs_directory/tree-split-streams.problems.log"
   two_logs_last_line="$(tail -n 1 "$two_logs_problems" 2>/dev/null)"   # 管道收尾的 grep -q 在 pipefail 下会把命中读成没命中：先落到变量
@@ -1647,7 +1597,7 @@ STUB
     selftest_cell_failed "每一项的输出应当出两份日志（tree-split-streams.log 全量；旁边的 tree-split-streams.problems.log 带行号收「本次未跑」那一行、末行写收了几行全量几行、退出码 77），输出里点名错误警告日志的路径 $two_logs_problems；实际目录里有「$(ls "$two_logs_directory" 2>/dev/null | tr '\n' ' ')」" \
       "看主循环里起分项驱动那一段：经 scripts/hosts/two-logs.sh 起，名取 \${item_output_file%.log}"
   fi
-  # 第 48 格：小仓（按段登记的仓根）的 验证包依赖 rocksdb、进程环境里四个取值是空的 ⇒ 清场与起任何一项之前 rocksdb-prebuilt.py entry 判红，退 78，
+  # 第 46 格：小仓（按段登记的仓根）的 验证包依赖 rocksdb、进程环境里四个取值是空的 ⇒ 清场与起任何一项之前 rocksdb-prebuilt.py entry 判红，退 78，
   #   不清场、分项驱动一次都没起（别的格小仓里没有这份清单，entry 报不判）
   cells=$((cells + 1)); : > "$log"; : > "$QUIESCE_LOG"
   mkdir -p "$segments_root/crates/singlefs-verification"
@@ -1659,8 +1609,8 @@ STUB
       "看按段登记之后 rocksdb-prebuilt.py entry 那一段"
   fi
   rm -rf -- "${segments_root:?}/crates"
-  # 第 49–51 格：跑完运行目录里不剩它建的编译目录（文件头「编译目录」）：调用方没设 CARGO_TARGET_DIR，点名一项；假驱动记下收到的编译目录、往里写一份产物。
-  #   第 49 格正常退 0、第 50 格驱动退 1（这一项红、整趟退 1）、第 51 格被 TERM 停（驱动睡 3 秒时只给入口发 TERM，入口等驱动退出后走 EXIT，退 143）：
+  # 第 47–49 格：跑完运行目录里不剩它建的编译目录（文件头「编译目录」）：调用方没设 CARGO_TARGET_DIR，点名一项；假驱动记下收到的编译目录、往里写一份产物。
+  #   第 47 格正常退 0、第 48 格驱动退 1（这一项红、整趟退 1）、第 49 格被 TERM 停（驱动睡 3 秒时只给入口发 TERM，入口等驱动退出后走 EXIT，退 143）：
   #   收到的编译目录在 $SINGLEFS_CRASH_AMPLIFICATION_HOME/runs/entry-*/target，跑完不在了
   # 逐格点名：被 TERM 停的那一格只给自己起的入口那一趟发一次，三格逐条调用、不在循环里发信号
   selftest_target_case() { # <格号:要的退出码>
@@ -1691,33 +1641,38 @@ STUB
   selftest_target_case 51:0
   selftest_target_case 52:1
   selftest_target_case 53:143
-  # 第 52 格：调用方设了 CARGO_TARGET_DIR：驱动照收到它、跑完不删
+  # 第 50 格：调用方设了 CARGO_TARGET_DIR：驱动照收到它、跑完不删
   cells=$((cells + 1)); : > "$log"; : > "$work/targets.log"; mkdir -p "$work/caller-target"
   CARGO_TARGET_DIR="$work/caller-target" STUB_TARGET_LOG="$work/targets.log" entry --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
   if [[ "$exit_code" != 0 || "$(head -n 1 "$work/targets.log" 2>/dev/null)" != "$work/caller-target" || ! -f "$work/caller-target/release/artifact" ]]; then
     selftest_cell_failed "调用方设了 CARGO_TARGET_DIR 时驱动应当照收到它、跑完不删（退 $exit_code，驱动收到「$(head -n 1 "$work/targets.log" 2>/dev/null)」）" \
       "看 run_build_directory_begin：设了 CARGO_TARGET_DIR 就不建、不删"
   fi
-  # 第 53 格：自证只在临时 prune-server 上跑（文件头「用法」--selftest）：摘掉临时服务的标记再起一份自证 ⇒ 退 2、说自证没跑，一格都不跑
+  # 第 51 格：自证只在临时 prune-server 上跑（文件头「用法」--selftest）：摘掉临时服务的标记再起一份自证 ⇒ 退 2、说自证没跑，一格都不跑
   cells=$((cells + 1))
   env -u PRUNE_SERVER_TEMPORARY_SERVICE_SOCKET bash "$0" --selftest >"$work/bare-selftest.out" 2>&1; exit_code=$?
   if [[ "$exit_code" != 2 ]] || ! grep -q "crash-amplification.sh 自证没跑：" "$work/bare-selftest.out" || grep -q "✗ 自证第" "$work/bare-selftest.out"; then
     selftest_cell_failed "不在临时 prune-server 底下起的自证应当退 2、说自证没跑、一格都不跑（退 $exit_code，输出 $(head -n 2 "$work/bare-selftest.out" | tr "\n" "|")）" \
       "看 run_selftest 开头调共用库 crash_amplification_selftest_service_problem 那一段"
   fi
-  # 第 54 格：分项驱动退 77、打的 CRASH_AMPLIFICATION_NOT_RUN 是 step=judge … reason=跑的过程中源码变了（不是排计划那一趟借不到显存）：
-  #   两项里这一项 exit=77 verdict=not-run，原因照那一行的 step= 与 reason= 写「…step=judge）：这一项没判成（跑的过程中源码变了…」，整趟标准错误里不出现借不到显存
+  # 第 52 格：分项驱动退 77、打的 CRASH_AMPLIFICATION_NOT_RUN 是 step=judge … reason=跑的过程中源码变了、0 行 CRASH_AMPLIFICATION：
+  #   两项里这一项 exit=77 verdict=not-run、不红，逐项报本次未跑（标准错误与 GATE_NOT_RUN_FILE 各一笔），原因照那一行的 step= 与 reason= 写「…step=judge）：这一项没判成（跑的过程中源码变了…」，
+  #   整趟退 0、成功句点名它；只点名这一项时一项都没判完，整趟退 77
   cells=$((cells + 1)); : > "$not_run_file"
   output="$(GATE_NOT_RUN_FILE="$not_run_file" STUB_SHAPE_crash_enumeration_tree_split_streams=source-changed-not-run \
     entry --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
-  if [[ "$exit_code" != 0 ]] \
-     || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=77 states=0 .* verdict=not-run ' <<<"$output" \
+  STUB_SHAPE=source-changed-not-run entry --item tree-split-streams >/dev/null 2>&1; only_not_run_exit=$?
+  if [[ "$exit_code" != 0 || "$only_not_run_exit" != 77 ]] \
+     || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=tree-split-streams exit=77 states=0 .* lines=0 .* verdict=not-run ' <<<"$output" \
+     || ! grep -q '^CRASH_AMPLIFICATION_ITEM item=fixed-script-through-rollback exit=0 .* verdict=green ' <<<"$output" \
+     || ! grep -q 'CRASH_AMPLIFICATION_TOTAL dispatched=2 items=2 failed=0 not_run=1 ' <<<"$output" \
      || ! grep -q '本次未跑（这不是通过）：崩溃放量分项 tree-split-streams：分项驱动退 77（一项都没跑到），报本次未跑（CRASH_AMPLIFICATION_NOT_RUN step=judge）：这一项没判成（跑的过程中源码变了' "$errors" \
-     || grep -q '借不到显存' "$errors"; then
-    selftest_cell_failed "分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了，原因不该写借不到显存：这一项没记本次未跑、原因没照 step= 与 reason= 写，或标准错误里写了借不到显存（退 $exit_code）：$output" \
-      "看主循环里 item_driver_not_run_cause：只有 step=placement 才写借不到显存，别的 step 照那一行的 reason= 写"
+     || ! grep -q '^崩溃放量分项 tree-split-streams：分项驱动退 77（一项都没跑到）' "$not_run_file" \
+     || ! grep -q '本次未跑 1 项：tree-split-streams（分项驱动退 77' <<<"$output"; then
+    selftest_cell_failed "分项驱动退 77 而 NOT_RUN 行写的是跑的过程中源码变了：这一项没记本次未跑、没逐项报、被判了红、原因没照 step= 与 reason= 写、成功句没点名，或只点名这一项时没退 77（两项那一趟退 $exit_code、只点名这一项退 $only_not_run_exit）：$output" \
+      "看主循环里 item_exit_not_run 与 item_driver_not_run 那几处：驱动退 77 不按「驱动退非 0」判红、记 not-run，原因取 CRASH_AMPLIFICATION_NOT_RUN 行的 step= 与 reason="
   fi
-  # 第 55–57 格：经 task-server 按项分片（文件头「经 task-server 按项分片」）：计划一项一片、不起驱动；一片只跑它那一项、存下输出与退出码、判红也退 0；
+  # 第 53–55 格：经 task-server 按项分片（文件头「经 task-server 按项分片」）：计划一项一片、不起驱动；一片只跑它那一项、存下输出与退出码、判红也退 0；
   #   合并照存下的输出重放、不起驱动，ITEM 行与退出码同不分片
   local shard_root="$work/shards" shard_target shard_driver_lines
   rm -rf -- "${shard_root:?}"; mkdir -p -- "$shard_root"
@@ -1750,7 +1705,7 @@ STUB
     selftest_cell_failed "按项分片的合并应当照各片存下的输出重放、不起驱动，两项的 ITEM 行与整趟退 1 同不分片（退 $exit_code，驱动被起 $(grep -c '^driver ' "$log") 次）：$output" \
       "看主循环里 shard_phase == merge 时的 item_command 与主流程 merge 分支读产物表那一段"
   fi
-  # 第 58 格：--no-shard 不是这一份的选项（经服务交的一律按项分片）：计划那一步照认不得的参数退 2，不写计划、不起驱动
+  # 第 56 格：--no-shard 不是这一份的选项（经服务交的一律按项分片）：计划那一步照认不得的参数退 2，不写计划、不起驱动
   cells=$((cells + 1)); : > "$log"
   rm -rf -- "${shard_root:?}"; mkdir -p -- "$shard_root"
   output="$(TASK_SERVER_SHARD_PHASE=plan TASK_SERVER_SHARD_PLAN_DIRECTORY="$shard_root/plan" entry --no-shard --item fixed-script-through-rollback --item tree-split-streams 2>"$errors")"; exit_code=$?
@@ -1758,7 +1713,7 @@ STUB
     selftest_cell_failed "--no-shard 不是这一份的选项，应当用法错退 2、不写计划、不起驱动（退 $exit_code，驱动被起 $(grep -c '^driver ' "$log") 次，计划 $([[ -e "$shard_root/plan/plan.json" ]] && echo 写了 || echo 没写)）：$output $(tail -n 2 "$errors" | tr '\n' ' ')" \
       "看参数那一段：认不得的参数一律 usage 退 2"
   fi
-  # 第 59 格：缩域（文件头「展开深度」）：给了 --crash-expand-up-to 6 ⇒ 每一项的分项驱动都收到 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6，TOTAL 行接 expand_up_to=6，
+  # 第 57 格：缩域（文件头「展开深度」）：给了 --crash-expand-up-to 6 ⇒ 每一项的分项驱动都收到 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6，TOTAL 行接 expand_up_to=6，
   #   成功句写「缩过域、不算门禁通过」与 6、句首不写「全部项」；只在环境里设了 4 ⇒ 当作给了 4；两样都给取参数（6）；都不给 ⇒ 驱动收到的是 unset、TOTAL 行不接、成功句写全部项
   cells=$((cells + 1))
   local expand_wrong="" expand_case expand_want expand_text
@@ -1790,7 +1745,7 @@ STUB
   fi
   [[ -z "$expand_wrong" ]] || selftest_cell_failed "给了 --crash-expand-up-to 6 应当把 SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=6 交给每一项的分项驱动、TOTAL 行接 expand_up_to=6、成功句写缩过域、不算门禁通过（环境里设了的当作给了同一个值，两样都给取参数，都不给什么都不交）：$expand_wrong" \
     "看参数解析之后缩域那一段（核值、export 变量）与收尾的 TOTAL 行、成功句"
-  # 第 60 格：缩域的值写坏退 2、一项都不跑：参数写 abc、-1、空串，参数后面没有值，环境里的变量写 abc 与空串
+  # 第 58 格：缩域的值写坏退 2、一项都不跑：参数写 abc、-1、空串，参数后面没有值，环境里的变量写 abc 与空串
   cells=$((cells + 1)); : > "$log"
   local expand_bad_wrong="" expand_bad_case
   for expand_bad_case in "argument:abc" "argument:-1" "argument:" "bare:" "environment:abc" "environment:"; do
@@ -1803,7 +1758,7 @@ STUB
   done
   [[ -z "$expand_bad_wrong" ]] || selftest_cell_failed "--crash-expand-up-to 的值（或环境里缩域变量的值）不是非负整数时应当退 2、一项都不跑：$expand_bad_wrong" \
     "看参数解析之后缩域那一段：值要匹配 ^[0-9]+\$，不是就交 usage（退 2）"
-  # 第 61–66 格：指定范围的崩溃域上限（文件头 usage 一段「指定范围的崩溃域上限」；估法与记录来源在 lib_crash_point_replay_items.py 文件头「指定范围的崩溃域上限」）。
+  # 第 59–64 格：指定范围的崩溃域上限（文件头 usage 一段「指定范围的崩溃域上限」；估法与记录来源在 lib_crash_point_replay_items.py 文件头「指定范围的崩溃域上限」）。
   #   点名 tree-split-streams。运行记录放这几格自己的运行目录 $scoped_home/runs/entry-scoped-*/<分项>.log（每格先清空，不混进前面各格假驱动留下的记录）；
   #   引擎展开上限常量（读它认哪份记录是全域）写进小仓；假 cargo 的读库程序 items 子命令按 STUB_ITEM_RECORDED、STUB_ITEM_TO_JUDGE、STUB_ITEM_REUSABLE 答块账
   local scoped_home="$work/scoped-home" scoped_wrong
@@ -1816,7 +1771,7 @@ STUB
   scoped_entry() { SINGLEFS_CRASH_AMPLIFICATION_HOME="$scoped_home" entry "$@"; }
   mkdir -p "$segments_root/crates/singlefs-verification/src"
   printf '%s\n' 'pub const EXPAND_UP_TO_WRITES_PER_SEGMENT_OF_THE_AMPLIFICATION: usize = 30;' >"$segments_root/crates/singlefs-verification/src/crash_amplification.rs"
-  # 第 61 格：上一趟不缩域真跑 300000 态（展开深度 30，较新）、更早缩到 6 的那一趟 225 态，库里 4 块键都对不上 ⇒ 估 300000 态，超上限退 79，
+  # 第 59 格：上一趟不缩域真跑 300000 态（展开深度 30，较新）、更早缩到 6 的那一趟 225 态，库里 4 块键都对不上 ⇒ 估 300000 态，超上限退 79，
   #   说明写能压到上限以内的 n（6）与两条出路，一项驱动都没起
   cells=$((cells + 1)); : > "$log"; scoped_wrong=""; rm -rf -- "${scoped_home:?}"
   scoped_record entry-scoped-old tree-split-streams 6 225 2
@@ -1829,7 +1784,7 @@ STUB
   [[ ! -s "$log" ]] || scoped_wrong+="拒了之后不该起分项驱动（调了 $(grep -c . "$log") 次）；"
   [[ -z "$scoped_wrong" ]] || selftest_cell_failed "带 --item、没缩域，估数超过 200000 态应当退 79、说明里写 --crash-expand-up-to 6 与留给提交时那一趟、一项驱动都不起：$scoped_wrong" \
     "看 scoped_domain_guard 与 lib_crash_point_replay_items.py 的 run_scoped_domain、refusal_text"
-  # 第 62 格：同样的记录，库里 4 块键都对得上 ⇒ 现判 0 态，放行，驱动照起
+  # 第 60 格：同样的记录，库里 4 块键都对得上 ⇒ 现判 0 态，放行，驱动照起
   cells=$((cells + 1)); : > "$log"; scoped_wrong=""
   STUB_ITEM_RECORDED=4 STUB_ITEM_TO_JUDGE=0 STUB_ITEM_REUSABLE=4 scoped_entry --item tree-split-streams >"$work/scoped.out" 2>"$errors"; exit_code=$?
   [[ "$exit_code" == 0 ]] || scoped_wrong+="点名项全部可复用应当放行（退 $exit_code）；"
@@ -1837,7 +1792,7 @@ STUB
   [[ "$(grep -c . "$log")" == 1 ]] || scoped_wrong+="放行之后驱动应当照起一次（调了 $(grep -c . "$log") 次）；"
   [[ -z "$scoped_wrong" ]] || selftest_cell_failed "库里录下的块键都对得上，不论上一趟的态数多大都应当放行、现判 0 态：$scoped_wrong" \
     "看 lib_crash_point_replay_items.py 的 estimate_subject：录下的块大于 0 且键对不上的块是 0 就是现判 0 态"
-  # 第 63 格：给了 --crash-expand-up-to 6（小于引擎常量 30）⇒ 缩过域，放行，不起读库程序
+  # 第 61 格：给了 --crash-expand-up-to 6（小于引擎常量 30）⇒ 缩过域，放行，不起读库程序
   cells=$((cells + 1)); : > "$log"; scoped_wrong=""; : > "$work/item-calls"
   STUB_ITEM_RECORDED=4 STUB_ITEM_TO_JUDGE=4 STUB_ITEM_REUSABLE=0 STUB_ITEM_CALLS="$work/item-calls" scoped_entry --item tree-split-streams --crash-expand-up-to 6 >"$work/scoped.out" 2>"$errors"; exit_code=$?
   [[ "$exit_code" == 0 ]] || scoped_wrong+="缩过域应当放行（退 $exit_code）；"
@@ -1845,7 +1800,7 @@ STUB
   [[ ! -s "$work/item-calls" ]] || scoped_wrong+="缩过域不判上限，不该起读库程序（起了：$(tr '\n' '|' <"$work/item-calls" | cut -c1-200)）；"
   [[ -z "$scoped_wrong" ]] || selftest_cell_failed "带了 --crash-expand-up-to 6 应当放行、不读库、不判上限：$scoped_wrong" \
     "看 scoped_domain_guard 交 --expand-up-to 与 run_scoped_domain 开头缩域那一支"
-  # 第 64 格：没有任何运行记录、库里一块都没录 ⇒ 估不出，不放行，退 79
+  # 第 62 格：没有任何运行记录、库里一块都没录 ⇒ 估不出，不放行，退 79
   cells=$((cells + 1)); : > "$log"; scoped_wrong=""; rm -rf -- "${scoped_home:?}"
   STUB_ITEM_RECORDED=0 STUB_ITEM_TO_JUDGE=0 STUB_ITEM_REUSABLE=0 scoped_entry --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
   [[ "$exit_code" == 79 ]] || scoped_wrong+="估不出应当退 79（退 $exit_code）；"
@@ -1854,7 +1809,7 @@ STUB
   [[ ! -s "$log" ]] || scoped_wrong+="拒了之后不该起分项驱动；"
   [[ -z "$scoped_wrong" ]] || selftest_cell_failed "库里没录这一项的块、也没有上一趟的运行记录，应当退 79、说明写算不出与出路、一项驱动都不起：$scoped_wrong" \
     "看 lib_crash_point_replay_items.py 的 estimate_subject 算不出那一支与 refusal_text"
-  # 第 65 格：只剩缩到 6 的那一趟记录（225 态）、库里 4 块键都对不上 ⇒ 缩过域的记录不当全域，估不出，退 79
+  # 第 63 格：只剩缩到 6 的那一趟记录（225 态）、库里 4 块键都对不上 ⇒ 缩过域的记录不当全域，估不出，退 79
   cells=$((cells + 1)); : > "$log"; scoped_wrong=""; rm -rf -- "${scoped_home:?}"
   scoped_record entry-scoped-old tree-split-streams 6 225 2
   STUB_ITEM_RECORDED=4 STUB_ITEM_TO_JUDGE=4 STUB_ITEM_REUSABLE=0 scoped_entry --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
@@ -1862,7 +1817,7 @@ STUB
   grep -qF "没有不缩域那一趟的真跑记录" "$errors" || scoped_wrong+="说明里应当写没有不缩域那一趟的真跑记录；"
   [[ -z "$scoped_wrong" ]] || selftest_cell_failed "缩过域那一趟的态数少，拿来当全域会估小，只有它时应当算不出、退 79：$scoped_wrong" \
     "看 lib_crash_point_replay_items.py 的 full_prior：只认展开深度等于引擎常量的记录"
-  # 第 66 格：崩溃点重放入口起这里时交 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1（它已按合表项判过）⇒ 记录与块账明明会拒，这里也不再判，驱动照起
+  # 第 64 格：崩溃点重放入口起这里时交 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1（它已按合表项判过）⇒ 记录与块账明明会拒，这里也不再判，驱动照起
   cells=$((cells + 1)); : > "$log"; scoped_wrong=""; rm -rf -- "${scoped_home:?}"
   scoped_record entry-scoped-new tree-split-streams 30 300000 1
   SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1 STUB_ITEM_RECORDED=4 STUB_ITEM_TO_JUDGE=4 STUB_ITEM_REUSABLE=0 scoped_entry --item tree-split-streams >/dev/null 2>"$errors"; exit_code=$?
@@ -1871,27 +1826,27 @@ STUB
   [[ -z "$scoped_wrong" ]] || selftest_cell_failed "收到 SINGLEFS_CRASH_SCOPED_DOMAIN_CHECKED=1 就不再判指定范围的上限：$scoped_wrong" \
     "看 scoped_domain_guard 前面那个 if：变量是 1 就不调"
   rm -rf -- "${scoped_home:?}" "${work:?}/item-calls" "${work:?}/scoped.out" "${segments_root:?}/crates"
-  # 第 67 格：不领卡（文件头「卡只归 GPU 批处理验证服务」）。多机配置开了 GPU（写全运行条件要的键、点名这一台的卡）、环境里没有卡，点名头两项，
-  #   假驱动演 GPU 批处理服务不在跑（STUB_GPU_VERIFICATION_SERVER_DOWN=1：往标准错误打起服务的命令、退 78），每回往 STUB_CARD_LOG 记「<测试目标> <段> cards=[…]」
-  #   ⇒ 头一项整趟交驱动（不带 --stage）、驱动收到的卡是 unset，记驱动退 78（verdict=not-run）、停在这一项（第二项不派），整趟退 78，起服务的命令照转出
+  # 第 65 格：不领卡（文件头「卡只归 GPU 批处理验证服务」）。多机配置开了 GPU（写全运行条件要的键、点名这一台的卡）、环境里没有卡，点名头两项，
+  #   假驱动照常跑完（每回往 STUB_CARD_LOG 记「<测试目标> <段> cards=[…]」）
+  #   ⇒ 两项都整趟交驱动（不带 --stage）、驱动收到的卡都是 unset，两项的 ITEM 行都是 exit=0 verdict=green，整趟退 0
   printf '%s\n' "HOSTS=127.0.0.1 2001:db8::65" "CARGO_BIN_DIRECTORY_BY_HOST=127.0.0.1=/selftest/this-cargo 2001:db8::65=/selftest/peer-cargo" \
     "BUILD_ROOT_BY_HOST=127.0.0.1=/selftest/this-builds 2001:db8::65=/selftest/peer-builds" "SLICE_MEMORY_CAP_BY_HOST=127.0.0.1=2G 2001:db8::65=1G" \
     ENABLE_ACROSS_MACHINES=0 ENABLE_GPU=1 QUIESCE_STOP_COMMAND= QUIESCE_STOPPED_CHECK_COMMAND= QUIESCE_START_COMMAND= QUIESCE_STARTED_CHECK_COMMAND= \
     'GPU_CARDS_BY_PRIORITY="127.0.0.1:0:15G"' 'GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="127.0.0.1:0:24G"' "NFS_SHARED_ROOTS=$work" >"$work/multi-host-gpu-on.env"
-  local no_card_first no_card_second no_card_first_target no_card_wrong=""
+  local no_card_first no_card_second no_card_first_target no_card_second_target no_card_wrong=""
   no_card_first="$(item_fields "${ITEMS[0]}" 1)"; no_card_second="$(item_fields "${ITEMS[1]}" 1)"
-  no_card_first_target="$(item_fields "${ITEMS[0]}" 2)"
+  no_card_first_target="$(item_fields "${ITEMS[0]}" 2)"; no_card_second_target="$(item_fields "${ITEMS[1]}" 2)"
   cells=$((cells + 1)); : > "$log"; : > "$work/card.log"
-  env -u GPU_CARDS_BY_PRIORITY SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on.env" STUB_CARD_LOG="$work/card.log" STUB_GPU_VERIFICATION_SERVER_DOWN=1 \
+  env -u GPU_CARDS_BY_PRIORITY SINGLEFS_MULTI_HOST_CONFIG="$work/multi-host-gpu-on.env" STUB_CARD_LOG="$work/card.log" \
     CRASH_AMPLIFICATION_ITEM_DRIVER="$stub" STUB_LOG="$log" CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT="$segments_root" bash "$0" --item "$no_card_first" --item "$no_card_second" >"$work/no-card.out" 2>"$errors"
   exit_code=$?
-  [[ "$exit_code" == 78 ]] || no_card_wrong+="整趟应当退 78（退 $exit_code）；"
-  [[ "$(tr '\n' '|' <"$work/card.log")" == "$no_card_first_target none cards=[unset]|" ]] \
-    || no_card_wrong+="驱动应当只起头一项一回、不带 --stage、收到的卡是 unset（实际「$(tr '\n' '|' <"$work/card.log")」）；"
-  grep -q "^CRASH_AMPLIFICATION_ITEM item=$no_card_first exit=78 .*verdict=not-run" "$work/no-card.out" || no_card_wrong+="头一项的 ITEM 行应当是 exit=78 verdict=not-run；"
-  grep -qF 'python3 gpu-verification-server/control start' "$work/no-card.out" "$errors" || no_card_wrong+="输出里应当有驱动打的起服务的命令；"
-  [[ -z "$no_card_wrong" ]] || selftest_cell_failed "不领卡、GPU 批处理服务不在跑：$no_card_wrong" \
-    "看主循环里 item_command（每项整趟交驱动、不带 --stage、不另设 GPU_CARDS_BY_PRIORITY）与驱动退 78 那一条（停在这一项、整趟退 78）"
+  [[ "$exit_code" == 0 ]] || no_card_wrong+="整趟应当退 0（退 $exit_code）；"
+  [[ "$(tr '\n' '|' <"$work/card.log")" == "$no_card_first_target none cards=[unset]|$no_card_second_target none cards=[unset]|" ]] \
+    || no_card_wrong+="驱动应当两项各起一回、不带 --stage、收到的卡都是 unset（实际「$(tr '\n' '|' <"$work/card.log")」）；"
+  grep -q "^CRASH_AMPLIFICATION_ITEM item=$no_card_first exit=0 .*verdict=green" "$work/no-card.out" || no_card_wrong+="头一项的 ITEM 行应当是 exit=0 verdict=green；"
+  grep -q "^CRASH_AMPLIFICATION_ITEM item=$no_card_second exit=0 .*verdict=green" "$work/no-card.out" || no_card_wrong+="第二项的 ITEM 行应当是 exit=0 verdict=green；"
+  [[ -z "$no_card_wrong" ]] || selftest_cell_failed "开了 GPU、环境里没有卡：每项都不该带卡（不领、不从多机配置挑）：$no_card_wrong" \
+    "看主循环里 item_command（每项整趟交驱动、不带 --stage、不另设 GPU_CARDS_BY_PRIORITY）"
   if (( failures > 0 )); then
     echo "  ✗ --selftest：$cells 格里 $failures 格判错" >&2
     echo "     → 怎么办：照上面每一格给的出路改，再跑 $0 --selftest" >&2
@@ -1930,7 +1885,7 @@ STUB
     echo "     → 怎么办：红的格与表里写的不同，要么改那一处判法让开关红在点名的格，要么照实改文件头那一行；单看一个开关：CRASH_AMPLIFICATION_BREAK=<开关> $0 --selftest" >&2
     exit 1
   fi
-  echo "  ✓ --selftest：列项、拒不认得的名与缺项名、不带参数不交展开深度、点名取并集、不清场（清场归 GPU 批处理验证服务）、认不出的选项退 2、给了 --crash-expand-up-to 把变量交给每一项的分项驱动并在 TOTAL 行与成功句写缩过域（环境里设了的当作给了同一个值、两样都给取参数）、缩域的值写坏退 2、照常退 0 有项红退 1、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、叫停的行不推复用数、派出收回、0 行判红、不穷举判红（不带参数时红在不穷举的那一项）、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、按登记整批不判的两个数按流分组每组只取一次（同流各行重复报不重复计，不同的流各取一次相加，同流各行不同记取不出并点名流）、red= 缺或坏判红、不带参数时零态判红、复用数是各行之和（计划行不取）、几条流各留的块相加报本次未跑、分项驱动退 77 记本次未跑（全是它时退 77）、几条流里有的没借到显存记本次未跑不算通过、只因登记的段不穷举不判红并报段号与写数（没登段的流照旧红）、每一趟往驱动送按段登记文件、登记文件写坏整趟拒跑、登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段（缩过规模时成功句报那几段）、驱动行没报那个字段照不穷举红（出路重编引擎）、登记段分片枚举不红而 ITEM 行与成功句报全展开与分片已判几态（总态数是超过 u64 的十进制串）、分片段已判 0 态而现判与复用都是 0 红在那条流与那一段、登了段的行登记段的域与分片进度没报全漏段或写坏照重编引擎红、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑、分项驱动退 77 而 NOT_RUN 行是跑的过程中源码变了时原因照 reason= 写不写借不到显存、点名两项以上当场声明项与项之间串行（一项不声明）、不领卡（每项整趟交驱动、驱动收到的卡是 unset，驱动报 GPU 批处理服务不在跑退 78 时停在头一项退 78、起服务的命令照转出），$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
+  echo "  ✓ --selftest：列项、拒不认得的名与缺项名、不带参数不交展开深度、点名取并集、不清场（清场归 GPU 批处理验证服务）、认不出的选项退 2、给了 --crash-expand-up-to 把变量交给每一项的分项驱动并在 TOTAL 行与成功句写缩过域（环境里设了的当作给了同一个值、两样都给取参数）、缩域的值写坏退 2、照常退 0 有项红退 1、驱动退非 0 与 red>0 判红、复用数的取法与取不出照实报、叫停的行不推复用数、派出收回、0 行判红、不穷举判红（不带参数时红在不穷举的那一项）、叫停与没判完报本次未跑与 77、驱动退 78 停下、平常跑拒只供自证的四个变量并逐个点名、有红又有项退 78 时退 1、退 78 而行里报红记红、按登记整批不判报数与取不出、按登记整批不判的两个数按流分组每组只取一次（同流各行重复报不重复计，不同的流各取一次相加，同流各行不同记取不出并点名流）、red= 缺或坏判红、不带参数时零态判红、复用数是各行之和（计划行不取）、几条流各留的块相加报本次未跑、分项驱动退 77 记本次未跑（全是它时退 77）、只因登记的段不穷举不判红并报段号与写数（没登段的流照旧红）、每一趟往驱动送按段登记文件、登记文件写坏整趟拒跑、登了段的流里另有展开上限盖不住又没登记的段红在那条流与那几段（缩过规模时成功句报那几段）、驱动行没报那个字段照不穷举红（出路重编引擎）、登记段分片枚举不红而 ITEM 行与成功句报全展开与分片已判几态（总态数是超过 u64 的十进制串）、分片段已判 0 态而现判与复用都是 0 红在那条流与那一段、登了段的行登记段的域与分片进度没报全漏段或写坏照重编引擎红、全部复用的一趟不红、分项驱动报判段没跑（step=judge）记本次未跑、分项驱动退 77 而 NOT_RUN 行是跑的过程中源码变了时原因照 step= 与 reason= 写、点名两项以上当场声明项与项之间串行（一项不声明）、不领卡（每项整趟交驱动、驱动收到的卡是 unset，驱动报 GPU 批处理服务不收这一族的这把版本键（没在跑也是不收）退 78 时停在头一项退 78、起服务的命令照转出）、驱动输出里有 GPU 批处理服务不收这一族待判行的出路时停下的那一句写不收这一族并原样转打那一行自己说的出路，$cells 格都对；开关轮 ${#switch_wheel_assignments[@]} 个开关（文件头现读）逐个打开，派出 ${#switch_wheel_assignments[@]} 个、收回 $switch_wheel_collected 个，各红在点名的那几格"
   exit 0
 }
 if (( selftest )); then run_selftest; fi
@@ -2041,7 +1996,7 @@ esac
 
 # RocksDB 预编库的取值（scripts/hosts/rocksdb-prebuilt.py 文件头「entry」）：起任何一项（分项驱动里起 cargo）之前判一次这台装了、此刻进程环境的取值对得上，
 #   判红退 78、一项都不跑。判的树是被判的仓根（自证起的子进程里同样换成 CRASH_AMPLIFICATION_SELFTEST_SEGMENTS_ROOT 那一棵小仓：没有依赖 rocksdb 的清单，entry 报不判）。
-#   弄坏开关 rocksdb-entry-unchecked 下不判（第 48 格判错）
+#   弄坏开关 rocksdb-entry-unchecked 下不判（第 46 格判错）
 if (( ! rocksdb_entry_checked )) && ! crash_amplification_break_is rocksdb-entry-unchecked && ! python3 "$crash_amplification_script_directory/../hosts/rocksdb-prebuilt.py" entry --root "$segments_root" >&2; then
   echo "  ✗ 起 cargo 之前 RocksDB 预编库的取值没判过（上面 rocksdb-prebuilt.py entry 的红句），一项都没跑（退 78）" >&2
   echo "  → 怎么办：照上面那几行的出路修（开新会话，或命令前 eval \"\$(python3 scripts/hosts/rocksdb-prebuilt.py env)\"），再跑同一条命令" >&2
@@ -2149,7 +2104,7 @@ for row in "${rows_to_run[@]}"; do
   # 按登记不判的两个数同一组各行报的不同的流名（文件头「按登记整批不判」）
   item_ignore_conflict_flows="${item_ignore_conflict_flows:--}"
   if [[ "$item_reused" == unknown ]] && crash_amplification_break_is accept-unknown-reuse; then item_reused=0; fi
-  # 分项驱动报的本次未跑（文件头「一项怎么判」not-run）：驱动退 77（一项都没跑到），或打了 CRASH_AMPLIFICATION_NOT_RUN 行（几条流里没借到的那几条）；
+  # 分项驱动报的本次未跑（文件头「一项怎么判」not-run）：驱动退 77（一项都没跑到），或打了 CRASH_AMPLIFICATION_NOT_RUN 行（判段没跑的那几条流）；
   #   原因取第一行的 reason=。弄坏开关 driver-77-as-failure 下退 77 照别的非 0 判红，driver-not-run-as-zero-lines 下不认那几行
   #   判段没跑的流（CRASH_AMPLIFICATION_NOT_RUN step=judge：配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性）另数一份，原因照它写；弄坏开关 judge-not-run-ignored 下不认那几行
   item_driver_not_run=0; item_driver_not_run_reason=""; item_driver_not_run_step=""; item_driver_not_run_lines=0; item_exit_not_run=0; item_judge_not_run_lines=0
@@ -2231,22 +2186,15 @@ for row in "${rows_to_run[@]}"; do
     elif (( item_driver_not_run )); then
       verdict=not-run
       if (( item_exit_not_run && item_driver_not_run_lines > 0 )); then
-        # 原因照第一行 NOT_RUN 的 step= 与 reason= 写：只有排计划那一趟（step=placement）是借不到显存，step=judge 的跑的过程中源码变了这类只照 reason= 写
-        item_driver_not_run_cause="这一项没判成"
-        if [[ "$item_driver_not_run_step" == placement ]] || crash_amplification_break_is not-run-cause-always-vram; then
-          item_driver_not_run_cause="借不到显存，这一项没判成"
-        fi
-        not_run_reason="分项驱动退 77（一项都没跑到），报本次未跑（CRASH_AMPLIFICATION_NOT_RUN step=${item_driver_not_run_step:-没写}）：${item_driver_not_run_cause}（${item_driver_not_run_reason:-那一行没写 reason=}）"
+        # 原因照第一行 NOT_RUN 的 step= 与 reason= 写（跑的过程中源码变了这类）
+        not_run_reason="分项驱动退 77（一项都没跑到），报本次未跑（CRASH_AMPLIFICATION_NOT_RUN step=${item_driver_not_run_step:-没写}）：这一项没判成（${item_driver_not_run_reason:-那一行没写 reason=}）"
       elif (( item_exit_not_run )); then
         not_run_reason="分项驱动退 77（一项都没跑到），没打 CRASH_AMPLIFICATION_NOT_RUN 行：原因看这一项的输出"
       elif (( item_judge_not_run_lines > 0 )); then
         item_judge_not_run_reason="$(awk '/^CRASH_AMPLIFICATION_NOT_RUN step=judge / { at = index($0, " reason="); print (at ? substr($0, at + 8) : ""); exit }' "$item_output_file")"
         not_run_reason="分项驱动报 $item_judge_not_run_lines 条流判段没跑（CRASH_AMPLIFICATION_NOT_RUN step=judge）：配置写了 ENABLE_GPU=1 而二进制没编进 gpu 特性，录入段照录、判段这一趟没判（${item_judge_not_run_reason:-那一行没写 reason=}）"
-        if (( item_driver_not_run_lines > item_judge_not_run_lines )); then
-          not_run_reason="${not_run_reason}；另有 $((item_driver_not_run_lines - item_judge_not_run_lines)) 条流借不到显存没判"
-        fi
       else
-        not_run_reason="分项驱动报 $item_driver_not_run_lines 条流本次未跑（CRASH_AMPLIFICATION_NOT_RUN）：借不到显存没判，借到的照判了（${item_driver_not_run_reason:-那一行没写 reason=}）"
+        not_run_reason="分项驱动报 $item_driver_not_run_lines 条流本次未跑（CRASH_AMPLIFICATION_NOT_RUN step=${item_driver_not_run_step:-没写}）：这一项没判成（${item_driver_not_run_reason:-那一行没写 reason=}）"
       fi
       if (( item_stopped > 0 )); then not_run_reason="${not_run_reason}；另有 $item_stopped 行叫停（stopped_early=true）"; fi
     elif (( item_stopped > 0 || item_unjudged > 0 )) && ! crash_amplification_break_is count-stopped-as-run; then

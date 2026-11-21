@@ -297,7 +297,7 @@ EXTRA_LINES = {
 # 会跑自证的类型要的一行（派发提示写明自证在哪跑）：按各定义「输入」一节判——
 # 工具员要给判红样本与弄坏开关，实现员与执行员会改脚本、装置或变异表锚点，调查员在仓副本里改坏、二分
 # 占位里另提一句这些命令谁起、怎么起：一切跑项目代码的命令只认经 task-server/task 起（records/2026-10-30-编译绕过内存总上限.md 批 3b），
-# 子 agent 一律不往统一任务服务交任务（records/2026-10-29-subagent拆分提案.md 第一百七十四节），所以这一行写的是主 agent 起交回命令的那棵树；
+# 子 agent 一律不往统一任务服务交任务（records/2026-11-17-subagent账本自上而下清欠.md 第一百七十四节），所以这一行写的是主 agent 起交回命令的那棵树；
 # 内存与排队归服务，提示里不写包装（不写「排不上带 ulimit -v 与 nice 直跑」这类绕开服务的做法）
 # 表里 required 的自证裸写 --selftest 在执行前被 project-code-guard.sh 拒（一百九十七节 ②）：占位里表外的写这一形，required 的指到下面「要临时服务的自证」那一行的整条；
 # 弄坏开关 selftest-location-hint-bare 下不分表内表外，一律写这一形
@@ -442,7 +442,7 @@ WRITE_SCOPE_LABEL = "写范围"
 def write_scope_line(agent_type, agents_dir):
     """骨架里的「写范围：…」一行：类型在写范围表（<仓根>/.claude/hooks/agent-write-scope.tsv，仓根取 agents_dir 往上两层）里的路径模式，原样列出（表的写法与读法在
     lib_write_scope.py 的 load_scopes，不另抄）。主 agent 填「要改的文件」「报告」时对着它写，免得派发闸 ④ 拒「提示要子 agent 写进写范围之外的路径」。
-    类型不在表里（没有 Write / Edit 的）、表不在、读不了的不打这一行。弄坏开关 scope-line-omitted 下不打。"""
+    类型不在表里（新建而还没登记的）、表不在、读不了的不打这一行。弄坏开关 scope-line-omitted 下不打。"""
     if BROKEN == "scope-line-omitted":
         return None
     table_path = os.path.join(os.path.dirname(os.path.dirname(os.path.normpath(agents_dir))), ".claude", "hooks", "agent-write-scope.tsv")
@@ -691,10 +691,12 @@ def selftest():
         foreign_home = os.path.join(work, "foreign-home")   # 换了家目录那一格的 HOME：不是 $HOME，里面什么都没有
         os.makedirs(foreign_home)
         write_batch_record(real_work)
-        for guard_type in sorted(guard_types or set()):
-            real_definition = os.path.join(REPOSITORY_ROOT, ".claude", "agents", f"{guard_type}.md")
-            if os.path.isfile(real_definition):
-                with open(real_definition, encoding="utf-8") as source, open(os.path.join(real_agents, f"{guard_type}.md"), "w", encoding="utf-8") as target:
+        # 真定义按 .claude/agents 的清单挑：读的是那个目录里的几份，算键的一方照清单整个目录收（照派发闸的类型表拼名字读，读哪几份它折不出）
+        definitions_directory = os.path.join(REPOSITORY_ROOT, ".claude", "agents")
+        for definition_name in sorted(os.listdir(definitions_directory)):
+            if definition_name.endswith(".md") and definition_name[:-len(".md")] in (guard_types or set()):
+                with open(os.path.join(definitions_directory, definition_name), encoding="utf-8") as source, \
+                        open(os.path.join(real_agents, definition_name), "w", encoding="utf-8") as target:
                     target.write(source.read())
         for guard_type in sorted(guard_types or set()):
             text_real = skeleton(guard_type, real_agents, {}, None)
@@ -767,11 +769,11 @@ def selftest():
         checked += 1
         if len(kb_scope_lines) != 1 or ".claude/kb/**" not in kb_scope_lines[0] or "records/" in kb_scope_lines[0]:
             failures.append(f"写范围一行：kb-scribe 的骨架应当有一行「写范围：」列 .claude/kb/**、不列 records/，实际 {kb_scope_lines}")
-        unlisted_scope_lines = [line for line in skeleton("sweep", scope_agents, {}, None).split("\n") if line.startswith(f"{WRITE_SCOPE_LABEL}：")] \
+        unlisted_scope_lines = [line for line in skeleton("no-row-sample", scope_agents, {}, None).split("\n") if line.startswith(f"{WRITE_SCOPE_LABEL}：")] \
             + [line for line in text.split("\n") if line.startswith(f"{WRITE_SCOPE_LABEL}：")]
         checked += 1
         if unlisted_scope_lines:
-            failures.append(f"写范围一行：写范围表里没有行的类型（sweep）与没有表的样本仓里的骨架不该打「写范围：」一行，实际 {unlisted_scope_lines}")
+            failures.append(f"写范围一行：写范围表里没有行的类型（样本类型 no-row-sample）与没有表的样本仓里的骨架不该打「写范围：」一行，实际 {unlisted_scope_lines}")
         scope_prompt = os.path.join(work, "scope-clerk.md")
         with open(scope_prompt, "w", encoding="utf-8") as handle:
             handle.write(fill_for_guard(clerk_text).replace(selftest_scratch(), "$SINGLEFS_WORK_ROOT/dispatch-prompt-selftest"))   # 草稿目录写工作根记号：这一格有表，派发闸 ④ 判报告行的落点
