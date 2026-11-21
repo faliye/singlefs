@@ -5,4 +5,4 @@ M4_只取一个相位	for phase in 0..ring_slot_count {	for phase in 0..1 {
 M5_读不到记成回退0	newest_alive.map(|newest_alive_generation| latest - newest_alive_generation)	Some(newest_alive.map(|newest_alive_generation| latest - newest_alive_generation).unwrap_or(0))
 M6_区域数少算一个	fn regions_needed(failure_domains: u64) -> u64 {\n    failure_domains + 1\n}	fn regions_needed(failure_domains: u64) -> u64 {\n    failure_domains\n}
 M7_区域位置全挤在盘首	let unaligned_offset_bytes = span * region_index / (regions - 1);	let unaligned_offset_bytes = 0 * span * region_index / (regions - 1);
-M8_死区也算幸存	if device_of_region[region_index as usize] == failed_device {	if false && device_of_region[region_index as usize] == failed_device {
+M8_死区也算幸存	if device_of_region[usize_from_u64(region_index)] == failed_device {	if false && device_of_region[usize_from_u64(region_index)] == failed_device {

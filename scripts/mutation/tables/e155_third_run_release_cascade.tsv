@@ -1,7 +1,7 @@
 M1_append两组间空隙取0	&[((backlog_generations - 1.0) * released_units).max(0.0)])	&[0.0_f64])
 M2_append的K5不加倍	AllocationVariant::ReleaseAppendOnly => 2.0 * (previous_written_units + distinct_data_units_touched) + extra_release_only_insertions_total,	AllocationVariant::ReleaseAppendOnly => previous_written_units + distinct_data_units_touched + extra_release_only_insertions_total,
 M3_append只改K5释放仍走基线几何	if let AllocationVariant::ReleaseAppendOnly = variant {	if false {
-M4_epoch时期分布写反	let expected_count_at_generation = node_units * touch_fraction * decay_ratio.powi(generation as i32 - 1);	let expected_count_at_generation = node_units * decay_ratio * touch_fraction.powi(generation as i32 - 1);
+M4_epoch时期分布写反	let expected_count_at_generation = node_units * touch_fraction * decay_ratio.powi(i32_from_u32(generation) - 1);	let expected_count_at_generation = node_units * decay_ratio * touch_fraction.powi(i32_from_u32(generation) - 1);
 M5_epoch不切块n_p恒1	let piece_count = match cluster_segment_slots {\n        None => 1.0,\n        Some(segment_slots) => (bump_unit_count / segment_slots).ceil().max(1.0),\n    };	let piece_count = match cluster_segment_slots {\n        None => 1.0,\n        Some(_) => 1.0,\n    };
 M6_epoch块长取64不取S除n_p	let piece_size = bump_unit_count / piece_count;	let piece_size = CLUSTER_SEGMENT_SLOTS as f64;
 M7_epoch泊松换成掷球公式	touched_pieces += piece_count * (1.0 - (-relative_to_piece_count).exp());	touched_pieces += piece_count * (1.0 - (1.0 - 1.0 / piece_count).powf(expected_count_at_generation));

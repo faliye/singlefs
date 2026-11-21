@@ -50,22 +50,27 @@
 #          没记过用时的中位数仍取全表。各片写一份选行文件 <计划目录>/shard-<片号>.selection，plan.json 每片一项：
 #          片都不钉（片里写了 pin 键服务拒，每片只写 label），各由服务照记录挑机器；各片判的记录都经 prune-server 写进同一份库。
 #          不写 memory_floor、不报内存量（一片的上限由服务按记录给）。
+#          row-plan 退非 0 退 1：它的标准输出写进 <计划目录>/row-plan.tsv，失败句带出它打的失败行（mutation_shard_row_plan_failure_reason），
+#          一条失败行都没打写「它没打失败行」（弄坏开关 row-plan-failure-line-dropped）。
 #   shard  照 TASK_SERVER_SHARD=<片号>/<片数> 跑那一片：GATE_MUTATION_ROW_SELECTION=<shard-<片号>.selection> bash <crates-mutation-replay> <树根>，退 1、3 都算这一片成了（退 0），别的照原码退；
 #          各片判的记录都写进 prune-server 里同一份库（库根照被判那棵树取，两台同名）；起了门禁的那一片把它判的选行文件拷进 <产物目录>/judged-rows，合并照它核；
+#          这一片本次未跑的几条由门禁追加进 <产物目录>/not-run-record（起门禁时交 GATE_MUTATION_SHARD_NOT_RUN_FILE，crates-mutation-replay.sh 文件头「分片」；每条一行
+#          「<门禁文件名> 本次未跑：<表>:<行号> <变异名>：…」，点名的测试没跑到被改坏的那一处，库里这把键下没有「抓到」的记录、row-plan 第三列是 0，合并从读不到里分出它们靠这份文件），没有本次未跑的那一片没有这份文件；
 #          每一片不看派到哪一台、在跑它的这一台现查 llvm 工具（记覆盖要的 llvm-profdata、llvm-cov，--version 的 LLVM 版本要以这一台 rustc -vV 的「LLVM version」起头；
 #          目录取 GATE_MUTATION_LLVM_TOOLS，没设取 rustc --print sysroot 下 lib/rustlib/<host>/bin；缺了退 78、一条变异都不起，出路写 rustup component add llvm-tools），
 #          再在树根跑 python3 scripts/hosts/rocksdb-prebuilt.py entry --root .（RocksDB 预编库的取值，判红退 78、一条变异都不起）；两台同一条规则；
 #          变异复跑带崩溃判定库的测试各对它自己起的临时 prune-server 跑（scripts/mutation/crates-mutation-rows.py 文件头「变异复跑的崩溃判定库」），这里不设库的变量。
 #   merge  照 TASK_SERVER_SHARD_OUTPUTS 读各片的 judged-rows，所有片判的行并成一份（去重），经 crates-mutation-rows.py row-plan --rows <并起来的行> --progress
 #          按本机此刻的源码算行键、查服务（第三列 1 是读得到），再逐片数这一片判的行里读到几行：
-#          有一片判的行一行都读不到退 1、点名那一片，出路先写比判法单元指纹（那一片开跑之后有人改了判法读的文件：它判的记录照开跑时的指纹进行键，
-#          此刻的行键对不上；那一片日志里 crates-mutation-replay 开跑那一行的「判法单元 <前 16 位>…」与此刻 crates-mutation-rows.py judging-units <树根> 打的比），
-#          再写它写进了别的库（连的不是同一份服务、判的不是同一棵树）；row-plan 退非 0 退 1；读不到的另几行逐行列出，由那一道接着的核账报；
-#          成功句报各片判的行里读得到几行、读不到几行。不拷库目录、不 import：两台写的是服务里同一份库。
+#          读不到的行里，这一片自己在 not-run-record 里报了本次未跑的先分出来（一行属哪一档只看那一片自己报的，不解析日志）：另起「  · 本次未跑：N 条（…这一趟不是整张表的结论）」一行，
+#          之后一条一行（第几片、台、行号、变异名、那一片打的原因），不算读不到、不让整道判红；报的记录读不出行号、或点名的行不在这一片判的行里，那几行不当本次未跑，退 1、点名那一片与头一条记录行；
+#          有一片判的行（分出本次未跑的之后）一行都读不到退 1、点名那一片，出路先写它写进了别的库（连的不是同一份服务），再写比两台的源码（判的不是同一棵树：被改坏的单元与点名测试的闭包里的源码不同，行键就不同；
+#          行键里没有编译器、链接器、cargo 配置与版本这类构建环境，不用比）；row-plan 退非 0 退 1；读不到的另几行逐行列出，由那一道接着的核账报；
+#          成功句报各片判的行里读得到几行、读不到几行；有本次未跑的改报抓到几行、本次未跑几行、读不到几行，并写这一趟不是整张表的结论。不拷库目录、不 import：两台写的是服务里同一份库。
 #          分步打进度（一步慢到看不出停在哪一步，服务按日志不涨判卡住）：每一步开始、结束各一行「  · 合并·<步名>：开始」「  · 合并·<步名>：完，用了 N 秒，…」（打 stdout 的是这一份的三步，
 #          row-plan 与核账的在 stderr），按次序是：
 #          · 读计划（这一份）：哪几片交了 judged-rows、各判了几行、并起来去重几行；
-#          · 核锚点、现算行键、读库、读用时表（row-plan --progress，crates-mutation-rows.py 文件头「合并那一步的分步进度」）：现算行键里「判法单元与工具链」「点名测试的闭包」算完另各打一行，
+#          · 核锚点、现算行键、读库、读用时表（row-plan --progress，crates-mutation-rows.py 文件头「合并那一步的分步进度」）：现算行键里「点名测试的闭包」算完另打一行，
 #            逐行做的步每过 GATE_MUTATION_PROGRESS_SECONDS 秒（没设 60）打一行「TASK_SERVER_HEARTBEAT 合并·<步名>：在第 N 行、共 M 行，…」，这种行不算日志在涨，真卡死照样判得出；
 #          · 逐片核对（这一份）：每一片一行「第 i 片（台）判的 N 行，读到 R 行、读不到 U 行」；
 #          · 核账（crates-mutation-replay 在这一步里调 run_stage，范围「合并·核账」）：开始、各逐行步、完（带退出码），在这一份返回之后打。
@@ -96,6 +101,8 @@
 #       ㉒ 计划那一步带 --only-rows 点名一行：row-plan 只对那一行算键（算键 1 行，不是整张表的 6 行），计划只分那一行（「✗ ㉒ 计划那一步带 --only-rows 点名一行：」；row-plan 那一行写的是算了 6 行的键）
 #   MUTATION_SHARD_RUN_BREAK=row-plan-selection-ignored  自证里直接起 row-plan 点名两行那一趟带 GATE_MUTATION_BREAK=rowplanselectionignored（crates-mutation-rows.py 的 row-plan 不看 --rows）
 #       ㉒ row-plan 点名两行：只对两行算键（算键 2 行），别的 4 行只给用时、键写 -；不点名算整张 6 行（「✗ ㉒ row-plan 点名两行：」；点名两行那一趟写的是算了 6 行的键）
+#   MUTATION_SHARD_RUN_BREAK=row-plan-failure-line-dropped  计划那一步 row-plan 退非 0 时失败句不带出它打的失败行（也不写「它没打失败行」）
+#       ㉝ 计划那一步的 row-plan 退非 0：失败句带出它打的失败行，一条都没打时写它没打失败行（「✗ ㉝ 计划那一步的 row-plan 退非 0：」；打了一条失败行的那一趟，失败句里没有那一行的字）
 #   MUTATION_SHARD_RUN_BREAK=anchor-broken-dispatched  ③ 分行不看 row-plan 的第五列：锚点失效、而行键算得出的那一行照样分出去
 #       ⑭ ③ 分行：锚点失效的行（第五列 anchor-broken，有键没键都算）不进各片、单报几行（「✗ ⑭ ③ 分行：锚点失效的行（第五列 anchor-broken，有键没键都算）不进各片、单报几行：pending.rows「1 2 4 」」）
 #   MUTATION_SHARD_RUN_BREAK=pile-pinned-local  计划给第 0 片写 pin=local：钉在本机
@@ -105,15 +112,25 @@
 #   MUTATION_SHARD_RUN_BREAK=llvm-tools-missing-skipped  一片在这一台查出缺 llvm 工具时这一堆不判、退 0（不退 78）
 #       ㉖ 每一片在跑它的这一台现查 llvm 工具：缺了退 78、一条变异都不起，出路写装哪个包；两片同一条规则（「✗ ㉖ 每一片在跑它的这一台现查 llvm 工具：」；两片退「0 0 」）
 #   MUTATION_SHARD_RUN_BREAK=merge-rows-unchecked  合并不查服务，judged-rows 里的行一律当读得到
-#       ㉕ 合并：另一片判的行按此刻的行键在服务里一行都读不到（判法单元指纹变了或写进了别的库）⇒ 退 1、点名那一片，出路先写比判法单元指纹（「✗ ㉕ 合并：」；合并退 0）
+#       ㉕ 合并：另一片判的行按此刻的行键在服务里一行都读不到（写进了别的库或两台源码不同）⇒ 退 1、点名那一片，出路先写查它写进了哪份库、再写比两台的源码（「✗ ㉕ 合并：」；合并退 0）
+#       ㉟ 合并认一片报的本次未跑：两片都起门禁、第 9 行点名的测试没跑到被改坏的那一处，合并退 0、另起「本次未跑：1 条」逐条列（「✗ ㉟ 合并认一片报的本次未跑：」；第 9 行被当读得到，合并输出里没有「本次未跑：1 条」）
+#       ㊱ 合并：一片没报本次未跑而判的行读不到，退 1、点名那一片（「✗ ㊱ 合并：」；没报的那一片合并退 0）
+#   MUTATION_SHARD_RUN_BREAK=not-run-counted-unreadable  合并不读各片的 not-run-record，本次未跑的行照读不到算
+#       ㉟ 合并认一片报的本次未跑：两片都起门禁、第 9 行点名的测试没跑到被改坏的那一处，合并退 0、另起「本次未跑：1 条」逐条列（「✗ ㉟ 合并认一片报的本次未跑：」；只判了那一行的一片合并退 1，输出里没有「本次未跑：1 条」）
+#       ㊱ 合并：报了本次未跑而记录读不出行号的一片也退 1（「✗ ㊱ 合并：」；那一片的输出里没有「读不出行号」，记录没读）
+#   MUTATION_SHARD_RUN_BREAK=not-run-not-handed-over  各片起门禁不交 GATE_MUTATION_SHARD_NOT_RUN_FILE：本次未跑的几条到不了产物目录
+#       ㉟ 合并认一片报的本次未跑：（「✗ ㉟ 合并认一片报的本次未跑：」；产物目录里没有 not-run-record、合并输出里没有「本次未跑：1 条」）
+#   MUTATION_SHARD_RUN_BREAK=unreported-rows-as-not-run  合并把没报本次未跑而读不到的行也当本次未跑（那一片自己报了的行照旧带它打的原因）
+#       ㉕ 合并：另一片判的行按此刻的行键在服务里一行都读不到（写进了别的库或两台源码不同）⇒ 退 1、点名那一片，出路先写查它写进了哪份库、再写比两台的源码（「✗ ㉕ 合并：」；那一片没报本次未跑，合并退 0）
+#       ㊱ 合并：一片没报本次未跑而判的行读不到，退 1、点名那一片（「✗ ㊱ 合并：」；没报的那一片合并退 0、输出里写本次未跑：1 条）
 #   MUTATION_SHARD_RUN_BREAK=merge-steps-silent  合并不打分步行：这一份不打读计划、逐片核对的行，row-plan 不带 --progress（核账的行由 crates-mutation-rows.py 打，不在这一份手里）
 #       ㉙ 合并分步输出：读计划、现算行键、读库、逐片核对、核账各步的开始、结束行按次序都在，逐片的数对（「✗ ㉙ 合并分步输出：」；输出里按次序找不到读计划的开始行）
 #       ㉚ 合并里一步慢时有心跳行：逐行的步每过一行停 0.3 秒、间隔 1 秒时，现算行键与读库有带心跳前缀的「在第 N 行、共 M 行」（「✗ ㉚ 合并里一步慢时有心跳行：」；合并·现算行键的心跳行 0 条）
 #   MUTATION_SHARD_RUN_BREAK=selftest-tmpdir-outside  自证不把 TMPDIR 换成自己临时目录下的 tmp/，场景照外面那一层（自证在调用方的 TMPDIR 下另建的）建临时目录
 #       ⑫ 场景都跑在自证自己的 tmp/ 下……跑完外面的临时目录……里没多出 singlefs-mutation-replay-*，自己的 tmp/ 下也一个不剩（「✗ ⑫ 场景都跑在自证自己的 tmp/ 下：」；
 #          「工作目录不在自证自己的 tmp/ 下的」：本机那一侧的假 cargo 在外面那一层的 singlefs-mutation-replay-* 里起）
-#   MUTATION_SHARD_RUN_BREAK=selftest-parallel-exit-dropped  自证那一层认：两个场景那两串同时跑完之后，steps 那一串的退出码文件删掉（像那一串没收回）
-#       自证并行（scenes）：派出去的件都收回了退出码（「✗ 自证并行（scenes）：派出去的件都收回了退出码：」；派出去 2 件、收回 1 件）
+#   MUTATION_SHARD_RUN_BREAK=selftest-parallel-exit-dropped  自证那一层认：三个场景那三串同时跑完之后，steps 那一串的退出码文件删掉（像那一串没收回）
+#       自证并行（scenes）：派出去的件都收回了退出码（「✗ 自证并行（scenes）：派出去的件都收回了退出码：」；派出去 3 件、收回 2 件）
 #
 # admission: always 每次调都分这一刻这棵树上没有作数记录的行；复用判定在判定库记录里，不在这里
 # run-condition: command python3 rsync ssh git cargo rustc
@@ -171,6 +188,19 @@ mutation_shard_row_plan() { # <crates-mutation-rows.py> <树根> <输出文件> 
     fi
   fi
   python3 "$1" row-plan "$2" ${selection_arguments[@]+"${selection_arguments[@]}"} > "$3"
+}
+
+mutation_shard_row_plan_failure_reason() { # <row-plan 的输出文件>：打接在「row-plan 退非 0」后面的一句。row-plan 的失败行（「  ✗ …」）打在标准输出、写进了输出文件，不在日志里：带出头一条，一条都没打写「它没打失败行」
+  # 弄坏开关 row-plan-failure-line-dropped：什么都不打，失败句里看不到 row-plan 自己的原因
+  mutation_shard_break_is row-plan-failure-line-dropped && return 0
+  # 有几条取头一条（row-plan 先打的是它自己的原因，后面是出路）
+  local failure_line
+  failure_line="$(grep -m 1 '✗' -- "$1" 2>/dev/null | sed 's/^[[:space:]]*//' | clip_text 400)"
+  if [[ -n "$failure_line" ]]; then
+    printf '，它打的失败行：%s' "$failure_line"
+  else
+    printf '，它没打失败行'
+  fi
 }
 
 mutation_shard_split_plan() { # <row-plan 的输出> <要现判的行文件> <留给合并之后的行文件> <键文件> [<只分这几行的选行文件>]：
@@ -564,7 +594,7 @@ mutation_shard_task_server_plan() { # 文件头「三步」的 plan
   [[ -n "$plan_directory" && -d "$plan_directory" ]] \
     || mutation_shard_fail "计划那一步没给在的计划目录（TASK_SERVER_SHARD_PLAN_DIRECTORY=${plan_directory:-没设}）" "这一步只由 task-server 按分片协议起"
   mutation_shard_row_plan "$rows_module" "$tree_root" "$plan_directory/row-plan.tsv" "$only_rows_file" \
-    || mutation_shard_fail "本机列不出每一行的记录与用时（crates-mutation-rows.py row-plan 退非 0）" "单跑 python3 scripts/mutation/crates-mutation-rows.py row-plan <树根> [--rows <选行文件>] 看它报什么"
+    || mutation_shard_fail "本机列不出每一行的记录与用时（crates-mutation-rows.py row-plan 退非 0$(mutation_shard_row_plan_failure_reason "$plan_directory/row-plan.tsv")）" "它的完整输出在 $plan_directory/row-plan.tsv；要重现就单跑 python3 scripts/mutation/crates-mutation-rows.py row-plan <树根> [--rows <选行文件>]"
   split_summary="$(mutation_shard_split_plan "$plan_directory/row-plan.tsv" "$plan_directory/pending.rows" "$plan_directory/after-merge.rows" "$plan_directory/keys" "$only_rows_file")" \
     || mutation_shard_fail "分行那一段 python 没跑成" "看上面 python 的报错"
   local table_rows pending_rows timed_rows default_seconds refused_rows anchor_broken_rows reused_rows unaccounted_rows
@@ -614,6 +644,13 @@ mutation_shard_task_server_shard() { # 文件头「三步」的 shard
     return 78
   fi
   echo "  · 第 $TASK_SERVER_SHARD 片（这一台，判的记录写进 prune-server 里同一份判定库）：$(grep -c '[0-9]' "$selection") 行"
+  # 这一片本次未跑的几条由门禁追加进产物目录的 not-run-record（crates-mutation-replay.sh 文件头「分片」），合并那一步照它列；弄坏开关 not-run-not-handed-over 下不交这个变量
+  rm -f -- "$output/not-run-record" || mutation_shard_fail "删不掉上一次留在产物目录里的 $output/not-run-record" "看产物目录可不可写"
+  if mutation_shard_break_is not-run-not-handed-over; then
+    echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=not-run-not-handed-over：起门禁不带 GATE_MUTATION_SHARD_NOT_RUN_FILE" >&2
+  else
+    stage_environment+=(GATE_MUTATION_SHARD_NOT_RUN_FILE="$output/not-run-record")
+  fi
   if ( cd "$tree_root" && exec "${stage_environment[@]}" GATE_MUTATION_ROW_SELECTION="$selection" bash "$stage_script" "$tree_root" ); then stage_exit=0; else stage_exit=$?; fi
   # 起了门禁（退 0、1、3）的这一片把它判的行交给合并去核（文件头「三步」merge）；别的退出码这一片没成，不交
   case "$stage_exit" in
@@ -625,20 +662,47 @@ mutation_shard_task_server_shard() { # 文件头「三步」的 shard
   esac
 }
 
-mutation_shard_rows_in_service() { # <row-plan 的输出> <judged-rows> <读不到的行写进哪个文件>：stdout 打「<读得到的行数> <读不到的行数>」（文件头「三步」merge）
-  MUTATION_SHARD_MERGE_UNCHECKED="$(mutation_shard_break_is merge-rows-unchecked && echo 1)" python3 - "$@" <<'PY_ROWS'
-import os, sys
-plan_path, judged_path, unreadable_path = sys.argv[1:]
+mutation_shard_rows_in_service() { # <row-plan 的输出> <judged-rows> <读不到的行写进哪个文件> <这一片的 not-run-record> <本次未跑的行写进哪个文件> <读不出的记录行写进哪个文件>：
+  # stdout 打「<读得到的行数> <读不到的行数> <本次未跑的行数> <读不出的记录行数>」（文件头「三步」merge）。
+  # 一行是哪一档：row-plan 第三列是 1 的读得到；不是 1 而这一片的 not-run-record 里有它的，本次未跑（「<行号>\t<门禁写的那一句>」逐行写进第五个文件）；两样都不是的读不到。
+  # not-run-record 每条一行「<门禁文件名> 本次未跑：<表>:<行号> <变异名>：…」（crates-mutation-replay.sh 写的）：不在这一片判的行里、认不出这个形状的行，
+  # 整行写进第六个文件、不当本次未跑（它点名的行照读不到算），由调用方判红；文件不在就是这一片没报本次未跑的行
+  MUTATION_SHARD_MERGE_UNCHECKED="$(mutation_shard_break_is merge-rows-unchecked && echo 1)" \
+  MUTATION_SHARD_NOT_RUN_IGNORED="$(mutation_shard_break_is not-run-counted-unreadable && echo 1)" \
+  MUTATION_SHARD_UNREPORTED_AS_NOT_RUN="$(mutation_shard_break_is unreported-rows-as-not-run && echo 1)" \
+  MUTATION_SHARD_RECORD_TABLE="$MUTATION_SHARD_TABLE" python3 - "$@" <<'PY_ROWS'
+import os, re, sys
+plan_path, judged_path, unreadable_path, record_path, not_run_path, malformed_path = sys.argv[1:]
 with open(judged_path, encoding="utf-8") as handle:
     judged = sorted({int(text) for text in (line.strip() for line in handle) if text.isdigit()})
 with open(plan_path, encoding="utf-8") as handle:
     readable_rows = {int(fields[0]) for fields in (line.rstrip("\n").split("\t") for line in handle if line.strip()) if len(fields) > 2 and fields[2] == "1"}
 if os.environ.get("MUTATION_SHARD_MERGE_UNCHECKED") == "1":   # 弄坏开关 merge-rows-unchecked：不查服务，一律当读得到
     readable_rows = set(judged)
-unreadable = [line_number for line_number in judged if line_number not in readable_rows]
+reported, malformed = {}, []
+if os.environ.get("MUTATION_SHARD_NOT_RUN_IGNORED") != "1" and os.path.isfile(record_path):   # 弄坏开关 not-run-counted-unreadable：不读这一片报的本次未跑
+    shape = re.compile(r"^\S+ 本次未跑：(" + re.escape(os.environ["MUTATION_SHARD_RECORD_TABLE"]) + r":([0-9]+) .+)$")
+    with open(record_path, encoding="utf-8") as handle:
+        for line in (text.rstrip("\n") for text in handle):
+            if not line.strip():
+                continue
+            found = shape.match(line)
+            if found is None or int(found.group(2)) not in judged:
+                malformed.append(line)
+            else:
+                reported.setdefault(int(found.group(2)), found.group(1))
+if os.environ.get("MUTATION_SHARD_UNREPORTED_AS_NOT_RUN") == "1":   # 弄坏开关 unreported-rows-as-not-run：没报本次未跑、读不到的行也当本次未跑（报了的行照旧带那一片打的原因）
+    reported.update({line_number: f"{os.environ['MUTATION_SHARD_RECORD_TABLE']}:{line_number} 没报本次未跑" for line_number in judged if line_number not in readable_rows and line_number not in reported})
+readable = [line_number for line_number in judged if line_number in readable_rows]
+not_run = [line_number for line_number in judged if line_number not in readable_rows and line_number in reported]
+unreadable = [line_number for line_number in judged if line_number not in readable_rows and line_number not in reported]
 with open(unreadable_path, "w", encoding="utf-8") as handle:
     handle.write("".join(f"{line_number}\n" for line_number in unreadable))
-print(len(judged) - len(unreadable), len(unreadable))
+with open(not_run_path, "w", encoding="utf-8") as handle:
+    handle.write("".join(f"{line_number}\t{reported[line_number]}\n" for line_number in not_run))
+with open(malformed_path, "w", encoding="utf-8") as handle:
+    handle.write("".join(f"{line}\n" for line in malformed))
+print(len(readable), len(unreadable), len(not_run), len(malformed))
 PY_ROWS
 }
 
@@ -646,10 +710,10 @@ mutation_shard_merge_line() { # <步名> <正文>：合并那一步的分步行�
   mutation_shard_break_is merge-steps-silent || echo "  · 合并·$1：$2"
 }
 
-mutation_shard_task_server_merge() { # 文件头「三步」的 merge：只核各片判的行按本机此刻的行键在 prune-server 里读得到；不拷库目录、不 import
-  local outputs="${TASK_SERVER_SHARD_OUTPUTS:-}" index host directory scratch counts readable unreadable merged=0 total_readable=0 total_unreadable=0
-  local step_started position judged_rows grep_exit union_rows shard_summary=""
-  local -a problems=() unreadable_notes=() shard_indexes=() shard_hosts=() shard_directories=() judged_files=() row_plan_progress=(--progress)
+mutation_shard_task_server_merge() { # 文件头「三步」的 merge：只核各片判的行按本机此刻的行键在 prune-server 里读得到（各片自己报了本次未跑的行另算）；不拷库目录、不 import
+  local outputs="${TASK_SERVER_SHARD_OUTPUTS:-}" index host directory scratch counts readable unreadable not_run malformed merged=0 total_readable=0 total_unreadable=0 total_not_run=0
+  local step_started position judged_rows grep_exit union_rows shard_summary="" not_run_note="" not_run_entry
+  local -a problems=() unreadable_notes=() not_run_lines=() shard_indexes=() shard_hosts=() shard_directories=() judged_files=() row_plan_progress=(--progress)
   [[ -n "$outputs" && -f "$outputs" ]] || mutation_shard_fail "合并那一步没给在的各片产物表（TASK_SERVER_SHARD_OUTPUTS=${outputs:-没设}）" "这一步只由 task-server 起"
   scratch="$(mktemp -d)" || mutation_shard_fail "建不了放 row-plan 输出的临时目录" "看 \$TMPDIR 满没满、有没有写权限"
   # 读计划：各片的产物表里哪几片交了 judged-rows，各判了几行；所有片判的行并成一份（去重、从小到大），row-plan 只算一趟
@@ -684,14 +748,20 @@ mutation_shard_task_server_merge() { # 文件头「三步」的 merge：只核�
     mutation_shard_merge_line 逐片核对 开始
     for position in "${!shard_indexes[@]}"; do
       index="${shard_indexes[position]}" host="${shard_hosts[position]}" directory="${shard_directories[position]}"
-      counts="$(mutation_shard_rows_in_service "$scratch/row-plan.tsv" "$directory/judged-rows" "$scratch/unreadable-$index")" \
+      counts="$(mutation_shard_rows_in_service "$scratch/row-plan.tsv" "$directory/judged-rows" "$scratch/unreadable-$index" "$directory/not-run-record" "$scratch/not-run-$index" "$scratch/malformed-$index")" \
         || { problems+=("第 $index 片（$host）：核读得到读不到的那一段 python 没跑成"); continue; }
-      read -r readable unreadable <<< "$counts"
+      read -r readable unreadable not_run malformed <<< "$counts"
       merged=$((merged + 1))
-      total_readable=$((total_readable + readable)); total_unreadable=$((total_unreadable + unreadable))
-      mutation_shard_merge_line 逐片核对 "第 $index 片（$host）判的 $((readable + unreadable)) 行，读到 $readable 行、读不到 $unreadable 行"
+      total_readable=$((total_readable + readable)); total_unreadable=$((total_unreadable + unreadable)); total_not_run=$((total_not_run + not_run))
+      not_run_note=""
+      (( not_run == 0 )) || not_run_note="、本次未跑 $not_run 行"
+      mutation_shard_merge_line 逐片核对 "第 $index 片（$host）判的 $((readable + unreadable + not_run)) 行，读到 $readable 行、读不到 $unreadable 行$not_run_note"
+      while IFS= read -r not_run_entry; do not_run_lines+=("第 $index 片（$host）${not_run_entry#*$'\t'}"); done < "$scratch/not-run-$index"
+      if (( malformed > 0 )); then
+        problems+=("第 $index 片（$host）交的本次未跑记录（$directory/not-run-record）有 $malformed 行读不出行号、或点名的行不在这一片判的行里，这几行不当本次未跑，头一行：$(head -n 1 -- "$scratch/malformed-$index" | clip_text 300)")
+      fi
       if (( readable == 0 && unreadable > 0 )); then
-        problems+=("第 $index 片（$host）判的 $unreadable 行按此刻的行键在 prune-server 里一行都读不到（先比判法单元指纹：那一片开跑之后有人改了判法读的文件，那一片判的记录照开跑时的指纹进行键、此刻的行键对不上——那一片日志里 crates-mutation-replay 开跑那一行的「判法单元 <前 16 位>…」与此刻在树根跑 python3 scripts/mutation/crates-mutation-rows.py judging-units $tree_root 打的指纹前 16 位比，不同就照此刻的判法重交整趟；相同再看它是不是写进了别的库：那一片连的是不是同一份服务、被判的是不是同一棵树）")
+        problems+=("第 $index 片（$host）判的 $unreadable 行按此刻的行键在 prune-server 里一行都读不到（先查它是不是写进了别的库：那一片连的是不是同一份服务；再比两台的源码：被判的是不是同一棵树，被改坏的单元与点名测试的闭包里的源码不同，行键就不同；行键里没有编译器、链接器、cargo 配置与版本这类构建环境，不用比）")
       elif (( unreadable > 0 )); then
         unreadable_notes+=("第 $index 片（$host）读不到的 $unreadable 行：$(tr '\n' ' ' < "$scratch/unreadable-$index")")
       fi
@@ -699,10 +769,19 @@ mutation_shard_task_server_merge() { # 文件头「三步」的 merge：只核�
     mutation_shard_merge_line 逐片核对 "完，用了 $((SECONDS - step_started)) 秒"
   fi
   rm -rf -- "${scratch:?}"
-  (( ${#problems[@]} == 0 )) || mutation_shard_fail "$(IFS='；'; echo "${problems[*]}")" "照括号里点名的那一片先比它开跑时与此刻的判法单元指纹，再查它写进了哪份库；row-plan 退非 0 的单跑 python3 scripts/mutation/crates-mutation-rows.py row-plan <树根> --rows <某一片的 judged-rows> --progress 看它报什么"
+  # 各片自己报了本次未跑的行逐条列（门禁的写法：「本次未跑：N 条」一行，之后一条一行），不算读不到、不让整道判红
+  if (( total_not_run > 0 )); then
+    echo "  · 本次未跑：$total_not_run 条（各片起的门禁报的：点名的测试在那一片所在的台上没跑到被改坏的那一处，不算抓到、不算没红，这一趟不是整张表的结论）"
+    printf '    · %s\n' "${not_run_lines[@]}"
+  fi
+  (( ${#problems[@]} == 0 )) || mutation_shard_fail "$(IFS='；'; echo "${problems[*]}")" "照括号里点名的那一片先查它写进了哪份库，再比两台的源码；row-plan 退非 0 的单跑 python3 scripts/mutation/crates-mutation-rows.py row-plan <树根> --rows <某一片的 judged-rows> --progress 看它报什么"
   (( ${#unreadable_notes[@]} == 0 )) || echo "  · 合并：$(IFS='；'; echo "${unreadable_notes[*]}")（没判成或不算数的结局，由接着的核账报）"
   [[ -z "${TASK_SERVER_SHARD_MISSING:-}" ]] || echo "  · 合并：缺第 ${TASK_SERVER_SHARD_MISSING} 片（人手单独取消的），它那一堆的行没判，接着的核账报它们"
-  echo "  ✓ 分片合并：$merged 片判的 $((total_readable + total_unreadable)) 行里 $total_readable 行按此刻的行键在 prune-server 里读得到、$total_unreadable 行读不到；接着由 crates-mutation-replay 在这一步核账"
+  if (( total_not_run == 0 )); then
+    echo "  ✓ 分片合并：$merged 片判的 $((total_readable + total_unreadable)) 行里 $total_readable 行按此刻的行键在 prune-server 里读得到、$total_unreadable 行读不到；接着由 crates-mutation-replay 在这一步核账"
+  else
+    echo "  ✓ 分片合并：$merged 片判的 $((total_readable + total_unreadable + total_not_run)) 行里 $total_readable 行抓到（按此刻的行键在 prune-server 里读得到）、$total_not_run 行本次未跑（逐条见上，不算抓到、不算没红）、$total_unreadable 行读不到；这一趟不是整张表的结论；接着由 crates-mutation-replay 在这一步核账"
+  fi
 }
 
 mutation_shard_main() {
@@ -755,7 +834,7 @@ mutation_shard_main() {
 }
 
 # ── 自证 ──────────────────────────────────────────────────────────────────────
-# 在临时目录里搭一棵小仓（本仓的 .claude/scripts、crates-mutation-replay 与登记表、scripts 整个目录、.claude/hooks/lib_work_root.py（判法单元的闭包够到它）、规范副本的符号链接，加一个 crates/tiny 与六行变异表），
+# 在临时目录里搭一棵小仓（本仓的 .claude/scripts、crates-mutation-replay 与登记表、scripts 整个目录、.claude/hooks/lib_work_root.py（memory_peaks_lib.py 的自证按路径载入它）、规范副本的符号链接，加一个 crates/tiny 与六行变异表），
 # 配置写在临时目录里（SINGLEFS_MULTI_HOST_CONFIG）。
 # 假 cargo（往自己目录下的 invocations.log 记起了哪几条）照 lib.rs 里「// TEST <名> NEEDS <原文>」判 ok / FAILED。逐格：
 #   ① 没经分片判过的行，门禁不现判：库是空的场景里直接起 crates-mutation-replay（核账），退 1、报 6 行在判定库里没有键相同的记录，假 cargo 一次测试都没起
@@ -765,10 +844,15 @@ mutation_shard_main() {
 #   ㉔ 经 task-server 分片的三步：场景里照 task-server 设的变量逐步起计划、两片、合并，计划写两片（按内存定片数：场景的峰值记录还没有，6 行按保守常量每片至多 5 行）、都不带内存下限，
 #      两片判的记录都写进场景那一份库（服务里同一份，不拷库目录）、各片的产物目录里有 judged-rows，合并按此刻的行键在服务里读得到判的每一行，
 #      之后门禁核账全部复用、判绿；不是服务按分片协议起的（没有 TASK_SERVER_SHARD_PHASE）退 2、提示经 task-server 提交
-#   ㉕ 合并只认服务里读得到的：两片起之前就合并，另一片的 judged-rows 点名的行还没判进服务（同「判法单元指纹变了」「写进了别的库」）⇒ 合并退 1、点名那一片，
-#      出路先写比那一片开跑时与此刻的判法单元指纹、再写查它写进了哪份库（弄坏开关 merge-rows-unchecked）
+#   ㉕ 合并只认服务里读得到的：两片起之前就合并，另一片的 judged-rows 点名的行还没判进服务（同「两台源码不同」「写进了别的库」）⇒ 合并退 1、点名那一片，
+#      出路先写查它写进了哪份库、再写比两台的源码（弄坏开关 merge-rows-unchecked）
+#   ㉟ 合并认一片报的本次未跑：场景 notrun 照计划、两片、合并三步走一遍，两台的假 cargo 都把第 9 行点名的测试当没卡的机器上的用例（自己目录下的 not-run-tests，打 NOT_RUN_NO_GPU_ADAPTER 后返回成功），
+#      报了的那一片的产物目录里有 not-run-record；合并退 0，另起「本次未跑：1 条」一行、之后逐条列（行号、变异名、那一片打的原因），成功句报抓到几行、本次未跑 1 行、读不到 0 行与「这一趟不是整张表的结论」；
+#      只判了那一行的一片（一行都读不到、但报了本次未跑）合并同样退 0（弄坏开关 not-run-counted-unreadable、not-run-not-handed-over）
+#   ㊱ 合并：一片没报本次未跑而判的行读不到，退 1、点名那一片、不写本次未跑；报了本次未跑而记录读不出行号的也退 1、不当本次未跑（弄坏开关 unreported-rows-as-not-run）
 #   ㉒ 计划那一步带 --only-rows 点名一行：row-plan 只算那一行的键（弄坏开关 row-plan-whole-table、only-rows-ignored），计划只分那一行；
 #      直接起 row-plan 点名两行算两行、别的行键写 -、不点名算整张 6 行（弄坏开关 row-plan-selection-ignored）
+#   ㉝ 计划那一步的 row-plan 退非 0：假的 row-plan 打一条失败行、退 2，失败句（退 1）里有那一条失败行的字；另一个假的什么都不打、退 2，失败句写「它没打失败行」、没有空括号（弄坏开关 row-plan-failure-line-dropped）
 #   ⑭ ③ 分行（mutation_shard_split_plan）喂一份写好的 row-plan 输出：锚点失效的两行（一行没键、一行有键）与拒算、复用的不进 pending.rows，汇总单报锚点失效 2 行
 #   ⑱ ③ 分行喂 --only-rows 的选行文件：只在选中的行里分；选中的行里要现判的进 pending.rows、复用的不进
 #   ㉗ 点名 N 行：pending.rows 加 after-merge.rows 恰好是点名的 N 行、不相交（喂 ⑭ 那份点名五行与不点名整张两趟；㉔ 判完之后计划那一步点名三行复用的：0 片、三行都记复用）
@@ -791,12 +875,12 @@ mutation_shard_main() {
 #      在 singlefs-mutation-replay-* 里起的每一次都在自证自己的 tmp/ 下、至少一次；跑完外面的临时目录里没多出 singlefs-mutation-replay-*，
 #      「外面的临时目录」是自证在调用方的 TMPDIR 下另建的一层（自证的临时目录就在它里面）：同一个 TMPDIR 下并行的几份自证互不数到对方建的目录，
 #      自证自己的 tmp/ 下也一个不剩（删不删由 crates-mutation-rows.py 的 run_pool 管）
-# 并行（.claude/rules/test-script-discipline.md「编译与算法都要快」）：两个场景（fresh、steps）各一串，两串同时跑；串里互不依赖的几件再同时跑（run_together），
+# 并行（.claude/rules/test-script-discipline.md「编译与算法都要快」）：三个场景（fresh、steps、notrun）各一串，三串同时跑；串里互不依赖的几件再同时跑（run_together），
 #   一批至多每台默认重活线程数件（scripts/hosts/heavy-threads.sh 的 heavy_thread_default，设了 SINGLEFS_THREAD_CAP 照它；取不到一件一件跑）。
 #   每件的输出与退出码落 <临时目录>/parallel/<批名>/ 下它自己的文件，照派活的次序逐个 wait 它的进程号；派出去的件没留下退出码文件的，逐个点名、记一格判错（collect_together）。
 #   各格记进各串自己的文件（子 shell 里的计数传不回来），收齐之后照登记次序回放、数格数；成功句报「并行 N 路」（各批同时跑的最多件数）。
-#   有次序的留在串里照次序跑：⑦ ⑨ 用 ① 搭好的场景；steps 里计划那一步在前（先把小仓的判法单元算热，之后几件取缓存），㉕ 的合并要在两片判进库之前，
-#   两片判完才合并、核账、再点名复用的行；⑭ ⑱ ㉗ ⑫ 在两串都收回之后跑（㉗ 读 steps 那一串留下的文件，⑫ 数两个场景留下的记录）；㉘ 的三趟与 ㉜ 的两趟在那之后同时跑（run_together memory-plan）。
+#   有次序的留在串里照次序跑：⑦ ⑨ 用 ① 搭好的场景；steps 里计划那一步在前，㉕ 的合并要在两片判进库之前，
+#   两片判完才合并、核账、再点名复用的行；⑭ ⑱ ㉗ ⑫ 在三串都收回之后跑（㉗ 读 steps 那一串留下的文件，⑫ 数三个场景留下的记录）；㉘ 的三趟与 ㉜ 的两趟在那之后同时跑（run_together memory-plan）。
 # 弄坏开关各让对应的格判错（见文件头「弄坏开关」）。
 # 场景里的门禁经 prune-server 写判定库：只在临时服务上跑（scripts/prune-server/prune_server_client.py 文件头「命令行」--with-temporary-service），不是就退 2、一格都不跑，不写真服务。
 mutation_shard_selftest() {
@@ -899,8 +983,7 @@ mutation_shard_selftest() {
   rsync -a --exclude __pycache__ "$repository_root/.claude/gate.d/lib/" "$template/.claude/gate.d/lib/"   # crates-mutation-replay source 的格共用库
   rsync -a --exclude __pycache__ --exclude /experiment-apparatus/target/ "$repository_root/scripts/" "$template/scripts/"   # 装置的编译目录几十 G，自证用不到
   ln -s "$repository_root/.claude/singlefs-ai-sop" "$template/.claude/singlefs-ai-sop"
-  # 判法单元的闭包（crates-mutation-rows.py 文件头「判法单元」）够得到 .claude/hooks/lib_work_root.py（memory_peaks_lib.py 的自证按路径载入它）：场景小仓里没有它，闭包记拒算 spec-path-missing，
-  #   算不出判法单元指纹，计划那一步与门禁整张判都退 1。只拷这一份，不拷整个 .claude/hooks/
+  # memory_peaks_lib.py 的自证按路径载入 .claude/hooks/lib_work_root.py：场景小仓里没有它，那一格载不进。只拷这一份，不拷整个 .claude/hooks/
   mkdir -p "$template/.claude/hooks"
   cp -- "$repository_root/.claude/hooks/lib_work_root.py" "$template/.claude/hooks/"
   printf 'target/\n__pycache__/\n/multi-host.env\n/.claude/singlefs-ai-sop\n' > "$template/.gitignore"
@@ -951,7 +1034,7 @@ SAMPLE_SOURCE
 #!/usr/bin/env python3
 # rocksdb-prebuilt-entry: selftest-fake-cargo（起 cargo 之前那几道 rocksdb-prebuilt.py entry 认这一行、不判）
 # 分片那一套自证的假 cargo：-V 打版本；test 照 crates/tiny/src/lib.rs 里「// TEST <名> NEEDS <原文>」判，原文在就 ok、不在就 FAILED；
-# 每起一次往自己目录下的 invocations.log 记「<过滤词>\t<lib.rs 的 sha256 前 12 位>」。
+# 每起一次往自己目录下的 invocations.log 记「<过滤词>\t<lib.rs 的 sha256 前 12 位>」；自己目录下的 not-run-tests 点名的用例不看源码、一律 ok，带 --show-output 时再打一行 NOT_RUN_NO_GPU_ADAPTER。
 # 记覆盖那两次（照 crates-mutation-rows.py 自证的假 cargo）：开头的 --config <值> 跳过；test --no-run 在 $CARGO_TARGET_DIR/debug/deps/ 下写假的可执行文件
 # （JSON：副本的根与 crates/tiny/src 下的 .rs）与它的 dep-info、打一行 compiler-artifact；设了 LLVM_PROFILE_FILE 的把跑到的用例执行的函数
 # （定义行里有那段原文的）写进那份 .profraw；假 llvm 工具是 crates-mutation-rows.py 的 FAKE_LLVM_TOOL
@@ -984,9 +1067,12 @@ after = arguments[arguments.index("--") + 1:] if "--" in arguments else []
 filters = [word for word in after if not word.startswith("-")]
 with open(os.path.join(here, "invocations.log"), "a", encoding="utf-8") as log:
     log.write(" ".join(filters) + "\t" + hashlib.sha256(source.encode()).hexdigest()[:12] + "\n")
-failed, executed = False, set()
+failed, executed, shown = False, set(), []
 definitions = re.findall(r"(?m)^pub fn (\w+).*$", source)
 lines = source.splitlines()
+# 自己目录下的 not-run-tests 点名的用例（一行一个）照没卡的机器上的 GPU 对拍用例：返回成功，带 --show-output 时交出一行 NOT_RUN_NO_GPU_ADAPTER
+not_run_path = os.path.join(here, "not-run-tests")
+not_run_names = set(open(not_run_path, encoding="utf-8").read().split()) if os.path.isfile(not_run_path) else set()
 for line in lines:
     words = line.split(" ", 4)
     if len(words) < 5 or words[:2] != ["//", "TEST"]:
@@ -994,10 +1080,17 @@ for line in lines:
     name, what = words[2], words[4]
     if filters and not any(word in "tests::" + name for word in filters):
         continue
+    if name in not_run_names:
+        print(f"test tests::{name} ... ok")
+        if "--show-output" in arguments:
+            shown.append(f"---- tests::{name} stdout ----\nNOT_RUN_NO_GPU_ADAPTER test={name} reason=自证：本机没有 GPU 适配器\n")
+        continue
     executed |= {match.group(1) for definition in lines for match in [re.match(r"^pub fn (\w+)", definition)] if match and what in definition}
     ok = what in source.replace(line, "")
     failed = failed or not ok
     print(f"test tests::{name} ... {'ok' if ok else 'FAILED'}")
+for text in shown:
+    print(text, end="")
 if os.environ.get("LLVM_PROFILE_FILE"):
     with open(os.environ["LLVM_PROFILE_FILE"].replace("%p", str(os.getpid())).replace("%m", "0"), "w", encoding="utf-8") as handle:
         json.dump({"executed": sorted(executed)}, handle)
@@ -1078,10 +1171,10 @@ FAKE_LLVM
     fi
     echo "$exit_code" > "$scene/exit"
   }
-  # 两个场景各是一串，两串同时跑（run_together scenes）：fresh 那一串是 ① ⑦ ⑨，steps 那一串是 ㉒ ㉕ ㉖ ㉔ 与 ㉗ 要的计划那一步。
-  #   串里有次序：⑦ ⑨ 用 ① 搭好的场景；steps 里计划那一步在前（它先把这棵小仓的判法单元算热），㉕ 的合并要在两片判进库之前，两片判完才合并、核账、再点名复用的行。
+  # 三个场景各是一串，三串同时跑（run_together scenes）：fresh 那一串是 ① ⑦ ⑨，steps 那一串是 ㉒ ㉕ ㉖ ㉔ 与 ㉗ 要的计划那一步，notrun 那一串是 ㉟ ㊱。
+  #   串里有次序：⑦ ⑨ 用 ① 搭好的场景；steps 里计划那一步在前，㉕ 的合并要在两片判进库之前，两片判完才合并、核账、再点名复用的行。
   #   串里互不依赖的几件再同时跑：计划之后的 ㉒ 计划点名一行、㉒ 直接起的两趟 row-plan、㉕ 的合并、㉖ 的两片（都不往库里写）；两片判进库那两件
-  #   （两台同时判同一份库就是分片的正常用法）。⑭ ⑱ ㉗ ⑫ 等两串都收回之后在这一层跑：㉗ 读 steps 那一串计划那一步留下的文件，⑫ 数两个场景留下的记录
+  #   （两台同时判同一份库就是分片的正常用法）。⑭ ⑱ ㉗ ⑫ 等三串都收回之后在这一层跑：㉗ 读 steps 那一串计划那一步留下的文件，⑫ 数三个场景留下的记录
   scene_fresh() { # ① ⑦ ⑨：场景 fresh 里照次序跑，格记进 expect-fresh.tsv
     local expect_records="$work/expect-fresh.tsv"
     # ① 没经分片判过的行，门禁不现判（核账，crates-mutation-replay.sh 文件头「分片」）：库是空的场景里直接起 crates-mutation-replay，
@@ -1166,8 +1259,8 @@ FAKE_LLVM
     local steps_only_rows="$steps/only-one.selection" steps_only_plan_exit steps_only_piles
     mkdir -p "$steps/plan-only"
     printf '7\n' > "$steps_only_rows"   # 变异表前三行是表头注释：第 7 行 halve-becomes-third
-    # ㉕ 合并只认服务里读得到的（文件头「三步」merge）：两片起之前就合并，另一片的 judged-rows 点名的行还没判进服务（与判法单元指纹变了、写进了别的库同形）⇒ 合并退 1、点名那一片，
-    #    出路先写比那一片开跑时与此刻的判法单元指纹，再写查它写进了哪份库
+    # ㉕ 合并只认服务里读得到的（文件头「三步」merge）：两片起之前就合并，另一片的 judged-rows 点名的行还没判进服务（与两台源码不同、写进了别的库同形）⇒ 合并退 1、点名那一片，
+    #    出路先写查它写进了哪份库，再写比两台的源码
     local steps_lost_exit
     mkdir -p "$steps/output-lost"
     cp -- "$steps/plan/shard-1.selection" "$steps/output-lost/judged-rows" 2>/dev/null
@@ -1189,10 +1282,10 @@ FAKE_LLVM
     steps_plan_view="$(python3 -c 'import json, sys; plan = json.load(open(sys.argv[1], encoding="utf-8")); print(" ".join(("pin=" + shard["pin"] if "pin" in shard else "unpinned") + ":" + str("memory_floor" in shard) for shard in plan["shards"]))' "$steps/plan/plan.json" 2>&1)"
     steps_piles="$(cat "$steps/plan/shard-0.selection" "$steps/plan/shard-1.selection" 2>/dev/null | grep -c '[0-9]') $(cat "$steps/plan/shard-0.selection" "$steps/plan/shard-1.selection" 2>/dev/null | sort -u | grep -c '[0-9]')"
     steps_lost_exit="$(exit_of steps-after-plan merge-lost)"
-    expect "㉕ 合并：另一片判的行按此刻的行键在服务里一行都读不到（判法单元指纹变了或写进了别的库）⇒ 退 1、点名那一片，出路先写比判法单元指纹" \
+    expect "㉕ 合并：另一片判的行按此刻的行键在服务里一行都读不到（写进了别的库或两台源码不同）⇒ 退 1、点名那一片，出路先写查它写进了哪份库、再写比两台的源码" \
       "$([[ "$steps_lost_exit" == 1 && -s "$steps/output-lost/judged-rows" ]] \
-           && grep -q '第 1 片（peer）判的 [1-9][0-9]* 行按此刻的行键在 prune-server 里一行都读不到（先比判法单元指纹：.*crates-mutation-rows.py judging-units .*相同再看它是不是写进了别的库' "$steps/merge-lost.out" \
-           && grep -q '→ 怎么办：照括号里点名的那一片先比它开跑时与此刻的判法单元指纹，再查它写进了哪份库' "$steps/merge-lost.out"; echo $?)" \
+           && grep -q '第 1 片（peer）判的 [1-9][0-9]* 行按此刻的行键在 prune-server 里一行都读不到（先查它是不是写进了别的库：.*再比两台的源码' "$steps/merge-lost.out" \
+           && grep -q '→ 怎么办：照括号里点名的那一片先查它写进了哪份库，再比两台的源码' "$steps/merge-lost.out"; echo $?)" \
       "合并退 $steps_lost_exit；输出尾部：$(tail -3 "$steps/merge-lost.out" | tr '\n' ' ')"
     for step_index in 0 1; do
       missing_tools_exits+="$(exit_of steps-after-plan "no-llvm-$step_index") "
@@ -1302,10 +1395,95 @@ FAKE_LLVM
       "点名两行那一趟：「${row_plan_selected_stderr:0:100}」（输出 $row_plan_selected_lines 行、有键的 $row_plan_keyed_lines 行：$(head -2 "$work/split-only/row-plan-two.tsv" | cut -c1-400 | tr '\n' ' ')）；整张那一趟：「${row_plan_whole_stderr:0:100}」"
   }
 
-  run_together scenes fresh scene_fresh "" steps scene_steps ""
+  # notrun 那一串（㉟ ㊱）：计划、两片、合并三步照 task-server 设的变量走一遍，两台的假 cargo 都把第 9 行（square-becomes-double）点名的测试 squares 当没卡的机器上的 GPU 对拍用例
+  #   （自己目录下的 not-run-tests 点名：返回成功、带 --show-output 打 NOT_RUN_NO_GPU_ADAPTER），那一行判成本次未跑；两片起的门禁把它记进产物目录的 not-run-record。
+  #   ㉟ 合并认各片报的本次未跑：合并退 0，另起「本次未跑：1 条」逐条列，成功句报抓到几条、本次未跑几条；只判了那一行的一片同样退 0。
+  #   ㊱ 没报本次未跑而行读不到的一片退 1；报了而读不出行号的也退 1、不当本次未跑
+  notrun_shard_step() { # <片号>：照计划起那一片
+    scene_environment notrun env TASK_SERVER_TASK="selftest-not-run-shard-$1" TASK_SERVER_SHARD_PHASE=shard TASK_SERVER_SHARD="$1/2" \
+      TASK_SERVER_SHARD_PLAN_DIRECTORY="$notrun/plan" TASK_SERVER_SHARD_OUTPUT_DIRECTORY="$notrun/output-$1" \
+      bash "$notrun/repo/scripts/mutation/mutation-shard-run.sh" "$notrun/repo" > "$notrun/shard-$1.out" 2>&1
+  }
+  notrun_merge() { # <名> <产物表>：起合并那一步，输出落 $notrun/<名>.out，在标准输出打它的退出码
+    local merge_exit
+    if scene_environment notrun env TASK_SERVER_TASK="selftest-not-run-merge-$1" TASK_SERVER_SHARD_PHASE=merge TASK_SERVER_SHARD_PLAN_DIRECTORY="$notrun/plan" TASK_SERVER_SHARD_OUTPUTS="$2" \
+         bash "$notrun/repo/scripts/mutation/mutation-shard-run.sh" "$notrun/repo" > "$notrun/$1.out" 2>&1; then
+      merge_exit=0
+    else
+      merge_exit=$?
+    fi
+    echo "$merge_exit"
+  }
+  scene_notrun() { # ㉟ ㊱：场景 notrun 里跑，格记进 expect-notrun.tsv
+    local expect_records="$work/expect-notrun.tsv"
+    prepare_scene notrun
+    local notrun="$work/notrun" notrun_plan_exit notrun_shard_exits notrun_reporters="" notrun_reporter="" notrun_host="" notrun_index notrun_record_line notrun_union
+    local notrun_merge_exit notrun_lonely_exit notrun_unreported_exit notrun_garbled_exit notrun_problems="" notrun_unreported_problems=""
+    local notrun_row_text='crates/mutations.tsv:9 square-becomes-double：本次未跑——点名的测试 squares 打了 NOT_RUN_NO_GPU_ADAPTER（自证：本机没有 GPU 适配器）后返回成功'
+    mkdir -p "$notrun/plan"
+    printf 'squares\n' > "$notrun/local-bin/not-run-tests"
+    printf 'squares\n' > "$notrun/peer-bin/not-run-tests"
+    if scene_environment notrun env TASK_SERVER_TASK=selftest-not-run-plan TASK_SERVER_SHARD_PHASE=plan TASK_SERVER_SHARD_PLAN_DIRECTORY="$notrun/plan" TASK_SERVER_SHARD_MAXIMUM=64 GATE_MUTATION_WORKERS=6 \
+         bash "$notrun/repo/scripts/mutation/mutation-shard-run.sh" "$notrun/repo" > "$notrun/plan.out" 2>&1; then
+      notrun_plan_exit=0
+    else
+      notrun_plan_exit=$?
+    fi
+    run_together notrun-shards shard-0 notrun_shard_step 0 shard-1 notrun_shard_step 1
+    collect_together notrun-shards shard-0 shard-1
+    notrun_shard_exits="$(exit_of notrun-shards shard-0) $(exit_of notrun-shards shard-1) "
+    for notrun_index in 0 1; do
+      [[ -s "$notrun/output-$notrun_index/not-run-record" ]] && notrun_reporters+="$notrun_index "
+    done
+    notrun_reporter="${notrun_reporters%% *}"
+    [[ "$notrun_reporter" == 0 ]] && notrun_host=local
+    [[ "$notrun_reporter" == 1 ]] && notrun_host=peer
+    notrun_record_line=""
+    [[ -n "$notrun_reporter" ]] && notrun_record_line="$(grep -h -m 1 'crates/mutations.tsv:9 ' "$notrun/output-$notrun_reporter/not-run-record")"
+    printf '0\tlocal\t%s\n1\tpeer\t%s\n' "$notrun/output-0" "$notrun/output-1" > "$notrun/outputs.tsv"
+    notrun_merge_exit="$(notrun_merge merge "$notrun/outputs.tsv")"
+    notrun_union="$(cat "$notrun/output-0/judged-rows" "$notrun/output-1/judged-rows" 2>/dev/null | sort -u | grep -c '[0-9]')"
+    # 只判了那一行本次未跑的一片（一片一行、读不到的就是那一行）：报了本次未跑的退 0，没报的退 1、写读不到的那句，报的记录读不出行号的退 1
+    mkdir -p "$notrun/lonely-reported" "$notrun/lonely-unreported" "$notrun/lonely-garbled"
+    printf '9\n' > "$notrun/lonely-reported/judged-rows"
+    printf '9\n' > "$notrun/lonely-unreported/judged-rows"
+    printf '9\n' > "$notrun/lonely-garbled/judged-rows"
+    printf '%s\n' "$notrun_record_line" > "$notrun/lonely-reported/not-run-record"
+    printf 'crates-mutation-replay.sh 本次未跑：这一行没有变异表行号\n' > "$notrun/lonely-garbled/not-run-record"
+    printf '1\tpeer\t%s\n' "$notrun/lonely-reported" > "$notrun/outputs-lonely-reported.tsv"
+    printf '1\tpeer\t%s\n' "$notrun/lonely-unreported" > "$notrun/outputs-lonely-unreported.tsv"
+    printf '1\tpeer\t%s\n' "$notrun/lonely-garbled" > "$notrun/outputs-lonely-garbled.tsv"
+    notrun_lonely_exit="$(notrun_merge lonely-reported "$notrun/outputs-lonely-reported.tsv")"
+    notrun_unreported_exit="$(notrun_merge lonely-unreported "$notrun/outputs-lonely-unreported.tsv")"
+    notrun_garbled_exit="$(notrun_merge lonely-garbled "$notrun/outputs-lonely-garbled.tsv")"
+    [[ "$notrun_plan_exit" == 0 && "$notrun_shard_exits" == "0 0 " ]] || notrun_problems+="计划退 $notrun_plan_exit、两片退「$notrun_shard_exits」；"
+    [[ "$notrun_reporters" == "0 " || "$notrun_reporters" == "1 " ]] || notrun_problems+="产物目录里有 not-run-record 的片是「${notrun_reporters:-没有}」，要恰好一片（那一行只在一片里判）；"
+    [[ "$notrun_record_line" == *"$notrun_row_text"* ]] || notrun_problems+="not-run-record 里没有第 9 行那一句（${notrun_record_line:-没找到}）；"
+    [[ "$notrun_merge_exit" == 0 ]] || notrun_problems+="合并退 $notrun_merge_exit；"
+    grep -qF -- "  · 本次未跑：1 条（" "$notrun/merge.out" || notrun_problems+="合并输出里没有「本次未跑：1 条」那一行；"
+    grep -qF -- "    · 第 $notrun_reporter 片（$notrun_host）$notrun_row_text" "$notrun/merge.out" || notrun_problems+="合并输出里没有逐条列第 9 行（行号、变异名、那一片打的原因）；"
+    grep -qF -- "✓ 分片合并：2 片判的 $notrun_union 行里 $((notrun_union - 1)) 行抓到（按此刻的行键在 prune-server 里读得到）、1 行本次未跑（逐条见上，不算抓到、不算没红）、0 行读不到；这一趟不是整张表的结论" "$notrun/merge.out" \
+      || notrun_problems+="成功句没写抓到 $((notrun_union - 1)) 行、本次未跑 1 行、读不到 0 行与「这一趟不是整张表的结论」；"
+    ! grep -q '一行都读不到' "$notrun/merge.out" || notrun_problems+="合并输出里有「一行都读不到」；"
+    [[ "$notrun_lonely_exit" == 0 ]] && grep -qF -- "  · 本次未跑：1 条（" "$notrun/lonely-reported.out" && grep -qF -- "    · 第 1 片（peer）$notrun_row_text" "$notrun/lonely-reported.out" \
+      && grep -qF -- "✓ 分片合并：1 片判的 1 行里 0 行抓到" "$notrun/lonely-reported.out" \
+      || notrun_problems+="只判了第 9 行的一片（报了本次未跑）合并退 $notrun_lonely_exit、没按本次未跑列（${notrun_record_line:-没有记录}）；"
+    expect "㉟ 合并认一片报的本次未跑：两片都起门禁、第 9 行点名的测试在两台上都没跑到被改坏的那一处，报了的那一片在产物目录留下 not-run-record，合并退 0、另起「本次未跑：1 条」逐条列（行号、变异名、那一片打的原因），成功句写抓到几条、本次未跑几条与「这一趟不是整张表的结论」，只判了那一行的一片同样退 0" \
+      "$([[ -z "$notrun_problems" ]]; echo $?)" "${notrun_problems}合并输出尾部：$(tail -4 "$notrun/merge.out" | clip_text 400 | tr '\n' ' ')；只判那一行的一片：$(tail -2 "$notrun/lonely-reported.out" | clip_text 300 | tr '\n' ' ')"
+    [[ "$notrun_unreported_exit" == 1 ]] && grep -qF -- '第 1 片（peer）判的 1 行按此刻的行键在 prune-server 里一行都读不到（先查它是不是写进了别的库' "$notrun/lonely-unreported.out" \
+      && ! grep -qF -- '本次未跑：1 条' "$notrun/lonely-unreported.out" \
+      || notrun_unreported_problems+="没报本次未跑、判的一行读不到的一片合并退 $notrun_unreported_exit（要退 1、点名那一片、不写本次未跑）；"
+    [[ "$notrun_garbled_exit" == 1 ]] && grep -qF -- '交的本次未跑记录' "$notrun/lonely-garbled.out" && grep -qF -- '读不出行号' "$notrun/lonely-garbled.out" \
+      && ! grep -qF -- '本次未跑：1 条' "$notrun/lonely-garbled.out" \
+      || notrun_unreported_problems+="本次未跑记录读不出行号的一片合并退 $notrun_garbled_exit（要退 1、点名读不出行号、不写本次未跑）；"
+    expect "㊱ 合并：一片没报本次未跑而判的行读不到，退 1、点名那一片，出路先写查它写进了哪份库、再写比两台的源码；报了本次未跑而记录读不出行号的也退 1，不当本次未跑" \
+      "$([[ -z "$notrun_unreported_problems" ]]; echo $?)" "${notrun_unreported_problems}没报的那一趟尾部：$(tail -2 "$notrun/lonely-unreported.out" | clip_text 300 | tr '\n' ' ')；读不出行号的那一趟尾部：$(tail -2 "$notrun/lonely-garbled.out" | clip_text 300 | tr '\n' ' ')"
+  }
+
+  run_together scenes fresh scene_fresh "" steps scene_steps "" notrun scene_notrun ""
   # 弄坏开关 selftest-parallel-exit-dropped：steps 那一串的退出码文件删掉，像那一串没收回
   mutation_shard_break_is selftest-parallel-exit-dropped && rm -f -- "$work/parallel/scenes/steps.exit"
-  collect_together scenes fresh steps
+  collect_together scenes fresh steps notrun
   local steps="$work/steps" reused_plan_exit reused_plan_rows reused_plan_shards
   reused_plan_exit="$(cat -- "$steps/plan-reused.exit" 2>&1)"
   reused_plan_rows="$(tr '\t\n' ': ' < "$steps/plan-reused/after-merge.rows" 2>/dev/null)"
@@ -1341,6 +1519,24 @@ FAKE_LLVM
   expect "⑱ ③ 分行带选行文件：只在选中的行里分，选中的行里要现判的进 pending.rows、复用的不进" \
     "$([[ "$only_line_one" == "2 1 4 3.5 0 0 1 -" && "$only_pending_one" == "2 " && "$only_line_two" == "2 2 4 3.5 0 0 0 -" && "$only_pending_two" == "1 2 " ]]; echo $?)" \
     "选中第 2、6 行：汇总「$only_line_one」pending.rows「$only_pending_one」；选中第 1、2 行：汇总「$only_line_two」pending.rows「$only_pending_two」"
+
+  # ㉝ 计划那一步的 row-plan 退非 0：row-plan 的失败行打在标准输出、写进计划目录的 row-plan.tsv，失败句要带出头一条。
+  #    两个假的 row-plan（python 文件，一个打一条失败行、一个什么都不打，都退 2）各在一个子 shell 里起计划那一步（子 shell 里 mutation_shard_fail 的 exit 只退这一层）
+  local plan_failure="$work/plan-failure" failure_with_line failure_with_line_exit failure_without_line failure_without_line_exit
+  mkdir -p "$plan_failure/with-line" "$plan_failure/without-line"
+  printf '%s\n' 'import sys' 'print("  ✗ 假的 row-plan 打的失败行：selftest-row-plan-failure")' 'print("     → 怎么办：假的出路")' 'sys.exit(2)' > "$plan_failure/failing-with-line.py"
+  printf '%s\n' 'import sys' 'sys.exit(2)' > "$plan_failure/failing-without-line.py"
+  failure_with_line="$(rows_module="$plan_failure/failing-with-line.py" tree_root="$plan_failure" only_rows_file="" TASK_SERVER_SHARD_PLAN_DIRECTORY="$plan_failure/with-line" \
+    mutation_shard_task_server_plan 2>&1)"
+  failure_with_line_exit=$?
+  failure_without_line="$(rows_module="$plan_failure/failing-without-line.py" tree_root="$plan_failure" only_rows_file="" TASK_SERVER_SHARD_PLAN_DIRECTORY="$plan_failure/without-line" \
+    mutation_shard_task_server_plan 2>&1)"
+  failure_without_line_exit=$?
+  expect "㉝ 计划那一步的 row-plan 退非 0：失败句带出它打的失败行，一条都没打时写它没打失败行" \
+    "$([[ "$failure_with_line_exit" == 1 && "$failure_without_line_exit" == 1 \
+       && "$failure_with_line" == *"row-plan 退非 0，它打的失败行：✗ 假的 row-plan 打的失败行：selftest-row-plan-failure）"* \
+       && "$failure_without_line" == *"row-plan 退非 0，它没打失败行）"* ]]; echo $?)" \
+    "打了一条失败行的那一趟退 $failure_with_line_exit：「$(head -n 1 <<< "$failure_with_line" | clip_text 300)」；什么都没打的那一趟退 $failure_without_line_exit：「$(head -n 1 <<< "$failure_without_line" | clip_text 300)」"
 
   # ㉗ 点名 N 行：要现判的行（pending.rows）加留给合并之后的行（after-merge.rows）恰好是点名的这 N 行、互不相交。三样：
   #   喂 ⑭ 那份 row-plan 输出、点名第 1、3、4、5、6 行（要现判、锚点失效没键、锚点失效有键、拒算、复用各一）；同一份不点名（整张 6 行）；
@@ -1587,9 +1783,9 @@ PY_ASSIGN_JUDGE
     [[ -n "$outside_entry" && "$outside_entry" == "$outside_temporary"/singlefs-mutation-replay-* ]] && rm -rf -- "${outside_entry:?}"
   done <<< "$outside_new"
 
-  # 照登记次序回放各格（fresh 那一串、steps 那一串、这一层），数格数与判错数
+  # 照登记次序回放各格（fresh 那一串、steps 那一串、notrun 那一串、这一层），数格数与判错数
   local records passed label detail parallel_ways=1 width_file width
-  for records in "$work/expect-fresh.tsv" "$work/expect-steps.tsv" "$work/expect-selftest.tsv"; do
+  for records in "$work/expect-fresh.tsv" "$work/expect-steps.tsv" "$work/expect-notrun.tsv" "$work/expect-selftest.tsv"; do
     [[ -f "$records" ]] || continue
     while IFS=$'\t' read -r passed label detail; do
       checked=$((checked + 1))
@@ -1612,7 +1808,7 @@ PY_ASSIGN_JUDGE
     echo "     → 怎么办：设了 MUTATION_SHARD_RUN_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看驱动的计划、各片、合并三步"
     return 1
   fi
-  echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对，并行 $parallel_ways 路（经 task-server 分片的计划、各片、合并三步：计划按片估内存定片数（每片预计内存在安全额度内、整个包跑的重行不与轻的行同片、轻的那几片只按轻的估、行少只一片、片数不超过服务交的上限）、各片不相交且不带内存下限、两片判进服务里同一份库、合并按此刻的行键核两片判的行读得到（读不到的那一片退 1）、合并与核账分步打开始结束行、一步慢时有心跳行、之后门禁核账全部复用、判绿；没经分片判过的行门禁不现判；不是服务按分片协议起的退 2、选行模式下被调退 2、弄坏开关设在自证之外退 2；--only-rows 只对选中的行算键、只在选中的行里分；锚点失效的行不分；点名的行要么进一堆、要么在 after-merge.rows 里留给合并之后的核账；场景跑完不留 singlefs-mutation-replay-*）"
+  echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对，并行 $parallel_ways 路（经 task-server 分片的计划、各片、合并三步：计划按片估内存定片数（每片预计内存在安全额度内、整个包跑的重行不与轻的行同片、轻的那几片只按轻的估、行少只一片、片数不超过服务交的上限）、各片不相交且不带内存下限、两片判进服务里同一份库、合并按此刻的行键核两片判的行读得到（读不到的那一片退 1；一片自己报了本次未跑的行不算读不到、另起「本次未跑」逐条列、不让整道判红）、合并与核账分步打开始结束行、一步慢时有心跳行、之后门禁核账全部复用、判绿；没经分片判过的行门禁不现判；不是服务按分片协议起的退 2、选行模式下被调退 2、弄坏开关设在自证之外退 2；--only-rows 只对选中的行算键、只在选中的行里分；计划那一步 row-plan 退非 0 时失败句带出它打的失败行；锚点失效的行不分；点名的行要么进一堆、要么在 after-merge.rows 里留给合并之后的核账；场景跑完不留 singlefs-mutation-replay-*）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then

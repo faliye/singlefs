@@ -41,7 +41,7 @@ big_point_upper_bound_tighter	("files_1000_units_1000", 1_000_000, 1_050_000),	(
 f3_raw_edge_at_the_flat_edge	raw.is_some_and(|raw| raw >= BAND_GROWS_AT_LEAST)	raw.is_some_and(|raw| raw >= BAND_DOES_NOT_GROW_AT_MOST)
 rounds_at_the_limit_exclusive	settle.rounds >= SETTLING_ROUNDS_LIMIT	settle.rounds > SETTLING_ROUNDS_LIMIT
 declared_lines_always_match	        declared_count == operations,	        true,
-lower_pair_reads_the_low_end_twice	ends[0].zip(ends[1]).and_then(|(low, middle)| two_point_reading(low.0, middle.0).alpha);	ends[0].zip(ends[1]).and_then(|(low, _)| two_point_reading(low.0, low.0).alpha);
+lower_pair_reads_the_low_end_twice	ends[0].zip(ends[1]).and_then(|(lower_end, middle)| two_point_reading(lower_end.0, middle.0).alpha);	ends[0].zip(ends[1]).and_then(|(lower_end, _)| two_point_reading(lower_end.0, lower_end.0).alpha);
 window_shape_without_the_probe_prefix	    if state == "same_mount" && probe != "standard" {	    if false {
 window_shape_extended_in_both_states	    if state == "same_mount" && EXTENDED_WINDOW_POINTS.contains(&point) {	    if EXTENDED_WINDOW_POINTS.contains(&point) {
 round_work_against_the_largest_round	        .filter(|settle| !settle.detail.is_empty() && settle.detail.iter().map(|round| round.roles_rewritten).sum::<u64>() != settle.round_work)	        .filter(|settle| !settle.detail.is_empty() && settle.detail.iter().map(|round| round.roles_rewritten).max().unwrap_or(0) != settle.round_work)

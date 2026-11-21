@@ -1,5 +1,5 @@
 M1_固定点只跑一轮链被吞掉	while rounds < ROUNDS_UPPER_LIMIT {	while rounds < 1 {
-M2_祖先层不脏	for level in dirty.iter_mut() {\n                if !level[node_index as usize] {	for level in dirty.iter_mut().take(1) {\n                if !level[node_index as usize] {
+M2_祖先层不脏	for level in dirty.iter_mut() {\n                if !level[usize_from_u64(node_index)] {	for level in dirty.iter_mut().take(1) {\n                if !level[usize_from_u64(node_index)] {
 M3_clustered偷偷用随机落点	Arm::Clustered => {\n                bump += 1;\n                bump - 1\n            }	Arm::Clustered => random_generator.below(geometry.total_keys()),
 M4_scattered偷偷聚簇	Arm::Scattered => random_generator.below(geometry.total_keys()),\n                }\n            })	Arm::Scattered => {\n                        bump += 1;\n                        bump - 1\n                    }\n                }\n            })
 M5_守恒计数器漏记链上的分配	.map(|_| {\n                blocks_allocated += 1;	.map(|_| {

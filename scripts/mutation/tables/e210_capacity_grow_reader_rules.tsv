@@ -21,3 +21,7 @@
 对照只跑第一条臂	let arms_under_control: &[Arm] = &ARMS;	let arms_under_control: &[Arm] = &ARMS[..1];
 甲不判成链	if !tables_form_a_chain(&valid_tables) {	if !tables_form_a_chain(&valid_tables) && false {
 基线臂不判全等	if !all_tables_equal(&valid_tables) {	if !all_tables_equal(&valid_tables) && false {
+再变大探测值只加一百	Numbering::OrderPreservingOnEveryNumber => alternative_number(	Numbering::OrderPreservingOnEveryNumber => size + GROW_STEP_SLOTS + 0 * alternative_number(
+换数表不递增	[(100, 10), (200, 20), (300, 30), (400, 40)],	[(100, 10), (200, 5), (300, 30), (400, 40)],
+类数不比	if main.classes != variant.classes {	if false && main.classes != variant.classes {
+登记原文口径取保序变体	.filter(|variant| variant.in_registered_clause)	.filter(|variant| variant.in_order_preserving_check)

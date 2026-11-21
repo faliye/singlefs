@@ -16,7 +16,7 @@ M14_多飞根序去掉F与C的次序约束	if rules.roots_in_txg_order && publis
 M15_fsync返回去掉条件2	if blocked {	if blocked && false {
 第二段补_按配置去重的返回去掉条件2	if !self.is_appended(earlier, configuration) {	if false {
 第二段补_按配置去重不记闭段点	next.closer_pending = operation.closes_a_segment();	next.closer_pending = false;
-第二段补_按配置去重不计闭段点上的待追加	let gained = u64::from(completes_a_closer && pending_next[transaction_index].is_some_and(|value| value > 0));	let gained = 0u64;
+第二段补_按配置去重不计闭段点上的待追加	let gained = u64::from(completes_a_closer && pending_of_transaction.is_some_and(|value| value > 0));	let gained = 0u64;
 第二段补_发布模板的序号改成发布内次序	let ordinal = 1 + rank_keys.iter().filter(|other_key| **other_key < key).count();	let ordinal = 1 + position_in_publish;
 第二段补_直接枚举的序号多算一名	let ordinal = 1 + jsns_ascending.iter().filter(|smaller| *smaller < jsn).count();	let ordinal = 1 + jsns_ascending.iter().filter(|smaller| *smaller <= jsn).count();
 第二段补_甲交错跨发布去掉首条按号	AppendArm::JiaInterleaved => issued_counts[other_position] > earlier_first,	AppendArm::JiaInterleaved => true,

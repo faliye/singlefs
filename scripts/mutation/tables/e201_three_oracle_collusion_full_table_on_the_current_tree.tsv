@@ -62,4 +62,5 @@ V14 哨兵不挑	    return tuple(sorted(order[:sentinel_count(len(reusable))]))
 复用 收尾红不进复用账	    if code != 0:\n        problems.append(f"item_verdicts_finish_exit_{code}")	    if False:\n        problems.append(f"item_verdicts_finish_exit_{code}")
 复用 现判的行不记进库	if plan.recorded(number):	if False:
 复用 不入库的那一包不留	if not plan.in_the_library(number):	if False:
-判法 E171 目录只在 e171_research_side 里插	    sys.path.insert(1, e171_research_side.E171_DIRECTORY)	    pass
+# 研究一侧把 E171 修后版目录插进 sys.path 的那一句（e171_research_side.py）：运行期 import frozen_o3 与算键的库解逐行驱动的四份 import 都靠它；逐行驱动自己那一句与它同值、不进表（等价，test_current_tree_row_driver.py 的 JudgeImportTests 钉住）。
+判法 E171 目录不进 import 路径	    sys.path.insert(1, E171_DIRECTORY)	    pass

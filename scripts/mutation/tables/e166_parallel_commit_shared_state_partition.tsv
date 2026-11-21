@@ -11,7 +11,7 @@ V10 P设 的 CHECK 不撤自己的标占就重算（乙 7 加锁 D = 2 的 n = 2
 V11 根环槽式子 (txg div 3) mod S 改成 txg mod S（甲 2 的 S = 4）	let slot = (u32::from(txg) / ROOT_RING_REGIONS) % slots_per_region;	let slot = u32::from(txg) % slots_per_region;
 V12 journal 环槽式子去掉「− 1」（甲 3 的环槽 5、6、7 变 6、7、8）	(u32::from(counter) - 1) % ring_slots	u32::from(counter) % ring_slots
 V13 树 ID 一次发 12 个改成 11 个（甲 6 的期末水位 65548 变 65547，乙 2 的 48 变 44、1296 变 1188，补 1 无文件 216 变 198、34992 变 32076）	const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: TreeIdentifierNumber = 65548;	const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: TreeIdentifierNumber = 65547;
-V14 新 inode 水位 = 上一版 + 新建数 − 1（甲 5 的期末水位 5 变 2）	view.inode_watermark = view.inode_watermark + shape.new_inodes;	view.inode_watermark = view.inode_watermark + shape.new_inodes - 1;
+V14 新 inode 水位 = 上一版 + 新建数 − 1（甲 5 的期末水位 5 变 2）	view.inode_watermark += shape.new_inodes;	view.inode_watermark += shape.new_inodes - 1;
 V15 枚举器在每个分叉点只走下标最小的那个事务（丙 1 的调度数 6、90 变 1）	            for transaction_index in enabled_indices {	            for transaction_index in enabled_indices.into_iter().take(1) {
 V16 O整 的重算计数不加一（乙 5 的 4、1140 变 0）	let retries_after_restart = transaction.retries + 1;	let retries_after_restart = transaction.retries;
 V17 A字面 把事务号放进锁里（Q-5 在 n = 2 同形由 18 变 0）	const LITERAL_LOCK_INSIDE_GROUPS: u8 =\n    GROUP_USER | GROUP_COMMIT_SLOTS | GROUP_ROOT_RING | GROUP_JOURNAL | GROUP_INODE;\nconst LITERAL_LOCK_OUTSIDE_GROUPS: u8 = GROUP_TRANSACTION_NUMBER | GROUP_TREE;	const LITERAL_LOCK_INSIDE_GROUPS: u8 =\n    GROUP_USER | GROUP_COMMIT_SLOTS | GROUP_ROOT_RING | GROUP_JOURNAL | GROUP_INODE | GROUP_TRANSACTION_NUMBER;\nconst LITERAL_LOCK_OUTSIDE_GROUPS: u8 = GROUP_TREE;

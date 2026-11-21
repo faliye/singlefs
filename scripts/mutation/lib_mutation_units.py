@@ -6,7 +6,7 @@
 切分与闭包不在这里：Rust 的函数单元、去注释指纹与从入口收的闭包都调 scripts/gate/lib_function_units.py（按文件路径 import，不另写一份，
 它的文件头「种类与限定名」「键」「拒算」）。这里做三件事：
   ① 一条变异落在哪几个单元上（UnitKeys.mutated_units）、点名的测试是哪一个单元（UnitKeys.resolve_test）、一个单元的闭包键与组成清单（UnitKeys.closure）；
-  ② 工具链行与依赖版本行（toolchain_lines、dependency_lines）；
+  ② 工具链行、编译器版本行、依赖版本行（toolchain_lines、compiler_version_lines、dependency_lines）：三张变异表的键平常都不收，只在各自的弄坏开关下进键，也给别的判定的键取依赖行；
   ③ 按条的判定库（Library）：每条判定按键寻址存进 prune-server，组成清单另按内容寻址存。
 
 单元：
@@ -36,6 +36,17 @@
     crates-mutation-rows.py --selftest 的「static-check 可达性那一段每份被改坏的文件只读一遍」那一格必须判错。
   闭包 = lib_function_units.py 的 rust_closure_of 从那个单元收的（测试单元按 cfg(test) 编；cargo 参数里有 --release 时 debug_assertions 不进 cfg），
     带上 cargo 参数里的特性；闭包里有拒算，这一个闭包就没有键。
+  测试服务代码不进键（登记表 scripts/gate/test-service-code-paths.tsv，认法只在 lib_function_units.py 的 is_test_service_code，这里不另抄；
+    D13（验证路线） 已定项 17「三类代码」表测试服务代码那一行：不进任何键，改它不让它自己的测试与变异行重判）：
+    点名测试的闭包与 mutate.sh 里被改坏的单元的闭包都经 lib_function_units.py 的 closure_key，闭包里落在测试服务代码里的单元不出 unit 行与 data 行（closure_key 排，这里不再排）；
+    被改坏的那一处本身落在测试服务代码里的行，键里不放那个单元的指纹：crates 变异表的行键里 mutated 那一组不放它（keyed_mutated_references），
+    mutate.sh 的 scope 取的那个单元的闭包键不带 entry 行（UnitKeys.closure 的 entry_kept 给假：入口就是被改坏的单元自己，entry 行会把它的指纹放回键里）；
+    点名的测试自己落在测试服务代码里的，它的闭包键照 closure_key 的规矩留 entry 行（入口单元自己的指纹照进键）。
+    结果：改那份测试服务代码（被改坏的单元自己，或闭包里别的测试服务代码）这一行的键不变、不重判；键只由原文、替换文、闭包里的产品与测试代码、开关与特性定。
+    表里两行都落在测试服务代码里、原文与替换文相同、点名同一条测试的，键相同：crates 变异表照撞键拒算（refuse_colliding_row_keys），mutate.sh 的同一张表里它们共用一把键。
+  弄坏开关 mutated-test-service-code-keyed（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：被改坏的单元落在测试服务代码里也把指纹放进键
+    （crates 变异表的 mutated 组收它，mutate_plan 取的闭包键带 entry 行）；
+    crates-mutation-rows.py --selftest 的「测试服务代码：被改坏的函数在测试服务代码里，改它之后一行都不现判」与「mutate.sh 的键：被改坏的单元在测试服务代码里，改它之后那一行的键不变」两格必须判错。
 闭包算不成（precompute_closures 抛 ClosureRefused）：入口在这一组 cfg 下不编（点名的测试带 #[cfg(feature = "gpu")]、cargo 参数没开那个特性）、没有叫这个名字的包这一类
   lib_function_units.py 的 UsageError，不是拒算（拒算是一个闭包没有键、这一行照跑），是这一行的参数与源码对不上。并行算（fork 出来的子进程）与就地算都把别的闭包算完，
   最后抛一个 ClosureRefused，逐处带类名、原消息与点名它的调用方标签；工作进程只交类名与消息，不交异常对象（按路径载入的模块没登记进 sys.modules 时它 pickle 不回父进程，
@@ -43,21 +54,39 @@
   弄坏开关 closure-error-masked（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：模块不登记进 sys.modules、工作进程把异常原样抛；
   crates-mutation-rows.py --selftest 的「点名的测试在这一组特性下不编」一格必须判错。
 
-工具链行（toolchain_lines）：rustc -vV 与 cargo -V 原样各行；环境里影响编出什么的变量（RUSTFLAGS、CARGO_ENCODED_RUSTFLAGS、RUSTDOCFLAGS、
-  CARGO_BUILD_RUSTFLAGS、CARGO_BUILD_TARGET、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、CARGO_PROFILE_*、CARGO_TARGET_<三元组>_{RUSTFLAGS,RUNNER,LINKER}）；
-  从根往上每一层与 CARGO_HOME 的 .cargo/config.toml（或 config）解析之后的 build（除 jobs、target-dir、incremental）、target、profile、env 各键；
-  根 Cargo.toml 解析之后的 profile、lints、workspace.lints 各键。只取解析后的值，不取原文（注释与排版不进）；文件路径不进（按层级号排）。
-  编译档里的 debug、incremental 两项三处都不进（PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT）：环境变量 CARGO_PROFILE_<档>_DEBUG、CARGO_PROFILE_<档>_INCREMENTAL，
-  cargo 配置与根 Cargo.toml 的 profile 表里各档（连同 package.<包>、build-override 两层）键名恰好是这两个的；按整个键名比，debug-assertions 照进。
-  与 scripts/gate/admission.py 的 PROFILE_SETTINGS_LEFT_OUT、crates/singlefs-unit-graph/src/build_toolchain.rs 的 PROFILE_SETTING_KEYS 同一口径。
-  弄坏开关 profile-debug-keyed（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：debug 照进（incremental 照旧不进）；
-  crates-mutation-rows.py --selftest 的「改编译档的 debug 与 incremental 之后行键不变」那一格必须判错。
-依赖版本行（dependency_lines，与 crates/singlefs-unit-graph/src/lock_file.rs 的 narrowed_lock_lines 同一条规则）：闭包里每个 Rust 单元真点名的外部 crate
+工具链行（toolchain_lines，平常哪张变异表的键都不收）：环境里影响编出什么的编译器与链接器变量（RUSTFLAGS、CARGO_ENCODED_RUSTFLAGS、RUSTDOCFLAGS、
+  CARGO_ENCODED_RUSTDOCFLAGS、CARGO_BUILD_RUSTFLAGS、CARGO_BUILD_TARGET、RUSTC_WRAPPER、RUSTC_WORKSPACE_WRAPPER、CARGO_TARGET_<三元组>_{RUSTFLAGS,RUNNER,LINKER}）；
+  从根往上每一层的 .cargo/config.toml（或 config，两样都在时只读 config）与 CARGO_HOME 的那一份（最低、只读一次）解析之后的 build（除 jobs、target-dir、incremental）、target、env 各键；
+  根 Cargo.toml 解析之后的 lints、workspace.lints 各键。只取解析后的值，不取原文（注释与排版不进）；文件路径不进（按层级号排）。
+  crates 变异表（crates-mutation-rows.py）、广谱变异（mutation-prune.py）与实验变异表（mutate.sh 经 mutate_plan）的键都不收这一份：它们的键只留被改坏的那一处与点名测试的闭包（含选中测试的开关与特性），
+  构建环境（编译器与链接器变量、cargo 配置、清单的 lints）、rustc 与 cargo 的版本、依赖版本、编译档与线程数一样都不进；crates 变异表只在下面几个弄坏开关下把 toolchain_lines 交的行收进行键
+  （crates_mutation_rows_base.py 的 build_environment_lines_for_break），实验变异表只在 mutate.sh 的弄坏开关 toolchainkeyed 下收（mutate_plan）。toolchain_lines 本身不起 rustc 与 cargo。
+  编译档与线程数不进 toolchain_lines：编译档 = 各档的 debug、incremental、opt-level、debug-assertions、overflow-checks、lto、panic、codegen-units
+  （环境变量 CARGO_PROFILE_*、cargo 配置与根 Cargo.toml 的 profile 表，连同 package.<包>、build-override 两层）与 cargo 配置 [build] 的 incremental；
+  线程数 = 环境变量 CARGO_BUILD_JOBS 与 cargo 配置 [build] 的 jobs。
+  弄坏开关 profile-keyed（GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK，只给证红用）：toolchain_lines 另收环境里的 CARGO_PROFILE_*、cargo 配置与根 Cargo.toml 的 profile 表的值，
+  crates 变异表把 toolchain_lines 交的行收进行键；
+  crates-mutation-rows.py --selftest 的「改编译档的 debug 之后行键不变」「改编译档的 incremental 之后行键不变」「改编译档的 opt-level、debug-assertions、codegen-units 之后行键不变」
+  「改配置文件与清单里的编译档、线程数之后行键不变」四格必须判错。
+  弄坏开关 build-jobs-keyed（同上两个变量，只给证红用）：toolchain_lines 另收环境里的 CARGO_BUILD_JOBS 与 cargo 配置 [build] 的 jobs，crates 变异表把 toolchain_lines 交的行收进行键；
+  crates-mutation-rows.py --selftest 的「改线程数之后行键不变」「改配置文件与清单里的编译档、线程数之后行键不变」两格必须判错。
+  弄坏开关 toolchain-version-keyed（同上，只给证红用）：compiler_version_lines（rustc -vV、cargo -V 原样各行）并进工具链行，crates 变异表把 toolchain_lines 交的行收进行键；
+  crates-mutation-rows.py --selftest 的「改 rustc、cargo 版本之后行键不变」「改编译器的环境变量 RUSTFLAGS 之后行键不变」
+  「假 cargo 的 -V 换一行之后样本每一行的行键、基线键、覆盖号都不变」「改编译器与链接器相关的环境变量之后…」「改 cargo 配置的 build、target、env 之后…」「改根清单的 lints 之后…」
+  「没有 rustc 与 cargo 也算得出行键」几格必须判错（toolchain_lines 的行里本来就有环境变量、cargo 配置与 lints）。
+  弄坏开关 build-environment-keyed（同上，只给证红用）：crates 变异表把 toolchain_lines 交的行（编译器与链接器相关的环境变量、cargo 配置的 build / target / env、根清单的 lints）收进行键；
+  crates-mutation-rows.py --selftest 的「改编译器的环境变量 RUSTFLAGS 之后行键不变」「改编译器与链接器相关的环境变量之后…」「改 cargo 配置的 build、target、env 之后…」「改根清单的 lints 之后…」四格必须判错。
+编译器版本行（compiler_version_lines，三张变异表的键里平常都没有它；弄坏开关 toolchain-version-keyed 并进 toolchain_lines，mutate.sh 的 toolchainkeyed 并进 mutate_plan 的键）：rustc -vV 与 cargo -V 原样各行；起不来抛 MutationUnitsError。
+依赖版本行（dependency_lines，三张变异表的键里平常都没有它，别的判定（verus-proof-check.py、mutation-prune.py 的弄坏开关）的键取它；与 crates/singlefs-unit-graph/src/lock_file.rs 的 narrowed_lock_lines 同一条规则）：闭包里每个 Rust 单元真点名的外部 crate
   （单元的词法单元里 use <外部 crate>::…、路径 <外部 crate>::…、extern crate <外部 crate>；外部 crate 是单元所在 crate 清单里不带 path 的依赖，
   代码名是依赖的键把 - 换成 _，包名取 package = 写的、没写取键），在根 Cargo.lock 里那个工作区 crate 自己的包（同名、没有 source）的 dependencies 里
   找到它、按名与版本落到恰好一个 [[package]]，再顺 dependencies 收传递依赖；一包一行「名<TAB>版本<TAB>来源<TAB>checksum」（没有的写 -）。
   落不到一个包的拒算（lock-dependency-unresolved），不静默跳过。闭包用到的工作区包里别的外部依赖不收。
   与 Rust 那一份的差别只有一处：那边按依赖的键找包，不认 package = 改名。
+  UnitKeys 默认不收（dependency_versions 为假：ClosureInfo.dependencies 交空、不读 Cargo.lock、没有这一类拒算），三张变异表的键里没有它，
+  Cargo.lock 里的依赖版本改了不作废已判的结论；mutate.sh 的弄坏开关 dependencykeyed 下 mutate_plan 把 UnitKeys.dependency_versions 设成真、依赖版本行进键。
+  弄坏开关 dependency-versions-keyed（同上，只给证红用）：UnitKeys 收依赖版本行并进点名测试的闭包键；
+  crates-mutation-rows.py --selftest 的「改 Cargo.lock 里的依赖版本之后行键不变」一格必须判错。
 
 判定库（Library）：在 prune-server 结论表里，键 = mutation-units[@命名空间]/<库目录名>/<相对路径>（scripts/prune-server/prune_server_client.py 文件头「键空间」）。
   库目录由调用方给（<库根的 git common-dir>/singlefs-crates-mutation-library、…/singlefs-mutate-library 这类），只当名字与命名空间：本地不建、不读、不写，
@@ -99,18 +128,16 @@ UNIT_ID_LENGTH = 16
 PARALLEL_MINIMUM = 8   # 要算的闭包不到这么多就在本进程里算（fork 子进程的开销比算还大）
 BUILD_VARIABLES = frozenset(("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS", "CARGO_BUILD_RUSTFLAGS",
                              "CARGO_BUILD_TARGET", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER"))
-BUILD_KEYS_NOT_AFFECTING_OUTPUT = frozenset(("jobs", "target-dir", "incremental"))
-PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT = frozenset(("debug", "incremental"))   # 编译档里不进键的两项（文件头「工具链行」）
-PROFILE_SETTING_TABLES = ("package", "build-override")   # 一档底下照同一组键写设置的两层（package.<包>、build-override）
-CONFIGURATION_SECTIONS = ("build", "target", "profile", "env")
-MANIFEST_SECTIONS = ("profile", "lints")
+BUILD_KEYS_LEFT_OUT = frozenset(("jobs", "target-dir", "incremental"))   # [build] 里不进键的键：线程数、编译目录、编译档的增量（文件头「工具链行」）
+CONFIGURATION_SECTIONS = ("build", "target", "env")
+MANIFEST_SECTIONS = ("lints",)
 NAME_TAKING_SWITCHES = frozenset(("-p", "--package", "--bin", "--test", "--example", "--bench", "--features", "-F", "--manifest-path", "--skip"))
 SWITCHES_NOT_AFFECTING_OUTCOME = frozenset(("-j", "--jobs", "--offline", "--quiet", "-q", "--color", "--message-format"))
 TEST_TARGET_KINDS = ("lib", "bin", "test")
 
 
 class MutationUnitsError(Exception):
-    """算不出键（工具链起不来、Cargo.lock 读不懂这一类）：调用方报错、这一趟不写库。"""
+    """算不出键（cargo 配置与清单读不懂；弄坏开关 toolchainkeyed、dependencykeyed 下另有 rustc、cargo 起不来与 Cargo.lock 读不懂）：调用方报错、这一趟不写库。"""
 
 
 class ClosureRefused(MutationUnitsError):
@@ -137,6 +164,14 @@ class ClosureRefused(MutationUnitsError):
 def break_is(name):
     """弄坏开关（只给证红用）：GATE_MUTATION_BREAK 或 CRATES_MUTATION_ROWS_BREAK（逗号分隔）里有 name。本库没有环境参数，读本进程的环境。"""
     return any(name in os.environ.get(variable, "").split(",") for variable in ("GATE_MUTATION_BREAK", "CRATES_MUTATION_ROWS_BREAK"))
+
+
+def keyed_mutated_references(references, service_code_keyed=False):
+    """被改坏的那几个单元（UnitReference）里要把指纹放进键的：落在测试服务代码里的（lib_function_units.py 的 is_test_service_code，文件头「测试服务代码不进键」）不放。
+    service_code_keyed 为真（调用方的弄坏开关 mutated-test-service-code-keyed）全放。"""
+    if service_code_keyed:
+        return list(references)
+    return [reference for reference in references if not function_units().is_test_service_code(reference.file)]
 
 
 def function_units():
@@ -309,7 +344,7 @@ class UnitKeys:
         self._tests = {}
         self._lock = None
         self.unit_table = {}   # 单元号 → UnitReference 的各段（precompute_closures 并行算回来的闭包共用）
-        self.dependencies_by_whole_crate = False   # 弄坏开关「按整包收」（mutate.sh 的 dependenciesbycrate）：依赖版本行不看点没点名
+        self.dependency_versions = break_is("dependency-versions-keyed")   # 收不收依赖版本行（文件头「依赖版本行」）：平常不收；mutate_plan 在弄坏开关 dependencykeyed 下设成真
 
     @property
     def workspace(self):
@@ -355,25 +390,7 @@ class UnitKeys:
 
     def dependencies_of(self, units, workspace=None):
         """一组 lib_function_units.py 的单元的依赖版本行与拒算（文件头「依赖版本行」）；单元取自哪个视图的工作区就给哪个（不给是产品行为视图）。"""
-        return dependency_lines(workspace or self.workspace, units, self.lock_packages(), self.dependencies_by_whole_crate)
-
-    def reference_dependencies(self, references):
-        """一组 UnitReference（被改坏的单元这一类）各自点名的外部 crate 的依赖版本行与拒算；数据单元与找不回单元的跳过。
-        形式化视图上交出去的那几个在形式化视图的文件里找，依赖版本行也照那个视图的词法单元取。"""
-        units, formal_units = [], []
-        for reference in references:
-            if reference.kind == "data-file" or not reference.file.endswith(".rs"):
-                continue
-            formal = reference in self._formal_references
-            rust_file = self.formal_workspace.file(reference.file) if formal else self.rust_file(reference.file)
-            (formal_units if formal else units).extend(
-                unit for unit in rust_file.units
-                if unit.kind == reference.kind and unit.name == reference.name and f"{unit.first_line}-{unit.last_line}" == reference.lines)
-        lines, refusals = self.dependencies_of(units)
-        if formal_units:
-            formal_lines, formal_refusals = self.dependencies_of(formal_units, self.formal_workspace)
-            lines, refusals = sorted(set(lines) | set(formal_lines)), sorted(set(refusals) | set(formal_refusals))
-        return lines, refusals
+        return dependency_lines(workspace or self.workspace, units, self.lock_packages())
 
     def source_bytes(self, path):
         """path（相对根）那份文件的整份字节：同一份单元键里每份文件只读一遍（文件头「单元」末段）；读不了照原样抛 OSError，不记。
@@ -591,7 +608,8 @@ class UnitKeys:
                     refused(position, type(error).__qualname__, str(error))
             self.raise_closure_refused(failures)
             return len(pending)
-        self.lock_packages()   # fork 之前读一次，子进程共用
+        if self.dependency_versions:
+            self.lock_packages()   # fork 之前读一次，子进程共用
         _PARALLEL.clear()
         _PARALLEL.update(keys=self, units=[item[0] for item in pending])
         tasks = [(index, index, item[1], item[2]) for index, item in enumerate(pending)]
@@ -625,19 +643,24 @@ class UnitKeys:
             merged.setdefault((class_name, message), []).extend(label for label in labels if label not in merged.get((class_name, message), []))
         raise ClosureRefused([(class_name, message, labels) for (class_name, message), labels in merged.items()])
 
-    def closure(self, unit, target_id, arguments=None):
-        """ClosureInfo：从 unit 收的闭包的键（lib_function_units.py 的 closure_key，不带工具链与依赖）、成员、依赖版本行（文件头「依赖版本行」）、拒算。
-        依赖版本行有拒算的，键也是 None。"""
+    def closure(self, unit, target_id, arguments=None, entry_kept=True):
+        """ClosureInfo：从 unit 收的闭包的键（lib_function_units.py 的 closure_key，不带工具链与依赖）、成员、依赖版本行（文件头「依赖版本行」，
+        dependency_versions 为假时交空）、拒算。依赖版本行有拒算的，键也是 None。
+        entry_kept 给假：键里不出 entry 行（入口就是 unit 自己，entry 行会把它的指纹放进键；被改坏的单元落在测试服务代码里时 mutate_plan 这样取，文件头「测试服务代码不进键」）。"""
         lfu = function_units()
         parsed = arguments if isinstance(arguments, CargoArguments) else parse_cargo_arguments(arguments or "")
         features = self.features_of(parsed, target_id)
-        cache_key = self.cache_key(unit, target_id, parsed)
+        cache_key = self.cache_key(unit, target_id, parsed) + (() if entry_kept else ("without-entry-lines",))
         if cache_key not in self._closures:
             cfg = [item for item in lfu.DEFAULT_RUST_CFG if not (parsed.release and item == "debug_assertions")]
             workspace = self.formal_workspace if id(unit) in self._formal_unit_ids else self.workspace
             closure = lfu.rust_closure_of(workspace, unit, target_id, cfg, True, features, parsed.no_default_features)
+            if not entry_kept:
+                closure.entry_units = []
             key, refusals = lfu.closure_key(closure)
-            dependencies, dependency_refusals = self.dependencies_of(closure.order, workspace)
+            dependencies, dependency_refusals = self.dependencies_of(closure.order, workspace) if self.dependency_versions else ([], [])
+            if key is not None and dependencies and break_is("dependency-versions-keyed"):   # 弄坏开关：依赖版本行并进闭包键
+                key = key_of_lines([("closure", [key]), ("dependency", dependencies)])
             self._closures[cache_key] = ClosureInfo(None if dependency_refusals else key, [reference_of(member) for member in closure.order], dependencies,
                                                     [f"{refusal.form} {refusal.file}:{refusal.line}" for refusal in refusals] + dependency_refusals)
         return self._closures[cache_key]
@@ -705,67 +728,30 @@ def flattened(prefix, value):
 
 
 def cargo_configuration_files(root, environment):
-    """cargo 读的配置文件（从根往上每一层的 .cargo/config.toml 或 .cargo/config，再加 CARGO_HOME 那一份），近的在前。"""
+    """cargo 读的配置文件（从根往上每一层的 .cargo/config 或 .cargo/config.toml，同一层两样都在时只读 config，再加 CARGO_HOME 那一份），近的在前；
+    CARGO_HOME 那一份最低、只读一次（落在往上那一串里的也挪到最后）。"""
+    cargo_home = environment.get("CARGO_HOME") or os.path.join(environment.get("HOME") or os.path.expanduser("~"), ".cargo")
+    cargo_home = os.path.join(os.path.abspath(root), cargo_home)
+    home_file = next((os.path.join(cargo_home, name) for name in ("config", "config.toml") if os.path.isfile(os.path.join(cargo_home, name))), None)
     found, directory = [], os.path.abspath(root)
     while True:
         for name in ("config", "config.toml"):
             path = os.path.join(directory, ".cargo", name)
             if os.path.isfile(path):
-                found.append(path)
+                if home_file is None or os.path.realpath(path) != os.path.realpath(home_file):
+                    found.append(path)
                 break
         parent = os.path.dirname(directory)
         if parent == directory:
             break
         directory = parent
-    cargo_home = environment.get("CARGO_HOME") or os.path.join(environment.get("HOME") or os.path.expanduser("~"), ".cargo")
-    cargo_home = os.path.join(os.path.abspath(root), cargo_home)
-    for name in ("config", "config.toml"):
-        path = os.path.join(cargo_home, name)
-        if os.path.isfile(path):
-            if os.path.realpath(path) not in {os.path.realpath(item) for item in found}:
-                found.append(path)
-            break
+    if home_file is not None:
+        found.append(home_file)
     return found
 
 
-def profile_settings_not_affecting_output():
-    """编译档里不进键的设置名（文件头「工具链行」）；弄坏开关 profile-debug-keyed 下只剩 incremental。"""
-    if break_is("profile-debug-keyed"):
-        return PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT - {"debug"}
-    return PROFILE_SETTINGS_NOT_AFFECTING_OUTPUT
-
-
-def keyed_profile_settings(settings):
-    """一档的设置表（或它底下 package.<包>、build-override 那一层）去掉键名恰好是不进键那几项的；不是表的原样交回。"""
-    if not isinstance(settings, dict):
-        return settings
-    left_out = profile_settings_not_affecting_output()
-    kept = {}
-    for name, item in settings.items():
-        if name in left_out:
-            continue
-        if name == "package" and isinstance(item, dict):
-            item = {package: keyed_profile_settings(table) for package, table in item.items()}
-        elif name in PROFILE_SETTING_TABLES:
-            item = keyed_profile_settings(item)
-        kept[name] = item
-    return kept
-
-
-def keyed_profile_section(section):
-    """profile 那一张表（各档 → 设置表）照 keyed_profile_settings 逐档去掉不进键的那几项；不是表的原样交回。"""
-    if not isinstance(section, dict):
-        return section
-    return {profile: keyed_profile_settings(settings) for profile, settings in section.items()}
-
-
-def profile_variable_keyed(name):
-    """环境变量 CARGO_PROFILE_<档>_<键> 进不进键：键是 DEBUG 或 INCREMENTAL（整个键名：_DEBUG_ASSERTIONS 不算）的不进。"""
-    return not any(name.endswith("_" + setting.upper().replace("-", "_")) for setting in profile_settings_not_affecting_output())
-
-
-def toolchain_lines(root, environment):
-    """见文件头「工具链行」。rustc / cargo 起不来抛 MutationUnitsError。"""
+def compiler_version_lines(root, environment):
+    """见文件头「编译器版本行」：rustc -vV 与 cargo -V 原样各行（「rustc<TAB>行」「cargo<TAB>行」）。起不来抛 MutationUnitsError。"""
     lines = []
     for command in (["rustc", "-vV"], ["cargo", "-V"]):
         try:
@@ -775,9 +761,17 @@ def toolchain_lines(root, environment):
         if completed.returncode != 0:
             raise MutationUnitsError(f"{' '.join(command)} 退 {completed.returncode}")
         lines += [f"{command[0]}\t{line.strip()}" for line in completed.stdout.splitlines() if line.strip()]
+    return lines
+
+
+def toolchain_lines(root, environment):
+    """见文件头「工具链行」：不含 rustc、cargo 的版本（compiler_version_lines），不起 rustc 与 cargo。配置文件与清单读不懂抛 MutationUnitsError。"""
+    profile_keyed, jobs_keyed = break_is("profile-keyed"), break_is("build-jobs-keyed")   # 弄坏开关：编译档、线程数回到键里
+    lines = compiler_version_lines(root, environment) if break_is("toolchain-version-keyed") else []   # 弄坏开关：编译器版本回到键里
     for name in sorted(environment):
         target_variable = name.startswith("CARGO_TARGET_") and name.endswith(("_RUSTFLAGS", "_RUNNER", "_LINKER"))
-        if name in BUILD_VARIABLES or (name.startswith("CARGO_PROFILE_") and profile_variable_keyed(name)) or target_variable:
+        if (name in BUILD_VARIABLES or target_variable or (profile_keyed and name.startswith("CARGO_PROFILE_"))
+                or (jobs_keyed and name == "CARGO_BUILD_JOBS")):
             lines.append(f"environment\t{name}={environment[name]}")
     for rank, path in enumerate(cargo_configuration_files(root, environment)):
         try:
@@ -785,12 +779,10 @@ def toolchain_lines(root, environment):
                 configuration = tomllib.load(handle)
         except (OSError, tomllib.TOMLDecodeError) as error:
             raise MutationUnitsError(f"{path} 读不懂：{error}") from error
-        for section in CONFIGURATION_SECTIONS:
+        for section in CONFIGURATION_SECTIONS + (("profile",) if profile_keyed else ()):
             value = configuration.get(section)
             if section == "build" and isinstance(value, dict):
-                value = {name: item for name, item in value.items() if name not in BUILD_KEYS_NOT_AFFECTING_OUTPUT}
-            if section == "profile":
-                value = keyed_profile_section(value)
+                value = {name: item for name, item in value.items() if name not in BUILD_KEYS_LEFT_OUT or (jobs_keyed and name == "jobs")}
             if value:
                 lines += [f"configuration\t{rank}\t{line}" for line in flattened(section, value)]
     manifest_path = os.path.join(root, "Cargo.toml")
@@ -800,7 +792,7 @@ def toolchain_lines(root, environment):
                 manifest = tomllib.load(handle)
         except (OSError, tomllib.TOMLDecodeError) as error:
             raise MutationUnitsError(f"{manifest_path} 读不懂：{error}") from error
-        sections = [(section, keyed_profile_section(manifest.get(section)) if section == "profile" else manifest.get(section)) for section in MANIFEST_SECTIONS]
+        sections = [(section, manifest.get(section)) for section in MANIFEST_SECTIONS + (("profile",) if profile_keyed else ())]
         sections.append(("workspace.lints", manifest.get("workspace", {}).get("lints")))
         for section, value in sections:
             if value:
@@ -881,10 +873,9 @@ def resolve_lock_item(packages, item):
     return candidates[0] if len(candidates) == 1 else None
 
 
-def dependency_lines(workspace, units, packages, by_whole_crate=False):
+def dependency_lines(workspace, units, packages):
     """见文件头「依赖版本行」：→ (依赖版本行，排好序；拒算，一条一句「lock-dependency-unresolved <文件>:<行>（<包> → <依赖>）」)。
-    workspace 是 lib_function_units.py 的 RustWorkspace，units 是闭包里的单元（不是 Rust 的、没有词法单元的跳过），packages 是 read_lock_packages 交的。
-    by_whole_crate（弄坏开关「按整包收」）：不看点没点名，单元所在 crate 的外部依赖全收。"""
+    workspace 是 lib_function_units.py 的 RustWorkspace，units 是闭包里的单元（不是 Rust 的、没有词法单元的跳过），packages 是 read_lock_packages 交的。"""
     refusals, pending = set(), []
     for unit in units:
         if getattr(unit, "language", None) != "rust" or getattr(unit, "data", False):
@@ -894,11 +885,7 @@ def dependency_lines(workspace, units, packages, by_whole_crate=False):
         if not external:
             continue
         own = next((package for package in packages if package["name"] == crate.package and not package.get("source")), None)
-        if by_whole_crate:
-            named = [(code_name, unit.first_line) for code_name in sorted(external)]
-        else:
-            named = path_roots_of(workspace.file(unit.file), unit)
-        for root, line in named:
+        for root, line in path_roots_of(workspace.file(unit.file), unit):
             dependency = external.get(root)
             if dependency is None:
                 continue
@@ -922,30 +909,6 @@ def dependency_lines(workspace, units, packages, by_whole_crate=False):
             else:
                 pending.append((found, path, line))
     return sorted(lines), sorted(refusals)
-
-
-# ── 判法单元（python 写的判法：从几个入口函数收的闭包） ────────────────────────
-
-def judging_units(repository, entries, whole_file=False):
-    """(键或 None, UnitReference 列表, 拒算列表)：从 entries（lib_function_units.py 的入口写法 <文件>::<限定名>）各收一个闭包、合起来，
-    键 = 合起来的单元（种类、指纹）多重集。whole_file（弄坏开关用）：键换成闭包碰到的那几份文件的整份原文。"""
-    lfu = function_units()
-    members, refusals = {}, set()
-    for entry in entries:
-        closure = lfu.closure_of(repository, entry)
-        for unit in closure.order:
-            members[(unit.file, unit.kind, unit.name, unit.first_line)] = unit
-        refusals |= {f"{refusal.form} {refusal.file}:{refusal.line}" for refusal in closure.refusals}
-    references = sorted((reference_of(unit) for unit in members.values()), key=lambda reference: (reference.file, reference.lines, reference.kind, reference.name))
-    if refusals:
-        return None, references, sorted(refusals)
-    if whole_file:
-        texts = []
-        for path in sorted({reference.file for reference in references}):
-            with open(os.path.join(repository, path), "rb") as handle:
-                texts.append(hashlib.sha256(handle.read()).hexdigest())
-        return key_of_lines([("form", ["whole-file"]), ("file", texts)]), references, []
-    return key_of_lines([("form", ["singlefs-judging-units-v1"]), ("unit", [f"{reference.kind}\t{reference.fingerprint}" for reference in references])]), references, []
 
 
 # ── 判定库 ────────────────────────────────────────────────────────────────────
@@ -1164,15 +1127,19 @@ def read_mutate_table(path):
 
 def mutate_plan(workspace_root, source, binary, table, cargo_words, environment, library_directory, plan_path, break_switches=()):
     """mutate.sh 开跑前调：逐条算键、查库，写 plan_path（JSON：每条的键与组成、测试的闭包键），回 [(下标, 变异名, 复用不复用, 档, 要不要判失败, 那一行, 现判的原因)]。
-    键（文件头「键」）：原文、替换文、包住原文那几个单元的闭包键（scope）、cargo 参数与特性（switches，bin 名不进）、工具链行、依赖版本行。
+    键（文件头「键」）：原文、替换文、包住原文那几个单元的闭包键（scope）、cargo 参数与特性（switches，bin 名不进）；与另两张变异表同口径，
+    编译器版本行、工具链行、依赖版本行都不进；包住原文的单元落在测试服务代码里的，它的闭包键不带它自己（文件头「测试服务代码不进键」）。
     复用另要：抓到的，红了的那几条测试此刻的闭包键与记录里的相同；没红、无效的，这个 bin 全部测试的闭包键合起来与记录里的相同。
-    依赖版本行每条各算：包住原文那几个单元的闭包里点名的外部 crate（文件头「依赖版本行」），落不到包的那一条拒算。break_switches 是 mutate.sh 的弄坏开关：
-      libraryunread   不读库（一律现判）；calleesignored  scope 只取包住原文那几个单元自己的指纹、不收它们调到的单元（依赖版本行也只看它们自己）；
-      dependenciesbycrate  依赖版本行按整包收（单元所在 crate 的外部依赖不看点没点名全收）。"""
+    break_switches 是 mutate.sh 的弄坏开关：
+      libraryunread   不读库（一律现判）；calleesignored  scope 只取包住原文那几个单元自己的指纹、不收它们调到的单元；
+      toolchainkeyed  编译器版本行（rustc -vV、cargo -V）与工具链行并进键（environment 只在这个开关下读）；
+      dependencykeyed  依赖版本行并进键：包住原文那几个单元的闭包里点名的外部 crate（文件头「依赖版本行」），落不到包的那一条拒算。"""
     keys = UnitKeys(workspace_root)
-    keys.dependencies_by_whole_crate = "dependenciesbycrate" in break_switches
+    toolchain_keyed, dependency_keyed = "toolchainkeyed" in break_switches, "dependencykeyed" in break_switches
+    keys.dependency_versions = dependency_keyed
+    service_code_keyed = break_is("mutated-test-service-code-keyed")   # 弄坏开关：被改坏的单元落在测试服务代码里也把指纹放进键
     library = Library(library_directory, "# 实验变异表的一条判定（scripts/mutation/mutate.sh 经 scripts/mutation/lib_mutation_units.py 写）\n")
-    toolchain = toolchain_lines(workspace_root, environment)
+    toolchain = compiler_version_lines(workspace_root, environment) + toolchain_lines(workspace_root, environment) if toolchain_keyed else []
     parsed = parse_cargo_arguments(cargo_words)
     target_id = None
     for target in keys.workspace.targets.values():
@@ -1190,10 +1157,8 @@ def mutate_plan(workspace_root, source, binary, table, cargo_words, environment,
             test_keys.append(info.key)
         all_tests_key = key_of_lines([("form", ["all-tests"]), ("test", test_keys)]) if test_refusal is None else None
     rows = read_mutate_table(table)
-    plan = {"rows": [], "tests": tests, "all_tests": all_tests_key, "library": library_directory,
-            "toolchain": None, "how": f"mutate.sh（{' '.join(cargo_words)}）"}
-    toolchain_key = key_of_lines([("toolchain", toolchain)])
-    plan["toolchain"] = toolchain_key
+    plan = {"rows": [], "tests": tests, "all_tests": all_tests_key, "library": library_directory, "how": f"mutate.sh（{' '.join(cargo_words)}）"}
+    toolchain_key = key_of_lines([("toolchain", toolchain)]) if toolchain_keyed else None
     decisions = []
     for name, original, replacement in rows:
         entry = {"name": name, "key": None, "refusal": None}
@@ -1204,15 +1169,17 @@ def mutate_plan(workspace_root, source, binary, table, cargo_words, environment,
         if refusal is None:
             for reference in units:
                 unit = keys.unit_of(reference)
+                # 包住原文的单元落在测试服务代码里：它自己的指纹不进键（文件头「测试服务代码不进键」），闭包键不带 entry 行
+                own_unit_keyed = service_code_keyed or not function_units().is_test_service_code(reference.file)
                 if "calleesignored" in break_switches:
                     scope_keys.append(f"{reference.kind}\t{reference.fingerprint}")
-                    own_lines, own_refusals = keys.dependencies_of([unit])
+                    own_lines, own_refusals = keys.dependencies_of([unit]) if dependency_keyed else ([], [])
                     if own_refusals:
                         refusal = f"包住原文的 {reference.name} 的依赖版本行拒算（{own_refusals[0]}）"
                         break
                     dependencies |= set(own_lines)
                     continue
-                info = keys.closure(unit, target_id, parsed)
+                info = keys.closure(unit, target_id, parsed, entry_kept=own_unit_keyed)
                 if info.key is None:
                     refusal = f"包住原文的 {reference.name} 的闭包拒算（{info.refusals[0]}）"
                     break
@@ -1222,16 +1189,21 @@ def mutate_plan(workspace_root, source, binary, table, cargo_words, environment,
         entry["refusal"] = refusal
         if refusal is None:
             scope_key = key_of_lines([("scope", scope_keys)])
-            dependency_key = key_of_lines([("dependency", sorted(dependencies))])
-            entry["scope"], entry["dependency"] = scope_key, dependency_key
-            entry["key"] = key_of_lines([("form", [MUTATE_KEY_FORM]), ("original", [escape_field(original)]),
-                                         ("replacement", [escape_field(replacement)]), ("scope", [scope_key]), ("switches", parsed.switches),
-                                         ("features", list(parsed.features)), ("toolchain", [toolchain_key]), ("dependency", [dependency_key])])
+            entry["scope"] = scope_key
+            key_lines = [("form", [MUTATE_KEY_FORM]), ("original", [escape_field(original)]), ("replacement", [escape_field(replacement)]),
+                         ("scope", [scope_key]), ("switches", parsed.switches), ("features", list(parsed.features))]
+            if toolchain_keyed:
+                key_lines.append(("toolchain", [toolchain_key]))
+            if dependency_keyed:
+                dependency_key = key_of_lines([("dependency", sorted(dependencies))])
+                key_lines.append(("dependency", [dependency_key]))
+                library.put_composition(dependency_key, lines=sorted(dependencies))
+            entry["key"] = key_of_lines(key_lines)
             library.put_composition(scope_key, scope_members)
-            library.put_composition(dependency_key, lines=sorted(dependencies))
         plan["rows"].append(entry)
         decisions.append(mutate_decision(library, plan, entry, break_switches))
-    library.put_composition(toolchain_key, lines=toolchain)
+    if toolchain_keyed:
+        library.put_composition(toolchain_key, lines=toolchain)
     library.flush_units()
     plan["test_refusal"] = test_refusal
     write_atomically(plan_path, json.dumps(plan, ensure_ascii=False, sort_keys=True))
@@ -1246,7 +1218,7 @@ def mutate_decision(library, plan, entry, break_switches):
         return False, "", "0", "", "弄坏开关 libraryunread：不读库"
     record = library.read("records", entry["key"])
     if record is None:
-        return False, "", "0", "", "库里没有这把键（新加的行，或原文、替换文、包住原文的单元与它调到的单元、cargo 参数、工具链、依赖有一样变了）"
+        return False, "", "0", "", "库里没有这把键（新加的行，或原文、替换文、包住原文的单元与它调到的单元、cargo 参数有一样变了）"
     verdict = record.get("verdict", "")
     if verdict not in MUTATE_REUSABLE:
         return False, "", "0", "", f"记录里的判定「{verdict}」不复用"
@@ -1419,6 +1391,97 @@ def specification_line_cell(work):
                 f"执行代码行的键 {executable}（{executable_note}，要取产品行为视图）、改了那条规格之后 {executable_after_specification_edit}（要与前者相同）")
 
 
+MUTATE_PLAN_SERVICE_FIXTURE = {
+    "Cargo.toml": '[workspace]\nmembers = ["tool"]\n',
+    "tool/Cargo.toml": '[package]\nname = "tool"\nversion = "0.1.0"\nedition = "2021"\n\n[[bin]]\nname = "tool"\npath = "src/main.rs"\n',
+    "tool/src/main.rs": """mod service;
+
+fn main() {
+    println!("{}", product_combine(1));
+}
+
+fn product_combine(value: u32) -> u32 {
+    service::helper(value) + 1
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn scales() {
+        assert_eq!(super::service::scaled(super::product_combine(1)), 21);
+    }
+}
+""",
+    "tool/src/service.rs": """pub fn scaled(value: u32) -> u32 {
+    value * 3
+}
+
+pub fn helper(value: u32) -> u32 {
+    value + 5
+}
+""",
+}
+MUTATE_PLAN_SERVICE_FILE = "tool/src/service.rs"   # 这一格里临时登成测试服务代码的那一份
+MUTATE_PLAN_SERVICE_CELL = ("mutate.sh 的键：被改坏的单元在测试服务代码里，改它之后那一行的键不变；闭包里的测试服务代码改了键不变，改包住原文的产品代码键变")
+
+
+def mutate_plan_test_service_code_cell(work):
+    """自证一格（crates-mutation-rows.py 的 --selftest 登记，弄坏开关 mutated-test-service-code-keyed）：mutate_plan 的键（文件头「测试服务代码不进键」）。
+    样本工作区一个 bin（tool）：service.rs 临时登成测试服务代码（登记表读进来的那一份里并进一行，跑完去掉），里面 scaled（被改坏）与 helper；
+    main.rs 里的 product_combine 调 helper、是被改坏的另一行。改 scaled 自己的函数体：那一行的键不变；改 service.rs 里 product_combine 闭包里的 helper：那一行的键不变；
+    改 product_combine 自己：那一行的键变。→ (过没过, 说明)。"""
+    lfu = function_units()
+    root = os.path.join(work, "mutate-plan-service")
+    shutil.rmtree(root, ignore_errors=True)
+    for path, text in MUTATE_PLAN_SERVICE_FIXTURE.items():
+        os.makedirs(os.path.dirname(os.path.join(root, path)), exist_ok=True)
+        with open(os.path.join(root, path), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    counter = []
+
+    def key_of(source, original, replacement):
+        """mutate_plan 对一条变异算出的键（算不出交 None 与拒算那一句）。"""
+        counter.append(None)
+        table = os.path.join(work, f"mutate-plan-service-{len(counter)}.tsv")
+        plan_path = os.path.join(work, f"mutate-plan-service-{len(counter)}.json")
+        with open(table, "w", encoding="utf-8") as handle:
+            handle.write(f"row\t{original}\t{replacement}\n")
+        mutate_plan(root, source, "tool", table, ["test", "--release", "--bin", "tool"], {}, os.path.join(work, "mutate-plan-service-library"), plan_path)
+        with open(plan_path, encoding="utf-8") as handle:
+            entry = json.load(handle)["rows"][0]
+        return entry["key"], entry["refusal"]
+
+    def edit(path, old, new):
+        full = os.path.join(root, path)
+        with open(full, encoding="utf-8") as handle:
+            text = handle.read()
+        assert text.count(old) == 1, (path, old)
+        with open(full + ".new", "w", encoding="utf-8") as handle:
+            handle.write(text.replace(old, new))
+        os.replace(full + ".new", full)
+
+    rows = lfu.test_service_code_rows()
+    rows[MUTATE_PLAN_SERVICE_FILE] = "自证：只在 mutate_plan_test_service_code_cell 跑的那一会儿登记"
+    try:
+        scaled_row = (MUTATE_PLAN_SERVICE_FILE, "value * 3", "value * 4")
+        combine_row = ("tool/src/main.rs", "service::helper(value) + 1", "service::helper(value) + 2")
+        scaled_before, scaled_note = key_of(*scaled_row)
+        combine_before, combine_note = key_of(*combine_row)
+        edit(MUTATE_PLAN_SERVICE_FILE, "pub fn scaled(value: u32) -> u32 {\n    value * 3\n}", "pub fn scaled(value: u32) -> u32 {\n    let _offset = 0;\n    value * 3\n}")
+        scaled_after, _note = key_of(*scaled_row)
+        edit(MUTATE_PLAN_SERVICE_FILE, "value + 5", "value + 6")
+        combine_after_helper, _note = key_of(*combine_row)
+        edit("tool/src/main.rs", "fn product_combine(value: u32) -> u32 {\n", "fn product_combine(value: u32) -> u32 {\n    let _spare = 0;\n")
+        combine_after_product, _note = key_of(*combine_row)
+    finally:
+        rows.pop(MUTATE_PLAN_SERVICE_FILE, None)
+    ok = (scaled_before is not None and combine_before is not None and scaled_after == scaled_before and combine_after_helper == combine_before
+          and combine_after_product is not None and combine_after_product != combine_before)
+    return ok, (f"被改坏的 scaled 在测试服务代码里：改它的函数体前 {scaled_before}（{scaled_note}）、后 {scaled_after}（要相同）；"
+                f"product_combine（被改坏、产品代码）：前 {combine_before}（{combine_note}）、改它闭包里测试服务代码的 helper 之后 {combine_after_helper}（要同前）、"
+                f"改 product_combine 自己之后 {combine_after_product}（要与前不同）")
+
+
 def mutate_record(plan_path, index, verdict, fails, line, red_names=""):
     """mutate.sh 判完一条（现判的）调：档在可复用的那几种里、这一条有键，就写一条记录；回写了没有。"""
     with open(plan_path, encoding="utf-8") as handle:
@@ -1428,7 +1491,7 @@ def mutate_record(plan_path, index, verdict, fails, line, red_names=""):
         return False
     red = [name for name in red_names.replace(",", " ").split() if name]
     fields = collections.OrderedDict(kind="mutate", key=entry["key"], verdict=verdict, fails=fails, line=line, judged_date=today_text(), how=plan["how"],
-                                     scope=entry.get("scope", ""), toolchain=plan["toolchain"], dependency=entry.get("dependency", ""),
+                                     scope=entry.get("scope", ""),
                                      all_tests=plan.get("all_tests") or "", red_tests=",".join(red),
                                      red_test_keys=",".join(f"{name}={plan['tests'].get(name, '')}" for name in red))
     Library(plan["library"], "# 实验变异表的一条判定（scripts/mutation/mutate.sh 经 scripts/mutation/lib_mutation_units.py 写）\n").write("records", entry["key"], fields)

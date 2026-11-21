@@ -1,8 +1,7 @@
 """广谱变异驱动（scripts/mutation/broad-mutation.py）自证的夹具：假的一步与假的清单驱动的脚本正文、假源码树、各序号怎么答的计划表、期望的汇总。
 只被驱动的自证在开头载入（run_selftest），没有命令行入口；驱动的运行期代码一处都不读这里的名字。
 
-这些名字不写在驱动里，因为判法单元指纹从驱动与规则库的函数收闭包，驱动里 import 时执行的模块级赋值全部随模块进闭包：夹具写在那里，
-改一处夹具库里的判定就一条都不沿用。放在这里，驱动自证的「改夹具文件判法单元指纹不变、改驱动里的运行期常量指纹变」那一格钉住这条边界。
+这些名字不写在驱动里：夹具只在自证里载入，驱动运行期读不到；自证的 selftest_fixture_reader_cells 核驱动里没有读它们的地方。
 夹具里要与驱动一致的名字（结局名）写字面量，不经驱动的常量取：自证借此对着字面量核驱动的写法。
 """
 
@@ -183,8 +182,6 @@ SELFTEST_STAGE_TWO_STEPS = ["two-test-doc", "two-build-verification", "two-test-
 SELFTEST_BUILD_STEPS = ("one-build", "two-build-verification", "two-build-debug")   # 编译步：基线键拒算、每趟照跑
 SELFTEST_NEXTEST_CASE = "singlefs-format::catching the_case_that_catches_it"
 SELFTEST_CATCHING_CASE = "singlefs-format::catching_cases catching_one"
-SELFTEST_JUDGING_KEY = "selftest-judging-units"
-SELFTEST_GPU_JUDGING_KEY = "selftest-gpu-judging-units"
 # 按条记基线那一格（selftest_baseline_entry_cells）另加的源码：第一段测试步一个测试二进制三条、一条起自己这个可执行文件且不点名测试（Command::new(current_exe())，单元闭包拒算）；
 # 验证包的库里两条（一条拒算）、另一个测试目标一条
 SELFTEST_ENTRY_BASELINE_FILE = "crates/singlefs-format/tests/per_entry.rs"

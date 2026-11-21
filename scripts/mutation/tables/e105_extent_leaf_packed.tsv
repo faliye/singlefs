@@ -1,5 +1,5 @@
 M1_扇出按节点算容器	    let records_per_container = fanout(unit_bytes, unit_header_bytes, record_bytes);	    let records_per_container = fanout(NODE_BYTES, unit_header_bytes, record_bytes);
 M2_树高少算一层	    while level_node_count > 1 {	    while level_node_count > 1 && levels.len() < 2 {
-M3_碰到的节点数不饱和	    level_node_count_float * (1.0 - (1.0 - 1.0 / level_node_count_float).powi(update_count as i32))	    (update_count as f64).min(level_node_count_float * 1e9)
+M3_碰到的节点数不饱和	    level_node_count_float * (1.0 - (1.0 - 1.0 / level_node_count_float).powi(i32_from_u64(update_count)))	    (update_count as f64).min(level_node_count_float * 1e9)
 M4_码3侧漏掉内部层	    touched(tree_geometry.container_count, update_count) * (unit_bytes * STRIPE_WIDTH) as f64 + copy_on_write_nodes(&tree_geometry.packed_internal_levels, update_count) * (NODE_BYTES * STRIPE_WIDTH) as f64	    touched(tree_geometry.container_count, update_count) * (unit_bytes * STRIPE_WIDTH) as f64
 M5_点查漏掉那次单元读	    (packed_internal_height + 1, packed_internal_height * NODE_BYTES + UNIT_BYTES)	    (packed_internal_height + 1, packed_internal_height * NODE_BYTES)

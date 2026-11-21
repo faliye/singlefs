@@ -6,13 +6,15 @@
 #   #[should_panic] 的用例那一段「 - should panic」不进名字；汇总行报了失败而一个名字都没取到，它退 3，这里记「抓名字的规则有盲区」。
 #
 #   mutate.sh <bin 名> <源文件> <变异表>      # 在 scripts/experiment-apparatus/ 里跑（在仓根下起也行，见下面「在仓根下起」）；参数不够三个退 2，打用法与一条例子
-#   认不出的选项（- 起头、又不是 --binary-of 的）退 2、点名它、一次 cargo 都不调
+#   mutate.sh <bin 名> <源文件> <变异表> --item <行名> [--item <行名>]…   # 只判点名的行（下面「点名行」）；--item 也可写在 <bin 名> 之前，写在那里时后面必须跟行名
+#   mutate.sh --list-items <bin 名> <源文件> <变异表>                      # 逐行打表里的行名（表的第一列），退 0；不编、不连服务（下面「点名行」）
+#   认不出的选项（- 起头、又不是 --binary-of、--list-items、--item 的）退 2、点名它、一次 cargo 都不调；<变异表> 之后认不出的参数同样
+#   <源文件>是目录式装置的入口（scripts/experiment-apparatus/<装置>/main.rs）时，变异表里每条的锚点在这个装置目录（含子目录）的全部 .rs 里找、改那一份（见下面「目录式装置」）
 #
 # 按条入库（判法在 scripts/mutation/lib_mutation_units.py 的 mutate_plan 与 mutate_record，单元的切分与闭包在 scripts/gate/lib_function_units.py）：
 #   每条变异一条判定：平常跑记「抓到 / 没红 / 无效」，按键存一个文件（判定、要打的那一行、判定日期、跑法）；
 #   键是原文、替换文、包住原文的 fn 单元与它依赖的单元指纹（入口是原文所在的最里层单元，lib_function_units.py 的 Rust 闭包）、cargo 参数与特性
-#   （bin 名不进）、工具链行（rustc -vV、cargo -V、这里给每个 cargo 带的 RUSTFLAGS 与构建配置解析后的值）、解析出的依赖版本行（包住原文那几个单元的闭包里真点名的外部 crate 在 scripts/experiment-apparatus/Cargo.lock 里落到的包与传递依赖，
-#   lib_mutation_units.py 文件头「依赖版本行」；落不到包的那一条拒算）；
+#   （bin 名不进）；与 crates 变异表、广谱变异同口径：rustc 与 cargo 的版本、调用方的 RUSTFLAGS 与构建配置、Cargo.lock 里的依赖版本都不进键，改了不作废已判的结论；
 #   不带变异名、表名、行号。平常跑复用另要：抓到的，红了的那几条测试此刻的闭包键与记录里的相同；没红、无效的，
 #   这个 bin 全部 #[test] 的闭包键合起来与记录里的相同。测试进程没跑完、抓名字的规则有盲区那两种不记、每趟照跑。原文不落在任何单元上（只在注释里）、闭包里有拒算的那一条拒算：每趟照跑、不写库。
 #   记红、撤绿、下趟现判（D13（验证路线） 已定项 17）：判失败的那几档（没红，记录里 fails=1）也照键写 records/<键>（mutate_record），
@@ -72,6 +74,28 @@
 #   不起 cargo、不进按条判定库、不复用；别的条照跑照判、照入库。收尾「计数：」里一栏「锚点失效 A 条」（接在现判、复用、拒算那三栏前面），A 不为 0 整轮退 3（判完别的条之后）。
 #   弄坏开关 MUTATE_BREAK=anchorstopsall 下：一条锚点失效就派活之前退 3、一条变异都不跑。
 #
+# 目录式装置（变异表一行只有三列，不带文件；装置拆成目录之后锚点落在入口 main.rs 或同目录的子模块文件里）：
+#   <源文件>的文件名是 main.rs（scripts/gate/lib_lag_split_family.py 的 is_directory_entry）而且在子目录里，它所在目录（含再往下各层，不含 target/）的全部 .rs
+#   就是这一份装置的源文件们（拆分族，family_members）。
+#   每条原文在这几份合起来恰好命中一次：命中的那一份就是这一条要改的文件，改的是副本里那一份、还原的也是那一份；0 次或多处（分布写在命中数后面）记「⚓ 锚点失效」，
+#   「原文在」之后写「装置目录 <目录>/ 的 N 份 .rs（含子目录）」。单文件装置（<源文件>不是子目录里的 main.rs，含直接放在装置根目录下的 <名>.rs）与不在装置目录之下的写法只这一份。
+#   按条入库的键：每条的「包住原文的单元」取自它要改的那一份文件，落在几份文件里的表分文件各算一次、按表序并成一份计划；测试的闭包键是整个 bin 的、与分几份无关。
+#   收尾核「源码没被改过」（退 5）也量全部几份与清单本身。副本里改、还原、touch 都按每条的文件做。
+#   弄坏开关 MUTATE_BREAK=anchorinsourceonly 下只看给的那一份；MUTATE_BREAK=directoryfamilyforall 下单文件装置也取它所在目录的全部 .rs。
+#   取不到清单（lib_lag_split_family.py 载不进）退 2、一条变异都不跑。
+#
+# 点名行（变异表一行的行名是第一列）：
+#   --list-items 逐行打表里的行名（空行与 # 起头的行不是行，同名的几行各打一行）、退 0；不编、不连服务，也不看 <bin 名>、<源文件> 对不对得上；变异表读不了退 2。同写 --item 时列项优先。
+#   --item <行名> 可给几次，取并集：只判点名的行，按表序判、按表序打。点名的行名表里没有（同名的几行全点），或 --item 后面没有行名，
+#   打原因与可点的行名（--list-items 列的同一份）、退 2、一次 cargo 都不调；这一道在读完表之后、起任何 cargo 之前。
+#   点名与否不进任何一行的键：点名那一趟拿只含点名那几行的一份表（分片根的 selected-table/ 下，整行原样）算键、查库、写库，
+#   键只由每行自己的原文、替换文、包住原文的单元与 cargo 参数定（行数、次序、行名都不进），所以点名单判一行与它在整张表那一趟里判，键相同、判定相同；
+#   整张表判过的行点名再跑照键复用，点名判过的行整张表再跑照键复用。
+#   基线、还原之后那一次、按条入库与复用哨兵点名与否判法相同；stderr 在读完表之后另打一行说点了几个行名、几行。
+#   成功那句与「计数：」写明点了几行：计数行末尾接「、点名 N 行（表里共 M 行）」，「已还原，基线仍全绿」之后接「；点名 N 行（表里共 M 行）」，
+#   「全部复用：」之后写「点名 N 行（表里共 M 行），K 条都按判定库复用」。不点名的那一趟这几句一个字不变。
+#   弄坏开关见下面开关表（item 起头的几条与 itemkeyed）。
+#
 #   mutate.sh --selftest    拿一个假的 cargo（PATH 前面放它，直接起）走一遍各种结局（抓到、没红、无效），
 #                           再走一遍并行的几样（进程数不同 stdout 逐字相同、各用各的副本、丢一份结果整道判红、锚点失效那一条记 ⚓ 而别的照跑、整轮退 3），
 #                           工作进程数取每台默认重活线程数（SINGLEFS_THREAD_CAP 顶），取不到退 2、一次 cargo 都不调；
@@ -87,21 +111,30 @@
 #                           下一趟那一条现判（stderr 写「上次判红（notred）」、cargo 照起）并判回抓到、别的两条复用，再下一趟三条都复用、一次 cargo 都不起；
 #                           再走一遍按条入库（被测源码换成一份带 #[test] 的）：同一条第二趟复用、一次 cargo 都不起（「全部复用」），
 #                           改了被改坏函数调到的函数之后那一条现判，原文只在注释里的那一条拒算照跑；
-#                           依赖版本行只收闭包里真点名的外部 crate（夹具 Cargo.lock：头一趟逐字是 extdep 与传递依赖 inner 两行，不点外部 crate 的是空的，
-#                           改闭包外点的 other 的版本照样复用，改 inner 的版本现判，认 package = 改名）。
+#                           版本不进键（夹具 Cargo.lock：extdep 带传递依赖 inner，adds 经 helper 点 extdep，other 只在闭包外点）：改 other 的版本、改 inner 的版本、
+#                           改 cargo -V 打的版本、改调用方的 RUSTFLAGS 之后那一条都照样复用、一次 cargo 都不起，改了 helper 点名的函数之后现判。
+#                           再走一遍目录式装置（文件头「目录式装置」；directory-judged、directory-stale、single-file-neighbor 三例）：bin 的入口是 fake_bench/main.rs、子模块 part.rs 在同一目录，
+#                           锚点落在子模块里的条改 part.rs、落在入口里的条改 main.rs、各还原各的（BEHAVIOR 一共基线与还原之后各一个 PASS、两个 RED、一个 BROKEN），第二趟三条都按判定库复用；
+#                           原文在 main.rs 与 part.rs 里各一次、哪里都没有的两条记「⚓ 锚点失效」（点名装置目录与分布）而别的照跑、整轮退 3；
+#                           单文件装置的锚点只在给的那一份里找（同目录邻居文件里才有的原文记命中 0 次）。
 #                           再走一遍副本范围：装置 include_str! 读仓根下别处的文件（../../.claude/heavy-thread-default）时副本根下链上、基线编得过、照常判抓到；
 #                           认不出的写法（env! 给的路径）与落到仓根之外的路径退 2、逐行点名、一次 cargo 都不起（判法在 scripts/hosts/lib_repository_copy.py 的闭包）。
 #                           再走一遍复用三问（reuse-three-questions，scripts/gate/lib_reuse_checks.py 文件头「一」）：两条抓到的表，头一趟两条现判、同一份输入第二趟全复用、
 #                           加一个没人调的函数全复用、改「改孤函数」那一条闭包里的 lonely_helper 只现判它，末尾打规范输出 REUSE_SELFTEST script=scripts/mutation/mutate.sh …；
 #                           再走一遍复用哨兵（reuse-sentinel，共用库文件头「二」）：种子 5、哨兵 1 条那一趟一条强制现判、与库里同为「caught」、退 0，不读库那一趟红「复用失灵」、退 1。
-#                           再走一遍测试线程（test-threads 三例，文件头「并行」）：调用方没设 RUST_TEST_THREADS、SINGLEFS_THREAD_CAP=10 时每条 cargo test 收到的是 10 ÷ 工作进程数、
-#                           上限 1 时取 1，调用方设了 7 的原样收到 7。
+#                           再走一遍测试线程（test-threads 四例，文件头「并行」）：调用方没设 RUST_TEST_THREADS、SINGLEFS_THREAD_CAP=10 时每条 cargo test 收到的是 10 ÷ 工作进程数、
+#                           上限 1 时取 1，调用方设了 7 的原样收到 7、SINGLEFS_THREAD_CAP 照样收到 10 ÷ 工作进程数；
+#                           服务设的（test-threads-service：RUST_TEST_THREADS、CARGO_BUILD_JOBS、SINGLEFS_THREAD_CAP 都是登记值 10、开 4 个工作进程）每条 cargo test 收到的三样都是 10 ÷ 4。
 #                           再走一遍在仓根下起（from-root 四例，文件头「在仓根下起」，不起 cargo）：kb 的写法与 ./ 起头、scripts/ 之外两种写法各改写对、退 6 报的复跑命令是改写后的参数，
 #                           --binary-of 照样打 bin 名，既不在仓根也不在 scripts/experiment-apparatus/ 的照旧退 2。
 #                           再走一遍上卡的表（文件头「上卡的表」；假 cargo 认 --no-run、编出一份假测试二进制，假测试二进制逐次记下收到的 GPU_CARDS_BY_PRIORITY，没设记 unset）：
 #                           card-phase（bin 挂 e163-gpu、环境里给卡串）每次 cargo 都带 --no-run，测试二进制每次都收到环境里给的那一串，判抓到、退 0；
 #                           card-phase-no-cards（同形、环境里没有卡串）测试二进制每次都收到 unset（没设），判抓到、退 0；
 #                           card-plain（不挂上卡特性的表）cargo 不带 --no-run、退 0；--test-targets 打出 card-phase 那一例的 fake-bench 挂 e163-gpu。
+#                           再走一遍点名行（文件头「点名行」；表里有注释行与空行、三条替换文各不相同的抓到，按条库那几格用带 #[test] 的被测源码）：
+#                           列项（item-list：--list-items 逐行打三个行名、退 0、一次 cargo 都不调、不读库）、点名单行（item-single：只判那一行，计数与成功句写点名 1 行，基线与还原之后那一次照跑）、
+#                           点名几行取并集（item-union：--item 写在 <bin 名> 之前一次、之后一次，按表序判、按表序打）、点名的行名写错与 --item 后面缺行名（item-unknown、item-missing-name：各退 2、列出可点的行名、一次 cargo 都不调）、
+#                           整张表判过之后点名一行照键复用（item-after-whole：不起 cargo、判定行与整表那一趟逐字相同）、点名一行判过之后跑整张表照键复用（item-before-whole：现判 2 条、复用 1 条、整表那一趟不报点名）。
 #                           每一例各用一份自己的临时目录：假 cargo、假 workspace、编译目录、按条判定库（MUTATE_LIBRARY_DIRECTORY）都在里面，不读别的例留下的东西；
 #                           复用哨兵的状态在每一趟自己的临时根（SHARD_ROOT）里。经统一任务服务交，登记为 selftest（.claude/hooks/selftest-registry.tsv）。
 #
@@ -134,12 +167,21 @@
 #   却各占一份副本、各编一遍基线。收小之后再打一行「这一轮开 N 个工作进程…卡在「要现判的条数」这一项…」，每个 cargo 的编译并行度与每条 cargo test 的测试线程数照新的工作进程数重算，
 #   第 2 份起的副本在这之后才拷；全部复用的不拷副本。弄坏开关 workersbytablecount 下仍按表里的条数开。
 #   内存不在这里判、不按内存收工作进程数：见下面「上限、限时与卡住」。
-#   每个 cargo 的编译并行度：先用 MUTATE_CARGO_JOBS，其次调用方已经设了的 CARGO_BUILD_JOBS，都没有就取 每台默认重活线程数 ÷ 工作进程数（至少 1；弄坏开关 workersbyprocessor 下取 核数 ÷ 工作进程数），免得 N 个 cargo 各按核数开 rustc。
-#   每条 cargo test 的测试线程数（基线、每条变异、还原之后那一次）：调用方设了 RUST_TEST_THREADS（非空）原样传、不覆盖；没设的给每次 cargo test 设
-#   RUST_TEST_THREADS=max(1, 线程上限 ÷ 工作进程数)，线程上限与工作进程数那一项取同一个登记值；免得 N 个工作进程的测试二进制各按整机核数起线程。
-#   只设在自己起的那几次 cargo test 的环境里、不 export。stderr 在头一行之后报一行设了几、怎么算的（或照调用方的）。
+#   服务设的与用例显式要的（RUST_TEST_THREADS、CARGO_BUILD_JOBS 两样同一条判据，explicitly_requested_threads）：线程上限是工作进程数那一项的同一个登记值
+#   （每台默认重活线程数）。统一任务服务给每条任务套的 capped.sh 把 RUST_TEST_THREADS、CARGO_BUILD_JOBS、SINGLEFS_THREAD_CAP 都设成这个登记值本身，
+#   于是收到的值是正整数而不小于线程上限的，当服务设的整机份额，照工作进程数分；小于线程上限的是用例显式要的（命令里 env RUST_TEST_THREADS=<n> 这类），原样传、不覆盖；
+#   不是正整数的原样传（libtest 与 cargo 自己报）。用例要的恰好等于线程上限的也照样分：N 个工作进程各拿整份就是要防的超卖，要一个测试二进制拿整份的设 MUTATE_JOBS=1。
+#   线程上限只在弄坏开关 workersbyprocessor 下取不到（SINGLEFS_THREAD_CAP 不是正整数），那时收到的非空值一律原样传。
+#   每个 cargo 的编译并行度：先用 MUTATE_CARGO_JOBS，其次用例显式要的 CARGO_BUILD_JOBS；服务设的 CARGO_BUILD_JOBS 取 线程上限 ÷ 工作进程数；都没有就取
+#   每台默认重活线程数 ÷ 工作进程数（至少 1；弄坏开关 workersbyprocessor 下取 核数 ÷ 工作进程数），免得 N 个 cargo 各按整份开 rustc。
+#   每条 cargo test 的测试线程数（基线、每条变异、还原之后那一次）：用例显式要的 RUST_TEST_THREADS 原样传；没设的与服务设的给每次 cargo test 设
+#   RUST_TEST_THREADS=max(1, 线程上限 ÷ 工作进程数)，这一路一条任务里各工作进程的测试线程合计不超过线程上限；用例显式要的原样传给每个工作进程，
+#   合计是显式值 × 工作进程数，可以超过线程上限（显式给 8、4 个工作进程合计 32）。
+#   测试二进制另读 SINGLEFS_THREAD_CAP 的那一路（scripts/experiment-apparatus/heavy_threads_default/threads.rs 的 default_heavy_threads 与直接读它的装置）：
+#   它是登记值的覆盖名，没有用例显式要的那一种，每次 cargo test 一律设 SINGLEFS_THREAD_CAP=max(1, 线程上限 ÷ 工作进程数)（只在上面那种取不到线程上限时不设）。
+#   这两样只设在自己起的那几次 cargo test 与上卡的表起的测试二进制的环境里、不 export。stderr 在头一行之后各报一行设了几、怎么算的（或照用例显式要的）。
 #   基线在每份副本上各跑一次（第 1 份那次就是原来的基线，其余几份顺带把各自的编译目录热起来），还原之后那一次也在每份副本上各跑一次。
-#   锚点在派活之前逐条核（每条原文在源码里恰好命中一次），不是的那一条见「锚点失效」，别的照派。
+#   锚点在派活之前逐条核（每条原文在源码里恰好命中一次；目录式装置在装置目录的全部 .rs 里合起来恰好一次），不是的那一条见「锚点失效」，别的照派。
 #   活是动态领的：每条变异一个认领目录（mkdir 是原子的），谁先跑完谁领表里下一条还没人领的。
 #   每条变异的判定写进自己的结果文件，父进程按表里的次序逐个读、逐行打到 stdout；工作进程一个字都不往 stdout 写。
 #   stdout 与进程数无关：MUTATE_JOBS=1 与 =4 逐字相同；头一行在 stderr，是两次跑唯一不同的那一行。
@@ -147,6 +189,7 @@
 #
 # 退出码：0 每条都判完、没有判失败的；1 有没红或抓名字的规则有盲区；
 #   2 用法、环境或基线不绿，或平常跑时带了只供自证的变量（见「只供自证」），或不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY（见「按条入库」），
+#     或点名的行名表里没有、--item 后面缺行名、列项时变异表读不了（见「点名行」），
 #     或取不到每台默认重活线程数，或判定库客户端退 3（客户端别的错：没配服务地址、时限写坏、帧被拒这类；查库那一段退 3 一次 cargo 都不调，
 #     判完写库那一步退 3 照跑完、收尾整轮退 2，见「按条入库」末尾）；
 #   3 有锚点失效的条（别的条照跑完；同时有 1 那几种的也退 3，逐条的行照打）；
@@ -170,14 +213,20 @@
 #       「✗ 自检：三种结局的表输出里」
 #       「✗ 自检：复用三问 reuse-three-questions」
 #       「✗ 自检：复用哨兵 reuse-sentinel」
-#       workers-registry、test-threads、test-threads-floor、test-threads-caller（三条、四条的表丢了一份判定，整轮退 8，这几格要的是退 0）
+#       workers-registry、test-threads、test-threads-floor、test-threads-caller、test-threads-service（三条、四条的表丢了一份判定，整轮退 8，这几格要的是退 0）
 #       「✗ 自检：工作进程数：SINGLEFS_THREAD_CAP=2」
 #       「✗ 自检：测试线程：调用方没设 RUST_TEST_THREADS」
 #       「✗ 自检：测试线程：线程上限 1」
 #       「✗ 自检：测试线程：调用方设了的 RUST_TEST_THREADS=7」
+#       「✗ 自检：测试线程：服务设的 RUST_TEST_THREADS=10」
+#       directory-judged（目录式装置那一例的表也是三条、头一趟丢了第 2 条的判定：头一趟整轮退 8，第二趟那条没入库、要现判）：
+#       「✗ 自检：目录式装置：锚点落在子模块里与入口里的三条应当各改各的那一份」
+#       「✗ 自检：目录式装置：第二趟同一张表应当三条都按判定库复用」
 #       unit-library-red（「✗ 自检：记红撤绿：同一把键经哨兵强制现判一条」：头一趟丢了第 2 条的判定没入库，库里只剩两条，哨兵取 2 条之后没有强制现判的那一条，后面「记红撤绿」两问跟着红）
 #       「✗ 自检：记红撤绿：库里同一把键最近一次是没红」
 #       「✗ 自检：记红撤绿：现判又判抓到之后再下一趟应当复用」
+#       item-union（点名两行、表里第 2 条是抓到三，丢了它的判定整轮退 8）、item-after-whole（整表那一趟丢了第 2 条抓到二的判定、整轮退 8，没入库的抓到二在点名那一趟现判、不是复用）
+#       「✗ 自检：点名几行取并集：」「✗ 自检：整表判过之后点名一行：」
 #   MUTATE_BREAK=unknownoptionaccepted  认不出的选项照旧当第一个位置参数往下走（没有这一道检查的样子）
 #       unknown-option（「认不出的选项 --no-such-option 应当退 2、点名它、一次 cargo 都不调」：当 bin 名往下走，退的不是 2、也点不到「认不出的选项」）
 #       「✗ 自检：认不出的选项」
@@ -217,12 +266,17 @@
 #       unit-library-callee（「改了被改坏函数调到的函数之后那一条应当现判……stderr 写库里没有这把键」：现判的原因写成了不读库）、
 #       reuse-three-questions（「复用三问 reuse-three-questions」：①②③ 全红）、reuse-sentinel（「复用哨兵 reuse-sentinel」：照常那一趟就红「复用失灵」退 1）；
 #       复用哨兵抽中的那几例（caught-only 第二趟这一类）另打「✗ 复用失灵」
-#       「✗ 自检：依赖版本行：改了闭包没点名的外部包 other 的版本之后那一条」
-#       「✗ 自检：依赖版本行：改了点名的 extdep 的传递依赖 inner 的版本之后那一条」
-#       unit-library-red（先判红的库里同一把键，不读库时计划里没有复用行，哨兵没有候选、强制现判的是空，下一趟整张现判，三问都落空）
+#       「✗ 自检：版本不进键：改了闭包没点名的外部包 other 的版本之后那一条」
+#       「✗ 自检：版本不进键：改了点名的 extdep 的传递依赖 inner 的版本之后那一条」
+#       「✗ 自检：版本不进键：改了 cargo -V 打的版本之后那一条」
+#       「✗ 自检：版本不进键：改了调用方的 RUSTFLAGS 值之后那一条」
+#       「✗ 自检：版本不进键：改了 helper 点名的函数之后那一条应当现判」（末一问：现判的原因写成了不读库、不是「库里没有这把键」）
+#       unit-library-red（先判红的库里同一把键，不读库时计划里没有复用行，哨兵没有候选、强制现判的是空，下一趟整张现判，三问都落空；
+#       三条的表记红撤绿之后那一趟也是 3 条全现判，不是 1 条：工作进程数收不到要现判的条数）
 #       「✗ 自检：记红撤绿：同一把键经哨兵强制现判一条」
 #       「✗ 自检：记红撤绿：库里同一把键最近一次是没红，下一趟应当现判」
 #       「✗ 自检：记红撤绿：现判又判抓到之后再下一趟应当复用」
+#       「✗ 自检：按条入库查过判定库之后工作进程数」
 #   MUTATE_BREAK=libraryoverridehonored  不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY 也照旧认、拿它当库目录
 #       library-directory-outside-service（「不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY 应当退 2……」：照常跑完、调了 cargo）
 #       「✗ 自检：不在临时 prune-server 底下设了 MUTATE_LIBRARY_DIRECTORY」
@@ -237,15 +291,18 @@
 #       plan-client-error（「查库那一段客户端退 3：应当退 2……」）
 #   MUTATE_BREAK=redreused  判红的（记录里 fails=1：没红、编不过）照旧当绿复用、进复用哨兵的候选：只要档在可复用的几种里就复用
 #       unit-library-red（「记红撤绿：库里同一把键最近一次是没红，下一趟应当现判……」：下一趟复用、cargo 一次都不起；同一格下一问「记红撤绿：现判又判抓到之后再下一趟应当复用……」跟着红）
-#   MUTATE_BREAK=calleesignored  键里包住原文的那个函数只取它自己的指纹、不收它调到的单元（依赖版本行也只看它自己）
+#   MUTATE_BREAK=calleesignored  键里包住原文的那个函数只取它自己的指纹、不收它调到的单元
 #       unit-library-callee（「改了被改坏函数调到的函数之后那一条应当现判……」：helper 改了照样复用、cargo 一次都不起）、
 #       reuse-three-questions（「复用三问 reuse-three-questions」：③ 红，lonely_helper 改了「改孤函数」照样复用）；
-#       unit-library-dependency（「依赖版本行：头一趟库里那一条应当逐字只记 extdep……」：adds 自己不点 extdep，记成空的）
-#       「✗ 自检：依赖版本行：改了点名的 extdep 的传递依赖 inner 的版本之后那一条」
-#       「✗ 自检：依赖版本行：helper 改点 alias_dep:: 之后库里那一条」
-#   MUTATE_BREAK=dependenciesbycrate  依赖版本行按整包收：单元所在 crate 清单里的外部依赖不看点没点名全收
-#       unit-library-dependency（「依赖版本行：头一趟库里那一条应当逐字只记 extdep……」多出 aliased、other、「……改了闭包没点名的外部包 other 的版本之后那一条应当照样复用……」现判了、
-#       「……helper 改点 alias_dep:: 之后……逐字只记 aliased 一行」多出 extdep、inner、other）
+#       unit-library-versions（版本不进键那一例，末一问：键没变、红了的那几条测试的闭包键对不上才现判，现判的原因写成「红了的那几条测试此刻对不上记录里的闭包键」、不是「库里没有这把键」）
+#       「✗ 自检：版本不进键：改了 helper 点名的函数之后那一条应当现判」
+#   MUTATE_BREAK=toolchainkeyed  rustc -vV、cargo -V 打的版本与调用方的 RUSTFLAGS 等构建环境（toolchain_lines）并进键（lib_mutation_units.py 的 mutate_plan）
+#       unit-library-versions（版本不进键那一例）
+#       「✗ 自检：版本不进键：改了 cargo -V 打的版本之后那一条」
+#       「✗ 自检：版本不进键：改了调用方的 RUSTFLAGS 值之后那一条」
+#   MUTATE_BREAK=dependencykeyed  依赖版本行（包住原文那几个单元的闭包里真点名的外部 crate 在 Cargo.lock 里落到的包与传递依赖）并进键
+#       unit-library-versions（版本不进键那一例：改了闭包没点名的外部包 other 的版本不动键，改了 inner 的版本动键）
+#       「✗ 自检：版本不进键：改了点名的 extdep 的传递依赖 inner 的版本之后那一条」
 #   MUTATE_BREAK=includesunlinked  副本根下不链 lib_repository_copy.py 闭包里 scripts/experiment-apparatus/ 之外的仓内文件，也不判闭包算不算得成
 #       include-outside（「装置 include_str 读仓根下别处的文件……应当链上、基线编得过」：基线编不过、退 2）、
 #       include-unrecognized（「认不出的 include_str! 写法……应当退 2、逐行点名、一次 cargo 都不起」：不判就起了 cargo）
@@ -255,7 +312,20 @@
 #       cap-lints、cap-lints-existing、encoded-empty、encoded-other（「deny 警告：平常跑……留死代码那一条应当判抓到、整轮退 0」：记成『⏭  [留死代码]』无效），
 #       四例都另红「deny 警告：……每个 cargo 收到的 RUSTFLAGS 应当逐字是」与「……stderr 应当报」，encoded-empty、encoded-other 两例再红「……收到的 CARGO_ENCODED_RUSTFLAGS 应当逐字是」
 #   MUTATE_BREAK=anchorstopsall  锚点失效一条就派活之前退 3、一条变异都不跑
-#       stale-anchor（「锚点失效的那一条应当记「⚓ 锚点失效」……」：退 3、一次 cargo 都没调、stdout 是空的）
+#       stale-anchor（「锚点失效的那一条应当记「⚓ 锚点失效」……」：退 3、一次 cargo 都没调、stdout 是空的）、
+#       directory-stale、single-file-neighbor（这两例的表里也有锚点失效的条：整轮仍退 3，但一次 cargo 都没调，失效那条之外的另一条没跑、没抓到）：
+#       「✗ 自检：目录式装置：原文在装置目录里命中 2 次」
+#       「✗ 自检：单文件装置：只在给的那一份里找锚点」
+#   MUTATE_BREAK=anchorinsourceonly  锚点只在给的那一份源文件里找（list_source_files 只交 <源文件> 自己）：目录式装置里落在子模块文件里的锚点都记命中 0 次
+#       directory-judged（「目录式装置：锚点落在子模块里与入口里的三条应当各改各的那一份」：子模块里的两条记了锚点失效、退 3）、
+#       directory-judged 的第二趟（「目录式装置：第二趟同一张表应当三条都按判定库复用」：两条锚点失效，退 3）、
+#       directory-stale（「目录式装置：原文在装置目录里命中 2 次」：main.rs 与 part.rs 各一次的那条只在 main.rs 里命中一次、没记锚点失效，子模块里有锚点的那条记了锚点失效）
+#       「✗ 自检：目录式装置：锚点落在子模块里与入口里的三条应当各改各的那一份」「✗ 自检：目录式装置：第二趟同一张表应当三条都按判定库复用」「✗ 自检：目录式装置：原文在装置目录里命中 2 次」
+#   MUTATE_BREAK=directoryfamilyforall  单文件装置也取它所在目录里（含子目录）的全部 .rs：同目录别的文件里才有的原文当成命中一次，改在那一份上
+#       single-file-neighbor（「单文件装置：只在给的那一份里找锚点」：邻居文件里的原文没记锚点失效、整轮退 1）
+#       stale-anchor（单文件装置里命中 0 次的那条也按装置目录的写法报：stdout 里 ⚓ 那一行写的是装置目录与它底下的 .rs 份数，不是给的那一份文件名）：
+#       「✗ 自检：锚点失效的那一条应当记「⚓ 锚点失效」」
+#       「✗ 自检：单文件装置：只在给的那一份里找锚点」
 #   MUTATE_BREAK=rocksdb-entry-unchecked  bin 编得到 librocksdb-sys 也不在起 cargo 之前调 scripts/hosts/rocksdb-prebuilt.py entry
 #       rocksdb-entry-refused（「bin 的 required-features 点到 rocksdb、进程环境里没有预编库的取值，应当在起 cargo 之前退 2……」：假 cargo 照起了）
 #   MUTATE_BREAK=rootnotentered  不认仓根：仓根的 Cargo.toml 也是 [workspace]，目录检查照样放过，参数照仓根的写法原样用
@@ -275,13 +345,26 @@
 #       unit-library-red（三条的表、记红撤绿之后那一趟只有 1 条现判：假 cargo 收到的编译目录应当只有 1 个、stderr 应当报「卡在「要现判的条数」这一项」）
 #       「✗ 自检：按条入库查过判定库之后工作进程数」
 #   MUTATE_BREAK=testthreadsunset  不给 cargo test 设 RUST_TEST_THREADS：每条 cargo test 照 libtest 默认按整机核数起线程
-#       test-threads（假 cargo 收到的是调用方那个空串）、test-threads-floor（同）、test-threads-caller（7 照样传到，但 stderr 没有「不覆盖」那一行）
+#       test-threads（假 cargo 收到的是调用方那个空串）、test-threads-floor（同）、test-threads-caller（7 照样传到，但 stderr 没有「不覆盖」那一行）、
+#       test-threads-service（假 cargo 收到的是服务设的 10，没分）；SINGLEFS_THREAD_CAP 那一路不归它，照样分
 #       「✗ 自检：测试线程：调用方没设 RUST_TEST_THREADS」
 #       「✗ 自检：测试线程：线程上限 1」
 #       「✗ 自检：测试线程：调用方设了的 RUST_TEST_THREADS=7」
+#       「✗ 自检：测试线程：服务设的 RUST_TEST_THREADS=10」
 #   MUTATE_BREAK=overridecallertestthreads  调用方设了的 RUST_TEST_THREADS 也换成算出来的
-#       test-threads-caller（假 cargo 收到的是线程上限 ÷ 工作进程数，不是 7）
+#       test-threads-caller（假 cargo 收到的是线程上限 ÷ 工作进程数，不是 7）、test-threads-service（值照样是分过的，stderr 没报「当服务设的分」）
 #       「✗ 自检：测试线程：调用方设了的 RUST_TEST_THREADS=7」
+#       「✗ 自检：测试线程：服务设的 RUST_TEST_THREADS=10」
+#   MUTATE_BREAK=registeredtestthreadskept  收到的 RUST_TEST_THREADS 不小于线程上限的也当用例显式要的、原样传（服务设的整份不分）
+#       test-threads-service（假 cargo 每次收到的是 10，不是 10 ÷ 4；stderr 报的是「照调用方设的」）
+#       「✗ 自检：测试线程：服务设的 RUST_TEST_THREADS=10」
+#   MUTATE_BREAK=threadcapundivided  不给 cargo test 设分过的 SINGLEFS_THREAD_CAP：测试二进制另读它的那一路拿到的是整份登记值
+#       test-threads-service（假 cargo 收到的 SINGLEFS_THREAD_CAP 是 10）、test-threads-caller（同）
+#       「✗ 自检：测试线程：服务设的 SINGLEFS_THREAD_CAP=10」
+#       「✗ 自检：测试线程：调用方设了 RUST_TEST_THREADS=7 时 SINGLEFS_THREAD_CAP」
+#   MUTATE_BREAK=registeredcargojobskept  收到的 CARGO_BUILD_JOBS 不小于线程上限的也当用例显式要的、原样用（服务设的整份不分）
+#       test-threads-service（假 cargo 每次收到的 CARGO_BUILD_JOBS 是 10，不是 10 ÷ 4）
+#       「✗ 自检：编译并行度：服务设的 CARGO_BUILD_JOBS=10」
 #   MUTATE_BREAK=cardphaseskipped  上卡的表也照不上卡的表跑（cargo test 编带跑一步，不拆成编与跑）
 #       card-phase、card-phase-no-cards（cargo 不带 --no-run、测试二进制一次都没起）
 #       「✗ 自检：上卡的表：每次 cargo 应当都带 --no-run」「✗ 自检：上卡的表：测试二进制应当每次都收到环境里给的卡串」
@@ -296,6 +379,38 @@
 #       card-plain（挂 fake-feature 的表 cargo 带了 --no-run）、
 #       required-features（挂两个别的特性的表 cargo 也带了 --no-run，参数对不上）
 #       「✗ 自检：上卡的表：不挂上卡特性的表 cargo 应当不带 --no-run、退 0」「✗ 自检：挂了 required-features 的 bin 应当每次带」
+#   MUTATE_BREAK=directoryformunseen  目录式目标不认：list_test_targets 里 [[bin]]、[[test]] 段没写 path 的，缺省路径只取平铺的 src/bin/<名>.rs、tests/<名>.rs，不找 <名>/main.rs；
+#       --binary-of 给 src/bin/<名>/main.rs 打文件名去掉 .rs（main），不打目录名
+#       目录式样本（--test-targets 打出的根文件列是 src/bin/tool.rs 与 tests/split.rs，文件不在）、binary-of 的第三个源文件（打 main 不打 split_tool）
+#       「✗ 自检：上卡的表：段没写 path 的目录式目标，--test-targets 应当打出」「✗ 自检：--binary-of bench/src/bin/split_tool/main.rs 应当退 0、只打」
+#   MUTATE_BREAK=suffixbinarymatch  find_declared_binary 退回后缀匹配：源文件整路径以 [[bin]] 的 path 收尾就算，不按清单目录解析 path 后与整路径比；
+#       同一份清单里 path 是 main.rs 的 [[bin]] 排在前面时，nested/main.rs 被认成它
+#       binary-of-same-suffix（--binary-of 给 pool/nested/main.rs 打了 plain、给 e142_x/main.rs 打了 e7-index-bench）
+#       「✗ 自检：--binary-of pool/nested/main.rs 应当退 0、只打」「✗ 自检：--binary-of ./pool/../pool/nested/main.rs 应当退 0、只打」「✗ 自检：--binary-of e142_x/main.rs 应当退 0、只打」
+#   MUTATE_BREAK=itemlistrowdropped  --list-items 少打表里最后一行
+#       item-list（打出的行名比表里的行少一个）
+#       「✗ 自检：列项：」
+#   MUTATE_BREAK=itemselectsall  --item 点了名也照旧判整张表（不筛行）
+#       item-single、item-union（判了没点名的行，计数与成功句报的行数是整张表的）、item-after-whole、item-before-whole（点名那一趟判出整张表的行数）
+#       「✗ 自检：点名单行：」「✗ 自检：点名几行取并集：」「✗ 自检：整表判过之后点名一行：」「✗ 自检：点名一行判过之后跑整表：」
+#   MUTATE_BREAK=itemoverwritten  给几次 --item 只认最后给的那一个行名，不取并集
+#       item-union（--item 写在 <bin 名> 之前与之后各一次，只判了后给的那一行）
+#       「✗ 自检：点名几行取并集：」
+#   MUTATE_BREAK=itemunknownaccepted  点名的行名表里没有时不拒，照旧往下跑（没有的行名当没点）
+#       item-unknown（没退 2、起了 cargo）
+#       「✗ 自检：点名的行名写错：」
+#   MUTATE_BREAK=itemmissingnameaccepted  --item 后面缺行名时不拒，当没写 --item 跑整张表
+#       item-missing-name（没退 2、起了 cargo）
+#       「✗ 自检：--item 后面缺行名：」
+#   MUTATE_BREAK=itemrejectlistdropped  点名被拒时退 2 而不列可点的行名
+#       item-unknown、item-missing-name（stderr 里没有表里的行名）
+#       「✗ 自检：点名的行名写错：」「✗ 自检：--item 后面缺行名：」
+#   MUTATE_BREAK=itemkeyed  点名的那一趟把点名并进每一行的替换文再算键、查库、写库（点名与否进了键）
+#       item-after-whole（整张表判过的行点名再跑照旧现判）、item-before-whole（点名判过的行整张表再跑照旧现判）
+#       「✗ 自检：整表判过之后点名一行：」「✗ 自检：点名一行判过之后跑整表：」
+#   MUTATE_BREAK=itemcountunsaid  点名那一趟的成功句与计数行不写点名了几行
+#       item-single、item-after-whole
+#       「✗ 自检：点名单行：」「✗ 自检：整表判过之后点名一行：」
 # RocksDB 预编库的取值：bin 编得到 librocksdb-sys（bin_builds_rocksdb：清单里 rocksdb 是不挂特性的依赖，或这个 bin 的 required-features 顺着 [features]
 #   一层层点到 dep:rocksdb / rocksdb）时，起任何 cargo 之前判一次（scripts/hosts/rocksdb-prebuilt.py entry --root <scripts/experiment-apparatus 的上两层>）：
 #   这台装了、此刻进程环境的取值对得上；判红退 2、一条变异都不跑。编不到的 bin（今天除 E162 那几个之外的全部）不判。
@@ -337,15 +452,18 @@ LIBTEST_RESULT_LINES="$(dirname "$SELF_PATH")/../gate/lib_libtest_result_lines.p
 #   e174-gpu 不在内：e174_lease_drop_wait_memory_return.rs 的单测全走 SimulatedCardHost（模型卡），真卡只在 child 子命令的 open_wgpu_card 里开。
 CARD_FEATURES=(e163-gpu)
 # list_test_targets <工作区目录>：逐行打各包的测试目标（文件头「上卡的表」--test-targets 那一行的格式）；清单读不了退 1、原因打在 stderr。
-#   弄坏开关 anyfeaturecard 下挂了任何 required-features 的目标都当上卡的目标（不看 CARD_FEATURES）
+#   [[bin]]、[[test]] 段没写 path 的，根文件照 cargo 的缺省找：src/bin/<名>.rs 或 src/bin/<名>/main.rs、tests/<名>.rs 或 tests/<名>/main.rs，在的那一份（两份都不在取平铺的）。
+#   弄坏开关 anyfeaturecard 下挂了任何 required-features 的目标都当上卡的目标（不看 CARD_FEATURES）；directoryformunseen 下缺省路径只取平铺的那一份
 list_test_targets() {
-  local any_feature=0
+  local any_feature=0 flat_only=0
   is_broken anyfeaturecard && any_feature=1
-  CARD_FEATURE_NAMES="${CARD_FEATURES[*]}" ANY_FEATURE_IS_CARD="$any_feature" python3 - "$1" <<'PY'
+  is_broken directoryformunseen && flat_only=1
+  CARD_FEATURE_NAMES="${CARD_FEATURES[*]}" ANY_FEATURE_IS_CARD="$any_feature" FLAT_DEFAULT_PATH_ONLY="$flat_only" python3 - "$1" <<'PY'
 import glob, os, sys, tomllib
 root = sys.argv[1]
 card_features = set(os.environ["CARD_FEATURE_NAMES"].split())
 any_feature_is_card = os.environ["ANY_FEATURE_IS_CARD"] == "1"
+flat_default_path_only = os.environ["FLAT_DEFAULT_PATH_ONLY"] == "1"
 
 
 def manifest_of(directory):
@@ -363,6 +481,7 @@ def rows_of(package_directory, manifest):
     package = manifest["package"]
     name = package["name"]
     exists = lambda relative: os.path.isfile(os.path.join(package_directory, relative))
+    default_root = lambda flat, directory: directory if exists(directory) and not exists(flat) and not flat_default_path_only else flat
     rows = []
     lib = manifest.get("lib")
     lib_path = (lib or {}).get("path", "src/lib.rs")
@@ -375,7 +494,7 @@ def rows_of(package_directory, manifest):
     declared_names = {target.get("name") for target in declared_bins}
     for target in declared_bins:
         target_name = target.get("name")
-        default_path = "src/main.rs" if target_name == name else f"src/bin/{target_name}.rs"
+        default_path = "src/main.rs" if target_name == name else default_root(f"src/bin/{target_name}.rs", f"src/bin/{target_name}/main.rs")
         if target.get("test", True):
             rows.append(("bin", target_name, target.get("path", default_path), card_of(target)))
     if package.get("autobins", True):
@@ -389,7 +508,7 @@ def rows_of(package_directory, manifest):
     declared_tests = manifest.get("test", [])
     for target in declared_tests:
         if target.get("test", True):
-            rows.append(("test", target.get("name"), target.get("path", f"tests/{target.get('name')}.rs"), card_of(target)))
+            rows.append(("test", target.get("name"), target.get("path", default_root(f"tests/{target.get('name')}.rs", f"tests/{target.get('name')}/main.rs")), card_of(target)))
     if package.get("autotests", True):
         declared_test_names = {target.get("name") for target in declared_tests}
         for path in sorted(glob.glob(os.path.join(package_directory, "tests/*.rs")) + glob.glob(os.path.join(package_directory, "tests/*/main.rs"))):
@@ -418,7 +537,9 @@ PY
 run_selftest() {
   local scratch failures=0 checked=0 output status
   local case_script="$SELF_PATH"   # run_case 跑哪一份 mutate.sh
-  local -a case_leading_arguments=()   # run_case 放在 bin 名之前的参数：认不出的选项那一例是 --no-such-option
+  local -a case_leading_arguments=()   # run_case 放在 bin 名之前的参数：认不出的选项那一例是 --no-such-option，点名行那几例是 --list-items 与 --item
+  local -a case_trailing_arguments=()  # run_case 放在变异表之后的参数：点名行那几例的 --item
+  local case_source_file=bench/src/bin/fake_bench.rs   # run_case 给 mutate.sh 的源文件：目录式装置那几例是 bench/src/bin/fake_bench/main.rs
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/mutate-selftest-XXXXXX")"
   # 自证起的子进程的标记：只有这里设（文件头「只供自证」）；子进程读完就清
   printf '%s\n' "$SELFTEST_MARK_CONTENT" >"$scratch/mark"
@@ -432,7 +553,7 @@ run_selftest() {
 #!/usr/bin/env bash
 # 假 cargo：只认 mutate.sh 调的 `cargo test --release --bin <名字>`，按被测源码里的 BEHAVIOR 演一种结局；
 # 每次被调记一行「当前目录|CARGO_TARGET_DIR|BEHAVIOR|参数」（并行的自证拿前两段数各用了几份副本、几个编译目录）
-# 按条入库算工具链行时问的 `cargo -V` 只打一行版本、不记（FAKE_CARGO_VERSION 设了打它：工具链变了那一例）
+# `cargo -V` 只打一行版本、不记（FAKE_CARGO_VERSION 设了打它）：键里没有版本，只有弄坏开关 toolchainkeyed 才问它；「改了 cargo -V 打的版本」那一问靠它换版本
 if [[ "${1:-}" == -V || "${1:-}" == --version ]]; then echo "${FAKE_CARGO_VERSION:-cargo 0.0.0 (mutate.sh selftest)}"; exit 0; fi
 # 照一档 BEHAVIOR 打测试那一段的输出、退那一档的退出码（cargo test 编带跑，与 --no-run 编出的假测试二进制共用）
 emit_test_output() {
@@ -446,7 +567,8 @@ emit_test_output() {
 }
 # 上卡的表那几例（文件头「上卡的表」）：--no-run 编出的假测试二进制起时设 FAKE_CARGO_EMIT_ONLY=<编的那一刻的 BEHAVIOR>，只打那一档的测试输出、不记
 if [[ -n "${FAKE_CARGO_EMIT_ONLY:-}" ]]; then emit_test_output "$FAKE_CARGO_EMIT_ONLY"; exit $?; fi
-behavior="$(sed -n 's/.*BEHAVIOR: \([A-Z]*\).*/\1/p' bench/src/bin/fake_bench.rs | head -1)"
+# 被测源码是单文件（fake_bench.rs）或目录式（fake_bench/main.rs 与 part.rs，按这个次序找头一处 BEHAVIOR）
+behavior="$(cat bench/src/bin/fake_bench.rs bench/src/bin/fake_bench/main.rs bench/src/bin/fake_bench/part.rs 2>/dev/null | sed -n 's/.*BEHAVIOR: \([A-Z]*\).*/\1/p' | head -1)"
 # FAKE_CARGO_BEHAVIOR_OVERRIDE 设了就演它（不进键：同一把键这一趟判出另一档，记红撤绿那一例用）
 behavior="${FAKE_CARGO_BEHAVIOR_OVERRIDE:-$behavior}"
 echo "$PWD|${CARGO_TARGET_DIR:-}|$behavior|$*" >>"$FAKE_CARGO_LOG"
@@ -456,6 +578,9 @@ echo "$behavior|${1:-}|${RUSTFLAGS-（没设）}" >>"$FAKE_CARGO_LOG.rustflags"
 echo "$behavior|${1:-}|${CARGO_ENCODED_RUSTFLAGS-（没设）}" >>"$FAKE_CARGO_LOG.encoded"
 # 另记收到的 RUST_TEST_THREADS（没设记「（没设）」），测试线程那几例拿它核每条 cargo test 的测试线程数
 echo "$behavior|${1:-}|${RUST_TEST_THREADS-（没设）}" >>"$FAKE_CARGO_LOG.test-threads"
+# 同样另记收到的 SINGLEFS_THREAD_CAP 与 CARGO_BUILD_JOBS（测试二进制另读的那一路与每个 cargo 的编译并行度）
+echo "$behavior|${1:-}|${SINGLEFS_THREAD_CAP-（没设）}" >>"$FAKE_CARGO_LOG.thread-cap"
+echo "$behavior|${1:-}|${CARGO_BUILD_JOBS-（没设）}" >>"$FAKE_CARGO_LOG.build-jobs"
 # 照真 cargo：CARGO_ENCODED_RUSTFLAGS 设了（空串也算）就只读它（各项以 0x1f 分隔）、不读 RUSTFLAGS
 if [[ -v CARGO_ENCODED_RUSTFLAGS ]]; then effective_flags="${CARGO_ENCODED_RUSTFLAGS//$'\x1f'/ }"; else effective_flags="${RUSTFLAGS:-}"; fi
 # 照 [lints.rust] warnings = "deny"：DEADCODE（替换文留下死代码）在 cargo 实读的 flags 里没有 --cap-lints warn 时编不过
@@ -511,6 +636,9 @@ FAKE_CARGO
     # 三条替换文各不相同的抓到：键 = 原文 + 替换文 + …，名字不进键，替换文相同的几条共用一把键（记红撤绿那一例要「只翻强制现判的那一条」，三条得各是一把键）
     printf '抓到一\tBEHAVIOR: PASS\tBEHAVIOR: RED // 一\n抓到二\tBEHAVIOR: PASS\tBEHAVIOR: RED // 二\n抓到三\tBEHAVIOR: PASS\tBEHAVIOR: RED // 三\n' \
       >"$tables/three-distinct.tsv"
+    # 点名行那几例的表（文件头「点名行」）：三条各不相同的抓到，前面带一行注释与一个空行（它们不是行）
+    printf '# 注释行不是行\n\n抓到一\tBEHAVIOR: PASS\tBEHAVIOR: RED // 一\n抓到二\tBEHAVIOR: PASS\tBEHAVIOR: RED // 二\n抓到三\tBEHAVIOR: PASS\tBEHAVIOR: RED // 三\n' \
+      >"$tables/item-rows.tsv"
     printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n锚点腐化\tBEHAVIOR: GONE\tBEHAVIOR: RED\n' >"$tables/stale-anchor.tsv"
     printf '改注释\t// 注释行\t// 改过的注释行\n' >"$tables/comment-only.tsv"
     printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: PANICS\n' >"$tables/should-panic.tsv"
@@ -525,7 +653,8 @@ FAKE_CARGO
     : >"$scratch/$label.cargo"
     if (cd "$case_directory/scripts/experiment-apparatus" && env -u CARGO_ENCODED_RUSTFLAGS -u GPU_CARDS_BY_PRIORITY PATH="$case_directory/bin:$PATH" FAKE_CARGO_LOG="$scratch/$label.cargo" \
           MUTATE_TARGET_DIR="$case_directory/target" MUTATE_LIBRARY_DIRECTORY="$case_directory/library" \
-          "$@" bash "$case_script" ${case_leading_arguments[@]+"${case_leading_arguments[@]}"} fake-bench bench/src/bin/fake_bench.rs "$table" \
+          "$@" bash "$case_script" ${case_leading_arguments[@]+"${case_leading_arguments[@]}"} fake-bench "$case_source_file" "$table" \
+          ${case_trailing_arguments[@]+"${case_trailing_arguments[@]}"} \
           >"$scratch/$label.stdout" 2>"$scratch/$label.stderr"); then
       echo 0 >"$scratch/$label.rc"
     else
@@ -694,6 +823,84 @@ PY
      || ! grep -qF "1 条锚点失效（上面 ⚓ 那几行）" "$scratch/stale-anchor.stderr" \
      || (( $(library_record_names "$scratch/stale-anchor/library" | grep -c .) > 1 )); then
     fail "锚点失效的那一条应当记「⚓ 锚点失效」、不入判定库，另一条照跑抓到，计数报锚点失效 1 条、整轮退 3，实际退 $status、调了 $(grep -c . "$scratch/stale-anchor.cargo") 次 cargo、判定库记录 $(library_record_names "$scratch/stale-anchor/library" | grep -c .) 份：$(cat "$scratch/stale-anchor.out")"
+  fi
+
+  # ── 目录式装置（文件头「目录式装置」）──
+  # 给的源文件是 bench/src/bin/fake_bench/main.rs（目录式装置的入口），子模块 part.rs 在同一目录；BEHAVIOR 写在 part.rs 里，假 cargo 照 main.rs、part.rs 的次序读头一处。
+  # directory-judged（MUTATE_JOBS=1，表序跑）：子模块里的锚点改 part.rs、入口里的锚点改 main.rs、第三条又落在 part.rs，各自还原的是自己改的那一份：
+  #   三条依次判抓到、抓到、无效，假 cargo 收到的 BEHAVIOR 一共是基线与还原之后各一个 PASS、两个 RED、一个 BROKEN（还原错了文件，第三条或收尾的 PASS 就变了）；
+  #   第二趟同一张表三条都按判定库复用（落在子模块里的条也算得出键）、一次 cargo 都不起。
+  # directory-stale：同一个原文在 main.rs 与 part.rs 里各出现一次、原文哪里都没有的两条记锚点失效（点名装置目录与分布），子模块里有锚点的那一条照跑抓到，整轮退 3。
+  # single-file-neighbor：单文件装置（给的源文件不是目录里的 main.rs）只在那一份里找锚点：同目录另一份文件里有的原文照记命中 0 次。
+  # 弄坏开关 anchorinsourceonly（只看给的那一份）让前两例判错，directoryfamilyforall（单文件装置也取同目录的全部 .rs）让第三例判错
+  prepare_directory_case() { # <标签>：prepare_case 建好的那一例里，把 bin 换成目录式（入口 main.rs、子模块 part.rs），再写那两张表
+    local apparatus="$scratch/$1/scripts/experiment-apparatus/bench" tables="$scratch/$1/scripts/mutation/tables"
+    prepare_case "$1"
+    rm -f -- "$apparatus/src/bin/fake_bench.rs"
+    mkdir -p "$apparatus/src/bin/fake_bench"
+    printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench/main.rs"\n' >"$apparatus/Cargo.toml"
+    cat >"$apparatus/src/bin/fake_bench/main.rs" <<'DIRECTORY_ENTRY'
+// 两处
+mod part;
+fn main() {} // ENTRY: PASS
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn adds() { assert_eq!(1 + 2, 3); }
+}
+DIRECTORY_ENTRY
+    cat >"$apparatus/src/bin/fake_bench/part.rs" <<'DIRECTORY_PART'
+// 两处
+pub fn adds() -> u32 { 1 + 2 } // BEHAVIOR: PASS
+DIRECTORY_PART
+    printf '子模块里的锚点\tBEHAVIOR: PASS\tBEHAVIOR: RED\n入口里的锚点\t// ENTRY: PASS\t// BEHAVIOR: RED\n子模块里的第二条\tBEHAVIOR: PASS\tBEHAVIOR: BROKEN\n' >"$tables/directory-judged.tsv"
+    printf '子模块里的锚点\tBEHAVIOR: PASS\tBEHAVIOR: RED\n两个文件各一次\t// 两处\t// 改过的两处\n哪里都没有\tBEHAVIOR: GONE\tBEHAVIOR: RED\n' >"$tables/directory-stale.tsv"
+  }
+  prepare_directory_case directory-judged
+  case_source_file=bench/src/bin/fake_bench/main.rs
+  run_case directory-judged ../mutation/tables/directory-judged.tsv MUTATE_JOBS=1
+  output="$(cat "$scratch/directory-judged.out")"; status="$(cat "$scratch/directory-judged.rc")"
+  local directory_behaviors directory_test_runs
+  directory_behaviors="$(awk -F'|' '$4 ~ /^test( |$)/ { print $3 }' "$scratch/directory-judged.cargo" | sort | tr '\n' ' ')"
+  checked=$((checked + 1))
+  if [[ "$status" != 0 || "$directory_behaviors" != "BROKEN PASS PASS RED RED " ]] \
+     || ! grep -qxF "✅ [子模块里的锚点] 红：tests::adds" "$scratch/directory-judged.stdout" || ! grep -qxF "✅ [入口里的锚点] 红：tests::adds" "$scratch/directory-judged.stdout" \
+     || ! grep -qF "⏭  [子模块里的第二条]" "$scratch/directory-judged.stdout" \
+     || ! grep -qxF "计数：抓到 2 条、没红 0 条、无效 1 条、没跑完 0 条、抓名字有盲区 0 条、锚点失效 0 条、现判 3 条、复用 0 条、拒算 0 条" "$scratch/directory-judged.stdout" \
+     || ! grep -qF "已还原，基线仍全绿" "$scratch/directory-judged.stdout"; then
+    fail "目录式装置：锚点落在子模块里与入口里的三条应当各改各的那一份、各还原各的（抓到、抓到、无效、退 0，假 cargo 收到的 BEHAVIOR 排序后是「BROKEN PASS PASS RED RED 」），实际退 $status、BEHAVIOR 是「$directory_behaviors」：$output"
+  fi
+  run_case directory-judged ../mutation/tables/directory-judged.tsv MUTATE_JOBS=1
+  output="$(cat "$scratch/directory-judged.out")"; status="$(cat "$scratch/directory-judged.rc")"
+  checked=$((checked + 1))
+  directory_test_runs="$(awk -F'|' '$4 ~ /^test( |$)/ { count++ } END { print count + 0 }' "$scratch/directory-judged.cargo")"
+  if [[ "$status" != 0 || "$directory_test_runs" != 0 ]] \
+     || ! grep -qxF "计数：抓到 2 条、没红 0 条、无效 1 条、没跑完 0 条、抓名字有盲区 0 条、锚点失效 0 条、现判 0 条、复用 3 条、拒算 0 条" "$scratch/directory-judged.stdout" \
+     || ! grep -qF "全部复用：表里 3 条都按判定库复用，没起 cargo" "$scratch/directory-judged.stdout"; then
+    fail "目录式装置：第二趟同一张表应当三条都按判定库复用（落在子模块里的条也算得出键）、一次 cargo 都不起，实际退 $status、cargo test 起了 $directory_test_runs 次：$output"
+  fi
+  prepare_directory_case directory-stale
+  run_case directory-stale ../mutation/tables/directory-stale.tsv MUTATE_JOBS=1
+  output="$(cat "$scratch/directory-stale.out")"; status="$(cat "$scratch/directory-stale.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 3 ]] || ! grep -qxF "✅ [子模块里的锚点] 红：tests::adds" "$scratch/directory-stale.stdout" \
+     || ! grep -qxF "⚓ [两个文件各一次] 锚点失效：原文在 装置目录 bench/src/bin/fake_bench/ 的 2 份 .rs（含子目录） 里命中 2 次（要求恰好 1 次；分布 bench/src/bin/fake_bench/main.rs 1 次、bench/src/bin/fake_bench/part.rs 1 次）—— 这一条没跑，不算抓到也不算没红" "$scratch/directory-stale.stdout" \
+     || ! grep -qxF "⚓ [哪里都没有] 锚点失效：原文在 装置目录 bench/src/bin/fake_bench/ 的 2 份 .rs（含子目录） 里命中 0 次（要求恰好 1 次）—— 这一条没跑，不算抓到也不算没红" "$scratch/directory-stale.stdout" \
+     || ! grep -qE '^计数：.*、锚点失效 2 条、现判 [0-9]+ 条、复用 [0-9]+ 条、拒算 [0-9]+ 条$' "$scratch/directory-stale.stdout" || ! grep -qF "已还原，基线仍全绿" "$scratch/directory-stale.stdout" \
+     || (( $(library_record_names "$scratch/directory-stale/library" | grep -c .) > 1 )); then
+    fail "目录式装置：原文在装置目录里命中 2 次（main.rs 与 part.rs 各一次）与 0 次的两条应当记「⚓ 锚点失效」（点名装置目录与分布）、不入判定库，子模块里有锚点的那一条照跑抓到，计数报锚点失效 2 条、整轮退 3，实际退 $status：$output"
+  fi
+  case_source_file=bench/src/bin/fake_bench.rs
+  prepare_case single-file-neighbor
+  printf '// 邻居行\nfn main() {}\n' >"$scratch/single-file-neighbor/scripts/experiment-apparatus/bench/src/bin/neighbor.rs"
+  printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n邻居里的锚点\t// 邻居行\t// 改过的邻居行\n' >"$scratch/single-file-neighbor/scripts/mutation/tables/neighbor.tsv"
+  run_case single-file-neighbor ../mutation/tables/neighbor.tsv MUTATE_JOBS=1
+  output="$(cat "$scratch/single-file-neighbor.out")"; status="$(cat "$scratch/single-file-neighbor.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 3 ]] || ! grep -qxF "✅ [抓到] 红：tests::adds" "$scratch/single-file-neighbor.stdout" \
+     || ! grep -qxF "⚓ [邻居里的锚点] 锚点失效：原文在 bench/src/bin/fake_bench.rs 里命中 0 次（要求恰好 1 次）—— 这一条没跑，不算抓到也不算没红" "$scratch/single-file-neighbor.stdout"; then
+    fail "单文件装置：只在给的那一份里找锚点，同目录另一份文件（neighbor.rs）里才有的原文应当记「⚓ 锚点失效」命中 0 次、整轮退 3、另一条照跑抓到，实际退 $status：$output"
   fi
 
   # ── required-features ──
@@ -888,7 +1095,8 @@ PY
   local binary_output binary_status
   prepare_case binary-of
   printf 'fn main() {}\n' >"$scratch/binary-of/scripts/experiment-apparatus/bench/src/bin/other_tool.rs"
-  for wanted in "bench/src/bin/fake_bench.rs fake-bench" "bench/src/bin/other_tool.rs other_tool"; do
+  mkdir -p "$scratch/binary-of/scripts/experiment-apparatus/bench/src/bin/split_tool"; printf 'fn main() {}\n' >"$scratch/binary-of/scripts/experiment-apparatus/bench/src/bin/split_tool/main.rs"
+  for wanted in "bench/src/bin/fake_bench.rs fake-bench" "bench/src/bin/other_tool.rs other_tool" "bench/src/bin/split_tool/main.rs split_tool"; do
     checked=$((checked + 1))
     if binary_output="$(cd "$scratch/binary-of/scripts/experiment-apparatus" && bash "$case_script" --binary-of "${wanted%% *}" 2>&1)"; then binary_status=0; else binary_status=$?; fi
     [[ "$binary_status" == 0 && "$binary_output" == "${wanted##* }" ]] \
@@ -897,6 +1105,22 @@ PY
   checked=$((checked + 1))
   if binary_output="$(cd "$scratch/binary-of/scripts/experiment-apparatus" && bash "$case_script" --binary-of bench/src/bin/absent.rs 2>&1)"; then binary_status=0; else binary_status=$?; fi
   [[ "$binary_status" == 2 && "$binary_output" == *"→ 怎么办"* ]] || fail "--binary-of 给的源文件不在时应当退 2、给出路，实际退 $binary_status：$binary_output"
+  # 同一份清单里 main.rs 与 nested/main.rs 各认各的（后缀匹配会把后者认成前者）：包里一份，工作区根的清单里一份（拆成目录式的实验装置）
+  prepare_case binary-of-same-suffix
+  local same_suffix_root="$scratch/binary-of-same-suffix/scripts/experiment-apparatus"
+  mkdir -p "$same_suffix_root/pool/nested" "$same_suffix_root/e142_x"
+  printf 'fn main() {}\n' >"$same_suffix_root/pool/main.rs"
+  printf 'fn main() {}\n' >"$same_suffix_root/pool/nested/main.rs"
+  printf '[package]\nname = "pool"\n\n[[bin]]\nname = "plain"\npath = "main.rs"\n\n[[bin]]\nname = "nested"\npath = "nested/main.rs"\n' >"$same_suffix_root/pool/Cargo.toml"
+  printf 'fn main() {}\n' >"$same_suffix_root/main.rs"
+  printf 'fn main() {}\n' >"$same_suffix_root/e142_x/main.rs"
+  printf '[workspace]\nmembers = ["bench"]\n\n[[bin]]\nname = "e7-index-bench"\npath = "main.rs"\n\n[[bin]]\nname = "e142-x"\npath = "e142_x/main.rs"\n' >"$same_suffix_root/Cargo.toml"
+  for wanted in "pool/main.rs plain" "pool/nested/main.rs nested" "./pool/../pool/nested/main.rs nested" "main.rs e7-index-bench" "e142_x/main.rs e142-x"; do
+    checked=$((checked + 1))
+    if binary_output="$(cd "$same_suffix_root" && bash "$case_script" --binary-of "${wanted%% *}" 2>&1)"; then binary_status=0; else binary_status=$?; fi
+    [[ "$binary_status" == 0 && "$binary_output" == "${wanted##* }" ]] \
+      || fail "--binary-of ${wanted%% *} 应当退 0、只打「${wanted##* }」（同一份清单里 main.rs 与 nested/main.rs 各认各的），实际退 $binary_status：$binary_output"
+  done
 
   # 按条入库（文件头「按条入库」）：被测源码换成一份带 #[test] 的（假 cargo 照旧只看 BEHAVIOR），抓到的那一条第二趟复用、一次 cargo 都不起（unit-library）；
   # 改了被改坏的函数调到的 helper 之后那一条现判（unit-library-callee）；原文只在注释里的那一条拒算、每趟照跑。
@@ -987,7 +1211,95 @@ PY
      && grep -qF "现判：[抓到] 库里没有这把键" <<<"$output" \
     || fail "改了被改坏函数调到的函数之后那一条应当现判（cargo 照起、计数行报现判 1 条、stderr 写库里没有这把键），实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/unit-library-callee.cargo") 次：$output"
 
-  # 依赖版本行（lib_mutation_units.py 文件头「依赖版本行」）：只收包住原文那个函数的闭包里真点名的外部 crate 与它们的传递依赖。
+  # ── 点名行（文件头「点名行」）：表是 item-rows.tsv（注释行、空行、三条替换文各不相同的抓到：抓到一、抓到二、抓到三，三把键），按条库那几格用带 #[test] 的被测源码 ──
+  # item-list：--list-items 逐行打行名、退 0、一次 cargo 都不调、不读库。弄坏开关 itemlistrowdropped（少打一行）下判错
+  # item-single：只点抓到二：只判那一行，计数行与成功句写点名 1 行（表里共 3 行），基线与还原之后那一次照跑（cargo 共起 3 次）。弄坏开关 itemselectsall（不筛）、itemcountunsaid（不写点了几行）下判错
+  # item-union：--item 写在 <bin 名> 之前一次、之后一次（抓到三、抓到一）：判抓到一与抓到三、按表序打、不判抓到二。弄坏开关 itemselectsall、itemoverwritten（只认最后给的）下判错
+  # item-unknown、item-missing-name：点名的行名表里没有、--item 后面缺行名：各退 2、点名原因、列出表里可点的三个行名、一次 cargo 都不调。
+  #   弄坏开关 itemunknownaccepted（行名写错不拒）、itemmissingnameaccepted（缺行名不拒）、itemrejectlistdropped（不列行名）下判错
+  # item-after-whole：整张表先判一趟，再点名抓到二：不起 cargo、判定行与整表那一趟逐字相同、全部复用。弄坏开关 itemkeyed（点名进了键）、itemselectsall、itemcountunsaid 下判错
+  # item-before-whole：先点名抓到二，再跑整张表：现判 2 条、复用 1 条、抓到二那一行与点名那一趟逐字相同、整表那一趟不报点名。弄坏开关 itemkeyed、itemselectsall 下判错
+  local item_names_text=$'抓到一\n抓到二\n抓到三' union_lines=$'✅ [抓到一] 红：tests::adds\n✅ [抓到三] 红：tests::adds' whole_status whole_line whole_output item_status item_line
+  rows_listed_in() { local row; for row in 抓到一 抓到二 抓到三; do grep -qxF "          $row" "$1" || return 1; done; }   # <stderr 文件>：被拒时列出的三个行名都在
+  prepare_case item-list
+  case_leading_arguments=(--list-items)
+  run_case item-list ../mutation/tables/item-rows.tsv
+  case_leading_arguments=()
+  checked=$((checked + 1))
+  if [[ "$(cat "$scratch/item-list.rc")" != 0 || "$(cat "$scratch/item-list.stdout")" != "$item_names_text" || -s "$scratch/item-list.cargo" ]] || grep -qF "判定库" "$scratch/item-list.stderr"; then
+    fail "列项：--list-items 应当退 0、逐行打表里的三个行名（注释行与空行不是行）、一次 cargo 都不调、不读判定库，实际退 $(cat "$scratch/item-list.rc")、调了 $(grep -c . "$scratch/item-list.cargo") 次：$(cat "$scratch/item-list.out")"
+  fi
+  prepare_case item-single
+  write_unit_library_source "$scratch/item-single"
+  case_trailing_arguments=(--item 抓到二)
+  run_case item-single ../mutation/tables/item-rows.tsv
+  case_trailing_arguments=()
+  output="$(cat "$scratch/item-single.out")"; status="$(cat "$scratch/item-single.rc")"
+  checked=$((checked + 1))
+  [[ "$status" == 0 && "$(real_cargo_calls "$scratch/item-single.cargo")" == 3 && "$(grep -c '^✅' "$scratch/item-single.stdout")" == 1 ]] \
+     && grep -qxF "基线：全绿" "$scratch/item-single.stdout" && grep -qxF "✅ [抓到二] 红：tests::adds" "$scratch/item-single.stdout" \
+     && grep -qxF "计数：抓到 1 条、没红 0 条、无效 0 条、没跑完 0 条、抓名字有盲区 0 条、锚点失效 0 条、现判 1 条、复用 0 条、拒算 0 条、点名 1 行（表里共 3 行）" "$scratch/item-single.stdout" \
+     && grep -qxF "已还原，基线仍全绿；点名 1 行（表里共 3 行）" "$scratch/item-single.stdout" \
+    || fail "点名单行：--item 抓到二 应当只判那一行（stdout 一个抓到、基线与还原之后那一次照跑、cargo 共起 3 次）、计数行与成功句写点名 1 行（表里共 3 行），实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/item-single.cargo") 次：$output"
+  prepare_case item-union
+  write_unit_library_source "$scratch/item-union"
+  case_leading_arguments=(--item 抓到三)
+  case_trailing_arguments=(--item 抓到一)
+  run_case item-union ../mutation/tables/item-rows.tsv
+  case_leading_arguments=(); case_trailing_arguments=()
+  output="$(cat "$scratch/item-union.out")"; status="$(cat "$scratch/item-union.rc")"
+  checked=$((checked + 1))
+  [[ "$status" == 0 && "$(grep '^✅' "$scratch/item-union.stdout")" == "$union_lines" ]] \
+     && grep -qF "计数：抓到 2 条、没红 0 条、无效 0 条" "$scratch/item-union.stdout" && grep -qF "、现判 2 条、复用 0 条、拒算 0 条" "$scratch/item-union.stdout" \
+    || fail "点名几行取并集：--item 抓到三（写在 <bin 名> 之前）与 --item 抓到一（写在变异表之后）应当判抓到一与抓到三、按表序打、不判抓到二，实际退 $status：$output"
+  prepare_case item-unknown
+  case_trailing_arguments=(--item 抓到一 --item 没有这一行)
+  run_case item-unknown ../mutation/tables/item-rows.tsv
+  case_trailing_arguments=()
+  checked=$((checked + 1))
+  if [[ "$(cat "$scratch/item-unknown.rc")" != 2 || -s "$scratch/item-unknown.cargo" ]] || ! grep -qF -- "--item 点名的行名表里没有：没有这一行" "$scratch/item-unknown.stderr" \
+     || ! rows_listed_in "$scratch/item-unknown.stderr"; then
+    fail "点名的行名写错：--item 没有这一行 应当退 2、点名它、列出表里可点的三个行名、一次 cargo 都不调（同写的抓到一也不跑），实际退 $(cat "$scratch/item-unknown.rc")、调了 $(grep -c . "$scratch/item-unknown.cargo") 次：$(cat "$scratch/item-unknown.out")"
+  fi
+  prepare_case item-missing-name
+  case_trailing_arguments=(--item)
+  run_case item-missing-name ../mutation/tables/item-rows.tsv
+  case_trailing_arguments=()
+  checked=$((checked + 1))
+  if [[ "$(cat "$scratch/item-missing-name.rc")" != 2 || -s "$scratch/item-missing-name.cargo" ]] || ! grep -qF -- "--item 后面缺行名" "$scratch/item-missing-name.stderr" \
+     || ! rows_listed_in "$scratch/item-missing-name.stderr"; then
+    fail "--item 后面缺行名：变异表之后的 --item 没有行名应当退 2、点名原因、列出表里可点的三个行名、一次 cargo 都不调，实际退 $(cat "$scratch/item-missing-name.rc")、调了 $(grep -c . "$scratch/item-missing-name.cargo") 次：$(cat "$scratch/item-missing-name.out")"
+  fi
+  prepare_case item-after-whole
+  write_unit_library_source "$scratch/item-after-whole"
+  run_case item-after-whole ../mutation/tables/item-rows.tsv
+  whole_status="$(cat "$scratch/item-after-whole.rc")"; whole_output="$(cat "$scratch/item-after-whole.out")"
+  whole_line="$(grep -F '[抓到二]' "$scratch/item-after-whole.stdout")"
+  case_trailing_arguments=(--item 抓到二)
+  run_case item-after-whole ../mutation/tables/item-rows.tsv
+  case_trailing_arguments=()
+  output="$(cat "$scratch/item-after-whole.out")"; status="$(cat "$scratch/item-after-whole.rc")"
+  checked=$((checked + 1))
+  [[ "$whole_status" == 0 && -n "$whole_line" && "$status" == 0 && "$(real_cargo_calls "$scratch/item-after-whole.cargo")" == 0 && "$(grep -c '^✅' "$scratch/item-after-whole.stdout")" == 1 ]] \
+     && grep -qF "、现判 3 条、复用 0 条、拒算 0 条" <<<"$whole_output" && grep -qxF "$whole_line" "$scratch/item-after-whole.stdout" \
+     && grep -qF "、现判 0 条、复用 1 条、拒算 0 条、点名 1 行（表里共 3 行）" "$scratch/item-after-whole.stdout" \
+     && grep -qF "全部复用：点名 1 行（表里共 3 行），1 条都按判定库复用，没起 cargo" "$scratch/item-after-whole.stdout" \
+    || fail "整表判过之后点名一行：整张表判完（现判 3 条）再点名抓到二，应当照键复用（一次 cargo 都不起、判定行与整表那一趟逐字相同「$whole_line」、计数行与「全部复用」写点名 1 行），实际整表那一趟退 $whole_status、点名那一趟退 $status、cargo 起了 $(real_cargo_calls "$scratch/item-after-whole.cargo") 次：$output"
+  prepare_case item-before-whole
+  write_unit_library_source "$scratch/item-before-whole"
+  case_trailing_arguments=(--item 抓到二)
+  run_case item-before-whole ../mutation/tables/item-rows.tsv
+  case_trailing_arguments=()
+  item_status="$(cat "$scratch/item-before-whole.rc")"
+  item_line="$(grep -F '[抓到二]' "$scratch/item-before-whole.stdout")"
+  run_case item-before-whole ../mutation/tables/item-rows.tsv
+  output="$(cat "$scratch/item-before-whole.out")"; status="$(cat "$scratch/item-before-whole.rc")"
+  checked=$((checked + 1))
+  [[ "$item_status" == 0 && -n "$item_line" && "$status" == 0 && "$(grep -c '^✅' "$scratch/item-before-whole.stdout")" == 3 ]] \
+     && grep -qF "、现判 2 条、复用 1 条、拒算 0 条" "$scratch/item-before-whole.stdout" && grep -qxF "$item_line" "$scratch/item-before-whole.stdout" \
+     && ! grep -qF "点名" "$scratch/item-before-whole.stdout" \
+    || fail "点名一行判过之后跑整表：先点名抓到二、再跑整张表，应当抓到一与抓到三现判、抓到二照键复用（计数行报现判 2 条复用 1 条、抓到二那一行与点名那一趟逐字相同「$item_line」）、整表那一趟的 stdout 不报点名，实际点名那一趟退 $item_status、整表那一趟退 $status：$output"
+
   # prune-server 不可用（文件头「按条入库」）：查库那一段连得上临时服务，每条判完写库那一步改连一个没人听的地址（只供自证的 MUTATE_SELFTEST_RECORD_UNREACHABLE）
   # ⇒ 整轮退 75、stderr 写「prune-server 不可用」，不当「没写进、下一趟照跑」放过。弄坏开关 recordunavailableignored（75 照「没写进」放过）下退 0，这一格判错
   local unreachable_address
@@ -1017,38 +1329,20 @@ PY
   checked=$((checked + 1))
   [[ "$status" == 2 && "$(real_cargo_calls "$scratch/plan-client-error.cargo")" == 0 ]] && grep -qF "判定库客户端报错（退 3" "$scratch/plan-client-error.stderr" \
     || fail "查库那一段客户端退 3：应当退 2、stderr 写「判定库客户端报错（退 3」、一次 cargo 都不调，实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/plan-client-error.cargo") 次：$(tail -n 4 "$scratch/plan-client-error.stderr")"
-  # 夹具：bench 声明 extdep、other、alias-dep（package = "aliased"）三个外部依赖，Cargo.lock 里 extdep 带一个传递依赖 inner；
-  # adds 调 helper、helper 点 extdep::，other 只在闭包外的 unrelated 里点。头一趟库里那一条的依赖版本行逐字是 extdep、inner 两行；
-  # 不点外部 crate 的 unit-library 那一例是空的；改 other 的版本第二趟照样复用、一次 cargo 都不起；改 inner 的版本现判；
-  # helper 改点 alias_dep:: 之后依赖版本行逐字是 aliased 一行（认 package = 改名）。
-  # 弄坏开关 dependenciesbycrate（按整包收）让头一趟与改名那一趟多出别的行、改 other 之后现判
-  library_dependency_lines() { # <按条判定库的目录> [<之前已有的记录名清单>]：库里新写下的那一条判定（不在清单里的恰好一条；不给清单是库里恰好一条）
-    # 记的依赖版本行，一行一条；空的打「（空）」。判定库在临时 prune-server 里（没有修改时刻可比，按「之前有哪几条」认新写下的那一条）
-    python3 - "$(dirname "$SELF_PATH")/lib_mutation_units.py" "$1" "${2:-}" <<'PY'
-import importlib.util, sys
-specification = importlib.util.spec_from_file_location("lib_mutation_units_for_mutate_selftest", sys.argv[1])
-units = importlib.util.module_from_spec(specification)
-sys.modules[specification.name] = units
-specification.loader.exec_module(units)
-library = units.Library(sys.argv[2])
-earlier = set(open(sys.argv[3], encoding="utf-8").read().split()) if sys.argv[3] else set()
-names = [name for name in library.stored_names("records") if name not in earlier]
-if len(names) != 1:
-    sys.exit(f"库里新写下的判定要恰好一条，实际 {len(names)} 条：{names[:3]}")
-fields = library.read("records", names[0])
-lines = (library.read_json("compositions", fields.get("dependency", "")) or {}).get("lines", [])
-print("\n".join(lines) if lines else "（空）")
-PY
-  }
+  # 版本不进键（lib_mutation_units.py 文件头「键」「依赖版本行」）：夹具 bench 声明 extdep、other 两个外部依赖，Cargo.lock 里 extdep 带一个传递依赖 inner；
+  # adds 调 helper、helper 点 extdep::，other 只在闭包外的 unrelated 里点。头一趟现判入库；之后每一趟改一样东西，那一条都复用、一次 cargo 都不起：
+  # 改 other 的版本、改 inner 的版本、改假 cargo 的 -V 打的版本（FAKE_CARGO_VERSION）、改调用方的 RUSTFLAGS；最后改 helper 点名的函数（闭包变了）那一条才现判，核键没有被改丢。
+  # 弄坏开关 dependencykeyed 让改 inner 的版本那一趟现判，toolchainkeyed 让改 -V 版本与改 RUSTFLAGS 两趟现判，
+  # calleesignored 让最后那一趟的现判原因变成「红了的那几条测试此刻对不上记录里的闭包键」（键没变、靠测试的闭包键兜底才现判），不是「库里没有这把键」，libraryunread 让它写成不读库
   write_dependency_lock() { # <Cargo.lock 的路径> <other 的版本> <inner 的版本>
     local registry='registry+https://example.invalid/index'
-    printf 'version = 4\n\n[[package]]\nname = "aliased"\nversion = "3.0.0"\nsource = "%s"\nchecksum = "33"\n\n[[package]]\nname = "bench"\nversion = "0.0.0"\ndependencies = [\n "aliased",\n "extdep",\n "other",\n]\n\n[[package]]\nname = "extdep"\nversion = "1.0.0"\nsource = "%s"\nchecksum = "aa"\ndependencies = [\n "inner",\n]\n\n[[package]]\nname = "inner"\nversion = "%s"\nsource = "%s"\nchecksum = "inner-%s"\n\n[[package]]\nname = "other"\nversion = "%s"\nsource = "%s"\nchecksum = "other-%s"\n' \
-      "$registry" "$registry" "$3" "$registry" "$3" "$2" "$registry" "$2" >"$1"
+    printf 'version = 4\n\n[[package]]\nname = "bench"\nversion = "0.0.0"\ndependencies = [\n "extdep",\n "other",\n]\n\n[[package]]\nname = "extdep"\nversion = "1.0.0"\nsource = "%s"\nchecksum = "aa"\ndependencies = [\n "inner",\n]\n\n[[package]]\nname = "inner"\nversion = "%s"\nsource = "%s"\nchecksum = "inner-%s"\n\n[[package]]\nname = "other"\nversion = "%s"\nsource = "%s"\nchecksum = "other-%s"\n' \
+      "$registry" "$3" "$registry" "$3" "$2" "$registry" "$2" >"$1"
   }
-  write_dependency_source() { # <例的目录> <helper 点的外部 crate 的代码名>
+  write_dependency_source() { # <例的目录> <helper 的函数体，例 extdep::shift(2)>
     cat >"$1/scripts/experiment-apparatus/bench/src/bin/fake_bench.rs" <<DEPENDENCY_SOURCE
 // 注释行
-fn helper() -> u32 { $2::shift(2) }
+fn helper() -> u32 { $2 }
 fn adds() -> u32 { 1 + helper() } // BEHAVIOR: PASS
 fn unrelated() -> u32 { other::value() }
 fn main() { let _ = adds(); let _ = unrelated(); }
@@ -1060,43 +1354,38 @@ mod tests {
 }
 DEPENDENCY_SOURCE
   }
-  local dependency_case="$scratch/unit-library-dependency" dependency_registry='registry+https://example.invalid/index' expected_dependency_lines recorded_dependency_lines
-  prepare_case unit-library-dependency
-  printf '\n[dependencies]\nextdep = "1.0"\nother = "2.0"\nalias-dep = { package = "aliased", version = "3.0" }\n' >>"$dependency_case/scripts/experiment-apparatus/bench/Cargo.toml"
-  write_dependency_lock "$dependency_case/scripts/experiment-apparatus/Cargo.lock" 2.0.0 0.5.0
-  write_dependency_source "$dependency_case" extdep
-  run_case unit-library-dependency ../mutation/tables/caught-only.tsv
-  output="$(cat "$scratch/unit-library-dependency.out")"; status="$(cat "$scratch/unit-library-dependency.rc")"
-  expected_dependency_lines="$(printf 'extdep\t1.0.0\t%s\taa\ninner\t0.5.0\t%s\tinner-0.5.0' "$dependency_registry" "$dependency_registry")"
-  recorded_dependency_lines="$(library_dependency_lines "$dependency_case/library" 2>&1)"
+  expect_version_reused() { # <改了什么> [<run_case 的额外环境变量…>]：同一条再跑一趟，应当复用、一次 cargo 都不起
+    local changed="$1"
+    shift
+    run_case unit-library-versions ../mutation/tables/caught-only.tsv "$@"
+    output="$(cat "$scratch/unit-library-versions.out")"; status="$(cat "$scratch/unit-library-versions.rc")"
+    checked=$((checked + 1))
+    [[ "$status" == 0 && "$(real_cargo_calls "$scratch/unit-library-versions.cargo")" == 0 ]] && grep -qF "、现判 0 条、复用 1 条、拒算 0 条" <<<"$output" \
+      || fail "版本不进键：${changed}之后那一条应当照样复用、一次 cargo 都不起，实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/unit-library-versions.cargo") 次：$output"
+  }
+  local versions_case="$scratch/unit-library-versions"
+  prepare_case unit-library-versions
+  printf '\n[dependencies]\nextdep = "1.0"\nother = "2.0"\n' >>"$versions_case/scripts/experiment-apparatus/bench/Cargo.toml"
+  write_dependency_lock "$versions_case/scripts/experiment-apparatus/Cargo.lock" 2.0.0 0.5.0
+  write_dependency_source "$versions_case" 'extdep::shift(2)'
+  run_case unit-library-versions ../mutation/tables/caught-only.tsv
+  output="$(cat "$scratch/unit-library-versions.out")"; status="$(cat "$scratch/unit-library-versions.rc")"
   checked=$((checked + 1))
-  [[ "$status" == 0 && "$recorded_dependency_lines" == "$expected_dependency_lines" ]] && grep -qF "、现判 1 条、复用 0 条、拒算 0 条" <<<"$output" \
-    || fail "依赖版本行：头一趟库里那一条应当逐字只记 extdep 与它的传递依赖 inner 两行（other 只在闭包外点、alias-dep 没人点），实际退 $status、记的是「$recorded_dependency_lines」：$output"
-  recorded_dependency_lines="$(library_dependency_lines "$scratch/unit-library/library" 2>&1)"
+  [[ "$status" == 0 ]] && grep -qF "、现判 1 条、复用 0 条、拒算 0 条" <<<"$output" \
+    || fail "版本不进键：头一趟应当现判 1 条入库（extdep 带传递依赖 inner，other 只在闭包外点），实际退 $status：$output"
+  write_dependency_lock "$versions_case/scripts/experiment-apparatus/Cargo.lock" 2.0.1 0.5.0
+  expect_version_reused "改了闭包没点名的外部包 other 的版本"
+  write_dependency_lock "$versions_case/scripts/experiment-apparatus/Cargo.lock" 2.0.1 0.5.1
+  expect_version_reused "改了点名的 extdep 的传递依赖 inner 的版本"
+  expect_version_reused "改了 cargo -V 打的版本" FAKE_CARGO_VERSION="cargo 9.9.9 (changed)"
+  expect_version_reused "改了调用方的 RUSTFLAGS 值" RUSTFLAGS=-Cdebuginfo=0
+  write_dependency_source "$versions_case" 'extdep::shift(3)'
+  run_case unit-library-versions ../mutation/tables/caught-only.tsv
+  output="$(cat "$scratch/unit-library-versions.out")"; status="$(cat "$scratch/unit-library-versions.rc")"
   checked=$((checked + 1))
-  [[ "$recorded_dependency_lines" == "（空）" ]] || fail "依赖版本行：闭包不点外部 crate 时（unit-library 那一例）应当是空的，实际记的是「$recorded_dependency_lines」"
-  write_dependency_lock "$dependency_case/scripts/experiment-apparatus/Cargo.lock" 2.0.1 0.5.0
-  run_case unit-library-dependency ../mutation/tables/caught-only.tsv
-  output="$(cat "$scratch/unit-library-dependency.out")"; status="$(cat "$scratch/unit-library-dependency.rc")"
-  checked=$((checked + 1))
-  [[ "$status" == 0 && "$(real_cargo_calls "$scratch/unit-library-dependency.cargo")" == 0 ]] && grep -qF "、现判 0 条、复用 1 条、拒算 0 条" <<<"$output" \
-    || fail "依赖版本行：改了闭包没点名的外部包 other 的版本之后那一条应当照样复用、一次 cargo 都不起，实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/unit-library-dependency.cargo") 次：$output"
-  write_dependency_lock "$dependency_case/scripts/experiment-apparatus/Cargo.lock" 2.0.1 0.5.1
-  run_case unit-library-dependency ../mutation/tables/caught-only.tsv
-  output="$(cat "$scratch/unit-library-dependency.out")"; status="$(cat "$scratch/unit-library-dependency.rc")"
-  checked=$((checked + 1))
-  [[ "$status" == 0 && "$(real_cargo_calls "$scratch/unit-library-dependency.cargo")" -ge 2 ]] && grep -qF "、现判 1 条、复用 0 条、拒算 0 条" <<<"$output" \
+  [[ "$status" == 0 && "$(real_cargo_calls "$scratch/unit-library-versions.cargo")" -ge 2 ]] && grep -qF "、现判 1 条、复用 0 条、拒算 0 条" <<<"$output" \
      && grep -qF "现判：[抓到] 库里没有这把键" <<<"$output" \
-    || fail "依赖版本行：改了点名的 extdep 的传递依赖 inner 的版本之后那一条应当现判（stderr 写库里没有这把键），实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/unit-library-dependency.cargo") 次：$output"
-  write_dependency_source "$dependency_case" alias_dep
-  library_record_names "$dependency_case/library" >"$scratch/unit-library-dependency.records-before-alias"
-  run_case unit-library-dependency ../mutation/tables/caught-only.tsv
-  output="$(cat "$scratch/unit-library-dependency.out")"; status="$(cat "$scratch/unit-library-dependency.rc")"
-  expected_dependency_lines="$(printf 'aliased\t3.0.0\t%s\t33' "$dependency_registry")"
-  recorded_dependency_lines="$(library_dependency_lines "$dependency_case/library" "$scratch/unit-library-dependency.records-before-alias" 2>&1)"
-  checked=$((checked + 1))
-  [[ "$status" == 0 && "$recorded_dependency_lines" == "$expected_dependency_lines" ]] \
-    || fail "依赖版本行：helper 改点 alias_dep:: 之后库里那一条应当逐字只记 aliased 一行（清单里 alias-dep 写了 package = \"aliased\"），实际退 $status、记的是「$recorded_dependency_lines」：$output"
+    || fail "版本不进键：改了 helper 点名的函数之后那一条应当现判（cargo 照起、计数行报现判 1 条、stderr 写库里没有这把键），实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/unit-library-versions.cargo") 次：$output"
 
   # 复用三问（scripts/gate/lib_reuse_checks.py 文件头「一」，格名 reuse-three-questions）：一例自己的目录与判定库，表里两条抓到——
   # 「改加法」改 adds（闭包含 helper）、「改孤函数」改 lonely（闭包含 lonely_helper，测试都不调它）。四趟：库是空的（两条现判）、同一份输入（①）、
@@ -1204,8 +1493,9 @@ PY
      && grep -qF 'scripts/experiment-apparatus/threads_probe.rs:2：编译期读的' <<<"$output" && grep -qF '落到仓根之外' <<<"$output" \
     || fail "认不出的 include_str! 写法与落到仓根之外的路径应当退 2、逐行点名、一次 cargo 都不起，实际退 $status、cargo 起了 $(real_cargo_calls "$scratch/include-unrecognized.cargo") 次：$output"
 
-  # ── 每条 cargo test 的测试线程数（文件头「并行」）：调用方没设 RUST_TEST_THREADS 时取 max(1, 线程上限 ÷ 工作进程数)，线程上限照登记取法（这几例用 SINGLEFS_THREAD_CAP 顶）；
-  # 调用方设了的原样传。假 cargo 把每次收到的 RUST_TEST_THREADS 记进 .cargo.test-threads
+  # ── 每条 cargo test 的测试线程数（文件头「并行」）：调用方没设 RUST_TEST_THREADS 与服务设的（不小于线程上限）取 max(1, 线程上限 ÷ 工作进程数)，
+  # 线程上限照登记取法（这几例用 SINGLEFS_THREAD_CAP 顶）；用例显式要的（小于线程上限）原样传；SINGLEFS_THREAD_CAP 一律分。
+  # 假 cargo 把每次收到的 RUST_TEST_THREADS、SINGLEFS_THREAD_CAP、CARGO_BUILD_JOBS 各记进 .cargo.test-threads、.cargo.thread-cap、.cargo.build-jobs
   local test_thread_lines test_thread_wanted floor_workers
   # test-threads：MUTATE_JOBS=4、四条的表，线程上限 10（工作进程数头一项同一个登记值 10）：开 4 个，每条 10 ÷ 4 = 2
   local thread_workers=4
@@ -1236,6 +1526,35 @@ PY
   if [[ "$(cat "$scratch/test-threads-caller.rc")" != 0 || -z "$test_thread_lines" || -n "$(grep -v '^[A-Z]*|test|7$' <<<"$test_thread_lines")" ]] \
      || ! grep -qF "照调用方设的 RUST_TEST_THREADS=7 跑（不覆盖）" "$scratch/test-threads-caller.stderr"; then
     fail "测试线程：调用方设了的 RUST_TEST_THREADS=7 应当原样传给每条 cargo test、stderr 说不覆盖，实际退 $(cat "$scratch/test-threads-caller.rc")，假 cargo 收到的：$(tr '\n' ' ' <<<"$test_thread_lines")"
+  fi
+  # 同一例：SINGLEFS_THREAD_CAP 没有用例显式要的那一种，调用方给了 RUST_TEST_THREADS 也照样分（10 ÷ 4 = 2）。弄坏开关 threadcapundivided 下判错
+  test_thread_lines="$(cat "$scratch/test-threads-caller.cargo.thread-cap" 2>/dev/null)"
+  checked=$((checked + 1))
+  if [[ -z "$test_thread_lines" || -n "$(grep -v "^[A-Z]*|test|$test_thread_wanted\$" <<<"$test_thread_lines")" ]]; then
+    fail "测试线程：调用方设了 RUST_TEST_THREADS=7 时 SINGLEFS_THREAD_CAP 照样应当分成线程上限 10 ÷ 工作进程 $thread_workers 个 = $test_thread_wanted，假 cargo 收到的（BEHAVIOR|子命令|值）：$(tr '\n' ' ' <<<"$test_thread_lines")"
+  fi
+  # test-threads-service：服务设的（统一任务服务套的 capped.sh 把 RUST_TEST_THREADS、CARGO_BUILD_JOBS、SINGLEFS_THREAD_CAP 都设成登记值本身，这里登记值是 10）、
+  # MUTATE_JOBS=4、四条的表开 4 个：每条 cargo test 收到的三样都是 10 ÷ 4 = 2，各工作进程合计不超过登记值。
+  # 弄坏开关 registeredtestthreadskept、threadcapundivided、registeredcargojobskept 各让一格判错（testthreadsunset 与 droprow 让 RUST_TEST_THREADS 那一格判错）
+  local service_lines
+  prepare_case test-threads-service
+  run_case test-threads-service ../mutation/tables/four-caught.tsv MUTATE_JOBS=4 SINGLEFS_THREAD_CAP=10 RUST_TEST_THREADS=10 CARGO_BUILD_JOBS=10 MUTATE_CARGO_JOBS=
+  service_lines="$(cat "$scratch/test-threads-service.cargo.test-threads" 2>/dev/null)"
+  checked=$((checked + 1))
+  if [[ "$(cat "$scratch/test-threads-service.rc")" != 0 || "$(grep -c "^[A-Z]*|test|$test_thread_wanted\$" <<<"$service_lines")" != $((2 * thread_workers + 4)) \
+        || "$(grep -c . <<<"$service_lines")" != $((2 * thread_workers + 4)) ]] \
+     || ! grep -qF "每条 cargo test 设 RUST_TEST_THREADS=$test_thread_wanted（线程上限 10 ÷ 工作进程 $thread_workers 个，至少 1；收到的 RUST_TEST_THREADS=10 不小于线程上限，当服务设的分）" "$scratch/test-threads-service.stderr"; then
+    fail "测试线程：服务设的 RUST_TEST_THREADS=10（等于登记值 10）、开 $thread_workers 个工作进程，每条 cargo test（共 $((2 * thread_workers + 4)) 次）收到的 RUST_TEST_THREADS 应当都是 10 ÷ $thread_workers = $test_thread_wanted、stderr 报当服务设的分，实际退 $(cat "$scratch/test-threads-service.rc")，假 cargo 收到的（BEHAVIOR|子命令|值）：$(tr '\n' ' ' <<<"$service_lines")；stderr：$(cat "$scratch/test-threads-service.stderr")"
+  fi
+  service_lines="$(cat "$scratch/test-threads-service.cargo.thread-cap" 2>/dev/null)"
+  checked=$((checked + 1))
+  if [[ "$(grep -c . <<<"$service_lines")" != $((2 * thread_workers + 4)) || -n "$(grep -v "^[A-Z]*|test|$test_thread_wanted\$" <<<"$service_lines")" ]]; then
+    fail "测试线程：服务设的 SINGLEFS_THREAD_CAP=10、开 $thread_workers 个工作进程，每条 cargo test（共 $((2 * thread_workers + 4)) 次）收到的 SINGLEFS_THREAD_CAP 应当都是 $test_thread_wanted，假 cargo 收到的（BEHAVIOR|子命令|值）：$(tr '\n' ' ' <<<"$service_lines")"
+  fi
+  service_lines="$(cat "$scratch/test-threads-service.cargo.build-jobs" 2>/dev/null)"
+  checked=$((checked + 1))
+  if [[ "$(grep -c . <<<"$service_lines")" != $((2 * thread_workers + 4)) || -n "$(grep -v "^[A-Z]*|test|$test_thread_wanted\$" <<<"$service_lines")" ]]; then
+    fail "编译并行度：服务设的 CARGO_BUILD_JOBS=10（等于登记值 10）、开 $thread_workers 个工作进程，每个 cargo（共 $((2 * thread_workers + 4)) 次）收到的 CARGO_BUILD_JOBS 应当都是 10 ÷ $thread_workers = $test_thread_wanted，假 cargo 收到的（BEHAVIOR|子命令|值）：$(tr '\n' ' ' <<<"$service_lines")"
   fi
 
   # ── 在仓根下起（文件头「在仓根下起」）：只核目录判定与参数改写，不起 cargo（bin 名对不上退 6、--binary-of 只打名字，都在起 cargo 之前）──
@@ -1325,6 +1644,17 @@ PY
      || ! grep -qxF "$(printf 'bench\tbin\tfake-bench\tsrc/bin/fake_bench.rs\te163-gpu')" "$scratch/card-targets.out"; then
     fail "上卡的表：--test-targets 应当打出「bench<TAB>bin<TAB>fake-bench<TAB>src/bin/fake_bench.rs<TAB>e163-gpu」，实际：$(tr '\n' ' ' <"$scratch/card-targets.out")"
   fi
+  # --test-targets：[[bin]]、[[test]] 段没写 path、文件放在目录式的位置（src/bin/<名>/main.rs、tests/<名>/main.rs）：根文件列写目录式的那一份，不写 cargo 找不到的平铺路径
+  directory_case="$scratch/directory-form"
+  mkdir -p "$directory_case/src/bin/tool" "$directory_case/tests/split"
+  printf '[package]\nname = "demo"\nversion = "0.0.0"\nedition = "2021"\n\n[[bin]]\nname = "tool"\n\n[[test]]\nname = "split"\n' >"$directory_case/Cargo.toml"
+  printf 'fn main() {}\n' >"$directory_case/src/bin/tool/main.rs"; printf 'fn main() {}\n' >"$directory_case/tests/split/main.rs"
+  checked=$((checked + 1))
+  if ! (cd "$directory_case" && bash "$case_script" --test-targets) >"$scratch/directory-targets.out" 2>&1 \
+     || ! grep -qxF "$(printf 'demo\tbin\ttool\tsrc/bin/tool/main.rs\t-')" "$scratch/directory-targets.out" \
+     || ! grep -qxF "$(printf 'demo\ttest\tsplit\ttests/split/main.rs\t-')" "$scratch/directory-targets.out"; then
+    fail "上卡的表：段没写 path 的目录式目标，--test-targets 应当打出「demo<TAB>bin<TAB>tool<TAB>src/bin/tool/main.rs<TAB>-」与「demo<TAB>test<TAB>split<TAB>tests/split/main.rs<TAB>-」，实际：$(tr '\n' ' ' <"$scratch/directory-targets.out")"
+  fi
 
   rm -rf -- "${scratch:?}"
   if ((failures)); then
@@ -1332,9 +1662,11 @@ PY
     echo "  → 怎么办：照上面逐条改——判结局的在 judge_mutation，起 cargo test 的在 run_cargo_test，基线与收尾计数在主流程，"
     echo "    并行的在 worker_count_and_head_line、run_worker 与 print_judged_rows_in_table_order，required-features 在 read_required_features；"
     echo "    平常跑拒只供自证的变量在 --selftest 那一支后面（running_under_selftest），工作进程数的头一项（每台默认重活线程数）在 worker_count_and_head_line；"
+    echo "    点名行：认参数与列项在 --list-items 那一支，筛行与退 2 在 select_mutation_rows、reject_item_selection，点名那一趟交给判定库那一段的表在 write_selected_table；"
     echo "    --binary-of 在 find_declared_binary；上卡的表：判上不上卡在 list_test_targets，串行跑测试二进制在 run_card_phase，交卡串在 run_test_executable；"
     echo "    每个 cargo 带的 RUSTFLAGS 与 CARGO_ENCODED_RUSTFLAGS 在 MUTATE_RUSTFLAGS、MUTATE_ENCODED_RUSTFLAGS 与 RUSTFLAGS_ENVIRONMENT（run_cargo_test 用它）；"
-    echo "    每条 cargo test 的 RUST_TEST_THREADS 在 TEST_THREADS_ENVIRONMENT（settle_test_threads_and_cargo_jobs 在 worker_count_and_head_line 之后算，工作进程数收小之后再算一次），在仓根下起的认法与参数改写在 relative_to_apparatus 那一段；"
+    echo "    每条 cargo test 的 RUST_TEST_THREADS 与 SINGLEFS_THREAD_CAP 在 TEST_THREADS_ENVIRONMENT（settle_test_threads_and_cargo_jobs 在 worker_count_and_head_line 之后算，工作进程数收小之后再算一次），"
+    echo "    服务设的与用例显式要的怎么分在 explicitly_requested_threads（线程上限 THREAD_CAP_FOR_SPLIT），在仓根下起的认法与参数改写在 relative_to_apparatus 那一段；"
     echo "    MUTATE_BREAK 设着的话这里本来就该红"
     exit 1
   fi
@@ -1351,11 +1683,14 @@ required-features：没挂的 bin 的 cargo 参数逐字不变，挂了两个的
 deny 警告：留死代码的那一条平常跑判抓到，基线、那一条与还原之后那一次的 RUSTFLAGS 逐字相同、都带 --cap-lints warn、调用方的接在前面；\
 环境里设了 CARGO_ENCODED_RUSTFLAGS（空串、别的值）时 cap 接进它、0x1f 分隔，cargo 实收的与 stderr 报的一致，没设的不凭空多出一个；\
 --binary-of 显式 [[bin]] 与没写的两种各打对名字、源文件不在退 2；\
+目录式装置：锚点落在子模块里与入口里的条各改各的那一份、各还原各的，第二趟都按判定库复用，原文在装置目录里命中 2 次或 0 次的记锚点失效，单文件装置只在给的那一份里找；\
 按条入库：同一条第二趟复用、一次 cargo 都不起，改了被改坏函数调到的函数之后那一条现判，原文只在注释里的那一条拒算照跑；\
-依赖版本行只收闭包里真点名的外部 crate 与传递依赖（逐字对得上夹具、不点的为空、改闭包外点的包照样复用、改传递依赖现判、认 package = 改名）；\
+版本不进键（改闭包外点的包的版本、改传递依赖的版本、改 cargo -V 打的版本、改调用方的 RUSTFLAGS 之后都照样复用，改了点名的函数才现判）；\
 副本根下链上装置 include_str! 读的仓内别处文件、基线编得过，认不出的写法与落到仓根之外的路径退 2 逐行点名；\
-测试线程：调用方没设时每条 cargo test 收到 max(1, 线程上限 ÷ 工作进程数)、调用方设了的原样收到；\
+测试线程：调用方没设与服务设的（等于登记值）每条 cargo test 收到 max(1, 线程上限 ÷ 工作进程数)、用例显式要的原样收到，SINGLEFS_THREAD_CAP 一律分，服务设的 CARGO_BUILD_JOBS 照工作进程数分；\
 在仓根下起：cd 进 scripts/experiment-apparatus/、参数改写成从那里起的写法（不起 cargo），既不在仓根也不在那里的照旧退 2；\
+点名行：--list-items 逐行打行名不起 cargo，--item 只判点名的行（几次取并集、计数行与成功句写点名了几行、基线照跑），行名写错与缺行名退 2 并列出可点的行名，\
+点名与否不进键（整张表判过的行点名照键复用、点名判过的行整张表照键复用）；\
 上卡的表：先编后串行跑测试二进制、不领卡、环境里给的卡串原样交而没有的不设，不挂上卡特性的表编带跑一步，--test-targets 打出上卡的目标）"
 }
 
@@ -1405,11 +1740,19 @@ if [[ -n "${MUTATE_LIBRARY_DIRECTORY:-}" ]] && ! is_broken libraryoverridehonore
   echo "        → 怎么办：unset MUTATE_LIBRARY_DIRECTORY 再跑（判定记进被判那棵仓的 git common-dir 底下那一份，键里不带哪棵仓）；自证与样本要另一份库：${service_problem#*$'\t'}" >&2
   exit 2
 fi
-# 头一个参数是 --binary-of（只打 bin 名）的，拿掉之后照下面解析（文件头用法那几行）
+# 头一个参数是 --binary-of（只打 bin 名）的，拿掉之后照下面解析（文件头用法那几行）；--list-items、--item（文件头「点名行」）可以写在 <bin 名> 之前，
+# 读完表之后再判（点名的行名在不在表里要读表才知道）
 PRINT_BINARY_ONLY=0
+LIST_ITEMS_ONLY=0
+ITEM_NAMES=()
+ITEM_NAME_MISSING=0   # --item 后面没有行名
+ITEM_SELECTED=0       # 点了名、只判点名的行（select_mutation_rows 设）
 while (($#)); do
   case "$1" in
     --binary-of) PRINT_BINARY_ONLY=1; shift; break ;;
+    --list-items) LIST_ITEMS_ONLY=1; shift ;;
+    --item)
+      if (($# >= 2)); then ITEM_NAMES+=("$2"); shift 2; else ITEM_NAME_MISSING=1; shift; fi ;;
     --test-targets)
       # 逐行打测试目标与上不上卡（文件头「上卡的表」），不编、不跑
       if ! list_test_targets "${2:-.}"; then
@@ -1419,10 +1762,10 @@ while (($#)); do
       fi
       exit 0 ;;
     -*)
-      # 认不出的选项（- 起头、不是上面两个）：退 2，不当 bin 名往下走。弄坏开关 unknownoptionaccepted：不判（没有这一道检查的样子）
+      # 认不出的选项（- 起头、不是上面几个）：退 2，不当 bin 名往下走。弄坏开关 unknownoptionaccepted：不判（没有这一道检查的样子）
       if ! is_broken unknownoptionaccepted; then
         echo "mutate: 认不出的选项 $1" >&2
-        echo "        → 怎么办：用法 mutate.sh <bin 名> <源文件> <变异表>，或 mutate.sh --binary-of <源文件>（bin 名不以 - 起头）" >&2
+        echo "        → 怎么办：用法 mutate.sh <bin 名> <源文件> <变异表> [--item <行名>]…，或 mutate.sh --list-items <bin 名> <源文件> <变异表>，或 mutate.sh --binary-of <源文件>（bin 名不以 - 起头）" >&2
         exit 2
       fi
       break ;;
@@ -1465,21 +1808,42 @@ print_root_invocation_note() { [[ -z "$ROOT_INVOCATION_NOTE" ]] || echo "$ROOT_I
 # 三条变异全被误报成盲区，换对名字后三条全被抓）。
 # 反方向更坏：Y 的测试恰好因别的原因红了，会被记成「变异被抓」。
 # 清单：从源文件所在目录一层层往上找最近的 Cargo.toml（实验工作区根是 scripts/experiment-apparatus，src/bin 布局与自带清单的子 crate 同样认得）。
-# find_declared_binary <源文件>：设 _manifest（那份清单）与 _declared（[[bin]] 里 path 对得上这份源文件的 name，没有是空串）；--binary-of 与下面的核对共用这一份读法
+# find_declared_binary <源文件>：设 _manifest（那份清单）与 _declared（[[bin]] 里 path 对得上这份源文件的 name，没有是空串）；--binary-of 与下面的核对共用这一份读法。
+# 对得上 = 清单所在目录接上 path 之后，与源文件（都从当前目录起算成绝对路径、去掉 . 与 ..）整路径相等：拆成目录式的 <名>/main.rs 各有各的 [[bin]]，
+# 不能拿 path 的后缀去套别的 main.rs。弄坏开关 suffixbinarymatch：退回后缀匹配（源文件整路径以 path 收尾就算）
 find_declared_binary() {
-  local source_file="$1" manifest_directory
+  local source_file="$1" manifest_directory suffix_match=0
   _manifest="" manifest_directory="$(dirname "$source_file")"
   while [[ -z "$_manifest" ]]; do
     if [[ -f "$manifest_directory/Cargo.toml" ]]; then _manifest="$manifest_directory/Cargo.toml"
     elif [[ "$manifest_directory" == . || "$manifest_directory" == / ]]; then _manifest="Cargo.toml"
     else manifest_directory="$(dirname "$manifest_directory")"; fi
   done
-  _declared="$(awk -v src="$source_file" '
+  is_broken suffixbinarymatch && suffix_match=1
+  _declared="$(awk -v src="$source_file" -v cwd="$PWD" -v manifest_directory="$(dirname "$_manifest")" -v suffix_match="$suffix_match" '
+    # normalize <路径>：相对的接在当前目录后面，去掉 . 与空段，.. 吃掉前一段
+    function normalize(path,   parts, count, position, kept, depth, result) {
+      if (substr(path, 1, 1) != "/") path = cwd "/" path
+      count = split(path, parts, "/"); depth = 0
+      for (position = 1; position <= count; position++) {
+        if (parts[position] == "" || parts[position] == ".") continue
+        if (parts[position] == ".." && depth > 0) { depth--; continue }
+        kept[++depth] = parts[position]
+      }
+      result = ""
+      for (position = 1; position <= depth; position++) result = result "/" kept[position]
+      return result == "" ? "/" : result
+    }
     /^\[\[bin\]\]/ { name=""; path=""; next }
     /^name *=/ { gsub(/.*= *"|"/,""); name=$0; next }
     /^path *=/ { gsub(/.*= *"|"/,""); path=$0;
-                 if (src ~ path"$") print name; next }
+                 if (suffix_match ? (src ~ path"$") : (normalize(src) == normalize(substr(path, 1, 1) == "/" ? path : manifest_directory "/" path))) print name; next }
   ' "$_manifest" 2>/dev/null | head -1)"
+}
+# discovered_binary_name <源文件>：没写 [[bin]] 的源文件，cargo 自动发现的二进制名：src/bin/<名>.rs 是文件名去掉 .rs，src/bin/<名>/main.rs 是目录名；
+#   弄坏开关 directoryformunseen 下目录式的也取文件名去掉 .rs
+discovered_binary_name() {
+  if [[ "$(basename "$1")" == main.rs && "$(basename "$(dirname "$(dirname "$1")")")" == bin ]] && ! is_broken directoryformunseen; then basename "$(dirname "$1")"; else basename "$1" .rs; fi
 }
 if ((PRINT_BINARY_ONLY)); then
   if (($# != 1)) || [[ ! -f "$1" ]]; then
@@ -1489,7 +1853,7 @@ if ((PRINT_BINARY_ONLY)); then
   fi
   print_root_invocation_note
   find_declared_binary "$1"
-  echo "${_declared:-$(basename "$1" .rs)}"   # 没写 [[bin]] 的按 cargo 自动发现的规则：文件名去掉 .rs
+  echo "${_declared:-$(discovered_binary_name "$1")}"   # 没写 [[bin]] 的按 cargo 自动发现的规则
   exit 0
 fi
 
@@ -1502,6 +1866,105 @@ if (($# < 3)) && ! is_broken bareusage; then
 fi
 BIN="$1"; SRC="$2"; TABLE="$3"
 
+# <变异表> 之后只认 --item <行名>、--list-items（文件头「点名行」）；认不出的参数退 2，不悄悄忽略（忽略了就是整张表照跑）
+trailing_arguments=("${@:4}")
+while ((${#trailing_arguments[@]})); do
+  case "${trailing_arguments[0]}" in
+    --list-items) LIST_ITEMS_ONLY=1; trailing_arguments=("${trailing_arguments[@]:1}") ;;
+    --item)
+      if ((${#trailing_arguments[@]} >= 2)); then ITEM_NAMES+=("${trailing_arguments[1]}"); trailing_arguments=("${trailing_arguments[@]:2}")
+      else ITEM_NAME_MISSING=1; trailing_arguments=(); fi ;;
+    *)
+      echo "mutate: 认不出的参数 ${trailing_arguments[0]}（<变异表> 之后只认 --item <行名>、--list-items）" >&2
+      echo "        → 怎么办：用法 mutate.sh <bin 名> <源文件> <变异表> [--item <行名>]…；可点的行名用 mutate.sh --list-items <bin 名> <源文件> <变异表> 列" >&2
+      exit 2 ;;
+  esac
+done
+
+# 读表：一行三段、制表符分隔，空行与 # 开头的行跳过，按表序进四个数组（整行原样另存：点名之后写成这一趟的表）
+read_mutation_table() { # <变异表>
+  local raw_line name from to
+  mutation_names=(); mutation_originals=(); mutation_replacements=(); mutation_lines=()
+  while IFS= read -r raw_line || [[ -n "$raw_line" ]]; do   # 末行没有换行也读（判定库那一段读表是这个口径）
+    IFS=$'\t' read -r name from to <<<"$raw_line"
+    [[ -z "${name:-}" || "${name:0:1}" == "#" ]] && continue
+    mutation_names+=("$name"); mutation_originals+=("$from"); mutation_replacements+=("$to"); mutation_lines+=("$raw_line")
+  done < "$1"
+}
+# 表里的行名，一行一个：$1 每行前面的缩进，$2 少打末尾几行（弄坏开关 itemlistrowdropped 才给非 0）
+print_row_names() {
+  local index indent="${1:-}" omitted="${2:-0}"
+  for ((index = 0; index < ${#mutation_names[@]} - omitted; index++)); do printf '%s%s\n' "$indent" "${mutation_names[index]}"; done
+}
+if ((LIST_ITEMS_ONLY)); then
+  # 逐行打表里的行名（文件头「点名行」），不编、不连服务；弄坏开关 itemlistrowdropped：少打最后一行
+  if [[ ! -r "$TABLE" ]]; then
+    echo "mutate: --list-items 读不了变异表 $TABLE" >&2
+    echo "        → 怎么办：给的 <变异表> 要是读得到的文件（相对当前目录；在仓根下起的话照 kb 的写法）" >&2
+    exit 2
+  fi
+  read_mutation_table "$TABLE"
+  omitted_rows=0
+  is_broken itemlistrowdropped && omitted_rows=1
+  print_row_names "" "$omitted_rows"
+  exit 0
+fi
+# 点名没法照办（--item 后面缺行名，或点的行名表里没有）：打原因与可点的行名，退 2，一次 cargo 都不调；弄坏开关 itemrejectlistdropped：不列行名
+reject_item_selection() { # <原因>
+  echo "mutate: $1，一条变异都没跑" >&2
+  if ! is_broken itemrejectlistdropped; then
+    echo "        表里可点的行名（${#mutation_names[@]} 行，mutate.sh --list-items 列的同一份）：" >&2
+    print_row_names "          " >&2
+  fi
+  echo "        → 怎么办：--item 后面写上面列的行名（表的第一列，可给几次、取并集）；要跑整张表就不带 --item" >&2
+  exit 2
+}
+# 读完表之后点名（文件头「点名行」）：行名表里没有、--item 后面缺行名退 2；点了名的只留点名那几行（四个数组一起筛，表序不变）。
+# 弄坏开关 itemmissingnameaccepted：缺行名不拒；itemunknownaccepted：表里没有的行名不拒；itemselectsall：不筛；itemoverwritten：只认最后给的那一个行名
+select_mutation_rows() {
+  local index item_name row_name known unknown_names="" selected kept_item_name
+  local -a kept_names=() kept_originals=() kept_replacements=() kept_lines=()
+  if ((ITEM_NAME_MISSING)) && ! is_broken itemmissingnameaccepted; then reject_item_selection "--item 后面缺行名"; fi
+  ((${#ITEM_NAMES[@]})) || return 0
+  if ! is_broken itemunknownaccepted; then
+    for item_name in "${ITEM_NAMES[@]}"; do
+      known=0
+      for row_name in ${mutation_names[@]+"${mutation_names[@]}"}; do [[ "$row_name" == "$item_name" ]] && known=1; done
+      ((known)) || unknown_names+="${unknown_names:+、}$item_name"
+    done
+  fi
+  [[ -z "$unknown_names" ]] || reject_item_selection "--item 点名的行名表里没有：$unknown_names"
+  kept_item_name="${ITEM_NAMES[${#ITEM_NAMES[@]} - 1]}"
+  for index in "${!mutation_names[@]}"; do
+    selected=0
+    if is_broken itemselectsall; then
+      selected=1
+    elif is_broken itemoverwritten; then
+      [[ "${mutation_names[index]}" == "$kept_item_name" ]] && selected=1
+    else
+      for item_name in "${ITEM_NAMES[@]}"; do [[ "${mutation_names[index]}" == "$item_name" ]] && selected=1; done
+    fi
+    ((selected)) || continue
+    kept_names+=("${mutation_names[index]}"); kept_originals+=("${mutation_originals[index]}")
+    kept_replacements+=("${mutation_replacements[index]}"); kept_lines+=("${mutation_lines[index]}")
+  done
+  mutation_names=(${kept_names[@]+"${kept_names[@]}"}); mutation_originals=(${kept_originals[@]+"${kept_originals[@]}"})
+  mutation_replacements=(${kept_replacements[@]+"${kept_replacements[@]}"}); mutation_lines=(${kept_lines[@]+"${kept_lines[@]}"})
+  ITEM_SELECTED=1
+}
+# 点名那一趟交给判定库那一段的表：只含点名那几行、整行原样（键只由每行自己的原文、替换文、包住原文的单元与 cargo 参数定，点名与否不进键）；
+# 弄坏开关 itemkeyed：每行的替换文后面并进点名，点名与否进了键
+write_selected_table() {
+  local index
+  for index in "${!mutation_lines[@]}"; do
+    if is_broken itemkeyed; then
+      printf '%s\t%s\t%s // 点名\n' "${mutation_names[index]}" "${mutation_originals[index]}" "${mutation_replacements[index]}"
+    else
+      printf '%s\n' "${mutation_lines[index]}"
+    fi
+  done
+}
+
 find_declared_binary "$SRC"
 if [[ -n "$_declared" ]]; then
   if [[ "$_declared" != "$BIN" ]]; then
@@ -1512,7 +1975,7 @@ if [[ -n "$_declared" ]]; then
   fi
 else
   # 没有显式 [[bin]] ⇒ cargo 自动发现，名字就是文件名去掉扩展名
-  _stem="$(basename "$SRC" .rs)"
+  _stem="$(discovered_binary_name "$SRC")"
   if [[ "$_stem" != "$BIN" ]]; then
     print_root_invocation_note
     echo "mutate: $SRC 没有显式 [[bin]]，自动发现的名字是 '$_stem'，不是 '$BIN'" >&2
@@ -1633,24 +2096,43 @@ if [[ -n "$REQUESTED_CARGO_JOBS" && ! "$REQUESTED_CARGO_JOBS" =~ ^[1-9][0-9]*$ ]
   exit 2
 fi
 
-# 读表：一行三段、制表符分隔，空行与 # 开头的行跳过（与改成并行之前逐行读的口径相同），按表序进三个数组
-mutation_names=(); mutation_originals=(); mutation_replacements=()
-while IFS=$'\t' read -r name from to; do
-  [[ -z "${name:-}" || "${name:0:1}" == "#" ]] && continue
-  mutation_names+=("$name"); mutation_originals+=("$from"); mutation_replacements+=("$to")
-done < "$TABLE"
+# 读表（read_mutation_table）；点了名的只留点名那几行（select_mutation_rows，文件头「点名行」）：往后的条数、行名、原文、替换文都是这一趟要判的那几行的
+read_mutation_table "$TABLE"
+TABLE_ROW_COUNT=${#mutation_names[@]}
+select_mutation_rows
 mutation_count=${#mutation_names[@]}
+# 点名那一趟的成功句与「计数：」写明点了几行；不点名的那一趟这几句一个字不变。弄坏开关 itemcountunsaid：不写
+SELECTION_COUNT_TEXT=""; SELECTION_SUCCESS_TEXT=""; REUSED_SUBJECT="表里 "
+if ((ITEM_SELECTED)); then
+  echo "mutate: 点名了 ${#ITEM_NAMES[@]} 个行名（--item）：只判表里点名的 $mutation_count 行（表里共 $TABLE_ROW_COUNT 行）；点名与否不进键，整张表那一趟判过的行照键复用" >&2
+  if ! is_broken itemcountunsaid; then
+    SELECTION_COUNT_TEXT="、点名 $mutation_count 行（表里共 $TABLE_ROW_COUNT 行）"
+    SELECTION_SUCCESS_TEXT="；点名 $mutation_count 行（表里共 $TABLE_ROW_COUNT 行）"
+    REUSED_SUBJECT="点名 $mutation_count 行（表里共 $TABLE_ROW_COUNT 行），"
+  fi
+fi
 
 # 开几个工作进程：各项取最小、至少 1，连同各项给几个、卡在哪一项、每个 cargo 的编译并行度一起打在 stderr 的头一行（文件头「并行」那一段）
 # 每台默认重活线程数（文件头「并行」）：工作进程数的头一项与每条 cargo test 的测试线程数都取它；取不到退 2、一条变异都没跑，不退回按核数算
 source "$(dirname "$SELF_PATH")/../hosts/heavy-threads.sh"
 HOST_HEAVY_THREADS=""
-CALLER_CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-}"   # 调用方给的；下面 export CARGO_BUILD_JOBS 会把它换成算出来的，工作进程数收小之后重算时仍要认调用方给的那一个
+CALLER_CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-}"   # 收到的（用例显式要的或服务设的，worker_count_and_head_line 判）；下面 export CARGO_BUILD_JOBS 会把它换成算出来的，工作进程数收小之后重算时仍要认收到的那一个
 if ! is_broken workersbyprocessor && ! HOST_HEAVY_THREADS="$(heavy_thread_default)"; then
   echo "mutate: 取不到每台默认重活线程数（上面是原因），定不了开几个工作进程，一条变异都没跑" >&2
   echo "        → 怎么办：照上面的出路修 .claude/heavy-thread-default 再跑；不退回按核数算" >&2
   exit 2
 fi
+# 线程上限（文件头「并行」那一段的服务设的与用例显式要的）：工作进程数那一项的同一个登记值，拿来判收到的值是哪一种、拿来分。
+# HOST_HEAVY_THREADS 只在弄坏开关 workersbyprocessor 下是空的：那时现取，取不到就空着（收到的非空值一律当用例显式要的、SINGLEFS_THREAD_CAP 不设）
+THREAD_CAP_FOR_SPLIT="$HOST_HEAVY_THREADS"
+if [[ -z "$THREAD_CAP_FOR_SPLIT" ]] && ! THREAD_CAP_FOR_SPLIT="$(heavy_thread_default 2>/dev/null)"; then THREAD_CAP_FOR_SPLIT=""; fi
+# explicitly_requested_threads <收到的值>：是用例显式要的（原样传）退 0；空的、或是正整数而不小于线程上限（服务设的整份）退 1。
+#   不是正整数的退 0（原样传，libtest 与 cargo 自己报）；线程上限空的，非空值一律退 0
+explicitly_requested_threads() {
+  [[ -n "$1" ]] || return 1
+  [[ "$1" =~ ^[1-9][0-9]*$ && -n "$THREAD_CAP_FOR_SPLIT" ]] || return 0
+  (($1 < THREAD_CAP_FOR_SPLIT))
+}
 worker_count_and_head_line() {
   local processor_count by_processor thread_budget smallest binding="" floor_note="" bound_index
   local -a bound_names=() bound_counts=() bound_texts=()
@@ -1682,8 +2164,11 @@ worker_count_and_head_line() {
   WORKER_COUNT=$((smallest < 1 ? 1 : smallest))
   if [[ -n "$REQUESTED_CARGO_JOBS" ]]; then
     CARGO_JOBS_PER_WORKER="$REQUESTED_CARGO_JOBS"; CARGO_JOBS_SOURCE="MUTATE_CARGO_JOBS"
-  elif [[ -n "$CALLER_CARGO_BUILD_JOBS" ]]; then
-    CARGO_JOBS_PER_WORKER="$CALLER_CARGO_BUILD_JOBS"; CARGO_JOBS_SOURCE="调用方的 CARGO_BUILD_JOBS"
+  elif [[ -n "$CALLER_CARGO_BUILD_JOBS" ]] && { is_broken registeredcargojobskept || explicitly_requested_threads "$CALLER_CARGO_BUILD_JOBS"; }; then   # 弄坏开关 registeredcargojobskept：服务设的整份也原样用
+    CARGO_JOBS_PER_WORKER="$CALLER_CARGO_BUILD_JOBS"; CARGO_JOBS_SOURCE="用例显式要的 CARGO_BUILD_JOBS"
+  elif [[ -n "$CALLER_CARGO_BUILD_JOBS" ]]; then   # 服务设的整份（不小于线程上限，explicitly_requested_threads）：照工作进程数分
+    CARGO_JOBS_PER_WORKER=$((THREAD_CAP_FOR_SPLIT / WORKER_COUNT < 1 ? 1 : THREAD_CAP_FOR_SPLIT / WORKER_COUNT))
+    CARGO_JOBS_SOURCE="收到的 CARGO_BUILD_JOBS=$CALLER_CARGO_BUILD_JOBS 不小于线程上限 $THREAD_CAP_FOR_SPLIT，当服务设的分：线程上限 ÷ 工作进程数"
   else
     if is_broken workersbyprocessor; then thread_budget=$processor_count; else thread_budget=$HOST_HEAVY_THREADS; fi   # 弄坏开关下按核数
     CARGO_JOBS_PER_WORKER=$((thread_budget / WORKER_COUNT < 1 ? 1 : thread_budget / WORKER_COUNT)); CARGO_JOBS_SOURCE="每台默认重活线程数 ÷ 工作进程数"
@@ -1701,34 +2186,44 @@ if ((CARD_MODE)); then
   echo "mutate: $BIN 是上卡的目标（特性 $CARD_TARGET_FEATURES）：基线、各条与还原之后那一次先编完（cargo test --no-run），要上卡跑的条都编好之后串行跑测试二进制；不领卡，环境里的 GPU_CARDS_BY_PRIORITY 有就原样交（文件头「上卡的表」）" >&2
 fi
 print_root_invocation_note
-# 每条 cargo test 的测试线程数（文件头「并行」）：调用方设了 RUST_TEST_THREADS（非空）原样传、不覆盖；没设的取 max(1, 线程上限 ÷ 工作进程数)，
-# 线程上限是工作进程数那一项的同一个登记值（HOST_HEAVY_THREADS；弄坏开关 workersbyprocessor 下现取，取不到退 2）。
-# 只设在 run_cargo_test 起的那几次 cargo test 的环境里（TEST_THREADS_ENVIRONMENT），不 export。
+# 每条 cargo test 的测试线程数（文件头「并行」）：用例显式要的 RUST_TEST_THREADS（explicitly_requested_threads）原样传、不覆盖；
+# 没设的与服务设的（不小于线程上限）取 max(1, 线程上限 ÷ 工作进程数)；SINGLEFS_THREAD_CAP 一律取同一个数（线程上限取不到时不设）。
+# 线程上限是工作进程数那一项的同一个登记值（THREAD_CAP_FOR_SPLIT；弄坏开关 workersbyprocessor 下取不到它而要算 RUST_TEST_THREADS 时退 2）。
+# 只设在 run_cargo_test 与 run_test_executable 起的那几次的环境里（TEST_THREADS_ENVIRONMENT），不 export。
 # 工作进程数收小之后（查过判定库、要现判的条数比开的少）再调一次，照新的工作进程数重算
 settle_test_threads_and_cargo_jobs() {
-  local thread_cap_of_host test_threads_per_worker
+  local thread_cap_of_host="$THREAD_CAP_FOR_SPLIT" test_threads_per_worker received_note=""
   TEST_THREADS_ENVIRONMENT=()
-  if ! is_broken testthreadsunset; then   # 弄坏开关 testthreadsunset：不设
-    if [[ -n "${RUST_TEST_THREADS:-}" ]] && ! is_broken overridecallertestthreads; then   # 弄坏开关 overridecallertestthreads：调用方设了的也换成算出来的
+  if ! is_broken testthreadsunset; then   # 弄坏开关 testthreadsunset：不设 RUST_TEST_THREADS
+    # 弄坏开关 overridecallertestthreads：用例显式要的也换成算出来的；registeredtestthreadskept：服务设的整份也当显式要的原样传
+    if [[ -n "${RUST_TEST_THREADS:-}" ]] && { is_broken registeredtestthreadskept || explicitly_requested_threads "$RUST_TEST_THREADS"; } && ! is_broken overridecallertestthreads; then
       echo "mutate: 每条 cargo test 照调用方设的 RUST_TEST_THREADS=$RUST_TEST_THREADS 跑（不覆盖）" >&2
     else
-      thread_cap_of_host="$HOST_HEAVY_THREADS"
       if [[ -z "$thread_cap_of_host" ]] && ! thread_cap_of_host="$(heavy_thread_default)"; then
         echo "mutate: 取不到每台默认重活线程数（上面是原因），定不了每条 cargo test 的 RUST_TEST_THREADS，一条变异都没跑" >&2
-        echo "        → 怎么办：照上面的出路修 .claude/heavy-thread-default 再跑；或调用方自己设 RUST_TEST_THREADS（原样传、不覆盖）" >&2
+        echo "        → 怎么办：照上面的出路修 .claude/heavy-thread-default 再跑；或调用方自己设小于登记值的 RUST_TEST_THREADS（原样传、不覆盖）" >&2
         exit 2
+      fi
+      if [[ -n "${RUST_TEST_THREADS:-}" ]] && ! is_broken overridecallertestthreads; then
+        received_note="；收到的 RUST_TEST_THREADS=$RUST_TEST_THREADS 不小于线程上限，当服务设的分"
       fi
       test_threads_per_worker=$((thread_cap_of_host / WORKER_COUNT < 1 ? 1 : thread_cap_of_host / WORKER_COUNT))
       TEST_THREADS_ENVIRONMENT=("RUST_TEST_THREADS=$test_threads_per_worker")
-      echo "mutate: 每条 cargo test 设 RUST_TEST_THREADS=$test_threads_per_worker（线程上限 $thread_cap_of_host ÷ 工作进程 $WORKER_COUNT 个，至少 1）" >&2
+      echo "mutate: 每条 cargo test 设 RUST_TEST_THREADS=$test_threads_per_worker（线程上限 $thread_cap_of_host ÷ 工作进程 $WORKER_COUNT 个，至少 1$received_note）" >&2
     fi
+  fi
+  # 测试二进制另读 SINGLEFS_THREAD_CAP 的那一路：它是登记值的覆盖名，一律分。弄坏开关 threadcapundivided：不设，测试二进制拿到整份
+  if [[ -n "$thread_cap_of_host" ]] && ! is_broken threadcapundivided; then
+    test_threads_per_worker=$((thread_cap_of_host / WORKER_COUNT < 1 ? 1 : thread_cap_of_host / WORKER_COUNT))
+    TEST_THREADS_ENVIRONMENT+=("SINGLEFS_THREAD_CAP=$test_threads_per_worker")
+    echo "mutate: 每条 cargo test 设 SINGLEFS_THREAD_CAP=$test_threads_per_worker（测试二进制另读的那一路；线程上限 $thread_cap_of_host ÷ 工作进程 $WORKER_COUNT 个，至少 1）" >&2
   fi
   export CARGO_BUILD_JOBS="$CARGO_JOBS_PER_WORKER"
 }
 settle_test_threads_and_cargo_jobs
 
 SHARD_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-mutate-XXXXXX")"
-PRISTINE="$SHARD_ROOT/pristine-source"   # 开跑时那一份被测源码，每条变异都从它改、每次还原都拷它
+PRISTINE="$SHARD_ROOT/pristine-source"   # 开跑时那几份被测源码（按装置目录里的相对路径放在它底下），每条变异都从它们改、每次还原都拷回
 CLAIMS="$SHARD_ROOT/claims"              # <行号>/：那一条被哪个工作进程认领了（mkdir 建成的那个领走）
 RESULTS="$SHARD_ROOT/results"            # <行号>.line（要打到 stdout 的那一行）、.stderr、.verdict（「档 要不要判失败」，最后写）
 mkdir -p "$CLAIMS" "$RESULTS"
@@ -1760,6 +2255,16 @@ cleanup() {
 }
 trap cleanup EXIT
 MUTATE_TARGET="${MUTATE_TARGET_DIR:-$SHARD_ROOT/target}"
+# 判定库那一段读的表：点了名的那一趟是只含点名那几行的一份（write_selected_table，文件名同原表），不点名的就是原表
+PLAN_TABLE="$TABLE"
+if ((ITEM_SELECTED)); then
+  PLAN_TABLE="$SHARD_ROOT/selected-table/$(basename -- "$TABLE")"
+  if ! mkdir -p "$(dirname -- "$PLAN_TABLE")" || ! write_selected_table >"$PLAN_TABLE"; then
+    echo "mutate: 写不了点名那几行的表 $PLAN_TABLE（上面是原因），一条变异都没跑" >&2
+    echo "        → 怎么办：看 \${TMPDIR:-/tmp} 的空间与权限，再跑同一条命令" >&2
+    exit 2
+  fi
+fi
 # 副本照仓里的层级放（copy-<i>/scripts/experiment-apparatus/）：装置用 include_str!("../../research/results/…") 读留存产物，
 # 副本根下放一个符号链接指回仓里那一份（只读，变异不改它）
 copy_root_of() { echo "$SHARD_ROOT/copy-$1"; }
@@ -1794,41 +2299,131 @@ if [[ -z "${SINGLEFS_MULTI_HOST_CONFIG:-}" ]]; then
   SINGLEFS_MULTI_HOST_CONFIG="$MUTATE_COPY_CONFIGURATION"
   export SINGLEFS_MULTI_HOST_CONFIG
 fi
-ORIGINAL_SUM="$(sha256sum "$SRC" | cut -d' ' -f1)"
-cp "$(copy_directory_of 1)/$SRC" "$PRISTINE"
+# 装置目录里的源文件们（文件头「目录式装置」）：给的源文件是目录式装置的入口文件（子目录里的 main.rs）时，锚点在它所在目录（含子目录）的全部 .rs 里找，
+# 目录里有哪几份取 scripts/gate/lib_lag_split_family.py 的拆分族（is_directory_entry、family_members，只 import、不改它）；单文件装置与路径落在装置目录之外的写法只这一份。
+# 打出来头一行是装置目录（单文件装置那一行是空的），后面一行一份文件，路径相对当前目录，目录逐层、各层按名字排序。
+# 弄坏开关 anchorinsourceonly：只这一份；directoryfamilyforall：单文件装置也取它所在目录里（含子目录）的全部 .rs
+SOURCE_FAMILY_LIBRARY="$(dirname "$SELF_PATH")/../gate/lib_lag_split_family.py"
+list_source_files() {
+  local only_given=0 directory_for_all=0
+  is_broken anchorinsourceonly && only_given=1
+  is_broken directoryfamilyforall && directory_for_all=1
+  SOURCE="$SRC" FAMILY_LIBRARY="$SOURCE_FAMILY_LIBRARY" ONLY_GIVEN="$only_given" DIRECTORY_FOR_ALL="$directory_for_all" python3 - <<'PY'
+import importlib.util, os, sys
+source = os.environ["SOURCE"]
+normal = os.path.normpath(source)
+if os.environ["ONLY_GIVEN"] == "1" or os.path.isabs(normal) or normal.startswith("..") or "/" not in normal:
+    print()
+    print(source)
+    sys.exit(0)
+specification = importlib.util.spec_from_file_location("lib_lag_split_family_for_mutate", os.environ["FAMILY_LIBRARY"])
+family = importlib.util.module_from_spec(specification)
+sys.modules[specification.name] = family
+specification.loader.exec_module(family)
+directory_for_all = os.environ["DIRECTORY_FOR_ALL"] == "1"
+if not directory_for_all and not family.is_directory_entry(normal):
+    print()
+    print(source)
+    sys.exit(0)
+directory = os.path.dirname(normal)
+paths = []
+for current, subdirectories, names in os.walk(directory):
+    subdirectories[:] = sorted(name for name in subdirectories if name != "target")
+    paths += [os.path.join(current, name) for name in sorted(names) if name.endswith(".rs")]
+members = paths if directory_for_all else family.family_members(normal, paths)
+if normal not in members:
+    print()
+    print(source)
+    sys.exit(0)
+print(directory)
+print("\n".join(members))
+PY
+}
+if ! source_listing="$(list_source_files)" || [[ -z "$source_listing" ]]; then
+  echo "mutate: 取不到 $SRC 所在装置目录里的源文件清单（上面是原因），一条变异都没跑" >&2
+  echo "        → 怎么办：核 scripts/gate/lib_lag_split_family.py 在不在、import 得进（目录式装置的目录怎么认取它），再整张表重跑" >&2
+  exit 2
+fi
+SOURCE_DIRECTORY="${source_listing%%$'\n'*}"
+mapfile -t SOURCE_FILES < <(tail -n +2 <<<"$source_listing")
+SOURCE_FILES_LIST="$SHARD_ROOT/source-files.list"
+printf '%s\n' "${SOURCE_FILES[@]}" >"$SOURCE_FILES_LIST"
+if [[ -z "$SOURCE_DIRECTORY" ]]; then
+  ANCHOR_SCOPE="$SRC"
+else
+  ANCHOR_SCOPE="装置目录 $SOURCE_DIRECTORY/ 的 ${#SOURCE_FILES[@]} 份 .rs（含子目录）"
+fi
+# 这一轮量的是开跑时那一份源码（收尾核它没被改过，退 5）：清单里每一份的内容连同清单本身合起来的指纹；清单取不到打一句固定的话（与开跑时的指纹不同）
+current_source_sum() {
+  local listing files
+  listing="$(list_source_files 2>/dev/null)" || { echo "源文件清单取不到"; return 0; }
+  mapfile -t files < <(tail -n +2 <<<"$listing")
+  { printf '%s\n' "${files[@]}"; sha256sum -- "${files[@]}"; } 2>&1 | sha256sum | cut -d' ' -f1
+}
+ORIGINAL_SUM="$(current_source_sum)"
+for source_file in "${SOURCE_FILES[@]}"; do
+  if ! mkdir -p "$PRISTINE/$(dirname "$source_file")" || ! cp "$(copy_directory_of 1)/$source_file" "$PRISTINE/$source_file"; then
+    echo "mutate: 拷不了开跑时那一份 $source_file（上面是原因），一条变异都没跑" >&2; exit 2
+  fi
+done
 
-# 从开跑时那一份源码施加一条变异：$1 原文、$2 替换文、$3 写到哪（空串只核命中、不写）。原文要恰好命中一次，否则退 1 并把命中数打到 stderr
+# 一条变异的原文在开跑时那几份源码里的哪一份：几份合起来恰好命中一次，那一份的路径打到 stdout；
+# 命中 0 次或多处退 1，stderr 打「命中 N 次（要求恰好 1 次[；分布 …]）：<原文>」（多处命中的分布只在目录式装置里写）
+find_anchor_file() { # <原文>
+  FROM="$1" PRISTINE="$PRISTINE" SOURCE_FILES_LIST="$SOURCE_FILES_LIST" python3 - <<'PY'
+import os, sys
+needle = os.environ["FROM"].replace("\\n", "\n")
+files = open(os.environ["SOURCE_FILES_LIST"]).read().splitlines()
+counts = [(path, open(os.path.join(os.environ["PRISTINE"], path)).read().count(needle)) for path in files]
+total = sum(count for _path, count in counts)
+if total != 1:
+    spread = ""
+    if total > 1 and len(files) > 1:
+        spread = "；分布 " + "、".join("%s %d 次" % (path, count) for path, count in counts if count)
+    sys.stderr.write("命中 %d 次（要求恰好 1 次%s）：%r\n" % (total, spread, needle)); sys.exit(1)
+print(next(path for path, count in counts if count))
+PY
+}
+# 从开跑时那一份源码施加一条变异：$1 原文、$2 替换文、$3 写到哪、$4 这一条要改的那一份源文件（find_anchor_file 找到的）。原文要在那一份里恰好命中一次，否则退 1 并把命中数打到 stderr
 write_mutated_source() {
-  FROM="$1" TO="$2" PRISTINE="$PRISTINE" DESTINATION="$3" python3 - <<'PY'
+  FROM="$1" TO="$2" PRISTINE_FILE="$PRISTINE/$4" DESTINATION="$3" python3 - <<'PY'
 import os,sys
-s=open(os.environ["PRISTINE"]).read()
+s=open(os.environ["PRISTINE_FILE"]).read()
 f=os.environ["FROM"].replace("\\n","\n"); t=os.environ["TO"].replace("\\n","\n")
 n=s.count(f)
 if n!=1:
     sys.stderr.write("命中 %d 次（要求恰好 1 次）：%r\n"%(n,f)); sys.exit(1)
-if os.environ["DESTINATION"]:
-    open(os.environ["DESTINATION"],"w").write(s.replace(f,t))
+open(os.environ["DESTINATION"],"w").write(s.replace(f,t))
 PY
 }
-# 锚点在派活之前逐条核（文件头「锚点失效」）：不是恰好命中一次的那一条记「⚓ 锚点失效」，判定先写进结果文件、认领目录先建好，
+# 锚点在派活之前逐条核（文件头「锚点失效」「目录式装置」）：每条原文在源文件们里合起来恰好命中一次，那一份就是这一条要改的文件（ROW_FILES）；
+# 不是恰好命中一次的那一条记「⚓ 锚点失效」，判定先写进结果文件、认领目录先建好，
 # 工作进程不领它、判定库不记它；别的条照跑，收尾计数单列、整轮退 3（.claude/rules/mutation-sampling.md 第七类）
 ANCHOR_BROKEN_INDEXES="$SHARD_ROOT/anchor-broken.indexes"
 : >"$ANCHOR_BROKEN_INDEXES"
 ANCHOR_BROKEN_COUNT=0
+ROW_FILES=()
 for ((row_index = 0; row_index < mutation_count; row_index++)); do
-  if ! anchor_hits="$(write_mutated_source "${mutation_originals[row_index]}" "${mutation_replacements[row_index]}" "" 2>&1)"; then
+  if anchor_file="$(find_anchor_file "${mutation_originals[row_index]}" 2>&1)"; then
+    ROW_FILES[row_index]="$anchor_file"
+  else
+    anchor_hits="$anchor_file"
+    ROW_FILES[row_index]=""
     if is_broken anchorstopsall; then   # 弄坏开关：一条锚点失效整轮退 3、一条变异都不跑
       echo "mutate: [${mutation_names[row_index]}] 替换没命中，证明作废（锚点在派活之前逐条核，这一轮一条变异都没跑）" >&2
       echo "        → 怎么办：把变异表里这一条的原文改到源码今天的写法、让它恰好命中一次，再整张表重跑" >&2
       exit 3
     fi
-    printf '%s\n' "⚓ [${mutation_names[row_index]}] 锚点失效：原文在 $SRC 里${anchor_hits%%：*}—— 这一条没跑，不算抓到也不算没红" >"$RESULTS/$row_index.line"
+    printf '%s\n' "⚓ [${mutation_names[row_index]}] 锚点失效：原文在 $ANCHOR_SCOPE 里${anchor_hits%%：*}—— 这一条没跑，不算抓到也不算没红" >"$RESULTS/$row_index.line"
     printf 'anchor 1\n' >"$RESULTS/$row_index.verdict"
     mkdir -p "$CLAIMS/$row_index"
     echo "$row_index" >>"$ANCHOR_BROKEN_INDEXES"
     ANCHOR_BROKEN_COUNT=$((ANCHOR_BROKEN_COUNT + 1))
   fi
 done
+ROW_SOURCES_LIST="$SHARD_ROOT/row-sources.list"   # 每条一行：这一条要改的源文件（锚点失效的那几条是空行），判定库那一段按它分组算键
+: >"$ROW_SOURCES_LIST"
+((mutation_count)) && printf '%s\n' "${ROW_FILES[@]}" >"$ROW_SOURCES_LIST"
 # 收尾那一句：锚点失效的条数不为 0 整轮退 3（判完别的条之后；4、5、7、8 那几种照它们自己的码先退）
 report_anchor_broken() {
   ((ANCHOR_BROKEN_COUNT)) || return 0
@@ -1884,32 +2479,77 @@ else
 fi
 library_cargo_words=(test --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"})
 library_breaks=""
-for library_break in libraryunread calleesignored dependenciesbycrate redreused; do is_broken "$library_break" && library_breaks+="${library_breaks:+,}$library_break"; done
+for library_break in libraryunread calleesignored toolchainkeyed dependencykeyed redreused; do is_broken "$library_break" && library_breaks+="${library_breaks:+,}$library_break"; done
 # 复用哨兵（文件头「复用哨兵」）：状态放这一轮自己的临时根；判法是 scripts/gate/lib_reuse_checks.py（拷进不带它的树里跑的这一份不抽）
 REUSE_CHECKS="$(dirname "$SELF_PATH")/../gate/lib_reuse_checks.py"
 REUSE_SENTINEL_STATE="$SHARD_ROOT/reuse-sentinel.json"
-if library_summary="$(env ${RUSTFLAGS_ENVIRONMENT[@]+"${RUSTFLAGS_ENVIRONMENT[@]}"} MUTATE_ANCHOR_BROKEN_INDEXES="$ANCHOR_BROKEN_INDEXES" \
+if library_summary="$(env ${RUSTFLAGS_ENVIRONMENT[@]+"${RUSTFLAGS_ENVIRONMENT[@]}"} MUTATE_ANCHOR_BROKEN_INDEXES="$ANCHOR_BROKEN_INDEXES" MUTATE_ROW_SOURCES="$ROW_SOURCES_LIST" \
       MUTATE_REUSE_CHECKS="$REUSE_CHECKS" MUTATE_REUSE_SENTINEL_STATE="$REUSE_SENTINEL_STATE" \
-      python3 - "$MUTATE_LIBRARY_HELPER" "$PWD" "$SRC" "$BIN" "$TABLE" \
+      python3 - "$MUTATE_LIBRARY_HELPER" "$PWD" "$SRC" "$BIN" "$PLAN_TABLE" \
       "$MUTATE_LIBRARY" "$PLAN_FILE" "$RESULTS" "$CLAIMS" "$library_breaks" "${library_cargo_words[@]}" <<'PY'
-import importlib.util, json, os, sys
+import importlib.util, json, os, sys, tempfile
 helper, root, source, binary, table, library, plan_path, results, claims, breaks = sys.argv[1:11]
 words = sys.argv[11:]
 specification = importlib.util.spec_from_file_location("lib_mutation_units_for_mutate", helper)
 units = importlib.util.module_from_spec(specification)
 sys.modules[specification.name] = units
 specification.loader.exec_module(units)
+# 锚点失效的那几条（派活之前那一段记好了「⚓ 锚点失效」）：不复用、不现判、不拒算，判定库不碰
+with open(os.environ["MUTATE_ANCHOR_BROKEN_INDEXES"], encoding="utf-8") as handle:
+    anchor_broken = {int(line) for line in handle if line.strip()}
+
+
+def plan_by_source_file():
+    """一条变异的键里「包住原文的单元」取自它要改的那一份源文件（文件头「目录式装置」）：每条的源文件在 MUTATE_ROW_SOURCES 里（一行一条，表序；锚点失效的是空行）。
+    要改的文件就一份（单文件装置、或目录式装置里每条都落在同一份）时整张表一次算；落在几份里的，每份各取它那几条写一张临时表、各算一次，
+    再按表序并成一份计划写进 plan_path（每条的键与组成、测试的闭包键照第一份有测试的算出来的那一份取；锚点失效的条放一个不算键的占位）。回 mutate_plan 那种 decisions。"""
+    breaks_tuple = tuple(item for item in breaks.split(",") if item)
+    with open(os.environ["MUTATE_ROW_SOURCES"], encoding="utf-8") as handle:
+        row_sources = handle.read().splitlines()
+    rows = units.read_mutate_table(table)
+    if len(row_sources) != len(rows):
+        raise ValueError(f"表里 {len(rows)} 条、认出要改哪份源文件的有 {len(row_sources)} 条，两边读表的口径对不上")
+    groups = {}
+    for index, row_source in enumerate(row_sources):
+        if index not in anchor_broken:
+            groups.setdefault(row_source, []).append(index)
+    if len(groups) <= 1:
+        return units.mutate_plan(root, next(iter(groups), source), binary, table, words, dict(os.environ), library, plan_path, breaks_tuple)
+    scratch = tempfile.mkdtemp(prefix="plan-groups-", dir=os.path.dirname(plan_path))
+    decisions, plans, placements = {}, {}, {}
+    for number, (group_source, indexes) in enumerate(groups.items()):
+        group_table = os.path.join(scratch, f"table-{number}.tsv")
+        with open(group_table, "w", encoding="utf-8") as handle:
+            for index in indexes:
+                name, original, replacement = rows[index]
+                handle.write("\t".join((name, original.replace("\n", "\\n"), replacement.replace("\n", "\\n"))) + "\n")
+        group_plan = os.path.join(scratch, f"plan-{number}.json")
+        group_decisions = units.mutate_plan(root, group_source, binary, group_table, words, dict(os.environ), library, group_plan, breaks_tuple)
+        with open(group_plan, encoding="utf-8") as handle:
+            plans[group_source] = json.load(handle)
+        for position, index in enumerate(indexes):
+            placements[index] = (group_source, position)
+            decisions[index] = (index,) + tuple(group_decisions[position][1:])
+    merged = dict(next((group for group in plans.values() if group["tests"]), next(iter(plans.values()))))
+    merged["rows"] = []
+    for index, (name, _original, _replacement) in enumerate(rows):
+        if index in placements:
+            group_source, position = placements[index]
+            merged["rows"].append(plans[group_source]["rows"][position])
+        else:
+            merged["rows"].append({"name": name, "key": None, "refusal": "锚点失效"})
+            decisions[index] = (index, name, False, "", "0", "", "拒算：锚点失效")
+    units.write_atomically(plan_path, json.dumps(merged, ensure_ascii=False, sort_keys=True))
+    return [decisions[index] for index in range(len(rows))]
+
+
 try:
-    decisions = units.mutate_plan(root, source, binary, table, words, dict(os.environ), library, plan_path,
-                                  tuple(item for item in breaks.split(",") if item))
-except Exception as error:   # 算不出键（工具链起不来、切不开、Cargo.lock 读不懂这一类）：这一趟每条现判、不写库，不让变异跑不起来
+    decisions = plan_by_source_file()
+except Exception as error:   # 算不出键（源文件切不开、闭包算不成这一类；弄坏开关下另有 rustc 起不来、Cargo.lock 读不懂）：这一趟每条现判、不写库，不让变异跑不起来
     print(f"mutate: 判定库：算不出键（{type(error).__name__}：{error}），这一趟每条现判、不写库", file=sys.stderr)
     print("0 0 0")
     sys.exit(0)
 reused = fresh = refused = 0
-# 锚点失效的那几条（派活之前那一段记好了「⚓ 锚点失效」）：不复用、不现判、不拒算，判定库不碰
-with open(os.environ["MUTATE_ANCHOR_BROKEN_INDEXES"], encoding="utf-8") as handle:
-    anchor_broken = {int(line) for line in handle if line.strip()}
 
 
 def sentinel_candidates():
@@ -2118,9 +2758,9 @@ if ((ALL_REMAINING_REUSED)); then
     count_verdict "$verdict_category"
     ((verdict_fails)) && reused_fail=1
   done
-  echo "计数：$(verdict_count_text)$LIBRARY_COUNT_TEXT"
+  echo "计数：$(verdict_count_text)$LIBRARY_COUNT_TEXT$SELECTION_COUNT_TEXT"
   if ((ANCHOR_BROKEN_COUNT)); then reused_scope="$LIBRARY_REUSED 条按判定库复用、锚点失效 $ANCHOR_BROKEN_COUNT 条没跑"; else reused_scope="$mutation_count 条都按判定库复用"; fi
-  echo "全部复用：表里 $reused_scope，没起 cargo（基线与还原之后那一次都没跑，副本里的源码一个字没改；库在 $MUTATE_LIBRARY）"
+  echo "全部复用：${REUSED_SUBJECT}$reused_scope，没起 cargo（基线与还原之后那一次都没跑，副本里的源码一个字没改；库在 $MUTATE_LIBRARY）"
   finish_reuse_sentinel
   ((REUSE_SENTINEL_RED)) && reused_fail=1
   if ((ANCHOR_BROKEN_COUNT)); then
@@ -2149,7 +2789,9 @@ done
 # 例：e114 在 M6 处退出后，下一轮基线连报两次「基线就是红的」，而单测直接跑 14 条全绿。
 # 先 touch 每份副本里的被测源码，逼 cargo 按这一轮的副本重编（每个工作进程的编译目录都跨轮留着，每份都要 touch）。
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
-  touch "$(copy_directory_of "$worker_index")/$SRC"
+  for source_file in "${SOURCE_FILES[@]}"; do
+    touch "$(copy_directory_of "$worker_index")/$source_file"
+  done
 done
 
 # 跑一次 cargo test：$1 副本目录、$2 编译目录，其余参数接在 cargo test 的参数后面（上卡的表只编那一步给 --no-run）。直接起，不设内存上限、不限时（文件头「上限、限时与卡住」）；
@@ -2292,16 +2934,17 @@ record_verdict() {
 
 # 第 $1 个工作进程判表里第 $2 条：从开跑时那一份源码施加变异、跑、判结局，写进结果文件（record_verdict）
 judge_mutation() {
-  local worker_index="$1" row_index="$2" name copy_directory target_directory out
+  local worker_index="$1" row_index="$2" name copy_directory target_directory out row_file
   name="${mutation_names[row_index]}"
+  row_file="${ROW_FILES[row_index]}"   # 这一条要改的那一份源文件（派活之前 find_anchor_file 找到的）；改的、还原的都是副本里的这一份
   copy_directory="$(copy_directory_of "$worker_index")"
   target_directory="$(target_directory_of "$worker_index")"
   if is_broken sharedcopy; then
     copy_directory="$(copy_directory_of 1)"; target_directory="$(target_directory_of 1)"
   fi
-  if ! write_mutated_source "${mutation_originals[row_index]}" "${mutation_replacements[row_index]}" "$copy_directory/$SRC" 2>"$RESULTS/$row_index.anchor"; then
+  if ! write_mutated_source "${mutation_originals[row_index]}" "${mutation_replacements[row_index]}" "$copy_directory/$row_file" "$row_file" 2>"$RESULTS/$row_index.anchor"; then
     # 派活之前核过的锚点在这里又对不上：同样记锚点失效（文件头「锚点失效」），不停别的工作进程
-    record_verdict "$row_index" anchor 1 "⚓ [$name] 锚点失效：原文在 $SRC 里$(sed -n '1s/：.*//p' "$RESULTS/$row_index.anchor")—— 这一条没跑，不算抓到也不算没红" ""
+    record_verdict "$row_index" anchor 1 "⚓ [$name] 锚点失效：原文在 $row_file 里$(sed -n '1s/：.*//p' "$RESULTS/$row_index.anchor")—— 这一条没跑，不算抓到也不算没红" ""
     return
   fi
   # ⚠️ **测试根本不终止、或无界分配：** 一条破坏可以让被测代码进死循环或吃满内存（例：E73 整轮挂死，E142 把整机拖进 OOM）。
@@ -2311,7 +2954,7 @@ judge_mutation() {
     # 上卡的表（文件头「上卡的表」）：这里只编，测试二进制拷进 executables/row-<行号>、记 .deferred，各条都编完之后由 run_card_phase 跑、判
     local compile_status
     if run_cargo_test "$copy_directory" "$target_directory" --no-run >"$RESULTS/$row_index.compile"; then compile_status=0; else compile_status=$?; fi
-    cp "$PRISTINE" "$copy_directory/$SRC"   # 还原，同下面不上卡的那一路
+    cp "$PRISTINE/$row_file" "$copy_directory/$row_file"   # 还原，同下面不上卡的那一路
     if ((compile_status != 0)); then
       record_verdict "$row_index" invalid 0 "⏭  [$name] 变异导致编译失败，本条无效（不计入盲区，也不算命中）" ""
     elif ! keep_test_executable "$RESULTS/$row_index.compile" "$copy_directory" "row-$row_index"; then
@@ -2322,7 +2965,7 @@ judge_mutation() {
     return
   fi
   out="$(run_cargo_test "$copy_directory" "$target_directory")"
-  cp "$PRISTINE" "$copy_directory/$SRC"   # 还原：下一条从开跑时那一份改，领完之后那一次测试也跑在还原过的源码上
+  cp "$PRISTINE/$row_file" "$copy_directory/$row_file"   # 还原：下一条从开跑时那一份改，领完之后那一次测试也跑在还原过的源码上
   judge_test_output "$row_index" "$out"
 }
 
@@ -2522,7 +3165,7 @@ elif ((claimed_count != mutation_count || collected_count != mutation_count || n
   exit 8
 fi
 # 「计数：」按档各数各的（count_verdict），几栏加起来等于表的条数
-echo "计数：$(verdict_count_text)$LIBRARY_COUNT_TEXT"
+echo "计数：$(verdict_count_text)$LIBRARY_COUNT_TEXT$SELECTION_COUNT_TEXT"
 report_library_record_errors
 finish_reuse_sentinel
 ((REUSE_SENTINEL_RED)) && fail=1
@@ -2541,10 +3184,10 @@ for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
     exit 4
   fi
 done
-echo "已还原，基线仍全绿"
+echo "已还原，基线仍全绿$SELECTION_SUCCESS_TEXT"
 # 这一轮量的是开跑时那一份源码：跑的这几分钟里有人改了工作区里的原件，结果就不算数，要重跑。
-if [[ "$(sha256sum "$SRC" | cut -d' ' -f1)" != "$ORIGINAL_SUM" ]]; then
-  echo "mutate: $SRC 在这一轮变异跑的时候被改过；上面的结果量的是开跑时那一份，改完之后重跑" >&2
+if [[ "$(current_source_sum)" != "$ORIGINAL_SUM" ]]; then
+  echo "mutate: $ANCHOR_SCOPE 在这一轮变异跑的时候被改过；上面的结果量的是开跑时那一份，改完之后重跑" >&2
   exit 5
 fi
 # 锚点失效的不为 0：别的条照跑完了，整轮退 3（文件头「锚点失效」）

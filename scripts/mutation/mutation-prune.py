@@ -17,19 +17,27 @@
 单元与闭包都由 scripts/gate/lib_function_units.py 算（Rust 那一份；本库只 import 它，不另切）：
   一条变异的容器 = 包住它的最小的单元（fn、impl 头、const、static、struct、enum、宏……；嵌套 fn 与闭包算外层 fn 的）。
   变异键（verdict key）= sha256（form 一行、容器单元闭包的键、容器里的相对位置、原文、替换文）；闭包的键是 lib_function_units 的 closure_key：
-    入口目标的生效 cfg、闭包里每个单元的（种类，指纹）多重集、数据单元的摘要，加调用方给的工具链行（global_lines）与依赖行（dependency_lines）。
+    入口目标的生效 cfg、闭包里每个单元的（种类，指纹）多重集、数据单元的摘要，加各包的 edition；调用方给的全局那几行（global_lines）平常是空的。
     相对位置按容器里去掉注释之后的词法单元下标与单元内偏移记（注释与空白不算）；不带路径、名字、行号。
-  依赖行：闭包里的单元真点名的外部 crate 照 Cargo.lock 落到的包（名、版本、来源、checksum），连同传递依赖；取法只在
-    scripts/mutation/lib_mutation_units.py 一处（它文件头「依赖版本行」，crates 变异表与 mutate.sh 用同一份）。
-  工具链行（驱动给）：rustc -vV、cargo nextest / cargo-mutants / llvm-profdata 的版本、构建环境的生效值（build_environment_lines）、判法单元指纹。
-    Cargo.toml 只取解析后的 [profile]、各包的 edition 与生效特性（特性在闭包的 cfg 行里），不取原文；.cargo/ 下的配置取解析后的值；排除表不进。
+  测试服务代码不进键（scripts/gate/test-service-code-paths.tsv 登的，认法只在 lib_function_units.py 的 is_test_service_code；D13（验证路线） 已定项 17「三类代码」表测试服务代码那一行，
+    不进任何键，改它不让它自己的测试与变异行重判）：闭包里落在测试服务代码里的单元不出 unit 行与 data 行（closure_key 排，变异键里的容器闭包与测试键、基线键、覆盖者键都经它）；
+    容器单元本身落在测试服务代码里的变异，变异键里的闭包不带 entry 行（入口就是容器自己，entry 行会把它的指纹放回键里；UnitTree.closure_key 的 entry_kept 给假）：
+    改那份测试服务代码，这一条的变异键不变、判过的照沿用（相对位置按容器里的词法单元下标记：改在变异点之前的代码，下标移了，键照变）；
+    测试自己落在测试服务代码里的，测试键照 closure_key 的规矩留 entry 行（入口单元自己的指纹照进键）。样本 SERVICE、SERVICE-CLOSURE、SERVICE-CONTROL 核这几件。
+  依赖版本不进键：Cargo.lock 里的包版本改了不作废已判的结论（弄坏开关 dependency-versions-keyed 把闭包里的单元真点名的外部 crate 照 Cargo.lock 落到的包
+    （名、版本、来源、checksum）连同传递依赖收进来；取法在 scripts/mutation/lib_mutation_units.py 的 dependency_lines，它文件头「依赖版本行」）。
+  全局那几行（驱动给，global_lines）平常是空的：键只留被改坏的那一处（容器单元、相对位置、原文、替换文）与测试的闭包，构建环境一样都不进。
+    不进的有：编译变量（RUSTFLAGS、RUSTDOCFLAGS、RUSTC 与几个 *_WRAPPER、CARGO_BUILD_*、CARGO_TARGET_*）与它们指的程序、cargo 配置的 build / target / env / unstable 解析值、
+    编译档（环境变量 CARGO_PROFILE_*、cargo 配置与 Cargo.toml 的 [profile]）与线程数（CARGO_BUILD_JOBS、[build] 的 jobs）、清单的 lints、rustc -vV、
+    cargo nextest / cargo-mutants / llvm-profdata 的版本、rust-toolchain 文件的值、驱动与算键库的代码、排除表；
+    Cargo.toml 只取各包的 edition 与生效特性（特性在闭包的 cfg 行里），不取原文。弄坏开关见下「规则」，各自把其中一样收进全局那几行。
   测试键 = 抓到它那条测试的单元闭包键（入口是那条测试函数）；认不出是哪条测试、或闭包拒算，交 None 与原因（那一条现判，不退整包、不退只比测试函数）。
   覆盖者键 = 静态闭包里有容器单元的每一条测试（第一段的、验证包的、被变异包的文档测试；标了 #[ignore] 的 cargo 不跑，不算；排除单里的不算：驱动登记的崩溃枚举用例与放量分项）各自测试键的多重集：
     闭包是那条测试执行得到的单元的上界，集合与各自的键不变、也没有新测试的闭包碰到它，没红就沿用。
     默认 cfg 下不编的测试（整份挂了这一次没开的 #![cfg(feature = "…")]，闭包交 entry-cfg-inactive）不可能是这一趟的覆盖者：跳过，不拒、不进条数，跳过几条写在 coverers_key 返回的第三项；别的拒因照旧整条拒。
 沿用判据（carry_decision）：键相同的那一行；抓到的另要测试键与现算的相同、那条测试此刻不在排除表里；
   没红的要覆盖者键相同才算数（这里判的是「这一行此刻还算不算数」，驱动的 --summary 与提交门禁按它定没红的状态；真跑一律不沿用没红、每趟现判，规矩在驱动的 Judgement.state 与 GpuJudging.state，见驱动文件头「记红、撤绿、下趟现判」）；
-  无效的键相同就沿用（键里有容器与它点到的单元、依赖、工具链）；驱动错不是结论，照选中现判；
+  无效的键相同就沿用（键里有容器与它点到的单元）；驱动错不是结论，照选中现判；
   拒算的（容器或它的闭包里有认不出的形态）不沿用，每趟现判。
 清单按单元存（list_unit_key）：cargo-mutants 给的每一条变异记在它的容器单元下（相对位置、原文、替换文、变异名去掉位置的那一段），
   键 = cargo-mutants 版本、.cargo/mutants.toml 解析后的值、文件路径（examine_globs 按路径挑文件）、单元的种类与指纹、cfg 条件链、外层单元的指纹；
@@ -38,10 +46,14 @@
 规则（每条后面是弄坏开关 BROAD_MUTATION_BREAK=<项>，只在 --selftest 与驱动的自证里生效）：
   BROAD_MUTATION_BREAK=catching-test-own-function-only  测试键只取测试函数自己的指纹，不取它的闭包
       「自证：样本 T16 判成 carry」「自证：同一条测试因别的原因拒算」
-  BROAD_MUTATION_BREAK=mutated-function-only  变异键只取容器单元自己的指纹，不取它的闭包（依赖行跟着不进）
-      「自证：样本 INDEXU 判成 carry」「自证：样本 MACRO 判成 carry」「自证：样本 S04 判成 carry」「自证：样本 Y8 判成 carry」「自证：样本 FC 判成 carry」「自证：样本 FD 判成 carry」「自证：样本 Y9 判成 carry」「自证：样本 Q1 判成 carry」「自证：样本 DEP 判成 carry」
+  BROAD_MUTATION_BREAK=mutated-function-only  变异键只取容器单元自己的指纹，不取它的闭包
+      「自证：样本 INDEXU 判成 carry」「自证：样本 MACRO 判成 carry」「自证：样本 S04 判成 carry」「自证：样本 Y8 判成 carry」「自证：样本 FC 判成 carry」「自证：样本 FD 判成 carry」「自证：样本 Y9 判成 carry」「自证：样本 Q1 判成 carry」「自证：样本 SERVICE-CONTROL 判成 carry」「自证：样本 SERVICE 判成 rejudge」
   BROAD_MUTATION_BREAK=container-fingerprint-dropped  变异键里的闭包去掉容器单元自己
       「自证：样本 S34U 判成 carry」「自证：样本 Y5 判成 carry」「自证：样本 FF 判成 carry」
+  BROAD_MUTATION_BREAK=mutated-test-service-code-keyed  容器单元落在测试服务代码里也把它自己的指纹放进变异键（闭包键带 entry 行）
+      「自证：样本 SERVICE 判成 rejudge」
+    SERVICE-CLOSURE（容器在产品代码里、调到的单元在测试服务代码里，改那个单元沿用）没有这一处自己的开关：排闭包里测试服务代码的单元是 lib_function_units.py 的 closure_key 做的，
+    环境里设 FUNCTION_UNITS_BREAK=test-service-code-keyed（closure_key 照收这些单元）下它判成 rejudge
     抓到的结论另有测试键守着（测试的闭包里有被测函数与它调到的），S34、INDEX 要同开两个开关才红：
     container-fingerprint-dropped,catching-test-own-function-only 红在 S34，mutated-function-only,catching-test-own-function-only 红在 INDEX
   BROAD_MUTATION_BREAK=defining-file-in-key  变异键另收闭包碰到的每份文件里全部单元的指纹
@@ -50,15 +62,21 @@
       「自证：样本 TWO 判成 carry」
   BROAD_MUTATION_BREAK=relative-position-counts-comments  相对位置连注释一起数
       「自证：样本 COMMENT 判成 rejudge」「自证：清单的一条没复原回去」
-  BROAD_MUTATION_BREAK=dependency-lines-dropped  依赖行不进键
-      「自证：样本 DEP 判成 carry」
-  BROAD_MUTATION_BREAK=dependency-whole-lock  依赖行取整份 Cargo.lock 的全部包
-      「自证：样本 DEP-OTHER 判成 rejudge」
-  BROAD_MUTATION_BREAK=profile-dropped  构建环境不取 Cargo.toml 解析后的 [profile]
-      「自证：样本 Y7 判成 carry」
-  BROAD_MUTATION_BREAK=manifest-text-in-global-key  构建环境另收 Cargo.toml 原文的 sha256
-      「自证：样本 MANIFEST 判成 rejudge」
-  BROAD_MUTATION_BREAK=exclusions-in-global-key  工具链行另收排除表的 sha256
+  BROAD_MUTATION_BREAK=dependency-versions-keyed  闭包里的单元真点名的外部 crate 照 Cargo.lock 落到的包（连同传递依赖）进键
+      「自证：样本 DEP 判成 rejudge」
+  BROAD_MUTATION_BREAK=toolchain-version-keyed  全局那几行另收 rustc -vV 各行、nextest / cargo-mutants / llvm-profdata 的版本与 rust-toolchain 文件解析后的值
+      「自证：样本 TOOLCHAIN 判成 rejudge」「自证：全局那几行带了构建环境、编译器与工具的版本」
+  BROAD_MUTATION_BREAK=build-environment-keyed  全局那几行另收构建环境的生效值：编译变量与它们指的程序（内容 sha256）、cargo 配置的 build（去掉 jobs、incremental）/ target / env / unstable 解析值
+      「自证：样本 BUILD-VARIABLE 判成 rejudge」「自证：样本 BUILD-CONFIG 判成 rejudge」「自证：全局那几行带了构建环境、编译器与工具的版本」
+  BROAD_MUTATION_BREAK=profile-keyed  全局那几行另收 Cargo.toml 解析后的 [profile]、环境变量 CARGO_PROFILE_*、cargo 配置的 [profile] 表
+      「自证：样本 Y7 判成 rejudge」「自证：全局那几行带了构建环境、编译器与工具的版本」
+  BROAD_MUTATION_BREAK=build-jobs-keyed  全局那几行另收 CARGO_BUILD_JOBS 与 cargo 配置 [build] 的 jobs
+      「自证：样本 JOBS 判成 rejudge」「自证：全局那几行带了构建环境、编译器与工具的版本」
+  BROAD_MUTATION_BREAK=judging-units-in-global-key  全局那几行另收这份库源码文本的 sha256（驱动与算键库的代码进键）
+      「自证：全局那几行带了判法单元指纹」
+  BROAD_MUTATION_BREAK=manifest-text-in-global-key  全局那几行另收 Cargo.toml 原文的 sha256
+      「自证：样本 MANIFEST 判成 rejudge」「自证：样本 LINTS 判成 rejudge」「自证：全局那几行带了构建环境、编译器与工具的版本」
+  BROAD_MUTATION_BREAK=exclusions-in-global-key  全局那几行另收排除表的 sha256
       「自证：样本 EXCLUDE-OTHER 判成 rejudge」
   BROAD_MUTATION_BREAK=catching-test-exclusion-dropped  抓到它的测试进了排除表也沿用
       「自证：样本 EXCLUDE-CATCHER 判成 carry」
@@ -98,7 +116,7 @@
       「自证：平常跑设了 BROAD_MUTATION_BREAK 没被拒」
 
 gate-similar: broad-mutation.py 它是逐条驱动（库目录、续跑、逐步命令），这里是它载入的纯函数库，判的是同一件事的剪枝那一半，分开是为了自证不碰库目录
-gate-similar: lib_function_units.py 它切单元、收闭包、算闭包键；这里只调它，加上广谱变异自己的那几样（容器、相对位置、测试键、覆盖者键、清单的单元键、依赖行）
+gate-similar: lib_function_units.py 它切单元、收闭包、算闭包键；这里只调它，加上广谱变异自己的那几样（容器、相对位置、测试键、覆盖者键、清单的单元键）
 """
 import hashlib
 import importlib.util
@@ -116,18 +134,21 @@ from project_preflight import preflight  # noqa: E402
 
 BREAKS = frozenset()    # 驱动在自证里设；本库 --selftest 自己从 BROAD_MUTATION_BREAK 读
 UNITS_LIBRARY_PATH = os.path.join(REPOSITORY, "scripts", "gate", "lib_function_units.py")
-MUTATION_UNITS_LIBRARY_PATH = os.path.join(REPOSITORY, "scripts", "mutation", "lib_mutation_units.py")   # 依赖版本行与 crates 变异表、mutate.sh 共用这一份
+MUTATION_UNITS_LIBRARY_PATH = os.path.join(REPOSITORY, "scripts", "mutation", "lib_mutation_units.py")   # 切 cargo 配置文件的那一份（cargo_configuration_files）与 crates 变异表、mutate.sh 共用
 VERDICT_KEY_FORM = "broad-mutation-verdict-v1"
 LIST_KEY_FORM = "broad-mutation-list-v1"
 NEXTEST_FILTER_CHUNK_BYTES = 32768
 SINGLE_ARGUMENT_LIMIT = 131072
 SPAWN_PATTERNS = re.compile(r"\bcurrent_exe\b|CARGO_BIN_EXE_|\bCommand::new\b|process::Command\b")
-# 构建环境里取生效值的环境变量（名字逐个、前缀一族）：编译器、rustdoc 的标志，cargo 的 build / profile / target 配置，换编译器的那几个
+# 构建环境里的环境变量（名字逐个、前缀一族）：编译器、rustdoc 的标志，cargo 的 build / target 配置，换编译器的那几个。只在弄坏开关 build-environment-keyed 下进全局那几行；
+# 编译档（CARGO_PROFILE_*）与线程数（CARGO_BUILD_JOBS）、增量（CARGO_BUILD_INCREMENTAL）连这个开关也不收（各有弄坏开关 profile-keyed、build-jobs-keyed）
 BUILD_VARIABLES = ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTDOCFLAGS", "CARGO_ENCODED_RUSTDOCFLAGS", "RUSTC", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER",
                    "RUSTDOC")
-BUILD_VARIABLE_PREFIXES = ("CARGO_BUILD_", "CARGO_PROFILE_", "CARGO_TARGET_")
+BUILD_VARIABLE_PREFIXES = ("CARGO_BUILD_", "CARGO_TARGET_")
+BUILD_VARIABLES_LEFT_OUT = ("CARGO_BUILD_JOBS", "CARGO_BUILD_INCREMENTAL")
+BUILD_TABLE_KEYS_LEFT_OUT = ("jobs", "incremental")
 PROGRAM_VARIABLES = ("RUSTC", "RUSTC_WRAPPER", "RUSTC_WORKSPACE_WRAPPER", "RUSTDOC")
-CARGO_CONFIG_TABLES = ("build", "profile", "target", "env", "unstable")
+CARGO_CONFIG_TABLES = ("build", "target", "env", "unstable")
 CARGO_CONFIG_PROGRAMS = (("build", "rustc"), ("build", "rustc-wrapper"), ("build", "rustc-workspace-wrapper"), ("build", "rustdoc"))
 
 
@@ -152,7 +173,7 @@ def parent_is_own_selftest():
 def refuse_break_outside_selftest(argv):
     """弄坏开关只在自证里认（文件头「弄坏开关只在自证里认」）：命令行不是单独一个 --selftest 而环境里设了 BROAD_MUTATION_BREAK，参数解析之前退 2、点名变量。
     弄坏开关 outside-selftest-guard-skipped：父进程是带 --selftest 的本库时不拒。"""
-    # 变量名写成字面量、不另立模块级常量：模块级赋值进广谱变异判法单元的闭包（scripts/gate/lib_function_units.py 文件头「import 时执行的模块级语句」）
+    # 变量名写成字面量、不另立模块级常量
     value = os.environ.get("BROAD_MUTATION_BREAK", "")
     if not value or argv == ["--selftest"]:
         return
@@ -189,7 +210,7 @@ MUTATION_UNITS_MODULE = None
 
 
 def mutation_units_library():
-    """scripts/mutation/lib_mutation_units.py（依赖版本行只认它一份：dependency_lines、read_lock_packages、lock_line）。"""
+    """scripts/mutation/lib_mutation_units.py（弄坏开关 dependency-versions-keyed 用的依赖版本行只认它一份：dependency_lines、read_lock_packages）。"""
     global MUTATION_UNITS_MODULE
     if MUTATION_UNITS_MODULE is None:
         specification = importlib.util.spec_from_file_location("lib_mutation_units_for_mutation_prune", MUTATION_UNITS_LIBRARY_PATH)
@@ -671,7 +692,7 @@ class UnitTree:
     def crate_of(self, unit):
         return self.workspace.crate_of_path(unit.file)
 
-    # 依赖行：闭包真引到的外部包，照 Cargo.lock 解析（连同传递依赖）
+    # 依赖行：平常是空的（依赖版本不进键）；弄坏开关 dependency-versions-keyed 下闭包真引到的外部包照 Cargo.lock 解析（连同传递依赖）
 
     def lock_packages(self):
         if self.lock is None:
@@ -679,13 +700,11 @@ class UnitTree:
         return self.lock
 
     def dependency_lines(self, closure):
-        """→ (依赖行, 拒算形态)。取法只在 lib_mutation_units.py 的 dependency_lines 一处（它文件头「依赖版本行」），排好序；
-        落不到包的形态是 lock-dependency-unresolved。"""
-        if broken("dependency-lines-dropped"):
+        """→ (依赖行, 拒算形态)：平常交空；弄坏开关 dependency-versions-keyed 下取法只在 lib_mutation_units.py 的 dependency_lines 一处
+        （它文件头「依赖版本行」），排好序，落不到包的形态是 lock-dependency-unresolved。"""
+        if not broken("dependency-versions-keyed"):
             return [], []
         packages = self.lock_packages()
-        if broken("dependency-whole-lock"):
-            return sorted(mutation_units_library().lock_line(entry) for entry in packages if entry.get("source")), []
         lines, refusals = mutation_units_library().dependency_lines(self.workspace, closure.order, packages)
         return lines, sorted({refusal.split(" ", 1)[0] for refusal in refusals})
 
@@ -700,8 +719,9 @@ class UnitTree:
 
     # 键
 
-    def closure_key(self, unit, global_lines, target_id=None):
-        """单元闭包的键：→ (键, 组成清单, 拒算形态)。拒算时照样算出看得见的那一部分的键（allow_refused），拒算形态交回调用方。"""
+    def closure_key(self, unit, global_lines, target_id=None, entry_kept=True):
+        """单元闭包的键：→ (键, 组成清单, 拒算形态)。拒算时照样算出看得见的那一部分的键（allow_refused），拒算形态交回调用方。
+        entry_kept 给假：键里不出 entry 行（unit 落在测试服务代码里的变异，mutation_key 这样取：入口就是容器自己，entry 行会把它的指纹放回键里）。"""
         closure, refusals = self.closure(unit, target_id)
         if closure is None:
             return None, [], refusals
@@ -710,6 +730,8 @@ class UnitTree:
         if broken("container-fingerprint-dropped"):
             kept = [member for member in closure.order if member is not unit]
             closure = _ClosureView(closure, kept)
+        elif not entry_kept:
+            closure = _ClosureView(closure, closure.order, entries_dropped=True)
         key, closure_refusals = self.library.closure_key(closure, toolchain=toolchain, dependencies=dependencies, allow_refused=True)
         composition = [member.text() for member in closure.units()] + [f"dependency\t{line}" for line in dependencies] + [f"toolchain\t{line}" for line in toolchain]
         forms = sorted({refusal.form for refusal in closure_refusals}) + dependency_refusals
@@ -720,11 +742,15 @@ class UnitTree:
 
 
 class _ClosureView:
-    """弄坏开关 container-fingerprint-dropped 用：成员少一个容器单元的闭包，别的照原样。"""
+    """弄坏开关 container-fingerprint-dropped 用：成员少一个容器单元的闭包，别的照原样。
+    entries_dropped：成员照原样，键里不出 entry 行（容器单元落在测试服务代码里时 UnitTree.closure_key 这样取，文件头「测试服务代码不进键」）。"""
 
-    def __init__(self, closure, kept):
+    def __init__(self, closure, kept, entries_dropped=False):
         self.order, self.refusals, self.cfg_lines, self.programs = kept, closure.refusals, closure.cfg_lines, closure.programs
         self.members = {id(member): member for member in kept}
+        if entries_dropped:
+            self.entry_units = []
+            self.cfg_atoms = getattr(closure, "cfg_atoms", None)
 
     def units(self):
         return sorted(self.order, key=lambda member: (member.file, member.first_line, member.kind, member.name))
@@ -744,7 +770,9 @@ def mutation_key(tree, item, global_lines):
     if broken("mutated-function-only"):
         closure_key, composition, refused = digest_of_lines([f"unit\t{unit.kind}\t{unit.fingerprint}"] + list(global_lines)), [unit.text()], []
     else:
-        closure_key, composition, refused = tree.closure_key(unit, global_lines)
+        # 容器落在测试服务代码里：它自己的指纹不进键（文件头「测试服务代码不进键」），闭包键不带 entry 行；弄坏开关 mutated-test-service-code-keyed：带
+        entry_kept = broken("mutated-test-service-code-keyed") or not tree.library.is_test_service_code(unit.file)
+        closure_key, composition, refused = tree.closure_key(unit, global_lines, entry_kept=entry_kept)
     lines = [f"form\t{VERDICT_KEY_FORM}", f"closure\t{closure_key}", f"original\t{hashlib.sha256(original.encode('utf-8', 'surrogateescape')).hexdigest()}",
              f"replacement\t{item['replacement']}"]
     if not broken("relative-position-dropped"):
@@ -963,7 +991,7 @@ def carry_decision(record, current, test_key_now="", test_reason="", coverers_no
     return False, f"outcome-{outcome}"
 
 
-# ── 全局那几行（每条判定的键里都有）：工具链、工具版本、构建环境的生效值、判法单元指纹 ─────────────────────────────
+# ── 全局那几行（每条判定的键里都有）：平常是空的，弄坏开关各收一样进来 ─────────────────────────────────────────
 
 def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
@@ -1006,30 +1034,47 @@ def toolchain_files(root):
         directory = parent
 
 
+BUILD_ENVIRONMENT_BREAKS = ("build-environment-keyed", "profile-keyed", "build-jobs-keyed", "toolchain-version-keyed", "manifest-text-in-global-key")
+
+
 def build_environment_lines(root, environment):
-    """构建环境的生效值（算工具链的一部分，底稿第二节第 4 条）：一行一样，不带路径、不取配置文件原文。
-    编译变量与它们指的程序（内容 sha256）；cargo 配置里 build / profile / target / env / unstable 这几张表解析后的值与配置里指的程序；
-    rust-toolchain 解析后的值；工作区 Cargo.toml 解析后的 [profile]。读不了的配置抛 ValueError（调用方当拒绝办）。"""
+    """只给弄坏开关用的（global_lines 在 BUILD_ENVIRONMENT_BREAKS 里任一个打开时取它）：一行一样，不带路径、不取配置文件原文；各开关各收各的，平常交空。
+    build-environment-keyed：编译变量与它们指的程序（内容 sha256）；cargo 配置里 build（去掉 jobs、incremental）/ target / env / unstable 这几张表解析后的值与配置里指的程序。
+    profile-keyed：编译档（环境变量 CARGO_PROFILE_*、cargo 配置与工作区 Cargo.toml 的 [profile]）。build-jobs-keyed：线程数（CARGO_BUILD_JOBS、[build] 的 jobs）。
+    toolchain-version-keyed：rust-toolchain 的值（编译器版本）。manifest-text-in-global-key：Cargo.toml 原文的 sha256。
+    读不了的配置抛 ValueError（调用方当拒绝办）。"""
+    environment_keyed, profile_keyed, jobs_keyed = broken("build-environment-keyed"), broken("profile-keyed"), broken("build-jobs-keyed")
     lines = []
     for name in sorted(environment):
-        if name in BUILD_VARIABLES or name.startswith(BUILD_VARIABLE_PREFIXES):
+        build_variable = (name in BUILD_VARIABLES or name.startswith(BUILD_VARIABLE_PREFIXES)) and name not in BUILD_VARIABLES_LEFT_OUT
+        if (environment_keyed and build_variable) or (profile_keyed and name.startswith("CARGO_PROFILE_")) or (jobs_keyed and name == "CARGO_BUILD_JOBS"):
             lines.append(f"variable {name}={environment[name]}")
-            if name in PROGRAM_VARIABLES or name.endswith(("_RUNNER", "_LINKER")):
+            if environment_keyed and build_variable and (name in PROGRAM_VARIABLES or name.endswith(("_RUNNER", "_LINKER"))):
                 program = environment[name].split(' ', 1)[0] if name.endswith("_RUNNER") else environment[name]
                 lines.append(f"program {name} {program_digest(program, root, environment)}")
-    for depth, path in enumerate(cargo_config_files(root, environment)):
+    for depth, path in enumerate(cargo_config_files(root, environment) if (environment_keyed or profile_keyed or jobs_keyed) else ()):
         try:
             with open(path, "rb") as handle:
                 parsed = tomllib.load(handle)
         except (OSError, tomllib.TOMLDecodeError) as error:
             raise ValueError(f"读不出 cargo 配置 {path}：{error}") from error
-        relevant = {table: parsed[table] for table in CARGO_CONFIG_TABLES if table in parsed}
-        lines.append(f"cargo-config {depth} {canonical(relevant)}")
+        relevant = {table: parsed[table] for table in CARGO_CONFIG_TABLES if environment_keyed and table in parsed}
+        if profile_keyed and "profile" in parsed:
+            relevant["profile"] = parsed["profile"]
+        if isinstance(parsed.get("build"), dict) and (environment_keyed or jobs_keyed):
+            kept = {key: value for key, value in parsed["build"].items()
+                    if (environment_keyed and key not in BUILD_TABLE_KEYS_LEFT_OUT) or (jobs_keyed and key == "jobs")}
+            if kept:
+                relevant["build"] = kept
+            else:
+                relevant.pop("build", None)
+        if relevant:
+            lines.append(f"cargo-config {depth} {canonical(relevant)}")
         for table, field in CARGO_CONFIG_PROGRAMS:
             value = parsed.get(table, {}).get(field)
-            if isinstance(value, str):
+            if environment_keyed and isinstance(value, str):
                 lines.append(f"program {table}.{field} {program_digest(value, os.path.dirname(os.path.dirname(path)), environment, root)}")
-    for depth, path in enumerate(toolchain_files(root)):
+    for depth, path in enumerate(toolchain_files(root) if broken("toolchain-version-keyed") else ()):   # 弄坏开关：rust-toolchain 的值回到键里
         with open(path, "rb") as handle:
             content = handle.read()
         try:
@@ -1045,20 +1090,27 @@ def build_environment_lines(root, environment):
             parsed = tomllib.loads(content.decode("utf-8", "replace"))
         except tomllib.TOMLDecodeError as error:
             raise ValueError(f"读不出 {manifest}：{error}") from error
-        if not broken("profile-dropped"):
+        if profile_keyed:
             lines.append(f"profile {canonical(parsed.get('profile', {}))}")
         if broken("manifest-text-in-global-key"):
             lines.append(f"manifest {hashlib.sha256(content).hexdigest()}")
     return lines
 
 
-def global_lines(toolchain_text, tool_lines, build_lines, judging_key, exclusions_digest=""):
-    """每条判定的键里都有的那几行（全局键）：只留工具链（rustc -vV 各行）、nextest / cargo-mutants / llvm-profdata 版本、构建环境的生效值、判法单元指纹。
-    排除表不进（加一条排除只让被排除的那几条测试不再算数，弄坏开关 exclusions-in-global-key 下才进）。"""
-    lines = [f"rustc {line}" for line in toolchain_text.strip().splitlines()]
-    lines += [f"tool {line}" for line in tool_lines]
-    lines += [f"build {line}" for line in build_lines]
-    lines.append(f"judging-units {judging_key}")
+def global_lines(exclusions_digest="", root=None, environment=None, toolchain_text="", tool_lines=()):
+    """每条判定的键里都有的那几行（全局键）：平常是空的（文件头「全局那几行」）。
+    弄坏开关各收一样进来：toolchain-version-keyed 收 rustc -vV 各行（toolchain_text）与 nextest / cargo-mutants / llvm-profdata 版本（tool_lines），
+    BUILD_ENVIRONMENT_BREAKS 里任一个收 build_environment_lines(root, environment) 交的行（root 是构建那棵树，environment 是环境变量表），
+    judging-units-in-global-key 收驱动与算键库的指纹，exclusions-in-global-key 收排除表（exclusions_digest）的摘要。"""
+    lines = []
+    if broken("toolchain-version-keyed"):
+        lines += [f"rustc {line}" for line in toolchain_text.strip().splitlines()]
+        lines += [f"tool {line}" for line in tool_lines]
+    if any(broken(name) for name in BUILD_ENVIRONMENT_BREAKS):
+        lines += [f"build {line}" for line in build_environment_lines(root, os.environ if environment is None else environment)]
+    if broken("judging-units-in-global-key"):
+        with open(os.path.realpath(__file__), "rb") as handle:
+            lines.append(f"judging-units {hashlib.sha256(handle.read()).hexdigest()}")
     if broken("exclusions-in-global-key"):
         lines.append(f"exclusions {exclusions_digest}")
     return lines
@@ -1258,7 +1310,7 @@ def nextest_filters(tests):
 # ── 自证：样本树上逐个判沿用的决定 ───────────────────────────────────────────────────────────────────────────
 # 每个样本：(名字, 期望, 守它的弄坏开关, 第一版的文件, 第二版换掉的文件, 变异 (文件, 原文, 替换文, 第几处), 判定库里那一行的结局, 别的选项)。
 # 期望 rejudge：沿用不了，必须现判（开关打开时那一格判成 carry、红）；期望 carry：键与沿用判据都对得上，照沿用（开关打开时判成 rejudge、红）。
-# 选项：record 第一版判的是哪一条（默认同一条）、exclusions 第二版的排除表多出的行。
+# 选项：record 第一版判的是哪一条（默认同一条）、exclusions 第二版的排除表多出的行、environment 第二版的环境变量（第一版是空表）、service_code 这个样本里临时登成测试服务代码的文件。
 # 样本树：工作区两个包，mcore（被变异，lib.rs 由各模块文件现生成 pub mod）与 mharness（tests/t.rs 里的 catches 是抓到它的那条测试）。
 SAMPLE_TEST = "mharness::t catches"
 SAMPLE_WORKSPACE = {
@@ -1295,6 +1347,12 @@ OFFSETS = "pub const OFFSET: u64 = 95;\npub fn offset_of(n: u64) -> u64 {\n    n
 USER = "pub fn user(n: u64) -> u64 {\n    bump!(n) * 3\n}\n"
 CHECK = "pub fn check(n: u64) -> u64 {\n    n + 1\n}\n"
 RARELY = "pub fn rarely(n: u64) -> u64 {\n    n + 7\n}\n"
+SERVICE_FILE = "crates/mcore/src/service.rs"
+SERVICE = "pub fn serve(n: u64) -> u64 {\n    let m = n + 1;\n    m * 2\n}\n"
+SERVICE_STEP_FILE = "crates/mcore/src/step.rs"
+SERVICE_STEP = "pub fn step(n: u64) -> u64 {\n    n * 2\n}\n"
+PRODUCT_FILE = "crates/mcore/src/product.rs"
+PRODUCT_USES_STEP = "use crate::step::step;\npub fn product(n: u64) -> u64 {\n    step(n) + 1\n}\n"
 SAMPLES = [
     # controls 路第 5 节点名的五格（L22）。S34 抓到的那一条有两把键守着（变异键里的容器单元、测试键里的被测函数），只拿掉一把照样现判：
     # 守它的写成「两个开关同开」（+ 连起来），单个开关红在 S34U（无效的结论没有测试键，只靠变异键）
@@ -1352,11 +1410,36 @@ SAMPLES = [
     ("FF", "rejudge", "container-fingerprint-dropped",
      {"crates/mcore/src/nested.rs": NESTED, T: test_calling("mcore::nested::outer(1)", 4)},
      {"crates/mcore/src/nested.rs": NESTED.replace("inner(value) * 2", "(value + 1) * 2")}, ("crates/mcore/src/nested.rs", "+", "-", 0), "unviable", {}),
-    # 全局那几行：profile 的生效值进键、Cargo.toml 的注释不进、排除表不进
-    ("Y7", "rejudge", "profile-dropped",
+    # 测试服务代码不进键（选项 service_code：样本里临时登成测试服务代码的文件，判完去掉）：容器在测试服务代码里，改它在变异点之后的代码，变异键不变；
+    # 容器在产品代码里、调到的单元在测试服务代码里，改那个单元键也不变（抓到它的测试键同样不变）；对照：同样的改动落在没登记的文件里，键变
+    ("SERVICE", "carry", "mutated-test-service-code-keyed",
+     {SERVICE_FILE: SERVICE, T: test_calling("mcore::service::serve(1)", 4)},
+     {SERVICE_FILE: SERVICE.replace("m * 2", "m * 3")}, (SERVICE_FILE, "+", "-", 0), "caught", {"service_code": [SERVICE_FILE]}),
+    ("SERVICE-CLOSURE", "carry", "closure_key 的 FUNCTION_UNITS_BREAK=test-service-code-keyed",
+     {SERVICE_STEP_FILE: SERVICE_STEP, PRODUCT_FILE: PRODUCT_USES_STEP, T: test_calling("mcore::product::product(1)", 3)},
+     {SERVICE_STEP_FILE: SERVICE_STEP.replace("n * 2", "n * 3")}, (PRODUCT_FILE, "+", "-", 0), "caught", {"service_code": [SERVICE_STEP_FILE]}),
+    ("SERVICE-CONTROL", "rejudge", "mutated-function-only",
+     {SERVICE_STEP_FILE: SERVICE_STEP, PRODUCT_FILE: PRODUCT_USES_STEP, T: test_calling("mcore::product::product(1)", 3)},
+     {SERVICE_STEP_FILE: SERVICE_STEP.replace("n * 2", "n * 3")}, (PRODUCT_FILE, "+", "-", 0), "unviable", {}),
+    # 全局那几行：构建环境（编译变量、cargo 配置、清单的 lints）、编译档、线程数不进键，Cargo.toml 的注释不进、排除表不进
+    ("Y7", "carry", "profile-keyed",
      {"Cargo.toml": SAMPLE_WORKSPACE["Cargo.toml"] + "\n[profile.dev]\noverflow-checks = true\n", "crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n",
       T: test_calling("mcore::y7::y7(1)", 201)},
      {"Cargo.toml": SAMPLE_WORKSPACE["Cargo.toml"] + "\n[profile.dev]\noverflow-checks = false\n"}, ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {}),
+    ("JOBS", "carry", "build-jobs-keyed",
+     {"crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n", T: test_calling("mcore::y7::y7(1)", 201)},
+     {".cargo/config.toml": "[build]\njobs = 3\nincremental = false\n"}, ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {}),
+    ("BUILD-VARIABLE", "carry", "build-environment-keyed",
+     {"crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n", T: test_calling("mcore::y7::y7(1)", 201)},
+     {}, ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {"environment": {"RUSTFLAGS": "--cfg selftest_flag", "CARGO_BUILD_TARGET": "x86_64-unknown-linux-gnu"}}),
+    ("BUILD-CONFIG", "carry", "build-environment-keyed",
+     {"crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n", T: test_calling("mcore::y7::y7(1)", 201)},
+     {".cargo/config.toml": '[build]\nrustflags = ["--cfg", "selftest_flag"]\n\n[env]\nSELFTEST_VALUE = "2"\n\n[target.x86_64-unknown-linux-gnu]\nlinker = "cc"\n'},
+     ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {}),
+    ("LINTS", "carry", "manifest-text-in-global-key",
+     {"Cargo.toml": SAMPLE_WORKSPACE["Cargo.toml"] + '\n[workspace.lints.rust]\nunused_variables = "warn"\n', "crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n",
+      T: test_calling("mcore::y7::y7(1)", 201)},
+     {"Cargo.toml": SAMPLE_WORKSPACE["Cargo.toml"] + '\n[workspace.lints.rust]\nunused_variables = "deny"\n'}, ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {}),
     ("MANIFEST", "carry", "manifest-text-in-global-key",
      {"crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n", T: test_calling("mcore::y7::y7(1)", 201)},
      {"Cargo.toml": "# 只改注释：工作区的成员与 profile 一样没变\n" + SAMPLE_WORKSPACE["Cargo.toml"]}, ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {}),
@@ -1393,15 +1476,14 @@ SAMPLES = [
      {"crates/mcore/src/comment.rs": "pub fn commented(n: u64) -> u64 {\n    let m = n * 2;\n    m + 1\n}\n", T: test_calling("mcore::comment::commented(1)", 3)},
      {"crates/mcore/src/comment.rs": "pub fn commented(n: u64) -> u64 {\n    // 只加一行注释\n    let m = n * 2; /* 行尾也加一段 */\n    m + 1\n}\n"},
      ("crates/mcore/src/comment.rs", "+", "-", 0), "caught", {}),
-    # 依赖：闭包真点了名的外部包的版本进键（无效的结论只靠变异键），别的包换版本不作废
-    ("DEP", "rejudge", "dependency-lines-dropped",
+    # 依赖版本与编译器版本不进键：闭包真点了名的外部包在 Cargo.lock 里的版本、rust-toolchain 文件里的编译器版本改了，判过的照沿用
+    ("DEP", "carry", "dependency-versions-keyed",
      {"crates/mcore/Cargo.toml": DEPENDENCY_MANIFEST, "Cargo.lock": dependency_lock("1.0.0", "2.0.0"),
       "crates/mcore/src/dep.rs": "pub fn dep(n: u64) -> u64 {\n    extdep::shift(n) + 1\n}\n", T: test_calling("mcore::dep::dep(1)", 2)},
      {"Cargo.lock": dependency_lock("1.0.1", "2.0.0")}, ("crates/mcore/src/dep.rs", "+", "-", 0), "unviable", {}),
-    ("DEP-OTHER", "carry", "dependency-whole-lock",
-     {"crates/mcore/Cargo.toml": DEPENDENCY_MANIFEST, "Cargo.lock": dependency_lock("1.0.0", "2.0.0"),
-      "crates/mcore/src/dep.rs": "pub fn dep(n: u64) -> u64 {\n    extdep::shift(n) + 1\n}\n", T: test_calling("mcore::dep::dep(1)", 2)},
-     {"Cargo.lock": dependency_lock("1.0.0", "2.0.1")}, ("crates/mcore/src/dep.rs", "+", "-", 0), "caught", {}),
+    ("TOOLCHAIN", "carry", "toolchain-version-keyed",
+     {"rust-toolchain.toml": '[toolchain]\nchannel = "1.98.0"\n', "crates/mcore/src/y7.rs": "pub fn y7(n: u8) -> u8 {\n    n + 200\n}\n", T: test_calling("mcore::y7::y7(1)", 201)},
+     {"rust-toolchain.toml": '[toolchain]\nchannel = "1.99.0"\n'}, ("crates/mcore/src/y7.rs", "+", "*", 0), "caught", {}),
 ]
 # 按覆盖挑测试的例外（X1b、X3 与 K1）：期望「跑全部」
 C2_SOURCES = {
@@ -1438,14 +1520,25 @@ def item_for(files, mutation):
             "name": f"{path}:{line_column(offset)[0]}:{line_column(offset)[1]}: replace {old} with {replacement}"}
 
 
-def sample_globals(root, exclusions):
+def sample_globals(root, exclusions, environment=None):
     exclusions_digest = digest_of_lines(["\t".join(row) for row in exclusions])
-    return global_lines("rustc 0.0.0-selftest\nhost: x86_64-unknown-linux-gnu", ["cargo-nextest 0.0.0-selftest"], build_environment_lines(root, {}),
-                        "selftest-judging-units", exclusions_digest)
+    return global_lines(exclusions_digest, root, {} if environment is None else environment, "rustc 0.0.0-selftest\nhost: x86_64-unknown-linux-gnu", ["cargo-nextest 0.0.0-selftest"])
 
 
 def sample_decision(work, sample):
-    """交 (决定, 理由)：决定是 carry 或 rejudge。"""
+    """交 (决定, 理由)：决定是 carry 或 rejudge。选项 service_code 点名的文件在判的这一会儿临时登成测试服务代码（并进登记表读进来的那一份，判完去掉）。"""
+    registered = units_library().test_service_code_rows()
+    added = [path for path in sample[7].get("service_code", []) if path not in registered]
+    registered.update({path: "自证：只在样本判沿用的那一会儿登记" for path in added})
+    try:
+        return sample_decision_of(work, sample)
+    finally:
+        for path in added:
+            registered.pop(path, None)
+
+
+def sample_decision_of(work, sample):
+    """sample_decision 的本体（登记的临时登记由它的外层做）。"""
     name, _expected, _switch, first, second, mutation, outcome, options = sample
     files_one = dict(first)
     files_two = dict(files_one, **second)
@@ -1454,7 +1547,7 @@ def sample_decision(work, sample):
     for root, files in zip(roots, (files_one, files_two)):
         write_tree(root, files)
     trees = [UnitTree(root) for root in roots]
-    globals_one, globals_two = sample_globals(roots[0], []), sample_globals(roots[1], exclusions_two)
+    globals_one, globals_two = sample_globals(roots[0], []), sample_globals(roots[1], exclusions_two, options.get("environment"))
     packages = ("mcore", "mharness")
     recorded = mutation_key(trees[0], item_for(files_one, options.get("record", mutation)), globals_one)
     test_one, _why = catching_test_key(trees[0], SAMPLE_TEST, globals_one)
@@ -1498,6 +1591,24 @@ def selftest_list_cells(work, check):
           "看 list_entry 与 restore_item：相对位置按去掉注释的词法单元数记，反算回此刻源码里的行列，原文要逐字对上")
 
 
+def selftest_global_lines_cell(work, check):
+    """全局那几行（文件头「全局那几行」）平常是空的：驱动给的 rustc -vV 各行、nextest / cargo-mutants / llvm-profdata 的版本换了，环境变量里的编译变量、编译档、线程数换了，
+    cargo 配置里写了 build / target / env，两趟都交同样的行，里面没有 rustc 行、工具版本行、构建环境行，也没有判法单元指纹。
+    弄坏开关 toolchain-version-keyed、build-environment-keyed、profile-keyed、build-jobs-keyed、manifest-text-in-global-key 下前一格判错，judging-units-in-global-key 下后一格判错。"""
+    root = os.path.join(work, "global-lines")
+    write_tree(root, {".cargo/config.toml": '[build]\nrustflags = ["--cfg", "selftest_flag"]\njobs = 3\n\n[env]\nSELFTEST_VALUE = "2"\n\n[profile.dev]\nopt-level = 1\n'})
+    changed_environment = {"RUSTFLAGS": "--cfg selftest_flag", "CARGO_BUILD_TARGET": "x86_64-unknown-linux-gnu", "CARGO_PROFILE_DEV_DEBUG": "false", "CARGO_BUILD_JOBS": "3"}
+    before = global_lines("", root, {}, "rustc 1.0.0 (selftest a)\nhost: x86_64-unknown-linux-gnu", ["cargo-nextest 1.0.0", "cargo-mutants 1.0.0", "LLVM 1.0.0"])
+    after = global_lines("", root, changed_environment, "rustc 2.0.0 (selftest b)\nhost: x86_64-unknown-linux-gnu", ["cargo-nextest 2.0.0", "cargo-mutants 2.0.0", "LLVM 2.0.0"])
+    version_or_build = [line for line in before + after if line.startswith(("rustc ", "tool ", "build "))]
+    check(before == after and not version_or_build,
+          f"全局那几行带了构建环境、编译器与工具的版本（换版本、环境变量之前 {[line[:40] for line in before]}；之后 {[line[:40] for line in after]}）",
+          "看 global_lines：不带 rustc、tool、build 行（弄坏开关 toolchain-version-keyed、build-environment-keyed、profile-keyed、build-jobs-keyed、manifest-text-in-global-key 各把一样收进来）")
+    check(not any(line.startswith("judging-units") for line in before),
+          f"全局那几行带了判法单元指纹 {[line[:40] for line in before if line.startswith('judging-units')]}：驱动与算键库的代码进了键",
+          "看 global_lines：不收这份库的源码文本（弄坏开关 judging-units-in-global-key 把它收进来）")
+
+
 COVERERS_FEATURE_MANIFEST = ('[package]\nname = "mharness"\nversion = "0.1.0"\nedition = "2021"\n\n[features]\ngpu = []\n\n'
                             '[dev-dependencies]\nmcore = { path = "../mcore" }\n')
 COVERERS_POOL = "pub fn publish(n: u64) -> u64 {\n    n + 1\n}\n"
@@ -1532,13 +1643,11 @@ def selftest_coverers_cells(work, check):
 
 
 # ── 算键提速（不改键）：外挂在 UnitTree 与本模块上的缓存与并行，由驱动在树建好之后装上 ──────────────────────────────────
-# 这一节的函数不带缺省值、不定义模块级的类与常量、不连到 JUDGING_ENTRIES 的闭包里：模块级的赋值、类头与带缺省值的 def 头、被闭包点到的函数
-# 一改，判法单元指纹就变（scripts/gate/lib_function_units.py 文件头「Python 闭包：import 时执行的模块级语句」），库里的判定一条都不沿用。
 # 缓存与并行只换算的方式：键、组成清单、拒算形态与参照（没装缓存的 UnitTree、串行）逐项相同，由 selftest_key_speed_cells 对拍。
 
 def lazy_lines_class():
     """组成清单的惰性写法：一把键的组成清单几千行，每条变异各存一份内存放不下；遍历时才从 supplier 现取，加一个列表得一个新的惰性清单。
-    类定义在函数里、缓存在函数属性上：模块级的类头会进判法单元的闭包。"""
+    类定义在函数里、缓存在函数属性上。"""
     made = getattr(lazy_lines_class, "made", None)
     if made is None:
         class LazyLines:
@@ -1560,17 +1669,17 @@ def lazy_lines_class():
 def cache_closure_keys(tree):
     """给这一棵 UnitTree 装上 closure_key 的缓存（按（单元, 目标, 全局行）存键与拒算形态，同一个单元里的几条变异共用一次闭包键的计算），
     组成清单不存：交惰性清单，遍历时照原来的 closure_key 现算，最近用过的 16 份留着（同一个单元的几条挨着用）。键与拒算形态是原来那个函数的返回值原样。
-    弄坏开关 closure-key-cache-ignores-globals：缓存键不带全局行（换了工具链行也交旧键）；closure-composition-empty：惰性清单里没有单元行。"""
+    弄坏开关 closure-key-cache-ignores-globals：缓存键不带全局行（换了全局行也交旧键）；closure-composition-empty：惰性清单里没有单元行。"""
     lazy = lazy_lines_class()
     original = tree.closure_key
     kept, recent = {}, {}
 
-    def cached(unit, global_lines, target_id=None):
+    def cached(unit, global_lines, target_id=None, entry_kept=True):
         captured = tuple(global_lines)
-        cache_key = (id(unit), target_id) if broken("closure-key-cache-ignores-globals") else (id(unit), target_id, captured)
+        cache_key = (id(unit), target_id, entry_kept) if broken("closure-key-cache-ignores-globals") else (id(unit), target_id, entry_kept, captured)
         found = kept.get(cache_key)
         if found is None:
-            key, _composition, forms = original(unit, list(captured), target_id)
+            key, _composition, forms = original(unit, list(captured), target_id, entry_kept)
             found = kept[cache_key] = (unit, key, forms)
 
         def supply():
@@ -1578,7 +1687,7 @@ def cache_closure_keys(tree):
                 return []
             lines = recent.get(cache_key)
             if lines is None:
-                lines = original(unit, list(captured), target_id)[1]
+                lines = original(unit, list(captured), target_id, entry_kept)[1]
                 recent[cache_key] = lines
                 while len(recent) > 16:
                     del recent[next(iter(recent))]
@@ -1735,7 +1844,7 @@ def selftest_key_speed_cells(work, check):
     other_key = fast.closure_key(unit_fast, second)[0]
     check(one_key and other_key and one_key != other_key and other_key == plain.closure_key(unit_plain, second)[0] and one_key == plain.closure_key(unit_plain, first)[0],
           f"同一个单元换了全局行之后装了缓存的 closure_key 没交出另一把键（{one_key and one_key[:8]}、{other_key and other_key[:8]}）",
-          "看 cache_closure_keys：缓存键是（单元, 目标, 全局行），工具链行变了键就变")
+          "看 cache_closure_keys：缓存键是（单元, 目标, 全局行），全局行变了键就变")
     sources = {"crates/mharness/tests/golden.rs": C2_SOURCES["crates/mharness/tests/golden.rs"], "crates/mcore/src/k.rs": "pub fn k() -> u64 {\n    1\n}\n"}
     spawn_root = os.path.join(work, "key-speed-spawn")
     write_tree(spawn_root, sources)
@@ -1778,6 +1887,7 @@ def run_selftest():
                 decision, reason = "error", f"{type(error).__name__}: {error}"
             check(decision == sample[1], f"样本 {sample[0]} 判成 {decision}（{reason}），该是 {sample[1]}（守它的开关 {sample[2]}）",
                   f"看文件头「规则」里开关 {sample[2]} 那一条与 carry_decision、mutation_key、catching_test_key、coverers_key")
+        selftest_global_lines_cell(work, check)
         selftest_list_cells(work, check)
         selftest_coverers_cells(work, check)
         selftest_key_speed_cells(work, check)

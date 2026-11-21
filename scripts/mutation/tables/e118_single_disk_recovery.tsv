@@ -1,7 +1,7 @@
 M1_副本不分散	const DITTO_SPREAD: u64 = DISK_SLOTS / 8;	const DITTO_SPREAD: u64 = 0;
 M2_链臂开销算成0	const CHAIN_BYTES: u64 = 6 + 6;	const CHAIN_BYTES: u64 = 0;
 M3_区间右边界多算一格	Fault::Span { start_slot, length_in_slots } => slot >= start_slot && slot < start_slot + length_in_slots,	Fault::Span { start_slot, length_in_slots } => slot >= start_slot && slot <= start_slot + length_in_slots,
-M4_散点周期判反	Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot % period_in_slots == 0,	Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot % period_in_slots != 0,
+M4_散点周期判反	Fault::Scatter { period_in_slots } => period_in_slots != 0 && slot.is_multiple_of(period_in_slots),	Fault::Scatter { period_in_slots } => period_in_slots != 0 && !slot.is_multiple_of(period_in_slots),
 M5_元数据占比算错	    let meta_slots = DISK_SLOTS * meta_permille / 1000;	    let meta_slots = DISK_SLOTS * meta_permille / 500;
 M6_数据单元占一个槽	        data_base: (0..data_unit_count).map(|data_index| meta_slots + data_index * 2).collect(),	        data_base: (0..data_unit_count).map(|data_index| meta_slots + data_index).collect(),
 M7_邻居只看前不看后	            if previous_neighbour_alive || next_neighbour_alive {	            if previous_neighbour_alive {

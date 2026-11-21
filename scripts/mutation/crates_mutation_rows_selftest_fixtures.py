@@ -1,6 +1,6 @@
 """scripts/mutation/crates-mutation-rows.py 的自证夹具：只被它的自证与弄坏开关的自证读的模块级常量（样本 crate 的源码、样本变异表的行）。
 自证起子进程用 -c 跑的代码串（POOL_ERROR_CHILD_PROGRAM、STAGE_CHILD_PROGRAM）不放这里：算键库折不出经 globals() 放进来的名字。crates-mutation-rows.py 的 load_selftest_fixtures 只在自证开跑时按路径载入这一份，照 FIXTURE_VALUES 的名字放进那份模块；
-判法单元的闭包里没有这一份，改这里的样本文本判法单元指纹不变（crates-mutation-rows.py 文件头「自证夹具」）。
+（crates-mutation-rows.py 文件头「自证夹具」）。
 运行期也读的常量（FAKE_CARGO、FAKE_LLVM_TOOL 这一类）不放这里。只被载入，没有命令行入口。
 """
 import collections
@@ -282,12 +282,12 @@ SELFTEST_GPU_ROUTE_ROWS = [
     "-p tiny --lib -- without_the_gpu_feature_routes_to_not_run\twithout_the_gpu_feature_routes_to_not_run",
 ]
 
-SELFTEST_GPU_THREADS_SOURCE = '''
+SELFTEST_GPU_RELEASED_TARGETS_SOURCE = '''
 // TEST released_agrees NEEDS 1 + 1 RUNS released_agrees,shared
 pub fn shared() -> u32 { 1 + 1 }
 '''
 
-SELFTEST_GPU_THREADS_ROWS = [
+SELFTEST_GPU_RELEASED_TARGETS_ROWS = [
     # 放开名单里的测试目标（目标名取本模块的 GPU_TEST_THREADS_RELEASED_TARGETS，格里 format 进去）
     "released-one-plus-one\tcrates/tiny/src/lib.rs\t{ 1 + 1 }\t{ 1 + 2 }\t-p tiny --features gpu --test {target} -- released_agrees\treleased_agrees",
     SELFTEST_GPU_FEATURE_ROW,
@@ -453,8 +453,8 @@ FIXTURE_VALUES = {   # load_selftest_fixtures 照这张表把名字放进 crates
     "SELFTEST_DEVICE_LOST_PANIC": SELFTEST_DEVICE_LOST_PANIC,
     "SELFTEST_GPU_ROUTE_SOURCE": SELFTEST_GPU_ROUTE_SOURCE,
     "SELFTEST_GPU_ROUTE_ROWS": SELFTEST_GPU_ROUTE_ROWS,
-    "SELFTEST_GPU_THREADS_SOURCE": SELFTEST_GPU_THREADS_SOURCE,
-    "SELFTEST_GPU_THREADS_ROWS": SELFTEST_GPU_THREADS_ROWS,
+    "SELFTEST_GPU_RELEASED_TARGETS_SOURCE": SELFTEST_GPU_RELEASED_TARGETS_SOURCE,
+    "SELFTEST_GPU_RELEASED_TARGETS_ROWS": SELFTEST_GPU_RELEASED_TARGETS_ROWS,
     "SELFTEST_GPU_POOL_TARGETS_SOURCE": SELFTEST_GPU_POOL_TARGETS_SOURCE,
     "SELFTEST_GPU_POOL_TARGETS_ROWS": SELFTEST_GPU_POOL_TARGETS_ROWS,
     "SELFTEST_GPU_POOL_LIST": SELFTEST_GPU_POOL_LIST,

@@ -1,6 +1,6 @@
 M1_盘上占用不向上取整	record_bytes_before_rounding.div_ceil(unit)	record_bytes_before_rounding / unit
 M2_分岔扫描少一档	for items in 0..=largest_item_count {\n        if units_on_disk(base, narrow_chain_bytes, items, unit) != units_on_disk(base, wide_chain_bytes, items, unit) {	for items in 0..=(largest_item_count / 100) {\n        if units_on_disk(base, narrow_chain_bytes, items, unit) != units_on_disk(base, wide_chain_bytes, items, unit) {
-M3_期望值不除位宽	chances / 2f64.powi(bits as i32)	chances
+M3_期望值不除位宽	chances / 2f64.powi(i32_from_u32(bits))	chances
 M4_至少一次退化成期望	1.0 - (-expected_false_accept_count).exp()	expected_false_accept_count
 M5_盘上占用漏掉链宽	let record_bytes_before_rounding = base + chain_bytes + items * ITEM_BYTES;	let record_bytes_before_rounding = base + items * ITEM_BYTES;
 M6_够用判据放宽到全通过	fn enough(at_least_once_probability: f64) -> bool {\n    at_least_once_probability < 0.01\n}	fn enough(at_least_once_probability: f64) -> bool {\n    at_least_once_probability <= 1.0\n}

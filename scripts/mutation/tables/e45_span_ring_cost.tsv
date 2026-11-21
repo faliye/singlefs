@@ -2,6 +2,6 @@ M1_摆放不对齐到单元	self.cursor += self.atomic_unit_bytes - self.cursor 
 M2_闭式少算余数那条	full_record_count * rounded_bytes_of_record(items_per_record) + if remaining_items > 0 { rounded_bytes_of_record(remaining_items) } else { 0 }	full_record_count * rounded_bytes_of_record(items_per_record)
 M3_E24口径混进事务字段	fn e23_unpadded_record_bytes(items: u64) -> u64 { BASE_RECORD_HEADER_BYTES + items * NAMED_ITEM_BYTES }	fn e23_unpadded_record_bytes(items: u64) -> u64 { record_header_bytes() + items * NAMED_ITEM_BYTES }
 M4_头部漏算反向链	fn record_header_bytes() -> u64 { BASE_RECORD_HEADER_BYTES + TRANSACTION_FIELD_BYTES + BACK_CHAIN_BYTES }	fn record_header_bytes() -> u64 { BASE_RECORD_HEADER_BYTES + TRANSACTION_FIELD_BYTES }
-M5_尾部不对齐	    fn finish(&mut self) -> u64 {\n        if self.cursor % self.atomic_unit_bytes != 0 {	    fn finish(&mut self) -> u64 {\n        if false {
+M5_尾部不对齐	    fn finish(&mut self) -> u64 {\n        if !self.cursor.is_multiple_of(self.atomic_unit_bytes) {	    fn finish(&mut self) -> u64 {\n        if false {
 M6_撕裂损失改回按记录算	fn transactions_lost_when_torn(_items_per_record: u64) -> u64 { 1 }	fn transactions_lost_when_torn(items_per_record: u64) -> u64 { items_per_record }
 M7_项宽写错	const NAMED_ITEM_BYTES: u64 = 56;	const NAMED_ITEM_BYTES: u64 = 48;

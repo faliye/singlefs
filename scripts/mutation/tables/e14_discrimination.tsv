@@ -1,7 +1,7 @@
 M1_真值忽略删除	Operation::Delete(key) => { live_sizes.remove(&key); }	Operation::Delete(_key) => { }
-M2_幂等合并先者胜	_ => { merged.insert(key, size_or_tombstone); }	_ => { merged.entry(key).or_insert(size_or_tombstone); }
+M2_幂等合并先者胜	Bug::None | Bug::DropMessage | Bug::DoubleApply => { merged.insert(key, size_or_tombstone); }	Bug::None | Bug::DropMessage | Bug::DoubleApply => { merged.entry(key).or_insert(size_or_tombstone); }
 M3_运行时账不减旧值	runtime_total += new_size - old_size;	runtime_total += new_size;
-M4_Δ累加方向反	match bug { Bug::MergeReversed => *accumulator -= delta, _ => *accumulator += delta }	match bug { Bug::MergeReversed => *accumulator += delta, _ => *accumulator -= delta }
+M4_Δ累加方向反	match bug { Bug::MergeReversed => *accumulator -= delta, Bug::None | Bug::TombstoneIgnored | Bug::DropMessage | Bug::DoubleApply => *accumulator += delta }	match bug { Bug::MergeReversed => *accumulator += delta, Bug::None | Bug::TombstoneIgnored | Bug::DropMessage | Bug::DoubleApply => *accumulator -= delta }
 M5_幂等丢消息注入失效	if bug == Bug::DropMessage && !buffered_entries.is_empty() { buffered_entries.pop(); }\n        if bug == Bug::DoubleApply { let duplicated_entries = buffered_entries.clone(); buffered_entries.extend(duplicated_entries); }\n        entries += buffered_entries.len();	if bug == Bug::DoubleApply { let duplicated_entries = buffered_entries.clone(); buffered_entries.extend(duplicated_entries); }\n        entries += buffered_entries.len();
 M6_Δ墓碑注入失效	if bug == Bug::TombstoneIgnored { (key, 0) }	if false { (key, 0) }
 M7_checker重放漏行	for &(_, delta) in &delta_log { accumulate(&mut checker_total, delta, bug); }	for &(_, delta) in delta_log.iter().skip(1) { accumulate(&mut checker_total, delta, bug); }

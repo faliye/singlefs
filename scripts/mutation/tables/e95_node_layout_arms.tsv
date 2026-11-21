@@ -9,7 +9,7 @@ M8_跨装置表里一个数错	    ("bump_cp_b256", "runs8", 1339),	    ("bump_c
 M9_写次数不计	        self.total_writes += 1;	        self.total_writes += 0;
 M10_空段判据放宽	            .find(|&segment_index| self.free_slots_per_segment[segment_index] as usize == self.slots_per_segment && self.open_segment != Some(segment_index))	            .find(|&segment_index| self.free_slots_per_segment[segment_index] as usize >= 1 && self.open_segment != Some(segment_index))
 M11_free_run长度判据差一	            if count >= run_length_in_slots {	            if count + 1 >= run_length_in_slots {
-M12_初始空槽少一个	        let free: BTreeSet<u32> = (object_count as u32..slot_count as u32).collect();	        let free: BTreeSet<u32> = ((object_count + 1) as u32..slot_count as u32).collect();
+M12_初始空槽少一个	        let free: BTreeSet<u32> = (u32_from_usize(object_count)..u32_from_usize(slot_count)).collect();	        let free: BTreeSet<u32> = (u32_from_usize(object_count + 1)..u32_from_usize(slot_count)).collect();
 M13_中位取成最小	    values.sort_unstable();\n    values[2]	    values.sort_unstable();\n    values[0]
 M14_节点组只落脏的	        let keys: Vec<usize> = if clean <= remaining {	        let keys: Vec<usize> = if false {
 M15_代际回落不计数	                        self.fallback_allocations += 1;\n                        let slot = self.allocate_first_fit_outside_open_generation_segments();	                        let slot = self.allocate_first_fit_outside_open_generation_segments();

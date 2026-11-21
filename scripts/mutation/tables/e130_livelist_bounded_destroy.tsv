@@ -12,4 +12,4 @@ M11_乙的上界假装算得出	pre_reserve_bytes: 0,	pre_reserve_bytes: net_all
 M12_乙的销毁读数不随活树走	destroy_reads: live_tree_nodes(load),	destroy_reads: net_allocated_block_count,
 M13_naive的释放路径不收预付	free_path_extra_bytes: LIVELIST_ENTRY_BYTES,\n    }\n}\n\n/// condense	free_path_extra_bytes: 0,\n    }\n}\n\n/// condense
 M14_ALLOC次数漏掉初始那一轮	self.self_born_block_count() * (1 + self.churn)	self.self_born_block_count() * self.churn
-M15_继承率取整方向改成截断	(live_block_count as f64 * share).round() as u64	(live_block_count as f64 * share) as u64
+M15_继承率取整方向改成截断	truncate_f64_to_u64((live_block_count as f64 * share).round())	truncate_f64_to_u64(live_block_count as f64 * share)

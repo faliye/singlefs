@@ -50,27 +50,40 @@ def service_library_directory(test, directory):
 
 
 def load_prove():
-    source = (DIRECTORY / 'prove-red.sh').read_text().split("3<<'PY'\n", 1)[1].rsplit('\nPY', 1)[0]
-    source = source.rsplit('sys.exit(main())', 1)[0]
-    namespace = {'__name__': 'audit_prove'}
+    sys.path.insert(0, str(DIRECTORY))
     with mock.patch.object(sys, 'argv', ['prove-red.sh', str(DIRECTORY)]):
-        exec(compile(source, str(DIRECTORY / 'prove-red.sh'), 'exec'), namespace)
+        import prove_red_core
+        import prove_red_selftest
+    namespace = vars(prove_red_core)   # run_cargo、rebuild_problem 这些换桩的名字在 core 里按名字被调：换在 core 的名字空间上
+    namespace.update({name: value for name, value in vars(prove_red_selftest).items() if not name.startswith('__') and name not in namespace})
     return namespace
+
+
+def prove_environment():
+    """prove_holding_the_lock 的 environment：入口 prove-red.sh 开头那几行定好 CARGO_BUILD_JOBS 再 export，lane_ceiling 与 prepared_lanes 读的就是这一项
+    （prove_red_core.py 的 build_jobs_total），不是正整数整次拒绝、退 2、一条都不跑。一路的用例，总数取 1。"""
+    return {'CARGO_BUILD_JOBS': '1'}
 
 
 @contextlib.contextmanager
 def prove_commands_stubbed(test, prove, directory):
     """证红那几条的外部命令桩：判定库的库根是 directory 底下一棵临时 git 仓（prove-red.sh 的 LIBRARY_ROOT_FOR_SELFTEST，库在临时服务里按库目录另占一份命名空间，
-    每条用例各一份、记录不串）。只有对这棵仓起的 git 照真起，别的 subprocess.run（RocksDB 预编库的取值、工具链查询）一律交退 0、空输出。"""
+    每条用例各一份、记录不串）。照真起的只有两样：对这棵仓起的 git；算键库给 .sh 做规范化的那一次 bash（scripts/gate/lib_function_units_shell_text.py 的 shell_normal_forms，
+    argv 是 bash --norc --noprofile -c <脚本> function-units <文件…>，结果在它写的 .normal 文件里：交空输出就没有 .normal，每份 .sh 都被当成 bash -n 不过、整份拒算 bash-syntax）。
+    别的 subprocess.run（RocksDB 预编库的取值、工具链查询）一律交退 0、空输出；
+    空输出的类型照调用方要的给（text、universal_newlines、encoding、errors 任一给了是 str，没给是 bytes）：算键库的工具链查询按 bytes 读 stdout，给它 str 就在 decode 上出错。"""
     service_library_directory(test, directory)
     library_root = os.path.join(directory, 'library-root')
     subprocess.run(['git', 'init', '-q', library_root], check=True, stdin=subprocess.DEVNULL)
     real_run = subprocess.run
 
     def run(command, *args, **kwargs):
-        if list(command[:3]) == ['git', '-C', library_root]:
+        shell_normalization = list(command[:4]) == ['bash', '--norc', '--noprofile', '-c'] and list(command[5:6]) == ['function-units']
+        if list(command[:3]) == ['git', '-C', library_root] or shell_normalization:
             return real_run(command, *args, **kwargs)
-        return subprocess.CompletedProcess([], 0, stdout='', stderr='')
+        text_mode = any(kwargs.get(name) for name in ('text', 'universal_newlines', 'encoding', 'errors'))
+        empty = '' if text_mode else b''
+        return subprocess.CompletedProcess([], 0, stdout=empty, stderr=empty)
 
     with mock.patch.dict(prove, LIBRARY_ROOT_FOR_SELFTEST=[library_root]), mock.patch.object(subprocess, 'run', side_effect=run):
         yield
@@ -103,9 +116,7 @@ class CacheTests(unittest.TestCase):
             (root / 'src').mkdir()
             (root / 'Cargo.toml').write_text('[package]\nname="tiny"\nversion="0.1.0"\nedition="2021"\n')
             (root / 'src/lib.rs').write_text('pub fn value() -> u32 { 42 }\n#[test]\nfn catches() { assert_eq!(value(), 42); }\n')
-            with mock.patch.object(rows, 'judging_units', return_value=('judging', [])), \
-                    mock.patch.object(rows, 'key_toolchain_lines', return_value=[]):
-                context = rows.KeyContext(d, {})
+            context = rows.KeyContext(d, {})
             def components(arguments):
                 fields = ['mutation', 'src/lib.rs', '{ 42 }', '{ 43 }', arguments, 'catches']
                 return context.components(rows.Row(1, *fields, fields))
@@ -117,6 +128,29 @@ class CacheTests(unittest.TestCase):
                     self.assertNotEqual(valid.row_key, excluded.row_key)
                     self.assertNotEqual(valid.baseline_key, excluded.baseline_key)
             self.assertEqual(valid.row_key, components('-p tiny --lib catches').row_key)
+
+    def test_build_environment_is_not_in_row_keys(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / 'src').mkdir()
+            manifest = '[package]\nname="tiny"\nversion="0.1.0"\nedition="2021"\n'
+            (root / 'Cargo.toml').write_text(manifest)
+            (root / 'src/lib.rs').write_text('pub fn value() -> u32 { 42 }\n#[test]\nfn catches() { assert_eq!(value(), 42); }\n')
+            fields = ['mutation', 'src/lib.rs', '{ 42 }', '{ 43 }', '-p tiny --lib -- catches', 'catches']
+
+            def keys_under(environment):
+                found = rows.KeyContext(d, environment).components(rows.Row(1, *fields, fields))
+                return found.row_key, found.baseline_key, found.coverage_id
+
+            before = keys_under({})
+            self.assertTrue(all(before))
+            (root / '.cargo').mkdir()
+            (root / '.cargo/config.toml').write_text('[build]\nrustflags = ["--cfg", "audit"]\n[target.x86_64-unknown-linux-gnu]\nlinker = "audit-linker"\n[env]\nAUDIT = "1"\n')
+            (root / 'Cargo.toml').write_text(manifest + '[lints.rust]\nunused_variables = "deny"\n')
+            after = keys_under({'RUSTFLAGS': '--cfg audit', 'CARGO_BUILD_TARGET': 'x86_64-unknown-linux-gnu', 'RUSTC_WRAPPER': 'audit-wrapper'})
+            self.assertEqual(before, after)
+            (root / 'src/lib.rs').write_text('pub fn value() -> u32 { 42 }\npub fn other() {}\n#[test]\nfn catches() { assert_eq!(value(), 42); other(); }\n')
+            self.assertNotEqual(before, keys_under({}))
 
     def test_cargo_subcommand_is_not_a_filter(self):
         self.assertEqual(units.parse_cargo_arguments('test --release --bin demo').filters, [])
@@ -161,10 +195,61 @@ class CacheTests(unittest.TestCase):
             root = Path(d)
             (root / '.cargo').mkdir()
             (root / '.cargo/config.toml').write_text('invalid [')
-            result = subprocess.CompletedProcess([], 0, stdout='fake version\n')
-            with mock.patch.object(units.subprocess, 'run', return_value=result):
-                with self.assertRaises(units.MutationUnitsError):
-                    units.toolchain_lines(d, {'HOME': d})
+            with self.assertRaises(units.MutationUnitsError):
+                units.toolchain_lines(d, {'HOME': d})
+
+    def test_profile_and_thread_settings_are_not_in_toolchain_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / '.cargo').mkdir()
+            (root / 'Cargo.toml').write_text('[workspace]\n')
+            before = units.toolchain_lines(d, {'HOME': d})
+            (root / '.cargo/config.toml').write_text('[build]\njobs = 3\nincremental = true\n[profile.test]\nopt-level = 1\n')
+            (root / 'Cargo.toml').write_text('[workspace]\n[profile.dev]\ndebug-assertions = false\n')
+            after = units.toolchain_lines(d, {'HOME': d, 'CARGO_BUILD_JOBS': '3', 'CARGO_PROFILE_TEST_DEBUG': 'false'})
+            self.assertEqual(before, after)
+
+    def test_compiler_versions_are_not_in_toolchain_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'Cargo.toml').write_text('[workspace]\n')
+            with mock.patch.object(units.subprocess, 'run', side_effect=AssertionError('toolchain_lines 不许起 rustc 与 cargo')) as run:
+                lines = units.toolchain_lines(d, {'HOME': d, 'RUSTFLAGS': '--cfg selftest'})
+            run.assert_not_called()
+            self.assertIn('environment\tRUSTFLAGS=--cfg selftest', lines)
+            self.assertFalse([line for line in lines if line.startswith(('rustc\t', 'cargo\t'))])
+            first = subprocess.CompletedProcess([], 0, stdout='first version\n')
+            second = subprocess.CompletedProcess([], 0, stdout='second version\n')
+            with mock.patch.object(units.subprocess, 'run', return_value=first):
+                before = units.compiler_version_lines(d, {'HOME': d})
+            with mock.patch.object(units.subprocess, 'run', return_value=second):
+                after = units.compiler_version_lines(d, {'HOME': d})
+            self.assertEqual(before, ['rustc\tfirst version', 'cargo\tfirst version'])
+            self.assertNotEqual(before, after)
+
+    def test_dependency_versions_are_not_in_unit_keys_by_default(self):
+        self.assertFalse(units.UnitKeys('.').dependency_versions)
+
+    def test_global_lines_are_empty_without_break_switches(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'rust-toolchain.toml').write_text('[toolchain]\nchannel = "1.98.0"\n')
+            (Path(d) / 'Cargo.toml').write_text('[workspace]\n[workspace.lints.rust]\nunused_variables = "warn"\n')
+            (Path(d) / '.cargo').mkdir()
+            (Path(d) / '.cargo/config.toml').write_text('[build]\nrustflags = ["--cfg", "audit"]\njobs = 3\n[env]\nAUDIT = "1"\n')
+            before = prune.global_lines('', d, {'HOME': d}, 'rustc 1.0.0\nhost: x', ['cargo-nextest 1.0.0'])
+            (Path(d) / 'rust-toolchain.toml').write_text('[toolchain]\nchannel = "1.99.0"\n')
+            after = prune.global_lines('', d, {'HOME': d, 'RUSTFLAGS': '--cfg audit', 'CARGO_BUILD_TARGET': 'x', 'CARGO_PROFILE_DEV_DEBUG': 'false'},
+                                       'rustc 2.0.0\nhost: x', ['cargo-nextest 2.0.0'])
+            self.assertEqual(before, [])
+            self.assertEqual(after, [])
+
+    def test_build_environment_break_puts_variables_and_configuration_in_global_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / 'Cargo.toml').write_text('[workspace]\n')
+            with mock.patch.object(prune, 'BREAKS', frozenset(['build-environment-keyed'])):
+                before = prune.global_lines('', d, {'HOME': d})
+                after = prune.global_lines('', d, {'HOME': d, 'RUSTFLAGS': '--cfg audit'})
+            self.assertNotEqual(before, after)
+            self.assertIn('build variable RUSTFLAGS=--cfg audit', after)
 
     def test_concurrent_unit_merges_keep_both_writers(self):
         with tempfile.TemporaryDirectory() as d:
@@ -211,9 +296,10 @@ class CacheTests(unittest.TestCase):
             executable.write_text('#!/bin/sh\nexit 0\n')
             executable.chmod(0o755)
             env = {'HOME': d, 'PATH': str(executable.parent), 'RUSTC_WRAPPER': executable.name}
-            before = prune.build_environment_lines(d, env)
-            executable.write_text('#!/bin/sh\nexit 1\n')
-            self.assertNotEqual(before, prune.build_environment_lines(d, env))
+            with mock.patch.object(prune, 'BREAKS', frozenset(['build-environment-keyed'])):
+                before = prune.build_environment_lines(d, env)
+                executable.write_text('#!/bin/sh\nexit 1\n')
+                self.assertNotEqual(before, prune.build_environment_lines(d, env))
 
     def test_wrapper_paths_with_spaces_and_relative_path_entries(self):
         with tempfile.TemporaryDirectory() as d:
@@ -240,14 +326,15 @@ class CacheTests(unittest.TestCase):
             config = parent / '.cargo/config.toml'
             config.write_text('[build]\nrustc-wrapper="wrapper"\n')
             env = {'HOME': d, 'PATH': 'bin'}
-            before = prune.build_environment_lines(str(root), env)
-            self.assertNotIn('program build.rustc-wrapper 不在', before)
-            executable.write_text('#!/bin/sh\nexit 1\n')
-            self.assertNotEqual(before, prune.build_environment_lines(str(root), env))
-            # A value containing a slash is relative to the config, not PATH/cwd.
-            config.write_text('[build]\nrustc-wrapper="project/bin/wrapper"\n')
-            expected = prune.program_digest(str(executable), str(root), env)
-            self.assertIn('program build.rustc-wrapper ' + expected, prune.build_environment_lines(str(root), env))
+            with mock.patch.object(prune, 'BREAKS', frozenset(['build-environment-keyed'])):
+                before = prune.build_environment_lines(str(root), env)
+                self.assertNotIn('program build.rustc-wrapper 不在', before)
+                executable.write_text('#!/bin/sh\nexit 1\n')
+                self.assertNotEqual(before, prune.build_environment_lines(str(root), env))
+                # A value containing a slash is relative to the config, not PATH/cwd.
+                config.write_text('[build]\nrustc-wrapper="project/bin/wrapper"\n')
+                expected = prune.program_digest(str(executable), str(root), env)
+                self.assertIn('program build.rustc-wrapper ' + expected, prune.build_environment_lines(str(root), env))
 
 
 class ProveTests(unittest.TestCase):
@@ -274,7 +361,7 @@ class ProveTests(unittest.TestCase):
                 return 101, f'test tests::{row.expected} ... FAILED\n'
             with mock.patch.dict(self.prove, run_cargo=cargo, rebuild_problem=lambda *a: None), \
                     prove_commands_stubbed(self, self.prove, d):
-                code, lines = self.prove['prove_holding_the_lock'](copy, 'demo', [row.name], 'cargo', {})
+                code, lines = self.prove['prove_holding_the_lock'](copy, 'demo', [row.name], 'cargo', prove_environment())
             self.assertEqual(code, 2, lines)
             self.assertEqual(len(calls), 1)
             self.assertIn('--show-output', calls[0][1])
@@ -295,7 +382,7 @@ class ProveTests(unittest.TestCase):
                 raise RuntimeError('interrupted cargo')
             with mock.patch.dict(self.prove, run_cargo=cargo), prove_commands_stubbed(self, self.prove, d):
                 with self.assertRaisesRegex(RuntimeError, 'interrupted cargo'):
-                    self.prove['prove_holding_the_lock'](copy, 'demo', [row.name], 'cargo', {})
+                    self.prove['prove_holding_the_lock'](copy, 'demo', [row.name], 'cargo', prove_environment())
             self.assertEqual(source.read_bytes(), data)
 
     def test_crlf_multiline_anchor_still_matches(self):
@@ -312,7 +399,7 @@ class ProveTests(unittest.TestCase):
                 return (0, 'test tests::answer_is_42 ... ok\n') if len(calls) == 1 else (101, 'test tests::answer_is_42 ... FAILED\n')
             with mock.patch.dict(self.prove, run_cargo=cargo, rebuild_problem=lambda *a: None), \
                     prove_commands_stubbed(self, self.prove, d):
-                code, lines = self.prove['prove_holding_the_lock'](copy, 'demo', ['multiline'], 'cargo', {})
+                code, lines = self.prove['prove_holding_the_lock'](copy, 'demo', ['multiline'], 'cargo', prove_environment())
             self.assertEqual(code, 0, lines)
             self.assertEqual(len(calls), 2)
             self.assertIn(b'43', calls[1])
@@ -342,7 +429,7 @@ class ProveTests(unittest.TestCase):
                 fake_entry = subprocess.CompletedProcess([], 0, stdout='', stderr='')
                 with mock.patch.dict(self.prove, run_cargo=cargo, rebuild_problem=lambda *a: None), \
                         mock.patch.object(subprocess, 'run', return_value=fake_entry):
-                    code, lines = self.prove['prove_holding_the_lock'](str(copy), 'demo', ['escape'], 'cargo', {})
+                    code, lines = self.prove['prove_holding_the_lock'](str(copy), 'demo', ['escape'], 'cargo', prove_environment())
                 self.assertEqual(code, 2, lines)
                 self.assertEqual(calls, [])
                 self.assertEqual(outside.read_text(), 'fn answer() -> u32 { 42 }\n')

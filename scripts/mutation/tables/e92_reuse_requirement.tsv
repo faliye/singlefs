@@ -1,4 +1,4 @@
-M1_违例不减K	let publishes = (scan_seconds * publish_rate).floor() as i64;\n    (publishes - window_generations as i64).max(0) as u64	let publishes = (scan_seconds * publish_rate).floor() as i64;\n    let _ = window_generations;\n    publishes.max(0) as u64
+M1_违例不减K	let publishes = truncate_f64_to_i64((scan_seconds * publish_rate).floor());\n    u64_from_i64((publishes - i64_from_u64(window_generations)).max(0))	let publishes = truncate_f64_to_i64((scan_seconds * publish_rate).floor());\n    let _ = window_generations;\n    u64_from_i64(publishes.max(0))
 M2_窗口不除发布率	fn window_seconds(window_generations: u64, publish_rate: f64) -> f64 {\n    window_generations as f64 / publish_rate\n}	fn window_seconds(window_generations: u64, publish_rate: f64) -> f64 {\n    let _ = publish_rate;\n    window_generations as f64\n}
 M3_择根回退需求塌成一代	pricing: Pricing::Generations, required_generations: Some(2) }	pricing: Pricing::Generations, required_generations: Some(1) }
 M4_模拟不判越界	if pinned_generation_age > window_generations {	if pinned_generation_age > 0 {

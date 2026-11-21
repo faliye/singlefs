@@ -8,7 +8,7 @@ M7_档区间下界写错	        let tier_smallest_object_size = if tier_index =
 M8_容器数不上取整	        if objects_in_tier > 0 { total += objects_in_tier.div_ceil(objects_per_container_for_slot_width(slot_width).max(1)); }	        if objects_in_tier > 0 { total += objects_in_tier / objects_per_container_for_slot_width(slot_width).max(1); }
 M9_变长臂退回完美装填	            if room < need { container_count += 1; room = UNIT_PAYLOAD_BYTES; }	            if room < need { container_count += 1; room = UNIT_PAYLOAD_BYTES + room; }
 M10_界线截断去掉	    let slot_width = slot_width.min(LIMIT);	    let slot_width = slot_width;
-M11_对数均匀退化成均匀	        "logunif" => { for object_size in 1..=LIMIT { weight_by_object_size[object_size as usize] = LIMIT / object_size; } }	        "logunif" => { for object_size in 1..=LIMIT { weight_by_object_size[object_size as usize] = 1; } }
+M11_对数均匀退化成均匀	        "logunif" => { for object_size in 1..=LIMIT { weight_by_object_size[usize_from_u64(object_size)] = LIMIT / object_size; } }	        "logunif" => { for object_size in 1..=LIMIT { weight_by_object_size[usize_from_u64(object_size)] = 1; } }
 M12_取整误差丢对象	    count_by_object_size[last_nonzero_object_size] += object_count - assigned_object_count;	    let _ = last_nonzero_object_size;
 M13_单元大小算错	const UNIT_BYTES: u64 = 32768;	const UNIT_BYTES: u64 = 16384;
 M14_wgeo公比写错	        "wgeo" => wgeo_tiers(1125, minimum_slot_width),	        "wgeo" => wgeo_tiers(1250, minimum_slot_width),

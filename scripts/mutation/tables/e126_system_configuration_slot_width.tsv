@@ -9,4 +9,4 @@ arm_ding_to_pbs	Arm::MinimumUnit => MINIMUM_UNIT_BYTES,	Arm::MinimumUnit => phys
 fits_strict	record_bytes <= width	record_bytes < width
 iomin_flip	width >= io_min	width <= io_min
 footprint_no_disks	(width * slots, width * slots * disks)	(width * slots, width * slots)
-tear_sector_floor	let sector_count = width.div_ceil(SECTOR_BYTES) as u32;	let sector_count = (width / SECTOR_BYTES) as u32;
+tear_sector_floor	let sector_count = u32_from_u64(width.div_ceil(SECTOR_BYTES));	let sector_count = u32_from_u64(width / SECTOR_BYTES);
