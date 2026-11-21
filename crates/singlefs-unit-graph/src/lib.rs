@@ -7,8 +7,8 @@
 //! 用法：`load_workspace` 装一个工作区（仓根或 `crates/` 目录），`compute_closure` 从一个入口收闭包，`reuse_key` 算键；
 //! 依赖行可以由调用方收窄好交进来，或用 `lock_file::narrowed_lock_lines` 从整份 `Cargo.lock` 只取闭包真引到的外部包；
 //! `output` 里是 `unit-graph` 命令行打的那几种行。切分按文件切片并行，线程数由调用方给，多线程与单线程输出逐字相同。
-//! `entry_groups` 按一组入口算键与组成清单、写成构建输出目录里的那份表（`singlefs-verification` 的构建脚本用，4-2a）；
-//! `build_toolchain` 拼一次构建的工具链行（`rustc -vV`、`cargo -V`、目标、RUSTFLAGS、profile 的生效值）；
+//! `entry_groups` 按一组入口算键与组成清单、写成构建输出目录里的那份表（`singlefs-verification` 的构建脚本用，4-2a；工具链行与依赖行不进这几把键）；
+//! `build_toolchain` 拼一次构建的工具链行（`rustc -vV`、`cargo -V`、目标、RUSTFLAGS；编译档不进；命令行用）；
 //! `build_features` 取这一次编译里各依赖包实际开了哪些特性（连别的包在同一次构建里并上来的），交给闭包按它解 cfg。
 //! `verus_ghost_code` 分开两类判定的键：产品行为判定在 [`Workspace::view_for_judgment`] 交的
 //! 视图上算（`verus!` 里的规格与证明块剥掉），形式化判定在装出来的那一份原样上算；`entry_groups` 的判器组都是产品行为判定。
@@ -41,10 +41,7 @@ pub use build_features::{
     features_enabled_on_the_dependencies, features_of_the_crate_being_built, BuildFeaturesError,
     FeaturesEnabledByTheBuild, ENABLED_FEATURES_METADATA_KEY,
 };
-pub use build_toolchain::{
-    effective_profile_lines, profile_name_of_the_build_script_profile_variable,
-    toolchain_lines_of_the_build, BuildToolchainInputs,
-};
+pub use build_toolchain::{toolchain_lines_of_the_build, BuildToolchainInputs};
 pub use closure::{
     compute_closure, compute_closure_of_entries,
     compute_closure_of_entries_with_the_features_of_the_build, reuse_key, ClosureOutcome,

@@ -37,6 +37,18 @@ const RESTART_WRITTEN_IN_COMMAND_NEW: &str = r#"fn restart() {
     command.status().expect("起得来");
 }"#;
 
+/// 用法都与 `let` 同层：`名字.display()` 写在函数体那一层的 `eprintln!` 里。
+const RESTART_BOUND_WITH_A_DIVERGING_FALLBACK_USED_AT_THE_LEVEL_OF_THE_LET: &str = r#"fn restart() {
+    let this_program = std::env::current_exe().unwrap_or_else(|error| {
+        eprintln!("取不到路径：{error}");
+        std::process::exit(78)
+    });
+    eprintln!("起 {}", this_program.display());
+    let status = std::process::Command::new(&this_program).arg("role").status();
+    drop(status);
+}"#;
+
+/// `名字.display()` 写在起子进程失败时那个闭包的块里，比 `let` 深一层（E16 第五跑 `run_every_mode_in_child_processes` 的形状之一）。
 const RESTART_BOUND_WITH_A_DIVERGING_FALLBACK: &str = r#"fn restart() {
     let this_program = std::env::current_exe().unwrap_or_else(|error| {
         eprintln!("取不到路径：{error}");
@@ -116,12 +128,23 @@ fn bin_main_restarting_itself_inside_command_new_is_keyed_and_follows_the_role_o
     );
 }
 
-/// 场景：路径绑给 `let`、失败时闭包 `process::exit`，用法只有 `Command::new(&名字)` 与 `名字.display()`（E16 第五跑的形状）。预期：同上。
+/// 场景：路径绑给 `let`、失败时闭包 `process::exit`，用法只有 `Command::new(&名字)` 与 `名字.display()`，`名字.display()` 写在起子进程失败时
+/// 那个闭包的块里、比 `let` 深一层（E16 第五跑的形状）。预期：拒算 `current-exe`（用法与 `let` 不同层）。
 #[test]
-fn bin_main_restarting_itself_through_a_binding_with_a_diverging_fallback_is_keyed() {
-    assert_keyed_from_main_and_follows_the_role_of_the_child(
+fn bin_main_restarting_itself_through_a_binding_displayed_inside_a_deeper_block_is_refused() {
+    assert_refused_from_main(
         "restart-bound-diverging-fallback",
         RESTART_BOUND_WITH_A_DIVERGING_FALLBACK,
+    );
+}
+
+/// 场景：路径绑给 `let`、失败时闭包 `process::exit`，用法只有 `Command::new(&名字)` 与 `名字.display()`，都与 `let` 同层。
+/// 预期：算得出键，键跟角色函数变。
+#[test]
+fn bin_main_restarting_itself_through_a_binding_used_at_the_level_of_the_let_is_keyed() {
+    assert_keyed_from_main_and_follows_the_role_of_the_child(
+        "restart-bound-used-at-the-level-of-the-let",
+        RESTART_BOUND_WITH_A_DIVERGING_FALLBACK_USED_AT_THE_LEVEL_OF_THE_LET,
     );
 }
 

@@ -442,8 +442,7 @@ fn fixture_judge_group_key(replacement: Option<&str>) -> String {
             entry_paths: vec![FIXTURE_JUDGE.entry_path.to_string()],
             features: Vec::new(),
         },
-        &[format!("host: {HOST_TARGET_TRIPLE}")],
-        &[],
+        HOST_TARGET_TRIPLE,
         &switches,
     )
     .unwrap_or_else(|error| panic!("夹具的判器组入口写对了：{error}"));

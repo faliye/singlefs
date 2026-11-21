@@ -776,7 +776,7 @@ mod tests {
     ));
 
     /// 产品 GPU 包那一侧的约定与这里读的对得上：清单写了 links、构建脚本照 [`ENABLED_FEATURES_METADATA_KEY`] 打元数据
-    /// （它的测试包的构建脚本经 [`features_enabled_on_the_dependencies`] 读，算对拍里参照一侧的判法单元键）。
+    /// （依赖它的实验装置 E202 那个包的构建脚本经 [`features_enabled_on_the_dependencies`] 读，算对拍两侧的判法单元键）。
     #[test]
     fn the_background_gpu_build_script_reports_under_the_key_read_here() {
         let manifest = crate::manifest::parse_crate_manifest(BACKGROUND_GPU_MANIFEST_TEXT)

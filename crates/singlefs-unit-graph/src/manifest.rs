@@ -30,6 +30,12 @@ pub struct ManifestError {
     pub reason: String,
 }
 
+/// 多行串开头三引号后面紧跟着、不算内容的换行（先比两个字节的那一种）。
+const NEWLINES_TRIMMED_AFTER_AN_OPENING_DELIMITER: [&[u8]; 2] = [b"\r\n", b"\n"];
+
+/// 反斜杠：基础串里转义的起头。
+const BACKSLASH: u8 = b'\\';
+
 struct TomlReader<'text> {
     bytes: &'text [u8],
     position: usize,
@@ -112,6 +118,13 @@ impl TomlReader<'_> {
         const MULTI_LINE_BASIC_STRING_DELIMITER: &[u8] = b"\"\"\"";
         if self.bytes[self.position..].starts_with(MULTI_LINE_BASIC_STRING_DELIMITER) {
             self.position += 3;
+            // TOML：紧跟在开头三引号后面的那一个换行不算串的内容（python `tomllib` 同样去掉）
+            let newline_after_the_opening_delimiter = NEWLINES_TRIMMED_AFTER_AN_OPENING_DELIMITER
+                .iter()
+                .find(|newline| self.bytes[self.position..].starts_with(newline));
+            if let Some(newline) = newline_after_the_opening_delimiter {
+                self.position += newline.len();
+            }
             let start = self.position;
             while self.position < self.bytes.len()
                 && !self.bytes[self.position..].starts_with(MULTI_LINE_BASIC_STRING_DELIMITER)
@@ -120,6 +133,10 @@ impl TomlReader<'_> {
             }
             if !self.bytes[self.position..].starts_with(MULTI_LINE_BASIC_STRING_DELIMITER) {
                 return Err(self.failure("串没闭上"));
+            }
+            // 多行基础串里的转义（含行末的反斜杠续行）这里不解：原样收下会读出与 python 不同的串、静默少收，读到就报读不了
+            if self.bytes[start..self.position].contains(&BACKSLASH) {
+                return Err(self.failure("多行基础串里的反斜杠转义不认"));
             }
             let content = String::from_utf8_lossy(&self.bytes[start..self.position]).into_owned();
             self.position = (self.position + 3).min(self.bytes.len());
@@ -261,22 +278,42 @@ impl TomlReader<'_> {
     }
 }
 
+/// 整份 TOML 读出来的样子：每条键值，与每个表头的路径（`[表]` 与 `[[数组表]]` 都算，按出现的次序，同一个表头出现几次记几次）。
+/// 只写表头、底下没有键的表只在 `table_headers` 里：它在不在，`entries` 看不出来。
+#[derive(Clone, Debug)]
+pub struct TomlDocument {
+    pub entries: Vec<TomlEntry>,
+    pub table_headers: Vec<Vec<String>>,
+}
+
 /// 把整份 `Cargo.toml` 读成一串键值。
 ///
 /// # Errors
 /// 表头、键、串、数组或内联表写坏了，交出错的行号与原因。
 pub fn parse_toml_entries(text: &str) -> Result<Vec<TomlEntry>, ManifestError> {
+    parse_toml_document(text).map(|document| document.entries)
+}
+
+/// 把整份 `Cargo.toml` 读成键值与表头（[`TomlDocument`]）。
+///
+/// # Errors
+/// 表头、键、串、数组或内联表写坏了，交出错的行号与原因。
+pub fn parse_toml_document(text: &str) -> Result<TomlDocument, ManifestError> {
     let mut reader = TomlReader {
         bytes: text.as_bytes(),
         position: 0,
     };
     let mut entries = Vec::new();
+    let mut table_headers: Vec<Vec<String>> = Vec::new();
     let mut table_path: Vec<String> = Vec::new();
     let mut table_occurrence = 0usize;
     loop {
         reader.skip_blanks_newlines_and_comments();
         let Some(byte) = reader.peek() else {
-            return Ok(entries);
+            return Ok(TomlDocument {
+                entries,
+                table_headers,
+            });
         };
         if byte == b'[' {
             let is_array_table = reader.bytes.get(reader.position + 1) == Some(&b'[');
@@ -288,6 +325,7 @@ pub fn parse_toml_entries(text: &str) -> Result<Vec<TomlEntry>, ManifestError> {
                 return Err(reader.failure("表头没闭上"));
             }
             reader.position += closing.len();
+            table_headers.push(table_path.clone());
             table_occurrence += 1;
             continue;
         }
@@ -437,6 +475,27 @@ fn apply_dependency_field(dependency: &mut Dependency, field: &str, value: &Toml
 /// # Errors
 /// TOML 读不了，或没有 `[package] name`。
 pub fn parse_crate_manifest(text: &str) -> Result<CrateManifest, ManifestError> {
+    read_crate_manifest(text, None)
+}
+
+/// 读一份 `Cargo.toml`；没写 `[package] name`（整个没有 `[package]` 也算）时包名取 `default_package_name`，不报错
+/// （`scripts/gate/lib_function_units.py` 的 `RustCrate` 取包名那一行：`package.get("name", 目录名或 "root")`）。
+///
+/// # Errors
+/// TOML 读不了。
+pub fn parse_crate_manifest_with_default_package_name(
+    text: &str,
+    default_package_name: &str,
+) -> Result<CrateManifest, ManifestError> {
+    read_crate_manifest(text, Some(default_package_name))
+}
+
+/// `parse_crate_manifest` 与 `parse_crate_manifest_with_default_package_name` 共用的读法：没写 `[package] name` 时取
+/// `default_package_name`，它也是 `None` 才报错。
+fn read_crate_manifest(
+    text: &str,
+    default_package_name: Option<&str>,
+) -> Result<CrateManifest, ManifestError> {
     let entries = parse_toml_entries(text)?;
     let mut package_name = None;
     let mut library: Option<DeclaredTarget> = None;
@@ -533,10 +592,12 @@ pub fn parse_crate_manifest(text: &str) -> Result<CrateManifest, ManifestError> 
             }
         }
     }
-    let package_name = package_name.ok_or(ManifestError {
-        line: 1,
-        reason: "没有 [package] name".to_string(),
-    })?;
+    let package_name = package_name
+        .or_else(|| default_package_name.map(str::to_string))
+        .ok_or(ManifestError {
+            line: 1,
+            reason: "没有 [package] name".to_string(),
+        })?;
     let declared_of = |section: &str| -> Vec<DeclaredTarget> {
         declared_by_occurrence
             .iter()
@@ -596,6 +657,40 @@ mod tests {
         assert!(
             parse_crate_manifest("[package]\nname = \"\"\"abc\n").is_err(),
             "没闭上的三引号串要拒"
+        );
+    }
+
+    /// 多行基础串开头三引号后面紧跟的那一个换行（`\n` 与 `\r\n` 两种）不算内容，后面的换行照收（python `tomllib` 同一个读法）。
+    #[test]
+    fn the_newline_right_after_the_opening_quotes_of_a_multi_line_basic_string_is_dropped() {
+        for (manifest_text, expected_name) in [
+            ("[package]\nname = \"\"\"\nalpha\"\"\"\n", "alpha"),
+            ("[package]\nname = \"\"\"\r\nalpha\"\"\"\n", "alpha"),
+            (
+                "[package]\nname = \"\"\"\nalpha\nbeta\"\"\"\n",
+                "alpha\nbeta",
+            ),
+        ] {
+            assert_eq!(
+                parse_crate_manifest(manifest_text)
+                    .expect("清单读得了")
+                    .package_name,
+                expected_name,
+                "{manifest_text:?}"
+            );
+        }
+    }
+
+    /// 多行基础串里有反斜杠（转义或行末续行）：这里不解，原样收会读出与 python 不同的串，报读不了。
+    #[test]
+    fn a_backslash_inside_a_multi_line_basic_string_is_refused() {
+        assert!(
+            parse_crate_manifest("[package]\nname = \"\"\"al\\u0070ha\"\"\"\n").is_err(),
+            "多行基础串里的转义要拒"
+        );
+        assert!(
+            parse_crate_manifest("[package]\nname = \"\"\"alpha \\\n  beta\"\"\"\n").is_err(),
+            "多行基础串里的行末续行要拒"
         );
     }
 

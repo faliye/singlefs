@@ -1,9 +1,10 @@
-//! 目录数据单元（批次 `records/2026-10-26-checker欠账C896-C897-C914.md#5` 的 5g 规则 B）：按 `env!("CARGO_MANIFEST_DIR")` 拼出的是
-//! `crates/` 之下（不是 `crates/` 本身）的一个目录时，整个目录（递归）记一个 `data-directory` 数据单元，不拒算；指纹是目录下每份文件
-//! 按相对路径排好、逐份一行「相对路径 \t 内容的 SHA-256」、每行以换行收尾的整段 SHA-256。拼出的目录绑到 `let` 名字上时看名字的每一处
-//! 用法（`.parent()` 这类往外走的照旧拒算）；私有的 `const 名字: &str = env!("CARGO_MANIFEST_DIR");` 按 `Path::new(名字)` 的用法折。
-//! 仓根、`crates/` 之外的目录与 `crates/` 整个照旧拒算 `runtime-read-path-not-literal`。
-//! 夹具：`fscan` 读自己的 `tables/` 与兄弟包 `fother` 的 `src/`，各种读法各是一个入口函数。
+//! 目录数据单元：按 `env!("CARGO_MANIFEST_DIR")` 拼出的是仓根 `crates/` 之下（不是 `crates/` 本身）的一个目录时，整个目录（递归）
+//! 记一个 `data-directory` 数据单元，不拒算；指纹是目录下每份文件按相对路径排好、逐份一行「相对路径 \t 内容的 SHA-256」、每行以换行
+//! 收尾的整段 SHA-256。拼出的目录绑到 `let` 名字上时看名字的每一处用法（`.parent()` 这类往外走的拒算）；私有的
+//! `const 名字: &str = env!("CARGO_MANIFEST_DIR");` 按 `Path::new(名字)` 的用法折。
+//! 仓根、`crates/` 之外的目录、`crates/` 整个，与清单目录不在 `crates/` 下的工作区成员读自己的目录，都拒算 `runtime-read-path-not-literal`
+//! （`scripts/gate/lib_function_units.py` 的 `is_data_directory` 同样只收 `crates/` 之下的目录）。
+//! 夹具：`fscan` 读自己的 `tables/` 与兄弟包 `fother` 的 `src/`，各种读法各是一个入口函数；`foutside` 是根清单点名的、在仓根下一层的成员。
 
 mod common_fixture_workspace;
 
@@ -202,4 +203,66 @@ fn directory_outside_crates_is_still_refused() {
 #[test]
 fn bound_package_root_that_goes_to_its_parent_is_still_refused() {
     assert_refused_as_runtime_path("fscan::repository_root_through_parent", 33);
+}
+
+const OUTSIDE_MEMBER_FILE: &str = "foutside/src/lib.rs";
+
+/// `foutside` 的库：清单目录在仓根下一层、不在 `crates/` 下（`gpu-verification-server` 同形），整个清单目录交给 `read_dir`。
+/// 行号进断言：改它要跟着改断言里的行号。
+const OUTSIDE_MEMBER_LIBRARY: &str = r#"use std::path::PathBuf;
+
+pub fn own_directory_count() -> usize {
+    std::fs::read_dir(PathBuf::from(env!("CARGO_MANIFEST_DIR"))).map(Iterator::count).unwrap_or(0)
+}
+"#;
+
+/// 根清单点名 `foutside` 当工作区成员（它在仓根下一层，不在 `crates/` 下）。
+fn tree_with_a_member_outside_crates(label: &str) -> FixtureTree {
+    FixtureTree::materialize(
+        label,
+        &[
+            ("Cargo.toml", "[workspace]\nmembers = [\"foutside\"]\n"),
+            (
+                "foutside/Cargo.toml",
+                "[package]\nname = \"foutside\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+            ),
+            (OUTSIDE_MEMBER_FILE, OUTSIDE_MEMBER_LIBRARY),
+            ("foutside/notes.txt", "成员目录里、源码之外的一份说明\n"),
+            ("Cargo.lock", "# 夹具不解析依赖\n"),
+        ],
+    )
+}
+
+const OUTSIDE_MEMBER_ENTRY: EntrySpecification = entry("foutside::own_directory_count");
+
+/// 场景：清单目录在仓根下一层的成员 `foutside`，`PathBuf::from(env!("CARGO_MANIFEST_DIR"))` 整个交给 `read_dir`（清单目录的上一级是
+/// 仓根、不是 `crates/`）。预期：闭包里没有 `data-directory` 行，拒算 `runtime-read-path-not-literal`、落在 `env!` 那一行
+/// （`scripts/gate/lib_function_units.py` 的 `is_data_directory` 不收这个目录，`runtime_manifest_path` 记 `runtime-path`）。
+#[test]
+fn manifest_directory_of_a_member_outside_crates_is_refused_instead_of_a_directory_data_unit() {
+    let tree = tree_with_a_member_outside_crates("directory-member-outside-crates");
+    let switches = RuleSwitches::every_rule_intact();
+    let workspace = workspace_of(tree.root(), &switches);
+    let outcome = closure_with_triple(
+        &workspace,
+        &OUTSIDE_MEMBER_ENTRY,
+        &switches,
+        HOST_TARGET_TRIPLE,
+    )
+    .expect("入口找得到");
+    let lines = closure_lines(&workspace, &outcome, None);
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.starts_with("data-directory\t")),
+        "crates/ 之外的成员读自己的清单目录：不收成目录数据单元：{lines:?}"
+    );
+    let reason = key_text(&tree, &OUTSIDE_MEMBER_ENTRY)
+        .expect_err("crates/ 之外的成员读自己的清单目录要拒算");
+    assert!(
+        reason.contains(&format!(
+            "refused\truntime-read-path-not-literal\t{OUTSIDE_MEMBER_FILE}:4\t"
+        )),
+        "拒算 runtime-read-path-not-literal、落在 env! 那一行（第 4 行）：{reason}"
+    );
 }

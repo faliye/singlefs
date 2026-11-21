@@ -1,26 +1,28 @@
-//! 一组入口的复用键与组成清单，连同写进构建输出目录的那份表（`singlefs-verification` 的构建脚本按登记的判器入口逐组算、写进
+//! 一组入口的复用键与组成清单，连同写进构建输出目录的那份表（`singlefs-verification` 的构建脚本按登记的入口逐组算、写进
 //! `OUT_DIR`，库经 `include_str!` 读回，跑时只用编进去的这一份、不读盘上的树；设计 3.8「build.rs 做什么」）。
+//! 一组的键可以只收几个包的单元（[`entry_group_key_keeping_only_the_listed_packages`]：判器与观察者引到的被检测产品代码只收产品包）。
 //!
-//! 一组 = 同一个目标里的几个入口 fn（[`crate::closure::compute_closure_of_entries`] 一次收），开哪几个特性、工具链行
-//! （[`crate::build_toolchain::toolchain_lines_of_the_build`]）与 `Cargo.lock`（按闭包收窄，[`crate::lock_file::narrowed_lock_lines`]）。
-//! 键就是 [`crate::closure::reuse_key`] 那一把：没有别的包并上来的特性时，与命令行 `unit-graph key <根> <入口>… --target … --cfg feature=…
-//! --toolchain-of-the-build … --lock-file Cargo.lock` 算的逐字相同；构建脚本另交这一次编译里依赖包被并上来的特性
-//! （[`crate::build_features`]，[`entry_group_key_with_the_features_of_the_build`]）时，等于把那些特性写进入口包对那个依赖的 `features` 之后
-//! 命令行算的那一把。
-//! 判器组都是产品行为判定（崩溃判定库的判器组与观察者）：键与组成清单都在 [`Workspace::view_for_judgment`] 交的产品行为视图上算，
+//! 一组 = 同一个目标里的几个入口 fn（[`crate::closure::compute_closure_of_entries`] 一次收），开哪几个特性、照哪个目标三元组收闭包
+//! （平台条件按它判）。工具链行（rustc、cargo、LLVM、目标、RUSTFLAGS）与 `Cargo.lock` 的依赖行都不进键（D13（验证路线） 已定项 17）：
+//! 键是 [`crate::closure::reuse_key`] 不带工具链行、不带依赖行的那一把；构建脚本另交这一次编译里依赖包被并上来的特性
+//! （[`crate::build_features`]，[`entry_group_key_with_the_features_of_the_build`]）时，等于把那些特性写进入口包对那个依赖的
+//! `features` 之后算的那一把。
+//! 各组都是产品行为判定（观察者与判器引到的被检测产品代码）：键与组成清单都在 [`Workspace::view_for_judgment`] 交的产品行为视图上算，
 //! `verus!` 里的规格与证明块不进指纹、不当边；与命令行对得上要另给 `--judgment-kind product-behavior`。
 //!
 //! 表的写法（一行一项、制表符隔开；组名与限定名、文件:行只当索引，不进键）：
 //!   `# singlefs entry group keys`                                   头一行
-//!   `toolchain\t<工具链行>`                                          这一趟拼的工具链行，逐行
+//!   `toolchain\t<行>`                                               构建脚本收闭包时照的目标（`target: <三元组>`），只当记录、不进键
 //!   `group\t<组名>\tkeyed\t<键十六进制>`                              算出了键
 //!   `group\t<组名>\trefused`                                         闭包里有拒算（拒算行另列）
-//!   `group\t<组名>\tnot-compiled\t<原因>`                            组里的入口在这组特性下一个都不编进来（例：`gpu` 特性关着时的 GPU 判器）
+//!   `group\t<组名>\tnot-compiled\t<原因>`                            组里的入口在这组特性下一个都不编进来（例：`gpu` 特性关着时只在它下面编的入口）
 //!   `not-compiled-entry\t<组名>\t<入口>`                             组里这个入口在这组特性下不编进来，键照其余的入口算
 //!   `unit\t<组名>\t<种类>\t<限定名>\t<文件>:<起>-<止>\t<指纹十六进制>`  组成清单（Rust、WGSL、数据单元，数据单元的限定名是数据文件路径）
 //!   `refusal\t<组名>\t<形态>\t<文件>:<行>\t<原样片段>`               拒算行
 //!   `watched\t<从仓根起的路径>`                                       构建脚本要看的文件（改了就重算），只给构建脚本打 `rerun-if-changed`
-//!   `build-feature\t<包名>\t<特性>`                                   这一次编译里依赖包被打开、算键时照请求的特性（一个都没有就没有这种行）；
+//!   `build-feature\t<包名>\t<特性>`                                   这一次编译里依赖包被打开的特性（一个都没有就没有这种行）：照它算键的那几张表
+//!                                                                    算键时照请求；验证包那一张的观察者与判器那几组（构建脚本给
+//!                                                                    [`entry_group_key_keeping_only_the_listed_packages`] 交空表）不照它，只当记录；
 //!                                                                    写在表末，读表的脚本按行头认行、认不出就停的（`crash-amplification-two-hosts.sh`
 //!                                                                    取观察者版本那一段）在它前面就取完了
 
@@ -28,12 +30,13 @@ use std::collections::BTreeSet;
 
 use crate::build_features::FeaturesEnabledByTheBuild;
 use crate::closure::{
-    compute_closure_of_entries_not_following_the_listed_units, reuse_key, ClosureRequest,
-    EntryError,
+    compute_closure_of_entries_not_following_the_listed_units,
+    outcome_keeping_only_the_listed_packages, reuse_key,
+    units_of_the_crates_reaching_none_of_the_listed_packages, ClosureRequest, EntryError,
+    PackagesKeptInTheKey,
 };
 use crate::closure::{ExternalKeyInputs, RequestedCondition};
-use crate::conditional_compilation::target_triple_of_toolchain_lines;
-use crate::lock_file::{narrowed_lock_lines, LockedPackage};
+use crate::conditional_compilation::CARGO_TARGET_TOOLCHAIN_LINE_PREFIX;
 use crate::output::{closure_lines, refusal_line};
 use crate::rule_switches::RuleSwitches;
 use crate::sha256::{Sha256Digest, DIGEST_BYTES};
@@ -42,6 +45,12 @@ use crate::workspace::{TargetKind, TargetSelector, Workspace};
 
 /// 表的头一行。
 pub const ENTRY_GROUP_TABLE_HEADER: &str = "# singlefs entry group keys";
+
+/// 构建脚本写进表里的那一行记录（`toolchain` 行）：收闭包时照的目标三元组（`target: <三元组>`）。只当记录、不进任何一组的键。
+#[must_use]
+pub fn target_line_of_the_table(target_triple: &str) -> String {
+    format!("{CARGO_TARGET_TOOLCHAIN_LINE_PREFIX}{target_triple}")
+}
 
 /// 一组入口：组名（只当索引）、目标、入口 fn 路径（头一个定 crate）、开的特性（不开默认特性：要默认特性就把 `default` 写进来）。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -78,24 +87,22 @@ pub struct EntryGroupKey {
     pub watched_files: BTreeSet<String>,
 }
 
-/// 收一组入口、算键。组里在这组特性下不编进来的入口不收、记进 `entries_not_compiled`，键照其余的入口算；一个都编不进来的交
-/// [`EntryGroupVerdict::NotCompiled`]。依赖包的特性只按清单解：同 [`entry_group_key_with_the_features_of_the_build`] 交空表。
+/// 收一组入口、算键（照 `target_triple` 判平台条件）。组里在这组特性下不编进来的入口不收、记进 `entries_not_compiled`，键照其余的入口算；
+/// 一个都编不进来的交 [`EntryGroupVerdict::NotCompiled`]。依赖包的特性只按清单解：同 [`entry_group_key_with_the_features_of_the_build`] 交空表。
 ///
 /// # Errors
 /// 入口找不到、不唯一、写法不对、不在同一个 crate 里（登记表写错了，调用方应当停下）。
 pub fn entry_group_key(
     workspace: &Workspace,
     request: &EntryGroupRequest,
-    toolchain_lines: &[String],
-    locked_packages: &[LockedPackage],
+    target_triple: &str,
     switches: &RuleSwitches,
 ) -> Result<EntryGroupKey, EntryError> {
     entry_group_key_with_the_features_of_the_build(
         workspace,
         request,
         &FeaturesEnabledByTheBuild::default(),
-        toolchain_lines,
-        locked_packages,
+        target_triple,
         switches,
     )
 }
@@ -110,8 +117,7 @@ pub fn entry_group_key_with_the_features_of_the_build(
     workspace: &Workspace,
     request: &EntryGroupRequest,
     features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
-    toolchain_lines: &[String],
-    locked_packages: &[LockedPackage],
+    target_triple: &str,
     switches: &RuleSwitches,
 ) -> Result<EntryGroupKey, EntryError> {
     entry_group_key_not_following_the_listed_units(
@@ -119,8 +125,7 @@ pub fn entry_group_key_with_the_features_of_the_build(
         request,
         &BTreeSet::new(),
         features_enabled_by_the_build,
-        toolchain_lines,
-        locked_packages,
+        target_triple,
         switches,
     )
     .map(|keyed| keyed.key)
@@ -143,8 +148,72 @@ pub fn entry_group_key_not_following_the_listed_units(
     request: &EntryGroupRequest,
     units_not_followed: &BTreeSet<String>,
     features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
-    toolchain_lines: &[String],
-    locked_packages: &[LockedPackage],
+    target_triple: &str,
+    switches: &RuleSwitches,
+) -> Result<EntryGroupKeyNotFollowingTheListedUnits, EntryError> {
+    entry_group_key_keeping_the_units_in_the_key(
+        workspace,
+        request,
+        units_not_followed,
+        UnitsInTheKey::EveryUnitOfTheClosure,
+        features_enabled_by_the_build,
+        target_triple,
+        switches,
+    )
+}
+
+/// 同 [`entry_group_key_with_the_features_of_the_build`]，键、组成清单与拒算只取 `kept` 点名的包里的单元：入口单元与入口目标的文件
+/// 都不进（[`crate::closure::outcome_keeping_only_the_listed_packages`]）。判器与观察者引到的被检测产品代码这样取：入口是判器与观察者，
+/// 它们自己的代码不进键，它们够到的产品代码进。闭包从入口收，经别的包才够到的这几个包的单元照收；依赖图上一个点名的包都够不到的 crate
+/// 不沿它收（[`crate::closure::units_of_the_crates_reaching_none_of_the_listed_packages`]：那里的代码调不到点名的包）。要看的文件照这样收出的闭包取
+/// （闭包里别的包改一处会改够到哪些单元；够不到点名的包的那几个 crate 的文件不看）。
+///
+/// # Errors
+/// 同 [`entry_group_key`]；表里或 `kept` 点名的包工作区里没有。
+pub fn entry_group_key_keeping_only_the_listed_packages(
+    workspace: &Workspace,
+    request: &EntryGroupRequest,
+    kept: &PackagesKeptInTheKey,
+    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+    target_triple: &str,
+    switches: &RuleSwitches,
+) -> Result<EntryGroupKey, EntryError> {
+    let units_of_the_crates_not_followed =
+        units_of_the_crates_reaching_none_of_the_listed_packages(
+            workspace.view_for_judgment(JudgmentKind::ProductBehavior),
+            kept,
+        )?;
+    entry_group_key_keeping_the_units_in_the_key(
+        workspace,
+        request,
+        &units_of_the_crates_not_followed,
+        UnitsInTheKey::TheListedPackages(kept),
+        features_enabled_by_the_build,
+        target_triple,
+        switches,
+    )
+    .map(|keyed| keyed.key)
+}
+
+/// 一组的键收闭包里哪些单元：全部，或只留点名的包（入口单元与入口目标的文件不留，[`outcome_keeping_only_the_listed_packages`]）。
+#[derive(Clone, Copy, Debug)]
+enum UnitsInTheKey<'kept> {
+    EveryUnitOfTheClosure,
+    TheListedPackages(&'kept PackagesKeptInTheKey),
+}
+
+/// [`entry_group_key_not_following_the_listed_units`] 与 [`entry_group_key_keeping_only_the_listed_packages`] 的本体。
+/// 键不带工具链行、不带依赖行（[`ExternalKeyInputs`] 两样都空）。
+///
+/// # Errors
+/// 同 [`entry_group_key_keeping_only_the_listed_packages`]。
+fn entry_group_key_keeping_the_units_in_the_key(
+    workspace: &Workspace,
+    request: &EntryGroupRequest,
+    units_not_followed: &BTreeSet<String>,
+    units_in_the_key: UnitsInTheKey<'_>,
+    features_enabled_by_the_build: &FeaturesEnabledByTheBuild,
+    target_triple: &str,
     switches: &RuleSwitches,
 ) -> Result<EntryGroupKeyNotFollowingTheListedUnits, EntryError> {
     let workspace = workspace.view_for_judgment(JudgmentKind::ProductBehavior);
@@ -154,14 +223,10 @@ pub fn entry_group_key_not_following_the_listed_units(
             request.group_name
         )));
     }
-    let target_triple = target_triple_of_toolchain_lines(toolchain_lines)
-        .ok()
-        .flatten()
-        .unwrap_or_default();
     let mut compiled_entries = request.entry_paths.clone();
     let mut entries_not_compiled = Vec::new();
     // 每一趟要么交出闭包，要么去掉一个不编进来的入口：至多入口数加一趟
-    let mut outcome = loop {
+    let outcome_of_the_closure = loop {
         let Some((first_entry, additional_entries)) = compiled_entries.split_first() else {
             return Ok(EntryGroupKeyNotFollowingTheListedUnits {
                 key: EntryGroupKey {
@@ -188,7 +253,7 @@ pub fn entry_group_key_not_following_the_listed_units(
                 .map(|feature| RequestedCondition::Feature(feature.clone()))
                 .collect(),
             uses_default_features: false,
-            target_triple: target_triple.clone(),
+            target_triple: target_triple.to_string(),
         };
         match compute_closure_of_entries_not_following_the_listed_units(
             workspace,
@@ -206,23 +271,17 @@ pub fn entry_group_key_not_following_the_listed_units(
             Err(error) => return Err(error),
         }
     };
-    let lock_lines = match narrowed_lock_lines(workspace, &outcome, locked_packages) {
-        Ok(lines) => lines,
-        Err(refusals) => {
-            outcome.refusals.extend(refusals);
-            outcome.refusals.sort();
-            outcome.refusals.dedup();
-            Vec::new()
+    let watched_files = watched_files_of_the_closure(workspace, &outcome_of_the_closure);
+    let units_reached_and_not_followed = outcome_of_the_closure
+        .units_reached_and_not_followed
+        .clone();
+    let outcome = match units_in_the_key {
+        UnitsInTheKey::EveryUnitOfTheClosure => outcome_of_the_closure,
+        UnitsInTheKey::TheListedPackages(kept) => {
+            outcome_keeping_only_the_listed_packages(workspace, &outcome_of_the_closure, kept)?
         }
     };
-    let key = reuse_key(
-        workspace,
-        &outcome,
-        &ExternalKeyInputs {
-            toolchain_lines: toolchain_lines.to_vec(),
-            lock_lines,
-        },
-    );
+    let key = reuse_key(workspace, &outcome, &ExternalKeyInputs::default());
     let composition_lines: Vec<String> = closure_lines(workspace, &outcome, None)
         .into_iter()
         .filter(|line| !line.starts_with("refused\t"))
@@ -242,9 +301,9 @@ pub fn entry_group_key_not_following_the_listed_units(
             verdict,
             entries_not_compiled,
             composition_lines,
-            watched_files: watched_files_of_the_closure(workspace, &outcome),
+            watched_files,
         },
-        units_reached_and_not_followed: outcome.units_reached_and_not_followed,
+        units_reached_and_not_followed,
     })
 }
 
@@ -302,7 +361,7 @@ fn watched_files_of_the_closure(
     watched
 }
 
-/// 把几组的结果与工具链行写成表（文件头那一种写法），没有并上来的特性。
+/// 把几组的结果与 `toolchain` 那几行记录（构建脚本交 [`target_line_of_the_table`] 那一行）写成表（文件头那一种写法），没有并上来的特性。
 #[must_use]
 pub fn entry_group_table_text(toolchain_lines: &[String], groups: &[EntryGroupKey]) -> String {
     entry_group_table_text_with_the_features_of_the_build(
@@ -401,7 +460,8 @@ pub struct ReadBackEntryGroup {
     pub composition: Vec<CompositionUnit>,
 }
 
-/// 读回的整张表：工具链行、各组（按表里的次序）、要看的文件、这一次编译里依赖包被打开的特性（拿同一份输入重算键用）。
+/// 读回的整张表：`toolchain` 那几行记录（构建脚本收闭包时照的目标）、各组（按表里的次序）、要看的文件、这一次编译里依赖包被打开的特性
+/// （拿同一份输入重算键用）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReadBackEntryGroupTable {
     pub toolchain_lines: Vec<String>,

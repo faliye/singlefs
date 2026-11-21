@@ -15,7 +15,8 @@ use std::sync::OnceLock;
 use crate::conditional_compilation::Predicate;
 use crate::lexer::{identifier_name, token_text, Token, TokenKind};
 use crate::manifest::{
-    parse_crate_manifest, BuildScriptDeclaration, CrateManifest, DeclaredTarget, ManifestError,
+    parse_crate_manifest_with_default_package_name, parse_toml_document, BuildScriptDeclaration,
+    CrateManifest, DeclaredTarget, ManifestError, TomlValue,
 };
 use crate::rule_switches::{BrokenRule, RuleSwitches};
 use crate::rust_items::{is_keyword, normalized_path, parse_rust_file, RustFileInput};
@@ -156,12 +157,14 @@ pub struct WorkspaceCrate {
     pub origin: CrateOrigin,
 }
 
-/// 一个 crate 是怎么收进来的：工作区成员（`crates/` 下的），还是顺 path 依赖收进来的工作区外 crate（`prune-server/` 这一类）。
+/// 一个 crate 是怎么收进来的：工作区成员（`directories_of_the_workspace_members` 收的：根清单 `members` 展开的，
+/// `gpu-verification-server/` 这样不在 `crates/` 下的也算；根清单没有 `[workspace]` 时是 `crates/` 下的；根清单带 `[package]` 时的仓根），
+/// 还是顺 path 依赖收进来的工作区外 crate（`prune-server/` 这一类）。
 /// 工作区外的按调用关系连，不按同名连（`closure` 的 `follow_bare_names`；与 `scripts/gate/lib_function_units.py` 的
 /// `RustCrate.outside_workspace` 同一个分法）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CrateOrigin {
-    UnderTheCratesDirectory,
+    WorkspaceMember,
     PathDependencyOutsideTheWorkspace,
 }
 
@@ -221,6 +224,8 @@ pub struct WorkspaceIndexes {
     pub blanket_implementations_by_trait_name: HashMap<String, Vec<UnitIndex>>,
     /// （文件，行内模块路径）→ 那个模块里的 use。
     pub uses_by_scope: HashMap<(FileIndex, Vec<String>), Vec<UnitIndex>>,
+    /// 有条目级宏调用的模块（文件，行内模块路径）：宏展开出的 `use … as 名` 能改相对 use 路径的首段指谁，这些模块里的相对 use 路径一律退回全连。
+    pub scopes_with_an_item_macro_invocation: BTreeSet<(FileIndex, Vec<String>)>,
     /// 条目 → 它文档注释里的文档测试单元。
     pub documentation_tests_of_item: HashMap<UnitIndex, Vec<UnitIndex>>,
     /// （文件，行内模块路径）→ 模块内文档注释里的文档测试单元。
@@ -428,7 +433,7 @@ fn names_reaching_crates_outside_the_workspace(
     let mut reaching = HashMap::new();
     for (crate_position, workspace_crate) in crates.iter().enumerate() {
         match workspace_crate.origin {
-            CrateOrigin::UnderTheCratesDirectory => {}
+            CrateOrigin::WorkspaceMember => {}
             CrateOrigin::PathDependencyOutsideTheWorkspace => {
                 let outside_crate = CrateIndex(crate_position);
                 reaching.insert(
@@ -608,7 +613,6 @@ pub struct Workspace {
 pub enum WorkspaceError {
     RootUnreadable { path: PathBuf, reason: String },
     ManifestUnreadable { path: PathBuf, error: ManifestError },
-    NoCrates { path: PathBuf },
 }
 
 impl fmt::Display for WorkspaceError {
@@ -624,13 +628,6 @@ impl fmt::Display for WorkspaceError {
                 error.line,
                 error.reason
             ),
-            WorkspaceError::NoCrates { path } => {
-                write!(
-                    formatter,
-                    "{} 底下没有一个带 Cargo.toml 的 crate 目录",
-                    path.display()
-                )
-            }
         }
     }
 }
@@ -664,6 +661,29 @@ fn relative_display(path: &Path, repository_root: &Path) -> String {
     relative
         .components()
         .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<String>>()
+        .join("/")
+}
+
+/// 一份源码文件从仓根起的路径，照 python `os.path.relpath` 的写法：仓根底下的照原样往下接，仓根外的（根清单 `members` 写了绝对路径或
+/// `..` 的成员）先写几个 `..` 退到两条路径共有的那一层再往下接。`path` 与 `repository_root` 都是规范化的绝对路径。
+fn relative_path_from_the_repository_root(path: &Path, repository_root: &Path) -> String {
+    let path_components: Vec<String> = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let root_components: Vec<String> = repository_root
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    let shared_components = path_components
+        .iter()
+        .zip(&root_components)
+        .take_while(|(path_component, root_component)| path_component == root_component)
+        .count();
+    let steps_up = root_components.len() - shared_components;
+    std::iter::repeat_n("..".to_string(), steps_up)
+        .chain(path_components[shared_components..].iter().cloned())
         .collect::<Vec<String>>()
         .join("/")
 }
@@ -730,6 +750,7 @@ fn parse_one_file(
     file: FileIndex,
     entry: &FileEntry,
     crates: &[WorkspaceCrate],
+    repository_root: &Path,
     switches: &RuleSwitches,
     origin: SourceOrigin<'_>,
 ) -> ParsedSource {
@@ -745,6 +766,7 @@ fn parse_one_file(
                 source: &source,
                 file_directory: &file_directory,
                 manifest_directory: Some(&crates[entry.crate_index.0].directory),
+                repository_root,
                 switches,
             });
             let mut file_level_refusals = parsed.file_level_refusals;
@@ -774,6 +796,7 @@ fn parse_one_file(
 fn parse_files_in_parallel(
     entries: &[FileEntry],
     crates: &[WorkspaceCrate],
+    repository_root: &Path,
     threads: NonZeroUsize,
     switches: &RuleSwitches,
     origin: SourceOrigin<'_>,
@@ -795,7 +818,15 @@ fn parse_files_in_parallel(
                         .enumerate()
                         .map(|(offset, entry)| {
                             let file = FileIndex(chunk_index * chunk_length + offset);
-                            (file, parse_one_file(file, entry, crates, switches, origin))
+                            let parsed = parse_one_file(
+                                file,
+                                entry,
+                                crates,
+                                repository_root,
+                                switches,
+                                origin,
+                            );
+                            (file, parsed)
                         })
                         .collect::<Vec<(FileIndex, ParsedSource)>>()
                 })
@@ -1245,6 +1276,7 @@ fn build_indexes(
         trait_implementations_by_trait_name: HashMap::new(),
         blanket_implementations_by_trait_name: HashMap::new(),
         uses_by_scope: HashMap::new(),
+        scopes_with_an_item_macro_invocation: BTreeSet::new(),
         documentation_tests_of_item: HashMap::new(),
         documentation_tests_of_module: HashMap::new(),
         files_by_path,
@@ -1339,6 +1371,11 @@ fn build_indexes(
                 .or_default()
                 .push(unit_index);
         }
+        if unit.kind == UnitKind::ItemMacroInvocation {
+            indexes
+                .scopes_with_an_item_macro_invocation
+                .insert((unit.file, unit.local_module_path.clone()));
+        }
         match &unit.documentation_test_of {
             Some(DocumentationTestAttachment::Item(owner)) => {
                 indexes
@@ -1360,10 +1397,345 @@ fn build_indexes(
     indexes
 }
 
-/// 装一个工作区：`root` 是仓根或 `crates/` 目录。
+/// 根清单 `[workspace]` 里收成员用的两样：`members` 的每一条通配与 `exclude` 逐字点名的路径（都从仓根算）。
+struct WorkspaceMemberPatterns {
+    members: Vec<String>,
+    exclude: Vec<String>,
+}
+
+impl WorkspaceMemberPatterns {
+    /// `members` 与 `exclude` 都还没读到。
+    fn nothing_listed() -> Self {
+        WorkspaceMemberPatterns {
+            members: Vec::new(),
+            exclude: Vec::new(),
+        }
+    }
+}
+
+/// 根清单里决定工作区成员的那几样。
+struct RootManifestMembership {
+    /// python 那一份的 `workspace` 非空时是 `Some`（它按字典真假判）：`workspace` 底下至少一个键，或有 `[workspace.metadata]`
+    /// 这类子表头（只写表头、底下没有键也算：字典里有一张空子表）。只写 `[workspace]`、底下没有键的与内联空表 `workspace = {}` 都是空表，与没有同样算。
+    workspace: Option<WorkspaceMemberPatterns>,
+    /// 根清单有 `package` 这一节（python 判 `"package" in manifest`）：仓根自己也是一个成员。只写表头、底下没有键的
+    /// `[package]` 也算。
+    root_is_a_package: bool,
+}
+
+/// 一个 TOML 数组里的每个串（不是数组、不是串的元素不算）。
+fn texts_in_the_array(value: &TomlValue) -> Vec<String> {
+    match value {
+        TomlValue::Array(elements) => elements
+            .iter()
+            .filter_map(|element| match element {
+                TomlValue::Text(text) => Some(text.clone()),
+                TomlValue::Boolean(_)
+                | TomlValue::Array(_)
+                | TomlValue::InlineTable(_)
+                | TomlValue::Unparsed(_) => None,
+            })
+            .collect(),
+        TomlValue::Text(_)
+        | TomlValue::Boolean(_)
+        | TomlValue::InlineTable(_)
+        | TomlValue::Unparsed(_) => Vec::new(),
+    }
+}
+
+/// 读仓根的 `Cargo.toml`（没有这份文件就是既没有 `[workspace]` 也没有 `[package]`）。
 ///
 /// # Errors
-/// 根目录读不了、没有 crate、或某份 `Cargo.toml` 读不了。
+/// 根清单在而读不了，或 TOML 写坏了。
+fn read_root_manifest_membership(
+    repository_root: &Path,
+) -> Result<RootManifestMembership, WorkspaceError> {
+    let manifest_path = repository_root.join("Cargo.toml");
+    let mut membership = RootManifestMembership {
+        workspace: None,
+        root_is_a_package: false,
+    };
+    if !manifest_path.is_file() {
+        return Ok(membership);
+    }
+    let text = std::fs::read_to_string(&manifest_path).map_err(|error| {
+        WorkspaceError::RootUnreadable {
+            path: manifest_path.clone(),
+            reason: error.to_string(),
+        }
+    })?;
+    let document =
+        parse_toml_document(&text).map_err(|error| WorkspaceError::ManifestUnreadable {
+            path: manifest_path.clone(),
+            error,
+        })?;
+    // 只写表头、底下没有键的节，python 照样读出一张表：`[package]` 让 `"package" in manifest` 成立；`[workspace.metadata]` 这类
+    // 子表头让 `workspace` 里有一张子表、非空。底下有键的节由下面逐条键值再认一遍
+    for table_header in &document.table_headers {
+        let header: Vec<&str> = table_header.iter().map(String::as_str).collect();
+        if header.first() == Some(&"package") {
+            membership.root_is_a_package = true;
+        }
+        if matches!(header.as_slice(), ["workspace", _sub_table, ..])
+            && membership.workspace.is_none()
+        {
+            membership.workspace = Some(WorkspaceMemberPatterns::nothing_listed());
+        }
+    }
+    for entry in &document.entries {
+        // 表头与键连起来看：`[workspace] members = …`、顶层的 `workspace.members = …` 与内联表 `workspace = { … }` 同义
+        let full_key_path: Vec<&str> = entry
+            .table_path
+            .iter()
+            .chain(entry.key_path.iter())
+            .map(String::as_str)
+            .collect();
+        match full_key_path.as_slice() {
+            ["workspace", key_below_the_workspace @ ..] => {
+                // `workspace = {}`：python 读出一张空字典、判假，与没有 `workspace` 同样算（退回读 `crates/`，多收的那一边）
+                if let ([], TomlValue::InlineTable(pairs)) = (key_below_the_workspace, &entry.value)
+                {
+                    if pairs.is_empty() {
+                        continue;
+                    }
+                }
+                let patterns = membership
+                    .workspace
+                    .get_or_insert_with(WorkspaceMemberPatterns::nothing_listed);
+                let fields: Vec<(&str, &TomlValue)> = match (key_below_the_workspace, &entry.value)
+                {
+                    ([], TomlValue::InlineTable(pairs)) => pairs
+                        .iter()
+                        .map(|(field, value)| (field.as_str(), value))
+                        .collect(),
+                    ([field], value) => vec![(*field, value)],
+                    _ => Vec::new(),
+                };
+                for (field, value) in fields {
+                    match field {
+                        "members" => patterns.members = texts_in_the_array(value),
+                        "exclude" => patterns.exclude = texts_in_the_array(value),
+                        _ => {}
+                    }
+                }
+            }
+            ["package", ..] => membership.root_is_a_package = true,
+            _ => {}
+        }
+    }
+    Ok(membership)
+}
+
+/// `[` 之后、配对的 `]` 之前那一段：配括号里的一个字符（`!` 起头取反，`a-z` 是区间）。
+struct BracketExpression {
+    is_negated: bool,
+    character_ranges: Vec<(char, char)>,
+}
+
+impl BracketExpression {
+    fn admits(&self, character: char) -> bool {
+        let is_listed = self
+            .character_ranges
+            .iter()
+            .any(|(lowest, highest)| (*lowest..=*highest).contains(&character));
+        is_listed != self.is_negated
+    }
+}
+
+/// 把 `[` 之后的模式读成一个括号表达式，交回它与配对的 `]` 之后剩下的模式；没有配对的 `]` 交 `None`（那个 `[` 当字面）。
+/// 紧跟在 `[` 或 `[!` 后面的 `]` 是括号里的字面，不算配对（python `fnmatch.translate` 同一个读法）。
+fn bracket_expression_after_the_opening(
+    after_opening: &[char],
+) -> Option<(BracketExpression, &[char])> {
+    let is_negated = after_opening.first() == Some(&'!');
+    let body_start = usize::from(is_negated);
+    let search_start = if after_opening.get(body_start) == Some(&']') {
+        body_start + 1
+    } else {
+        body_start
+    };
+    let closing = search_start
+        + after_opening
+            .get(search_start..)?
+            .iter()
+            .position(|character| *character == ']')?;
+    let body = after_opening.get(body_start..closing)?;
+    let mut character_ranges = Vec::new();
+    let mut position = 0usize;
+    // 每一轮读掉一个字符或一个区间（三个字符），position 只增不减，读到 body 末尾为止
+    while let Some(&lowest) = body.get(position) {
+        match (body.get(position + 1), body.get(position + 2)) {
+            (Some(&'-'), Some(&highest)) => {
+                character_ranges.push((lowest, highest));
+                position += 3;
+            }
+            _ => {
+                character_ranges.push((lowest, lowest));
+                position += 1;
+            }
+        }
+    }
+    let rest = after_opening.get(closing + 1..)?;
+    Some((
+        BracketExpression {
+            is_negated,
+            character_ranges,
+        },
+        rest,
+    ))
+}
+
+/// 一节通配配不配一个名字：`*` 配任意几个字符（含零个）、`?` 配一个字符、`[…]` 见 [`BracketExpression`]，别的字符逐字配
+/// （python `fnmatch` 在 POSIX 上的读法，大小写敏感）。
+fn component_pattern_matches(pattern: &[char], name: &[char]) -> bool {
+    let Some((&pattern_head, pattern_rest)) = pattern.split_first() else {
+        return name.is_empty();
+    };
+    let first_name_character_and_rest = name.split_first();
+    match pattern_head {
+        '*' => (0..=name.len()).any(|skipped_characters| {
+            name.get(skipped_characters..)
+                .is_some_and(|name_rest| component_pattern_matches(pattern_rest, name_rest))
+        }),
+        '?' => first_name_character_and_rest
+            .is_some_and(|(_, name_rest)| component_pattern_matches(pattern_rest, name_rest)),
+        '[' => match bracket_expression_after_the_opening(pattern_rest) {
+            Some((bracket, after_the_bracket)) => {
+                first_name_character_and_rest.is_some_and(|(&character, name_rest)| {
+                    bracket.admits(character)
+                        && component_pattern_matches(after_the_bracket, name_rest)
+                })
+            }
+            None => first_name_character_and_rest.is_some_and(|(&character, name_rest)| {
+                character == '[' && component_pattern_matches(pattern_rest, name_rest)
+            }),
+        },
+        literal => first_name_character_and_rest.is_some_and(|(&character, name_rest)| {
+            character == literal && component_pattern_matches(pattern_rest, name_rest)
+        }),
+    }
+}
+
+/// 一个目录里配得上这一节通配的条目。名字以 `.` 起头的条目只在这一节自己也以 `.` 起头时才配（python `glob` 的读法）；
+/// 目录读不了就是一个都没有。
+fn entries_matching_the_component(directory: &Path, component: &str) -> Vec<PathBuf> {
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return Vec::new();
+    };
+    let pattern: Vec<char> = component.chars().collect();
+    let matches_hidden_names = component.starts_with('.');
+    entries
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let name_characters: Vec<char> = name.chars().collect();
+            (matches_hidden_names || !name.starts_with('.'))
+                && component_pattern_matches(&pattern, &name_characters)
+        })
+        .map(|entry| entry.path())
+        .collect()
+}
+
+/// 根清单 `members` 里的一条照 python `glob.glob(os.path.join(仓根, 这一条))` 展开：按 `/` 逐节往下，带 `*`、`?`、`[` 的那一节
+/// 配上一层目录里的条目，别的节原样接上（存不存在、有没有 `Cargo.toml` 由调用方核）。以 `/` 起头的绝对路径从文件系统的根往下展开
+/// （`os.path.join` 遇到绝对路径就丢掉前面的仓根），落在仓根外的成员照收。
+fn paths_matching_the_member_pattern(repository_root: &Path, member_pattern: &str) -> Vec<PathBuf> {
+    let starting_directory = if Path::new(member_pattern).is_absolute() {
+        PathBuf::from("/")
+    } else {
+        repository_root.to_path_buf()
+    };
+    let mut matched = vec![starting_directory];
+    for component in member_pattern
+        .split('/')
+        .filter(|component| !component.is_empty())
+    {
+        let is_wildcard = component.contains(['*', '?', '[']);
+        matched = matched
+            .into_iter()
+            .flat_map(|base| {
+                if is_wildcard {
+                    entries_matching_the_component(&base, component)
+                } else {
+                    vec![base.join(component)]
+                }
+            })
+            .collect();
+    }
+    matched
+}
+
+/// 工作区成员的目录（规范化的绝对路径，排好序），与 `scripts/gate/lib_function_units.py` 的 `discover_rust_crates` 收成员的那一段
+/// 同一条规则：根清单的 `workspace` 非空（[`RootManifestMembership`]）时，`members` 的每一条照通配展开，去掉 `exclude` 点名的与底下
+/// 没有 `Cargo.toml` 的；没有时取 `crates_directory` 底下有 `Cargo.toml` 的目录（`crates_directory` 不在就是一个也没有）。根清单有
+/// `package` 这一节时仓根自己也是一个成员。一个成员都收不出就是一个空的工作区，交空列表（python 那一份同样）。
+///
+/// # Errors
+/// 根清单读不了，或 `crates_directory` 在而读不了。
+fn directories_of_the_workspace_members(
+    repository_root: &Path,
+    crates_directory: &Path,
+) -> Result<Vec<PathBuf>, WorkspaceError> {
+    let membership = read_root_manifest_membership(repository_root)?;
+    let mut member_directories: BTreeSet<PathBuf> = BTreeSet::new();
+    match &membership.workspace {
+        Some(patterns) => {
+            let excluded: BTreeSet<PathBuf> = patterns
+                .exclude
+                .iter()
+                .map(|path| normalized_path(&repository_root.join(path)))
+                .collect();
+            for member_pattern in &patterns.members {
+                for matched in paths_matching_the_member_pattern(repository_root, member_pattern) {
+                    let directory = normalized_path(&matched);
+                    if !excluded.contains(&directory) && directory.join("Cargo.toml").is_file() {
+                        member_directories.insert(directory);
+                    }
+                }
+            }
+        }
+        None => {
+            if crates_directory.is_dir() {
+                let entries = std::fs::read_dir(crates_directory).map_err(|error| {
+                    WorkspaceError::RootUnreadable {
+                        path: crates_directory.to_path_buf(),
+                        reason: error.to_string(),
+                    }
+                })?;
+                member_directories.extend(
+                    entries
+                        .filter_map(Result::ok)
+                        .map(|entry| normalized_path(&entry.path()))
+                        .filter(|directory| directory.join("Cargo.toml").is_file()),
+                );
+            }
+        }
+    }
+    if membership.root_is_a_package {
+        member_directories.insert(repository_root.to_path_buf());
+    }
+    Ok(member_directories.into_iter().collect())
+}
+
+/// 一个 crate 的 `Cargo.toml` 没写 `[package] name` 时的包名：它的目录名，仓根自己取 `root`（`scripts/gate/lib_function_units.py`
+/// 的 `RustCrate` 取包名那一行：`posixpath.basename(相对仓根的目录) or "root"`，仓根的相对目录是空串）。`crate_directory` 与
+/// `repository_root` 都是规范化的绝对路径。
+fn default_package_name_of(crate_directory: &Path, repository_root: &Path) -> String {
+    match crate_directory.file_name() {
+        Some(directory_name) if crate_directory != repository_root => {
+            directory_name.to_string_lossy().into_owned()
+        }
+        Some(_) | None => "root".to_string(),
+    }
+}
+
+/// 装一个工作区：`root` 是仓根或 `crates/` 目录。底下有 `crates/` 目录或有根清单 `Cargo.toml` 的是仓根（python 那一份把传进来的
+/// 目录当仓根，根上有 `Cargo.toml` 就读它）；两样都没有的是 `crates/` 目录本身，仓根取它的上一层。工作区成员照
+/// `directories_of_the_workspace_members` 收，一个都收不到就是一个空的工作区；`Cargo.toml` 没写 `[package] name` 的 crate 照
+/// `default_package_name_of` 取名。
+///
+/// # Errors
+/// 根目录读不了，或某份 `Cargo.toml`（根清单也算）读不了。
 pub fn load_workspace(
     root: &Path,
     threads: NonZeroUsize,
@@ -1374,7 +1746,9 @@ pub fn load_workspace(
             path: root.to_path_buf(),
             reason: error.to_string(),
         })?;
-    let (crates_directory, repository_root) = if canonical_root.join("crates").is_dir() {
+    let is_the_repository_root =
+        canonical_root.join("crates").is_dir() || canonical_root.join("Cargo.toml").is_file();
+    let (crates_directory, repository_root) = if is_the_repository_root {
         (canonical_root.join("crates"), canonical_root.clone())
     } else {
         let parent = canonical_root
@@ -1382,32 +1756,16 @@ pub fn load_workspace(
             .map_or_else(|| canonical_root.clone(), Path::to_path_buf);
         (canonical_root.clone(), parent)
     };
-    let mut crate_directories: Vec<PathBuf> = std::fs::read_dir(&crates_directory)
-        .map_err(|error| WorkspaceError::RootUnreadable {
-            path: crates_directory.clone(),
-            reason: error.to_string(),
-        })?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.is_dir() && path.join("Cargo.toml").is_file())
-        .collect();
-    crate_directories.sort();
-    if crate_directories.is_empty() {
-        return Err(WorkspaceError::NoCrates {
-            path: crates_directory,
-        });
-    }
+    let crate_directories =
+        directories_of_the_workspace_members(&repository_root, &crates_directory)?;
     let mut crates = Vec::new();
-    // 收完 `crates/` 下的以后，顺各 crate 清单的 path 依赖（普通、开发、构建三种）广度优先收落在仓根底下、有 `Cargo.toml` 的目录
+    // 收完工作区成员以后，顺各 crate 清单的 path 依赖（普通、开发、构建三种）广度优先收落在仓根底下、有 `Cargo.toml` 的目录
     // （根清单 exclude 里的 `prune-server/` 这一类自己是工作区根的独立工程）；`.`、`..` 起头的、落在仓根外的、清单里写成绝对路径的不收。
     // 与 `scripts/gate/lib_function_units.py` 的 `discover_rust_crates` 同一条规则。弄坏开关 path-dependencies-outside-the-workspace：不收
     let follows_path_dependencies =
         switches.is_intact(BrokenRule::PathDependenciesOutsideTheWorkspace);
-    let mut known_directories: BTreeSet<PathBuf> = crate_directories
-        .iter()
-        .map(|directory| normalized_path(directory.as_path()))
-        .collect();
-    // `crates/` 下的是工作区成员；之后顺 path 依赖收进来的是工作区外的（`CrateOrigin`）
+    let mut known_directories: BTreeSet<PathBuf> = crate_directories.iter().cloned().collect();
+    // 工作区成员之外、顺 path 依赖收进来的是工作区外的（`CrateOrigin`）
     let workspace_member_directories = known_directories.clone();
     let mut pending_directories: VecDeque<PathBuf> = crate_directories.into_iter().collect();
     while let Some(directory) = pending_directories.pop_front() {
@@ -1418,11 +1776,14 @@ pub fn load_workspace(
                 reason: error.to_string(),
             }
         })?;
-        let manifest =
-            parse_crate_manifest(&text).map_err(|error| WorkspaceError::ManifestUnreadable {
-                path: manifest_path.clone(),
-                error,
-            })?;
+        let manifest = parse_crate_manifest_with_default_package_name(
+            &text,
+            &default_package_name_of(&directory, &repository_root),
+        )
+        .map_err(|error| WorkspaceError::ManifestUnreadable {
+            path: manifest_path.clone(),
+            error,
+        })?;
         let crate_identifier = manifest
             .library
             .as_ref()
@@ -1452,7 +1813,7 @@ pub fn load_workspace(
             }
         }
         let origin = if workspace_member_directories.contains(&normalized_path(&directory)) {
-            CrateOrigin::UnderTheCratesDirectory
+            CrateOrigin::WorkspaceMember
         } else {
             CrateOrigin::PathDependencyOutsideTheWorkspace
         };
@@ -1464,10 +1825,25 @@ pub fn load_workspace(
             origin,
         });
     }
+    // 一个 crate 的目录底下套着别的 crate 的目录时（仓根自己是成员、成员 `crates/outer` 底下有成员 `crates/outer/inner` 这类），
+    // 套在里面的那个目录底下的文件归里面那个 crate，外面的不再收一遍：每份文件只归离它最近的那个 crate 目录
+    // （与 `scripts/gate/lib_function_units.py` 的 `RustWorkspace.all_files` 同一条规则）
+    let directories_of_the_crates: Vec<PathBuf> = crates
+        .iter()
+        .map(|workspace_crate| normalized_path(&workspace_crate.directory))
+        .collect();
     let mut entries = Vec::new();
     for (crate_position, workspace_crate) in crates.iter().enumerate() {
         let mut found = Vec::new();
         collect_source_files(&workspace_crate.directory, &mut found);
+        let own_directory = normalized_path(&workspace_crate.directory);
+        found.retain(|absolute_path| {
+            !directories_of_the_crates.iter().any(|directory| {
+                *directory != own_directory
+                    && directory.starts_with(&own_directory)
+                    && absolute_path.starts_with(directory)
+            })
+        });
         for absolute_path in found {
             let language = if absolute_path
                 .extension()
@@ -1478,7 +1854,10 @@ pub fn load_workspace(
                 SourceLanguage::Rust
             };
             entries.push(FileEntry {
-                relative_path: relative_display(&absolute_path, &repository_root),
+                relative_path: relative_path_from_the_repository_root(
+                    &normalized_path(&absolute_path),
+                    &repository_root,
+                ),
                 absolute_path: normalized_path(&absolute_path),
                 crate_index: CrateIndex(crate_position),
                 language,
@@ -1517,6 +1896,7 @@ fn assemble_workspace(
     let parsed = parse_files_in_parallel(
         &entries,
         &crates,
+        &repository_root,
         loading.threads,
         loading.switches,
         loading.origin,

@@ -77,8 +77,7 @@ fn group_key_with(
     entry_group_key(
         &workspace,
         &group(entry_paths, features),
-        &[TOOLCHAIN_LINE.to_string()],
-        &[],
+        HOST_TARGET_TRIPLE,
         &switches,
     )
 }

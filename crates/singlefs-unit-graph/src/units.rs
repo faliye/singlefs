@@ -221,6 +221,41 @@ impl RefusalForm {
             RefusalForm::ShellBashSyntax => "bash-syntax",
         }
     }
+
+    /// 这一种拒算说的是不是闭包收没收全：切不全的文件、判不了的条件编译、拼名字的宏、没含进来的文件、缺的模块文件、proc-macro crate、
+    /// 认不出的目标平台、`verus!` 剥不了的文件，与经子进程、可执行文件另起的代码——这几种那一处后面可能还有没收进来的边，
+    /// 连到哪个包都说不定。别的几种只说那一处自己读的输入定不下来（运行期读的路径、读不了的数据文件、`include_*!` 的写法、构建脚本交的值、
+    /// 外部函数、WGSL 的名字与切分、shell 脚本、`Cargo.lock` 里找不到的包），只关那一处所在的单元。
+    /// 只键几个包的单元时（[`crate::closure::outcome_keeping_only_the_listed_packages`]），前一种不论落在哪都留，
+    /// 后一种只在落在留下的文件里时留。
+    #[must_use]
+    pub fn leaves_the_edges_of_the_closure_uncertain(self) -> bool {
+        match self {
+            RefusalForm::UnbalancedBrackets
+            | RefusalForm::UnrecognizedItemStart
+            | RefusalForm::UnrecognizedConditionalCompilationPredicate
+            | RefusalForm::ItemLevelInclude
+            | RefusalForm::IdentifierPastingMacro
+            | RefusalForm::ProcedureMacroCrate
+            | RefusalForm::CurrentExecutablePath
+            | RefusalForm::ModuleFileMissing
+            | RefusalForm::BinaryTargetMissing
+            | RefusalForm::TargetTripleUnrecognized
+            | RefusalForm::VerusGhostCodeUnparsed => true,
+            RefusalForm::IncludeArgumentNotInAllowedForms
+            | RefusalForm::RuntimeReadWithoutLiteralPath
+            | RefusalForm::DataFileUnreadable
+            | RefusalForm::ExternalFunctionInterface
+            | RefusalForm::BuildScriptMissing
+            | RefusalForm::WgslUndefinedName
+            | RefusalForm::WgslUnrecognizedItemStart
+            | RefusalForm::LockDependencyUnresolved
+            | RefusalForm::ShellPathUnfolded
+            | RefusalForm::ShellPathOutsideRoot
+            | RefusalForm::ShellPathMissing
+            | RefusalForm::ShellBashSyntax => false,
+        }
+    }
 }
 
 /// 拒算落在哪份文件。
@@ -279,6 +314,12 @@ pub enum SourceRead {
     /// [`SourceRead::ChildTestProcess`] 那一形：起的就是在跑的这个程序。入口是一个 bin 的 `fn main`、不按测试编的时候它再进一次
     /// 已在闭包里的 `main`，不算新代码；别的入口（在跑的是 libtest，参数选中哪条测试说不清）拒算 `current-exe`，`fragment` 是那一条的原样片段。
     OwnProgramRestart { line: u32, fragment: String },
+    /// `extern "C"` 块属性里没有 `link`、只声明登记的 C 库调用（`rust_items` 的
+    /// `extern_block_declares_only_listed_system_library_calls`）：这个块自己不改链接的库。放不放行要看链进同一份产物的库——
+    /// 名单块所在的包与入口所在的包、连同它们顺依赖够到的包里，有不在工作区里的包、有 `extern` 块的属性里有 `link`、或构建脚本
+    /// （连同它调到的构建依赖）里写了加库的指令，链接时多出的库可能导出同名符号，闭包里拒算 `extern-function-interface`
+    /// （`closure` 的 `final_product_may_link_libraries_beyond_the_system_library` 判），`line`、`fragment` 是那个块的。
+    ExternBlockOfListedSystemLibraryCalls { line: u32, fragment: String },
     /// `Command::new(current_exe())` 起本测试二进制的一个子进程，参数里 `--exact` 后面跟着的测试名：闭包里解到入口目标里那个
     /// `#[test] fn`，连一条边（`current-exe-child`）。解不出来时照旧拒算 `current-exe`，`fragment` 就是那一条的原样片段。
     ChildTestProcess {

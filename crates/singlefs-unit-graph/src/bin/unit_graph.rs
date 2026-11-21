@@ -2,7 +2,7 @@
 //!
 //!   unit-graph dump <根> [--judgment-kind <种类>] [--threads <N>]
 //!   unit-graph closure <根> <入口 fn 路径> [<入口 fn 路径>…] [--target <目标>] [--cfg <谓词>]… [--no-default-features]
-//!                      [--toolchain-line <行>…] [--toolchain-of-the-build <profile>]
+//!                      [--toolchain-line <行>…] [--toolchain-of-the-build]
 //!                      [--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <种类>] [--threads <N>]
 //!   unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]
 //!   unit-graph why <根> <入口 fn 路径> [<入口 fn 路径>…] --unit <子串> [与 closure 相同的选项]
@@ -10,10 +10,10 @@
 //! `why` 只查不算键：闭包里「文件路径 + 空格 + 限定名」含 `--unit` 那个子串的单元，各是经哪条边头一回被排进闭包的
 //! （行格式见库的 `output::why_lines`）；目标三元组照 closure 一样从工具链行取，依赖行不用，有拒算照打链、退 0。
 //! 给几个入口时一起收一个闭包（`compute_closure_of_entries`：几个入口都在 `--target` 点名的那个目标里、同一个 crate）。
-//! `--toolchain-of-the-build <profile>` 照这台机器现拼一次构建的工具链行（`build_toolchain::toolchain_lines_of_the_build`，与
+//! `--toolchain-of-the-build` 照这台机器现拼一次构建的工具链行（`build_toolchain::toolchain_lines_of_the_build`，与
 //! `singlefs-verification` 的构建脚本同一份拼法）：跑 `$RUSTC -vV`（没设跑 `rustc`）与 `$CARGO -V`（没设跑 `cargo`），目标取
-//! `CARGO_BUILD_TARGET`、没设取 `rustc -vV` 的 `host:`，RUSTFLAGS 取 `CARGO_ENCODED_RUSTFLAGS`、没设按空白切 `RUSTFLAGS`，
-//! profile 的生效值从 `<根>` 那棵树的根 `Cargo.toml` 算（`CARGO_PROFILE_<名>_<键>` 照盖）；拼出的行接在 `--toolchain-line` 给的后面。
+//! `CARGO_BUILD_TARGET`、没设取 `rustc -vV` 的 `host:`，RUSTFLAGS 取 `CARGO_ENCODED_RUSTFLAGS`、没设按空白切 `RUSTFLAGS`；
+//! 编译档不拼进来。拼出的行接在 `--toolchain-line` 给的后面。
 //! 要与构建脚本写进 `OUT_DIR` 的键逐字相同，另给 `--no-default-features` 与构建时开的每个特性（`--cfg 'feature="default"'` 这样逐个写）、
 //! `--lock-file <根>/Cargo.lock` 和 `--judgment-kind product-behavior`（判器组是产品行为判定）。
 //! `--judgment-kind` 定这一趟在哪个视图上切、收、算（`singlefs_unit_graph::verus_ghost_code`）：`product-behavior` 剥掉 `verus!` 里的规格与证明块，
@@ -30,7 +30,7 @@
 //! `--threads` 不给时照 `.claude/heavy-thread-default` 的取法（`SINGLEFS_THREAD_CAP` 设了照它）。
 //!
 //! 退出码：0 交了全部行（`dump` 照列拒算行，也是 0）；2 用法错（缺目标三元组、两种依赖行都给了）、根目录或清单读不了、
-//! `--lock-file` 读不了、`--toolchain-of-the-build` 拼不出（`rustc`、`cargo` 跑不了，profile 算不出）、入口找不到或不唯一、
+//! `--lock-file` 读不了、`--toolchain-of-the-build` 拼不出（`rustc`、`cargo` 跑不了）、入口找不到或不唯一、
 //! 几个入口不在同一个 crate、入口在这组 cfg 下不编进来、闭包读到的 shell 脚本交 bash 规范化跑不下去（bash 不在、退非 0、超时）、
 //! 写标准输出失败；
 //! 3 闭包里有拒算（`closure` 列组成清单与拒算行、不打键行，`key` 只打拒算行）。
@@ -42,9 +42,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 
-use singlefs_unit_graph::build_toolchain::{
-    effective_profile_lines, toolchain_lines_of_the_build, BuildToolchainInputs,
-};
+use singlefs_unit_graph::build_toolchain::{toolchain_lines_of_the_build, BuildToolchainInputs};
 use singlefs_unit_graph::closure::{
     compute_closure_of_entries, reuse_key, ClosureRequest, ExternalKeyInputs, RequestedCondition,
 };
@@ -61,7 +59,7 @@ use singlefs_unit_graph::workspace::{load_workspace, TargetSelector, Workspace};
 const USAGE: &str = concat!(
     "用法：unit-graph dump <根> [--judgment-kind <product-behavior|formal-verification>] [--threads <N>]\n",
     "      unit-graph closure <根> <入口 fn 路径> [<入口 fn 路径>…] [--target <目标>] [--cfg <谓词>]… [--no-default-features] ",
-    "[--toolchain-line <行>…（其中一行 host: <三元组> 或 target: <三元组>）] [--toolchain-of-the-build <profile>] ",
+    "[--toolchain-line <行>…（其中一行 host: <三元组> 或 target: <三元组>）] [--toolchain-of-the-build] ",
     "[--lock-line <行>… | --lock-file <Cargo.lock>] [--judgment-kind <product-behavior|formal-verification>] [--threads <N>]\n",
     "      unit-graph key <根> <入口 fn 路径> [<入口 fn 路径>…] [与 closure 相同的选项]\n",
     "      unit-graph why <根> <入口 fn 路径> [<入口 fn 路径>…] --unit <子串> [与 closure 相同的选项]"
@@ -80,6 +78,13 @@ enum Command {
     Why,
 }
 
+/// 给的工具链行后面接不接这台机器现拼的那几行（`--toolchain-of-the-build`）。
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ToolchainLinesOfThisMachine {
+    Appended,
+    NotAppended,
+}
+
 struct Arguments {
     command: Command,
     root: PathBuf,
@@ -90,7 +95,7 @@ struct Arguments {
     toolchain_lines: Vec<String>,
     lock_lines: Vec<String>,
     lock_file: Option<PathBuf>,
-    build_profile: Option<String>,
+    toolchain_lines_of_this_machine_in_the_key: ToolchainLinesOfThisMachine,
     judgment_kind: JudgmentKind,
     threads: Option<NonZeroUsize>,
     /// `why` 要查的单元：文件路径或限定名里的一段。
@@ -119,7 +124,7 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
         toolchain_lines: Vec::new(),
         lock_lines: Vec::new(),
         lock_file: None,
-        build_profile: None,
+        toolchain_lines_of_this_machine_in_the_key: ToolchainLinesOfThisMachine::NotAppended,
         judgment_kind: JudgmentKind::FormalVerification,
         threads: None,
         unit_pattern: None,
@@ -129,15 +134,8 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
         let current = raw[position].as_str();
         let value = raw.get(position + 1);
         match current {
-            "--threads"
-            | "--target"
-            | "--cfg"
-            | "--toolchain-line"
-            | "--lock-line"
-            | "--lock-file"
-            | "--toolchain-of-the-build"
-            | "--unit"
-            | "--judgment-kind" => {
+            "--threads" | "--target" | "--cfg" | "--toolchain-line" | "--lock-line"
+            | "--lock-file" | "--unit" | "--judgment-kind" => {
                 let Some(value) = value else {
                     return Err(format!("{current} 后面缺值"));
                 };
@@ -162,7 +160,6 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
                     "--unit" => arguments.unit_pattern = Some(value.clone()),
                     "--toolchain-line" => arguments.toolchain_lines.push(value.clone()),
                     "--lock-file" => arguments.lock_file = Some(PathBuf::from(value)),
-                    "--toolchain-of-the-build" => arguments.build_profile = Some(value.clone()),
                     "--judgment-kind" => {
                         arguments.judgment_kind = JudgmentKind::parse(value).map_err(|text| {
                             format!(
@@ -178,6 +175,11 @@ fn parse_arguments(raw: &[String]) -> Result<Arguments, String> {
             }
             "--no-default-features" => {
                 arguments.uses_default_features = false;
+                position += 1;
+            }
+            "--toolchain-of-the-build" => {
+                arguments.toolchain_lines_of_this_machine_in_the_key =
+                    ToolchainLinesOfThisMachine::Appended;
                 position += 1;
             }
             option if option.starts_with("--") => return Err(format!("认不得选项「{option}」")),
@@ -224,11 +226,8 @@ fn output_of(program: &str, argument: &str) -> Result<String, String> {
     String::from_utf8(output.stdout).map_err(|_| format!("{program} {argument} 的输出不是 UTF-8"))
 }
 
-/// `--toolchain-of-the-build <profile>`：照这台机器与 `workspace` 那棵树的根 `Cargo.toml` 现拼工具链行（文件头写了取法）。
-fn toolchain_lines_of_this_machine(
-    workspace: &Workspace,
-    profile: &str,
-) -> Result<Vec<String>, String> {
+/// `--toolchain-of-the-build`：照这台机器现拼工具链行（文件头写了取法）。
+fn toolchain_lines_of_this_machine() -> Result<Vec<String>, String> {
     let environment = |name: &str| std::env::var(name).ok();
     let rustc = environment("RUSTC").unwrap_or_else(|| "rustc".to_string());
     let cargo = environment("CARGO").unwrap_or_else(|| "cargo".to_string());
@@ -248,16 +247,11 @@ fn toolchain_lines_of_this_machine(
             .collect::<Vec<&str>>()
             .join("\u{1f}")
     });
-    let root_manifest = workspace.repository_root.join("Cargo.toml");
-    let root_manifest_text = std::fs::read_to_string(&root_manifest)
-        .map_err(|error| format!("{} 读不了：{error}", root_manifest.display()))?;
-    let profile_lines = effective_profile_lines(&root_manifest_text, profile, &environment)?;
     Ok(toolchain_lines_of_the_build(&BuildToolchainInputs {
         rustc_version_text: &rustc_version_text,
         cargo_version_text: &cargo_version_text,
         target_triple: &target_triple,
         encoded_rustflags: &encoded_rustflags,
-        profile_lines: &profile_lines,
     }))
 }
 
@@ -290,16 +284,18 @@ fn lines_of(
         }
         Command::Closure | Command::Key | Command::Why => {
             let mut toolchain_lines = arguments.toolchain_lines.clone();
-            if let Some(profile) = &arguments.build_profile {
-                match toolchain_lines_of_this_machine(workspace, profile) {
-                    Ok(lines) => toolchain_lines.extend(lines),
-                    Err(message) => {
-                        return (
-                            Vec::new(),
-                            format!("--toolchain-of-the-build 拼不出：{message}"),
-                            EXIT_USAGE,
-                        )
-                    }
+            let lines_of_this_machine = match arguments.toolchain_lines_of_this_machine_in_the_key {
+                ToolchainLinesOfThisMachine::Appended => toolchain_lines_of_this_machine(),
+                ToolchainLinesOfThisMachine::NotAppended => Ok(Vec::new()),
+            };
+            match lines_of_this_machine {
+                Ok(lines) => toolchain_lines.extend(lines),
+                Err(message) => {
+                    return (
+                        Vec::new(),
+                        format!("--toolchain-of-the-build 拼不出：{message}"),
+                        EXIT_USAGE,
+                    )
                 }
             }
             let target_triple = match target_triple_of_toolchain_lines(&toolchain_lines) {

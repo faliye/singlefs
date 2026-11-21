@@ -1,6 +1,9 @@
 //! R-裸名局部绑定遮住同名函数（`src/closure.rs` 文件头「R-裸名局部绑定遮住同名函数」）：函数里名字每一处都是 `let` 或参数绑定的、或落在绑定的作用域里的，
-//! 不往外连同名函数；认不准的（绑定之前调了、初始值里调了、块外调了、带路径的、函数体里有嵌套条目的、宏调用括号里的 `let`、`if let`、作用域外的格式串捕获）照连。
-//! 夹具只切词、不编译。真仓的形状是 `let main = SamplingPoint::Main;`，名字写进宏调用实参与闭包：不连可执行文件自己的 `fn main`。
+//! 不往外连同名函数；认不准的（绑定之前调了、初始值里调了、块外调了、带路径的、函数体里有嵌套条目的、宏调用括号里的 `let`、`if let`、作用域外的格式串捕获、
+//! 落在名单外的宏调用括号里的）照连。名单是 `src/closure.rs` 的 `STANDARD_MACROS_EVALUATING_THEIR_ARGUMENTS_IN_PLACE`（标准库那 16 个就地求值实参的宏），
+//! 名单每一项、名单外的宏与宏调用括号里的 `let` 这几形的用例在 `unit_graph_shapes_that_hide_the_callee_widen_the_closure_or_refuse_the_key.rs`。
+//! 夹具只切词、不编译。真仓的形状是 `let main = SamplingPoint::Main;`，名字写进名单里的 `format!` 的实参与闭包：不连可执行文件自己的 `fn main`；
+//! 写进名单外的宏（工作区的、外部 crate 的）括号里的照连。
 //! 每条用例改被它点名的那个同名条目，判入口的键变不变；弄坏开关 `local-bindings-shadow-same-named-functions`（`src/rule_switches.rs`）打开时遮住的也连。
 
 mod common_fixture_workspace;
@@ -113,13 +116,6 @@ pub fn calls_the_function_in_a_nested_function() -> u32 {
 pub fn binds_the_name_of_a_constant() -> u32 {
     let LIMIT = 3;
     LIMIT
-}
-
-pub fn lets_inside_a_macro_call() -> u32 {
-    wrapped! {
-        let helper_total = 7;
-        helper_total
-    }
 }
 
 pub fn if_let_binds_the_name_and_a_later_statement_calls_the_function() -> u32 {
@@ -484,19 +480,6 @@ fn let_with_the_name_of_a_constant_links_the_constant() {
     );
 }
 
-/// 场景：宏调用括号里写 `let helper_total = 7;`，展开成什么看不出。预期：改函数键变。
-#[test]
-fn let_inside_a_macro_call_does_not_shadow() {
-    assert_eq!(
-        expectation_with_every_rule_intact(
-            "fshadow::lets_inside_a_macro_call",
-            EDIT_OF_THE_SAME_NAMED_FUNCTION
-        ),
-        KeyExpectation::Changes,
-        "宏调用括号里的 let 不当绑定"
-    );
-}
-
 /// 场景：`if let helper_total = …` 的绑定只在 if 块里，后面的语句调同名函数。预期：改函数键变。
 #[test]
 fn an_if_let_does_not_bind_the_name_for_the_later_statements() {
@@ -523,7 +506,7 @@ fn format_capture_before_the_let_links_the_function() {
     );
 }
 
-/// 场景（真仓 `let main = SamplingPoint::Main;` 的形状）：绑定之后名字写进宏调用实参、闭包与格式串捕获。预期：改同名函数键不变。
+/// 场景（真仓 `let main = SamplingPoint::Main;` 的形状）：绑定之后名字写进名单里的 `format!` 的实参、闭包与格式串捕获。预期：改同名函数键不变。
 #[test]
 fn let_used_in_macro_arguments_closures_and_captures_shadows_the_function() {
     assert_eq!(
@@ -532,7 +515,7 @@ fn let_used_in_macro_arguments_closures_and_captures_shadows_the_function() {
             EDIT_OF_THE_SAME_NAMED_FUNCTION
         ),
         KeyExpectation::StaysTheSame,
-        "作用域里宏调用实参、闭包、格式串捕获里的名字都是局部变量"
+        "作用域里名单里的宏的调用实参、闭包、格式串捕获里的名字都是局部变量"
     );
 }
 
