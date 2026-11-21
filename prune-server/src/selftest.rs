@@ -43,6 +43,11 @@ use crate::selftest_fault_cells::{
     cell_server_kill_while_client_writes,
 };
 use crate::selftest_gpu_judging_cells::{
+    cell_claim_listing_filters_by_the_given_prefix,
+    cell_claim_listing_leaves_the_library_untouched,
+    cell_claim_listing_refuses_a_prefix_outside_the_gpu_claim_family,
+    cell_claim_listing_resumes_after_the_last_key, cell_claim_listing_shows_only_unexpired_claims,
+    cell_claim_release_frees_only_the_named_holder,
     cell_conclusion_guard_checked_after_deduplication,
     cell_conclusion_write_deletes_the_pending_row,
     cell_conclusion_write_proceeds_after_the_lease_expires,
@@ -114,7 +119,7 @@ struct Cell {
     function: CellFunction,
 }
 
-const CELLS: [Cell; 65] = [
+const CELLS: [Cell; 71] = [
     Cell {
         name: "batched-point-read",
         remedy: "看 storage.rs 的 read_points：同一张表的键要一次 batched_multi_get_cf 查完，次序与请求相同",
@@ -438,6 +443,37 @@ const CELLS: [Cell; 65] = [
         name: "forced-rejudge-writes-the-rejudged-row",
         remedy: "看 gpu_judging_rows.rs 的 GpuConclusion::guarded_write（强制现判另带 gpu-rejudged/ 那一行、摘要取写的值或期待）与 reliable_client.rs 的 write_gpu_conclusion",
         function: cell_forced_rejudge_writes_the_rejudged_row,
+    },
+    Cell {
+        name: "claim-release-frees-only-the-named-holder",
+        remedy: "看 committer.rs 的 add_claim_release（只放认领表里记的持有者就是帧里的持有者的，别的持有者持着的回「别人持有」、不动）\
+                 与 protocol.rs 的放认领帧（只收 gpu-claim/ 起头的键）",
+        function: cell_claim_release_frees_only_the_named_holder,
+    },
+    Cell {
+        name: "claim-listing-shows-only-unexpired-claims",
+        remedy: "看 committer.rs 的 add_claim_listing（只列租期此刻没到的认领，过了租期还留在内存认领表里的不列）",
+        function: cell_claim_listing_shows_only_unexpired_claims,
+    },
+    Cell {
+        name: "claim-listing-refuses-a-prefix-outside-the-gpu-claim-family",
+        remedy: "看 committer.rs 的 add_claim_listing（前缀不以 gpu-claim/ 起头回状态 1）",
+        function: cell_claim_listing_refuses_a_prefix_outside_the_gpu_claim_family,
+    },
+    Cell {
+        name: "claim-listing-filters-by-the-given-prefix",
+        remedy: "看 committer.rs 的 add_claim_listing（只列键以请求的前缀起头的认领）",
+        function: cell_claim_listing_filters_by_the_given_prefix,
+    },
+    Cell {
+        name: "claim-listing-resumes-after-the-last-key",
+        remedy: "看 committer.rs 的 add_claim_listing（从排在续扫起点之后的第一把键起列）与 reliable_client.rs 的 list_claims",
+        function: cell_claim_listing_resumes_after_the_last_key,
+    },
+    Cell {
+        name: "claim-listing-leaves-the-library-untouched",
+        remedy: "看 committer.rs 的 add_claim_listing（只读内存认领表，不往这一组的写批里加东西）",
+        function: cell_claim_listing_leaves_the_library_untouched,
     },
     Cell {
         name: OWN_PROCESS_CELL_NAME,

@@ -184,10 +184,22 @@ pub enum BreakSwitch {
     ConclusionWritePendingRowsKept,
     /// 容错客户端写 GPU 结论时不带强制现判的那一行 `gpu-rejudged/`。
     RejudgedRowDropped,
+    /// 放认领不看持有者：键上有认领记录就放，别的持有者持着的也放。
+    ClaimReleaseIgnoresTheHolder,
+    /// 列认领连租期过了的也列。
+    ClaimListingIncludesExpired,
+    /// 列认领不核前缀是不是 GPU 认领键的族前缀：别的前缀照列（回空）而不是回状态 1。
+    ClaimListingPrefixUnchecked,
+    /// 列认领不按请求的前缀筛，列全部认领。
+    ClaimListingIgnoresThePrefix,
+    /// 列认领不看续扫起点，总从头列。
+    ClaimListingResumeKeyIgnored,
+    /// 列认领的时候把列到的认领照原样再写一遍进这一组（改了库、同步一次 WAL）。
+    ClaimListingWritesTheLibrary,
 }
 
 impl BreakSwitch {
-    pub const ALL: [BreakSwitch; 86] = [
+    pub const ALL: [BreakSwitch; 92] = [
         BreakSwitch::MultiGetPerKey,
         BreakSwitch::WriteSyncPerEntry,
         BreakSwitch::PrefixScanOverruns,
@@ -274,6 +286,12 @@ impl BreakSwitch {
         BreakSwitch::WriteIfAbsentOverwrites,
         BreakSwitch::ConclusionWritePendingRowsKept,
         BreakSwitch::RejudgedRowDropped,
+        BreakSwitch::ClaimReleaseIgnoresTheHolder,
+        BreakSwitch::ClaimListingIncludesExpired,
+        BreakSwitch::ClaimListingPrefixUnchecked,
+        BreakSwitch::ClaimListingIgnoresThePrefix,
+        BreakSwitch::ClaimListingResumeKeyIgnored,
+        BreakSwitch::ClaimListingWritesTheLibrary,
     ];
 
     pub fn name(self) -> &'static str {
@@ -388,6 +406,12 @@ impl BreakSwitch {
             BreakSwitch::WriteIfAbsentOverwrites => "write-if-absent-overwrites",
             BreakSwitch::ConclusionWritePendingRowsKept => "conclusion-write-pending-rows-kept",
             BreakSwitch::RejudgedRowDropped => "rejudged-row-dropped",
+            BreakSwitch::ClaimReleaseIgnoresTheHolder => "claim-release-ignores-the-holder",
+            BreakSwitch::ClaimListingIncludesExpired => "claim-listing-includes-expired",
+            BreakSwitch::ClaimListingPrefixUnchecked => "claim-listing-prefix-unchecked",
+            BreakSwitch::ClaimListingIgnoresThePrefix => "claim-listing-ignores-the-prefix",
+            BreakSwitch::ClaimListingResumeKeyIgnored => "claim-listing-resume-key-ignored",
+            BreakSwitch::ClaimListingWritesTheLibrary => "claim-listing-writes-the-library",
         }
     }
 
@@ -514,6 +538,20 @@ impl BreakSwitch {
                 "conclusion-write-deletes-the-pending-row"
             }
             BreakSwitch::RejudgedRowDropped => "forced-rejudge-writes-the-rejudged-row",
+            BreakSwitch::ClaimReleaseIgnoresTheHolder => {
+                "claim-release-frees-only-the-named-holder"
+            }
+            BreakSwitch::ClaimListingIncludesExpired => "claim-listing-shows-only-unexpired-claims",
+            BreakSwitch::ClaimListingPrefixUnchecked => {
+                "claim-listing-refuses-a-prefix-outside-the-gpu-claim-family"
+            }
+            BreakSwitch::ClaimListingIgnoresThePrefix => {
+                "claim-listing-filters-by-the-given-prefix"
+            }
+            BreakSwitch::ClaimListingResumeKeyIgnored => "claim-listing-resumes-after-the-last-key",
+            BreakSwitch::ClaimListingWritesTheLibrary => {
+                "claim-listing-leaves-the-library-untouched"
+            }
         }
     }
 

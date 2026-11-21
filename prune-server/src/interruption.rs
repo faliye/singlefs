@@ -1,5 +1,5 @@
-//! 压测器收到 SIGTERM（task-server 的 cancel、systemd 停单元）或 SIGINT 时只置一个标记；
-//! 各循环看到标记就停下、照常返回，压测库由守卫在返回路上删掉（成功、失败、被打断都删）。
+//! 压测器与 GPU 批处理服务（`gpu-verification-server/src/main.rs`）收到 SIGTERM（task-server 的 cancel、systemd 停单元）或 SIGINT 时只置一个标记；
+//! 各循环看到标记就停下、照常返回：压测库由守卫在返回路上删掉（成功、失败、被打断都删），GPU 批处理服务收尾之后放掉自己的认领。
 
 use std::sync::atomic::{AtomicBool, Ordering};
 

@@ -723,6 +723,8 @@ impl ConnectionReceiver {
                 | ResponseOutcome::ScanEntries { .. }
                 | ResponseOutcome::Statistics(_)
                 | ResponseOutcome::Claims(_)
+                | ResponseOutcome::ClaimsReleased(_)
+                | ResponseOutcome::ClaimListing { .. }
                 | ResponseOutcome::PrefixDeleted { .. }
                 | ResponseOutcome::ConnectedClients(_)
                 | ResponseOutcome::Busy { .. }
@@ -946,6 +948,8 @@ impl SimpleClient {
             | ResponseOutcome::ScanEntries { .. }
             | ResponseOutcome::Statistics(_)
             | ResponseOutcome::Claims(_)
+            | ResponseOutcome::ClaimsReleased(_)
+            | ResponseOutcome::ClaimListing { .. }
             | ResponseOutcome::ConnectedClients(_)
             | ResponseOutcome::ServerStopping { .. }
             | ResponseOutcome::Busy { .. }

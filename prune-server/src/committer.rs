@@ -12,6 +12,13 @@
 //! 重发落下时往后推的那一段至多是这一次认领调用自己用掉的时间（重连总时长上限管着）。
 //! 认领先逐键判结局、只数回应的字节，再动库与认领表：回应会越过帧长上限的整帧回状态 1（说明里写回应会有多少字节），
 //! 回应记不进待处理额度的回忙，两种都一个键都不认领、不续租（弄坏开关 claim-response-unbudgeted 退回不核字节、照编超长回应的写法）。
+//! 放认领（`protocol.rs` 文件头「放认领」）：只看内存认领表、只放帧里点名的持有者名下的，放掉的从内存认领表与这一组的写批里一起去掉，
+//! 不碰数据行、不用先提交这一组（弄坏开关 claim-release-ignores-the-holder 退回不看持有者、有记录就放）。
+//! 列认领（`protocol.rs` 文件头「列认领」）：只读内存认领表，键以前缀起头、租期此刻没到的按键升序列出，不改库、不动认领、不用先提交这一组；
+//! 前缀不是 GPU 认领键的族前缀回状态 1，回应先记进待处理额度（记不进回忙、什么都没改），排在这一组后面同步之后才回。
+//! 弄坏开关 claim-listing-includes-expired 连过了租期的也列，claim-listing-prefix-unchecked 不核前缀是不是族前缀，
+//! claim-listing-ignores-the-prefix 不按请求的前缀筛、列全部认领，claim-listing-resume-key-ignored 不看续扫起点、总从头列，
+//! claim-listing-writes-the-library 列的时候把列到的认领照原样再写一遍进这一组。
 //! 删前缀：同样先把这一组里改过数据行的写与真删提交掉（删的是已落盘的库），再扫；只有认领行的一组不用先提交
 //! （扫走到记账那一段就停，看不到认领行，`storage.rs` 的 `scan_prefix_for_deletion`）。回应（带这一帧最后一把键）先编好、照认领的办法先记进待处理额度，
 //! 记不进整帧回忙、一把键都不删（只数不删的那一帧同样回忙，不留超限的回应），记得进才把删除记进新的一组，
@@ -45,14 +52,17 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use crate::break_switches::BreakSwitch;
 use crate::connections::ConnectionRecord;
 use crate::fault_log::FaultKind;
+use crate::gpu_judging_rows::GPU_CLAIM_FAMILY_PREFIX;
 use crate::protocol::{
-    decode_request_body, encode_busy, encode_claim_outcomes, encode_entries_acknowledgement,
-    encode_guard_refusal, encode_prefix_deleted_response, encode_rejection,
-    encode_write_acknowledgement, held_by_other_outcome_bytes, maximum_response_payload_bytes,
-    ClaimOutcome, EntryInTable, GuardRefusal, GuardedConclusionWriteView, KeyInTable,
-    OperationCode, RequestRejection, RequestView, ResponseStatus, ServiceKeys, TrailingBytes,
-    CLAIM_OUTCOME_COUNT_BYTES, FRAME_LENGTH_FIELD_BYTES, MAXIMUM_CLIENT_IDENTITY_BYTES,
-    MAXIMUM_FRAME_BODY_BYTES, RESPONSE_HEADER_BYTES, SHORT_CLAIM_OUTCOME_BYTES,
+    decode_request_body, encode_busy, encode_claim_listing, encode_claim_outcomes,
+    encode_claim_release_outcomes, encode_entries_acknowledgement, encode_guard_refusal,
+    encode_prefix_deleted_response, encode_rejection, encode_write_acknowledgement,
+    held_by_other_outcome_bytes, listed_claim_bytes, maximum_response_payload_bytes, ClaimOutcome,
+    ClaimReleaseOutcome, EntryInTable, GuardRefusal, GuardedConclusionWriteView, KeyInTable,
+    ListedClaim, OperationCode, RequestRejection, RequestView, ResponseStatus, ServiceKeys,
+    TrailingBytes, CLAIM_LISTING_HEADER_BYTES, CLAIM_OUTCOME_COUNT_BYTES, FRAME_LENGTH_FIELD_BYTES,
+    MAXIMUM_CLIENT_IDENTITY_BYTES, MAXIMUM_FRAME_BODY_BYTES, RESPONSE_HEADER_BYTES,
+    SHORT_CLAIM_OUTCOME_BYTES,
 };
 use crate::server::{PendingSlot, SharedState, STORAGE_SYNC_FAILED_EXIT_CODE};
 use crate::storage::{claim_key, ClaimRecord, GroupBatch, GroupCommitFailure};
@@ -83,6 +93,13 @@ struct DeletePrefixRequest<'frame> {
     after_key: &'frame [u8],
     maximum_keys: u32,
     count_only: bool,
+}
+
+/// 列认领帧解出来的三样（`protocol.rs` 文件头「列认领」）。
+struct ClaimListingRequest<'frame> {
+    prefix: &'frame [u8],
+    after_key: &'frame [u8],
+    maximum_entries: u32,
 }
 
 /// 一帧的回应往哪交、占着的待处理名额、哪条连接来的（帧体拆出去解码之后剩下的那一半）。
@@ -373,6 +390,30 @@ impl Committer {
                     group = self.new_group();
                 }
                 self.add_guarded_conclusion_write(&mut group, job, sequence, &conclusion);
+                group
+            }
+            RequestView::ReleaseClaims {
+                holder_identity,
+                keys,
+            } => {
+                self.add_claim_release(&mut group, job, sequence, holder_identity, &keys);
+                group
+            }
+            RequestView::ListClaims {
+                prefix,
+                after_key,
+                maximum_entries,
+            } => {
+                self.add_claim_listing(
+                    &mut group,
+                    job,
+                    sequence,
+                    &ClaimListingRequest {
+                        prefix,
+                        after_key,
+                        maximum_entries,
+                    },
+                );
                 group
             }
             RequestView::BatchedPointRead(_)
@@ -936,6 +977,155 @@ impl Committer {
         } else {
             queue(group, job, response, sequence, operation_code);
         }
+    }
+
+    /// 放认领一帧（`protocol.rs` 文件头「放认领」）：逐键看内存认领表，记的持有者就是帧里的持有者的放掉（内存认领表与这一组的写批一起），
+    /// 没有记录回「没人持着」，记的是别的持有者回「别人持有」、不动。只动认领记录、不碰数据行，所以不用先提交这一组里改过数据行的写；
+    /// 回应一键一字节、不长过请求，照写确认那样排进这一组、同步之后回。弄坏开关 claim-release-ignores-the-holder 下不看持有者，有记录就放。
+    fn add_claim_release(
+        &mut self,
+        group: &mut Group,
+        job: Reply,
+        sequence: u64,
+        holder_identity: &[u8],
+        keys: &[KeyInTable<'_>],
+    ) {
+        let operation_code = OperationCode::ReleaseClaims.code();
+        let ignores_the_holder = self.is_enabled(BreakSwitch::ClaimReleaseIgnoresTheHolder);
+        let mut outcomes = Vec::with_capacity(keys.len());
+        for key in keys {
+            let is_held_by_the_named_holder = self
+                .claims
+                .get(&claim_key(key.key))
+                .map(|record| record.holder_identity == holder_identity || ignores_the_holder);
+            let outcome = match is_held_by_the_named_holder {
+                None => ClaimReleaseOutcome::NotClaimed,
+                Some(true) => {
+                    self.release_claim_on(&mut group.batch, key.key);
+                    ClaimReleaseOutcome::Released
+                }
+                Some(false) => ClaimReleaseOutcome::HeldByOther,
+            };
+            outcomes.push(outcome);
+        }
+        queue(
+            group,
+            job,
+            encode_claim_release_outcomes(sequence, &outcomes),
+            sequence,
+            operation_code,
+        );
+    }
+
+    /// 列认领一帧（`protocol.rs` 文件头「列认领」）：照内存认领表列出键以前缀起头、排在续扫起点之后、租期此刻没到的认领，按键升序，至多条数上限条、
+    /// 回应不越过帧长上限（越过的在那一条处截断、标截断）。前缀不是 GPU 认领键的族前缀回状态 1；一条都装不下一帧回状态 1。
+    /// 只读认领表：不改库、不动认领；回应先记进待处理额度（记不进回忙，什么都没改），排进这一组、同步之后回。
+    /// 弄坏开关见文件头：claim-listing-includes-expired、claim-listing-prefix-unchecked、claim-listing-ignores-the-prefix、
+    /// claim-listing-resume-key-ignored、claim-listing-writes-the-library。
+    fn add_claim_listing(
+        &mut self,
+        group: &mut Group,
+        mut job: Reply,
+        sequence: u64,
+        request: &ClaimListingRequest<'_>,
+    ) {
+        let operation_code = OperationCode::ListClaims.code();
+        let is_prefix_checked = !self.is_enabled(BreakSwitch::ClaimListingPrefixUnchecked);
+        if is_prefix_checked && !request.prefix.starts_with(GPU_CLAIM_FAMILY_PREFIX) {
+            let message = format!(
+                "列认领只收 GPU 认领键的族前缀（以 {} 起头），收到 {:02x?}",
+                String::from_utf8_lossy(GPU_CLAIM_FAMILY_PREFIX),
+                &request.prefix[..request.prefix.len().min(16)]
+            );
+            send_now(
+                job.responder,
+                encode_rejection(
+                    sequence,
+                    ResponseStatus::MalformedPayload,
+                    operation_code,
+                    &message,
+                ),
+                job.slot,
+            );
+            return;
+        }
+        let now = now_milliseconds();
+        let includes_expired = self.is_enabled(BreakSwitch::ClaimListingIncludesExpired);
+        let ignores_the_prefix = self.is_enabled(BreakSwitch::ClaimListingIgnoresThePrefix);
+        let ignores_the_resume_key = self.is_enabled(BreakSwitch::ClaimListingResumeKeyIgnored);
+        let writes_the_library = self.is_enabled(BreakSwitch::ClaimListingWritesTheLibrary);
+        let mut matching: Vec<(&[u8], &ClaimRecord)> = self
+            .claims
+            .iter()
+            .filter_map(|(claim, record)| {
+                let key = claim.get(1..)?;
+                let is_live = record.lease_expiry_milliseconds > now || includes_expired;
+                let is_under_the_prefix = ignores_the_prefix || key.starts_with(request.prefix);
+                let is_after_the_resume_key = ignores_the_resume_key
+                    || request.after_key.is_empty()
+                    || key > request.after_key;
+                (is_live && is_under_the_prefix && is_after_the_resume_key).then_some((key, record))
+            })
+            .collect();
+        matching.sort_unstable_by(|left, right| left.0.cmp(right.0));
+        let maximum_entries = usize::try_from(request.maximum_entries).unwrap_or(usize::MAX);
+        let payload_limit = maximum_response_payload_bytes();
+        let mut payload_bytes = CLAIM_LISTING_HEADER_BYTES;
+        let mut listed = Vec::new();
+        let mut is_truncated = false;
+        for (key, record) in matching {
+            let entry_bytes = listed_claim_bytes(key.len(), record.holder_identity.len());
+            if listed.len() >= maximum_entries || payload_bytes + entry_bytes > payload_limit {
+                is_truncated = true;
+                break;
+            }
+            payload_bytes += entry_bytes;
+            if writes_the_library {
+                self.shared
+                    .library
+                    .add_claim(&mut group.batch, &claim_key(key), record);
+            }
+            listed.push(ListedClaim {
+                key: key.to_vec(),
+                holder_identity: record.holder_identity.clone(),
+                remaining_lease_milliseconds: record.lease_expiry_milliseconds.saturating_sub(now),
+            });
+        }
+        if listed.is_empty() && is_truncated {
+            let message = format!(
+                "列认领的下一条认领连同回应头装不下一帧（帧长上限 {MAXIMUM_FRAME_BODY_BYTES} 字节）；没有列出任何认领"
+            );
+            send_now(
+                job.responder,
+                encode_rejection(
+                    sequence,
+                    ResponseStatus::MalformedPayload,
+                    operation_code,
+                    &message,
+                ),
+                job.slot,
+            );
+            return;
+        }
+        let response = encode_claim_listing(sequence, is_truncated, &listed);
+        if !job.slot.reserve_response(response.len()) {
+            let retry_after = self.shared.retry_after_milliseconds();
+            self.shared
+                .counters
+                .busy_rejections
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let message = format!(
+                "忙：列认领回应 {} 字节记不进待处理额度；什么都没改，{retry_after} 毫秒后再来",
+                response.len()
+            );
+            send_now(
+                job.responder,
+                encode_busy(sequence, operation_code, retry_after, &message),
+                job.slot,
+            );
+            return;
+        }
+        queue_reserved(group, job, response, sequence, operation_code);
     }
 
     /// 把 `key` 上的认领从内存认领表与 `batch` 里去掉（写结论、删前缀删掉这把键时；这把键上没有认领就不动）。

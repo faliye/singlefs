@@ -100,7 +100,7 @@ fake-ssh 把收到的参数逐次记进 fake/ssh-calls.log、打一行标准输�
       drop-oversized-refused-while-running（✗ drop-oversized-refused-while-running：单元在跑时退 4）
   PRUNE_SERVER_CONTROL_BREAK=cgroup-show-failure-ignored  stop 回读 cgroup 时丢掉 systemctl show 的退出码，show 失败照当 cgroup 里没有进程
       stop-refuses-unreadable-cgroup（✗ stop-refuses-unreadable-cgroup：show 失败时 stop 退 0）
-  PRUNE_SERVER_CONTROL_BREAK=build-hint-leaves-build-directory  缺二进制时的编法提示只让到编译目录里取二进制（编译目录任务一结束就被服务删）
+  PRUNE_SERVER_CONTROL_BREAK=build-hint-leaves-build-directory  缺二进制时的编法提示不把二进制拷到共享根、只让到编译目录里取（编译目录归树、在派到的那台自己的编译根下）
       install-build-hint-saves-binary（✗ install-build-hint-saves-binary：提示里没有把二进制拷到共享根的 && cp）
   PRUNE_SERVER_CONTROL_BREAK=watch-running-states-narrowed  watch 只认 active 算在跑，activating、reloading、deactivating 当单元不在跑
       watch-accepts-transitional-states（✗ watch-accepts-transitional-states：is-active 打 activating 时 watch 退了）
@@ -160,13 +160,16 @@ EVEN_WITH_CLIENTS_FLAG = "--even-with-connected-clients"
 STOPPED_STATES = ("inactive", "failed")
 # 单元算在的状态：active、activating、reloading、deactivating 都算在（.claude/rules/command-safety-by-review.md），watch 只在状态落在这四个之外时报单元不在跑
 RUNNING_STATES = ("active", "activating", "reloading", "deactivating")
-# 编法的提示：编译目录归服务、任务一结束就被服务删，所以编和拷到共享根在同一条提交命令里做完（README.md「装」第 1 条）
+# 编法的提示：编译目录归树、不归任务（本机组里的，任务记下结局、task clean、取消都不删它；派到第二台、中途失败或被停的那一趟，multi-host-run.sh 的 ⑥ 连它用的组里那一个一起删；
+# 树是任务 --cwd 解开符号链接后往上第一层有 .git 的那一层，哪一层都没有就是解开后的 --cwd 本身，树删了才跟着删；这一条的 --cwd 是 <仓根>/prune-server，树是那棵仓的根），
+# 在派到的那台自己的编译根下、wait 的末行不点名它
+# （task-server/task_server_lib.py 文件头「编译目录」）；所以编和拷到共享根在同一条提交命令里做完，二进制取那一条里的 CARGO_TARGET_DIR（README.md「装」第 1 条）
 BUILD_COMMAND = ("task-server/task submit --cwd <仓根>/prune-server -- bash -c 'cargo build --release --offline --bin prune-server"
                  " && cp \"${CARGO_TARGET_DIR:?}/release/prune-server\" <共享根下的目录>/prune-server.new"
                  " && mv <共享根下的目录>/prune-server.new <共享根下的目录>/prune-server'；"
                  "task-server/task wait <号>；<共享根下的目录>/prune-server 是二进制（<共享根下的目录> 取多机配置 NFS_SHARED_ROOTS 某一段下的目录；"
-                 "task wait 打的 build=<目录> 跑完就被服务删了，别到那里取）")
-# 弄坏开关 build-hint-leaves-build-directory 下的提示：只让取编译目录里的二进制（编译目录已被服务删）
+                 "task wait 的末行不点名编译目录：编译目录归树、在派到的那台自己的编译根下，别到那里取）")
+# 弄坏开关 build-hint-leaves-build-directory 下的提示：只让取编译目录里的二进制、没拷到共享根（task wait 的末行不点名编译目录，提示却叫人读末行取）
 BUILD_COMMAND_LEAVING_THE_BUILD_DIRECTORY = ("task-server/task submit --cwd <仓根>/prune-server -- cargo build --release --offline --bin prune-server；"
                                              "task-server/task wait <号> 的末行 build=<目录>，二进制是 <目录>/release/prune-server（README.md「装」）")
 # 多机配置的主机数组（各台有线直连段的 IP，一行空格分隔）；哪一项是这一台、哪一项是第二台只经共用取法取（文件头），这里只在拒绝的出路与自证的配置里点名
@@ -232,7 +235,7 @@ def control_broken(name):
 
 
 def build_command():
-    """缺二进制时的编法提示（自证里弄坏开关 build-hint-leaves-build-directory 换成取编译目录里二进制的旧写法）。"""
+    """缺二进制时的编法提示（自证里弄坏开关 build-hint-leaves-build-directory 换成只让到编译目录里取二进制的写法）。"""
     if control_broken("build-hint-leaves-build-directory"):
         return BUILD_COMMAND_LEAVING_THE_BUILD_DIRECTORY
     return BUILD_COMMAND
@@ -1379,7 +1382,7 @@ def cell_stop_refuses_unreadable_cgroup(base, switches):
 
 
 def cell_install_build_hint_saves_binary(base, switches):
-    """缺二进制时 install 退 78，编法提示是同一条提交命令里编完就把二进制拷到共享根（编译目录任务一结束就被服务删，提示不叫人到编译目录取）。"""
+    """缺二进制时 install 退 78，编法提示是同一条提交命令里编完就把二进制拷到共享根（编译目录归树、在派到的那台自己的编译根下、wait 的末行不点名它，提示不叫人到编译目录取）。"""
     world = SelftestWorld(base, "build-hint", host_configuration(LOCAL_ADDRESS), switches)
     code, _, error = world.run(["install"])
     problems = []
@@ -1387,6 +1390,8 @@ def cell_install_build_hint_saves_binary(base, switches):
     expect(problems, "cargo build --release --offline --bin prune-server && cp " in error and "&& mv " in error,
            f"编法提示该是 cargo build 之后同一条命令里 && cp 到共享根再 && mv，标准错误：{error.strip()}")
     expect(problems, SHARED_ROOTS_KEY in error, f"编法提示该点名共享根 {SHARED_ROOTS_KEY}，标准错误：{error.strip()}")
+    expect(problems, "编译目录归树" in error and "末行不点名编译目录" in error,
+           f"编法提示该说编译目录归树、wait 的末行不点名它，标准错误：{error.strip()}")
     expect(problems, "<目录>/release/prune-server" not in error, f"编法提示不该叫人到编译目录取二进制，标准错误：{error.strip()}")
     return problems
 

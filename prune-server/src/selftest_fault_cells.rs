@@ -1116,6 +1116,8 @@ pub(crate) fn cell_group_commit_coalesces_syncs(context: &CellContext) -> Result
                 | ResponseOutcome::ScanEntries { .. }
                 | ResponseOutcome::Statistics(_)
                 | ResponseOutcome::Claims(_)
+                | ResponseOutcome::ClaimsReleased(_)
+                | ResponseOutcome::ClaimListing { .. }
                 | ResponseOutcome::PrefixDeleted { .. }
                 | ResponseOutcome::ConnectedClients(_)
                 | ResponseOutcome::ServerStopping { .. }

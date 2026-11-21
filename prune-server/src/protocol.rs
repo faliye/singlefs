@@ -50,6 +50,18 @@
 //!   5. 都过了：条目写进、删键删掉、认领键与条目键、删键上的认领释放、记下请求号已生效，同一组提交、WAL 同步之后回确认（与成批写相同）。
 //!
 //!   GPU 判出的结论（`gpu_judging_rows` 文件头：认领键是 `gpu-claim/` 那一行，删键是 `gpu-pending/` 那一行，强制现判另带一条 `gpu-rejudged/`）走它。
+//! - 放认领（操作码 12）：`u8 持有者身份长`、持有者身份（1 到 255 字节）、`u32 键数`，每键 `u8 表`、`u32 键长`、键。键一律是 GPU 认领键
+//!   （`gpu_judging_rows` 文件头，`gpu-claim/` 起头），有一把不是就整帧回状态 1。逐键看认领表：这把键上记的持有者就是帧里的持有者（租期到没到都算）
+//!   的放掉，回「放掉了」；没有认领记录回「没人持着」；记的是别的持有者回「别人持有」、不动它（只放点名的持有者名下的）。
+//!   放掉的与回应同一组提交、WAL 同步之后才回。不按（身份，请求号）去重、不进客户端的追加日志：放本来就幂等，重发只会把「放掉了」报成「没人持着」，
+//!   重发之前别的持有者认领走的照「别人持有」不动。GPU 批处理服务起来时以上一个进程的持有者放它留下的认领、停的时候放自己的、
+//!   认领到之后重读待判行不在了放刚认领到的（`gpu-verification-server/src/library_pending_pool.rs` 文件头「认领」）。
+//! - 列认领（操作码 13）：`u32 前缀长`、前缀、`u32 续扫起点长`、续扫起点、`u32 条数上限`（至少 1，0 回状态 1）。前缀要以 GPU 认领键的族前缀（`gpu-claim/`，
+//!   `gpu_judging_rows` 文件头）起头，不然回状态 1；续扫起点空是从前缀起，不空时必须以前缀起头（不然回状态 1），从排在它之后的第一把键起列（上一帧回的最后一把键）。
+//!   只看提交线程内存里的认领表：键以前缀起头、租期此刻没到的认领按键升序列出，过了租期还留在表里的不列；每条带键（客户端的键，不带记账那一段的标签）、
+//!   持有者身份与剩余租期。不改库、不动认领、不进客户端的追加日志，所以不按（身份，请求号）去重，断线重发无妨。
+//!   一帧被条数上限或帧长上限截断时，客户端拿这一帧的最后一把键接着列；连一条都装不下一帧（键长逼近帧长上限）回状态 1。
+//!   回应的字节先记进待处理额度，记不进整帧回忙（什么都没改，重发即可）；回应排在这一组后面、WAL 同步之后才回，所以回应里的认领都已同步进 WAL。
 //!
 //! 回应帧：`[u32 帧体长度][u64 请求序号][u8 状态][u8 操作码][内容]`。状态 0 是做完，内容按操作码：
 //! - 成批点读：`u32 个数`，每个 `u8 在不在`（0 / 1），在的再跟 `u32 值长`、值，次序与请求里的键相同；
@@ -57,6 +69,8 @@
 //! - 按前缀扫：`u8 有没有被条数上限或帧长上限截断`、`u32 条数`，每条 `u32 键长`、键、`u32 值长`、值，按键升序；
 //! - 统计：`u32 个数`，每个 `u32 名字长`、名字、`u64 值`；
 //! - 认领：`u32 个数`，每个 `u8 结局`：0 认领到；1 别人持有，再跟 `u8 持有者身份长`、身份、`u64 剩余租期毫秒`；2 已有结论。
+//! - 放认领：`u32 个数`，每个 `u8 结局`：0 放掉了；1 没人持着；2 别人持有（没放）。一键一字节，回应不长过请求，不另核帧长上限。
+//! - 列认领：`u8 有没有被条数上限或帧长上限截断`、`u32 条数`，每条 `u32 键长`、键、`u8 持有者身份长`、身份、`u64 剩余租期毫秒`，按键升序。
 //! - 删前缀：`u32 这一帧数到（只数不删时）或删掉（删时）几把`、`u8 前缀下是不是已经没有更多的键`（1 没有了；0 还有，用下面的最后一把键接着来）、
 //!   `u32 最后一把键长`、最后一把键（这一帧一把都没碰到时是空）。
 //! - 列连着的客户端、宣布停服务：`u32 个数`，每个 `u64 连接号`、`u8 走哪条`（1 unix、2 TCP）、`u32 长`对端地址、`u8 报到过没有`，
@@ -83,7 +97,20 @@
 //! 回应按完成先后写回，可能乱序，客户端按回应里的序号对回请求。同一条连接上先写后读同一个键要等写的回应到了再发读；
 //! 同一个客户端两帧写同一个键，回了忙的那一帧重发之后可能落在后发的那一帧之后，要定次序就等前一帧的确认再发后一帧。
 
+use crate::gpu_judging_rows::GPU_CLAIM_FAMILY_PREFIX;
 use crate::sha256::{sha256_digest, DIGEST_BYTES};
+
+mod connection_level_frames;
+mod request_decoding;
+mod request_encoding;
+mod response_decoding;
+mod response_encoding;
+
+pub use self::connection_level_frames::*;
+pub use self::request_decoding::*;
+pub use self::request_encoding::*;
+pub use self::response_decoding::*;
+pub use self::response_encoding::*;
 
 /// 帧体长度上限：满块一帧 65536 态、每态一条约 130 字节，约 9 MB；留出几倍余量，又不让一个坏长度把服务的内存吃满。
 pub const MAXIMUM_FRAME_BODY_BYTES: u32 = 64 * 1024 * 1024;
@@ -219,10 +246,12 @@ pub enum OperationCode {
     DeletePrefix,
     WriteIfAbsent,
     GuardedConclusionWrite,
+    ReleaseClaims,
+    ListClaims,
 }
 
 impl OperationCode {
-    pub const ALL: [OperationCode; 11] = [
+    pub const ALL: [OperationCode; 13] = [
         OperationCode::BatchedPointRead,
         OperationCode::BatchedWrite,
         OperationCode::PrefixScan,
@@ -234,6 +263,8 @@ impl OperationCode {
         OperationCode::DeletePrefix,
         OperationCode::WriteIfAbsent,
         OperationCode::GuardedConclusionWrite,
+        OperationCode::ReleaseClaims,
+        OperationCode::ListClaims,
     ];
 
     pub fn code(self) -> u8 {
@@ -249,17 +280,22 @@ impl OperationCode {
             OperationCode::DeletePrefix => 9,
             OperationCode::WriteIfAbsent => 10,
             OperationCode::GuardedConclusionWrite => 11,
+            OperationCode::ReleaseClaims => 12,
+            OperationCode::ListClaims => 13,
         }
     }
 
-    /// 写（成批写、不在才写、写结论）、认领与删前缀要改库（或要读已落盘的库），交提交线程按到达次序组提交；别的交工作线程并行做，或由读线程当场做（报到、列客户端、宣布停服务）。
-    pub fn changes_library(self) -> bool {
+    /// 写（成批写、不在才写、写结论）、认领、放认领与删前缀要改库（或要读已落盘的库），列认领要读认领表（只在提交线程的内存里），
+    /// 这几种交提交线程按到达次序组提交；别的交工作线程并行做，或由读线程当场做（报到、列客户端、宣布停服务）。
+    pub fn is_handled_by_committer(self) -> bool {
         match self {
             OperationCode::BatchedWrite
             | OperationCode::Claim
             | OperationCode::DeletePrefix
             | OperationCode::WriteIfAbsent
-            | OperationCode::GuardedConclusionWrite => true,
+            | OperationCode::GuardedConclusionWrite
+            | OperationCode::ReleaseClaims
+            | OperationCode::ListClaims => true,
             OperationCode::BatchedPointRead
             | OperationCode::PrefixScan
             | OperationCode::Statistics
@@ -282,7 +318,9 @@ impl OperationCode {
             | OperationCode::Claim
             | OperationCode::DeletePrefix
             | OperationCode::WriteIfAbsent
-            | OperationCode::GuardedConclusionWrite => false,
+            | OperationCode::GuardedConclusionWrite
+            | OperationCode::ReleaseClaims
+            | OperationCode::ListClaims => false,
         }
     }
 
@@ -372,689 +410,6 @@ fn u32_from_usize(value: usize, what: &str) -> u32 {
     })
 }
 
-/// 往一帧里追加字段，`finish` 时回填帧体长度。
-pub struct FrameEncoder {
-    bytes: Vec<u8>,
-}
-
-impl FrameEncoder {
-    pub fn with_capacity(capacity_in_bytes: usize) -> FrameEncoder {
-        let mut bytes = Vec::with_capacity(capacity_in_bytes + FRAME_LENGTH_FIELD_BYTES);
-        bytes.extend_from_slice(&[0_u8; FRAME_LENGTH_FIELD_BYTES]);
-        FrameEncoder { bytes }
-    }
-
-    pub fn put_u8(&mut self, value: u8) {
-        self.bytes.push(value);
-    }
-
-    pub fn put_u32(&mut self, value: u32) {
-        self.bytes.extend_from_slice(&value.to_le_bytes());
-    }
-
-    pub fn put_u64(&mut self, value: u64) {
-        self.bytes.extend_from_slice(&value.to_le_bytes());
-    }
-
-    pub fn put_length_prefixed(&mut self, field: &[u8]) {
-        self.put_u32(u32_from_usize(field.len(), "字段长度"));
-        self.bytes.extend_from_slice(field);
-    }
-
-    /// 一段短文字：`u8 长`、字节。超过 255 字节是调用方的 bug（报到的各段在 `ClientAnnouncement::new` 里截过）。
-    pub fn put_short_text(&mut self, text: &str) {
-        let length = u8::try_from(text.len()).unwrap_or_else(|_| {
-            panic!(
-                "短文字要至多 {MAXIMUM_ANNOUNCEMENT_TEXT_BYTES} 字节，收到 {} 字节",
-                text.len()
-            )
-        });
-        self.bytes.push(length);
-        self.bytes.extend_from_slice(text.as_bytes());
-    }
-
-    /// 按前缀扫的回应：帧头之后先占位的截断标记与条数，扫完再填（`server.rs` 边扫边编，文件头「额度」）。
-    ///
-    /// # Panics
-    /// 帧头之后还没放进截断标记与条数那 5 字节（调用方先 `put_u8`、`put_u32` 占位）。
-    pub fn set_prefix_scan_header(&mut self, is_truncated: bool, entry_count: u32) {
-        let start = FRAME_LENGTH_FIELD_BYTES + usize_from_u32(RESPONSE_HEADER_BYTES);
-        self.bytes[start] = u8::from(is_truncated);
-        self.bytes[start + 1..start + 5].copy_from_slice(&entry_count.to_le_bytes());
-    }
-
-    /// 再放 `additional` 字节要多分配的容量（`server.rs` 边编边记额度：先按它记，再 `grow_capacity`）：装得下回 0，装不下回把容量翻倍
-    /// （至少到装得下）多出的字节。
-    #[must_use]
-    pub fn capacity_growth_for(&self, additional: usize) -> usize {
-        let needed = self.bytes.len() + additional;
-        let capacity = self.bytes.capacity();
-        if needed <= capacity {
-            0
-        } else {
-            needed.max(capacity.saturating_mul(2)) - capacity
-        }
-    }
-
-    /// 容量加 `growth` 字节（`capacity_growth_for` 算的、已经记进额度的那么多）；0 不动。
-    pub fn grow_capacity(&mut self, growth: usize) {
-        if growth > 0 {
-            let additional = self.bytes.capacity() + growth - self.bytes.len();
-            self.bytes.reserve_exact(additional);
-        }
-    }
-
-    /// 帧体此刻的字节数（不含长度字段）。
-    pub fn body_bytes(&self) -> usize {
-        self.bytes.len() - FRAME_LENGTH_FIELD_BYTES
-    }
-
-    pub fn finish(mut self) -> Vec<u8> {
-        let body_bytes = u32_from_usize(self.body_bytes(), "帧体长度");
-        self.bytes[..FRAME_LENGTH_FIELD_BYTES].copy_from_slice(&body_bytes.to_le_bytes());
-        self.bytes
-    }
-}
-
-fn begin_request(sequence: u64, operation_code: u8, capacity_in_bytes: usize) -> FrameEncoder {
-    let mut encoder =
-        FrameEncoder::with_capacity(capacity_in_bytes + usize_from_u32(REQUEST_HEADER_BYTES));
-    encoder.put_u64(sequence);
-    encoder.put_u8(operation_code);
-    encoder
-}
-
-/// 成批点读帧：先声明键数，再逐个加键；加的个数与声明的不同是调用方的 bug。
-pub struct PointReadFrameBuilder {
-    encoder: FrameEncoder,
-    declared_keys: u32,
-    added_keys: u32,
-}
-
-pub fn begin_point_read_frame(
-    sequence: u64,
-    key_count: u32,
-    capacity_in_bytes: usize,
-) -> PointReadFrameBuilder {
-    let mut encoder = begin_request(
-        sequence,
-        OperationCode::BatchedPointRead.code(),
-        capacity_in_bytes + 4,
-    );
-    encoder.put_u32(key_count);
-    PointReadFrameBuilder {
-        encoder,
-        declared_keys: key_count,
-        added_keys: 0,
-    }
-}
-
-impl PointReadFrameBuilder {
-    pub fn key(&mut self, table: Table, key: &[u8]) {
-        self.encoder.put_u8(table.code());
-        self.encoder.put_length_prefixed(key);
-        self.added_keys += 1;
-    }
-
-    pub fn finish(self) -> Vec<u8> {
-        assert_eq!(
-            self.added_keys, self.declared_keys,
-            "成批点读帧声明的键数与加进去的键数不同"
-        );
-        self.encoder.finish()
-    }
-}
-
-/// 成批写帧：先声明条数，再逐条加。
-pub struct WriteFrameBuilder {
-    encoder: FrameEncoder,
-    declared_entries: u32,
-    added_entries: u32,
-}
-
-/// 身份长度不在 1 到 255 字节之内是调用方的 bug（身份由客户端自己生成）。
-fn put_client_identity(encoder: &mut FrameEncoder, client_identity: &[u8]) {
-    assert!(
-        !client_identity.is_empty() && client_identity.len() <= MAXIMUM_CLIENT_IDENTITY_BYTES,
-        "客户端身份要 1 到 {MAXIMUM_CLIENT_IDENTITY_BYTES} 字节，收到 {} 字节",
-        client_identity.len()
-    );
-    encoder.put_u8(u8::try_from(client_identity.len()).expect("上面核过不超 255"));
-    encoder.bytes.extend_from_slice(client_identity);
-}
-
-pub fn begin_write_frame(
-    sequence: u64,
-    client_identity: &[u8],
-    request_number: u64,
-    entry_count: u32,
-    capacity_in_bytes: usize,
-) -> WriteFrameBuilder {
-    begin_entries_frame(
-        OperationCode::BatchedWrite,
-        sequence,
-        client_identity,
-        request_number,
-        entry_count,
-        capacity_in_bytes,
-    )
-}
-
-/// 不在才写帧（文件头「不在才写」）：内容与成批写帧相同，操作码 10。
-pub fn begin_write_if_absent_frame(
-    sequence: u64,
-    client_identity: &[u8],
-    request_number: u64,
-    entry_count: u32,
-    capacity_in_bytes: usize,
-) -> WriteFrameBuilder {
-    begin_entries_frame(
-        OperationCode::WriteIfAbsent,
-        sequence,
-        client_identity,
-        request_number,
-        entry_count,
-        capacity_in_bytes,
-    )
-}
-
-/// 成批写与不在才写共用的帧头：身份、请求号、条数。
-fn begin_entries_frame(
-    operation: OperationCode,
-    sequence: u64,
-    client_identity: &[u8],
-    request_number: u64,
-    entry_count: u32,
-    capacity_in_bytes: usize,
-) -> WriteFrameBuilder {
-    let mut encoder = begin_request(
-        sequence,
-        operation.code(),
-        capacity_in_bytes + client_identity.len() + 13,
-    );
-    put_client_identity(&mut encoder, client_identity);
-    encoder.put_u64(request_number);
-    encoder.put_u32(entry_count);
-    WriteFrameBuilder {
-        encoder,
-        declared_entries: entry_count,
-        added_entries: 0,
-    }
-}
-
-/// 一帧写结论要带的东西（文件头「写结论」逐个字段）；客户端身份与请求号由发它的客户端填。
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct GuardedConclusionWrite {
-    /// 认领的持有者身份（1 到 255 字节）：核认领时与认领键上记的持有者比。
-    pub holder_identity: Vec<u8>,
-    pub claim_key: Vec<u8>,
-    pub guard_key: Vec<u8>,
-    /// 写的一方读到的守卫那一行的样子。
-    pub guard_expectation: GuardRowState,
-    /// 守卫键在里面时排最后一条。
-    pub entries: Vec<(Table, Vec<u8>, Vec<u8>)>,
-    pub deleted_keys: Vec<GuardedDeletion>,
-}
-
-/// 写结论帧里的一把删键与写的一方读到的那一行（文件头「写结论」第 4 步）：库里那一行此刻的样子与 `expectation` 不同，整帧拒。
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct GuardedDeletion {
-    pub key: Vec<u8>,
-    pub expectation: GuardRowState,
-}
-
-/// 一把删键在写结论帧里另占的字节（键长 4、期待 1 加摘要），不含键本身。
-const GUARDED_DELETION_FIXED_BYTES: usize = 4 + 1 + GUARD_ROW_DIGEST_BYTES;
-
-/// 写结论帧在条目与删键之外另占的字节（身份长 1、请求号 8、持有者身份长 1、认领键长 4、守卫键长 4、期待 1 加摘要、条数 4、删键数 4）。
-const GUARDED_CONCLUSION_FIXED_BYTES: usize =
-    1 + 8 + 1 + 4 + 4 + 1 + GUARD_ROW_DIGEST_BYTES + 4 + 4;
-
-/// 写结论帧（文件头「写结论」）。持有者身份长度不在 1 到 255 字节之内是调用方的 bug（容错客户端编帧之前先核，`reliable_client.rs`）。
-pub fn encode_guarded_conclusion_write_frame(
-    sequence: u64,
-    client_identity: &[u8],
-    request_number: u64,
-    request: &GuardedConclusionWrite,
-) -> Vec<u8> {
-    let capacity = GUARDED_CONCLUSION_FIXED_BYTES
-        + client_identity.len()
-        + request.holder_identity.len()
-        + request.claim_key.len()
-        + request.guard_key.len()
-        + request
-            .entries
-            .iter()
-            .map(|(_, key, value)| 9 + key.len() + value.len())
-            .sum::<usize>()
-        + request
-            .deleted_keys
-            .iter()
-            .map(|deletion| GUARDED_DELETION_FIXED_BYTES + deletion.key.len())
-            .sum::<usize>();
-    let mut encoder = begin_request(
-        sequence,
-        OperationCode::GuardedConclusionWrite.code(),
-        capacity,
-    );
-    put_client_identity(&mut encoder, client_identity);
-    encoder.put_u64(request_number);
-    put_client_identity(&mut encoder, &request.holder_identity);
-    encoder.put_length_prefixed(&request.claim_key);
-    encoder.put_length_prefixed(&request.guard_key);
-    request.guard_expectation.put(&mut encoder);
-    encoder.put_u32(u32_from_usize(request.entries.len(), "写结论的条数"));
-    for (table, key, value) in &request.entries {
-        encoder.put_u8(table.code());
-        encoder.put_length_prefixed(key);
-        encoder.put_length_prefixed(value);
-    }
-    encoder.put_u32(u32_from_usize(request.deleted_keys.len(), "写结论的删键数"));
-    for deletion in &request.deleted_keys {
-        encoder.put_length_prefixed(&deletion.key);
-        deletion.expectation.put(&mut encoder);
-    }
-    encoder.finish()
-}
-
-impl WriteFrameBuilder {
-    pub fn entry(&mut self, table: Table, key: &[u8], value: &[u8]) {
-        self.encoder.put_u8(table.code());
-        self.encoder.put_length_prefixed(key);
-        self.encoder.put_length_prefixed(value);
-        self.added_entries += 1;
-    }
-
-    pub fn finish(self) -> Vec<u8> {
-        assert_eq!(
-            self.added_entries, self.declared_entries,
-            "成批写帧声明的条数与加进去的条数不同"
-        );
-        self.encoder.finish()
-    }
-}
-
-/// 按前缀扫帧、从前缀起（续扫起点空）。
-pub fn encode_prefix_scan_frame(
-    sequence: u64,
-    table: Table,
-    prefix: &[u8],
-    maximum_entries: u32,
-) -> Vec<u8> {
-    encode_prefix_scan_frame_after(sequence, table, prefix, maximum_entries, &[])
-}
-
-/// 按前缀扫帧（文件头「按前缀扫」）：`after_key` 空是从前缀起，不空是从排在它之后的第一把键起。
-pub fn encode_prefix_scan_frame_after(
-    sequence: u64,
-    table: Table,
-    prefix: &[u8],
-    maximum_entries: u32,
-    after_key: &[u8],
-) -> Vec<u8> {
-    let mut encoder = begin_request(
-        sequence,
-        OperationCode::PrefixScan.code(),
-        prefix.len() + after_key.len() + 13,
-    );
-    encoder.put_u8(table.code());
-    encoder.put_length_prefixed(prefix);
-    encoder.put_u32(maximum_entries);
-    encoder.put_length_prefixed(after_key);
-    encoder.finish()
-}
-
-pub fn encode_statistics_frame(sequence: u64) -> Vec<u8> {
-    begin_request(sequence, OperationCode::Statistics.code(), 0).finish()
-}
-
-/// 删前缀帧（文件头「删前缀」）：`after_key` 空是从前缀起，不空是从排在它之后的第一把键起；`count_only` 为真只数不删。
-pub fn encode_delete_prefix_frame(
-    sequence: u64,
-    prefix: &[u8],
-    after_key: &[u8],
-    maximum_keys: u32,
-    count_only: bool,
-) -> Vec<u8> {
-    let mut encoder = begin_request(
-        sequence,
-        OperationCode::DeletePrefix.code(),
-        prefix.len() + after_key.len() + 13,
-    );
-    encoder.put_length_prefixed(prefix);
-    encoder.put_length_prefixed(after_key);
-    encoder.put_u32(maximum_keys);
-    encoder.put_u8(u8::from(count_only));
-    encoder.finish()
-}
-
-/// 认领帧：一批键各自向服务认领，租期以毫秒计。
-pub fn encode_claim_frame(
-    sequence: u64,
-    client_identity: &[u8],
-    lease_milliseconds: u32,
-    keys: &[(Table, &[u8])],
-) -> Vec<u8> {
-    let capacity =
-        client_identity.len() + 9 + keys.iter().map(|(_, key)| 5 + key.len()).sum::<usize>();
-    let mut encoder = begin_request(sequence, OperationCode::Claim.code(), capacity);
-    put_client_identity(&mut encoder, client_identity);
-    encoder.put_u32(lease_milliseconds);
-    encoder.put_u32(u32_from_usize(keys.len(), "认领的键数"));
-    for (table, key) in keys {
-        encoder.put_u8(table.code());
-        encoder.put_length_prefixed(key);
-    }
-    encoder.finish()
-}
-
-/// 换掉一帧编好的认领请求（[`encode_claim_frame`]，带长度字段）里的租约毫秒数：帧头之后是客户端身份（长度 1 字节加身份），再后面 4 字节是租约。
-/// 弄坏开关 claim-lease-shrunk-on-resend 下客户端每次发认领时照剩下的租约换（`reliable_client` 的 `claim_lease_left`，改前的写法），帧的其余字节不动。
-pub fn replace_claim_lease(frame: &mut [u8], lease_milliseconds: u32) {
-    let identity_length_offset = FRAME_LENGTH_FIELD_BYTES + usize_from_u32(REQUEST_HEADER_BYTES);
-    let lease_offset = identity_length_offset + 1 + usize::from(frame[identity_length_offset]);
-    frame[lease_offset..lease_offset + 4].copy_from_slice(&lease_milliseconds.to_le_bytes());
-}
-
-/// 换掉一帧请求的序号（重连之后重发、回了忙之后重发都用新序号，帧的其余字节不动）。
-pub fn replace_request_sequence(frame: &mut [u8], sequence: u64) {
-    frame[SEQUENCE_FIELD_OFFSET..SEQUENCE_FIELD_OFFSET + 8]
-        .copy_from_slice(&sequence.to_le_bytes());
-}
-
-/// 一帧编好的请求是不是序号 0 的连接层帧（报到）：故障注入代理不拿它们数帧、不往它们身上注入。
-pub fn is_connection_level_request(frame: &[u8]) -> bool {
-    frame
-        .get(FRAME_LENGTH_FIELD_BYTES..)
-        .and_then(peek_request_header)
-        .is_some_and(|(sequence, _)| sequence == CONNECTION_LEVEL_SEQUENCE)
-}
-
-/// 报到帧（序号 0，服务不回）。
-pub fn encode_connection_announcement_frame(announcement: &ClientAnnouncement) -> Vec<u8> {
-    let mut encoder = begin_request(
-        CONNECTION_LEVEL_SEQUENCE,
-        OperationCode::ConnectionAnnouncement.code(),
-        announcement.host.len() + announcement.task.len() + announcement.attempt.len() + 7,
-    );
-    put_announcement(&mut encoder, announcement);
-    encoder.finish()
-}
-
-fn put_announcement(encoder: &mut FrameEncoder, announcement: &ClientAnnouncement) {
-    encoder.put_short_text(&announcement.host);
-    encoder.put_short_text(&announcement.task);
-    encoder.put_short_text(&announcement.attempt);
-    encoder.put_u32(announcement.process_identifier);
-}
-
-pub fn encode_connected_clients_frame(sequence: u64) -> Vec<u8> {
-    begin_request(sequence, OperationCode::ConnectedClients.code(), 0).finish()
-}
-
-pub fn encode_announce_stop_frame(sequence: u64) -> Vec<u8> {
-    begin_request(sequence, OperationCode::AnnounceStop.code(), 0).finish()
-}
-
-/// 帧体（不含长度字段）开头的序号与操作码；帧体短于请求帧头回 `None`（长度闸已经挡在前面，这里只防御）。
-pub fn peek_request_header(body: &[u8]) -> Option<(u64, u8)> {
-    let header = body.get(..usize_from_u32(REQUEST_HEADER_BYTES))?;
-    let sequence = u64::from_le_bytes(header[..8].try_into().expect("切的正好是 8 字节"));
-    Some((sequence, header[8]))
-}
-
-/// 照原样拼一帧：自证造认不得的操作码与解不开的内容用。
-pub fn encode_raw_request_frame(sequence: u64, operation_code: u8, payload: &[u8]) -> Vec<u8> {
-    let mut encoder = begin_request(sequence, operation_code, payload.len());
-    encoder.bytes.extend_from_slice(payload);
-    encoder.finish()
-}
-
-/// 按位置读帧体的游标；越界是「内容解不开」，不是 panic。GPU 判的几种行的值（`gpu_judging_rows`）照同一套小端写法，也拿它读。
-pub(crate) struct ByteCursor<'frame> {
-    bytes: &'frame [u8],
-    position: usize,
-}
-
-impl<'frame> ByteCursor<'frame> {
-    pub(crate) fn new(bytes: &'frame [u8]) -> ByteCursor<'frame> {
-        ByteCursor { bytes, position: 0 }
-    }
-
-    pub(crate) fn remaining(&self) -> usize {
-        self.bytes.len() - self.position
-    }
-
-    pub(crate) fn take(&mut self, byte_count: usize, what: &str) -> Result<&'frame [u8], String> {
-        if byte_count > self.remaining() {
-            return Err(format!(
-                "读{what}要 {byte_count} 字节，只剩 {} 字节",
-                self.remaining()
-            ));
-        }
-        let field = &self.bytes[self.position..self.position + byte_count];
-        self.position += byte_count;
-        Ok(field)
-    }
-
-    pub(crate) fn u8(&mut self, what: &str) -> Result<u8, String> {
-        Ok(self.take(1, what)?[0])
-    }
-
-    pub(crate) fn u32(&mut self, what: &str) -> Result<u32, String> {
-        let field = self.take(4, what)?;
-        Ok(u32::from_le_bytes(
-            field.try_into().expect("take 回的正好是 4 字节"),
-        ))
-    }
-
-    pub(crate) fn u64(&mut self, what: &str) -> Result<u64, String> {
-        let field = self.take(8, what)?;
-        Ok(u64::from_le_bytes(
-            field.try_into().expect("take 回的正好是 8 字节"),
-        ))
-    }
-
-    pub(crate) fn length_prefixed(&mut self, what: &str) -> Result<&'frame [u8], String> {
-        let length = self.u32(what)?;
-        self.take(usize_from_u32(length), what)
-    }
-
-    fn table(&mut self) -> Result<Table, String> {
-        let code = self.u8("表号")?;
-        Table::from_code(code).ok_or_else(|| format!("认不得的表号 {code}"))
-    }
-
-    fn client_identity(&mut self) -> Result<&'frame [u8], String> {
-        let length = self.u8("客户端身份长")?;
-        if length == 0 {
-            return Err("客户端身份长是 0".to_string());
-        }
-        self.take(usize::from(length), "客户端身份")
-    }
-
-    /// 写结论帧里的持有者身份（`u8 长`、身份，1 到 255 字节）。
-    fn holder_identity(&mut self) -> Result<&'frame [u8], String> {
-        let length = self.u8("持有者身份长")?;
-        if length == 0 {
-            return Err("持有者身份长是 0".to_string());
-        }
-        self.take(usize::from(length), "持有者身份")
-    }
-
-    /// 守卫那一行的样子（`u8` 0 不在；1 在，再跟 32 字节值的 SHA-256）。
-    fn guard_row_state(&mut self, what: &str) -> Result<GuardRowState, String> {
-        match self.u8(what)? {
-            GUARD_ROW_ABSENT_CODE => Ok(GuardRowState::Absent),
-            GUARD_ROW_PRESENT_CODE => {
-                let digest = self.take(GUARD_ROW_DIGEST_BYTES, what)?;
-                Ok(GuardRowState::Present {
-                    value_digest: digest.try_into().expect("take 回的正好是摘要那么多字节"),
-                })
-            }
-            other => Err(format!(
-                "{what}只能是 {GUARD_ROW_ABSENT_CODE}（不在）或 {GUARD_ROW_PRESENT_CODE}（在），收到 {other}"
-            )),
-        }
-    }
-
-    /// 成批写、不在才写、写结论的条目：`u32 条数`，每条 `u8 表`、`u32 键长`、键、`u32 值长`、值。
-    fn entries(&mut self) -> Result<Vec<EntryInTable<'frame>>, String> {
-        let entry_count = self.u32("条数")?;
-        let mut entries = Vec::with_capacity(self.capacity_for(entry_count, 9));
-        for _ in 0..entry_count {
-            let table = self.table()?;
-            let key = self.length_prefixed("键")?;
-            let value = self.length_prefixed("值")?;
-            entries.push(EntryInTable { table, key, value });
-        }
-        Ok(entries)
-    }
-
-    fn short_text(&mut self, what: &str) -> Result<String, String> {
-        let length = self.u8(what)?;
-        let field = self.take(usize::from(length), what)?;
-        std::str::from_utf8(field)
-            .map(str::to_string)
-            .map_err(|_| format!("{what}不是 UTF-8"))
-    }
-
-    fn announcement(&mut self) -> Result<ClientAnnouncement, String> {
-        let host = self.short_text("主机名")?;
-        let task = self.short_text("任务号")?;
-        let attempt = self.short_text("第几次")?;
-        let process_identifier = self.u32("进程号")?;
-        Ok(ClientAnnouncement {
-            host,
-            task,
-            attempt,
-            process_identifier,
-        })
-    }
-
-    /// 按声称的个数预留容量之前先按剩下的字节数封顶，坏的个数字段不会让服务一次要几十 GB。
-    fn capacity_for(&self, declared_count: u32, minimum_bytes_per_item: usize) -> usize {
-        usize_from_u32(declared_count).min(self.remaining() / minimum_bytes_per_item)
-    }
-}
-
-/// 客户端报到的身份：哪台、哪个任务的第几次、哪个进程。不在 task-server 里跑的，任务号与第几次是空串。
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ClientAnnouncement {
-    pub host: String,
-    pub task: String,
-    pub attempt: String,
-    pub process_identifier: u32,
-}
-
-/// 截到至多 255 字节，落在字符边界上。
-fn truncate_to_short_text(text: &str) -> String {
-    let mut end = text.len().min(MAXIMUM_ANNOUNCEMENT_TEXT_BYTES);
-    while !text.is_char_boundary(end) {
-        end -= 1;
-    }
-    text[..end].to_string()
-}
-
-impl ClientAnnouncement {
-    /// 各段超过 255 字节的截掉（主机名与任务号都远短于它；截是为了编帧时不撞长度上限）。
-    pub fn new(
-        host: &str,
-        task: &str,
-        attempt: &str,
-        process_identifier: u32,
-    ) -> ClientAnnouncement {
-        ClientAnnouncement {
-            host: truncate_to_short_text(host),
-            task: truncate_to_short_text(task),
-            attempt: truncate_to_short_text(attempt),
-            process_identifier,
-        }
-    }
-}
-
-/// 一条连接走的哪一处监听。
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum Transport {
-    UnixSocket,
-    Network,
-}
-
-impl Transport {
-    pub const ALL: [Transport; 2] = [Transport::UnixSocket, Transport::Network];
-
-    pub fn code(self) -> u8 {
-        match self {
-            Transport::UnixSocket => 1,
-            Transport::Network => 2,
-        }
-    }
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Transport::UnixSocket => "unix",
-            Transport::Network => "tcp",
-        }
-    }
-
-    pub fn from_code(code: u8) -> Option<Transport> {
-        Transport::ALL
-            .into_iter()
-            .find(|transport| transport.code() == code)
-    }
-}
-
-/// 列连着的客户端时的一条。
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ConnectedClient {
-    pub connection: u64,
-    pub transport: Transport,
-    pub peer_address: String,
-    pub announcement: Option<ClientAnnouncement>,
-    pub connected_since_milliseconds: u64,
-}
-
-/// 列连着的客户端、宣布停服务的回应。
-pub fn encode_connected_clients_response(
-    sequence: u64,
-    operation: OperationCode,
-    clients: &[ConnectedClient],
-) -> Vec<u8> {
-    let mut encoder = begin_response(
-        sequence,
-        ResponseStatus::Completed,
-        operation.code(),
-        4 + clients.len() * 96,
-    );
-    encoder.put_u32(u32_from_usize(clients.len(), "客户端个数"));
-    for client in clients {
-        encoder.put_u64(client.connection);
-        encoder.put_u8(client.transport.code());
-        encoder.put_length_prefixed(client.peer_address.as_bytes());
-        match &client.announcement {
-            Some(announcement) => {
-                encoder.put_u8(1);
-                put_announcement(&mut encoder, announcement);
-            }
-            None => encoder.put_u8(0),
-        }
-        encoder.put_u64(client.connected_since_milliseconds);
-    }
-    encoder.finish()
-}
-
-/// 服务停了（序号 0、操作码 0，服务主动发）。
-pub fn encode_server_stopping(message: &str) -> Vec<u8> {
-    let mut encoder = begin_response(
-        CONNECTION_LEVEL_SEQUENCE,
-        ResponseStatus::ServerStopping,
-        0,
-        message.len() + 4,
-    );
-    encoder.put_length_prefixed(message.as_bytes());
-    encoder.finish()
-}
-
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct KeyInTable<'frame> {
     pub table: Table,
@@ -1066,849 +421,6 @@ pub struct EntryInTable<'frame> {
     pub table: Table,
     pub key: &'frame [u8],
     pub value: &'frame [u8],
-}
-
-/// 解开的请求，键与值借用帧体，不另拷。
-#[derive(Debug, PartialEq, Eq)]
-pub enum RequestView<'frame> {
-    BatchedPointRead(Vec<KeyInTable<'frame>>),
-    BatchedWrite {
-        client_identity: &'frame [u8],
-        request_number: u64,
-        entries: Vec<EntryInTable<'frame>>,
-    },
-    PrefixScan {
-        table: Table,
-        prefix: &'frame [u8],
-        maximum_entries: u32,
-        after_key: &'frame [u8],
-    },
-    Statistics,
-    Claim {
-        client_identity: &'frame [u8],
-        lease_milliseconds: u32,
-        keys: Vec<KeyInTable<'frame>>,
-    },
-    ConnectionAnnouncement(ClientAnnouncement),
-    ConnectedClients,
-    AnnounceStop,
-    DeletePrefix {
-        prefix: &'frame [u8],
-        after_key: &'frame [u8],
-        maximum_keys: u32,
-        count_only: bool,
-    },
-    WriteIfAbsent {
-        client_identity: &'frame [u8],
-        request_number: u64,
-        entries: Vec<EntryInTable<'frame>>,
-    },
-    GuardedConclusionWrite(GuardedConclusionWriteView<'frame>),
-}
-
-/// 解开的写结论帧（文件头「写结论」），键与值借用帧体；解帧时已核过那几条写法（`guarded_conclusion_write_problem`）。
-#[derive(Debug, PartialEq, Eq)]
-pub struct GuardedConclusionWriteView<'frame> {
-    pub client_identity: &'frame [u8],
-    pub request_number: u64,
-    pub holder_identity: &'frame [u8],
-    pub claim_key: &'frame [u8],
-    pub guard_key: &'frame [u8],
-    pub guard_expectation: GuardRowState,
-    pub entries: Vec<EntryInTable<'frame>>,
-    pub deleted_keys: Vec<GuardedDeletionView<'frame>>,
-}
-
-/// 解开的一把删键与帧里给它的期待（[`GuardedDeletion`] 借用帧体的那一份）。
-#[derive(Debug, PartialEq, Eq)]
-pub struct GuardedDeletionView<'frame> {
-    pub key: &'frame [u8],
-    pub expectation: GuardRowState,
-}
-
-/// 写结论帧违反文件头「写结论」那几条写法时回说明（服务回状态 1），合规回 `None`。
-fn guarded_conclusion_write_problem(view: &GuardedConclusionWriteView<'_>) -> Option<String> {
-    if view.claim_key.is_empty() {
-        return Some("认领键是空的".to_string());
-    }
-    if view.guard_key.is_empty() {
-        return Some("守卫键是空的".to_string());
-    }
-    let guard_positions: Vec<usize> = view
-        .entries
-        .iter()
-        .enumerate()
-        .filter(|(_, entry)| entry.key == view.guard_key)
-        .map(|(position, _)| position)
-        .collect();
-    match guard_positions.as_slice() {
-        [] => {}
-        [position] if position + 1 == view.entries.len() => {}
-        [_] | [_, _, ..] => {
-            return Some(format!(
-                "守卫键在条目里的位置（从 0 数）是 {guard_positions:?}，共 {} 条：守卫那一行只许写一次、且排最后一条（一份结论有多行时守卫放在最后落的那一行）",
-                view.entries.len()
-            ));
-        }
-    }
-    let claim_key_written = view.entries.iter().any(|entry| entry.key == view.claim_key);
-    let claim_key_deleted = view
-        .deleted_keys
-        .iter()
-        .any(|deletion| deletion.key == view.claim_key);
-    if claim_key_written || claim_key_deleted {
-        return Some(
-            "认领键在条目或删键里：认领键只记认领，不当数据行写、也不删（写了它，之后认领它就回「已有结论」）"
-                .to_string(),
-        );
-    }
-    for GuardedDeletionView { key, .. } in &view.deleted_keys {
-        if key.is_empty() {
-            return Some("删键里有空键".to_string());
-        }
-        if *key == view.guard_key || view.entries.iter().any(|entry| entry.key == *key) {
-            return Some(format!(
-                "删键 {:02x?} 是守卫键或某条条目的键：同一帧里不又写又删同一把键",
-                &key[..key.len().min(16)]
-            ));
-        }
-    }
-    None
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct DecodedRequest<'frame> {
-    pub sequence: u64,
-    pub view: RequestView<'frame>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum RequestRejection {
-    UnknownOperation { operation_code: u8 },
-    MalformedPayload { operation_code: u8, reason: String },
-}
-
-/// 帧尾多出来的字节：平常拒；只有弄坏开关 `trailing-bytes-accepted` 放过。
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum TrailingBytes {
-    Rejected,
-    Accepted,
-}
-
-/// 解请求帧体（不含长度字段）。拒绝时带上读得到的序号（帧体短于 8 字节时是 0）。
-pub fn decode_request_body(
-    body: &[u8],
-    trailing_bytes: TrailingBytes,
-    service_keys: ServiceKeys,
-) -> Result<DecodedRequest<'_>, (u64, RequestRejection)> {
-    let mut cursor = ByteCursor::new(body);
-    let sequence = cursor.u64("请求序号").map_err(|reason| {
-        (
-            CONNECTION_LEVEL_SEQUENCE,
-            RequestRejection::MalformedPayload {
-                operation_code: 0,
-                reason,
-            },
-        )
-    })?;
-    let operation_code = cursor.u8("操作码").map_err(|reason| {
-        (
-            sequence,
-            RequestRejection::MalformedPayload {
-                operation_code: 0,
-                reason,
-            },
-        )
-    })?;
-    let Some(operation) = OperationCode::from_code(operation_code) else {
-        return Err((
-            sequence,
-            RequestRejection::UnknownOperation { operation_code },
-        ));
-    };
-    let malformed = |reason: String| {
-        (
-            sequence,
-            RequestRejection::MalformedPayload {
-                operation_code,
-                reason,
-            },
-        )
-    };
-    let view = decode_request_payload(operation, &mut cursor).map_err(malformed)?;
-    if cursor.remaining() != 0 && trailing_bytes == TrailingBytes::Rejected {
-        return Err(malformed(format!(
-            "内容解完之后帧尾还多 {} 字节",
-            cursor.remaining()
-        )));
-    }
-    if service_keys == ServiceKeys::Refused {
-        if let Some(reason) = service_key_refusal(&view) {
-            return Err(malformed(reason));
-        }
-    }
-    Ok(DecodedRequest { sequence, view })
-}
-
-/// 请求里有落在服务记账那一段的键（或以它起头的前缀）时回说明。
-fn service_key_refusal(view: &RequestView<'_>) -> Option<String> {
-    let refused = |what: &str, key: &[u8]| {
-        Some(format!(
-            "{what} {:02x?} 的第一个字节不小于 0x{SERVICE_KEY_LEADING_BYTE_MINIMUM:02X}：这一段键留给服务自己的记账（去重与认领），客户端不许读写",
-            &key[..key.len().min(16)]
-        ))
-    };
-    match view {
-        RequestView::BatchedPointRead(keys) | RequestView::Claim { keys, .. } => keys
-            .iter()
-            .find(|key| is_service_key(key.key))
-            .and_then(|key| refused("键", key.key)),
-        RequestView::BatchedWrite { entries, .. } | RequestView::WriteIfAbsent { entries, .. } => {
-            entries
-                .iter()
-                .find(|entry| is_service_key(entry.key))
-                .and_then(|entry| refused("键", entry.key))
-        }
-        RequestView::GuardedConclusionWrite(conclusion) => conclusion
-            .entries
-            .iter()
-            .map(|entry| entry.key)
-            .chain(conclusion.deleted_keys.iter().map(|deletion| deletion.key))
-            .chain([conclusion.claim_key, conclusion.guard_key])
-            .find(|key| is_service_key(key))
-            .and_then(|key| refused("键", key)),
-        RequestView::PrefixScan { prefix, .. } | RequestView::DeletePrefix { prefix, .. }
-            if is_service_key(prefix) =>
-        {
-            refused("前缀", prefix)
-        }
-        RequestView::PrefixScan { .. }
-        | RequestView::DeletePrefix { .. }
-        | RequestView::Statistics
-        | RequestView::ConnectionAnnouncement(_)
-        | RequestView::ConnectedClients
-        | RequestView::AnnounceStop => None,
-    }
-}
-
-fn decode_request_payload<'frame>(
-    operation: OperationCode,
-    cursor: &mut ByteCursor<'frame>,
-) -> Result<RequestView<'frame>, String> {
-    match operation {
-        OperationCode::BatchedPointRead => {
-            let key_count = cursor.u32("键数")?;
-            let mut keys = Vec::with_capacity(cursor.capacity_for(key_count, 5));
-            for _ in 0..key_count {
-                let table = cursor.table()?;
-                let key = cursor.length_prefixed("键")?;
-                keys.push(KeyInTable { table, key });
-            }
-            Ok(RequestView::BatchedPointRead(keys))
-        }
-        OperationCode::BatchedWrite => {
-            let client_identity = cursor.client_identity()?;
-            let request_number = cursor.u64("请求号")?;
-            let entries = cursor.entries()?;
-            Ok(RequestView::BatchedWrite {
-                client_identity,
-                request_number,
-                entries,
-            })
-        }
-        OperationCode::WriteIfAbsent => {
-            let client_identity = cursor.client_identity()?;
-            let request_number = cursor.u64("请求号")?;
-            let entries = cursor.entries()?;
-            Ok(RequestView::WriteIfAbsent {
-                client_identity,
-                request_number,
-                entries,
-            })
-        }
-        OperationCode::GuardedConclusionWrite => {
-            let client_identity = cursor.client_identity()?;
-            let request_number = cursor.u64("请求号")?;
-            let holder_identity = cursor.holder_identity()?;
-            let claim_key = cursor.length_prefixed("认领键")?;
-            let guard_key = cursor.length_prefixed("守卫键")?;
-            let guard_expectation = cursor.guard_row_state("守卫那一行的期待")?;
-            let entries = cursor.entries()?;
-            let deleted_key_count = cursor.u32("删键数")?;
-            let mut deleted_keys = Vec::with_capacity(cursor.capacity_for(deleted_key_count, 5));
-            for _ in 0..deleted_key_count {
-                let key = cursor.length_prefixed("删键")?;
-                let expectation = cursor.guard_row_state("删键那一行的期待")?;
-                deleted_keys.push(GuardedDeletionView { key, expectation });
-            }
-            let conclusion = GuardedConclusionWriteView {
-                client_identity,
-                request_number,
-                holder_identity,
-                claim_key,
-                guard_key,
-                guard_expectation,
-                entries,
-                deleted_keys,
-            };
-            match guarded_conclusion_write_problem(&conclusion) {
-                Some(problem) => Err(problem),
-                None => Ok(RequestView::GuardedConclusionWrite(conclusion)),
-            }
-        }
-        OperationCode::Claim => {
-            let client_identity = cursor.client_identity()?;
-            let lease_milliseconds = cursor.u32("租期毫秒")?;
-            let key_count = cursor.u32("键数")?;
-            let mut keys = Vec::with_capacity(cursor.capacity_for(key_count, 5));
-            for _ in 0..key_count {
-                let table = cursor.table()?;
-                let key = cursor.length_prefixed("键")?;
-                keys.push(KeyInTable { table, key });
-            }
-            Ok(RequestView::Claim {
-                client_identity,
-                lease_milliseconds,
-                keys,
-            })
-        }
-        OperationCode::PrefixScan => {
-            let table = cursor.table()?;
-            let prefix = cursor.length_prefixed("前缀")?;
-            let maximum_entries = cursor.u32("条数上限")?;
-            let after_key = cursor.length_prefixed("续扫起点")?;
-            if !after_key.is_empty() && !after_key.starts_with(prefix) {
-                return Err("续扫起点不以前缀起头：续扫起点是上一帧回的最后一把键".to_string());
-            }
-            Ok(RequestView::PrefixScan {
-                table,
-                prefix,
-                maximum_entries,
-                after_key,
-            })
-        }
-        OperationCode::DeletePrefix => {
-            let prefix = cursor.length_prefixed("前缀")?;
-            let after_key = cursor.length_prefixed("续扫起点")?;
-            let maximum_keys = cursor.u32("本帧至多几把")?;
-            let count_only = match cursor.u8("只数不删")? {
-                0 => false,
-                1 => true,
-                other => return Err(format!("「只数不删」只能是 0 或 1，收到 {other}")),
-            };
-            if prefix.is_empty() {
-                return Err("前缀是空的：删空前缀等于清空整个库，不收".to_string());
-            }
-            if !after_key.is_empty() && !after_key.starts_with(prefix) {
-                return Err("续扫起点不以前缀起头：续扫起点是上一帧回的最后一把键".to_string());
-            }
-            if maximum_keys == 0 || maximum_keys > MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME {
-                return Err(format!(
-                    "本帧至多几把要在 1 到 {MAXIMUM_DELETE_PREFIX_KEYS_PER_FRAME} 之间，收到 {maximum_keys}"
-                ));
-            }
-            Ok(RequestView::DeletePrefix {
-                prefix,
-                after_key,
-                maximum_keys,
-                count_only,
-            })
-        }
-        OperationCode::Statistics => Ok(RequestView::Statistics),
-        OperationCode::ConnectionAnnouncement => {
-            Ok(RequestView::ConnectionAnnouncement(cursor.announcement()?))
-        }
-        OperationCode::ConnectedClients => Ok(RequestView::ConnectedClients),
-        OperationCode::AnnounceStop => Ok(RequestView::AnnounceStop),
-    }
-}
-
-/// 回应帧的开头：序号、状态、操作码；内容由调用方接着写。
-pub fn begin_response(
-    sequence: u64,
-    status: ResponseStatus,
-    operation_code: u8,
-    capacity_in_bytes: usize,
-) -> FrameEncoder {
-    let mut encoder =
-        FrameEncoder::with_capacity(capacity_in_bytes + usize_from_u32(RESPONSE_HEADER_BYTES));
-    encoder.put_u64(sequence);
-    encoder.put_u8(status.code());
-    encoder.put_u8(operation_code);
-    encoder
-}
-
-pub fn encode_rejection(
-    sequence: u64,
-    status: ResponseStatus,
-    operation_code: u8,
-    message: &str,
-) -> Vec<u8> {
-    assert!(
-        status != ResponseStatus::Completed,
-        "拒绝回应的状态不能是做完"
-    );
-    assert!(
-        status != ResponseStatus::Busy,
-        "忙的回应带「多少毫秒后再来」，走 encode_busy"
-    );
-    assert!(
-        status != ResponseStatus::GuardRefused,
-        "守卫不过的回应带种类，走 encode_guard_refusal"
-    );
-    let mut encoder = begin_response(sequence, status, operation_code, message.len() + 4);
-    encoder.put_length_prefixed(message.as_bytes());
-    encoder.finish()
-}
-
-/// 忙：这一帧没有排队、没有做，`retry_after_milliseconds` 之后再来。
-pub fn encode_busy(
-    sequence: u64,
-    operation_code: u8,
-    retry_after_milliseconds: u32,
-    message: &str,
-) -> Vec<u8> {
-    let mut encoder = begin_response(
-        sequence,
-        ResponseStatus::Busy,
-        operation_code,
-        message.len() + 8,
-    );
-    encoder.put_u32(retry_after_milliseconds);
-    encoder.put_length_prefixed(message.as_bytes());
-    encoder.finish()
-}
-
-/// 写确认：写了几条、这个请求号是不是早已生效（这一次没再写）。
-pub fn encode_write_acknowledgement(
-    sequence: u64,
-    entries_written: u32,
-    is_already_applied: bool,
-) -> Vec<u8> {
-    encode_entries_acknowledgement(
-        sequence,
-        OperationCode::BatchedWrite,
-        entries_written,
-        is_already_applied,
-    )
-}
-
-/// 成批写、不在才写、写结论的确认（三者回应相同，操作码照请求）：写了几条、这个请求号是不是早已生效。
-pub fn encode_entries_acknowledgement(
-    sequence: u64,
-    operation: OperationCode,
-    entries_written: u32,
-    is_already_applied: bool,
-) -> Vec<u8> {
-    let mut encoder = begin_response(sequence, ResponseStatus::Completed, operation.code(), 5);
-    encoder.put_u32(entries_written);
-    encoder.put_u8(u8::from(is_already_applied));
-    encoder.finish()
-}
-
-/// 写结论守卫不过（状态 7，文件头「回应帧」）：种类与它带的东西、说明。
-pub fn encode_guard_refusal(sequence: u64, refusal: &GuardRefusal, message: &str) -> Vec<u8> {
-    let key_bytes = match refusal {
-        GuardRefusal::DeletedRowChanged { key, .. } => key.len(),
-        GuardRefusal::ClaimHeldByOther { .. } | GuardRefusal::GuardRowChanged { .. } => 0,
-    };
-    let mut encoder = begin_response(
-        sequence,
-        ResponseStatus::GuardRefused,
-        OperationCode::GuardedConclusionWrite.code(),
-        message.len() + key_bytes + MAXIMUM_CLIENT_IDENTITY_BYTES + GUARD_ROW_DIGEST_BYTES + 16,
-    );
-    match refusal {
-        GuardRefusal::ClaimHeldByOther {
-            holder_identity,
-            remaining_lease_milliseconds,
-        } => {
-            encoder.put_u8(GUARD_REFUSAL_CLAIM_HELD_BY_OTHER_CODE);
-            put_client_identity(&mut encoder, holder_identity);
-            encoder.put_u64(*remaining_lease_milliseconds);
-        }
-        GuardRefusal::GuardRowChanged { current } => {
-            encoder.put_u8(GUARD_REFUSAL_GUARD_ROW_CHANGED_CODE);
-            current.put(&mut encoder);
-        }
-        GuardRefusal::DeletedRowChanged { key, current } => {
-            encoder.put_u8(GUARD_REFUSAL_DELETED_ROW_CHANGED_CODE);
-            encoder.put_length_prefixed(key);
-            current.put(&mut encoder);
-        }
-    }
-    encoder.put_length_prefixed(message.as_bytes());
-    encoder.finish()
-}
-
-/// 认领的结局，逐键一个。
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ClaimOutcome {
-    Claimed,
-    HeldByOther {
-        holder_identity: Vec<u8>,
-        remaining_lease_milliseconds: u64,
-    },
-    AlreadyConcluded,
-}
-
-/// 回应内容（回应帧头之后）至多这么多字节，再多整帧就越过帧长上限 `MAXIMUM_FRAME_BODY_BYTES`。
-pub fn maximum_response_payload_bytes() -> usize {
-    usize_from_u32(MAXIMUM_FRAME_BODY_BYTES - RESPONSE_HEADER_BYTES)
-}
-
-/// 认领回应内容开头的个数字段。
-pub const CLAIM_OUTCOME_COUNT_BYTES: usize = 4;
-/// 「认领到」「已有结论」编进回应各占的字节（只有结局那 1 字节）。
-pub const SHORT_CLAIM_OUTCOME_BYTES: usize = 1;
-
-/// 「别人持有」编进回应占的字节：结局 1、身份长 1、持有者身份、剩余租期 8。
-pub fn held_by_other_outcome_bytes(holder_identity_bytes: usize) -> usize {
-    1 + 1 + holder_identity_bytes + 8
-}
-
-/// 一组认领结局编成回应之后内容的字节数（不含回应帧头），与 `encode_claim_outcomes` 写出的逐字节相同。
-pub fn claim_outcomes_payload_bytes(outcomes: &[ClaimOutcome]) -> usize {
-    CLAIM_OUTCOME_COUNT_BYTES
-        + outcomes
-            .iter()
-            .map(|outcome| match outcome {
-                ClaimOutcome::HeldByOther {
-                    holder_identity, ..
-                } => held_by_other_outcome_bytes(holder_identity.len()),
-                ClaimOutcome::Claimed | ClaimOutcome::AlreadyConcluded => SHORT_CLAIM_OUTCOME_BYTES,
-            })
-            .sum::<usize>()
-}
-
-/// 删前缀回应（文件头「删前缀」）：这一帧数到或删掉几把、前缀下是不是已经没有更多的键、最后一把键（一把都没碰到时空）。
-pub fn encode_prefix_deleted_response(
-    sequence: u64,
-    keys_in_frame: u32,
-    is_exhausted: bool,
-    last_key: &[u8],
-) -> Vec<u8> {
-    let mut encoder = begin_response(
-        sequence,
-        ResponseStatus::Completed,
-        OperationCode::DeletePrefix.code(),
-        last_key.len() + 9,
-    );
-    encoder.put_u32(keys_in_frame);
-    encoder.put_u8(u8::from(is_exhausted));
-    encoder.put_length_prefixed(last_key);
-    encoder.finish()
-}
-
-/// 认领回应：调用方先按 `claim_outcomes_payload_bytes` 核过不超 `maximum_response_payload_bytes`（服务在认领之前核，
-/// 超了整帧拒、一个键都不认领，`committer.rs` 的 `add_claim`）。
-pub fn encode_claim_outcomes(sequence: u64, outcomes: &[ClaimOutcome]) -> Vec<u8> {
-    let capacity = claim_outcomes_payload_bytes(outcomes);
-    let mut encoder = begin_response(
-        sequence,
-        ResponseStatus::Completed,
-        OperationCode::Claim.code(),
-        capacity,
-    );
-    encoder.put_u32(u32_from_usize(outcomes.len(), "认领结局个数"));
-    for outcome in outcomes {
-        match outcome {
-            ClaimOutcome::Claimed => encoder.put_u8(0),
-            ClaimOutcome::HeldByOther {
-                holder_identity,
-                remaining_lease_milliseconds,
-            } => {
-                encoder.put_u8(1);
-                put_client_identity(&mut encoder, holder_identity);
-                encoder.put_u64(*remaining_lease_milliseconds);
-            }
-            ClaimOutcome::AlreadyConcluded => encoder.put_u8(2),
-        }
-    }
-    encoder.finish()
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum RejectionStatus {
-    MalformedPayload,
-    UnknownOperation,
-    FrameLengthRejected,
-    StorageFailed,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct ScanEntry {
-    pub key: Vec<u8>,
-    pub value: Vec<u8>,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct StatisticsCounter {
-    pub name: String,
-    pub value: u64,
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ResponseOutcome {
-    PointValues(Vec<Option<Vec<u8>>>),
-    WriteAcknowledged {
-        entries_written: u32,
-        is_already_applied: bool,
-    },
-    ScanEntries {
-        is_truncated: bool,
-        entries: Vec<ScanEntry>,
-    },
-    Statistics(Vec<StatisticsCounter>),
-    Claims(Vec<ClaimOutcome>),
-    /// 删前缀的回应：`keys_in_frame` 是这一帧数到（只数不删时）或删掉的键数，`is_exhausted` 为真是前缀下已经没有更多的键，
-    /// `last_key` 是这一帧碰到的最后一把键（下一帧的续扫起点；一把都没碰到时空）。
-    PrefixDeleted {
-        keys_in_frame: u32,
-        is_exhausted: bool,
-        last_key: Vec<u8>,
-    },
-    ConnectedClients(Vec<ConnectedClient>),
-    ServerStopping {
-        message: String,
-    },
-    Busy {
-        retry_after_milliseconds: u32,
-        message: String,
-    },
-    Rejected {
-        status: RejectionStatus,
-        message: String,
-    },
-    /// 写结论守卫不过（状态 7）：这一帧一条都没写。
-    GuardRefused {
-        refusal: GuardRefusal,
-        message: String,
-    },
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Response {
-    pub sequence: u64,
-    pub operation_code: u8,
-    pub outcome: ResponseOutcome,
-}
-
-/// 统计回应里按名字取一个计数。
-pub fn statistics_value(counters: &[StatisticsCounter], name: &str) -> Option<u64> {
-    counters
-        .iter()
-        .find(|counter| counter.name == name)
-        .map(|counter| counter.value)
-}
-
-/// 解回应帧体（不含长度字段）。认不得的状态、做完却带认不得的操作码、内容与长度对不上，都是错。
-pub fn decode_response_body(body: &[u8]) -> Result<Response, String> {
-    let mut cursor = ByteCursor::new(body);
-    let sequence = cursor.u64("回应序号")?;
-    let status_code = cursor.u8("状态")?;
-    let operation_code = cursor.u8("操作码")?;
-    let status = ResponseStatus::from_code(status_code)
-        .ok_or_else(|| format!("认不得的回应状态 {status_code}"))?;
-    let outcome = match status {
-        ResponseStatus::Completed => {
-            let operation = OperationCode::from_code(operation_code)
-                .ok_or_else(|| format!("回应说做完了，操作码却是认不得的 {operation_code}"))?;
-            decode_completed_payload(operation, &mut cursor)?
-        }
-        ResponseStatus::MalformedPayload => {
-            rejected(RejectionStatus::MalformedPayload, &mut cursor)?
-        }
-        ResponseStatus::UnknownOperation => {
-            rejected(RejectionStatus::UnknownOperation, &mut cursor)?
-        }
-        ResponseStatus::FrameLengthRejected => {
-            rejected(RejectionStatus::FrameLengthRejected, &mut cursor)?
-        }
-        ResponseStatus::StorageFailed => rejected(RejectionStatus::StorageFailed, &mut cursor)?,
-        ResponseStatus::ServerStopping => {
-            let message =
-                String::from_utf8_lossy(cursor.length_prefixed("服务停了的说明")?).into_owned();
-            ResponseOutcome::ServerStopping { message }
-        }
-        ResponseStatus::Busy => {
-            let retry_after_milliseconds = cursor.u32("多少毫秒后再来")?;
-            let message = String::from_utf8_lossy(cursor.length_prefixed("忙的说明")?).into_owned();
-            ResponseOutcome::Busy {
-                retry_after_milliseconds,
-                message,
-            }
-        }
-        ResponseStatus::GuardRefused => {
-            let refusal = match cursor.u8("守卫不过的种类")? {
-                GUARD_REFUSAL_CLAIM_HELD_BY_OTHER_CODE => {
-                    let holder_identity = cursor.client_identity()?.to_vec();
-                    let remaining_lease_milliseconds = cursor.u64("剩余租期毫秒")?;
-                    GuardRefusal::ClaimHeldByOther {
-                        holder_identity,
-                        remaining_lease_milliseconds,
-                    }
-                }
-                GUARD_REFUSAL_GUARD_ROW_CHANGED_CODE => GuardRefusal::GuardRowChanged {
-                    current: cursor.guard_row_state("守卫那一行此刻的样子")?,
-                },
-                GUARD_REFUSAL_DELETED_ROW_CHANGED_CODE => GuardRefusal::DeletedRowChanged {
-                    key: cursor.length_prefixed("变了的删键")?.to_vec(),
-                    current: cursor.guard_row_state("删键那一行此刻的样子")?,
-                },
-                other => {
-                    return Err(format!(
-                        "守卫不过的种类只能是 {GUARD_REFUSAL_CLAIM_HELD_BY_OTHER_CODE}、{GUARD_REFUSAL_GUARD_ROW_CHANGED_CODE} 或 {GUARD_REFUSAL_DELETED_ROW_CHANGED_CODE}，收到 {other}"
-                    ))
-                }
-            };
-            let message =
-                String::from_utf8_lossy(cursor.length_prefixed("守卫不过的说明")?).into_owned();
-            ResponseOutcome::GuardRefused { refusal, message }
-        }
-    };
-    if cursor.remaining() != 0 {
-        return Err(format!(
-            "回应内容解完之后帧尾还多 {} 字节",
-            cursor.remaining()
-        ));
-    }
-    Ok(Response {
-        sequence,
-        operation_code,
-        outcome,
-    })
-}
-
-fn rejected(
-    status: RejectionStatus,
-    cursor: &mut ByteCursor<'_>,
-) -> Result<ResponseOutcome, String> {
-    let message = String::from_utf8_lossy(cursor.length_prefixed("拒绝说明")?).into_owned();
-    Ok(ResponseOutcome::Rejected { status, message })
-}
-
-fn decode_completed_payload(
-    operation: OperationCode,
-    cursor: &mut ByteCursor<'_>,
-) -> Result<ResponseOutcome, String> {
-    match operation {
-        OperationCode::BatchedPointRead => {
-            let value_count = cursor.u32("值的个数")?;
-            let mut values = Vec::with_capacity(cursor.capacity_for(value_count, 1));
-            for _ in 0..value_count {
-                match cursor.u8("在不在")? {
-                    0 => values.push(None),
-                    1 => values.push(Some(cursor.length_prefixed("值")?.to_vec())),
-                    other => return Err(format!("「在不在」只能是 0 或 1，收到 {other}")),
-                }
-            }
-            Ok(ResponseOutcome::PointValues(values))
-        }
-        OperationCode::BatchedWrite
-        | OperationCode::WriteIfAbsent
-        | OperationCode::GuardedConclusionWrite => {
-            let entries_written = cursor.u32("写了几条")?;
-            let is_already_applied = match cursor.u8("早已生效标记")? {
-                0 => false,
-                1 => true,
-                other => return Err(format!("早已生效标记只能是 0 或 1，收到 {other}")),
-            };
-            Ok(ResponseOutcome::WriteAcknowledged {
-                entries_written,
-                is_already_applied,
-            })
-        }
-        OperationCode::Claim => {
-            let outcome_count = cursor.u32("认领结局个数")?;
-            let mut outcomes = Vec::with_capacity(cursor.capacity_for(outcome_count, 1));
-            for _ in 0..outcome_count {
-                match cursor.u8("认领结局")? {
-                    0 => outcomes.push(ClaimOutcome::Claimed),
-                    1 => {
-                        let holder_identity = cursor.client_identity()?.to_vec();
-                        let remaining_lease_milliseconds = cursor.u64("剩余租期毫秒")?;
-                        outcomes.push(ClaimOutcome::HeldByOther {
-                            holder_identity,
-                            remaining_lease_milliseconds,
-                        });
-                    }
-                    2 => outcomes.push(ClaimOutcome::AlreadyConcluded),
-                    other => return Err(format!("认领结局只能是 0、1、2，收到 {other}")),
-                }
-            }
-            Ok(ResponseOutcome::Claims(outcomes))
-        }
-        OperationCode::PrefixScan => {
-            let is_truncated = match cursor.u8("截断标记")? {
-                0 => false,
-                1 => true,
-                other => return Err(format!("截断标记只能是 0 或 1，收到 {other}")),
-            };
-            let entry_count = cursor.u32("条数")?;
-            let mut entries = Vec::with_capacity(cursor.capacity_for(entry_count, 8));
-            for _ in 0..entry_count {
-                let key = cursor.length_prefixed("键")?.to_vec();
-                let value = cursor.length_prefixed("值")?.to_vec();
-                entries.push(ScanEntry { key, value });
-            }
-            Ok(ResponseOutcome::ScanEntries {
-                is_truncated,
-                entries,
-            })
-        }
-        OperationCode::DeletePrefix => {
-            let keys_in_frame = cursor.u32("这一帧碰到几把键")?;
-            let is_exhausted = match cursor.u8("前缀下没有更多标记")? {
-                0 => false,
-                1 => true,
-                other => return Err(format!("前缀下没有更多标记只能是 0 或 1，收到 {other}")),
-            };
-            let last_key = cursor.length_prefixed("最后一把键")?.to_vec();
-            Ok(ResponseOutcome::PrefixDeleted {
-                keys_in_frame,
-                is_exhausted,
-                last_key,
-            })
-        }
-        OperationCode::Statistics => {
-            let counter_count = cursor.u32("计数的个数")?;
-            let mut counters = Vec::with_capacity(cursor.capacity_for(counter_count, 12));
-            for _ in 0..counter_count {
-                let name = String::from_utf8_lossy(cursor.length_prefixed("计数名")?).into_owned();
-                let value = cursor.u64("计数值")?;
-                counters.push(StatisticsCounter { name, value });
-            }
-            Ok(ResponseOutcome::Statistics(counters))
-        }
-        OperationCode::ConnectedClients | OperationCode::AnnounceStop => {
-            let client_count = cursor.u32("客户端个数")?;
-            let mut clients = Vec::with_capacity(cursor.capacity_for(client_count, 22));
-            for _ in 0..client_count {
-                let connection = cursor.u64("连接号")?;
-                let transport_code = cursor.u8("走哪条")?;
-                let transport = Transport::from_code(transport_code)
-                    .ok_or_else(|| format!("认不得的「走哪条」{transport_code}"))?;
-                let peer_address =
-                    String::from_utf8_lossy(cursor.length_prefixed("对端地址")?).into_owned();
-                let announcement = match cursor.u8("报到过没有")? {
-                    0 => None,
-                    1 => Some(cursor.announcement()?),
-                    other => return Err(format!("「报到过没有」只能是 0 或 1，收到 {other}")),
-                };
-                let connected_since_milliseconds = cursor.u64("连上的时刻")?;
-                clients.push(ConnectedClient {
-                    connection,
-                    transport,
-                    peer_address,
-                    announcement,
-                    connected_since_milliseconds,
-                });
-            }
-            Ok(ResponseOutcome::ConnectedClients(clients))
-        }
-        OperationCode::ConnectionAnnouncement => Err("报到不回应，服务回了做完的报到".to_string()),
-    }
 }
 
 #[cfg(test)]
@@ -2158,6 +670,142 @@ mod tests {
                     refusal,
                     message: "说明".to_string(),
                 }
+            );
+        }
+    }
+
+    /// 放认领帧解出来的持有者与键与编进去的相同，三种结局的回应解出来与编进去的相同。
+    #[test]
+    fn claim_release_frame_and_its_outcomes_decode_to_what_was_encoded() {
+        let keys: [(Table, &[u8]); 2] = [
+            (Table::Conclusions, b"gpu-claim/aa/0000000000000001"),
+            (Table::Conclusions, b"gpu-claim/aa/0000000000000002"),
+        ];
+        let frame = encode_release_claims_frame(5, b"previous-holder", &keys);
+        let decoded = decode_request_body(
+            &frame[FRAME_LENGTH_FIELD_BYTES..],
+            TrailingBytes::Rejected,
+            ServiceKeys::Refused,
+        )
+        .expect("放认领帧解得开");
+        let RequestView::ReleaseClaims {
+            holder_identity,
+            keys: decoded_keys,
+        } = decoded.view
+        else {
+            panic!("解出来不是放认领：{decoded:?}");
+        };
+        assert_eq!(holder_identity, b"previous-holder");
+        let decoded_key_bytes: Vec<&[u8]> = decoded_keys.iter().map(|key| key.key).collect();
+        assert_eq!(decoded_key_bytes, vec![keys[0].1, keys[1].1]);
+        let outcomes = ClaimReleaseOutcome::ALL.to_vec();
+        let response = encode_claim_release_outcomes(6, &outcomes);
+        assert_eq!(
+            decode_response_body(&response[FRAME_LENGTH_FIELD_BYTES..])
+                .expect("解得开")
+                .outcome,
+            ResponseOutcome::ClaimsReleased(outcomes)
+        );
+    }
+
+    /// 放认领帧里有一把不是 GPU 认领键（`gpu-claim/` 起头）：整帧被拒成内容解不开（文件头「放认领」只放 GPU 认领键）。
+    #[test]
+    fn claim_release_frame_with_a_key_outside_the_gpu_claims_is_refused() {
+        let keys: [(Table, &[u8]); 2] = [
+            (Table::Conclusions, b"gpu-claim/aa/0000000000000001"),
+            (Table::Conclusions, b"gpu-pending/aa/0000000000000001"),
+        ];
+        let frame = encode_release_claims_frame(5, b"previous-holder", &keys);
+        let rejection = decode_request_body(
+            &frame[FRAME_LENGTH_FIELD_BYTES..],
+            TrailingBytes::Rejected,
+            ServiceKeys::Refused,
+        )
+        .map(|decoded| format!("{decoded:?}"))
+        .expect_err("待判行的键不是认领键：该整帧拒");
+        assert!(
+            matches!(rejection.1, RequestRejection::MalformedPayload { .. }),
+            "该被拒成内容解不开，实际 {rejection:?}"
+        );
+    }
+
+    /// 列认领帧解出来的前缀、续扫起点与条数上限与编进去的相同；回应解出来的条目与截断标记与编进去的相同。
+    #[test]
+    fn claim_listing_frame_and_its_response_decode_to_what_was_encoded() {
+        let frame = encode_list_claims_frame(
+            7,
+            b"gpu-claim/temporary-library/",
+            b"gpu-claim/temporary-library/aa",
+            25,
+        );
+        let decoded = decode_request_body(
+            &frame[FRAME_LENGTH_FIELD_BYTES..],
+            TrailingBytes::Rejected,
+            ServiceKeys::Refused,
+        )
+        .expect("列认领帧解得开");
+        assert_eq!(
+            decoded.view,
+            RequestView::ListClaims {
+                prefix: b"gpu-claim/temporary-library/",
+                after_key: b"gpu-claim/temporary-library/aa",
+                maximum_entries: 25,
+            }
+        );
+        let claims = vec![
+            ListedClaim {
+                key: b"gpu-claim/temporary-library/aa/bb".to_vec(),
+                holder_identity: b"holder-one".to_vec(),
+                remaining_lease_milliseconds: 1_500,
+            },
+            ListedClaim {
+                key: b"gpu-claim/temporary-library/cc".to_vec(),
+                holder_identity: b"holder-two".to_vec(),
+                remaining_lease_milliseconds: 30_000,
+            },
+        ];
+        for is_truncated in [false, true] {
+            let response = encode_claim_listing(8, is_truncated, &claims);
+            assert_eq!(
+                decode_response_body(&response[FRAME_LENGTH_FIELD_BYTES..])
+                    .expect("解得开")
+                    .outcome,
+                ResponseOutcome::ClaimListing {
+                    is_truncated,
+                    claims: claims.clone(),
+                }
+            );
+        }
+    }
+
+    /// 列认领帧的条数上限是 0、续扫起点不以前缀起头、前缀落在服务记账那一段：都整帧被拒成内容解不开。
+    #[test]
+    fn claim_listing_frames_with_a_zero_limit_a_foreign_resume_key_or_a_service_prefix_are_refused()
+    {
+        for (description, frame) in [
+            (
+                "条数上限 0",
+                encode_list_claims_frame(7, b"gpu-claim/", b"", 0),
+            ),
+            (
+                "续扫起点不以前缀起头",
+                encode_list_claims_frame(7, b"gpu-claim/a", b"gpu-claim/b", 10),
+            ),
+            (
+                "前缀落在记账那一段",
+                encode_list_claims_frame(7, &[0xF1, b'g'], b"", 10),
+            ),
+        ] {
+            let rejection = decode_request_body(
+                &frame[FRAME_LENGTH_FIELD_BYTES..],
+                TrailingBytes::Rejected,
+                ServiceKeys::Refused,
+            )
+            .map(|decoded| format!("{decoded:?}"))
+            .expect_err(description);
+            assert!(
+                matches!(rejection.1, RequestRejection::MalformedPayload { .. }),
+                "{description}：该被拒成内容解不开，实际 {rejection:?}"
             );
         }
     }

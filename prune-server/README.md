@@ -11,16 +11,24 @@ singlefs 的判定库服务：RocksDB 判定库的唯一持有者，两台的任
 | `src/server.rs` | 准入：待处理帧数与字节数的额度（收着的帧体、待处理的帧、没写出去的回应都记在里面）、帧读取期限、写回应期限、连接数上限 |
 | `src/journal.rs` | 容错客户端的追加日志：格式（含请求号高水位）、整理、旁边的 `<日志>.lock` 排他锁 |
 | `src/fault_log.rs` | 故障行的写法 |
-| `src/gpu_judging_rows.rs` | GPU 判的三族键与行：待判行 `gpu-pending/`（不在才写）、认领 `gpu-claim/`、强制现判行 `gpu-rejudged/`，写结论帧（核认领与守卫那一行、删待判行）的拼法；帧在 `src/protocol.rs` 文件头「不在才写」「写结论」 |
+| `src/gpu_judging_rows.rs` | GPU 判的三族键与行：待判行 `gpu-pending/`（不在才写）、认领 `gpu-claim/`（认领帧认领，写结论帧与放认领帧放）、强制现判行 `gpu-rejudged/`，写结论帧（核认领与守卫那一行、删待判行）的拼法；帧在 `src/protocol.rs` 文件头「不在才写」「写结论」「放认领」「列认领」 |
 | `src/oversized_values.rs` | 离线子命令 `drop-oversized-values`：服务停着时删掉一把键单独一帧也读不回的整值（「库」一节） |
+
+## 放认领
+
+协议里的放认领帧（操作码 12，`src/protocol.rs` 文件头「放认领」）以点名的持有者放掉几把 GPU 认领键上的认领：只放这个持有者名下的（租期到没到都放），别人持着的回「别人持有」、不动，没有认领记录的回「没人持着」；有一把键不是 `gpu-claim/` 起头的整帧拒。放掉的与回应同一组提交、WAL 同步之后才回；不去重、不进追加日志（放幂等）。GPU 批处理服务（`gpu-verification-server/`）起来时以上一个已不在的进程的持有者放它留下的认领、停的时候放自己的、认领到之后重读待判行不在了放刚认领到的，不等满租期。GPU 批处理服务核对待判行那一族的认领键是 `gpu-claim/facts-verifier/<流键>/<块号>`（`gpu-verification-server/src/facts_verifier_family.rs`），同样以 `gpu-claim/` 起头，放认领帧与写结论帧照收，与 `gpu-claim/<流键>/<块号>` 不会相同（流键那一段是十六进制）。Rust 容错客户端是 `release_claims_as`、`release_gpu_block_claims`；Python 客户端（`scripts/prune-server/prune_server_client.py`）没有这一帧。自证格 `claim-release-frees-only-the-named-holder`，弄坏开关 `claim-release-ignores-the-holder`。
+
+## 列认领
+
+认领表在服务的记账段（`F1` ‖ 键，`src/storage.rs` 文件头），客户端读不到、扫不到；协议里的列认领帧（操作码 13，`src/protocol.rs` 文件头「列认领」）按键前缀列出此刻有效（租期没到）的认领与各自的持有者身份、剩余租期：请求是 `u32 前缀长`、前缀、`u32 续扫起点长`、续扫起点、`u32 条数上限`（至少 1）；回应是 `u8 截断标记`、`u32 条数`，每条 `u32 键长`、键、`u8 持有者身份长`、身份、`u64 剩余租期毫秒`，按键升序。前缀要以 `gpu-claim/` 起头（别的回状态 1）；过了租期还留在表里的不列；一帧被条数上限或帧长上限截断时用这一帧最后一条的键作续扫起点接着列。只读提交线程内存里的认领表：不改库、不动认领、不进追加日志；回应先记进待处理额度（记不进回忙，什么都没改），排在同一组后面、WAL 同步之后才回。Rust 容错客户端是 `list_claims_after`（一帧）、`list_claims`（列到不再截断）；Python 客户端是 `Client.list_claims_after`、`Client.list_claims`（`scripts/prune-server/prune_server_client.py`）。自证格 `claim-listing-shows-only-unexpired-claims`、`claim-listing-refuses-a-prefix-outside-the-gpu-claim-family`、`claim-listing-filters-by-the-given-prefix`、`claim-listing-resumes-after-the-last-key`、`claim-listing-leaves-the-library-untouched`，弄坏开关依次是 `claim-listing-includes-expired`、`claim-listing-prefix-unchecked`、`claim-listing-ignores-the-prefix`、`claim-listing-resume-key-ignored`、`claim-listing-writes-the-library`。
 
 ## 装
 
-1. 编（经统一任务服务，不在本机直接起 cargo）。编译目录归服务、派到哪台都可能、跑完就删，所以同一条命令里把二进制拷到多机配置 `NFS_SHARED_ROOTS` 某一段下的目录（两台同一绝对路径读得到）：
+1. 编（经统一任务服务，不在本机直接起 cargo）。编译目录归树、不归任务（任务记下结局、`task-server/task clean`、取消都不删本机组里的那一个，派到第二台、中途失败或被停的那一趟连它一起删；树删了才跟着删整组），在派到的那台自己的编译根下、`task wait` 的末行不点名它（`task-server/task_server_lib.py` 文件头「编译目录」），所以同一条命令里把二进制拷到多机配置 `NFS_SHARED_ROOTS` 某一段下的目录（两台同一绝对路径读得到）：
    `task-server/task submit --cwd <仓根>/prune-server -- bash -c 'cargo build --release --offline --bin prune-server && cp "${CARGO_TARGET_DIR:?}/release/prune-server" <共享根下的目录>/prune-server.new && mv <共享根下的目录>/prune-server.new <共享根下的目录>/prune-server'`，再 `task-server/task wait <号>`；`<共享根下的目录>/prune-server` 是二进制。
 2. `python3 prune-server/control install --dry-run --binary <那个二进制>` 看每一步。
 3. `python3 prune-server/control install --binary <那个二进制>`：拷成 `~/.local/share/singlefs/prune-server/bin/prune-server`（回读 sha256），建状态目录 `~/.local/state/singlefs/prune-server`（700），写单元、`daemon-reload`、`start`，回读服务通了才退 0。不 `enable`，单元也没有 `[Install]` 段：开机不自起（用户定：「开机不自启动。 但是启动后要有恢复能力。」），起来之后才靠 `Restart=always` 恢复。单元带 `Restart=always`：进程不是 `systemctl stop` 停掉的（被 earlyoom 杀、崩了、退了），隔 `RestartSec` 秒由 systemd 拉起，落在容错客户端一轮重连（至多 120 秒）里，客户端重连上接着做。服务的库是状态目录下的 `library`，服务头一次起时建。
-4. 用完 `task-server/task clean <号>` 删编译目录。
+4. 编译目录不用自己删：它归这棵树，树删了服务跟着删它那一整组（`task-server/README.md`「编译目录」）。
 5. 换二进制：`python3 prune-server/control swap-binary --binary <那个二进制>`。不先 `control stop`：stop 要宣布停服务，连着的客户端收到「服务停了」当场退 75、不重试，跑了很久的任务白跑。`swap-binary` 做第 3 步那一套（拷、回读 sha256、写单元、`daemon-reload`），再 `systemctl --user restart`，不宣布停服务：服务收 SIGTERM 立刻结束、不发通知，连着的 Python 与 Rust 容错客户端当连接断了，照各自的重连总时长（缺省 120 秒）等服务回来、重发没确认的帧。回读 `is-active` 是 `active`、服务通、单元 `cgroup.procs` 里每个进程的可执行文件（`/proc/<进程号>/exe`）的 sha256 等于装好的二进制的，才退 0。换之前连着的客户端先打出来。
 
 ## 库
@@ -85,6 +93,8 @@ PRUNE_SERVER_FAULT time=<零时区 ISO 8601，到毫秒> kind=<storage-read-fail
 ## 第二台怎么连
 
 第二台的客户端连 `multi-host.env` 里的 `PRUNE_SERVER_TCP_ADDRESS`（本机在有线直连段上的地址），与本机的服务读同一份配置。TCP 这一版不认证、帧不带校验列，只开在有线直连段的地址上。
+
+测试与自证起的临时服务（`server::start_in_this_process`、`scripts/prune-server/prune_server_client_selftest.py` 的 `TestServer`）的 TCP 绑多机配置 `HOSTS` 里这一台的地址（端口由内核挑），不绑回环：两台的 GPU 批处理服务都连得到。`start_in_this_process` 的绑定地址由调用方给（`<这一台在 HOSTS 里的地址>:0`），读不到 `HOSTS` 的由调用方报错，这里不补缺省；`TestServer` 照 `scripts/hosts/multi_host_addresses.py` 的 `resolve` 取，取不到整份自证与 `--with-temporary-service` 退 78。
 
 ## 出了问题怎么处置（主 agent）
 

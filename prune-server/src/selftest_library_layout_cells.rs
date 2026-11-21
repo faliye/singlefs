@@ -8,8 +8,7 @@
 //!
 //! 样本库照 `crates/singlefs-verification/src/verdict_store.rs` 的开法造与核：建库用 `library_options(LibraryCreation::CreateEmpty)`
 //! 那几项（建、目录已在就拒、LZ4）加 `synced_write_options` 的同步写；只读核用 `open_existing_for_reading_only` 那几项
-//! （不建、LZ4、RocksDB 的运行日志另放，`open_for_read_only` 不拿锁、只开默认列族）。行的键以表标签起头（`VerdictStoreTable::key_tag`），
-//! 库布局行是键 `00`、值布局号 6（大端）。
+//! （不建、LZ4、RocksDB 的运行日志另放，`open_for_read_only` 不拿锁、只开默认列族）。行的键以表标签起头（`VerdictStoreTable::key_tag`）。
 //! 服务的弄坏开关只交这一格要证红的那几项（`BreakSwitches::only_these`），客户端不带开关。
 //!
 //! 另三格（records/2026-11-03-task-server与prune-server深入对攻审核.md 的 PS-02、PS-06 剩下那一半与多机配置位置拒算那一件）：
@@ -54,8 +53,8 @@ use crate::storage::{
     APPLIED_REQUEST_KEY_TAG, CLAIM_KEY_TAG, DESCRIPTOR_HEADROOM,
 };
 
-/// 崩溃判定库这一版的布局号（`verdict_store.rs` 的 `LIBRARY_LAYOUT_NUMBER_OF_THIS_VERSION`）。
-const SAMPLE_LIBRARY_LAYOUT_NUMBER: u32 = 6;
+/// 「选项对不上」那几份样本库里那一行的键的第一个字节：结论块那张表的标签（`verdict_store.rs` 的 `VerdictStoreTable::key_tag`）。
+const MISMATCH_SAMPLE_KEY_TAG: u8 = 0x0A;
 /// 「选项对不上」那一份样本库用的比较器名字（与 RocksDB 缺省的按字节比较器不同名、次序相反）。
 const REVERSED_COMPARATOR_NAME: &str = "prune-server-selftest.reversed-bytewise";
 /// 服务收 SIGTERM 之后等它退出的上限。
@@ -79,11 +78,11 @@ fn tagged_key(tag: u8, filler: u8, length: usize) -> Vec<u8> {
     key
 }
 
-/// 库布局行：键 `00`，值布局号（4 字节大端）。
-fn layout_row() -> (Vec<u8>, Vec<u8>) {
+/// 「选项对不上」那几份样本库里的一行：表标签起头的键、一个短值。
+fn mismatch_sample_row() -> (Vec<u8>, Vec<u8>) {
     (
-        vec![0x00],
-        SAMPLE_LIBRARY_LAYOUT_NUMBER.to_be_bytes().to_vec(),
+        tagged_key(MISMATCH_SAMPLE_KEY_TAG, 0xE5, 105),
+        b"conclusion-block".to_vec(),
     )
 }
 
@@ -470,7 +469,7 @@ pub(crate) fn cell_library_refuses_mismatched(context: &CellContext) -> Result<S
         BreakSwitch::LibraryWithoutCurrentFileOpened,
     ]);
     let directory = CellDirectory::create()?;
-    let rows = vec![layout_row()];
+    let rows = vec![mismatch_sample_row()];
 
     let extra_column_family = "extra-family";
     let with_extra_column_family = directory.path.join("with-extra-column-family");
@@ -553,10 +552,6 @@ fn build_many_files_library(directory: &Path, table_files: u32) -> Result<(u64, 
     options.set_level_zero_stop_writes_trigger(i32::MAX);
     let database = DB::open(&options, directory)
         .map_err(|error| format!("造不了样本库 {}：{error}", directory.display()))?;
-    let (layout_key, layout_value) = layout_row();
-    database
-        .put(layout_key, layout_value)
-        .map_err(|error| format!("写不进样本库 {}：{error}", directory.display()))?;
     for row in 0..table_files {
         database
             .put(many_files_key(row), row.to_be_bytes())

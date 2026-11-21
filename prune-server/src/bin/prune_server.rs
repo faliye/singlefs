@@ -241,6 +241,12 @@
 //!   PRUNE_SERVER_BREAK=conclusion-write-pending-rows-kept         写结论不删帧里的删键（待判行留着）               conclusion-write-deletes-the-pending-row
 //!   PRUNE_SERVER_BREAK=conclusion-guard-deleted-row-unchecked     写结论不核删键、读完之后被改过的也照删           conclusion-write-refused-when-the-pending-row-changed
 //!   PRUNE_SERVER_BREAK=rejudged-row-dropped                       容错客户端写 GPU 结论不带强制现判那一行          forced-rejudge-writes-the-rejudged-row
+//!   PRUNE_SERVER_BREAK=claim-release-ignores-the-holder           放认领不看持有者、别人持着的也放                 claim-release-frees-only-the-named-holder
+//!   PRUNE_SERVER_BREAK=claim-listing-includes-expired             列认领连租期过了的也列                           claim-listing-shows-only-unexpired-claims
+//!   PRUNE_SERVER_BREAK=claim-listing-prefix-unchecked             列认领不核前缀是不是 gpu-claim/ 起头              claim-listing-refuses-a-prefix-outside-the-gpu-claim-family
+//!   PRUNE_SERVER_BREAK=claim-listing-ignores-the-prefix           列认领不按请求的前缀筛、列全部认领               claim-listing-filters-by-the-given-prefix
+//!   PRUNE_SERVER_BREAK=claim-listing-resume-key-ignored           列认领不看续扫起点、总从头列                     claim-listing-resumes-after-the-last-key
+//!   PRUNE_SERVER_BREAK=claim-listing-writes-the-library           列认领时把列到的认领再写一遍进库                 claim-listing-leaves-the-library-untouched
 //!
 //! 没有弄坏开关的格：single-library-holder（拒的是 RocksDB 自己的 LOCK）、tcp-route-from-configuration（读配置那一处由
 //! missing-tcp-address-refused 的开关管）、bench-runs-every-mode（跑通性的冒烟格；fault-injection 的逐键核对与它的去重、重放

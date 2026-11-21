@@ -1,6 +1,7 @@
-//! 自证里 GPU 判的三族那九格（`gpu_judging_rows` 文件头，帧在 `protocol.rs` 文件头「不在才写」「写结论」）：
+//! 自证里 GPU 判的三族那十格（`gpu_judging_rows` 文件头，帧在 `protocol.rs` 文件头「不在才写」「写结论」「放认领」）：
 //! 写结论核认领（别人持着、租期没到拒；租期过了照写；自己持着、没人持着照写）、核守卫那一行（两份都绿而不同不覆盖、不悄悄丢）、
-//! 核放在去重之后、待判行不在才写、写结论删待判行、删的待判行读完之后被改过整帧拒、强制现判另写那一行。
+//! 核放在去重之后、待判行不在才写、写结论删待判行、删的待判行读完之后被改过整帧拒、强制现判另写那一行、放认领只放点名的持有者名下的，
+//! 以及列认领（`protocol.rs` 文件头「列认领」）五格：只列租期没到的、只收族前缀、按请求的前缀筛、被截断时续扫起点接得上、不改库。
 //! 每格起自己的服务，服务与客户端只带这一格要证红的那一项弄坏开关（`BreakSwitches::only_these`）：别的格的开关不碰这一格。
 //! 每格只核自己点名的那一样，不顺带核别的格核的（例：只有删待判行那一格读待判行删没删），一项开关只红它点名的那一格。
 
@@ -15,14 +16,19 @@ use crate::client::SimpleClient;
 use crate::gpu_judging_rows::{
     gpu_claim_key, gpu_pending_key, gpu_pending_prefix_of_stream, gpu_rejudged_key,
     GpuBlockAddress, GpuClaimHolder, GpuConclusion, GpuPendingRow, GpuRejudgedRow,
+    GPU_CLAIM_FAMILY_PREFIX,
 };
 use crate::protocol::{
-    encode_claim_frame, encode_guarded_conclusion_write_frame, ClaimOutcome, GuardRefusal,
-    GuardRowState, GuardedConclusionWrite, ResponseOutcome, Table,
+    encode_claim_frame, encode_guarded_conclusion_write_frame, statistics_value, ClaimOutcome,
+    ClaimReleaseOutcome, GuardRefusal, GuardRowState, GuardedConclusionWrite, RejectionStatus,
+    ResponseOutcome, Table,
 };
-use crate::reliable_client::{GuardedConclusionWriteOutcome, ReliableClient, WriteAcknowledgement};
+use crate::reliable_client::{
+    ClientFailure, GuardedConclusionWriteOutcome, ReliableClient, WriteAcknowledgement,
+};
 use crate::selftest::{start_test_server_with_switches, CellContext, CellDirectory, TestServer};
 use crate::selftest_fault_cells::{client_settings, failure_text};
+use crate::server::WRITE_AHEAD_LOG_SYNC_COUNT_COUNTER;
 use crate::sha256::sha256_digest;
 
 /// 这几格的流键：以表标签那样的字节起头，与别的格的键不撞。
@@ -755,4 +761,326 @@ pub(crate) fn cell_forced_rejudge_writes_the_rejudged_row(
         }
     }
     Ok("强制现判两次（写结论块的、库里相同不重写的）：两行 gpu-rejudged/ 都在，持有者是判它的那一个、结论摘要是结论块的 SHA-256".to_string())
+}
+
+/// 放认领只放帧里点名的持有者名下的（`protocol.rs` 文件头「放认领」）：以持有者甲放甲持着的、乙持着的、没人持着的三块，
+/// 回「放掉了」「别人持有」「没人持着」；之后丙认领甲那一块认领到，乙那一块回乙持有。判别力：弄坏开关 claim-release-ignores-the-holder。
+pub(crate) fn cell_claim_release_frees_only_the_named_holder(
+    context: &CellContext,
+) -> Result<String, String> {
+    const RELEASED_BLOCK: u64 = 12;
+    const BLOCK_OF_ANOTHER_HOLDER: u64 = 13;
+    const UNCLAIMED_BLOCK: u64 = 14;
+    let switches = context
+        .break_switches
+        .only_these(&[BreakSwitch::ClaimReleaseIgnoresTheHolder]);
+    let directory = CellDirectory::create()?;
+    let (_server, mut client) = server_and_client(context, &switches, &directory.path)?;
+    let releasing_holder = holder_on_card(0);
+    let another_holder = holder_on_card(1);
+    let claimed_by_the_releasing_holder = claim_blocks(
+        &mut client,
+        &releasing_holder,
+        &[RELEASED_BLOCK],
+        LONG_LEASE_MILLISECONDS,
+    )?;
+    let claimed_by_another_holder = claim_blocks(
+        &mut client,
+        &another_holder,
+        &[BLOCK_OF_ANOTHER_HOLDER],
+        LONG_LEASE_MILLISECONDS,
+    )?;
+    if claimed_by_the_releasing_holder != vec![ClaimOutcome::Claimed]
+        || claimed_by_another_holder != vec![ClaimOutcome::Claimed]
+    {
+        return Err(format!(
+            "两个持有者各认领一块都该认领到，回的是 {claimed_by_the_releasing_holder:?} 与 {claimed_by_another_holder:?}"
+        ));
+    }
+    let blocks: Vec<(Vec<u8>, u64)> = [RELEASED_BLOCK, BLOCK_OF_ANOTHER_HOLDER, UNCLAIMED_BLOCK]
+        .iter()
+        .map(|block_number| (SELFTEST_STREAM_KEY.to_vec(), *block_number))
+        .collect();
+    let released = client
+        .release_gpu_block_claims(&releasing_holder.identity(), &blocks)
+        .map_err(|failure| failure_text(&failure))?;
+    let expected = vec![
+        ClaimReleaseOutcome::Released,
+        ClaimReleaseOutcome::HeldByOther,
+        ClaimReleaseOutcome::NotClaimed,
+    ];
+    if released != expected {
+        return Err(format!(
+            "以持有者甲放甲持着的、乙持着的、没人持着的三块，该回 {expected:?}，回的是 {released:?}"
+        ));
+    }
+    let after = claim_blocks(
+        &mut client,
+        &holder_on_card(2),
+        &[RELEASED_BLOCK, BLOCK_OF_ANOTHER_HOLDER],
+        LONG_LEASE_MILLISECONDS,
+    )?;
+    let another_holder_identity = another_holder.identity();
+    let is_only_the_named_holder_released = matches!(
+        after.as_slice(),
+        [
+            ClaimOutcome::Claimed,
+            ClaimOutcome::HeldByOther { holder_identity, .. },
+        ] if *holder_identity == another_holder_identity
+    );
+    if !is_only_the_named_holder_released {
+        return Err(format!(
+            "放过之后丙认领：甲那一块该认领到、乙那一块该回乙持有，回的是 {after:?}"
+        ));
+    }
+    Ok("以持有者甲放三块：甲持着的放掉、乙持着的不动、没人持着的报没人持着；丙随即认领到甲那一块，乙那一块照旧乙持有".to_string())
+}
+
+/// 块号在认领键末尾占的字节数（`gpu_judging_rows` 文件头：16 位小写十六进制）。
+const BLOCK_NUMBER_FIELD_BYTES: usize = 16;
+
+/// 一条流的认领键前缀 `gpu-claim/<流键的十六进制>/`：这条流所有块的认领键都以它起头。
+fn claim_key_prefix_of_stream(stream_key: &[u8]) -> Vec<u8> {
+    let key = gpu_claim_key(stream_key, 0);
+    key[..key.len() - BLOCK_NUMBER_FIELD_BYTES].to_vec()
+}
+
+/// 列认领只列租期没到的（`protocol.rs` 文件头「列认领」）：持有者甲认领一块（长租期）、持有者乙认领一块（短租期），等过短租期之后按族前缀列：
+/// 只列甲那一块，键、持有者身份对，剩余租期大于 0 又不超过长租期。判别力：弄坏开关 claim-listing-includes-expired。
+pub(crate) fn cell_claim_listing_shows_only_unexpired_claims(
+    context: &CellContext,
+) -> Result<String, String> {
+    const LIVE_BLOCK: u64 = 20;
+    const EXPIRED_BLOCK: u64 = 21;
+    let switches = context
+        .break_switches
+        .only_these(&[BreakSwitch::ClaimListingIncludesExpired]);
+    let directory = CellDirectory::create()?;
+    let (_server, mut client) = server_and_client(context, &switches, &directory.path)?;
+    let live_holder = holder_on_card(0);
+    let expiring_holder = holder_on_card(1);
+    let claimed_live = claim_blocks(
+        &mut client,
+        &live_holder,
+        &[LIVE_BLOCK],
+        LONG_LEASE_MILLISECONDS,
+    )?;
+    let claimed_expiring = claim_blocks(
+        &mut client,
+        &expiring_holder,
+        &[EXPIRED_BLOCK],
+        SHORT_LEASE_MILLISECONDS,
+    )?;
+    if claimed_live != vec![ClaimOutcome::Claimed]
+        || claimed_expiring != vec![ClaimOutcome::Claimed]
+    {
+        return Err(format!(
+            "两个持有者各认领一块都该认领到，回的是 {claimed_live:?} 与 {claimed_expiring:?}"
+        ));
+    }
+    thread::sleep(WAIT_PAST_SHORT_LEASE);
+    let listed = client
+        .list_claims(GPU_CLAIM_FAMILY_PREFIX)
+        .map_err(|failure| failure_text(&failure))?;
+    let [only_claim] = listed.as_slice() else {
+        return Err(format!(
+            "短租期过了之后列认领该只列长租期那一块，列出了 {} 条：{listed:?}",
+            listed.len()
+        ));
+    };
+    if only_claim.key != gpu_claim_key(SELFTEST_STREAM_KEY, LIVE_BLOCK)
+        || only_claim.holder_identity != live_holder.identity()
+        || only_claim.remaining_lease_milliseconds == 0
+        || only_claim.remaining_lease_milliseconds > u64::from(LONG_LEASE_MILLISECONDS)
+    {
+        return Err(format!(
+            "列出的那一条该是长租期的那一块（键、持有者身份对，剩余租期在 1 到 {LONG_LEASE_MILLISECONDS} 毫秒之间），列出的是 {only_claim:?}"
+        ));
+    }
+    Ok("长租期一块、短租期一块（等过短租期）：列认领只列长租期那一块，键、持有者身份、剩余租期都对，过了租期的不列".to_string())
+}
+
+/// 列认领只收 `gpu-claim/` 起头的前缀：别的族的前缀、空前缀、少一个斜杠的族名都回状态 1（`ClientFailure::Rejected`），族前缀本身照列。
+/// 判别力：弄坏开关 claim-listing-prefix-unchecked。
+pub(crate) fn cell_claim_listing_refuses_a_prefix_outside_the_gpu_claim_family(
+    context: &CellContext,
+) -> Result<String, String> {
+    let switches = context
+        .break_switches
+        .only_these(&[BreakSwitch::ClaimListingPrefixUnchecked]);
+    let directory = CellDirectory::create()?;
+    let (_server, mut client) = server_and_client(context, &switches, &directory.path)?;
+    for (description, prefix) in [
+        ("待判行的族前缀", b"gpu-pending/".as_slice()),
+        ("空前缀", b"".as_slice()),
+        ("少一个斜杠的族名", b"gpu-claim".as_slice()),
+    ] {
+        match client.list_claims_after(prefix, &[], 10) {
+            Err(ClientFailure::Rejected {
+                status: RejectionStatus::MalformedPayload,
+                ..
+            }) => {}
+            other => {
+                return Err(format!(
+                "{description}不是 gpu-claim/ 起头：该回状态 1（内容解不开）被拒，实际 {other:?}"
+            ))
+            }
+        }
+    }
+    let accepted = client
+        .list_claims_after(GPU_CLAIM_FAMILY_PREFIX, &[], 10)
+        .map_err(|failure| failure_text(&failure))?;
+    if accepted.is_truncated || !accepted.claims.is_empty() {
+        return Err(format!(
+            "没有任何认领时按族前缀列该回空、不截断，回的是 {accepted:?}"
+        ));
+    }
+    Ok("待判行的族前缀、空前缀、少一个斜杠的族名都被拒成内容解不开；gpu-claim/ 本身照列（没有认领回空）".to_string())
+}
+
+/// 列认领按请求的前缀筛：两条流各认领几块，按一条流的前缀列只回这条流的块，按另一条流的前缀列只回那一条流的块。
+/// 判别力：弄坏开关 claim-listing-ignores-the-prefix。
+pub(crate) fn cell_claim_listing_filters_by_the_given_prefix(
+    context: &CellContext,
+) -> Result<String, String> {
+    const OTHER_STREAM_KEY: &[u8] = b"\x1cgpu-selftest-other-stream";
+    let switches = context
+        .break_switches
+        .only_these(&[BreakSwitch::ClaimListingIgnoresThePrefix]);
+    let directory = CellDirectory::create()?;
+    let (_server, mut client) = server_and_client(context, &switches, &directory.path)?;
+    let holder = holder_on_card(0);
+    let blocks = vec![
+        (SELFTEST_STREAM_KEY.to_vec(), 30),
+        (SELFTEST_STREAM_KEY.to_vec(), 31),
+        (OTHER_STREAM_KEY.to_vec(), 30),
+    ];
+    let claimed = client
+        .claim_gpu_blocks(&holder, &blocks, LONG_LEASE_MILLISECONDS)
+        .map_err(|failure| failure_text(&failure))?;
+    if claimed != vec![ClaimOutcome::Claimed; blocks.len()] {
+        return Err(format!("三块都该认领到，回的是 {claimed:?}"));
+    }
+    for (stream_key, expected_blocks) in [
+        (SELFTEST_STREAM_KEY, vec![30_u64, 31]),
+        (OTHER_STREAM_KEY, vec![30]),
+    ] {
+        let listed = client
+            .list_claims(&claim_key_prefix_of_stream(stream_key))
+            .map_err(|failure| failure_text(&failure))?;
+        let listed_keys: Vec<Vec<u8>> = listed.into_iter().map(|claim| claim.key).collect();
+        let expected_keys: Vec<Vec<u8>> = expected_blocks
+            .iter()
+            .map(|block_number| gpu_claim_key(stream_key, *block_number))
+            .collect();
+        if listed_keys != expected_keys {
+            return Err(format!(
+                "按流 {} 的前缀列，该只回这条流的 {} 块，回的键是 {listed_keys:?}",
+                String::from_utf8_lossy(stream_key),
+                expected_keys.len()
+            ));
+        }
+    }
+    Ok("两条流各认领几块：按一条流的认领键前缀列只回这条流的块、按键升序，按另一条流的前缀列只回那一条流的块".to_string())
+}
+
+/// 列认领被条数上限截断时续扫起点接得上：五块认领，一帧至多两条，三帧接着列：头两帧各两条且标截断，第三帧一条不截断，
+/// 合起来是五块按键升序、不重不漏。判别力：弄坏开关 claim-listing-resume-key-ignored。
+pub(crate) fn cell_claim_listing_resumes_after_the_last_key(
+    context: &CellContext,
+) -> Result<String, String> {
+    const LOWEST_BLOCK_NUMBER: u64 = 40;
+    const BLOCK_COUNT: u64 = 5;
+    const ENTRIES_PER_FRAME: u32 = 2;
+    let switches = context
+        .break_switches
+        .only_these(&[BreakSwitch::ClaimListingResumeKeyIgnored]);
+    let directory = CellDirectory::create()?;
+    let (_server, mut client) = server_and_client(context, &switches, &directory.path)?;
+    let holder = holder_on_card(0);
+    let block_numbers: Vec<u64> =
+        (LOWEST_BLOCK_NUMBER..LOWEST_BLOCK_NUMBER + BLOCK_COUNT).collect();
+    let claimed = claim_blocks(
+        &mut client,
+        &holder,
+        &block_numbers,
+        LONG_LEASE_MILLISECONDS,
+    )?;
+    if claimed != vec![ClaimOutcome::Claimed; block_numbers.len()] {
+        return Err(format!("五块都该认领到，回的是 {claimed:?}"));
+    }
+    let expected_keys: Vec<Vec<u8>> = block_numbers
+        .iter()
+        .map(|block_number| gpu_claim_key(SELFTEST_STREAM_KEY, *block_number))
+        .collect();
+    let mut listed_keys: Vec<Vec<u8>> = Vec::new();
+    let mut after_key: Vec<u8> = Vec::new();
+    for (expected_count, expected_truncated) in [(2_usize, true), (2, true), (1, false)] {
+        let frame = client
+            .list_claims_after(GPU_CLAIM_FAMILY_PREFIX, &after_key, ENTRIES_PER_FRAME)
+            .map_err(|failure| failure_text(&failure))?;
+        if frame.claims.len() != expected_count || frame.is_truncated != expected_truncated {
+            return Err(format!(
+                "续扫起点 {after_key:02x?} 之后那一帧该回 {expected_count} 条、截断 {expected_truncated}，回的是 {} 条、截断 {}",
+                frame.claims.len(),
+                frame.is_truncated
+            ));
+        }
+        if let Some(highest_key_claim) = frame.claims.last() {
+            after_key = highest_key_claim.key.clone();
+        }
+        listed_keys.extend(frame.claims.into_iter().map(|claim| claim.key));
+    }
+    if listed_keys != expected_keys {
+        return Err(format!(
+            "三帧接着列合起来该是五块按键升序、不重不漏 {expected_keys:?}，列出的是 {listed_keys:?}"
+        ));
+    }
+    Ok("五块认领、一帧至多两条：三帧接着列（2 条截断、2 条截断、1 条不截断），合起来五块按键升序、不重不漏".to_string())
+}
+
+/// 列认领不改库：列之前与之后，WAL 同步次数不变（改了库的组提交才同步）。判别力：弄坏开关 claim-listing-writes-the-library。
+pub(crate) fn cell_claim_listing_leaves_the_library_untouched(
+    context: &CellContext,
+) -> Result<String, String> {
+    const CLAIMED_BLOCK: u64 = 50;
+    let switches = context
+        .break_switches
+        .only_these(&[BreakSwitch::ClaimListingWritesTheLibrary]);
+    let directory = CellDirectory::create()?;
+    let (_server, mut client) = server_and_client(context, &switches, &directory.path)?;
+    let claimed = claim_blocks(
+        &mut client,
+        &holder_on_card(0),
+        &[CLAIMED_BLOCK],
+        LONG_LEASE_MILLISECONDS,
+    )?;
+    if claimed != vec![ClaimOutcome::Claimed] {
+        return Err(format!("这一块该认领到，回的是 {claimed:?}"));
+    }
+    let synchronizations_before = write_ahead_log_synchronizations(&mut client)?;
+    let listed = client
+        .list_claims(GPU_CLAIM_FAMILY_PREFIX)
+        .map_err(|failure| failure_text(&failure))?;
+    if listed.len() != 1 {
+        return Err(format!("该列出刚认领的那一块，列出了 {listed:?}"));
+    }
+    let synchronizations_after = write_ahead_log_synchronizations(&mut client)?;
+    if synchronizations_after != synchronizations_before {
+        return Err(format!(
+            "列认领不改库、不该同步 WAL：列之前同步了 {synchronizations_before} 次，列之后 {synchronizations_after} 次"
+        ));
+    }
+    Ok(format!(
+        "认领一块之后列认领：WAL 同步次数列之前与列之后都是 {synchronizations_before}，列认领没有写库"
+    ))
+}
+
+/// 服务统计里 WAL 同步的次数。
+fn write_ahead_log_synchronizations(client: &mut ReliableClient) -> Result<u64, String> {
+    let counters = client
+        .statistics()
+        .map_err(|failure| failure_text(&failure))?;
+    statistics_value(&counters, WRITE_AHEAD_LOG_SYNC_COUNT_COUNTER)
+        .ok_or_else(|| format!("统计里没有 {WRITE_AHEAD_LOG_SYNC_COUNT_COUNTER}：{counters:?}"))
 }
